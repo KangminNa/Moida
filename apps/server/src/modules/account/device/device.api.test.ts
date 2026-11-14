@@ -634,6 +634,7 @@ describe('러너 추가', () => {
     assert.deepEqual(names, [
       'read_transcript',
       'save_note',
+      'page_base',
       'next_jobs',
       'report_progress',
       'submit_result',

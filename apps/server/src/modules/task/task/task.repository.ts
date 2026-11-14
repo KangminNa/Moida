@@ -1,4 +1,4 @@
-import { ChangeSignal, Rule, TableRepository } from '../../platform';
+import { ChangeSignal, Conflict, Database, Rule, TableRepository } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { taskEvents, taskRuns, tasks } from '../task.schema';
 import type { OutputRow, TaskRow } from '../task.tables';
@@ -6,6 +6,9 @@ import { Task } from './task';
 
 // task.tasks + task_events ↔ Task. 불러오기·잠그기·저장(바뀐 칸만)은 기반이 하고, 여기에는 대기열 SQL과 실행 기록이 있다.
 export class TaskRepository extends TableRepository<TaskRow, Task> {
+  /** 한 페이지에 대기 · 실행 · 기다림 중인 일은 하나 (DB의 부분 유일 인덱스) */
+  private static readonly ONE_OPEN_PAGE = 'tasks_one_open_page';
+
   /** 실행 기록이 쌓였다는 신호 (콘솔의 실행 기록 화면이 다시 읽는다) */
   static readonly LOGGED = 'task.event.added';
 
@@ -87,6 +90,15 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       status: [Task.RUNNING, Task.WAITING],
     });
     return rows.filter((t) => t.holdsCode);
+  }
+
+  /** 이 페이지를 고치는 일(payload.page.pageId)이 아직 끝나지 않았는가 (스케줄이 건너뛸 때) */
+  async hasOpenPage(spaceId: string, pageId: string): Promise<boolean> {
+    const [row] = await this.sql`
+      SELECT 1 FROM task.tasks
+      WHERE space_id = ${spaceId} AND payload->'page'->>'pageId' = ${pageId}
+        AND status = ANY(${[Task.QUEUED, Task.RUNNING, Task.WAITING]}::text[]) LIMIT 1`;
+    return row !== undefined;
   }
 
   /** 에이전트 없는 일의 종류 하나를 payload의 도구로 거른다 */
@@ -273,7 +285,12 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     const [row] = await this.sql<TaskRow[]>`
       INSERT INTO task.tasks ${this.sql(task.unsaved as never)}
       ON CONFLICT (space_id, request_id) DO NOTHING
-      RETURNING *`;
+      RETURNING *`.catch((error: unknown) => {
+      // 한 페이지를 고치는 일은 한 번에 하나 (자라는 페이지, 2차 5단계)
+      if (Database.isUniqueViolation(error, TaskRepository.ONE_OPEN_PAGE))
+        throw new Conflict('이 페이지를 고치는 일이 이미 돌고 있어요. 끝난 뒤에 다시 맡겨 주세요');
+      throw error;
+    });
     if (!row) return false;
     task.saved(row);
     await this.publishEvents(task);

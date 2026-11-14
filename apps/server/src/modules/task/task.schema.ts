@@ -217,6 +217,7 @@ export const schedules = taskSchema.table('schedules', {
   last_run_at: timestamp('last_run_at', { withTimezone: true }),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  page_id: uuid('page_id'),
 });
 
 /** task.skill_revisions */

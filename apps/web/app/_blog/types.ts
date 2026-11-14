@@ -4,6 +4,7 @@ import type {
   BasketView,
 } from '../../../server/src/modules/blog/basket/basket.view';
 import type {
+  PageChangesView,
   PageDetailView,
   PageListView,
   PublicPageListView,
@@ -52,3 +53,5 @@ export type PublicPageList = ReturnType<PublicPageListView['toJSON']>;
 /** 페이지 하나와 판 목록 (새 판부터) */
 export type PageDetail = ReturnType<PageDetailView['toJSON']>;
 export type PageRevision = PageDetail['revisionList'][number];
+/** 판 하나의 바뀐 점 (앞 판과 비교한 data.json, 2차 5단계 자라는 페이지) */
+export type PageChanges = ReturnType<PageChangesView['toJSON']>;

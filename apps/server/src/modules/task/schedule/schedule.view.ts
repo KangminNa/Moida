@@ -24,6 +24,8 @@ export class ScheduleView {
       timeZone: r.time_zone,
       instruction: r.instruction,
       goalId: r.goal_id,
+      /** 새 판을 만들 페이지 (자라는 페이지). 없으면 null */
+      pageId: r.page_id,
       dailyMax: r.daily_max,
       /** 이 날(시간대 기준)에 만든 작업 수. 화면이 오늘인지 견준다 */
       runDay: r.run_day,

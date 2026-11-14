@@ -21,6 +21,7 @@ function settingsOf(f: RequestFields, body: Record<string, unknown>): Partial<Sc
     time_zone: f.text('timeZone', 100),
     instruction: f.optionalText('instruction', Schedule.INSTRUCTION_MAX) ?? '',
     goal_id: body.goalId === undefined || body.goalId === null ? null : f.uuid('goalId'),
+    page_id: body.pageId === undefined || body.pageId === null ? null : f.uuid('pageId'),
     daily_max: f.integer('dailyMax', 1, Schedule.DAILY_MAX_LIMIT),
   };
 }

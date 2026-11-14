@@ -1,10 +1,11 @@
 import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
 import {
-  type Actor,
+  Actor,
   BaseQuery,
   BlobStore,
   Database,
+  Leases,
   LibraryInput,
   type LibraryRow,
   NotFound,
@@ -12,8 +13,10 @@ import {
 } from '../../platform';
 import type { PageRevisionRow, PageRow } from '../blog.tables';
 import { Page } from './page';
-import type { PageSiteInput, ReadPageInput } from './page.input';
+import type { PageBaseInput, PageRevisionInput, PageSiteInput, ReadPageInput } from './page.input';
 import {
+  PageBaseView,
+  PageChangesView,
   PageDetailView,
   PageListView,
   PageRevisionView,
@@ -21,6 +24,7 @@ import {
   PublicPageListView,
   PublicPageView,
 } from './page.view';
+import { PageDataDiff } from './page-data-diff.policy';
 import { PageFiles } from './page-files';
 import { PageTicket } from './page-ticket';
 
@@ -66,11 +70,18 @@ export class PageQuery extends BaseQuery {
   /** 바깥 주소의 앞부분 (웹이 /pages/…를 api/pages/site/…로 넘긴다) */
   static readonly SITE = '/pages';
   private static readonly MISSING = '없는 페이지예요';
+  /** 자라는 페이지의 데이터 파일과 읽는 크기 */
+  private static readonly DATA = 'data.json';
+  private static readonly DATA_MAX = 1024 * 1024;
+  /** page_base가 내용까지 주는 글 파일과 그 크기의 합 */
+  private static readonly TEXT = /\.(html?|css|m?js|json|md|txt|csv|svg|xml)$/i;
+  private static readonly BASE_TEXT_MAX = 300 * 1024;
 
   constructor(
     db: Database,
     private readonly blobs: BlobStore,
     private readonly box: SecretBox,
+    private readonly leases: Leases,
   ) {
     super(db);
   }
@@ -96,9 +107,16 @@ export class PageQuery extends BaseQuery {
     if (!page) throw new NotFound(PageQuery.MISSING);
     const revisions = await this.sql<PageRevisionRow[]>`
       SELECT * FROM blog.page_revisions WHERE page_id = ${page.id} ORDER BY seq DESC`;
+    // 확인 대기 판은 그 판에 묶인 보기 표로 미리 본다 (공개 페이지의 바깥 주소는 보이는 판만 낸다)
+    const pending = page.pending_seq;
+    const preview =
+      pending === null
+        ? null
+        : `${PageQuery.SITE}/${PageTicket.MARK}${new PageTicket(page.id, pending).seal(this.box, new Date())}/${encodeURIComponent(page.name)}/${PageFiles.ENTRY}`;
     return new PageDetailView(
       new PageView(page),
       revisions.map((r) => new PageRevisionView(r, PageFiles.of(r.files).toJSON())),
+      preview,
     );
   }
 
@@ -107,8 +125,8 @@ export class PageQuery extends BaseQuery {
    * (격리된 페이지 안에서는 쿠키가 실리지 않아 딸린 파일을 표로 받는다)
    */
   async site(actor: Actor, req: PageSiteInput, now: Date): Promise<PageSiteAnswer> {
-    const ticketPage =
-      req.ticket === null ? null : PageTicket.open(this.box, req.ticket, now).pageId;
+    const ticket = req.ticket === null ? null : PageTicket.open(this.box, req.ticket, now);
+    const ticketPage = ticket?.pageId ?? null;
     const [page] = await this.sql<PageRow[]>`
       SELECT p.* FROM blog.pages p WHERE ${this.inSpace(actor)} AND p.name = ${req.name}
         ${ticketPage === null ? this.sql`` : this.sql`AND p.id = ${ticketPage}`}`;
@@ -127,8 +145,9 @@ export class PageQuery extends BaseQuery {
         req.ticket === null ? PageQuery.SITE : `${PageQuery.SITE}/${PageTicket.MARK}${req.ticket}`;
       return PageSiteAnswer.to(`${base}/${name}/${PageFiles.ENTRY}`);
     }
+    const seq = ticket?.seq ?? page.current_seq;
     const [revision] = await this.sql<PageRevisionRow[]>`
-      SELECT * FROM blog.page_revisions WHERE page_id = ${page.id} AND seq = ${page.current_seq}`;
+      SELECT * FROM blog.page_revisions WHERE page_id = ${page.id} AND seq = ${seq}`;
     const file = revision ? PageFiles.of(revision.files).find(req.file) : null;
     const blob = file ? await this.blobs.find(file.blobHash) : null;
     if (!file || !blob) throw new NotFound(PageQuery.MISSING);
@@ -138,6 +157,63 @@ export class PageQuery extends BaseQuery {
       blob.size,
       isPublic && ticketPage === null,
     );
+  }
+
+  /**
+   * 판 하나의 바뀐 점 (자라는 페이지): 앞 판과 data.json을 비교한다 (PageDataDiff). 주인만.
+   * 앞 판에 data.json이 없으면 모두 더해진 것, 이 판에 없으면 data: false
+   */
+  async changes(actor: Actor, req: PageRevisionInput): Promise<PageChangesView> {
+    actor.assertOwner();
+    const [page] = await this.sql<PageRow[]>`
+      SELECT p.* FROM blog.pages p WHERE ${this.inSpace(actor)} AND p.id = ${req.id}`;
+    if (!page) throw new NotFound(PageQuery.MISSING);
+    const rows = await this.sql<PageRevisionRow[]>`
+      SELECT * FROM blog.page_revisions WHERE page_id = ${page.id} AND seq IN (${req.seq}, ${req.seq - 1})`;
+    const now = rows.find((r) => r.seq === req.seq);
+    if (!now) throw new NotFound(`없는 버전이에요: ${req.seq}`);
+    const after = await this.dataOf(now);
+    if (after === undefined) return new PageChangesView(req.seq, false, [], false);
+    const before = rows.find((r) => r.seq === req.seq - 1);
+    const diff = PageDataDiff.between(before ? await this.dataOf(before) : undefined, after);
+    return new PageChangesView(req.seq, true, diff.changes, diff.truncated);
+  }
+
+  /**
+   * 러너가 쥔 만들기 일이 고칠 페이지 (MCP page_base, 2차 5단계): 가장 새 판의 파일과 방향. 글 파일은 내용까지
+   * (모두 BASE_TEXT_MAX바이트까지), 그 밖은 이름 · 크기만. 페이지 주문이 없거나 새 페이지면 page_id null
+   */
+  async base(actor: Actor, req: PageBaseInput): Promise<PageBaseView> {
+    actor.assertCan(Actor.RUN);
+    const work = await this.leases.of(actor, req.taskId);
+    const pageId = (work.payload as { page?: { pageId?: unknown } } | null)?.page?.pageId;
+    if (work.kind !== 'make' || typeof pageId !== 'string') return new PageBaseView(null, 0, []);
+    const [page] = await this.sql<PageRow[]>`
+      SELECT p.* FROM blog.pages p WHERE p.space_id = ${actor.requireSpace()} AND p.id = ${pageId}`;
+    if (!page || page.revisions === 0) return new PageBaseView(null, 0, []);
+    const [revision] = await this.sql<PageRevisionRow[]>`
+      SELECT * FROM blog.page_revisions WHERE page_id = ${page.id} AND seq = ${page.revisions}`;
+    let budget = PageQuery.BASE_TEXT_MAX;
+    const files = [];
+    for (const f of revision ? PageFiles.of(revision.files).toJSON() : []) {
+      const readable = PageQuery.TEXT.test(f.name) && f.sizeBytes <= budget;
+      const text = readable ? await this.blobs.text(f.blobHash, budget) : null;
+      if (text !== null) budget -= f.sizeBytes;
+      files.push({ name: f.name, size: f.sizeBytes, text });
+    }
+    return new PageBaseView(page, page.revisions, files);
+  }
+
+  /** 판의 data.json 값. 없거나 읽을 수 없으면 undefined */
+  private async dataOf(revision: PageRevisionRow): Promise<unknown> {
+    const file = PageFiles.of(revision.files).find(PageQuery.DATA);
+    const text = file ? await this.blobs.text(file.blobHash, PageQuery.DATA_MAX) : null;
+    if (text === null) return undefined;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
   }
 
   /** hashes 가운데 판이 가리키는 파일 (BlobStore.registerUse: 쓰는 동안 platform이 파일을 지우지 않게) */

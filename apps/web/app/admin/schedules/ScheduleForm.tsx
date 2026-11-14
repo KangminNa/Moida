@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, useId, useRef, useState } from 'react';
+import { usePages } from '../../_blog/live';
 import { flatTree, WEEKDAY_LABELS } from '../../_task/labels';
 import { useGoals } from '../../_task/live';
 import type { Agent, Schedule } from '../../_task/types';
@@ -32,6 +33,8 @@ export type ScheduleBody = {
   timeZone: string;
   instruction: string;
   goalId: string | null;
+  /** 차례마다 새 버전을 만들 페이지 (자라는 페이지) */
+  pageId: string | null;
   dailyMax: number;
 };
 
@@ -39,6 +42,7 @@ export type ScheduleBody = {
 // 정한 시각에 지시대로 작업이 생긴다.
 // 담당을 정하고 지시를 비우면 정기 확인(맡은 목표와 진행 중인 일을 확인)이 된다 (예전의 하트비트).
 // 앞 작업이 끝나지 않았거나 담당이 쉬는 중이면 그 차례는 건너뛰고, 하루 한도에 닿으면 그날은 더 만들지 않는다.
+// 페이지를 고르면 차례마다 그 페이지의 새 버전을 만드는 만들기 작업이 된다 (그 페이지를 고치는 일이 돌면 건너뛴다).
 export function ScheduleForm({
   schedule,
   agents,
@@ -64,6 +68,7 @@ export function ScheduleForm({
 }) {
   const id = useId();
   const goals = useGoals();
+  const pages = usePages();
   const [title, setTitle] = useState(schedule?.title ?? '정기 확인');
   const [agentId, setAgentId] = useState(schedule?.agentId ?? presetAgent ?? '');
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
@@ -73,6 +78,7 @@ export function ScheduleForm({
   const [everyHours, setEveryHours] = useState(schedule?.everyHours ?? 4);
   const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? browserZone());
   const [goalId, setGoalId] = useState(schedule?.goalId ?? '');
+  const [pageId, setPageId] = useState(schedule?.pageId ?? '');
   const [instruction, setInstruction] = useState(schedule?.instruction ?? '');
   const [dailyMax, setDailyMax] = useState(schedule?.dailyMax ?? 3);
   // 만들기: 같은 내용을 다시 보내면 같은 requestId (응답을 놓쳐 다시 눌러도 스케줄은 하나)
@@ -106,6 +112,7 @@ export function ScheduleForm({
       timeZone: timeZone.trim(),
       instruction: instruction.trim(),
       goalId: goalId || null,
+      pageId: pageId || null,
       dailyMax,
     };
     requestId.current ??= crypto.randomUUID();
@@ -257,6 +264,25 @@ export function ScheduleForm({
               </option>
             ))}
           </select>
+        </div>
+      )}
+      {(pages.data?.pages.length ?? 0) > 0 && (
+        <div className="field">
+          <label htmlFor={`${id}-page`}>페이지</label>
+          <select
+            id={`${id}-page`}
+            className="input"
+            value={pageId}
+            onChange={(e) => edit(() => setPageId(e.target.value))}
+          >
+            <option value="">없음</option>
+            {pages.data?.pages.map((page) => (
+              <option key={page.id} value={page.id}>
+                {page.title}
+              </option>
+            ))}
+          </select>
+          <small>고르면 차례마다 이 페이지의 새 버전을 만듦. 담당은 만들기 권한이 있어야 함</small>
         </div>
       )}
       <div className="field">

@@ -10,10 +10,22 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { Actor, CurrentActor, type HttpResponse } from '../../platform';
-import { EditPageInput, PageSiteInput, ReadPageInput, SwitchPageInput } from './page.input';
+import {
+  EditPageInput,
+  PageRevisionInput,
+  PageSiteInput,
+  ReadPageInput,
+  SwitchPageInput,
+} from './page.input';
 import { PageQuery, PageSiteAnswer } from './page.query';
 import { PageService } from './page.service';
-import type { PageDetailView, PageListView, PageView, PublicPageListView } from './page.view';
+import type {
+  PageChangesView,
+  PageDetailView,
+  PageListView,
+  PageView,
+  PublicPageListView,
+} from './page.view';
 
 // 페이지: AI가 만든 HTML 묶음을 바깥 주소로 내보낸 것. 콘솔의 목록 · 상세 · 고치기는 주인만.
 // 바깥 주소(/pages/<이름>/…)는 웹이 site/…로 넘긴다: 공개 페이지는 누구나, 비공개는 주인만 본다.
@@ -58,7 +70,17 @@ export class PageController {
     return this.pages.detail(actor, ReadPageInput.from(id));
   }
 
-  /** 제목 · 공개 범위 */
+  /** 판 하나의 바뀐 점: 앞 판과 비교한 data.json의 차이 (자라는 페이지, 2차 5단계) */
+  @Get(':id/revisions/:seq/changes')
+  changes(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Param('seq') seq: string,
+  ): Promise<PageChangesView> {
+    return this.pages.changes(actor, PageRevisionInput.from(id, seq));
+  }
+
+  /** 제목 · 공개 범위 · 방향 */
   @Patch(':id')
   async edit(
     @CurrentActor() actor: Actor,
@@ -68,7 +90,7 @@ export class PageController {
     return (await this.service.edit(actor, EditPageInput.from(id, body))).view();
   }
 
-  /** 보이는 판을 옮긴다 (되돌리기) */
+  /** 보이는 판을 옮긴다 (되돌리기 · 확인 대기 판 보이기) */
   @HttpCode(200)
   @Post(':id/current')
   async switchTo(

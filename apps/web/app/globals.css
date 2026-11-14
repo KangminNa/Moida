@@ -1790,6 +1790,40 @@ a.chip {
   border-radius: 8px;
 }
 
+/* 버전 하나의 바뀐 점 (data.json). 빠진 값은 줄을 긋고 더해진 값은 굵게: 색 없이 구분한다 */
+.page-changes {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.page-changes li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+
+.page-changes code,
+.page-changes del,
+.page-changes ins {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.page-changes del {
+  color: var(--faint);
+}
+
+.page-changes ins {
+  font-weight: 600;
+  text-decoration: none;
+}
+
 @media (max-width: 1040px) {
   .page-work {
     grid-template-columns: minmax(0, 1fr);

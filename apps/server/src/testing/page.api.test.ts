@@ -66,6 +66,8 @@ async function build(
   page: Json,
   files: Readonly<Record<string, string>>,
   instruction = `페이지 만들기 ${randomUUID()}`,
+  /** 빌린 뒤 올리기 전에 (러너가 page_base를 읽는 때) */
+  leased: (taskId: string) => Promise<void> = async () => {},
 ): Promise<string> {
   const task = ok(
     await api.request('POST', '/api/tasks', owner, {
@@ -78,6 +80,7 @@ async function build(
     201,
   );
   await lease(String(task.id));
+  await leased(String(task.id));
   for (const [name, text] of Object.entries(files)) {
     const bytes = Buffer.from(text);
     const ticket = await mcp(slot, 'begin_upload', {
@@ -358,5 +361,180 @@ describe('페이지 (/api/pages)', () => {
       page: { title: '안 됨' },
     });
     assert.equal(general.status, 422, general.text);
+  });
+});
+
+describe('자라는 페이지 (2차 5단계)', () => {
+  test('러너는 쥔 일의 페이지 지금 판을 받고(page_base), 바뀐 파일만 내면 그 위에 새 판이 된다', async () => {
+    const title = `현황판 ${randomUUID().slice(0, 6)}`;
+    await build(
+      { title },
+      {
+        'index.html': '<p>1판</p>',
+        'data.json': JSON.stringify({ count: 1, list: [1, 2], gone: 'x' }),
+        'logo.png': 'PNG',
+      },
+    );
+    const first = await pageOf(title);
+    const directed = ok(
+      await api.request('PATCH', `/api/pages/${first.id}`, owner, {
+        version: first.version,
+        direction: '매주 숫자를 새로 채워요',
+      }),
+    );
+    assert.equal(directed.direction, '매주 숫자를 새로 채워요');
+
+    let base: Json = {};
+    await build(
+      { pageId: first.id },
+      { 'data.json': JSON.stringify({ count: 2, list: [1, 2, 3] }) },
+      '이번 주 숫자로',
+      async (taskId) => {
+        base = await mcp(slot, 'page_base', { task_id: taskId });
+        const other = await api.mcp(String(writer.authorization).slice(7), 'tools/call', {
+          name: 'page_base',
+          arguments: { task_id: taskId },
+        });
+        assert.equal((other.json().result as Json).isError, true, '러너가 아닌 기기는 받지 못한다');
+      },
+    );
+    assert.deepEqual(
+      [base.page_id, base.title, base.direction, base.seq],
+      [first.id, title, '매주 숫자를 새로 채워요', 1],
+    );
+    assert.deepEqual(
+      (base.files as Json[]).map((f) => [f.name, f.text === null ? null : 'text']).sort(),
+      [
+        ['data.json', 'text'],
+        ['index.html', 'text'],
+        ['logo.png', null],
+      ],
+      '글 파일만 내용까지',
+    );
+
+    const second = await pageOf(title);
+    assert.deepEqual([second.currentSeq, second.revisions], [2, 2], '비공개 페이지는 바로 보인다');
+    const detail = ok(await api.get(`/api/pages/${second.id}`, owner));
+    const [newest] = detail.revisionList as { seq: number; files: Json[] }[];
+    assert.deepEqual(
+      newest?.files.map((f) => f.name).sort(),
+      ['data.json', 'index.html', 'logo.png'],
+      '내지 않은 파일은 앞 판 그대로',
+    );
+    const changes = ok(await api.get(`/api/pages/${second.id}/revisions/2/changes`, owner));
+    assert.deepEqual([changes.base, changes.data, changes.truncated], [1, true, false]);
+    assert.deepEqual(
+      (changes.changes as Json[]).map((c) => [c.path, c.kind, c.before, c.after]),
+      [
+        ['count', 'changed', '1', '2'],
+        ['list[2]', 'added', null, '3'],
+        ['gone', 'removed', '"x"', null],
+      ],
+    );
+    const visitor = await api.get(`/api/pages/${second.id}/revisions/2/changes`);
+    assert.equal(visitor.status, 403, visitor.text);
+  });
+
+  test('한 페이지를 고치는 일은 한 번에 하나 (409)', async () => {
+    const title = `하나씩 ${randomUUID().slice(0, 6)}`;
+    await build({ title }, { 'index.html': '<p>1판</p>' });
+    const page = await pageOf(title);
+    const ask = () =>
+      api.request('POST', '/api/tasks', owner, {
+        requestId: randomUUID(),
+        kind: 'make',
+        agentId: maker.id,
+        instruction: '고쳐 줘',
+        page: { pageId: page.id },
+      });
+    const open = ok(await ask(), 201);
+    const second = await ask();
+    assert.equal(second.status, 409, second.text);
+    assert.match(second.text, /이 페이지를 고치는 일이 이미 돌고 있어요/);
+    ok(await api.request('POST', `/api/tasks/${open.id}/cancel`, owner, { version: open.version }));
+    ok(await ask(), 201);
+    const [left] = await api.service(Database).sql<{ id: string; version: number }[]>`
+      SELECT id, version FROM task.tasks
+      WHERE payload->'page'->>'pageId' = ${page.id} AND status = 'queued'`;
+    ok(
+      await api.request('POST', `/api/tasks/${left?.id}/cancel`, owner, { version: left?.version }),
+    );
+  });
+
+  test('공개 페이지의 새 버전은 확인 대기: 알림이 오고, 관리자가 미리 본 뒤 "이 버전 보이기"로 바꾼다', async () => {
+    const title = `공개 현황판 ${randomUUID().slice(0, 6)}`;
+    await build({ title }, { 'index.html': '<p>1판</p>' });
+    const first = await pageOf(title);
+    ok(
+      await api.request('PATCH', `/api/pages/${first.id}`, owner, {
+        version: first.version,
+        visibility: 'public',
+      }),
+    );
+    await build({ pageId: first.id }, { 'index.html': '<p>2판</p>' }, '새 숫자로');
+    const held = (await pageOf(title)) as Page & { pendingSeq: number | null };
+    assert.deepEqual([held.currentSeq, held.revisions, held.pendingSeq], [1, 2, 2]);
+    const name = encodeURIComponent(held.name);
+    assert.equal(await (await site(`${name}/index.html`)).text(), '<p>1판</p>', '방문자는 앞 판');
+
+    const detail = ok(await api.get(`/api/pages/${held.id}`, owner));
+    const preview = await site(follow(String(detail.pendingPath)));
+    assert.equal(await preview.text(), '<p>2판</p>', '관리자는 대기 판을 미리 본다');
+    const notices = async () =>
+      (ok(await api.get('/api/notifications', owner)).notifications as Json[]).filter(
+        (n) => n.kind === 'blog.page.pending' && n.link === `/admin/library/pages/${held.id}`,
+      );
+    const [notice] = await notices();
+    assert.deepEqual([notice?.severity, notice?.read], ['immediate', false]);
+
+    const shown = ok(
+      await api.request('POST', `/api/pages/${held.id}/current`, owner, {
+        version: held.version,
+        seq: 2,
+      }),
+    );
+    assert.deepEqual([shown.currentSeq, shown.pendingSeq], [2, null]);
+    assert.equal(await (await site(`${name}/index.html`)).text(), '<p>2판</p>');
+    const [settled] = await notices();
+    assert.equal(settled?.read, true, '보이면 알림은 읽음');
+  });
+
+  test('방향은 관리자만, 4000자까지, 빈 글이면 지운다', async () => {
+    const title = `방향 ${randomUUID().slice(0, 6)}`;
+    await build({ title }, { 'index.html': '<p>1판</p>' });
+    const page = await pageOf(title);
+    const long = await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+      version: page.version,
+      direction: '가'.repeat(4001),
+    });
+    assert.equal(long.status, 400, long.text);
+    const set = ok(
+      await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+        version: page.version,
+        direction: '여행 일정',
+      }),
+    );
+    const kept = ok(
+      await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+        version: set.version,
+        title: `${title} 새 이름`,
+      }),
+    );
+    assert.equal(kept.direction, '여행 일정', '보내지 않으면 그대로');
+    const cleared = ok(
+      await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+        version: kept.version,
+        direction: '',
+      }),
+    );
+    assert.equal(cleared.direction, '');
+    const denied = await api.request(
+      'PATCH',
+      `/api/pages/${page.id}`,
+      TestUser.visitor,
+      { version: cleared.version, direction: '몰래' },
+      writer,
+    );
+    assert.equal(denied.status, 403, denied.text);
   });
 });

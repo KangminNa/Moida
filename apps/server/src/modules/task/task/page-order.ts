@@ -19,9 +19,13 @@ export class PageOrder {
     readonly pageId: string | null,
   ) {}
 
-  /** 이 결과물 묶음을 페이지로 내보낼 수 없는 까닭. 내보낼 수 있으면 null */
-  static refusal(outputs: readonly OutputRow[]): string | null {
-    if (!outputs.some((o) => o.name === PageOrder.ENTRY))
+  /**
+   * 이 결과물 묶음을 페이지로 내보낼 수 없는 까닭. 내보낼 수 있으면 null.
+   * 있는 페이지를 고치는 일(pageId)은 바꾼 파일만 내도 된다: blog가 앞 판의 파일 위에 얹는다 (2차 5단계 자라는 페이지)
+   */
+  refusal(outputs: readonly OutputRow[]): string | null {
+    if (outputs.length === 0) return '페이지로 내보낼 파일이 없어요';
+    if (this.pageId === null && !outputs.some((o) => o.name === PageOrder.ENTRY))
       return `${PageOrder.ENTRY}이 없어 페이지로 내보내지 못했어요`;
     if (outputs.length > PageOrder.FILES_MAX)
       return `페이지의 파일은 ${PageOrder.FILES_MAX}개까지예요 (지금 ${outputs.length}개)`;

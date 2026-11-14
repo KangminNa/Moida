@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import {
-  type Actor,
+  Actor,
   EntityService,
   Idempotency,
   NoticeKind,
   Notices,
+  RuleViolation,
   type Sql,
   type VersionInput,
 } from '../../platform';
@@ -95,7 +96,8 @@ export class ScheduleService extends EntityService<Schedule> {
 
   /**
    * 때가 된 스케줄을 돌린다 (일꾼이 1분마다). 다음 시각으로 넘기고, 작업을 만들 수 있을 때만 만든다.
-   * 만들지 않는 때: 담당이 멈췄거나 한도로 쉼, 앞 작업이 아직 끝나지 않음, 하루 한도에 닿음. 만든 작업 수를 돌려준다
+   * 만들지 않는 때: 담당이 멈췄거나 한도로 쉼, 앞 작업이 아직 끝나지 않음, 가리키는 페이지를 고치는 다른 일이 돎,
+   * 하루 한도에 닿음. 만든 작업 수를 돌려준다
    */
   async runDue(actor: Actor): Promise<number> {
     actor.assertOwnerOrSystem();
@@ -118,7 +120,11 @@ export class ScheduleService extends EntityService<Schedule> {
             continue;
           }
         }
-        if (await tasks.hasOpenRequest(spaceId, schedule.requestPrefix)) {
+        const { pageId } = schedule;
+        const busy =
+          (await tasks.hasOpenRequest(spaceId, schedule.requestPrefix)) ||
+          (pageId !== null && (await tasks.hasOpenPage(spaceId, pageId)));
+        if (busy) {
           await schedules.save(schedule);
           continue;
         }
@@ -149,9 +155,16 @@ export class ScheduleService extends EntityService<Schedule> {
     };
   }
 
-  /** 담당 에이전트와 목표가 이 공간에 있는가. 목표는 진행 중이어야 한다 */
+  /**
+   * 담당 에이전트와 목표가 이 공간에 있는가. 목표는 진행 중이어야 한다.
+   * 페이지를 가리키면 담당이 만들기(make) 권한을 가져야 한다 (담당이 없으면 make 에이전트가 자동으로 맡는다)
+   */
   private async assertRefs(tx: Sql, spaceId: string, settings: Partial<ScheduleRow>) {
-    if (settings.agent_id) await new AgentRepository(tx).load(spaceId, settings.agent_id);
+    const agent = settings.agent_id
+      ? await new AgentRepository(tx).load(spaceId, settings.agent_id)
+      : null;
+    if (settings.page_id && agent && !agent.scopes.includes(Actor.MAKE))
+      throw new RuleViolation('페이지의 새 버전은 만들기(make) 권한이 있는 에이전트가 맡아요');
     if (settings.goal_id)
       (await new GoalRepository(tx).load(spaceId, settings.goal_id)).assertActive();
   }

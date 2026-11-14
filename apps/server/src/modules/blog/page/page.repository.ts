@@ -2,6 +2,7 @@ import { TableRepository } from '../../platform';
 import { pageRevisions, pages } from '../blog.schema';
 import type { PageRow } from '../blog.tables';
 import { Page } from './page';
+import { PageFiles } from './page-files';
 
 // blog.pages ↔ Page. 판(blog.page_revisions)은 saveParts로 함께 넣는다 (추가만).
 export class PageRepository extends TableRepository<PageRow, Page> {
@@ -33,6 +34,12 @@ export class PageRepository extends TableRepository<PageRow, Page> {
     const taken = new Set(rows.map((r) => r.name));
     if (!taken.has(wanted)) return wanted;
     for (let n = 2; ; n += 1) if (!taken.has(`${wanted}-${n}`)) return `${wanted}-${n}`;
+  }
+
+  /** 판 하나의 파일 목록. 판이 없으면 null */
+  async filesOf(pageId: string, seq: number): Promise<PageFiles | null> {
+    const row = await this.row(pageRevisions, { page_id: pageId, seq }, { columns: ['files'] });
+    return row ? PageFiles.of(row.files) : null;
   }
 
   protected override async saveParts(page: Page): Promise<void> {

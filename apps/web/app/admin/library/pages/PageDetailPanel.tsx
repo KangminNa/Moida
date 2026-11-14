@@ -10,46 +10,29 @@ import { useAction } from '../../../_lib/use-action';
 import { when } from '../../../_task/labels';
 import { usePageTasks } from '../../../_task/live';
 import { TaskPill } from '../../../_task/parts';
-import type { Output, OutputPage, Task } from '../../../_task/types';
+import type { Task } from '../../../_task/types';
 import { PageAskForm } from './PageAskForm';
-import { PageTitleForm } from './PageTitleForm';
+import { PageChangesPanel } from './PageChangesPanel';
+import { PageEditForm } from './PageEditForm';
 
 const CONFLICT = '이미 바뀐 페이지예요. 최신 내용을 다시 읽었어요';
 /** 서버가 붙이는 격리와 같다 (틀에도 한 번 더): 페이지의 스크립트는 콘솔과 로그인에 닿지 못한다 */
 const FRAME_SANDBOX =
   'allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads';
 const ENTRY = 'index.html';
-/** 만들기 작업이 받는 재료의 수 */
-const MATERIALS_MAX = 10;
-/** 보이는 판의 파일을 찾지 못했다. 서버에 보내지 않고 이 오류로 멈춘다 */
-const NO_FILES = {
-  ok: false,
-  status: 0,
-  error: {
-    code: 'no_files',
-    message: '공개 버전의 파일이 결과물에 없어요. 결과물의 휴지통에서 복원한 뒤 다시 해 주세요',
-  },
-} as const;
-
-/** 고칠 때 넘길 재료: 그 판을 만든 실행의 파일. 문(index.html)을 맨 앞에, 받는 수까지만 */
-function materialsOf(outputs: readonly Output[]): string[] {
-  const last = Math.max(0, ...outputs.map((o) => o.runSeq ?? 0));
-  return outputs
-    .filter((o) => o.runSeq === last)
-    .sort((a, b) => Number(b.name === ENTRY) - Number(a.name === ENTRY))
-    .slice(0, MATERIALS_MAX)
-    .map((o) => o.id);
-}
 
 // 페이지 하나: 왼쪽에 지금 보이는 판, 오른쪽에 고쳐 달라는 입력 · 공개 · 판 목록.
-// 고쳐 달라고 하면 보이는 판의 파일을 재료로 만들기 작업이 돌고, 끝나면 새 판이 곧바로 보인다. 앞 판은 남아서 되돌릴 수 있다.
+// 고쳐 달라고 하면 만들기 작업이 서버에서 이 페이지의 가장 새 판을 받아 바뀐 파일만 낸다 (러너 page_base).
+// 비공개 페이지는 새 판이 곧바로 보이고, 공개 페이지는 확인 대기로 남아 관리자가 미리 본 뒤 보인다.
+// 앞 판은 남아서 되돌릴 수 있다. 판마다 data.json의 바뀐 점을 펼쳐 본다.
 export function PageDetailPanel({ id }: { id: string }) {
   const page = usePage(id);
   const making = usePageTasks();
   const action = useAction();
   const save = useAction();
   const ask = useAction();
-  const [renaming, setRenaming] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [opened, setOpened] = useState<number | null>(null);
   const p = page.data;
   const problem = action.problem ?? page.error ?? making.error;
 
@@ -64,35 +47,27 @@ export function PageDetailPanel({ id }: { id: string }) {
   const fixing = making.tasks.filter((t) => t.page?.pageId === p.id);
 
   async function fix(shown: PageDetail, instruction: string, requestId: string) {
-    const current = shown.revisionList.find((r) => r.seq === shown.currentSeq);
-    if (!current) return false;
     const reply = await ask.run(
       'ask',
-      async () => {
-        const files = await api<OutputPage>('GET', `/api/outputs?taskId=${current.taskId}`);
-        if (!files.ok) return files;
-        const outputIds = materialsOf(files.data.outputs);
-        if (outputIds.length === 0) return NO_FILES;
-        return api<Task>('POST', '/api/tasks', {
+      () =>
+        api<Task>('POST', '/api/tasks', {
           requestId,
           kind: 'make',
           instruction,
           page: { pageId: shown.id },
-          materials: { outputIds, wikiIds: [] },
-        });
-      },
+        }),
       { done: '작업 등록됨' },
     );
     return reply?.ok === true;
   }
 
-  async function rename(shown: PageDetail, title: string) {
+  async function edit(shown: PageDetail, changes: { title: string; direction: string }) {
     const reply = await save.run(
-      'title',
-      () => api('PATCH', `/api/pages/${shown.id}`, { version: shown.version, title }),
-      { done: '제목 저장됨', reload: page.reload, conflict: CONFLICT },
+      'edit',
+      () => api('PATCH', `/api/pages/${shown.id}`, { version: shown.version, ...changes }),
+      { done: '저장됨', reload: page.reload, conflict: CONFLICT },
     );
-    if (reply?.ok) setRenaming(false);
+    if (reply?.ok) setEditing(false);
   }
 
   function toggle(shown: PageDetail) {
@@ -109,11 +84,11 @@ export function PageDetailPanel({ id }: { id: string }) {
     );
   }
 
-  const show = (shown: PageDetail, r: PageRevision) =>
+  const show = (shown: PageDetail, seq: number) =>
     action.run(
-      `seq:${r.seq}`,
-      () => api('POST', `/api/pages/${shown.id}/current`, { version: shown.version, seq: r.seq }),
-      { done: `버전 ${r.seq} 공개 중`, reload: page.reload, conflict: CONFLICT },
+      `seq:${seq}`,
+      () => api('POST', `/api/pages/${shown.id}/current`, { version: shown.version, seq }),
+      { done: `버전 ${seq} 보이는 중`, reload: page.reload, conflict: CONFLICT },
     );
 
   return (
@@ -126,9 +101,9 @@ export function PageDetailPanel({ id }: { id: string }) {
           </p>
         </div>
         <div className="row">
-          {!renaming && (
-            <button type="button" className="ghost" onClick={() => setRenaming(true)}>
-              제목 편집
+          {!editing && (
+            <button type="button" className="ghost" onClick={() => setEditing(true)}>
+              편집
             </button>
           )}
           <a className="ghost" href={path} target="_blank" rel="noreferrer">
@@ -137,18 +112,50 @@ export function PageDetailPanel({ id }: { id: string }) {
         </div>
       </header>
       {problem && <p className="error">{problem}</p>}
-      {renaming && (
-        <PageTitleForm
+      {editing ? (
+        <PageEditForm
           key={p.version}
           title={p.title}
+          direction={p.direction}
           busy={save.busy !== null}
           problem={save.problem}
-          onSubmit={(title) => rename(p, title)}
+          onSubmit={(changes) => edit(p, changes)}
           onClose={() => {
-            setRenaming(false);
+            setEditing(false);
             save.clear();
           }}
         />
+      ) : (
+        p.direction && (
+          <p className="note">
+            <b>방향</b> {p.direction}
+          </p>
+        )
+      )}
+      {p.pendingSeq !== null && p.pendingPath && (
+        <section className="panel" aria-label="확인 대기">
+          <div className="plugin-head">
+            <div>
+              <b>버전 {p.pendingSeq} 확인 대기</b>
+              <p>공개 페이지라 확인한 뒤에 보임. 방문자는 지금 버전 {p.currentSeq}을 봄</p>
+            </div>
+            <button
+              type="button"
+              className="cta small"
+              disabled={action.busy !== null}
+              onClick={() => show(p, p.pendingSeq as number)}
+            >
+              이 버전 보이기
+            </button>
+          </div>
+          <iframe
+            key={p.pendingPath}
+            className="page-frame"
+            title={`${p.title} 버전 ${p.pendingSeq}`}
+            src={p.pendingPath}
+            sandbox={FRAME_SANDBOX}
+          />
+        </section>
       )}
       <div className="page-work">
         <iframe
@@ -205,29 +212,41 @@ export function PageDetailPanel({ id }: { id: string }) {
               <h2 id="page-revisions">버전</h2>
             </div>
             <ul className="list">
-              {p.revisionList.map((r) => (
+              {p.revisionList.map((r: PageRevision) => (
                 <li key={r.seq} className="list-cell schedule-row">
                   <div className="item-main">
                     <b>
                       버전 {r.seq}{' '}
-                      {r.seq === p.currentSeq && <span className="pill on">공개 버전</span>}
+                      {r.seq === p.currentSeq && <span className="pill on">보이는 버전</span>}
+                      {r.seq === p.pendingSeq && <span className="pill">확인 대기</span>}
                     </b>
                     <small>
                       {when(r.createdAt)} · 파일 {r.files.length}개 ·{' '}
                       <Link href={`/admin/tasks/${r.taskId}`}>작업</Link>
                     </small>
                     {r.note && <small className="clamp">{r.note}</small>}
+                    {opened === r.seq && <PageChangesPanel id={p.id} seq={r.seq} />}
                   </div>
-                  {r.seq !== p.currentSeq && (
+                  <div className="row">
                     <button
                       type="button"
                       className="ghost"
-                      disabled={action.busy !== null}
-                      onClick={() => show(p, r)}
+                      aria-expanded={opened === r.seq}
+                      onClick={() => setOpened(opened === r.seq ? null : r.seq)}
                     >
-                      이 버전 공개
+                      바뀐 점
                     </button>
-                  )}
+                    {r.seq !== p.currentSeq && (
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={action.busy !== null}
+                        onClick={() => show(p, r.seq)}
+                      >
+                        이 버전 보이기
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

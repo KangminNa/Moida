@@ -50,6 +50,8 @@ export const pages = blogSchema.table('pages', {
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  direction: text('direction').notNull(),
+  pending_seq: integer('pending_seq'),
 });
 
 /** blog.post_revisions */

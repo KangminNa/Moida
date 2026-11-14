@@ -16,6 +16,9 @@ export class PageView {
       title: r.title,
       visibility: r.visibility,
       currentSeq: r.current_seq,
+      /** 확인을 기다리는 판 (공개 페이지의 새 판). 없으면 null */
+      pendingSeq: r.pending_seq,
+      direction: r.direction,
       revisions: r.revisions,
       version: r.version,
       createdAt: r.created_at.toISOString(),
@@ -74,14 +77,79 @@ export class PageRevisionView {
   }
 }
 
-/** 페이지 하나와 판 목록 (새 판부터) */
+/** 페이지 하나와 판 목록 (새 판부터). pendingPath: 확인 대기 판을 미리 볼 주소 (그 판에 묶인 보기 표, 30분) */
 export class PageDetailView {
   constructor(
     private readonly page: PageView,
     private readonly revisions: readonly PageRevisionView[],
+    private readonly pendingPath: string | null = null,
   ) {}
 
   toJSON() {
-    return { ...this.page.toJSON(), revisionList: this.revisions.map((r) => r.toJSON()) };
+    return {
+      ...this.page.toJSON(),
+      revisionList: this.revisions.map((r) => r.toJSON()),
+      pendingPath: this.pendingPath,
+    };
+  }
+}
+
+/** data.json의 바뀐 점 한 줄: 경로, added · removed · changed, 앞 · 뒤 값(JSON 글자, 잘림) */
+export interface PageDataChange {
+  path: string;
+  kind: string;
+  before: string | null;
+  after: string | null;
+}
+
+/**
+ * 판 하나의 바뀐 점 (자라는 페이지, 2차 5단계): 앞 판과 비교한 data.json의 차이.
+ * data가 false면 이 판에 data.json이 없거나 읽을 수 없다 (그때 changes는 비어 있다)
+ */
+export class PageChangesView {
+  constructor(
+    private readonly seq: number,
+    private readonly data: boolean,
+    private readonly changes: readonly PageDataChange[],
+    private readonly truncated: boolean,
+  ) {}
+
+  toJSON() {
+    return {
+      seq: this.seq,
+      base: this.seq > 1 ? this.seq - 1 : null,
+      data: this.data,
+      changes: this.changes,
+      truncated: this.truncated,
+    };
+  }
+}
+
+/** page_base의 파일 하나: 글 파일이면 내용, 그림 등은 이름 · 크기만 (새 판에서 그대로 남는다) */
+export interface PageBaseFile {
+  name: string;
+  size: number;
+  text: string | null;
+}
+
+/**
+ * page_base의 답 (러너에게, 2차 5단계): 고칠 페이지의 가장 새 판 · 방향. 고칠 페이지가 없는 일이면 page_id가 null
+ */
+export class PageBaseView {
+  constructor(
+    private readonly row: Pick<PageRow, 'id' | 'title' | 'direction'> | null,
+    private readonly seq: number,
+    private readonly files: readonly PageBaseFile[],
+  ) {}
+
+  toJSON() {
+    const r = this.row;
+    return {
+      page_id: r?.id ?? null,
+      title: r?.title ?? null,
+      direction: r?.direction ?? '',
+      seq: this.seq,
+      files: this.files,
+    };
   }
 }

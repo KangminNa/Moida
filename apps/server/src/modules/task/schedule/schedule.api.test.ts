@@ -226,6 +226,41 @@ describe('스케줄 (/api/schedules)', () => {
     assert.equal((await tasksOf(schedule)).length, 2, '다시 움직이면 돈다');
   });
 
+  test('페이지를 가리키면 그 페이지의 만들기 일. 같은 페이지를 고치는 일이 돌면 건너뛰고, 담당은 make 권한이 있어야 한다', async () => {
+    const pageId = randomUUID();
+    const plain = await newAgent();
+    const refused = await create({ ...DAILY, agentId: plain.id, pageId });
+    assert.equal(refused.status, 422, refused.text);
+    const maker = await newAgent({ scopes: ['make'] });
+    const schedule = ok(
+      await create({ ...DAILY, title: '현황판', agentId: maker.id, pageId }),
+      201,
+    );
+    assert.equal(schedule.pageId, pageId);
+    await makeDue(schedule);
+    await job.run();
+    const [made] = await tasksOf(schedule);
+    const [row] = await db.sql<{ kind: string; payload: { page?: Json } }[]>`
+      SELECT kind, payload FROM task.tasks WHERE id = ${String(made?.id)}`;
+    assert.deepEqual([row?.kind, row?.payload.page], ['make', { pageId }]);
+
+    const other = ok(
+      await create({ ...DAILY, title: '같은 페이지', agentId: maker.id, pageId }),
+      201,
+    );
+    await makeDue(other);
+    await job.run();
+    assert.equal((await tasksOf(other)).length, 0, '같은 페이지를 고치는 일이 돌고 있다');
+    const [skipped] = (await list()).filter((s) => s.id === other.id);
+    const now = await api.request('POST', `/api/schedules/${other.id}/run`, owner, {
+      version: skipped?.version,
+    });
+    assert.equal(now.status, 409, now.text);
+    assert.match(now.text, /이 페이지를 고치는 일이 이미 돌고 있어요/);
+    const [kept] = (await list()).filter((s) => s.id === other.id);
+    assert.equal(kept?.dayRuns, 0, '만들지 못한 지금 한 번은 세지 않는다');
+  });
+
   test('하루 한도: 지금 한 번도 함께 세고, 닿으면 일꾼도 건너뛰고 지금 한 번은 422', async () => {
     const schedule = ok(await create({ ...DAILY, instruction: '한도 시험', dailyMax: 2 }), 201);
     const run = (s: Json) =>

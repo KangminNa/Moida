@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BaseTool, ToolTextBody } from '../platform';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
 import texts from './blog.tools.ko.json';
+import { PageBaseTool } from './page/page.tool';
 import { BlogGetPostTool, BlogSaveDraftTool } from './post/post.tool';
 
 // blog가 AI에게 여는 MCP 도구 목록. 새 도구는 여기에만 더한다 (mcp 모듈은 모듈별 목록을 모으기만 한다).
@@ -16,7 +17,8 @@ export class BlogTools {
     saveDraft: BlogSaveDraftTool,
     basketGet: BasketGetTool,
     keepPage: KeepPageTool,
+    pageBase: PageBaseTool,
   ) {
-    this.tools = [getPost, saveDraft, basketGet, keepPage];
+    this.tools = [getPost, saveDraft, basketGet, keepPage, pageBase];
   }
 }

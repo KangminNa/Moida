@@ -59,6 +59,13 @@ export class PageFiles {
     return new PageFiles(entries);
   }
 
+  /** 이 판의 파일 위에 새 파일들(받은 목록)을 얹은 목록: 이름이 같으면 새 것 (자라는 페이지의 새 판) */
+  overlay(fresh: unknown): readonly unknown[] {
+    const added = Array.isArray(fresh) ? fresh : [];
+    const names = new Set(added.map((f) => (f as { name?: unknown } | null)?.name));
+    return [...this.entries.filter((e) => !names.has(e.name)), ...added];
+  }
+
   /** 이름으로 찾는다. 없으면 null */
   find(name: string): PageFileEntry | null {
     return this.entries.find((e) => e.name === name) ?? null;

@@ -4,6 +4,7 @@ import { Job } from './job';
 import type { Json } from './json';
 import type { McpClient } from './mcp-client';
 import { NoteSource } from './note-source';
+import { PageBase } from './page-base';
 import { type ProgressBatch, ProgressState, type RunResult } from './progress';
 import type { RunnerAbility } from './runner-ability';
 
@@ -235,6 +236,11 @@ export class CairnServer {
   async saveNote(taskId: string, answer: string): Promise<string> {
     const body = await this.mcp.call('save_note', { task_id: taskId, answer });
     return `${body.text('status')} · 판 ${body.number('seq')}`;
+  }
+
+  /** 고칠 페이지의 가장 새 판 (blog page_base, 쥔 만들기 일의 것만). 처음 만드는 페이지면 null */
+  async pageBase(taskId: string, stop?: AbortSignal): Promise<PageBase | null> {
+    return PageBase.from(await this.mcp.call('page_base', { task_id: taskId }, 0, stop));
   }
 
   /** browser-tabs: 빌린 browse 작업이 어디서 도는지 (사이트 · 둘러보기). 패키지가 꺼져 있거나 사이트가 없으면 ToolRefused */

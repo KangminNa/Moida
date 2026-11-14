@@ -572,7 +572,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   ): void {
     this.assertHeldBy(runnerId, now);
     const page = status === Task.DONE && made !== null ? PageOrder.of(this.row.payload) : null;
-    const refusal = page === null || made === null ? null : PageOrder.refusal(made);
+    const refusal = page === null || made === null ? null : page.refusal(made);
     if (refusal !== null) {
       this.fail(refusal, now);
       return;

@@ -8,10 +8,12 @@ import { BasketController } from './basket/basket.api';
 import { BasketQuery } from './basket/basket.query';
 import { BasketService } from './basket/basket.service';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
+import { BlogNotices } from './blog-notices';
 import { BlogTools } from './blog-tools';
 import { PageController } from './page/page.api';
 import { PageQuery } from './page/page.query';
 import { PageService } from './page/page.service';
+import { PageBaseTool } from './page/page.tool';
 import { PageBuiltHandler } from './page/page-built.handler';
 import { PostController } from './post/post.api';
 import { PostQuery } from './post/post.query';
@@ -25,6 +27,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
 @Module({
   imports: [VaultModule],
   providers: [
+    BlogNotices,
     PostService,
     PostQuery,
     PostArchiveQuery,
@@ -36,6 +39,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     BlogSaveDraftTool,
     BasketGetTool,
     KeepPageTool,
+    PageBaseTool,
     BlogTools,
     PublishApprovedHandler,
     PageService,

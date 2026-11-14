@@ -49,6 +49,8 @@ export interface PageRow {
   version: number;
   created_at: Date;
   updated_at: Date;
+  direction: string;
+  pending_seq: number | null;
 }
 export type PageNew = Partial<PageRow> & Pick<PageRow, 'id' | 'space_id' | 'name' | 'title' | 'current_seq' | 'revisions'>;
 

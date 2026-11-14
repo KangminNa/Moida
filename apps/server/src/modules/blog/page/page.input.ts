@@ -20,11 +20,14 @@ export class EditPageInput extends BaseRequest {
     readonly version: number,
     readonly title: string | null,
     readonly visibility: string | null,
+    /** 방향 (빈 글이면 지운다). 보내지 않으면 그대로 */
+    readonly direction: string | null,
   ) {
     super();
   }
 
   static from(id: string, raw: unknown): EditPageInput {
+    const given = (raw as { direction?: unknown } | null)?.direction;
     return BaseRequest.read(
       { ...(raw as object), id },
       (f) =>
@@ -33,6 +36,7 @@ export class EditPageInput extends BaseRequest {
           f.version(),
           f.optionalText('title', Page.TITLE_MAX),
           f.optionalText('visibility', 20),
+          given === '' ? '' : f.optionalText('direction', Page.DIRECTION_MAX),
         ),
     );
   }
@@ -113,5 +117,34 @@ export class PageSiteInput {
     const [name, file = null, ...rest] = parts;
     if (!name || rest.length > 0 || ticket === '') throw new NotFound('없는 페이지예요');
     return new PageSiteInput(ticket, name, file);
+  }
+}
+
+/** GET /api/pages/:id/revisions/:seq/changes: 판 하나 */
+export class PageRevisionInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly seq: number,
+  ) {
+    super();
+  }
+
+  static from(id: string, seq: string): PageRevisionInput {
+    return BaseRequest.read({ id, seq }, (f) => {
+      const n = Number(f.text('seq', 9));
+      if (!Number.isSafeInteger(n) || n < 1) f.reject('seq', '1 이상의 버전 번호여야 해요');
+      return new PageRevisionInput(f.uuid('id'), n);
+    });
+  }
+}
+
+/** MCP page_base { task_id }: 러너가 쥔 만들기 일 */
+export class PageBaseInput extends BaseRequest {
+  private constructor(readonly taskId: string) {
+    super();
+  }
+
+  static from(raw: unknown): PageBaseInput {
+    return BaseRequest.read(raw, (f) => new PageBaseInput(f.uuid('task_id')));
   }
 }

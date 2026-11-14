@@ -133,6 +133,12 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
                     {agentList.find((a) => a.id === s.agentId)?.name ?? '자동 배정'} · 오늘{' '}
                     {todayRuns(s)}/{s.dailyMax}
                     {s.nextRunAt ? ` · 다음 ${when(s.nextRunAt)}` : ''}
+                    {s.pageId && (
+                      <>
+                        {' · '}
+                        <Link href={`/admin/library/pages/${s.pageId}`}>페이지</Link>
+                      </>
+                    )}
                   </small>
                 </div>
                 <div className="row">

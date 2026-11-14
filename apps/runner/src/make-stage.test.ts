@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
 import { ClaudeCli } from './claude-cli';
 import { Job } from './job';
 import { Json } from './json';
 import { MakeMaterials } from './make-stage';
+import { PageBase } from './page-base';
+import { PromptPack } from './prompt-pack';
 
 // 만들기 작업의 재료 읽기 (서버가 걸렀어도 지시문 · 도구 입력에 쓰기 전에 다시 본다)와 일의 모양.
 
@@ -99,5 +104,74 @@ describe('만들기 작업', () => {
     const workspace = await cli.open(probe);
     assert.equal(cli.args(workspace).includes('WebSearch'), false);
     await workspace.remove();
+  });
+});
+
+describe('자라는 페이지의 지금 판 (page_base)', () => {
+  const base = (body: object) => PageBase.from(Json.of(body));
+
+  test('고칠 페이지가 없으면 null. 디스크에 쓰기 전에 파일 이름을 다시 본다', () => {
+    assert.equal(base({ page_id: null, files: [] }), null);
+    const page = base({
+      page_id: id(5),
+      title: '현황판',
+      direction: '매주 채워요',
+      seq: 3,
+      files: [
+        { name: 'index.html', text: '<p>3판</p>' },
+        { name: '../up.html', text: 'x' },
+        { name: '.hidden', text: 'x' },
+        { name: 'a\nb', text: 'x' },
+        { name: 'logo.png', text: null },
+      ],
+    });
+    assert.ok(page);
+    assert.deepEqual(
+      page.files.map((f) => f.name),
+      ['index.html', 'logo.png'],
+    );
+    assert.deepEqual([page.title, page.direction, page.seq], ['현황판', '매주 채워요', 3]);
+    assert.match(page.listing, /^- index\.html\n- logo\.png \(그대로 남아요/);
+  });
+
+  test('글 파일만 inputs/page/에 쓰고, 지시문은 바뀐 파일만 내라고 알린다', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cairn-page-base-'));
+    try {
+      const page = base({
+        page_id: id(6),
+        title: '여행 지도',
+        direction: '도시별로 묶어요',
+        seq: 2,
+        files: [
+          { name: 'index.html', text: '<p>2판</p>' },
+          { name: 'data.json', text: '{"a":1}' },
+          { name: 'photo.jpg', text: null },
+        ],
+      });
+      assert.ok(page);
+      const into = await page.writeTo(dir);
+      assert.equal(into, join(dir, 'page'));
+      assert.deepEqual((await readdir(into)).sort(), ['data.json', 'index.html']);
+      assert.equal(await readFile(join(into, 'index.html'), 'utf8'), '<p>2판</p>');
+
+      const pack = PromptPack.read(resolve(__dirname, '../../../skills'));
+      const growing = pack.fill('make', {
+        page: true,
+        base: into,
+        baseTitle: page.title,
+        baseSeq: page.seq,
+        baseFiles: page.listing,
+        direction: page.direction,
+      });
+      assert.match(growing, /# 고칠 페이지: 여행 지도 \(지금 버전 2\)/);
+      assert.match(growing, /바뀐 파일만 결과물 폴더에 내요/);
+      assert.match(growing, /## 이 페이지의 방향[^\n]*\n도시별로 묶어요/);
+      assert.doesNotMatch(growing, /index\.html을 꼭/, '고치는 일은 문을 다시 내지 않아도 된다');
+      const fresh = pack.fill('make', { page: true });
+      assert.match(fresh, /index\.html을 꼭 만들어요/);
+      assert.doesNotMatch(fresh, /고칠 페이지/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

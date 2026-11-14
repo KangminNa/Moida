@@ -6,6 +6,7 @@ import { SchedulePolicy } from './schedule.policy';
 import { ScheduleView } from './schedule.view';
 
 // 스케줄 하나 (task.schedules, 7단계). 정해진 시각에 지시대로 작업을 만든다. 하트비트를 넓힌 것이다:
+// 페이지를 가리키면(page_id, 2차 5단계 자라는 페이지) 그 페이지의 새 판을 만드는 만들기 일이 된다 (payload.page).
 // 담당이 정해져 있고 지시가 비어 있으면 "정기 확인"(맡은 목표와 진행 중인 일을 확인)이 된다.
 // 주기는 매일(시각 + 요일) 또는 N시간마다. 켜져 있으면 늘 다음 시각(next_run_at)이 있다 (DB CHECK).
 // 하루 한도(daily_max): 스케줄의 시간대 기준 하루에 만드는 작업 수. 구독 AI를 사람 없이 돌리는 양을 묶는다 (기획서 11장).
@@ -44,6 +45,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
         time_zone: 'UTC',
         instruction: '',
         goal_id: null,
+        page_id: null,
         daily_max: 3,
         run_day: null,
         day_runs: 0,
@@ -97,6 +99,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
       time_zone: timeZone = '',
       instruction = '',
       goal_id: goalId = null,
+      page_id: pageId = null,
       daily_max: dailyMax = 0,
       enabled = false,
     } = settings;
@@ -129,6 +132,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('time_zone', timeZone);
     this.put('instruction', instruction);
     this.put('goal_id', goalId);
+    this.put('page_id', pageId);
     this.put('daily_max', dailyMax);
     this.put('enabled', enabled);
     this.put('next_run_at', enabled ? this.after(now) : null);
@@ -172,21 +176,31 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     return now;
   }
 
-  /** 이 시각에 만드는 작업. 목표가 닫혔으면 목표 없이. 담당이 없으면 빌릴 때 자동 배정 */
+  /**
+   * 이 시각에 만드는 작업. 목표가 닫혔으면 목표 없이. 담당이 없으면 빌릴 때 자동 배정.
+   * 페이지를 가리키면 그 페이지의 새 판을 만드는 만들기 일 (make 권한이 있는 에이전트가 맡는다)
+   */
   wake(slot: Date, goal: Goal | null, now: Date): Task {
+    const pageId = this.row.page_id;
+    const schedule = { id: this.id, at: slot.toISOString() };
     return Task.open(
       this.row.space_id,
       this.requestIdFor(slot),
       {
         agent_id: this.row.agent_id,
-        kind: Task.GENERAL,
+        kind: pageId ? Task.MAKE : Task.GENERAL,
         title: this.titleFor(slot),
         instruction: this.taskInstruction,
-        payload: { schedule: { id: this.id, at: slot.toISOString() } },
+        payload: pageId ? { schedule, page: { pageId } } : { schedule },
         goal_id: goal?.active ? goal.id : null,
       },
       now,
     );
+  }
+
+  /** 가리키는 페이지 (자라는 페이지). 없으면 null */
+  get pageId(): string | null {
+    return this.row.page_id;
   }
 
   /** 이 시각에 만드는 작업의 제목: 스케줄 이름과 시간대 기준 날짜 · 시각 */

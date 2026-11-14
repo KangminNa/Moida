@@ -224,6 +224,7 @@ export interface ScheduleRow {
   last_run_at: Date | null;
   version: number;
   created_at: Date;
+  page_id: string | null;
 }
 export type ScheduleNew = Partial<ScheduleRow> & Pick<ScheduleRow, 'id' | 'space_id' | 'title' | 'mode' | 'time_zone'>;
 

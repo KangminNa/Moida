@@ -29,5 +29,11 @@
       "title": "페이지 제목",
       "text": "페이지에서 읽은 글 (10,000자까지, 고른 부분이 있으면 그 부분)"
     }
+  },
+  "page_base": {
+    "description": "쥔 만들기 일이 고칠 페이지(payload.page.pageId)의 가장 새 판과 방향을 받는다 (자라는 페이지). 글 파일(html · css · js · json · md · csv · svg)은 내용까지, 그림 등은 이름 · 크기만. 새 판에는 다시 낸 파일만 바뀌고 내지 않은 파일은 그대로 남는다. 고칠 페이지가 없는 일이면 page_id가 null.",
+    "input": {
+      "task_id": "쥔 만들기 일의 id"
+    }
   }
 }

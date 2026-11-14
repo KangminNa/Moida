@@ -8,7 +8,8 @@ import {
   type MaterialFile,
   MaterialGone,
 } from './material-downloader';
-import { ServerUnreachable } from './mcp-client';
+import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { PageBase } from './page-base';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
@@ -42,7 +43,8 @@ export class MakeMaterials {
 }
 
 // 만들기 작업의 앞뒤 (결과물 2차). 칸 안에서 AI가 셸로 PPT · 문서 · 영상을 만들어 outputs/에 두면 JobRun이 결과물로 올린다.
-//   앞: 자리 → 재료 결과물을 표로 받아 inputs/에(러너) → 빈 작업 폴더 · 재료를 agent에게
+//   앞: 자리 → 고칠 페이지의 지금 판(page_base, 글 파일을 inputs/page/에) → 재료 결과물을 표로 받아 inputs/에(러너)
+//       → 빈 작업 폴더 · 재료를 agent에게
 //   뒤: agent 프로세스를 모두 끄고(띄워 둔 변환기 · 서버) 요약을 결과로. 올린 결과물이 없으면 JobRun이 실패로 끝낸다
 // 재료 위키는 받지 않는다: 작업 토큰에 봉인한 허락으로 AI가 get_wiki로 읽는다 (지시문에 id만).
 // 결재는 없다: Cairn 안에 보관하는 것은 발행이 아니다.
@@ -57,6 +59,8 @@ export class MakeStage implements SandboxStage {
   private files: readonly MaterialFile[] = [];
   /** 그사이 휴지통에 가 받지 못한 재료 */
   private gone: readonly string[] = [];
+  /** 고칠 페이지의 가장 새 판과 그 글 파일을 둔 폴더 (자라는 페이지). 처음 만드는 페이지면 null */
+  private base: { page: PageBase; dir: string } | null = null;
   private unreached = false;
 
   constructor(
@@ -90,6 +94,7 @@ export class MakeStage implements SandboxStage {
     const materials = files.length > 0 || wikis.length > 0 || gone.length > 0;
     if (!materials && !this.job.page) return null;
     const shown = room === null ? [] : files;
+    const base = this.base;
     return prompts.fill('make', {
       materials,
       inputs: room?.inputsDir ?? null,
@@ -97,6 +102,11 @@ export class MakeStage implements SandboxStage {
       wikis: wikis.map((id) => `- wiki_id: ${id}`).join('\n'),
       gone: gone.length,
       page: this.job.page,
+      base: base?.dir ?? null,
+      baseTitle: base?.page.title ?? null,
+      baseSeq: base?.page.seq ?? null,
+      baseFiles: base?.page.listing ?? null,
+      direction: base?.page.direction ?? null,
     });
   }
 
@@ -109,8 +119,28 @@ export class MakeStage implements SandboxStage {
     const room = await SandboxRoom.open(this.config.workDir, this.job.taskId, this.agent);
     this.room = room;
     const { outputs } = this.materials;
-    if (outputs.length > 0) {
-      const dir = await room.openInputs();
+    let page: PageBase | null = null;
+    if (this.job.page) {
+      try {
+        page = await this.server.pageBase(this.job.taskId, signal);
+      } catch (error) {
+        if (signal.aborted) return null;
+        if (error instanceof ToolRefused)
+          return failed(`고칠 페이지를 받지 못했어요: ${error.message}`);
+        if (error instanceof ServerUnreachable) {
+          this.unreached = true;
+          return RunEnding.release(`고칠 페이지를 받지 못해 돌려줘요: ${error.message}`);
+        }
+        throw error;
+      }
+    }
+    const inputs = outputs.length > 0 || page !== null ? await room.openInputs() : null;
+    if (page !== null && inputs !== null) {
+      this.base = { page, dir: await page.writeTo(inputs) };
+      note(new RunEvent(RunEvent.READ, `고칠 페이지의 버전 ${page.seq}를 받았어요`, 0));
+    }
+    if (outputs.length > 0 && inputs !== null) {
+      const dir = inputs;
       const downloader = new MaterialDownloader(this.server, this.config.serverUrl);
       const files: MaterialFile[] = [];
       const gone: string[] = [];

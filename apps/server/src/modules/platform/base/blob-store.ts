@@ -222,4 +222,13 @@ export class BlobStore {
       throw error;
     }
   }
+
+  /** 작은 글 파일을 글자로 읽는다 (페이지의 data.json · index.html 등). 없거나 max바이트를 넘으면 null */
+  async text(hash: string, max: number): Promise<string | null> {
+    const blob = await this.find(hash);
+    if (!blob || blob.size > max) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of await this.open(hash)) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks).toString('utf8');
+  }
 }
