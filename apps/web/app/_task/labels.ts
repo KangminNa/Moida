@@ -44,6 +44,8 @@ export const LOGIN_SITE = 'browser.site.login';
 export const LOGGED_IN_NOTE = '로그인했어요';
 /** code-github 패키지의 PR 머지 결재 (주인이 GitHub에서 머지한 뒤 승인) */
 export const MERGE_PULL = 'code.pr.merge';
+/** 외부 도구 꽂기 (2차 7단계): AI가 제안한 도구를 붙이는 결재. 승인하면 켜고 제안한 에이전트에 붙인다 */
+export const PLUG_TOOL = 'task.tool.plug';
 
 /** 목표 실행의 결재: 다음 회차로 갈지, 목표 실행을 완료로 닫을지 (서버의 Approval.GOAL_*) */
 export const GOAL_CONTINUE = 'task.goal.continue';
@@ -64,6 +66,7 @@ export const ACTION_LABELS: Record<string, string> = {
   [PUBLISH_SITE]: '브라우저 버튼 누르기',
   [LOGIN_SITE]: '로그인 필요',
   [MERGE_PULL]: 'PR 머지',
+  [PLUG_TOOL]: '외부 도구 붙이기',
   [RAISE_LIMIT]: '한도 변경',
   [GOAL_CONTINUE]: '목표 실행 중간 결재',
   [GOAL_COMPLETE]: '목표 실행 최종 결재',

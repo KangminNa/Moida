@@ -84,8 +84,8 @@ export class JobRun {
     private readonly stage: SandboxStage | null = null,
   ) {
     this.tool = login.token === null ? null : AiTools.for(job.tool, login.token, config);
-    // 자격 안의 토큰까지 (Codex auth.json의 access · refresh) 로그와 기록에서 지운다
-    this.redactor = (this.tool?.secrets ?? []).reduce(
+    // 자격 안의 토큰 (Codex auth.json의 access · refresh) · 외부 도구의 머리글 값까지 로그와 기록에서 지운다
+    this.redactor = [...(this.tool?.secrets ?? []), ...job.runtime.secrets].reduce(
       (r, secret) => r.with(secret),
       redactor.with(job.runToken).with(login.token),
     );

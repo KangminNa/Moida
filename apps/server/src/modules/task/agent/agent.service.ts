@@ -9,6 +9,7 @@ import {
   type Sql,
   type VersionInput,
 } from '../../platform';
+import { ExternalToolQuery } from '../external-tool/external-tool.query';
 import { RunnerRepository } from '../runner/runner.repository';
 import { Agent } from './agent';
 import type {
@@ -19,6 +20,7 @@ import type {
 } from './agent.input';
 import { AgentQuery } from './agent.query';
 import { AgentRepository } from './agent.repository';
+import { AgentOrg } from './agent-org.policy';
 import { AgentTeams } from './agent-team.policy';
 
 // 에이전트 쓰기: 만들기, 고치기, 멈추기, 다시 시작, 휴지통 · 복원. 모두 주인만.
@@ -31,8 +33,18 @@ export class AgentService extends EntityService<Agent> {
   constructor(
     db: Database,
     private readonly agents: AgentQuery,
+    private readonly tools: ExternalToolQuery,
   ) {
     super(db);
+  }
+
+  /** 허락할 외부 도구가 공간에 있는가 (2차 7단계). 없는 이름이 있으면 422 */
+  private async assertKnownTools(
+    actor: Actor,
+    names: readonly string[] | undefined,
+  ): Promise<void> {
+    const missing = names?.length ? await this.tools.missing(actor, names) : [];
+    if (missing.length > 0) throw new RuleViolation(`없는 외부 도구예요: ${missing.join(', ')}`);
   }
 
   protected store(tx: Sql): AgentRepository {
@@ -52,7 +64,7 @@ export class AgentService extends EntityService<Agent> {
       const agent = org.find((a) => a.id === req.id && !a.deleted);
       if (!agent) throw new NotFound('에이전트를 찾을 수 없어요');
       agent.assertVersion(req.version);
-      const gone = req.team ? Agent.teamUnder(agent, org) : [agent];
+      const gone = req.team ? AgentOrg.teamUnder(agent, org) : [agent];
       const why = await this.agents.blockers(
         actor,
         gone.map((a) => a.id),
@@ -85,6 +97,7 @@ export class AgentService extends EntityService<Agent> {
   async create(actor: Actor, req: CreateAgentInput): Promise<Agent> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
+    await this.assertKnownTools(actor, req.fields.external_tools);
     return this.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, AgentService.CREATE);
@@ -146,6 +159,7 @@ export class AgentService extends EntityService<Agent> {
 
   /** 보고 대상을 바꾸지 않으면 그 에이전트만 잠근다. 러너는 같은 공간의 것만 (없으면 404) */
   async update(actor: Actor, req: UpdateAgentInput): Promise<Agent> {
+    await this.assertKnownTools(actor, req.changes.external_tools);
     const { reportsTo, runnerId, reviewerId } = req;
     if (reportsTo === undefined && runnerId === undefined && reviewerId === undefined)
       return this.changeAsOwner(actor, req, (agent) => agent.edit(req.changes));

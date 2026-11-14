@@ -11,6 +11,7 @@ import { JobTeamMemberView } from '../task/job.view';
 import type { AgentNew, AgentRevisionNew, AgentRow } from '../task.tables';
 import { AgentUsageView } from '../usage/usage.view';
 import { AgentSavedView } from './agent.view';
+import { AgentOrg } from './agent-org.policy';
 import { AgentRuntime } from './agent-runtime.policy';
 import { AgentScopes } from './agent-scopes.policy';
 
@@ -40,6 +41,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     'runner_id',
     'model',
     'effort',
+    'external_tools',
   ];
   private static readonly NAME_MAX = 60;
   private static readonly ROLE_MAX = 2000;
@@ -90,6 +92,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     },
     model: (value) => AgentRuntime.model(value),
     effort: (value) => AgentRuntime.effort(value),
+    external_tools: (value) => AgentScopes.tools(value),
   };
 
   /** 새 에이전트의 빈 칸. 이 순서로 규칙을 지난다 */
@@ -165,8 +168,35 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return this.row.effort ?? '';
   }
 
+  /** 허락한 외부 도구의 이름 (2차 7단계). 러너가 이 에이전트의 일에만 붙인다 */
+  get externalTools(): readonly string[] {
+    return this.row.external_tools ?? [];
+  }
+
+  /** 외부 도구 하나를 더 붙일 수 없는 까닭 (제안의 결재를 실행하기 전에 본다). 붙일 수 있으면 null */
+  toolProblem(name: string): string | null {
+    if (this.deleted) return '제안한 에이전트를 지웠어요';
+    return AgentScopes.toolProblem(this.scopes, this.externalTools, name);
+  }
+
+  /** 외부 도구 하나를 더 허락한다 (제안을 승인했을 때). 권한 조합 · 개수는 고치기와 같은 규칙 */
+  plugTool(name: string): void {
+    const tools = this.externalTools;
+    if (!tools.includes(name)) this.edit({ external_tools: [...tools, name] });
+  }
+
+  /** 지운 외부 도구를 뺀다 */
+  unplugTool(name: string): void {
+    this.edit({ external_tools: this.externalTools.filter((t) => t !== name) });
+  }
+
   get monthlyLimit(): number | null {
     return this.row.monthly_limit;
+  }
+
+  /** 보고 대상 에이전트. null이면 관리자에게 보고한다 */
+  get reportsTo(): string | null {
+    return this.row.reports_to ?? null;
   }
 
   /** 관리자 바로 아래 (보고 대상이 없다). 대화 상대가 될 수 있다 */
@@ -206,11 +236,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     this.announce();
   }
 
-  /** head와 그 아래 팀 전체, 아래부터 (팀째 지울 때 팀원을 위로 올리지 않게 아래부터 지운다) */
-  static teamUnder(head: Agent, org: readonly Agent[]): readonly Agent[] {
-    return [...org.filter((a) => head.manages(a)).flatMap((a) => Agent.teamUnder(a, org)), head];
-  }
-
   /**
    * 주인이 고친 칸을 적는다. runner를 주면 일을 맡을 러너도 정한다 (null이면 아무 러너). 설정이 바뀌면 설정 판을 하나 올린다.
    * 묶이면 그 러너만 이 에이전트의 일을 빌리고, 꺼져 있으면 일이 기다린다. 코드 러너 칸에는 묶지 않고,
@@ -222,6 +247,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     if (runner !== undefined) this.put('runner_id', runner?.id ?? null);
     this.accept(changes, Agent.RULES);
     AgentRuntime.assertFits(this.row.tool, this.row.effort ?? '');
+    AgentScopes.assertTools(this.row.scopes ?? [], this.externalTools);
     if (this.row.runner_id && AgentScopes.sandboxed(this.row.scopes ?? []))
       throw new RuleViolation(
         '코드 · 만들기 권한이 있는 에이전트는 샌드박스에서만 돌아 러너에 묶을 수 없어요',
@@ -294,12 +320,12 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     if (managerId !== null) {
       const manager = org.find((a) => a.id === managerId);
       if (!manager || manager.deleted) throw new RuleViolation('보고 대상 에이전트가 없어요');
-      const above = Agent.chainUp(manager, org);
+      const above = AgentOrg.chainUp(manager, org);
       if (above.some((a) => a.id === this.id))
         throw new RuleViolation('자기 자신이나 자기 팀원에게는 보고할 수 없어요');
       level = above.length + 1;
     }
-    if (level + Agent.heightOf(this.id, org) - 1 > Agent.ORG_DEPTH_MAX)
+    if (level + AgentOrg.heightOf(this.id, org) - 1 > Agent.ORG_DEPTH_MAX)
       throw new RuleViolation(`조직도는 ${Agent.ORG_DEPTH_MAX}단계까지예요`);
     if (managerId === this.row.reports_to) return;
     const before = this.settingsSnapshot();
@@ -363,26 +389,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   /** 팀장이 받는 일에 실리는 팀원 하나. kinds는 이 팀원에게 맡길 수 있는 일의 종류 */
   memberView(kinds: readonly string[]): JobTeamMemberView {
     return new JobTeamMemberView(this.row, kinds);
-  }
-
-  /** agent부터 맨 위까지 (agent 포함). 저장된 조직도에 순환이 없어도 org 수만큼만 따라간다 */
-  private static chainUp(agent: Agent, org: readonly Agent[]): readonly Agent[] {
-    const chain = [agent];
-    for (let at = agent; at.row.reports_to !== null && chain.length <= org.length; ) {
-      const boss = org.find((a) => a.id === at.row.reports_to);
-      if (!boss) break;
-      chain.push(boss);
-      at = boss;
-    }
-    return chain;
-  }
-
-  /** id부터 가장 깊은 팀원까지의 단계 수 (팀원이 없으면 1) */
-  private static heightOf(id: string, org: readonly Agent[], seen = new Set<string>()): number {
-    if (seen.has(id)) return 1;
-    seen.add(id);
-    const team = org.filter((a) => a.row.reports_to === id && !a.deleted);
-    return 1 + Math.max(0, ...team.map((a) => Agent.heightOf(a.id, org, seen)));
   }
 
   private moveTo(status: string): void {

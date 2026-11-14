@@ -10,6 +10,7 @@ import { actionLabel, flatTree, holdLabel, TOOL_LABELS, taskStatusLabel } from '
 import {
   type RunnerChoice,
   useAgents,
+  useExternalTools,
   useRunnerChoices,
   useTasksIn,
   useUsage,
@@ -32,6 +33,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   const waiting = useTasksIn('waiting');
   const usage = useUsage();
   const runners = useRunnerChoices();
+  const externalTools = useExternalTools().data?.tools ?? [];
   // 열린 입력 칸: 추가, 또는 편집 중인 에이전트의 id
   const [open, setOpen] = useState<string | null>(adding ? NEW : null);
   // 팀 템플릿 칸 (에이전트가 없을 때는 늘 보인다)
@@ -139,6 +141,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
           agents={list ?? []}
           ownerName={ownerName}
           runners={runners}
+          externalTools={externalTools}
           busy={save.busy !== null}
           problem={save.problem}
           onSubmit={(body, requestId) => submit(null, body, requestId)}
@@ -174,6 +177,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
                 agents={list}
                 ownerName={ownerName}
                 runners={runners}
+                externalTools={externalTools}
                 busy={save.busy !== null}
                 problem={save.problem}
                 onSubmit={(body, requestId) => submit(a, body, requestId)}

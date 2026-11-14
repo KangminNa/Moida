@@ -34,6 +34,7 @@ export interface AgentRow {
   reviewer_id: string | null;
   model: string;
   effort: string;
+  external_tools: readonly string[];
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 
@@ -107,6 +108,25 @@ export interface ChatRow {
   pending: string | null;
 }
 export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'title' | 'request_id'>;
+
+/** task.external_tools */
+export interface ExternalToolRow {
+  id: string;
+  space_id: string;
+  name: string;
+  title: string;
+  url: string;
+  header_name: string | null;
+  secret: Buffer | null;
+  nonce: Buffer | null;
+  status: string;
+  note: string;
+  proposed_by: string | null;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+}
+export type ExternalToolNew = Partial<ExternalToolRow> & Pick<ExternalToolRow, 'id' | 'space_id' | 'name' | 'title' | 'url'>;
 
 /** task.goal_rounds */
 export interface GoalRoundRow {

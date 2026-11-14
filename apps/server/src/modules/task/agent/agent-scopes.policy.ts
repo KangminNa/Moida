@@ -48,6 +48,53 @@ export class AgentScopes {
     return AgentScopes.ALL.filter((s) => value.includes(s));
   }
 
+  /**
+   * 외부 도구(바깥 서비스의 MCP, 2차 7단계)를 붙일 수 없는 권한: 비공개를 여는 것과 셸. 바깥으로 가는 길이라 browse와 같은 규칙.
+   * DB CHECK agents_tools_not_private와 같다
+   */
+  private static readonly NOT_WITH_TOOLS: readonly string[] = [
+    Actor.READ_ALL,
+    Actor.WRITE,
+    Actor.CODE,
+    Actor.MAKE,
+  ];
+
+  /** 한 에이전트에 붙일 수 있는 외부 도구 수 (DB CHECK와 같다) */
+  private static readonly TOOLS_MAX = 10;
+
+  /** 외부 도구 이름 목록의 규칙 (Agent의 external_tools 칸): 개수, 겹친 이름은 하나로 */
+  static tools(value: readonly string[]): string[] {
+    if (value.length > AgentScopes.TOOLS_MAX)
+      throw new RuleViolation(`외부 도구는 ${AgentScopes.TOOLS_MAX}개까지예요`);
+    return [...new Set(value)];
+  }
+
+  /** 도구 name을 더 붙일 수 없는 까닭. 붙일 수 있으면 null (제안의 결재를 실행하기 전에) */
+  static toolProblem(
+    scopes: readonly string[],
+    tools: readonly string[],
+    name: string,
+  ): string | null {
+    if (!AgentScopes.mayUseTools(scopes))
+      return '제안한 에이전트의 권한(전체 읽기 · 초안 작성 · 코드 · 만들기)에는 외부 도구를 붙이지 않아요';
+    if (!tools.includes(name) && tools.length >= AgentScopes.TOOLS_MAX)
+      return `외부 도구는 ${AgentScopes.TOOLS_MAX}개까지예요`;
+    return null;
+  }
+
+  /** 이 권한의 에이전트에 외부 도구를 붙일 수 있는가 */
+  static mayUseTools(scopes: Iterable<string>): boolean {
+    return ![...scopes].some((s) => AgentScopes.NOT_WITH_TOOLS.includes(s));
+  }
+
+  /** 외부 도구를 붙인 에이전트의 권한 조합을 본다 (도구를 붙일 때도, 권한을 바꿀 때도) */
+  static assertTools(scopes: readonly string[], tools: readonly string[]): void {
+    if (tools.length > 0 && !AgentScopes.mayUseTools(scopes))
+      throw new RuleViolation(
+        '외부 도구는 전체 읽기 · 초안 작성 · 코드 작업 · 파일 만들기와 함께 줄 수 없어요',
+      );
+  }
+
   /** 코드 러너 칸에서만 도는 권한(code · make)이 있는가. DB CHECK agents_pinned_not_sandboxed와 같다 */
   static sandboxed(scopes: readonly string[]): boolean {
     return scopes.some((s) => AgentScopes.SANDBOXED.includes(s));

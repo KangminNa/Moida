@@ -41,6 +41,8 @@ export class AgentSavedView {
       /** AI CLI의 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계) */
       model: r.model ?? '',
       effort: r.effort ?? '',
+      /** 허락한 외부 도구의 이름 (2차 7단계) */
+      externalTools: r.external_tools ?? [],
       /** 보고 대상 에이전트. null이면 주인에게 보고한다 */
       reportsTo: r.reports_to,
       /** 일을 맡을 러너 (task.runners의 id). null이면 아무 러너 */

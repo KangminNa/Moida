@@ -5,6 +5,7 @@ import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
 import { CliRuntime } from './cli-runtime';
 import { CodexStream } from './codex-stream';
+import type { ExternalMcp } from './external-mcp';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import type { PromptPack } from './prompt-pack';
@@ -18,7 +19,9 @@ import type { SandboxRoom } from './sandbox-room';
 //       읽기는 sandbox가 막지 않아서(실험으로 확인) 셸을 끄는 것이 첫 벽이다.
 //       --strict-config: 설정 이름이 바뀐 버전이면 셸이 조용히 열리지 않고 시작부터 실패한다.
 // 스킬: 셸이 없어 SKILL.md를 스스로 읽지 못하므로 지시문에 넣는다.
-// MCP: cairn 하나. 작업 토큰은 환경 변수(CAIRN_RUN_TOKEN)로만 넘기고, 셸 명령에는 기본만 넘긴다(shell_environment_policy).
+// MCP: cairn (브라우저 작업이면 playwright, 허락한 외부 도구 x-*). 작업 토큰 · 외부 도구의 머리글 값은 환경 변수로만 넘기고
+//      (bearer_token_env_var · env_http_headers), 셸 명령에는 기본만 넘긴다(shell_environment_policy).
+//      env_http_headers는 Codex 설정 문서의 이름이다. 버전이 바뀌어 모르는 이름이 되면 --strict-config가 시작부터 막는다 (토큰 없이 조용히 붙지 않는다).
 // 자격: auth.json은 쓸 때 갱신 토큰이 바뀐다. 끝난 뒤 바뀌었으면 서버에 되돌려 쓴다 (changedCredential → ai_login_refresh).
 // 설정 값은 Codex 0.164.0의 --strict-config로 이름을 확인했다.
 export class CodexCli implements AiTool {
@@ -62,6 +65,8 @@ export class CodexCli implements AiTool {
   private browser: BrowserMcp | null = null;
   /** 셸을 여는가: 코드 러너 칸의 자리에서 하는 일(코드 · 만들기)만 */
   private shell = false;
+  /** 이 일에 붙인 외부 도구 (2차 7단계). MCP가 붙는 일이고 셸이 없을 때만 */
+  private tools: readonly ExternalMcp[] = [];
   /** model_reasoning_effort가 받는 값. 모르는 값은 쓰지 않고 CLI의 기본으로 (서버 AgentRuntime과 같다) */
   static readonly EFFORTS: readonly string[] = ['low', 'medium', 'high'];
 
@@ -74,6 +79,7 @@ export class CodexCli implements AiTool {
     browser: BrowserMcp | null = null,
     shell = false,
     runtime: CliRuntime = CliRuntime.NONE,
+    tools: readonly ExternalMcp[] = [],
   ): string {
     // 셸을 연 칸의 일: Codex의 sandbox는 끄고 칸이 벽이다 (Claude Code와 같은 조건. Docker 안에서 Codex sandbox가 도는지도 불확실).
     // 셸 명령은 Codex가 받은 환경(프록시 · 칸의 홈)을 그대로 쓴다
@@ -118,7 +124,29 @@ export class CodexCli implements AiTool {
         `command = ${JSON.stringify(browser.command)}`,
         `args = [${browser.args.map((a) => JSON.stringify(a)).join(', ')}]`,
       );
+    if (mcpUrl !== null)
+      tools.forEach((tool, i) => {
+        const headers = Object.keys(tool.headers).map(
+          (name, j) => `${JSON.stringify(name)} = ${JSON.stringify(CodexCli.toolEnv(i, j))}`,
+        );
+        lines.push('', `[mcp_servers.${tool.server}]`, `url = ${JSON.stringify(tool.url)}`);
+        if (headers.length > 0) lines.push(`env_http_headers = { ${headers.join(', ')} }`);
+      });
     return `${lines.join('\n')}\n`;
+  }
+
+  /** 외부 도구 i의 머리글 j를 넘기는 환경 변수 이름 (설정 파일에는 이름만, 값은 환경으로) */
+  private static toolEnv(i: number, j: number): string {
+    return `CAIRN_TOOL_${i}_${j}`;
+  }
+
+  /** 외부 도구의 머리글 값들 (환경 변수 이름 → 값) */
+  private static toolValues(tools: readonly ExternalMcp[]): Record<string, string> {
+    return Object.fromEntries(
+      tools.flatMap((tool, i) =>
+        Object.values(tool.headers).map((value, j) => [CodexCli.toolEnv(i, j), value]),
+      ),
+    );
   }
 
   async open(job: Job, room: SandboxRoom | null = null): Promise<JobWorkspace> {
@@ -126,9 +154,10 @@ export class CodexCli implements AiTool {
     const mcp = job.runToken === null ? null : this.mcpUrl;
     this.browser = mcp === null ? null : BrowserMcp.for(job, this.browserUrl);
     this.shell = job.sandboxed && room !== null && mcp !== null;
+    this.tools = mcp === null || job.sandboxed ? [] : job.runtime.tools;
     await writeFile(
       join(workspace.configDir, 'config.toml'),
-      CodexCli.configToml(mcp, this.browser, this.shell, job.runtime),
+      CodexCli.configToml(mcp, this.browser, this.shell, job.runtime, this.tools),
       {
         mode: 0o600,
       },
@@ -167,6 +196,7 @@ export class CodexCli implements AiTool {
       ...(workspace.tmpDir === null ? {} : { TMPDIR: workspace.tmpDir }),
       CODEX_HOME: workspace.configDir,
       ...(job.runToken === null ? {} : { [CodexCli.TOKEN_ENV]: job.runToken }),
+      ...CodexCli.toolValues(this.tools),
     };
   }
 
@@ -193,7 +223,11 @@ export class CodexCli implements AiTool {
 
   stream(): AiStream {
     return new CodexStream(
-      this.browser ? [CodexStream.SERVER, BrowserMcp.SERVER] : [CodexStream.SERVER],
+      [
+        CodexStream.SERVER,
+        ...(this.browser ? [BrowserMcp.SERVER] : []),
+        ...this.tools.map((t) => t.server),
+      ],
       this.shell,
     );
   }

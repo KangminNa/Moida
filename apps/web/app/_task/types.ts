@@ -16,6 +16,7 @@ import type {
   ApprovalView,
 } from '../../../server/src/modules/task/approval/approval.view';
 import type { ChatDetailView, ChatListView } from '../../../server/src/modules/task/chat/chat.view';
+import type { ExternalToolListView } from '../../../server/src/modules/task/external-tool/external-tool.view';
 import type { GoalListView, GoalView } from '../../../server/src/modules/task/goal/goal.view';
 import type {
   GoalRunDetailView,
@@ -73,6 +74,9 @@ export type Approval = ReturnType<ApprovalView['toJSON']>;
 export type ApprovalPage = ReturnType<ApprovalPageView['toJSON']>;
 export type Agent = ReturnType<AgentView['toJSON']>;
 export type AgentList = ReturnType<AgentListView['toJSON']>;
+/** 외부 도구 (2차 7단계). 토큰은 실리지 않는다 (hasSecret만) */
+export type ExternalToolList = ReturnType<ExternalToolListView['toJSON']>;
+export type ExternalTool = ExternalToolList['tools'][number];
 export type AgentTeamList = ReturnType<AgentTeamListView['toJSON']>;
 export type AgentTeam = AgentTeamList['teams'][number];
 export type AgentTeamSaved = ReturnType<AgentTeamSavedView['toJSON']>;

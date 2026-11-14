@@ -17,6 +17,7 @@ const COLUMNS: ColumnReaders<AgentRow> = {
   plan_stop_percent: (f, n) => f.optionalInteger(n, 1, 100),
   model: (f, n) => f.optionalText(n, 80) ?? '',
   effort: (f, n) => f.optionalText(n, 10) ?? '',
+  external_tools: (f, n) => f.optionalTextList(n, 10, 30) ?? undefined,
 };
 
 /** 보고 대상 칸 (만들기 · 고치기가 함께 쓴다): 보내지 않으면 undefined, null이면 주인에게 보고 */

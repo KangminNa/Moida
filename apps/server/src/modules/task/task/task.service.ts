@@ -19,6 +19,7 @@ import { AiLoginRepository } from '../ai/ai-login.repository';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
 import { ChatUpdateQuery } from '../chat/chat-update.query';
+import { ExternalToolQuery } from '../external-tool/external-tool.query';
 import { GoalRepository } from '../goal/goal.repository';
 import { OutputQuery } from '../output/output.query';
 import { RunnerRepository } from '../runner/runner.repository';
@@ -66,6 +67,7 @@ export class TaskService extends BaseService {
     private readonly repoSkills: RepoSkillGateway,
     private readonly outputs: OutputQuery,
     private readonly chats: ChatUpdateQuery,
+    private readonly tools: ExternalToolQuery,
   ) {
     super(db);
   }
@@ -88,8 +90,7 @@ export class TaskService extends BaseService {
    */
   async next(actor: Actor, req: NextJobsInput): Promise<readonly JobView[]> {
     actor.assertCan(Actor.RUN);
-    const spaceId = TaskService.spaceOf(actor);
-    const runnerId = TaskService.runnerOf(actor);
+    const [spaceId, runnerId] = TaskService.runnerAt(actor);
     const deadline = Date.now() + req.waitSeconds * 1000;
     for (;;) {
       const runner = await this.transaction((tx) =>
@@ -108,8 +109,7 @@ export class TaskService extends BaseService {
   /** 진행 보고: 기록을 남기고 임대를 늘린다. 쓴 토큰은 에이전트의 한 달 한도에 더하고, 러너가 본 구독 사용률을 남긴다 */
   async report(actor: Actor, req: ReportProgressInput): Promise<ProgressView> {
     actor.assertCan(Actor.RUN);
-    const spaceId = TaskService.spaceOf(actor);
-    const runnerId = TaskService.runnerOf(actor);
+    const [spaceId, runnerId] = TaskService.runnerAt(actor);
     const now = new Date();
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
@@ -140,8 +140,7 @@ export class TaskService extends BaseService {
   /** 끝내기. 살아 있는 임대로만 된다. 같은 request_id는 처음 결과를 돌려준다 */
   async submit(actor: Actor, req: SubmitResultInput): Promise<Task> {
     actor.assertCan(Actor.RUN);
-    const spaceId = TaskService.spaceOf(actor);
-    const runnerId = TaskService.runnerOf(actor);
+    const [spaceId, runnerId] = TaskService.runnerAt(actor);
     const now = new Date();
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
@@ -160,8 +159,7 @@ export class TaskService extends BaseService {
   /** 처리하지 못한 일을 돌려준다 */
   async release(actor: Actor, req: ReleaseJobInput): Promise<Task> {
     actor.assertCan(Actor.RUN);
-    const spaceId = TaskService.spaceOf(actor);
-    const runnerId = TaskService.runnerOf(actor);
+    const [spaceId, runnerId] = TaskService.runnerAt(actor);
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, req.taskId);
@@ -376,7 +374,9 @@ export class TaskService extends BaseService {
     const made = await this.outputs.madeBy(actor, ids);
     const view = task.jobView(agent, this.box, goals, org, children, skill?.jobView() ?? null);
     view.withOutputs(made).withChat(await this.chats.forJob(actor, task.id));
-    return view.withPrompt(prompt?.jobView() ?? null);
+    // 외부 도구 (2차 7단계): 이 에이전트에게 허락한 것만, 토큰은 여기서 풀려 이 일과 함께만 나간다
+    const tools = await this.tools.forJob(actor, agent);
+    return view.withPrompt(prompt?.jobView() ?? null).withTools(tools);
   }
 
   private async expire(tx: Sql, now: Date): Promise<number> {
@@ -436,8 +436,9 @@ export class TaskService extends BaseService {
     return actor.spaceId;
   }
 
-  private static runnerOf(actor: Actor): string {
-    if (!actor.id) throw new Forbidden(Actor.RUN);
-    return actor.id;
+  /** 러너의 공간과 기기 id (run 권한 기기만 닿는다) */
+  private static runnerAt(actor: Actor): readonly [string, string] {
+    if (!actor.spaceId || !actor.id) throw new Forbidden(Actor.RUN);
+    return [actor.spaceId, actor.id];
   }
 }

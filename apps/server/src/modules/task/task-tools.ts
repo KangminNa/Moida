@@ -4,6 +4,7 @@ import { AiLoginRefreshTool, AiLoginTool, AiSigninTool } from './ai/ai-login.too
 import { RequestApprovalTool } from './approval/approval.tool';
 import { AskAgentTool } from './chat/chat.tool';
 import { AgentUpdatesTool, PostUpdateTool } from './chat/chat-update.tool';
+import { ProposeToolTool } from './external-tool/external-tool.tool';
 import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxTool } from './inbox/inbox.tool';
 import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
@@ -42,6 +43,7 @@ export class TaskTools {
     inbox: InboxTool,
     agentUpdates: AgentUpdatesTool,
     postUpdate: PostUpdateTool,
+    proposeTool: ProposeToolTool,
   ) {
     this.tools = [
       nextJobs,
@@ -61,6 +63,7 @@ export class TaskTools {
       inbox,
       agentUpdates,
       postUpdate,
+      proposeTool,
     ];
   }
 }

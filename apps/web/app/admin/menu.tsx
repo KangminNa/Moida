@@ -159,6 +159,7 @@ export const MENU = [
       { href: '/admin/devices', name: '기기', icon: 'device' },
       { href: '/admin/ai', name: 'AI', icon: 'session' },
       { href: '/admin/plugins', name: '플러그인', icon: 'plug' },
+      { href: '/admin/external-tools', name: '외부 도구', icon: 'plug' },
     ],
   },
   {

@@ -1,33 +1,15 @@
 'use client';
 
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { SCOPE_LABELS } from '../../_lib/types';
-import {
-  actionLabel,
-  LOGIN_SITE,
-  MERGE_PULL,
-  PUBLISH_POST,
-  PUBLISH_SITE,
-  TOOL_LABELS,
-} from '../../_task/labels';
+import { TOOL_LABELS } from '../../_task/labels';
 import type { RunnerChoice } from '../../_task/live';
-import type { Agent } from '../../_task/types';
+import type { Agent, ExternalTool } from '../../_task/types';
+import { AccessFields } from './AccessFields';
 import { BossField } from './BossField';
 import { LimitField } from './LimitField';
 import { ReviewerField } from './ReviewerField';
 import { RunnerField } from './RunnerField';
 import { RuntimeFields, runtimeFor } from './RuntimeFields';
-
-/** 에이전트에게 줄 수 있는 권한. run은 러너의 것이라 없다 (서버의 Agent.SCOPES와 맞춘다) */
-const SCOPES = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'browse', 'code', 'make'];
-/** 고를 수 있는 결재 동작: 승인 뒤 실행하는 모듈이 있는 것만. 없으면 작업이 끝나지 않는다. 한도 변경은 서버만 올린다 */
-const ACTIONS = [PUBLISH_POST, PUBLISH_SITE, LOGIN_SITE, MERGE_PULL];
-/** 브라우저 사용을 켜면 함께 켜는 결재 동작: 러너가 이 에이전트의 이름으로 클릭 · 로그인 결재를 올린다 */
-const BROWSE_ACTIONS = [PUBLISH_SITE, LOGIN_SITE];
-
-function toggled(list: readonly string[], value: string): string[] {
-  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-}
 
 /** 빈 칸은 한도 없음. 맞지 않는 값이면 undefined */
 function limitOf(text: string): number | null | undefined {
@@ -57,6 +39,8 @@ export type AgentBody = {
   planStopPercent: number | null;
   reportsTo: string | null;
   runnerId: string | null;
+  /** 허락한 외부 도구의 이름 (2차 7단계) */
+  externalTools: readonly string[];
   /** 모델 · 생각 강도 (빈 글이면 CLI의 기본, 2차 7단계) */
   model: string;
   effort: string;
@@ -70,6 +54,7 @@ export function AgentForm({
   agents,
   ownerName,
   runners,
+  externalTools,
   busy,
   problem,
   onSubmit,
@@ -83,6 +68,8 @@ export function AgentForm({
   ownerName: string;
   /** 묶을 수 있는 러너 (실행 러너 고르기) */
   runners: readonly RunnerChoice[];
+  /** 공간의 외부 도구 (허락 칸, 2차 7단계) */
+  externalTools: readonly ExternalTool[];
   busy: boolean;
   problem: string | null;
   onSubmit: (body: AgentBody, requestId: string) => void;
@@ -101,9 +88,13 @@ export function AgentForm({
   const [reportsTo, setReportsTo] = useState(agent?.reportsTo ?? '');
   const [runnerId, setRunnerId] = useState(agent?.runnerId ?? '');
   const [reviewerId, setReviewerId] = useState(agent?.reviewerId ?? '');
-  const [scopes, setScopes] = useState<readonly string[]>(agent?.scopes ?? []);
+  const [access, setAccess] = useState({
+    scopes: agent?.scopes ?? [],
+    actions: agent?.approvalActions ?? [],
+    tools: agent?.externalTools ?? [],
+  });
+  const { scopes } = access;
   const sandboxed = scopes.includes('code') || scopes.includes('make');
-  const [actions, setActions] = useState<readonly string[]>(agent?.approvalActions ?? []);
   const [limit, setLimit] = useState(agent?.monthlyLimit?.toString() ?? '');
   const [fiveHour, setFiveHour] = useState(agent?.fiveHourLimit?.toString() ?? '');
   const [planStop, setPlanStop] = useState(agent?.planStopPercent?.toString() ?? '');
@@ -141,7 +132,8 @@ export function AgentForm({
         role: role.trim(),
         tool,
         scopes,
-        approvalActions: actions,
+        approvalActions: access.actions,
+        externalTools: access.tools,
         monthlyLimit,
         fiveHourLimit,
         planStopPercent,
@@ -235,43 +227,12 @@ export function AgentForm({
           onChange={(value) => change(() => setReviewerId(value))}
         />
       )}
-      <fieldset className="checks">
-        <legend>권한</legend>
-        <small>
-          세션 정리는 정리와 전체 읽기 권한이 함께 필요. 브라우저 사용 · 코드 작업 · 파일 만들기는
-          전체 읽기 · 초안 작성과 함께 줄 수 없음
-        </small>
-        {SCOPES.map((s) => (
-          <label key={s} className="check">
-            <input
-              type="checkbox"
-              checked={scopes.includes(s)}
-              onChange={() =>
-                change(() => {
-                  const next = toggled(scopes, s);
-                  setScopes(next);
-                  if (s === 'browse' && next.includes(s))
-                    setActions([...new Set([...actions, ...BROWSE_ACTIONS])]);
-                })
-              }
-            />
-            {SCOPE_LABELS[s]}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset className="checks">
-        <legend>결재 요청할 수 있는 동작</legend>
-        {[...new Set([...ACTIONS, ...(agent?.approvalActions ?? [])])].map((a) => (
-          <label key={a} className="check">
-            <input
-              type="checkbox"
-              checked={actions.includes(a)}
-              onChange={() => change(() => setActions(toggled(actions, a)))}
-            />
-            {actionLabel(a)}
-          </label>
-        ))}
-      </fieldset>
+      <AccessFields
+        value={access}
+        kept={agent?.approvalActions ?? []}
+        tools={externalTools}
+        onChange={(next) => change(() => setAccess(next))}
+      />
       <LimitField
         id={`${id}-limit`}
         label="월 한도 (토큰)"

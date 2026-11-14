@@ -38,6 +38,7 @@ export const agents = taskSchema.table('agents', {
   reviewer_id: uuid('reviewer_id'),
   model: text('model').notNull(),
   effort: text('effort').notNull(),
+  external_tools: text('external_tools').array().notNull(),
 });
 
 /** task.ai_logins */
@@ -105,6 +106,24 @@ export const chats = taskSchema.table('chats', {
   project: text('project'),
   deliver: text('deliver'),
   pending: text('pending'),
+});
+
+/** task.external_tools */
+export const externalTools = taskSchema.table('external_tools', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  name: text('name').notNull(),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  header_name: text('header_name'),
+  secret: byteaColumn('secret'),
+  nonce: byteaColumn('nonce'),
+  status: text('status').notNull(),
+  note: text('note').notNull(),
+  proposed_by: uuid('proposed_by'),
+  version: integer('version').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 
 /** task.goal_rounds */

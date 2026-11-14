@@ -34,6 +34,11 @@ import { ChatUpdateHandler } from './chat/chat-update.handler';
 import { ChatUpdateQuery } from './chat/chat-update.query';
 import { ChatUpdateService } from './chat/chat-update.service';
 import { AgentUpdatesTool, PostUpdateTool } from './chat/chat-update.tool';
+import { ExternalToolController } from './external-tool/external-tool.api';
+import { ExternalToolQuery } from './external-tool/external-tool.query';
+import { ExternalToolService } from './external-tool/external-tool.service';
+import { ProposeToolTool } from './external-tool/external-tool.tool';
+import { ExternalToolPlugHandler } from './external-tool/external-tool-plug.handler';
 import { GoalController } from './goal/goal.api';
 import { GoalQuery } from './goal/goal.query';
 import { GoalService } from './goal/goal.service';
@@ -163,6 +168,11 @@ import { WebPageGateway } from './web/web-page.gateway';
     OutputPurgeJob,
     // 자동화 레시피 (2차 5단계): 레시피의 일이 끝나면 그 뒤의 레시피 (계기 after)
     ScheduleFollowHandler,
+    // 외부 도구 꽂기 (2차 7단계)
+    ExternalToolService,
+    ExternalToolQuery,
+    ExternalToolPlugHandler,
+    ProposeToolTool,
   ],
   controllers: [
     AgentController,
@@ -178,6 +188,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     OutputController,
     GoalRunController,
     ChatController,
+    ExternalToolController,
   ],
   exports: [TaskTools, TaskQuery],
 })
@@ -211,6 +222,8 @@ export class TaskModule implements OnModuleInit {
     private readonly follows: ScheduleFollowHandler,
     private readonly directory: AgentDirectory,
     private readonly agentQuery: AgentQuery,
+    private readonly toolPlugs: ExternalToolPlugHandler,
+    private readonly externalTools: ExternalToolService,
   ) {}
 
   onModuleInit(): void {
@@ -229,6 +242,11 @@ export class TaskModule implements OnModuleInit {
     this.workers.every(this.leases, TaskModule.LEASE_CHECK_MS);
     this.workers.every(this.schedules, TaskModule.SCHEDULE_CHECK_MS);
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
+    // 외부 도구 (2차 7단계): 제안의 결재가 정해지면 붙이거나 지우고, 서버 키를 바꾸면 토큰을 다시 잠근다
+    for (const topic of ExternalToolPlugHandler.TOPICS) this.workers.on(topic, this.toolPlugs);
+    this.rotation.register('task.external_tools', (actor) =>
+      this.externalTools.resealSecrets(actor),
+    );
     this.workers.every(this.outputPurge, OutputPurgeJob.EVERY_MS);
     // 기능 패키지의 도구(code-github의 code_credential 등)가 묻는 임대 확인
     this.leaseChecks.register((actor, id) => this.tasks.leasedWork(actor, id));

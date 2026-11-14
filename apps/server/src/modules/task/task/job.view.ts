@@ -1,4 +1,4 @@
-import type { AgentRow, ChatUpdateRow, OutputRow, TaskRow } from '../task.tables';
+import type { AgentRow, ChatUpdateRow, ExternalToolRow, OutputRow, TaskRow } from '../task.tables';
 
 // 러너 · 에이전트가 MCP로 받는 작업의 모양 (next_jobs · report_progress · submit_result · delegate_task). 도구의 모양이라 snake_case.
 // 화면이 받는 모양은 task.view.ts. view끼리는 서로 가져오지 않는다 (경계 검사: view는 표 인터페이스만)
@@ -91,6 +91,11 @@ export class JobSkillView {
   }
 }
 
+/** 러너에게 가는 외부 도구 하나 (2차 7단계): 표의 칸에 일을 빌려 줄 때 푼 머리글(토큰)을 더했다 */
+export type JobToolRow = Pick<ExternalToolRow, 'name' | 'title' | 'url'> & {
+  headers: Readonly<Record<string, string>>;
+};
+
 /**
  * 러너가 빌려 간 일 하나 (next_jobs). MCP 도구의 모양이라 snake_case. run_token은 여기서 한 번만 나간다.
  * 연결 확인(task.kind가 ai_test)에는 에이전트도 run_token도 없다. 어느 도구인지는 task.payload.tool에 있다.
@@ -141,6 +146,14 @@ export class JobView {
     return this;
   }
 
+  /** 이 에이전트에게 허락한 외부 도구 (2차 7단계). 러너가 MCP 설정에 더한다. headers에만 토큰이 있다 */
+  private tools: readonly JobToolRow[] = [];
+
+  withTools(tools: readonly JobToolRow[]): this {
+    this.tools = tools;
+    return this;
+  }
+
   toJSON() {
     const r = this.row;
     const a = this.agent;
@@ -185,6 +198,12 @@ export class JobView {
         })),
       })),
       rounds_left: this.roundsLeft,
+      tools: this.tools.map((t) => ({
+        name: t.name,
+        title: t.title,
+        url: t.url,
+        headers: t.headers,
+      })),
     };
   }
 }

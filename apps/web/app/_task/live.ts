@@ -10,6 +10,7 @@ import type {
   AiTools,
   ApprovalPage,
   ChatList,
+  ExternalToolList,
   GoalList,
   GoalRunDetail,
   GoalRunList,
@@ -43,6 +44,8 @@ export const CHAT_DETAIL_TOPICS = [
 ];
 /** 실행 기록이 쌓이면 사용량이 바뀐다 */
 export const AGENT_TOPICS = ['task.agent.changed', 'task.event.added'];
+/** 외부 도구 (2차 7단계): AI의 제안 · 결재로 붙음 · 실패 */
+const EXTERNAL_TOOL_TOPICS = ['task.external_tool.*', 'task.approval.*'];
 /** 구독 사용률이 오거나 실행 기록이 쌓이면 사용량이 바뀐다 */
 export const USAGE_TOPICS = ['task.usage.changed', 'task.event.added'];
 /** 시간이 지나 창이 끝나는 일에는 신호가 없다. 쉬던 에이전트가 돌아온 것이 보이게 이 간격으로도 읽는다 */
@@ -55,6 +58,15 @@ export function useChats() {
 
 export function useAgents() {
   return useLiveValue('agents', () => api<AgentList>('GET', '/api/agents'), AGENT_TOPICS);
+}
+
+/** 외부 도구 목록 (설정 › 외부 도구, 에이전트 폼의 허락 칸) */
+export function useExternalTools() {
+  return useLiveValue(
+    'external-tools',
+    () => api<ExternalToolList>('GET', '/api/external-tools'),
+    EXTERNAL_TOOL_TOPICS,
+  );
 }
 
 /** AI 도구마다의 로그인 상태. 연결 확인과 웹 로그인은 작업으로 돌아서 작업이 바뀔 때 다시 읽는다 */

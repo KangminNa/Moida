@@ -3,6 +3,7 @@ import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
 import { ClaudeStream } from './claude-stream';
 import { CliRuntime } from './cli-runtime';
+import type { ExternalMcp } from './external-mcp';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import type { PromptPack } from './prompt-pack';
@@ -10,7 +11,7 @@ import type { SandboxRoom } from './sandbox-room';
 
 // Claude Code를 부르는 법. Codex가 들어올 때 공통 모양을 뽑는다 (객체설계 13장: 추상화는 둘째 구현이 생길 때).
 //
-// 격리: 설정·홈은 빈 임시 폴더, MCP는 --strict-mcp-config로 넘긴 cairn 하나, claude.ai 연결은 끈다.
+// 격리: 설정·홈은 빈 임시 폴더, MCP는 --strict-mcp-config로 넘긴 것만 (cairn, 브라우저 작업의 playwright, 허락한 외부 도구 x-*), claude.ai 연결은 끈다.
 // 브라우저 작업(browse)에서만 playwright를 더한다 (BrowserMcp: 서버 브라우저에 CDP로, 사이트의 허용 출처만).
 // --bare는 쓰지 않는다: CLAUDE_CODE_OAUTH_TOKEN을 읽지 않는다.
 // 권한: 셸을 주지 않는다. 내장 도구는 파일 도구만, 쓰기는 acceptEdits라 work 폴더 안에서만, MCP는 cairn만 묻지 않고 허락한다.
@@ -65,6 +66,8 @@ export class ClaudeCli implements AiTool {
   private web = false;
   /** 에이전트가 정한 모델 · 생각 강도 (2차 7단계) */
   private runtime = CliRuntime.NONE;
+  /** 이 일에 붙인 외부 도구 (2차 7단계). MCP가 붙는 일이고 셸이 없을 때만 */
+  private tools: readonly ExternalMcp[] = [];
   /** --effort가 받는 값 (Claude Code 2.1의 도움말). 모르는 값은 넘기지 않고 CLI의 기본으로 */
   static readonly EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -84,8 +87,11 @@ export class ClaudeCli implements AiTool {
     this.shell = job.sandboxed && room !== null && runToken !== null;
     this.web = runToken !== null;
     this.runtime = job.runtime;
+    this.tools = runToken === null || job.sandboxed ? [] : job.runtime.tools;
     return JobWorkspace.open(
-      runToken === null ? null : ClaudeCli.mcpConfig(this.mcpUrl, runToken, this.browser),
+      runToken === null
+        ? null
+        : ClaudeCli.mcpConfig(this.mcpUrl, runToken, this.browser, this.tools),
       ClaudeCli.settings(process.env.HOME),
       job.skill,
       this.skillsDir,
@@ -96,7 +102,11 @@ export class ClaudeCli implements AiTool {
 
   stream(): AiStream {
     return new ClaudeStream(
-      this.browser ? [ClaudeStream.SERVER, BrowserMcp.SERVER] : [ClaudeStream.SERVER],
+      [
+        ClaudeStream.SERVER,
+        ...(this.browser ? [BrowserMcp.SERVER] : []),
+        ...this.tools.map((t) => t.server),
+      ],
       this.shell,
     );
   }
@@ -110,8 +120,16 @@ export class ClaudeCli implements AiTool {
     return [this.oauthToken];
   }
 
-  /** mcp.json의 내용. 이 파일에만 작업 토큰을 쓴다. 브라우저 작업이면 playwright를 더한다 */
-  static mcpConfig(url: string, runToken: string, browser: BrowserMcp | null = null): string {
+  /**
+   * mcp.json의 내용. 이 파일에만 작업 토큰 · 외부 도구의 머리글을 쓴다 (작업 자리 밖, 600, 작업이 끝나면 지운다).
+   * 브라우저 작업이면 playwright를, 허락한 외부 도구가 있으면 x-<이름>의 원격 MCP를 더한다
+   */
+  static mcpConfig(
+    url: string,
+    runToken: string,
+    browser: BrowserMcp | null = null,
+    tools: readonly ExternalMcp[] = [],
+  ): string {
     const servers: Record<string, object> = {
       [ClaudeStream.SERVER]: {
         type: 'http',
@@ -121,6 +139,8 @@ export class ClaudeCli implements AiTool {
     };
     if (browser)
       servers[BrowserMcp.SERVER] = { type: 'stdio', command: browser.command, args: browser.args };
+    for (const tool of tools)
+      servers[tool.server] = { type: 'http', url: tool.url, headers: { ...tool.headers } };
     return JSON.stringify({ mcpServers: servers });
   }
 
@@ -162,6 +182,7 @@ export class ClaudeCli implements AiTool {
       '--allowedTools',
       `mcp__${ClaudeStream.SERVER}__*`,
       ...(this.browser ? [`mcp__${BrowserMcp.SERVER}__*`] : []),
+      ...this.tools.map((t) => `mcp__${t.server}__*`),
       ...(workspace.skillReady ? [ClaudeCli.SKILL_TOOL] : []),
       ...(this.shell ? ClaudeCli.CODE_TOOLS : []),
       ...(this.web ? [ClaudeCli.WEB_TOOL] : []),

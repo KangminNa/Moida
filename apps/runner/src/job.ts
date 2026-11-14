@@ -205,7 +205,7 @@ export class Job {
       ),
       agent.flag('bound'),
       raw.field('prompt_package') ? SkillPackage.from(raw.child('prompt_package')) : null,
-      CliRuntime.from(agent),
+      CliRuntime.from(agent, raw.list('tools')),
     );
   }
 
@@ -332,6 +332,10 @@ export class Job {
     else if (this.skill && skillText)
       parts.push(prompts.fill('skill', { name: this.skill, text: skillText.trim() }));
     parts.push(prompts.fill('work', { outputs: outputsDir, browse: this.isBrowse }));
+    // 외부 도구 (2차 7단계): 어댑터가 붙이는 조건과 같다 (MCP가 붙는 일, 셸이 없는 일)
+    const tools = this.runToken === null || this.sandboxed ? [] : this.runtime.tools;
+    if (tools.length > 0)
+      parts.push(prompts.fill('tools', { names: tools.map((t) => t.server).join(', ') }));
     return parts.join('\n\n');
   }
 }
