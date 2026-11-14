@@ -4,6 +4,10 @@ import type {
   BasketView,
 } from '../../../server/src/modules/blog/basket/basket.view';
 import type {
+  MenuListView,
+  PublicMenuListView,
+} from '../../../server/src/modules/blog/menu/menu.view';
+import type {
   PageChangesView,
   PageDetailView,
   PageListView,
@@ -55,3 +59,9 @@ export type PageDetail = ReturnType<PageDetailView['toJSON']>;
 export type PageRevision = PageDetail['revisionList'][number];
 /** 판 하나의 바뀐 점 (앞 판과 비교한 data.json, 2차 5단계 자라는 페이지) */
 export type PageChanges = ReturnType<PageChangesView['toJSON']>;
+
+/** 블로그 메뉴 (2차 6단계): 관리자의 목록 · 메뉴 하나, 공개 메뉴 줄 */
+export type MenuList = ReturnType<MenuListView['toJSON']>;
+export type Menu = MenuList['menus'][number];
+export type PublicMenuList = ReturnType<PublicMenuListView['toJSON']>;
+export type PublicMenu = PublicMenuList['menus'][number];

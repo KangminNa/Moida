@@ -10,6 +10,10 @@ import { BasketService } from './basket/basket.service';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
 import { BlogNotices } from './blog-notices';
 import { BlogTools } from './blog-tools';
+import { MenuController } from './menu/menu.api';
+import { MenuQuery } from './menu/menu.query';
+import { MenuService } from './menu/menu.service';
+import { BlogMenusTool } from './menu/menu.tool';
 import { PageController } from './page/page.api';
 import { PageQuery } from './page/page.query';
 import { PageService } from './page/page.service';
@@ -45,8 +49,19 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     PageService,
     PageQuery,
     PageBuiltHandler,
+    // 블로그 메뉴 (2차 6단계)
+    MenuService,
+    MenuQuery,
+    BlogMenusTool,
   ],
-  controllers: [PostController, AssetController, FileController, BasketController, PageController],
+  controllers: [
+    PostController,
+    AssetController,
+    FileController,
+    BasketController,
+    PageController,
+    MenuController,
+  ],
   exports: [BlogTools],
 })
 export class BlogModule implements OnModuleInit {

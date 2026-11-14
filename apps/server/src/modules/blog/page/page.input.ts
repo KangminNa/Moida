@@ -2,6 +2,17 @@ import { BaseRequest, NotFound } from '../../platform';
 import { Page } from './page';
 import { PageTicket } from './page-ticket';
 
+/** GET /api/pages?menu=: 이 메뉴(주소)에 올린 페이지만 (2차 6단계, 공개 블로그의 /m/<주소>) */
+export class ListPagesInput extends BaseRequest {
+  private constructor(readonly menu: string | null) {
+    super();
+  }
+
+  static from(query: unknown): ListPagesInput {
+    return BaseRequest.read(query ?? {}, (f) => new ListPagesInput(f.optionalText('menu', 200)));
+  }
+}
+
 /** GET /api/pages/:id */
 export class ReadPageInput extends BaseRequest {
   private constructor(readonly id: string) {

@@ -6,12 +6,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
   StreamableFile,
 } from '@nestjs/common';
 import { Actor, CurrentActor, type HttpResponse } from '../../platform';
 import {
   EditPageInput,
+  ListPagesInput,
   PageRevisionInput,
   PageSiteInput,
   ReadPageInput,
@@ -38,8 +40,11 @@ export class PageController {
 
   /** 주인: 모든 페이지. 방문자: 공개 페이지의 이름 · 제목 */
   @Get()
-  list(@CurrentActor() actor: Actor): Promise<PageListView | PublicPageListView> {
-    return this.pages.list(actor);
+  list(
+    @CurrentActor() actor: Actor,
+    @Query() query: unknown,
+  ): Promise<PageListView | PublicPageListView> {
+    return this.pages.list(actor, ListPagesInput.from(query));
   }
 
   /** 바깥 주소의 파일. 늘 격리 머리글을 붙인다: 페이지의 스크립트가 주인의 로그인에 닿지 못하게 */

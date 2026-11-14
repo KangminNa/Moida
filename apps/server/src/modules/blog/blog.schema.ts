@@ -1,7 +1,7 @@
 // 자동으로 만든 파일이라 고치지 않는다. 마이그레이션 뒤 pnpm db:rows로 다시 만든다 (scripts/db-rows.mjs).
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
-import { integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const blogSchema = pgSchema('blog');
 const workSchema = pgSchema('work');
@@ -14,16 +14,35 @@ export const assets = blogSchema.table('assets', {
   caption: text('caption'),
 });
 
-/** blog.categories */
-export const categories = blogSchema.table('categories', {
+/** blog.issues */
+export const issues = blogSchema.table('issues', {
   id: uuid('id').notNull(),
   space_id: uuid('space_id').notNull(),
-  parent_id: uuid('parent_id'),
+  title: text('title').notNull(),
+  intro: text('intro'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  menu_id: uuid('menu_id').notNull(),
+  number: integer('number').notNull(),
+  status: text('status').notNull(),
+  published_at: timestamp('published_at', { withTimezone: true }),
+  version: integer('version').notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+/** blog.menus */
+export const menus = blogSchema.table('menus', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
   name: text('name').notNull(),
   slug: text('slug').notNull(),
   sort: integer('sort').notNull(),
   version: integer('version').notNull(),
-  deleted_at: timestamp('deleted_at', { withTimezone: true }),
+  kind: text('kind').notNull(),
+  policy: text('policy').notNull(),
+  agent_id: uuid('agent_id'),
+  rss: boolean('rss').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 
 /** blog.page_revisions */
@@ -52,6 +71,7 @@ export const pages = blogSchema.table('pages', {
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
   direction: text('direction').notNull(),
   pending_seq: integer('pending_seq'),
+  menu_id: uuid('menu_id'),
 });
 
 /** blog.post_revisions */
@@ -86,9 +106,9 @@ export const posts = blogSchema.table('posts', {
   head_text: text('head_text'),
   head_revision_id: uuid('head_revision_id'),
   version: integer('version').notNull(),
-  category_id: uuid('category_id'),
-  series_id: uuid('series_id'),
-  series_order: integer('series_order'),
+  menu_id: uuid('menu_id'),
+  issue_id: uuid('issue_id'),
+  issue_order: integer('issue_order'),
   tags: text('tags').array().notNull(),
   cover_blob_hash: text('cover_blob_hash'),
   align: text('align').notNull(),
@@ -98,16 +118,6 @@ export const posts = blogSchema.table('posts', {
   purge_after: timestamp('purge_after', { withTimezone: true }),
   meta: jsonb('meta').notNull(),
   main_wiki_id: uuid('main_wiki_id'),
-});
-
-/** blog.series */
-export const series = blogSchema.table('series', {
-  id: uuid('id').notNull(),
-  space_id: uuid('space_id').notNull(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull(),
-  description: text('description'),
-  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 /** work.basket_items */

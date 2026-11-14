@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseQuery, NotFound } from '../../platform';
+import { type Actor, AgentCard, BaseQuery, NotFound } from '../../platform';
 import { agentRevisions, agents } from '../task.schema';
 import type { AgentRow } from '../task.tables';
 import type { ListAgentsInput } from './agent.input';
@@ -17,6 +17,13 @@ export class AgentQuery extends BaseQuery {
     return new AgentRevisionListView(
       await this.rows(agentRevisions, { agent_id: id }, { order: ['revision desc'] }),
     );
+  }
+
+  /** 다른 모듈이 platform AgentDirectory로 묻는 에이전트 하나 (예: blog 메뉴의 운영 팀). 지운 에이전트는 없다 */
+  async card(actor: Actor, id: string): Promise<AgentCard | null> {
+    actor.assertOwner();
+    const row = await this.row(agents, { space_id: actor.requireSpace(), id, deleted_at: null });
+    return row ? new AgentCard(row.id, row.name, row.scopes) : null;
   }
 
   /** 팀 템플릿 목록 (코드에 둔 것, AgentTeams) */

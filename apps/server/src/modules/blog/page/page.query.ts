@@ -13,7 +13,13 @@ import {
 } from '../../platform';
 import type { PageRevisionRow, PageRow } from '../blog.tables';
 import { Page } from './page';
-import type { PageBaseInput, PageRevisionInput, PageSiteInput, ReadPageInput } from './page.input';
+import type {
+  ListPagesInput,
+  PageBaseInput,
+  PageRevisionInput,
+  PageSiteInput,
+  ReadPageInput,
+} from './page.input';
 import {
   PageBaseView,
   PageChangesView,
@@ -86,13 +92,14 @@ export class PageQuery extends BaseQuery {
     super(db);
   }
 
-  async list(actor: Actor): Promise<PageListView | PublicPageListView> {
+  async list(actor: Actor, req: ListPagesInput): Promise<PageListView | PublicPageListView> {
     const all = actor.kind === 'owner';
     const rows = await this.sql<(PageRow & { last_task_id: string | null })[]>`
       SELECT p.*, (SELECT r.task_id FROM blog.page_revisions r
                    WHERE r.page_id = p.id AND r.seq = p.revisions) AS last_task_id
       FROM blog.pages p
       WHERE ${this.inSpace(actor)} ${all ? this.sql`` : this.sql`AND p.visibility = ${Page.PUBLIC}`}
+        ${req.menu === null ? this.sql`` : this.sql`AND p.menu_id IN (SELECT m.id FROM blog.menus m WHERE m.slug = ${req.menu} AND m.space_id = p.space_id)`}
       ORDER BY p.updated_at DESC, p.id DESC`;
     return all
       ? new PageListView(rows.map((r) => new PageView(r, r.last_task_id)))

@@ -148,7 +148,10 @@ export const MENU = [
   },
   {
     label: '블로그',
-    items: [{ href: '/admin/posts', name: '글', icon: 'post' }],
+    items: [
+      { href: '/admin/posts', name: '글', icon: 'post' },
+      { href: '/admin/menus', name: '메뉴', icon: 'book' },
+    ],
   },
   {
     label: '연결',

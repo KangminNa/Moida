@@ -47,6 +47,7 @@ export class PostQuery extends BaseQuery {
       SELECT p.*, (SELECT count(*) FROM blog.post_revisions x WHERE x.post_id = p.id)::int AS revision_count
       FROM blog.posts p
       WHERE ${this.inSpace(actor)} ${this.filter(all, req.status)}
+        ${req.menu === null ? this.sql`` : this.sql`AND p.menu_id IN (SELECT m.id FROM blog.menus m WHERE m.slug = ${req.menu} AND m.space_id = p.space_id)`}
         ${req.before === null ? this.sql`` : this.sql`AND (${at}, p.id) < (${req.before[0]}, ${req.before[1]})`}
       ORDER BY ${at} DESC, p.id DESC
       LIMIT ${PostQuery.PAGE + 1}`;

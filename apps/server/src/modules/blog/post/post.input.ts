@@ -172,12 +172,15 @@ export class ListPostsInput extends BaseRequest {
     readonly status: string | null,
     /** 이 시각·id보다 앞(더 오래된) 글부터 */
     readonly before: readonly [Date, string] | null,
+    /** 이 메뉴(주소)에 올린 글만 (2차 6단계, 공개 블로그의 /m/<주소>) */
+    readonly menu: string | null = null,
   ) {
     super();
   }
 
   static from(query: unknown): ListPostsInput {
     return BaseRequest.read(query, (f) => {
+      const menu = f.optionalText('menu', 200);
       const status = f.optionalText('status', 20);
       if (status !== null && !ListPostsInput.FILTERS.includes(status))
         f.reject('status', `${ListPostsInput.FILTERS.join(' · ')} 중 하나예요`);
@@ -188,6 +191,7 @@ export class ListPostsInput extends BaseRequest {
       return new ListPostsInput(
         status,
         match?.[1] && match[2] ? [new Date(match[1]), match[2]] : null,
+        menu,
       );
     });
   }

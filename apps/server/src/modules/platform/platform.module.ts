@@ -9,6 +9,7 @@ import { Outbox } from './base/outbox';
 import { SecretBox } from './base/secret-box';
 import { SecretRotation } from './base/secret-rotation';
 import { SensitivePolicy } from './base/sensitive-policy';
+import { AgentDirectory } from './directory/agent-directory';
 import { HealthController } from './health/health.api';
 import { HealthQuery } from './health/health.query';
 import { DomainErrorFilter } from './http/domain-error.filter';
@@ -68,6 +69,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
+    AgentDirectory,
     ChangeStream,
     CoreWorkers,
     OutboxWorker,
@@ -108,6 +110,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
+    AgentDirectory,
     ChangeStream,
     CoreWorkers,
     OutboxWorker,

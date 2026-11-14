@@ -11,18 +11,38 @@ export interface AssetRow {
 }
 export type AssetNew = Partial<AssetRow> & Pick<AssetRow, 'post_id' | 'blob_hash'>;
 
-/** blog.categories */
-export interface CategoryRow {
+/** blog.issues */
+export interface IssueRow {
   id: string;
   space_id: string;
-  parent_id: string | null;
+  title: string;
+  intro: string | null;
+  created_at: Date;
+  menu_id: string;
+  number: number;
+  status: string;
+  published_at: Date | null;
+  version: number;
+  updated_at: Date;
+}
+export type IssueNew = Partial<IssueRow> & Pick<IssueRow, 'id' | 'space_id' | 'title' | 'menu_id' | 'number'>;
+
+/** blog.menus */
+export interface MenuRow {
+  id: string;
+  space_id: string;
   name: string;
   slug: string;
   sort: number;
   version: number;
-  deleted_at: Date | null;
+  kind: string;
+  policy: string;
+  agent_id: string | null;
+  rss: boolean;
+  created_at: Date;
+  updated_at: Date;
 }
-export type CategoryNew = Partial<CategoryRow> & Pick<CategoryRow, 'id' | 'space_id' | 'name' | 'slug'>;
+export type MenuNew = Partial<MenuRow> & Pick<MenuRow, 'id' | 'space_id' | 'name' | 'slug'>;
 
 /** blog.page_revisions */
 export interface PageRevisionRow {
@@ -51,6 +71,7 @@ export interface PageRow {
   updated_at: Date;
   direction: string;
   pending_seq: number | null;
+  menu_id: string | null;
 }
 export type PageNew = Partial<PageRow> & Pick<PageRow, 'id' | 'space_id' | 'name' | 'title' | 'current_seq' | 'revisions'>;
 
@@ -88,9 +109,9 @@ export interface PostRow {
   head_text: string | null;
   head_revision_id: string | null;
   version: number;
-  category_id: string | null;
-  series_id: string | null;
-  series_order: number | null;
+  menu_id: string | null;
+  issue_id: string | null;
+  issue_order: number | null;
   tags: readonly string[];
   cover_blob_hash: string | null;
   align: string;
@@ -102,17 +123,6 @@ export interface PostRow {
   main_wiki_id: string | null;
 }
 export type PostNew = Partial<PostRow> & Pick<PostRow, 'id' | 'space_id' | 'slug'>;
-
-/** blog.series */
-export interface SeriesRow {
-  id: string;
-  space_id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  created_at: Date;
-}
-export type SeriesNew = Partial<SeriesRow> & Pick<SeriesRow, 'id' | 'space_id' | 'name' | 'slug'>;
 
 /** work.basket_items */
 export interface BasketItemRow {

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BaseTool, ToolTextBody } from '../platform';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
 import texts from './blog.tools.ko.json';
+import { BlogMenusTool } from './menu/menu.tool';
 import { PageBaseTool } from './page/page.tool';
 import { BlogGetPostTool, BlogSaveDraftTool } from './post/post.tool';
 
@@ -18,7 +19,8 @@ export class BlogTools {
     basketGet: BasketGetTool,
     keepPage: KeepPageTool,
     pageBase: PageBaseTool,
+    menus: BlogMenusTool,
   ) {
-    this.tools = [getPost, saveDraft, basketGet, keepPage, pageBase];
+    this.tools = [getPost, saveDraft, menus, basketGet, keepPage, pageBase];
   }
 }

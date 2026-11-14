@@ -1,5 +1,12 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { BlobStore, CoreWorkers, Leases, LibraryQuery, SecretRotation } from '../platform';
+import {
+  AgentDirectory,
+  BlobStore,
+  CoreWorkers,
+  Leases,
+  LibraryQuery,
+  SecretRotation,
+} from '../platform';
 import { AgentController } from './agent/agent.api';
 import { AgentQuery } from './agent/agent.query';
 import { AgentService } from './agent/agent.service';
@@ -202,6 +209,8 @@ export class TaskModule implements OnModuleInit {
     private readonly agentless: AgentlessRequestHandler,
     private readonly library: LibraryQuery,
     private readonly follows: ScheduleFollowHandler,
+    private readonly directory: AgentDirectory,
+    private readonly agentQuery: AgentQuery,
   ) {}
 
   onModuleInit(): void {
@@ -227,6 +236,8 @@ export class TaskModule implements OnModuleInit {
     this.blobs.registerUse(['task.outputs.blob_hash'], (actor, hashes) =>
       this.outputs.usedBlobs(actor, hashes),
     );
+    // 다른 모듈이 묻는 에이전트 (2차 6단계, blog 메뉴의 운영 팀)
+    this.directory.register((actor, id) => this.agentQuery.card(actor, id));
     // 보관함의 결과물 (2차 5단계)
     this.library.register([OutputQuery.LIBRARY_KIND], (a, f) => this.outputs.library(a, f));
   }

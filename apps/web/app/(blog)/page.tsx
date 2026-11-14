@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { SpaceInfo } from '../_account/types';
-import { formatDate, postPath } from '../_blog/format';
-import type { PostList } from '../_blog/types';
+import { PostList } from '../_blog/PostList';
+import type { PostList as PostPage } from '../_blog/types';
 import { serverGet } from '../_lib/server-api';
 
 // 첫 화면 = 글 목록: 공개한 글을 발행한 순서로. 주인이 열어도 방문자가 보는 그대로 (초안·링크 공개 글은 없음).
@@ -41,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const { cursor } = search;
   const [space, list] = await Promise.all([
     serverGet<SpaceInfo>('/api/space', true),
-    serverGet<PostList>(`/api/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, true),
+    serverGet<PostPage>(`/api/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, true),
   ]);
   if (space && !space.installed) redirect('/install');
   return (
@@ -49,30 +49,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       {space?.description && <p className="blog-intro">{space.description}</p>}
       {!space || !list ? (
         <p className="blog-empty">서버에 연결하지 못했어요</p>
-      ) : list.posts.length === 0 ? (
-        <p className="blog-empty">공개한 글 없음</p>
       ) : (
-        <ol className="post-list">
-          {list.posts.map((p) => (
-            <li key={p.slug}>
-              <a href={postPath(p.slug)}>
-                <h2>{p.title}</h2>
-                {p.excerpt && <p>{p.excerpt}</p>}
-                <div className="post-meta">
-                  <time dateTime={p.publishedAt ?? undefined}>{formatDate(p.publishedAt)}</time>
-                  {p.tags.map((t) => (
-                    <span key={t}>#{t}</span>
-                  ))}
-                </div>
-              </a>
-            </li>
-          ))}
-        </ol>
-      )}
-      {list?.next && (
-        <a className="blog-more" href={`/?cursor=${encodeURIComponent(list.next)}`}>
-          이전 글 더 보기
-        </a>
+        <PostList
+          posts={list.posts}
+          more={list.next ? `/?cursor=${encodeURIComponent(list.next)}` : null}
+        />
       )}
     </main>
   );

@@ -1,15 +1,21 @@
-// 공개 화면의 머리. 이름은 글 목록으로, 오른쪽은 주인이면 콘솔, 아니면 로그인. 페이지는 공개한 것이 있을 때만.
+import { menuPath } from './format';
+import type { PublicMenu } from './types';
+
+// 공개 화면의 머리. 이름은 글 목록으로, 관리자가 만든 메뉴(2차 6단계)가 순서대로, 오른쪽은 관리자면 콘솔, 아니면 로그인.
+// 페이지는 공개한 것이 있을 때만.
 export function BlogHeader({
   name,
   logoUrl,
   owner,
   pages,
+  menus,
 }: {
   name: string;
   /** 사이트 로고 (사이트 메뉴에서 올린 그림). 없으면 이름만 */
   logoUrl: string | null;
   owner: boolean;
   pages: boolean;
+  menus: readonly PublicMenu[];
 }) {
   return (
     <header className="blog-top">
@@ -21,6 +27,11 @@ export function BlogHeader({
         {name || 'Cairn'}
       </a>
       <nav aria-label="블로그 메뉴">
+        {menus.map((m) => (
+          <a key={m.slug} href={menuPath(m.slug)}>
+            {m.name}
+          </a>
+        ))}
         {pages && <a href="/pages">페이지</a>}
         <a href="/graph">그래프</a>
         <a href={owner ? '/admin' : '/login'}>{owner ? '콘솔' : '로그인'}</a>

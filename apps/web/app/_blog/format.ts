@@ -27,3 +27,8 @@ export function postPath(slug: string): string {
 export function pagePath(name: string): string {
   return `/pages/${encodeURIComponent(name)}`;
 }
+
+/** 메뉴의 바깥 주소 (2차 6단계) */
+export function menuPath(slug: string): string {
+  return `/m/${encodeURIComponent(slug)}`;
+}

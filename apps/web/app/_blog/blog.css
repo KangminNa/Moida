@@ -30,6 +30,8 @@
 
 .blog-top nav {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 4px;
 }
 
@@ -37,6 +39,25 @@
   max-width: 720px;
   margin: 0 auto;
   padding: 24px 20px 96px;
+}
+
+/* 메뉴 하나 (/m/<주소>, 2차 6단계): 제목, 페이지 하나 메뉴는 넓게 틀 하나 */
+.blog-main.wide {
+  max-width: none;
+}
+
+.blog-menu-title {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+.menu-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 160px);
+  min-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .blog-intro {
