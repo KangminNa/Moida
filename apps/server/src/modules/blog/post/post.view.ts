@@ -34,6 +34,9 @@ function ownerColumns(r: Readonly<PostRow>, revisionCount: number) {
     updatedAt: r.updated_at.toISOString(),
     deletedAt: r.deleted_at?.toISOString() ?? null,
     version: r.version,
+    /** 올린 메뉴 · 호 (2차 6단계). 없으면 null */
+    menuId: r.menu_id,
+    issueId: r.issue_id,
   };
 }
 
@@ -51,6 +54,8 @@ function pageColumns(r: Readonly<PostRow>, body: string) {
 function savedColumns(r: Readonly<PostRow>, body: string, revisionCount: number, revised: boolean) {
   return {
     id: r.id,
+    menuId: r.menu_id,
+    issueId: r.issue_id,
     slug: r.slug,
     title: r.title ?? '',
     body,
@@ -228,6 +233,7 @@ export class ToolPostView {
       tags: r.tags,
       main_wiki_id: this.mainWikiId,
       ref_wiki_ids: this.refWikiIds,
+      menu_id: r.menu_id,
     };
   }
 }
@@ -245,6 +251,7 @@ export class ToolDraftView {
       post_id: r.id,
       version: r.version,
       status: r.status,
+      menu_id: r.menu_id,
       url: `${this.site}/admin/posts/${r.id}`,
     };
   }

@@ -242,11 +242,14 @@ export class PageQuery extends BaseQuery {
     actor.assertOwner();
     if (filter.project !== null) return [];
     const rows = await this.sql<
-      Pick<PageRow, 'id' | 'name' | 'title' | 'visibility' | 'updated_at'>[]
+      (Pick<PageRow, 'id' | 'name' | 'title' | 'visibility' | 'updated_at' | 'menu_id'> & {
+        menu: string | null;
+      })[]
     >`
-      SELECT id, name, title, visibility, updated_at FROM blog.pages
-      WHERE space_id = ${actor.requireSpace()} ${this.libraryWindow('updated_at', 'id', filter)}
-      ORDER BY updated_at DESC, id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+      SELECT p.id, p.name, p.title, p.visibility, p.updated_at, p.menu_id, m.name AS menu
+      FROM blog.pages p LEFT JOIN blog.menus m ON m.id = p.menu_id
+      WHERE p.space_id = ${actor.requireSpace()} ${this.libraryWindow('p.updated_at', 'p.id', filter)}
+      ORDER BY p.updated_at DESC, p.id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: PageQuery.LIBRARY_KIND,
       id: r.id,
@@ -256,6 +259,8 @@ export class PageQuery extends BaseQuery {
       href: `/admin/library/pages/${r.id}`,
       url: r.visibility === Page.PUBLIC ? `/pages/${r.name}/` : null,
       visibility: r.visibility,
+      placeId: r.menu_id,
+      place: r.menu,
     }));
   }
 }

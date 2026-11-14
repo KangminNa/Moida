@@ -9,8 +9,10 @@ import {
   TableEntity,
 } from '../../platform';
 import type { PostNew, PostRevisionNew, PostRevisionRow, PostRow } from '../blog.tables';
+import type { Menu } from '../menu/menu';
 import { PublicSavedPostView, SavedPostView, ToolDraftView } from './post.view';
 import { PostContent } from './post-content';
+import { PostPublish } from './post-publish.policy';
 
 /** 글 한 줄과 함께 읽는 칸: 지금 판의 제목·본문, 판 수, 참고 wiki */
 export interface LoadedPost extends PostRow {
@@ -77,10 +79,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
   /** 휴지통에 둔 글을 영구히 지우기까지 (영구 삭제 일꾼은 뒤 단계) */
   static readonly TRASH_DAYS = 30;
   /** 결재로 맡기는 공개 (task.approvals.action) */
-  static readonly PUBLISH_ACTION = 'blog.post.publish';
-  /** 대상이 없어 결재한 공개를 하지 못했을 때의 이유 */
-  static readonly NO_POST = '없는 글이라 공개하지 않았어요';
-  private static readonly PUBLISH_FAILED = 'blog.post.publish_failed';
+  static readonly PUBLISH_ACTION = PostPublish.ACTION;
 
   /** 글을 쓰는 쪽이 정하는 칸과 그 규칙 */
   private static readonly RULES: ColumnRules<PostRow> = {
@@ -127,37 +126,6 @@ export class Post extends TableEntity<PostRow, PostNew> {
   static spaceOf(by: Actor): string {
     if (!by.spaceId) throw new Forbidden(Actor.WRITE);
     return by.spaceId;
-  }
-
-  /** 결재로 공개하는 요청자의 결재 id. 그 밖의 요청자(주인도)와 다른 동작의 결재는 이 길로 오지 못한다 */
-  static approvalOf(by: Actor): string {
-    if (by instanceof ApprovedActor && by.action === Post.PUBLISH_ACTION) return by.approvalId;
-    throw new Forbidden('publish', '결재한 공개만 할 수 있어요');
-  }
-
-  /** 결재한 공개의 실패 결과. 글을 찾지 못해도 작업은 끝나야 해서 글 없이 만든다 */
-  static publishFailed(
-    spaceId: string,
-    postId: string,
-    approvalId: string,
-    error: string,
-  ): DomainEvent {
-    return new DomainEvent(Post.PUBLISH_FAILED, 1, spaceId, {
-      postId,
-      approvalId,
-      outcome: 'failed',
-      error,
-    });
-  }
-
-  /** 앞서 낸 결과 그대로 (같은 결재가 다시 왔을 때). before는 그 이벤트의 toJSON() */
-  static sameResult(spaceId: string, before: Readonly<Record<string, unknown>>): DomainEvent {
-    return new DomainEvent(
-      String(before.name),
-      Number(before.v),
-      spaceId,
-      before.data as Readonly<Record<string, unknown>>,
-    );
   }
 
   /**
@@ -257,6 +225,22 @@ export class Post extends TableEntity<PostRow, PostNew> {
     if (this.row.status === Post.PUBLISHED) this.announceUpdate();
   }
 
+  /**
+   * 메뉴에 올리기 (2차 6단계): 올린 글은 공개 대기이고, 공개는 공개 범위로 정한다. null은 메뉴에서 빼기.
+   * 공개된 글은 관리자만 옮긴다. 메뉴가 받는 종류인지 · 이 요청자가 올릴 수 있는지는 메뉴가 본다. 호에서는 빠진다
+   */
+  placeIn(menu: Menu | null, by: Actor, now: Date): void {
+    this.assertLive();
+    if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
+    menu?.assertHolds('post');
+    menu?.assertWriter(by);
+    if ((menu?.id ?? null) === this.row.menu_id) return;
+    this.put('menu_id', menu?.id ?? null);
+    this.put('issue_id', null);
+    this.put('issue_order', null);
+    this.touch(now);
+  }
+
   /** 공개 범위 바꾸기. 처음 공개(공개·링크만)한 때를 발행일로 남긴다 */
   changeStatus(status: string, by: Actor, now: Date): void {
     Post.assertOwner(by);
@@ -277,9 +261,9 @@ export class Post extends TableEntity<PostRow, PostNew> {
    * 결과는 기록하지 않고 돌려준다: 같은 결재가 다시 오면 Service가 이 결과를 그대로 다시 낸다.
    */
   publishApproved(by: Actor, targetVersion: number, now: Date): DomainEvent {
-    const approvalId = Post.approvalOf(by);
+    const approvalId = PostPublish.approvalOf(by);
     const problem = this.publishProblem(targetVersion);
-    if (problem) return Post.publishFailed(this.row.space_id, this.id, approvalId, problem);
+    if (problem) return PostPublish.failed(this.row.space_id, this.id, approvalId, problem);
     this.put('status', Post.PUBLISHED);
     if (!this.row.published_at) this.put('published_at', now);
     this.touch(now);

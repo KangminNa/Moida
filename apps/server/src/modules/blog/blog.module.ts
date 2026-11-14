@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { BlobStore, CoreWorkers, LibraryQuery } from '../platform';
+import { ActionChecks, BlobStore, CoreWorkers, LibraryQuery } from '../platform';
 import { VaultModule } from '../vault';
 import { AssetController, FileController } from './asset/asset.api';
 import { AssetQuery } from './asset/asset.query';
@@ -19,6 +19,7 @@ import { PageQuery } from './page/page.query';
 import { PageService } from './page/page.service';
 import { PageBaseTool } from './page/page.tool';
 import { PageBuiltHandler } from './page/page-built.handler';
+import { Post } from './post/post';
 import { PostController } from './post/post.api';
 import { PostQuery } from './post/post.query';
 import { PostService } from './post/post.service';
@@ -75,6 +76,7 @@ export class BlogModule implements OnModuleInit {
     private readonly pages: PageQuery,
     private readonly posts: PostQuery,
     private readonly library: LibraryQuery,
+    private readonly checks: ActionChecks,
   ) {}
 
   onModuleInit(): void {
@@ -86,6 +88,8 @@ export class BlogModule implements OnModuleInit {
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
     this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
+    // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
+    this.checks.register(Post.PUBLISH_ACTION, (a, id) => this.posts.publishProblem(a, id));
     // 파일을 가리키는 칸: 쓰는 동안 platform이 파일을 지우지 않게
     this.blobs.registerUse(
       ['blog.assets.blob_hash', 'blog.posts.cover_blob_hash'],

@@ -58,6 +58,7 @@ export { type EntityStore, TableRepository } from './base/table-repository';
 export { type ToolTextBody, ToolTexts } from './base/tool-texts';
 export { ZipFile } from './base/zip-file';
 export { ZipLimits, ZipReader } from './base/zip-reader';
+export { ActionChecks, type ActionTarget } from './directory/action-checks';
 export { AgentCard, AgentDirectory } from './directory/agent-directory';
 export { Cookies } from './http/cookies';
 export { CurrentActor } from './http/current-actor';

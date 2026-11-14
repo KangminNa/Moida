@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseService, Database, Forbidden, SystemActor } from '../../platform';
+import {
+  ActionChecks,
+  type Actor,
+  BaseService,
+  Database,
+  Forbidden,
+  SystemActor,
+} from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
@@ -11,6 +18,7 @@ import { ChatResult } from './chat-result.policy';
 
 // 결과 결재 (2차 2단계 · 기획서 결정 2026-11-14): 대화의 일이 바뀔 때마다(작업 상태 · 결재 요청) 회차가 가라앉았는지 보고
 // 다음 하나를 한다: 받을 것이 없으면 다시 맡김(result-check) · 검토자 짝의 검토(result-review) · 결과 카드.
+// 받을 것이 있어도 동작의 대상을 가진 모듈이 빠진 점을 짚으면(platform ActionChecks, 2차 6단계) 다시 맡긴다.
 // 카드 · 실린 결재 · 결과물은 함께 바뀌어야 해서 같은 트랜잭션에서 여러 묶음을 쓴다 (ApprovalService와 같은 까닭).
 // 대화를 먼저 잠가 같은 대화의 판단은 하나씩 한다. 잠그는 순서: 대화 → 결재 → 결과물.
 // 카드의 결정(고른 것만 남기기)은 ApprovalService.decide, 수정 요청 · 반려 뒤의 정리는 ChatService.closeByCard
@@ -19,6 +27,7 @@ export class ChatResultService extends BaseService {
   constructor(
     db: Database,
     private readonly skills: SkillQuery,
+    private readonly checks: ActionChecks,
   ) {
     super(db);
   }
@@ -43,11 +52,19 @@ export class ChatResultService extends BaseService {
       const agents = await new AgentRepository(tx).all(spaceId);
       const partner = agents.find((a) => a.id === chat.agentId);
       const reviewer = agents.find((a) => a.id === partner?.reviewerId && !a.deleted) ?? null;
-      const missing = ChatResult.missing(
-        chat.deliver,
-        actions.map((a) => a.action),
-        made.map((o) => o.name),
-      );
+      // 받을 것이 있어도 그 동작의 대상을 가진 모듈이 짚는 빠진 점 (2차 6단계: 메뉴에 올리지 않은 글의 발행)
+      const problems = chat.deliver
+        ? await this.checks.problemsOf(
+            actor,
+            actions.map((a) => ({ action: a.action, targetId: a.targetId })),
+          )
+        : [];
+      const missing =
+        ChatResult.missing(
+          chat.deliver,
+          actions.map((a) => a.action),
+          made.map((o) => o.name),
+        ) ?? (problems.length > 0 ? chat.deliver : null);
       const step = ChatResult.next(
         turn.status,
         actions.length + made.length,
@@ -60,7 +77,7 @@ export class ChatResultService extends BaseService {
       if (step === ChatResult.FIX && partner && missing) {
         const message = prompts.fill('result-check', {
           deliver: missing,
-          need: ChatResult.needOf(missing),
+          need: problems.length > 0 ? problems.join(' · ') : ChatResult.needOf(missing),
         });
         const task = chat.fix(partner, message, previous, now);
         await chats.save(chat);

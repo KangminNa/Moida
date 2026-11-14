@@ -33,12 +33,14 @@ export class EditPageInput extends BaseRequest {
     readonly visibility: string | null,
     /** 방향 (빈 글이면 지운다). 보내지 않으면 그대로 */
     readonly direction: string | null,
+    /** 올릴 메뉴 (2차 6단계). 보내지 않으면 그대로, null은 메뉴에서 빼기 */
+    readonly menuId: string | null | undefined,
   ) {
     super();
   }
 
   static from(id: string, raw: unknown): EditPageInput {
-    const given = (raw as { direction?: unknown } | null)?.direction;
+    const body = (raw ?? {}) as { direction?: unknown; menuId?: unknown };
     return BaseRequest.read(
       { ...(raw as object), id },
       (f) =>
@@ -47,7 +49,8 @@ export class EditPageInput extends BaseRequest {
           f.version(),
           f.optionalText('title', Page.TITLE_MAX),
           f.optionalText('visibility', 20),
-          given === '' ? '' : f.optionalText('direction', Page.DIRECTION_MAX),
+          body.direction === '' ? '' : f.optionalText('direction', Page.DIRECTION_MAX),
+          !('menuId' in body) ? undefined : body.menuId === null ? null : f.uuid('menuId'),
         ),
     );
   }

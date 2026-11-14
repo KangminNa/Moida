@@ -158,14 +158,31 @@ export class PostQuery extends BaseQuery {
   }
 
   /** 보관함의 글 (2차 5단계, platform LibraryQuery에 등록). 휴지통 밖, 공개 · 링크 공개 글은 바깥 주소도 */
+  /**
+   * 결재한 발행을 실행하기 전에 빠진 점 (platform ActionChecks, 2차 6단계 받을 것 "블로그"의 검사).
+   * 메뉴에도 호에도 올리지 않은 글이면 그 말을, 없는 글이면 null (발행이 실패로 알린다)
+   */
+  async publishProblem(actor: Actor, postId: string): Promise<string | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<PostRow, 'title' | 'menu_id' | 'issue_id'>[]>`
+      SELECT title, menu_id, issue_id FROM blog.posts WHERE id = ${postId} AND deleted_at IS NULL`;
+    if (!row || row.menu_id !== null || row.issue_id !== null) return null;
+    return `메뉴에 올리지 않은 글: ${row.title || '제목 없음'}`;
+  }
+
   async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
     actor.assertOwner();
     if (filter.project !== null) return [];
-    const rows = await this.sql<Pick<PostRow, 'id' | 'slug' | 'title' | 'status' | 'updated_at'>[]>`
-      SELECT id, slug, title, status, updated_at FROM blog.posts
-      WHERE space_id = ${actor.requireSpace()} AND deleted_at IS NULL
-        ${this.libraryWindow('updated_at', 'id', filter)}
-      ORDER BY updated_at DESC, id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    const rows = await this.sql<
+      (Pick<PostRow, 'id' | 'slug' | 'title' | 'status' | 'updated_at' | 'menu_id'> & {
+        menu: string | null;
+      })[]
+    >`
+      SELECT p.id, p.slug, p.title, p.status, p.updated_at, p.menu_id, m.name AS menu
+      FROM blog.posts p LEFT JOIN blog.menus m ON m.id = p.menu_id
+      WHERE p.space_id = ${actor.requireSpace()} AND p.deleted_at IS NULL
+        ${this.libraryWindow('p.updated_at', 'p.id', filter)}
+      ORDER BY p.updated_at DESC, p.id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: PostQuery.LIBRARY_KIND,
       id: r.id,
@@ -175,6 +192,8 @@ export class PostQuery extends BaseQuery {
       href: `/admin/posts/${r.id}`,
       url: r.status === Post.DRAFT ? null : `/posts/${r.slug}`,
       visibility: r.status,
+      placeId: r.menu_id,
+      place: r.menu,
     }));
   }
 }

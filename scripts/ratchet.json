@@ -10,16 +10,15 @@
     "apps/web/app/admin/notices/PushBox.tsx"
   ],
   "handWrittenLoad": [
-    "apps/web/app/admin/notices/PushBox.tsx",
     "apps/web/app/admin/library/outputs/MakeForm.tsx",
+    "apps/web/app/admin/notices/PushBox.tsx",
     "apps/web/app/admin/posts/WikiPicker.tsx"
   ],
   "longFiles": {
     "apps/runner/src/code-stage.ts": 403,
     "apps/runner/src/job-run.ts": 329,
-    "apps/server/src/modules/blog/post/post.ts": 306,
     "apps/server/src/modules/task/task/task.service.ts": 370,
-    "apps/server/src/modules/task/task/task.ts": 572,
+    "apps/server/src/modules/task/task/task.ts": 570,
     "apps/server/src/modules/vault/change/change-op.ts": 797,
     "apps/web/app/_vault/GraphBoard.tsx": 342,
     "apps/web/app/_vault/graph-scene.ts": 701,

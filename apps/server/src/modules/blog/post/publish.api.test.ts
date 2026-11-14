@@ -568,6 +568,7 @@ describe('cairn-write 스킬', () => {
       'get_session',
       'blog_get_post',
       'blog_save_draft',
+      'blog_menus',
       'request_approval',
     ]) {
       assert.ok(text.includes(`\`${name}\``), `스킬에 없는 도구: ${name}`);

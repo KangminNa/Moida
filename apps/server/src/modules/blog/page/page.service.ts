@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type Actor, EntityService, type Sql } from '../../platform';
+import { MenuRepository } from '../menu/menu.repository';
 import { Page } from './page';
 import type { EditPageInput, PageBuiltInput, SwitchPageInput } from './page.input';
 import { PageRepository } from './page.repository';
@@ -43,11 +44,26 @@ export class PageService extends EntityService<Page> {
     });
   }
 
-  /** 제목 · 공개 범위 · 방향 */
-  edit(actor: Actor, req: EditPageInput): Promise<Page> {
-    return this.changeAsOwner(actor, req, (page) =>
-      page.edit(req.title, req.visibility, req.direction, new Date()),
-    );
+  /** 제목 · 공개 범위 · 방향 · 메뉴 (메뉴를 정하면 그 메뉴를 잠가 페이지 하나 메뉴에 둘이 들어가지 않게) */
+  async edit(actor: Actor, req: EditPageInput): Promise<Page> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    return this.transaction(async (tx) => {
+      const pages = this.store(tx);
+      const page = await pages.lock(spaceId, req.id);
+      page.assertVersion(req.version);
+      const now = new Date();
+      page.edit(req.title, req.visibility, req.direction, now);
+      if (req.menuId !== undefined) {
+        const menu =
+          req.menuId === null
+            ? null
+            : await new MenuRepository(tx).holder(spaceId, req.menuId, true);
+        page.placeIn(menu, menu ? await pages.othersIn(menu.id, page.id) : 0, now);
+      }
+      await pages.save(page);
+      return page;
+    });
   }
 
   /** 보이는 판을 옮긴다 (되돌리기) */

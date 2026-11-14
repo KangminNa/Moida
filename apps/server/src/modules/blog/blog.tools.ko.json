@@ -21,7 +21,8 @@
       "body_md": "본문 md",
       "tags": "태그. 고칠 때 비우면 지금 태그 그대로",
       "main_wiki_id": "대표 wiki id. 글이 그래프에서 이 wiki 아래에 놓인다. null이면 비운다",
-      "ref_wiki_ids": "참고 wiki id. 보낸 목록으로 바뀌고 빈 목록이면 비운다. 대표와 같은 id는 빠진다"
+      "ref_wiki_ids": "참고 wiki id. 보낸 목록으로 바뀌고 빈 목록이면 비운다. 대표와 같은 id는 빠진다",
+      "menu_id": "올릴 메뉴 id (blog_menus에서 고른다, kind가 posts인 메뉴). 메뉴에 올린 글은 공개 대기이고, 공개는 결재로 한다. null이면 메뉴에서 뺀다. 보내지 않으면 그대로"
     }
   },
   "keep_page": {

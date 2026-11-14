@@ -1,4 +1,11 @@
-import { BaseEntity, type ColumnRules, RuleViolation, TableEntity } from '../../platform';
+import {
+  type Actor,
+  BaseEntity,
+  type ColumnRules,
+  Forbidden,
+  RuleViolation,
+  TableEntity,
+} from '../../platform';
 import type { MenuNew, MenuRow } from '../blog.tables';
 import { SlugPolicy } from '../post/slug.policy';
 import { MenuView } from './menu.view';
@@ -104,6 +111,18 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
       (thing === 'issue' && this.row.kind === Menu.ISSUES);
     if (!fits)
       throw new RuleViolation(`${this.row.name}(${this.row.kind}) 메뉴에는 담을 수 없어요`);
+  }
+
+  /**
+   * 이 메뉴에 올릴 수 있는 요청자 (메뉴의 것은 공개된다, 원칙 5): 관리자와 기기는 늘, 에이전트는 비공개를 읽지 않고
+   * 운영 팀이 정해져 있으면 그 에이전트만
+   */
+  assertWriter(by: Actor): void {
+    if (by.kind !== 'agent') return;
+    if (by.canSeePrivate())
+      throw new Forbidden('menu', '비공개를 읽는 에이전트는 메뉴에 올리지 못해요');
+    if (this.row.agent_id !== null && this.row.agent_id !== by.id)
+      throw new Forbidden('menu', `${this.row.name} 메뉴의 운영 팀이 아니에요`);
   }
 
   view(): MenuView {

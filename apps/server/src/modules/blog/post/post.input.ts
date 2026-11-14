@@ -234,6 +234,8 @@ export class SaveDraftInput extends BaseRequest {
     /** 보내지 않으면 지금 연결 그대로. 대표 null·참고 []는 비우기 */
     readonly mainWikiId: string | null | undefined,
     readonly refWikiIds: readonly string[] | undefined,
+    /** 올릴 메뉴 (2차 6단계, blog_menus의 id). 보내지 않으면 그대로, null은 메뉴에서 빼기 */
+    readonly menuId: string | null | undefined = undefined,
   ) {
     super();
   }
@@ -254,7 +256,34 @@ export class SaveDraftInput extends BaseRequest {
         f.columns(DRAFT_COLUMNS),
         mainWikiOf(f, raw, 'main_wiki_id'),
         refWikisOf(f, 'ref_wiki_ids'),
+        menuOf(f, raw, 'menu_id'),
       );
+    });
+  }
+}
+
+/** 메뉴 칸: 보내지 않으면 undefined(그대로), null은 빼기 */
+function menuOf(f: RequestFields, raw: unknown, name: string): string | null | undefined {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  if (!(name in body)) return undefined;
+  return body[name] === null ? null : f.uuid(name);
+}
+
+/** POST /api/posts/:id/menu: 메뉴에 올리기 · 빼기 (2차 6단계, 관리자). 본 version을 함께 보낸다 */
+export class PostMenuInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly version: number,
+    readonly menuId: string | null,
+  ) {
+    super();
+  }
+
+  static from(id: string, raw: unknown): PostMenuInput {
+    return BaseRequest.read(withId(id, raw), (f) => {
+      const menuId = menuOf(f, raw, 'menuId');
+      if (menuId === undefined) f.reject('menuId', '메뉴 id나 null이어야 해요');
+      return new PostMenuInput(f.uuid('id'), f.version(), menuId ?? null);
     });
   }
 }

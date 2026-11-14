@@ -3,6 +3,7 @@ import { type Actor, CurrentActor } from '../../platform';
 import {
   CreatePostInput,
   ListPostsInput,
+  PostMenuInput,
   PostSlugInput,
   PostStatusInput,
   PostVersionInput,
@@ -78,6 +79,18 @@ export class PostController {
     @Body() body: unknown,
   ): Promise<SavedPostView | PublicSavedPostView> {
     const post = await this.service.changeStatus(actor, PostStatusInput.from(id, body));
+    return post.view(actor);
+  }
+
+  /** 메뉴에 올리기 · 빼기 (2차 6단계, 관리자): { version, menuId | null } */
+  @HttpCode(200)
+  @Post(':id/menu')
+  async menu(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<SavedPostView | PublicSavedPostView> {
+    const post = await this.service.placeInMenu(actor, PostMenuInput.from(id, body));
     return post.view(actor);
   }
 

@@ -10,9 +10,11 @@ import {
   type VersionTarget,
 } from '../../platform';
 import { PostWikiQuery } from '../../vault';
+import { MenuRepository } from '../menu/menu.repository';
 import { Post } from './post';
 import type {
   CreatePostInput,
+  PostMenuInput,
   PostStatusInput,
   PostVersionInput,
   SaveDraftInput,
@@ -20,6 +22,7 @@ import type {
 } from './post.input';
 import { PostRepository } from './post.repository';
 import { PostContent } from './post-content';
+import { PostPublish } from './post-publish.policy';
 import { SlugPolicy } from './slug.policy';
 
 // 글 쓰기: 새 글, 고쳐 쓰기(새 판), 공개 범위, 휴지통·되살리기. 관리 화면의 편집기가 부른다.
@@ -67,6 +70,25 @@ export class PostService extends EntityService<Post> {
       await once.remember({ postId: post.id });
       return post;
     });
+  }
+
+  /** 메뉴에 올리기 · 빼기 (2차 6단계, 관리자). 메뉴가 받는 종류인지는 Post · Menu가 본다 */
+  async placeInMenu(actor: Actor, req: PostMenuInput): Promise<Post> {
+    actor.assertOwner();
+    const spaceId = Post.spaceOf(actor);
+    return this.transaction(async (tx) => {
+      const posts = new PostRepository(tx);
+      const post = await posts.lock(spaceId, req.id);
+      post.assertVersion(req.version);
+      post.placeIn(await this.menuOf(tx, spaceId, req.menuId), actor, new Date());
+      await posts.save(post);
+      return post;
+    });
+  }
+
+  /** 올릴 메뉴 (공유 잠금: 올리는 동안 지워지지 않게). null은 빼기 */
+  private menuOf(tx: Sql, spaceId: string, menuId: string | null) {
+    return menuId === null ? Promise.resolve(null) : new MenuRepository(tx).holder(spaceId, menuId);
   }
 
   /** 고쳐 쓰기: 제목·본문이 바뀌었으면 새 판. 주소·wiki 연결을 보내지 않으면 지금 그대로 */
@@ -119,6 +141,8 @@ export class PostService extends EntityService<Post> {
         post.edit(content, req.changes, actor, now);
       }
       post.linkWikis(req.mainWikiId, req.refWikiIds, actor, now);
+      if (req.menuId !== undefined)
+        post.placeIn(await this.menuOf(tx, spaceId, req.menuId), actor, now);
       await posts.save(post);
       await once.remember({ postId: post.id });
       return post;
@@ -136,17 +160,17 @@ export class PostService extends EntityService<Post> {
    * 공개할 수 있는지는 Post가 정하고, 바뀐 내용과 결과 이벤트는 함께 커밋된다.
    */
   async publishApproved(actor: Actor, postId: string, targetVersion: number): Promise<void> {
-    const approvalId = Post.approvalOf(actor);
+    const approvalId = PostPublish.approvalOf(actor);
     const spaceId = Post.spaceOf(actor);
     await this.transaction(async (tx) => {
       const posts = new PostRepository(tx);
       const post = await posts.lockOrNull(spaceId, postId);
       const once = new Idempotency(tx, spaceId, approvalId, PostService.PUBLISH);
       const before = await once.previous();
-      if (before) return posts.announce(Post.sameResult(spaceId, before));
+      if (before) return posts.announce(PostPublish.sameResult(spaceId, before));
       const result = post
         ? post.publishApproved(actor, targetVersion, new Date())
-        : Post.publishFailed(spaceId, postId, approvalId, Post.NO_POST);
+        : PostPublish.failed(spaceId, postId, approvalId, PostPublish.NO_POST);
       if (post) await posts.save(post);
       await posts.announce(result);
       await once.remember(result.toJSON());

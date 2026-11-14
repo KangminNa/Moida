@@ -36,6 +36,13 @@ export class PageRepository extends TableRepository<PageRow, Page> {
     for (let n = 2; ; n += 1) if (!taken.has(`${wanted}-${n}`)) return `${wanted}-${n}`;
   }
 
+  /** 메뉴에 있는 다른 페이지의 수 (페이지 하나 메뉴는 하나만) */
+  async othersIn(menuId: string, exceptId: string): Promise<number> {
+    const [row] = await this.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM blog.pages WHERE menu_id = ${menuId} AND id <> ${exceptId}`;
+    return row?.n ?? 0;
+  }
+
   /** 판 하나의 파일 목록. 판이 없으면 null */
   async filesOf(pageId: string, seq: number): Promise<PageFiles | null> {
     const row = await this.row(pageRevisions, { page_id: pageId, seq }, { columns: ['files'] });

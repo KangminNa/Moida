@@ -1,5 +1,6 @@
 import { BaseEntity, DomainEvent, NotFound, RuleViolation, TableEntity } from '../../platform';
 import type { PageNew, PageRevisionNew, PageRow } from '../blog.tables';
+import { Menu } from '../menu/menu';
 import { SlugPolicy } from '../post/slug.policy';
 import { PageView } from './page.view';
 import type { PageFiles } from './page-files';
@@ -100,6 +101,20 @@ export class Page extends TableEntity<PageRow, PageNew> {
         throw new RuleViolation(`공개 범위는 ${Page.VISIBILITIES.join(' · ')} 중 하나예요`);
       this.put('visibility', visibility);
     }
+    this.put('updated_at', now);
+    this.announce();
+  }
+
+  /**
+   * 메뉴에 올리기 (2차 6단계, 관리자): 페이지 모음 · 페이지 하나 메뉴에. null은 빼기. 보이는 것은 공개 범위가 정한다.
+   * others: 그 메뉴에 이미 있는 다른 페이지 수 (페이지 하나 메뉴에는 하나만)
+   */
+  placeIn(menu: Menu | null, others: number, now: Date): void {
+    menu?.assertHolds('page');
+    if (menu?.kind === Menu.PAGE && others > 0)
+      throw new RuleViolation('페이지 하나 메뉴에는 페이지가 하나만 들어가요');
+    if ((menu?.id ?? null) === this.row.menu_id) return;
+    this.put('menu_id', menu?.id ?? null);
     this.put('updated_at', now);
     this.announce();
   }

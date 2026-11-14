@@ -172,4 +172,86 @@ describe('메뉴 (/api/menus)', () => {
       false,
     );
   });
+
+  test('글을 메뉴에 올리면 공개 대기, 공개한 글만 방문자의 메뉴 목록에. 받지 않는 메뉴는 422, 방문자는 403', async () => {
+    const menu = ok(
+      await create({ kind: 'posts', name: `일기 ${mark}`, slug: `diary-${mark}` }),
+      201,
+    );
+    const pages = ok(await create({ kind: 'pages', name: `페이지들 ${mark}` }), 201);
+    const post = ok(
+      await api.request('POST', '/api/posts', owner, {
+        requestId: randomUUID(),
+        title: `메뉴 글 ${mark}`,
+        body: '본문',
+      }),
+      201,
+    );
+    const wrong = await api.request('POST', `/api/posts/${post.id}/menu`, owner, {
+      version: post.version,
+      menuId: pages.id,
+    });
+    assert.equal(wrong.status, 422, wrong.text);
+    for (const headers of [{}, writer]) {
+      const denied = await api.request(
+        'POST',
+        `/api/posts/${post.id}/menu`,
+        TestUser.visitor,
+        { version: post.version, menuId: menu.id },
+        headers,
+      );
+      assert.equal(denied.status, 403, denied.text);
+    }
+    const placed = ok(
+      await api.request('POST', `/api/posts/${post.id}/menu`, owner, {
+        version: post.version,
+        menuId: menu.id,
+      }),
+    );
+    assert.equal(placed.menuId, menu.id);
+    const inMenu = async () =>
+      (
+        ok(await api.get(`/api/posts?menu=${encodeURIComponent(String(menu.slug))}`))
+          .posts as Json[]
+      ).map((p) => p.slug);
+    assert.deepEqual(await inMenu(), [], '공개 대기: 아직 보이지 않는다');
+    ok(
+      await api.request('POST', `/api/posts/${post.id}/status`, owner, {
+        version: placed.version,
+        status: 'published',
+      }),
+    );
+    assert.deepEqual(await inMenu(), [post.slug]);
+    const library = (ok(await api.get('/api/library?kind=post', owner)).items as Json[]).find(
+      (i) => i.id === post.id,
+    );
+    assert.deepEqual([library?.placeId, library?.place], [menu.id, `일기 ${mark}`]);
+    const busy = await api.request('POST', `/api/menus/${menu.id}/delete`, owner, {
+      version: menu.version,
+    });
+    assert.equal(busy.status, 422, '글이 있는 메뉴는 지우지 못한다');
+  });
+
+  test('AI 도구: blog_menus로 편집 방침을 읽고, blog_save_draft의 menu_id로 초안을 메뉴에 올린다', async () => {
+    const menu = ok(
+      await create({ kind: 'posts', name: `AI 글 ${mark}`, policy: '짧게 세 문단으로' }),
+      201,
+    );
+    const token = String(writer.authorization).slice('Bearer '.length);
+    const call = async (name: string, args: Json) => {
+      const res = await api.mcp(token, 'tools/call', { name, arguments: args });
+      const result = res.json().result as { isError?: boolean; structuredContent?: Json };
+      assert.ok(result && !result.isError, res.text);
+      return result.structuredContent ?? {};
+    };
+    const menus = (await call('blog_menus', {})).menus as Json[];
+    assert.equal(menus.find((m) => m.id === menu.id)?.policy, '짧게 세 문단으로');
+    const saved = await call('blog_save_draft', {
+      request_id: randomUUID(),
+      title: `AI 초안 ${mark}`,
+      body_md: '본문',
+      menu_id: menu.id,
+    });
+    assert.equal(saved.menu_id, menu.id);
+  });
 });

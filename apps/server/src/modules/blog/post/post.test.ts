@@ -13,6 +13,7 @@ import {
 import { type LoadedPost, Post } from './post';
 import type { SavedPostView } from './post.view';
 import { PostContent } from './post-content';
+import { PostPublish } from './post-publish.policy';
 import { SlugPolicy } from './slug.policy';
 
 // 글 주소·내용·판·공개 범위 규칙 (DB 없이).
@@ -456,6 +457,6 @@ describe('결재한 공개', () => {
   test('다시 낼 결과는 처음 결과와 같다', () => {
     const result = saved(Post.DRAFT).publishApproved(approved, 3, later);
     const stored = JSON.parse(JSON.stringify(result.toJSON()));
-    assert.deepEqual(Post.sameResult(SPACE, stored).toJSON(), result.toJSON());
+    assert.deepEqual(PostPublish.sameResult(SPACE, stored).toJSON(), result.toJSON());
   });
 });
