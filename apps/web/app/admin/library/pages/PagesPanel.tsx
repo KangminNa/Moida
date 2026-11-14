@@ -50,6 +50,7 @@ export function PagesPanel({ watch }: { watch: string | null }) {
         label="만들 페이지"
         placeholder="예: 이번 주말 서울 데이트 코스를 지도로 짜 줘"
         submit="만들기"
+        hint="끝나면 새 페이지 · 공개 전에는 나만 봄"
         busy={ask.busy !== null}
         problem={ask.problem}
         onSubmit={create}

@@ -21,6 +21,8 @@
   만들기 작업이 끝나면 `PageBuiltHandler`(`task.page.built`) → `PageService.built`: 페이지가 없으면 만들고(이름은 `Page.nameOf(title)`, 겹치면 번호) 판을 붙여 그 판을 보이게 한다.
   `api/pages`: 목록(주인은 전부 + `lastTaskId`, 그 밖은 공개 페이지의 이름 · 제목만), 상세와 판 목록 · 제목 · 공개 범위(`PATCH`) · 보이는 판 옮기기(`/current`)는 주인만.
   바깥 주소는 `GET api/pages/site/*path`(웹이 `/pages/…`를 넘긴다, `PageQuery.site` → `PageSiteAnswer`). 시험은 task와 이어져 `src/testing/page.api.test.ts`에 있다
+  자라는 페이지 (2차 5단계): 방향(`pages.direction`, 관리자만 `edit`), 있는 페이지의 새 판은 앞 판 위에 이번 파일을 얹는다(`PageFiles.overlay`, 고칠 페이지가 없는데 문이 없으면 만들지 않는다). 공개 페이지의 새 판은 확인 대기(`pending_seq`, 이벤트 `blog.page.pending` → `BlogNotices` 즉시 알림)이고 `switchTo`로 그 판(이상)을 보이면 풀린다(`blog.page.shown` → 알림 읽음). 대기 판은 판 번호를 봉인한 보기 표(`PageTicket(pageId, seq)`)로 미리 본다.
+  바뀐 점 `GET api/pages/:id/revisions/:seq/changes`(`PageDataDiff`: 앞 판과 `data.json`의 잎을 비교, 주인만). MCP `page_base`(run, `page.tool.ts`): 페이지를 고치는 만들기 일을 쥔 러너만(platform `Leases`) 가장 새 판의 글 파일 · 방향을 받는다
 
 엔티티는 `TableEntity`(platform)로 표 한 줄을 들고, Repository(`TableRepository`)는 바뀐 칸만 저장한다 (객체설계 6장). 칼럼을 아는 곳은 `blog.tables.ts`, Entity의 `RULES`, Input의 `COLUMNS`, View의 `toJSON`, 보관·복원이다.
 글의 주소·태그·정렬은 `Post.RULES`를 지나 `edit(content, changes)`로 바뀌고(주소의 모양과 겹침은 `SlugPolicy`가 먼저 본다), 공개 범위·휴지통·wiki 연결은 동사 메서드로만 바뀐다.
@@ -45,7 +47,8 @@
 `blog.post.published` · `blog.post.updated` · `blog.post.unpublished` · `blog.post.deleted` (v1: postId, slug, title, status, postVersion, mainWikiId, refWikiIds. vault가 글 자리 사본을 갱신한다). 임시 글은 알리지 않아 공개해야 그래프에 나온다.
 결재한 공개의 결과: 성공이면 `blog.post.published`에 `approvalId`·`outcome: 'done'`이 붙고(사람의 공개에는 없다), 실패면 `blog.post.publish_failed` (postId, approvalId, outcome: 'failed', error. 글 상태는 싣지 않아 사본을 고치는 데 쓰지 않는다). task가 받아 작업을 끝낸다.
 
-`blog.page.changed` (v1: pageId, name, currentSeq, visibility. 페이지가 생기거나 판이 붙거나 보이는 판 · 공개 범위 · 제목이 바뀔 때. 화면의 변경 신호로 쓴다)
+`blog.page.changed` (v1: pageId, name, currentSeq, visibility. 페이지가 생기거나 판이 붙거나 보이는 판 · 공개 범위 · 제목 · 방향이 바뀔 때. 화면의 변경 신호로 쓴다)
+`blog.page.pending` (v1: pageId, title, seq. 공개 페이지에 확인 대기 판이 생김) · `blog.page.shown` (v1: pageId, seq. 대기 판을 보임). 받는 모듈은 없고 알림(`BlogNotices`)만 만든다
 
 받는 이벤트: `task.approval.granted` 중 `action`이 `blog.post.publish`인 것만 (`CoreWorkers.expect`도 여기서 적는다).
 `task.page.built` (taskId, runId, pageId, title, note, files): 페이지의 새 판. 두 번 받아도 판은 하나다 (`page_revisions`의 `UNIQUE(page_id, run_id)`와 `PageRepository.hasRun`)

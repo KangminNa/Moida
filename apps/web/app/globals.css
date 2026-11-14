@@ -1790,7 +1790,14 @@ a.chip {
   border-radius: 8px;
 }
 
-/* 버전 하나의 바뀐 점 (data.json). 빠진 값은 줄을 긋고 더해진 값은 굵게: 색 없이 구분한다 */
+/* 버전 하나의 바뀐 점 (data.json). 버전 줄 아래 한 줄을 다 쓴다. 빠진 값은 줄을 긋고 더해진 값은 굵게: 색 없이 구분한다 */
+.page-changes-box {
+  flex-basis: 100%;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
 .page-changes {
   display: grid;
   gap: 4px;

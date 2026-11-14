@@ -20,6 +20,7 @@ const CONFLICT = '이미 바뀐 페이지예요. 최신 내용을 다시 읽었�
 const FRAME_SANDBOX =
   'allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads';
 const ENTRY = 'index.html';
+// 공개 페이지는 브라우저가 60초 담아 둔다 (max-age): 보이는 판이 바뀌면 틀 주소에 판 번호를 붙여 새로 받는다
 
 // 페이지 하나: 왼쪽에 지금 보이는 판, 오른쪽에 고쳐 달라는 입력 · 공개 · 판 목록.
 // 고쳐 달라고 하면 만들기 작업이 서버에서 이 페이지의 가장 새 판을 받아 바뀐 파일만 낸다 (러너 page_base).
@@ -162,7 +163,7 @@ export function PageDetailPanel({ id }: { id: string }) {
           key={`${p.currentSeq}:${p.updatedAt}`}
           className="page-frame"
           title={p.title}
-          src={`${path}/${ENTRY}`}
+          src={`${path}/${ENTRY}?v=${p.currentSeq}`}
           sandbox={FRAME_SANDBOX}
         />
         <div className="stack">
@@ -170,6 +171,11 @@ export function PageDetailPanel({ id }: { id: string }) {
             label="고칠 내용"
             placeholder="예: 둘째 날은 실내 코스로 바꿔 줘"
             submit="저장"
+            hint={
+              p.visibility === 'public'
+                ? '끝나면 새 버전 · 공개 페이지라 확인한 뒤에 보임'
+                : '끝나면 바로 새 버전 · 나만 봄'
+            }
             busy={ask.busy !== null}
             problem={ask.problem}
             onSubmit={(instruction, requestId) => fix(p, instruction, requestId)}
@@ -225,7 +231,6 @@ export function PageDetailPanel({ id }: { id: string }) {
                       <Link href={`/admin/tasks/${r.taskId}`}>작업</Link>
                     </small>
                     {r.note && <small className="clamp">{r.note}</small>}
-                    {opened === r.seq && <PageChangesPanel id={p.id} seq={r.seq} />}
                   </div>
                   <div className="row">
                     <button
@@ -247,6 +252,11 @@ export function PageDetailPanel({ id }: { id: string }) {
                       </button>
                     )}
                   </div>
+                  {opened === r.seq && (
+                    <div className="page-changes-box">
+                      <PageChangesPanel id={p.id} seq={r.seq} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

@@ -15,7 +15,8 @@
 - 에이전트 없는 일 요청 (2차 4단계, `task/agentless.*`): 다른 모듈이 `task.agentless.requested`로 요청한다 (`AgentlessRequestHandler` → `AgentlessService`). 받는 종류는 `session_note` 하나(`AgentlessRequestInput`). 도구는 서버의 로그인에서 고른다(`LeasePolicy.serverTool`, 없으면 claude로 두고 기다림), 우선순위 -10, requestId로 하나. 세션 노트(`Task.SESSION_NOTE`, `AGENTLESS`)는 배정 일처럼 `testTools`로 거르고, 러너에게 지시문 틀(`prompt_package`)을 함께 보낸다(`Task.writesNote`). 일의 글(원문)은 작업에 없다: 러너가 vault의 `read_transcript`로 받아 틀 `session-note`를 채우고 답은 `save_note`로 vault에 보낸 뒤 `submit_result`로 끝낸다 (apps/runner `NoteStage`)
 - `inbox/`: 나를 기다리는 것 (MCP `inbox`, 기기 권한 `inbox`, 2차 4단계): 결재 화면 목록과 같은 결재(대화의 결재는 빼고 결과 카드는 대화 주소로)와 맡을 에이전트를 묻는 대화(배정 일이 돌지 않는 것)의 수 · 최근 5개 (`InboxQuery`). 브라우저 확장의 배지가 1분마다 읽는다
 - `goal/`: 목표 (`Goal`). 회사 목표부터 이어지는 나무. 작업이 목표 하나에 이어진다. `api/goals`
-- `schedule/`: 스케줄 (`Schedule`, `SchedulePolicy`, 7단계에서 하트비트를 넓혀 합침). 정해진 시각에 지시대로 작업을 만든다. `api/schedules`, 일꾼의 `ScheduleJob`(1분마다)
+- `schedule/`: 스케줄 (`Schedule`, `SchedulePolicy`, 7단계에서 하트비트를 넓혀 합침). 정해진 시각에 지시대로 작업을 만든다. `api/schedules`, 일꾼의 `ScheduleJob`(1분마다).
+  2차 5단계 자동화 레시피 (새 표 없이): 어디로(`destination`) task · page(`page_id`의 새 판을 만드는 make 작업, `payload.page`) · chat(담당의 대화 회차, 처음엔 `Chat.open` + `assign`으로 대화를 열어 `chat_id`로 기억, 다음부터 `Chat.send`. 회차를 보낸 요청은 `schedule:<스케줄>:<시각>`), 받을 것(대화에만, 그 대화의 받을 것), 지킬 것(지시문 틀 `recipe`), 계기(`trigger` time · manual · after). 앞 레시피의 일이 끝나면 `ScheduleFollowHandler`(`task.task.changed` done) → `ScheduleService.follow`(끝난 작업 하나에 한 번 `Idempotency`, 하루 한도 안에서). 한 페이지를 고치는 일은 한 번에 하나 (`tasks_one_open_page` 부분 유일 색인 → `TaskRepository.insertOnce`가 409)
 - `task/`: 작업 (`Task` + 실행 기록 `task_events`). 화면이 받는 모양은 `task.view.ts`, 러너 · 에이전트가 MCP로 받는 모양(`next_jobs` · `report_progress` · `delegate_task`)은 `job.view.ts`. `queued → running → waiting → running → done`, `failed`, `cancelled`.
   `api/tasks`, MCP `next_jobs` · `report_progress` · `submit_result` · `release_job`, 위임 `delegate_task`(작업 토큰)
 - `approval/`: 결재 (`Approval`). `pending → approved · rejected · revision_requested · cancelled`.
@@ -98,7 +99,7 @@ platform
 - 진행 보고는 version을 올리지 않는다 (`saveLease`). 보고가 잦아도 주인의 취소가 막히면 안 된다. 같은 request_id로 다시 보낸 보고도 그 일을 맡았던 러너만 (`assertWorkedBy`)
 - 러너가 닿은 때(`RunnerRepository.seen`)도 version을 올리지 않는다: 러너가 자주 닿아도 주인의 켜기·끄기가 막히면 안 된다. `next_jobs` · `report_progress` · `ai_login` · `ai_signin`이 남긴다 (로그인하는 동안 러너는 `ai_signin`만 부른다). 일 받기를 끈 러너의 `next_jobs`는 빈 목록이다
 - 잠그는 순서는 어디서나 작업 → 결재 → 에이전트. 작업끼리는 위 작업 → 아래 작업 (취소 전파). 위 작업을 깨우는 쪽은 위 작업만 잠근다
-- 스케줄: 주기는 매일(시각 + 요일)과 N시간마다만. 시각 계산은 `SchedulePolicy` 한 곳 (크론 라이브러리를 넣지 않는다). 돌리기는 스케줄 → 작업 순서로 쓰고, 작업의 request_id(`schedule:<스케줄>:<시각>`)로 한 번만 만든다. 앞 작업(`schedule:<스케줄>:` 접두어, `hasOpenRequest`)이 끝나지 않았거나 담당이 일을 받을 수 없으면 건너뛴다. 놓친 시각은 몰아서 돌리지 않는다. 담당이 없으면 자동 배정이라 지시가 있어야 한다 (`Schedule` 규칙)
+- 스케줄: 주기는 매일(시각 + 요일)과 N시간마다만. 시각 계산은 `SchedulePolicy` 한 곳 (크론 라이브러리를 넣지 않는다). 돌리기는 스케줄 → 작업 순서로 쓰고, 작업의 request_id(`schedule:<스케줄>:<시각>`)로 한 번만 만든다. 앞 작업(`schedule:<스케줄>:` 접두어, `hasOpenRequest`) · 가리키는 페이지를 고치는 일(`hasOpenPage`) · 대화의 마지막 회차가 끝나지 않았거나 담당이 일을 받을 수 없으면 건너뛴다. 담당 · 받을 것 · 어디로가 바뀌면 `chat_id`를 비워 다음 차례에 새 대화를 연다. 앞 레시피를 거슬러 올라가 자기가 나오면(`chainOf`) 고리라 422. 놓친 시각은 몰아서 돌리지 않는다. 담당이 없으면 자동 배정이라 지시가 있어야 한다 (`Schedule` 규칙)
 - 하루 한도(`daily_max` 1~24): 스케줄의 시간대 기준 하루에 만든 작업 수. `run_day`는 글자("YYYY-MM-DD")다: date 칸은 드라이버가 Date로 바꿔 날 비교가 어긋난다. 건너뛴 차례는 세지 않고(`claimRun`은 만들 차례에만), 주인의 "지금 한 번"은 세지만 앞 작업은 보지 않는다 (사람이 고른 것)
 - 위임: `waiting`에는 늘 기다리는 것(`wait_reason`: approval · subtasks)이 있다 (DB CHECK). 결재 승인 · 고쳐 달라는 말은 결재를 기다리는 작업에만, 깨우기는 하위 작업을 기다리는 작업에만. 받는 쪽 · 종류 · 한도는 `Task`가 막고 LLM에게 맡기지 않는다
 - 한도 올리기 결재는 서버만 올린다. 승인은 같은 트랜잭션에서 한도를 두 배로 하고 에이전트를 다시 움직인다

@@ -30,6 +30,8 @@ const library = async (query = '') =>
 const mine = (items: Json[]) => items.filter((i) => String(i.title).includes(mark));
 
 before(async () => {
+  // 결과물을 올리는 시험: 디스크 여유 몫을 끈다 (다른 결과물 시험과 같다)
+  process.env.CAIRN_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
   writer = await api.writeDevice(owner, `library-writer-${mark}`);

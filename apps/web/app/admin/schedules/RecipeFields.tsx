@@ -29,9 +29,11 @@ export function recipeOf(schedule: Schedule | null): Recipe {
   };
 }
 
-// 자동화 레시피의 칸 (2차 5단계): 어디로(작업 · 대화 회차 · 페이지 새 버전) · 받을 것(대화) · 지킬 것 · 계기.
-// 그리는 조각이라 값은 폼이 들고, 바뀐 값 한 벌을 onChange로 돌려준다.
-export function RecipeFields({
+// 자동화 레시피의 칸 (2차 5단계). 그리는 조각이라 값은 폼이 들고, 바뀐 값 한 벌을 onChange로 돌려준다.
+// 폼의 순서는 언제(TriggerFields, 주기 위) → 무엇을(지시) → 지킬 것 · 어디로 · 받을 것(RecipeFields).
+
+/** 계기(정한 시각 · 손으로만 · 다른 레시피가 끝난 뒤)와 앞 레시피 */
+export function TriggerFields({
   id,
   value,
   others,
@@ -44,12 +46,77 @@ export function RecipeFields({
   others: readonly Schedule[];
   onChange: (next: Recipe) => void;
 }) {
+  const set = (more: Partial<Recipe>) => onChange({ ...value, ...more });
+  return (
+    <>
+      <div className="field">
+        <label htmlFor={`${id}-trigger`}>계기</label>
+        <select
+          id={`${id}-trigger`}
+          className="input"
+          value={value.trigger}
+          onChange={(e) => set({ trigger: e.target.value, afterId: '' })}
+        >
+          {Object.entries(TRIGGER_LABELS).map(([key, label]) => (
+            <option key={key} value={key} disabled={key === 'after' && others.length === 0}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {value.trigger === 'after' && (
+        <div className="field">
+          <label htmlFor={`${id}-after`}>앞 레시피</label>
+          <select
+            id={`${id}-after`}
+            className="input"
+            value={value.afterId}
+            required
+            onChange={(e) => set({ afterId: e.target.value })}
+          >
+            <option value="">고르기</option>
+            {others.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}
+              </option>
+            ))}
+          </select>
+          <small>앞 레시피의 일이 끝나면 한 번</small>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** 지킬 것 · 어디로(작업 · 대화 회차 · 페이지 새 버전) · 페이지 · 받을 것(대화) */
+export function RecipeFields({
+  id,
+  value,
+  onChange,
+}: {
+  /** 칸 id의 앞부분 (폼의 useId) */
+  id: string;
+  value: Recipe;
+  onChange: (next: Recipe) => void;
+}) {
   const pages = usePages();
   const set = (more: Partial<Recipe>) => onChange({ ...value, ...more });
   const pageList = pages.data?.pages ?? [];
 
   return (
     <>
+      <div className="field">
+        <label htmlFor={`${id}-rules`}>지킬 것</label>
+        <textarea
+          id={`${id}-rules`}
+          className="input"
+          rows={2}
+          value={value.rules}
+          maxLength={RULES_MAX}
+          placeholder="예: 표 하나로, 출처 주소를 함께"
+          onChange={(e) => set({ rules: e.target.value })}
+        />
+      </div>
       <div className="field">
         <label htmlFor={`${id}-destination`}>어디로</label>
         <select
@@ -108,53 +175,6 @@ export function RecipeFields({
             ))}
           </select>
           <small>결과에 없으면 다시 맡김</small>
-        </div>
-      )}
-      <div className="field">
-        <label htmlFor={`${id}-rules`}>지킬 것</label>
-        <textarea
-          id={`${id}-rules`}
-          className="input"
-          rows={2}
-          value={value.rules}
-          maxLength={RULES_MAX}
-          placeholder="예: 표 하나로, 출처 주소를 함께"
-          onChange={(e) => set({ rules: e.target.value })}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor={`${id}-trigger`}>계기</label>
-        <select
-          id={`${id}-trigger`}
-          className="input"
-          value={value.trigger}
-          onChange={(e) => set({ trigger: e.target.value, afterId: '' })}
-        >
-          {Object.entries(TRIGGER_LABELS).map(([key, label]) => (
-            <option key={key} value={key} disabled={key === 'after' && others.length === 0}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {value.trigger === 'after' && (
-        <div className="field">
-          <label htmlFor={`${id}-after`}>앞 레시피</label>
-          <select
-            id={`${id}-after`}
-            className="input"
-            value={value.afterId}
-            required
-            onChange={(e) => set({ afterId: e.target.value })}
-          >
-            <option value="">고르기</option>
-            {others.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title}
-              </option>
-            ))}
-          </select>
-          <small>앞 레시피의 일이 끝나면 한 번</small>
         </div>
       )}
     </>

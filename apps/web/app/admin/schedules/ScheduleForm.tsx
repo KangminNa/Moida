@@ -5,7 +5,7 @@ import { flatTree } from '../../_task/labels';
 import { useGoals } from '../../_task/live';
 import type { Agent, Schedule } from '../../_task/types';
 import { type Period, PeriodFields, periodBody, periodOf } from './PeriodFields';
-import { type Recipe, RecipeFields, recipeOf } from './RecipeFields';
+import { type Recipe, RecipeFields, recipeOf, TriggerFields } from './RecipeFields';
 
 /** 하루 한도의 끝 (서버의 Schedule.DAILY_MAX_LIMIT) */
 const DAILY_MAX_LIMIT = 24;
@@ -42,10 +42,10 @@ export type ScheduleBody = {
 };
 
 // 스케줄 하나를 만들거나 고치는 폼: 칸의 상태와 보낼 본문만 가진다. 저장은 패널이 돌린다 (onSubmit).
-// 정한 시각에 지시대로 작업이 생긴다.
+// 계기에 맞춰 지시대로 작업 · 대화 회차 · 페이지 새 버전이 생긴다.
 // 담당을 정하고 지시를 비우면 정기 확인(맡은 목표와 진행 중인 일을 확인)이 된다 (예전의 하트비트).
 // 앞 작업이 끝나지 않았거나 담당이 쉬는 중이면 그 차례는 건너뛰고, 하루 한도에 닿으면 그날은 더 만들지 않는다.
-// 자동화 레시피 (2차 5단계): 어디로(작업 · 대화 회차 · 페이지 새 버전) · 받을 것 · 지킬 것 · 계기는 RecipeFields가 그린다.
+// 자동화 레시피 (2차 5단계): 계기는 TriggerFields(주기 위), 지킬 것 · 어디로 · 받을 것은 RecipeFields(지시 아래)가 그린다.
 // 계기가 정한 시각이 아니면 주기 칸을 숨긴다.
 export function ScheduleForm({
   schedule,
@@ -162,6 +162,12 @@ export function ScheduleForm({
         />
         켜기
       </label>
+      <TriggerFields
+        id={id}
+        value={recipe}
+        others={schedules.filter((s) => s.id !== schedule?.id)}
+        onChange={(next) => edit(() => setRecipe(next))}
+      />
       {recipe.trigger === 'time' && (
         <PeriodFields id={id} value={period} onChange={(next) => edit(() => setPeriod(next))} />
       )}
@@ -226,12 +232,7 @@ export function ScheduleForm({
         />
         <small>앞 작업이 끝나지 않았거나 담당이 쉬는 중이면 그 차례는 건너뛰어요</small>
       </div>
-      <RecipeFields
-        id={id}
-        value={recipe}
-        others={schedules.filter((s) => s.id !== schedule?.id)}
-        onChange={(next) => edit(() => setRecipe(next))}
-      />
+      <RecipeFields id={id} value={recipe} onChange={(next) => edit(() => setRecipe(next))} />
       {problem && <p className="error">{problem}</p>}
       <div className="row">
         <button

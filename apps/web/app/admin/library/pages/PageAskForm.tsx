@@ -7,6 +7,7 @@ export function PageAskForm({
   label,
   placeholder,
   submit,
+  hint,
   busy,
   problem,
   onSubmit,
@@ -16,6 +17,8 @@ export function PageAskForm({
   placeholder: string;
   /** 단추의 글 */
   submit: string;
+  /** 단추 옆 안내: 끝나면 어떻게 보이는지 */
+  hint: string;
   busy: boolean;
   problem: string | null;
   /** 보냈으면 true: 칸을 비운다. requestId는 내용을 고치기 전까지 같다 (다시 눌러도 작업은 하나) */
@@ -49,7 +52,7 @@ export function PageAskForm({
         }}
       />
       <div className="ask-row">
-        <span className="note">끝나면 바로 페이지에 반영 · 공개 전에는 나만 봄</span>
+        <span className="note">{hint}</span>
         <span className="spacer" />
         <button type="submit" className="cta small" disabled={busy || !instruction.trim()}>
           {submit}
