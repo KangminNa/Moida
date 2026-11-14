@@ -25,12 +25,17 @@ export class ChatResult {
   static readonly FIX = 'fix';
   static readonly REVIEW = 'review';
   static readonly CARD = 'card';
-  /** 받을 것마다 결과에 있어야 하는 것: 이름 끝이 그것인 결과물, 또는 그 동작의 결재 */
-  private static readonly NEEDS: Readonly<Record<string, { output?: string; action?: string }>> = {
+  /**
+   * 받을 것마다 결과에 있어야 하는 것: 이름 끝이 그것인 결과물, 또는 그 동작 중 하나의 결재
+   * (블로그는 글 하나의 발행이나 매거진 호의 발행, 2차 6단계)
+   */
+  private static readonly NEEDS: Readonly<
+    Record<string, { output?: string; actions?: readonly string[] }>
+  > = {
     html: { output: '.html' },
-    blog: { action: 'blog.post.publish' },
-    browser: { action: 'browser.site.publish' },
-    code: { action: 'code.pr.merge' },
+    blog: { actions: ['blog.post.publish', 'blog.issue.publish'] },
+    browser: { actions: ['browser.site.publish'] },
+    code: { actions: ['code.pr.merge'] },
   };
 
   /** 받을 것의 모양 검사 (DB CHECK와 같은 목록). 비우면 null (대화 답) */
@@ -51,14 +56,14 @@ export class ChatResult {
     if (!need) return null;
     const has = need.output
       ? outputs.some((name) => name.toLowerCase().endsWith(need.output as string))
-      : actions.includes(need.action as string);
+      : (need.actions ?? []).some((action) => actions.includes(action));
     return has ? null : deliver;
   }
 
   /** 있어야 하는 것의 이름 (검사 실패 지시문에 싣는다) */
   static needOf(deliver: string): string {
     const need = ChatResult.NEEDS[deliver];
-    return need?.output ? `${need.output} 결과물` : `${need?.action ?? deliver} 결재`;
+    return need?.output ? `${need.output} 결과물` : `${need?.actions?.join(' · ') ?? deliver} 결재`;
   }
 
   /**

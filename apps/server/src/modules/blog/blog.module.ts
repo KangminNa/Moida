@@ -10,6 +10,11 @@ import { BasketService } from './basket/basket.service';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
 import { BlogNotices } from './blog-notices';
 import { BlogTools } from './blog-tools';
+import { Issue } from './issue/issue';
+import { IssueController } from './issue/issue.api';
+import { IssueQuery } from './issue/issue.query';
+import { IssueService } from './issue/issue.service';
+import { IssuePublishHandler } from './issue/issue-publish.handler';
 import { MenuController } from './menu/menu.api';
 import { MenuQuery } from './menu/menu.query';
 import { MenuService } from './menu/menu.service';
@@ -50,10 +55,13 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     PageService,
     PageQuery,
     PageBuiltHandler,
-    // 블로그 메뉴 (2차 6단계)
+    // 블로그 메뉴 · 매거진 호 (2차 6단계)
     MenuService,
     MenuQuery,
     BlogMenusTool,
+    IssueService,
+    IssueQuery,
+    IssuePublishHandler,
   ],
   controllers: [
     PostController,
@@ -62,6 +70,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     BasketController,
     PageController,
     MenuController,
+    IssueController,
   ],
   exports: [BlogTools],
 })
@@ -77,10 +86,13 @@ export class BlogModule implements OnModuleInit {
     private readonly posts: PostQuery,
     private readonly library: LibraryQuery,
     private readonly checks: ActionChecks,
+    private readonly issuePublish: IssuePublishHandler,
+    private readonly issues: IssueQuery,
   ) {}
 
   onModuleInit(): void {
     this.workers.on(PublishApprovedHandler.TOPIC, this.approved);
+    this.workers.on(PublishApprovedHandler.TOPIC, this.issuePublish);
     this.workers.expect(PublishApprovedHandler.TOPIC);
     // 만들기 작업이 끝나며 알린 페이지 (task가 보낸다)
     this.workers.on(PageBuiltHandler.TOPIC, this.built);
@@ -90,6 +102,7 @@ export class BlogModule implements OnModuleInit {
     this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
     // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
     this.checks.register(Post.PUBLISH_ACTION, (a, id) => this.posts.publishProblem(a, id));
+    this.checks.register(Issue.ACTION, (a, id) => this.issues.publishProblem(a, id));
     // 파일을 가리키는 칸: 쓰는 동안 platform이 파일을 지우지 않게
     this.blobs.registerUse(
       ['blog.assets.blob_hash', 'blog.posts.cover_blob_hash'],

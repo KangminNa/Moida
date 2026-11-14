@@ -63,6 +63,10 @@ export class BlogSaveDraftTool extends BaseTool {
         type: ['string', 'null'],
         format: 'uuid',
       },
+      issue_id: {
+        type: ['string', 'null'],
+        format: 'uuid',
+      },
       ref_wiki_ids: {
         type: 'array',
         items: { type: 'string', format: 'uuid' },

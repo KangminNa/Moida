@@ -8,11 +8,12 @@ import {
   RuleViolation,
   TableEntity,
 } from '../../platform';
-import type { PostNew, PostRevisionNew, PostRevisionRow, PostRow } from '../blog.tables';
+import type { PostNew, PostRow } from '../blog.tables';
 import type { Menu } from '../menu/menu';
 import { PublicSavedPostView, SavedPostView, ToolDraftView } from './post.view';
 import { PostContent } from './post-content';
 import { PostPublish } from './post-publish.policy';
+import { PostRevision } from './post-revision';
 
 /** 글 한 줄과 함께 읽는 칸: 지금 판의 제목·본문, 판 수, 참고 wiki */
 export interface LoadedPost extends PostRow {
@@ -20,44 +21,6 @@ export interface LoadedPost extends PostRow {
   head_body: string | null;
   revision_count: number;
   ref_wiki_ids: readonly string[] | null;
-}
-
-/** 글의 판 하나 (blog.post_revisions, 추가만): 그때의 제목과 본문 */
-export class PostRevision extends TableEntity<PostRevisionRow, PostRevisionNew> {
-  /** Actor 종류 → 판에 남기는 만든 쪽 (post_revisions.actor_type). 기기와 에이전트는 둘 다 AI 도구다 */
-  private static readonly ACTOR_TYPES: Readonly<Record<string, string>> = {
-    owner: 'user',
-    device: 'ai',
-    agent: 'ai',
-    system: 'system',
-  };
-
-  /** seq: 몇 번째 판인가 (1부터). base: 바로 앞의 판 (첫 판이면 null) */
-  static write(
-    postId: string,
-    seq: number,
-    content: PostContent,
-    base: string | null,
-    requestId: string | null,
-    by: Actor,
-    now: Date,
-  ): PostRevision {
-    return new PostRevision(
-      {
-        id: BaseEntity.newId(),
-        post_id: postId,
-        seq,
-        title: content.title,
-        body_md: content.body,
-        base_revision_id: base,
-        request_id: requestId,
-        actor_type: PostRevision.ACTOR_TYPES[by.kind] ?? 'system',
-        actor_id: by.id,
-        created_at: now,
-      },
-      true,
-    );
-  }
 }
 
 // 글. 저장할 때 내용(제목·본문)이 바뀌었으면 새 판이 쌓인다. 주소·태그·정렬·공개 범위는 판 없이 글에 둔다.
@@ -173,6 +136,11 @@ export class Post extends TableEntity<PostRow, PostNew> {
     return this.row.slug;
   }
 
+  /** 든 호 (2차 6단계). 없으면 null */
+  get issueId(): string | null {
+    return this.row.issue_id;
+  }
+
   /** 이번에 새로 쌓인 판 (Repository가 저장한다) */
   get addedRevision(): PostRevision | null {
     return this.added;
@@ -239,6 +207,32 @@ export class Post extends TableEntity<PostRow, PostNew> {
     this.put('issue_id', null);
     this.put('issue_order', null);
     this.touch(now);
+  }
+
+  /**
+   * 호에 넣기 · 빼기 (2차 6단계): 순서(order)와 함께. 호에 든 글은 메뉴에서 빠진다 (글 목록 메뉴와 호 중 하나).
+   * 발행한 호의 글은 Issue가 막고, 공개된 글은 관리자만 옮긴다
+   */
+  joinIssue(issueId: string | null, order: number, by: Actor, now: Date): void {
+    this.assertLive();
+    if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
+    if (issueId === this.row.issue_id && (issueId === null || order === this.row.issue_order))
+      return;
+    this.put('issue_id', issueId);
+    this.put('issue_order', issueId === null ? null : order);
+    if (issueId !== null) this.put('menu_id', null);
+    this.touch(now);
+  }
+
+  /** 호와 함께 공개 (결재한 호 발행 · 관리자의 호 발행). 휴지통 글이면 까닭을 돌려주고 바꾸지 않는다 */
+  publishWithIssue(now: Date): string | null {
+    if (this.row.deleted_at) return `휴지통에 있는 글이 있어요: ${this.head.title}`;
+    if (this.row.status === Post.PUBLISHED) return null;
+    this.put('status', Post.PUBLISHED);
+    if (!this.row.published_at) this.put('published_at', now);
+    this.touch(now);
+    this.announce('blog.post.published');
+    return null;
   }
 
   /** 공개 범위 바꾸기. 처음 공개(공개·링크만)한 때를 발행일로 남긴다 */

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { menuPath } from '../../_blog/format';
 import { MENU_KIND_LABELS } from '../../_blog/labels';
@@ -108,6 +109,11 @@ export function MenusPanel() {
                   {m.policy && <small className="clamp">{m.policy}</small>}
                 </div>
                 <div className="row">
+                  {m.kind === 'issues' && (
+                    <Link className="ghost" href={`/admin/menus/${m.id}`}>
+                      호 관리
+                    </Link>
+                  )}
                   <button type="button" className="ghost" onClick={() => setOpen(m.id)}>
                     편집
                   </button>

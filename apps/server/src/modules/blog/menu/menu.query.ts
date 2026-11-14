@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseQuery } from '../../platform';
-import { menus } from '../blog.schema';
+import { issues, menus } from '../blog.schema';
 import type { MenuListRow } from './menu.view';
 import { MenuListView, PublicMenuListView, ToolMenuView } from './menu.view';
 
 // 메뉴 읽기 (2차 6단계). 메뉴의 이름 · 주소 · 종류는 공개다 (공개 블로그의 메뉴 줄). 설정 칸은 관리자만.
+// AI 도구는 호 목록 메뉴에 만드는 중인 호를 함께 받는다 (blog_save_draft의 issue_id)
 // 방문자는 공간을 모른다: MVP는 공간 하나라 방문자 읽기는 공간으로 거르지 않는다 (blog 규칙).
 @Injectable()
 export class MenuQuery extends BaseQuery {
@@ -24,8 +25,15 @@ export class MenuQuery extends BaseQuery {
   /** blog_menus: 글을 쓸 AI가 고를 메뉴와 편집 방침 (write 권한) */
   async forTool(actor: Actor): Promise<ToolMenuView> {
     actor.assertCan(Actor.WRITE);
+    const spaceId = actor.requireSpace();
+    const drafts = await this.rows(
+      issues,
+      { space_id: spaceId, status: 'draft' },
+      { order: ['number'], columns: ['id', 'menu_id', 'number', 'title'] },
+    );
     return new ToolMenuView(
-      await this.rows(menus, { space_id: actor.requireSpace() }, { order: ['sort', 'created_at'] }),
+      await this.rows(menus, { space_id: spaceId }, { order: ['sort', 'created_at'] }),
+      drafts,
     );
   }
 

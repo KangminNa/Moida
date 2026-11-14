@@ -1,4 +1,4 @@
-import type { MenuRow } from '../blog.tables';
+import type { IssueRow, MenuRow } from '../blog.tables';
 
 // 메뉴의 읽기 모양 (2차 6단계). 웹이 `import type`으로 가져온다 (객체설계 6장).
 // 보는 사람마다 둘이다: 관리자는 설정 칸 전부와 담긴 수, 방문자는 메뉴 줄에 필요한 이름 · 주소 · 종류만.
@@ -59,9 +59,14 @@ export class PublicMenuListView {
   }
 }
 
-/** blog_menus의 답: 글을 쓸 AI가 고를 메뉴와 편집 방침. MCP는 snake_case */
+/** blog_menus의 답: 글을 쓸 AI가 고를 메뉴와 편집 방침, 호 목록 메뉴에는 만드는 중인 호. MCP는 snake_case */
 export class ToolMenuView {
-  constructor(private readonly rows: readonly Readonly<MenuRow>[]) {}
+  constructor(
+    private readonly rows: readonly Readonly<MenuRow>[],
+    private readonly drafts: readonly Readonly<
+      Pick<IssueRow, 'id' | 'menu_id' | 'number' | 'title'>
+    >[],
+  ) {}
 
   toJSON() {
     return {
@@ -71,6 +76,9 @@ export class ToolMenuView {
         kind: r.kind,
         policy: r.policy,
         agent_id: r.agent_id,
+        issues: this.drafts
+          .filter((i) => i.menu_id === r.id)
+          .map((i) => ({ id: i.id, number: i.number, title: i.title })),
       })),
     };
   }

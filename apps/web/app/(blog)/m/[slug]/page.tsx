@@ -5,14 +5,15 @@ import { formatDate, menuPath, pagePath } from '../../../_blog/format';
 import { PostList } from '../../../_blog/PostList';
 import type {
   PostList as PostPage,
+  PublicIssueList,
   PublicMenu,
   PublicMenuList,
   PublicPageList,
 } from '../../../_blog/types';
 import { serverGet } from '../../../_lib/server-api';
 
-// 메뉴 하나 (/m/<주소>, 2차 6단계). 종류마다: 글 목록은 그 메뉴의 공개 글, 페이지 모음은 공개 페이지 목록,
-// 페이지 하나는 그 페이지를 격리된 틀로. 관리자가 열어도 방문자가 보는 그대로다.
+// 메뉴 하나 (/m/<주소>, 2차 6단계). 종류마다: 글 목록은 그 메뉴의 공개 글, 호 목록은 발행한 호,
+// 페이지 모음은 공개 페이지 목록, 페이지 하나는 그 페이지를 격리된 틀로. 관리자가 열어도 방문자가 보는 그대로다.
 export const dynamic = 'force-dynamic';
 
 /** 페이지의 스크립트는 콘솔과 로그인에 닿지 못한다 (서버의 격리 머리글과 같다) */
@@ -69,6 +70,33 @@ export default async function MenuScreen({
       </main>
     );
   }
+  if (menu.kind === 'issues') {
+    const issues = (await serverGet<PublicIssueList>(`/api/issues?${query}`, true))?.issues ?? [];
+    return (
+      <main className="blog-main">
+        <h1 className="blog-menu-title">{menu.name}</h1>
+        {issues.length === 0 ? (
+          <p className="blog-empty">발행한 호 없음</p>
+        ) : (
+          <ol className="post-list">
+            {issues.map((i) => (
+              <li key={i.number}>
+                <a href={`${menuPath(menu.slug)}/${i.number}`}>
+                  <h2>
+                    {i.number}호 · {i.title}
+                  </h2>
+                  {i.intro && <p>{i.intro}</p>}
+                  <div className="post-meta">
+                    <time dateTime={i.publishedAt ?? undefined}>{formatDate(i.publishedAt)}</time>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ol>
+        )}
+      </main>
+    );
+  }
   const pages = (await serverGet<PublicPageList>(`/api/pages?${query}`, true))?.pages ?? [];
   const [single] = pages;
   if (menu.kind === 'page')
@@ -90,7 +118,7 @@ export default async function MenuScreen({
     <main className="blog-main">
       <h1 className="blog-menu-title">{menu.name}</h1>
       {pages.length === 0 ? (
-        <p className="blog-empty">공개한 {menu.kind === 'issues' ? '호' : '페이지'} 없음</p>
+        <p className="blog-empty">공개한 페이지 없음</p>
       ) : (
         <ol className="post-list">
           {pages.map((p) => (

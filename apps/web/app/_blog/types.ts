@@ -4,6 +4,12 @@ import type {
   BasketView,
 } from '../../../server/src/modules/blog/basket/basket.view';
 import type {
+  IssueDetailView,
+  IssueListView,
+  PublicIssueListView,
+  PublicIssueView,
+} from '../../../server/src/modules/blog/issue/issue.view';
+import type {
   MenuListView,
   PublicMenuListView,
 } from '../../../server/src/modules/blog/menu/menu.view';
@@ -65,3 +71,10 @@ export type MenuList = ReturnType<MenuListView['toJSON']>;
 export type Menu = MenuList['menus'][number];
 export type PublicMenuList = ReturnType<PublicMenuListView['toJSON']>;
 export type PublicMenu = PublicMenuList['menus'][number];
+
+/** 매거진 호 (2차 6단계): 관리자의 목록 · 호 하나(글까지), 방문자의 발행한 호 목록 · 호 하나 */
+export type IssueList = ReturnType<IssueListView['toJSON']>;
+export type Issue = IssueList['issues'][number];
+export type IssueDetail = ReturnType<IssueDetailView['toJSON']>;
+export type PublicIssueList = ReturnType<PublicIssueListView['toJSON']>;
+export type PublicIssue = ReturnType<PublicIssueView['toJSON']>;

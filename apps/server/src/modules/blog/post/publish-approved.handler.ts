@@ -19,7 +19,7 @@ export class PublishApprovedHandler extends BaseHandler {
     const req = ApprovedPublishInput.from(event.data);
     await this.posts.publishApproved(
       new ApprovedActor(event.spaceId, req.decidedBy, req.approvalId, req.action),
-      req.postId,
+      req.targetId,
       req.targetVersion,
     );
   }

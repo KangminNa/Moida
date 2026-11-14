@@ -5,6 +5,7 @@ import {
   Database,
   EntityService,
   Idempotency,
+  RuleViolation,
   SensitivePolicy,
   type Sql,
   type VersionTarget,
@@ -86,6 +87,25 @@ export class PostService extends EntityService<Post> {
     });
   }
 
+  /**
+   * 초안을 호에 넣기 · 빼기 (2차 6단계): 발행 전의 호에만, 그 호의 메뉴에 올릴 수 있는 요청자만 (Menu.assertWriter).
+   * 이미 그 호에 든 글은 순서를 그대로 둔다
+   */
+  private async intoIssue(
+    tx: Sql,
+    spaceId: string,
+    post: Post,
+    issueId: string | null,
+    actor: Actor,
+    now: Date,
+  ): Promise<void> {
+    if (issueId === null) return post.joinIssue(null, 0, actor, now);
+    const slot = await new PostRepository(tx).issueSlot(spaceId, issueId);
+    if (slot.status !== 'draft') throw new RuleViolation('이미 발행한 호예요');
+    (await new MenuRepository(tx).holder(spaceId, slot.menu_id)).assertWriter(actor);
+    if (post.issueId !== slot.id) post.joinIssue(slot.id, slot.next, actor, now);
+  }
+
   /** 올릴 메뉴 (공유 잠금: 올리는 동안 지워지지 않게). null은 빼기 */
   private menuOf(tx: Sql, spaceId: string, menuId: string | null) {
     return menuId === null ? Promise.resolve(null) : new MenuRepository(tx).holder(spaceId, menuId);
@@ -143,6 +163,8 @@ export class PostService extends EntityService<Post> {
       post.linkWikis(req.mainWikiId, req.refWikiIds, actor, now);
       if (req.menuId !== undefined)
         post.placeIn(await this.menuOf(tx, spaceId, req.menuId), actor, now);
+      if (req.issueId !== undefined)
+        await this.intoIssue(tx, spaceId, post, req.issueId, actor, now);
       await posts.save(post);
       await once.remember({ postId: post.id });
       return post;

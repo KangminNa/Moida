@@ -46,6 +46,13 @@
   max-width: none;
 }
 
+.blog-back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .blog-menu-title {
   margin: 0 0 12px;
   font-size: 22px;

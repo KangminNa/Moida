@@ -236,6 +236,8 @@ export class SaveDraftInput extends BaseRequest {
     readonly refWikiIds: readonly string[] | undefined,
     /** 올릴 메뉴 (2차 6단계, blog_menus의 id). 보내지 않으면 그대로, null은 메뉴에서 빼기 */
     readonly menuId: string | null | undefined = undefined,
+    /** 넣을 호 (blog_menus의 issues). 보내지 않으면 그대로, null은 호에서 빼기 */
+    readonly issueId: string | null | undefined = undefined,
   ) {
     super();
   }
@@ -257,6 +259,7 @@ export class SaveDraftInput extends BaseRequest {
         mainWikiOf(f, raw, 'main_wiki_id'),
         refWikisOf(f, 'ref_wiki_ids'),
         menuOf(f, raw, 'menu_id'),
+        menuOf(f, raw, 'issue_id'),
       );
     });
   }
@@ -288,13 +291,14 @@ export class PostMenuInput extends BaseRequest {
   }
 }
 
-/** 주인이 승인한 공개: 일꾼이 꺼낸 task.approval.granted의 내용. blog는 task를 모르므로 값으로만 읽는다 */
+/** 주인이 승인한 공개(글 · 호): 일꾼이 꺼낸 task.approval.granted의 내용. blog는 task를 모르므로 값으로만 읽는다 */
 export class ApprovedPublishInput extends BaseRequest {
   private constructor(
     readonly approvalId: string,
     readonly action: string,
     readonly decidedBy: string,
-    readonly postId: string,
+    /** 결재의 대상 (글 · 호) */
+    readonly targetId: string,
     readonly targetVersion: number,
   ) {
     super();
