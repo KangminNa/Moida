@@ -146,6 +146,7 @@ describe('PromptPack', () => {
       'code',
       'code-replay',
       'make',
+      'recipe',
     ])
       assert.doesNotThrow(() => pack.fill(name), name);
   });

@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
-import { Database } from '../../platform';
+import { Database, DomainEvent } from '../../platform';
 import { ScheduleJob } from './schedule.job';
+import { ScheduleFollowHandler } from './schedule-follow.handler';
 
 // /api/schedules: 보는 사람별 결과 (방문자 · write 기기 · 주인)와 일꾼의 돌리기 · 하루 한도.
 
@@ -27,7 +28,8 @@ before(async () => {
 after(async () => {
   const open = await db.sql<{ id: string }[]>`
     SELECT id FROM task.tasks
-    WHERE request_id LIKE 'schedule:%' AND status IN ('queued', 'running', 'waiting')`;
+    WHERE (request_id LIKE 'schedule:%' OR payload->'chat'->>'requestId' LIKE 'schedule:%')
+      AND status IN ('queued', 'running', 'waiting')`;
   for (const { id } of open) {
     const detail = ok(await api.get(`/api/tasks/${id}`, owner));
     ok(await api.request('POST', `/api/tasks/${id}/cancel`, owner, { version: detail.version }));
@@ -289,5 +291,141 @@ describe('스케줄 (/api/schedules)', () => {
     await makeDue(schedule);
     await job.run();
     assert.equal((await tasksOf(schedule)).length, 2, '한도에 닿으면 일꾼도 만들지 않는다');
+  });
+
+  describe('자동화 레시피 (2차 5단계)', () => {
+    /** 대화 레시피가 만든 회차 작업들 (회차를 보낸 요청이 schedule:<레시피>:) */
+    const turnsOf = (schedule: Json) =>
+      db.sql<{ id: string; status: string; instruction: string; request_id: string }[]>`
+        SELECT id, status, instruction, request_id FROM task.tasks
+        WHERE payload->'chat'->>'requestId' LIKE ${`schedule:${schedule.id}:%`} ORDER BY created_at`;
+    const cancel = async (id: string) => {
+      const { version } = ok(await api.get(`/api/tasks/${id}`, owner));
+      ok(await api.request('POST', `/api/tasks/${id}/cancel`, owner, { version }));
+    };
+
+    test('대화로 보내면 처음엔 대화를 열고, 다음 차례부터 같은 대화의 회차. 지킬 것은 지시 뒤에, 받을 것은 대화의 받을 것', async () => {
+      const agent = await newAgent({ name: `레시피 담당 ${randomUUID().slice(0, 6)}` });
+      const recipe = {
+        ...DAILY,
+        title: '주간 보고',
+        agentId: agent.id,
+        destination: 'chat',
+        instruction: '이번 주 글 진행을 정리해 줘',
+        rules: '표 하나로, 다섯 줄 넘지 않게',
+        deliver: 'html',
+      };
+      const schedule = ok(await create(recipe), 201);
+      assert.deepEqual(
+        [schedule.destination, schedule.trigger, schedule.deliver, schedule.chatId],
+        ['chat', 'time', 'html', null],
+      );
+      await makeDue(schedule, 3);
+      await job.run();
+      const [first] = await turnsOf(schedule);
+      assert.ok(first, '첫 회차');
+      assert.match(
+        first.instruction,
+        /^이번 주 글 진행을 정리해 줘\n\n# 지킬 것\n[^\n]+\n표 하나로, 다섯 줄 넘지 않게$/,
+      );
+      const [opened] = (await list()).filter((s) => s.id === schedule.id);
+      assert.ok(opened?.chatId, '연 대화를 기억한다');
+      const { chat } = ok(await api.get(`/api/chats/${opened?.chatId}`, owner)) as { chat: Json };
+      assert.deepEqual([chat.agentId, chat.turns, chat.deliver], [agent.id, 1, 'html']);
+
+      await makeDue(schedule, 2);
+      await job.run();
+      assert.equal((await turnsOf(schedule)).length, 1, '앞 회차의 답을 기다리는 중');
+      await cancel(first.id);
+      await makeDue(schedule, 1);
+      await job.run();
+      const turns = await turnsOf(schedule);
+      assert.equal(turns.length, 2);
+      const again = ok(await api.get(`/api/chats/${opened?.chatId}`, owner)) as { chat: Json };
+      assert.equal(again.chat.turns, 2, '같은 대화의 다음 회차');
+    });
+
+    test('대화는 관리자 바로 아래 에이전트와만, 받을 것은 대화에만 (422)', async () => {
+      const lead = await newAgent({ name: `팀장 ${randomUUID().slice(0, 6)}` });
+      const member = await newAgent({
+        name: `팀원 ${randomUUID().slice(0, 6)}`,
+        reportsTo: lead.id,
+      });
+      const chatTo = (agentId: unknown, more: Json = {}) =>
+        create({ ...DAILY, agentId, destination: 'chat', instruction: '정리', ...more });
+      assert.equal((await chatTo(member.id)).status, 422);
+      assert.equal((await chatTo(null)).status, 422, '담당이 있어야 한다');
+      assert.equal((await create({ ...DAILY, instruction: '요약', deliver: 'html' })).status, 422);
+    });
+
+    test('손으로만 도는 레시피는 시각이 없고 "지금 실행"으로만 돈다', async () => {
+      const schedule = ok(
+        await create({ ...DAILY, instruction: '손으로 요약', trigger: 'manual' }),
+        201,
+      );
+      assert.equal(schedule.nextRunAt, null);
+      await job.run();
+      assert.equal((await tasksOf(schedule)).length, 0);
+      ok(
+        await api.request('POST', `/api/schedules/${schedule.id}/run`, owner, {
+          version: schedule.version,
+        }),
+      );
+      const [task] = await tasksOf(schedule);
+      assert.equal(task?.instruction, '손으로 요약', '지킬 것이 없으면 지시 그대로');
+    });
+
+    test('다른 레시피의 일이 끝나면 뒤 레시피가 한 번 돈다. 서로 기다리는 고리는 막는다', async () => {
+      const first = ok(
+        await create({ ...DAILY, title: '수집', instruction: '모아 줘', trigger: 'manual' }),
+        201,
+      );
+      const next = ok(
+        await create({
+          ...DAILY,
+          title: '정리',
+          instruction: '모은 것을 정리해 줘',
+          trigger: 'after',
+          afterId: first.id,
+        }),
+        201,
+      );
+      assert.equal(next.nextRunAt, null);
+      const made = ok(
+        await api.request('POST', `/api/schedules/${first.id}/run`, owner, {
+          version: first.version,
+        }),
+      );
+      const handler = api.service(ScheduleFollowHandler);
+      const { space_id: spaceId } = (
+        await db.sql<
+          { space_id: string }[]
+        >`SELECT space_id FROM task.tasks WHERE id = ${String(made.id)}`
+      )[0] as { space_id: string };
+      const finished = new DomainEvent('task.task.changed', 1, spaceId, {
+        taskId: made.id,
+        status: 'done',
+      });
+      await handler.handle(finished);
+      assert.equal((await tasksOf(next)).length, 0, '끝나지 않은 일로는 돌지 않는다');
+      await db.sql`UPDATE task.tasks SET status = 'done' WHERE id = ${String(made.id)}`;
+      await handler.handle(finished);
+      await handler.handle(finished);
+      const followed = await tasksOf(next);
+      assert.equal(followed.length, 1, '같은 끝남은 한 번만');
+      assert.equal(followed[0]?.instruction, '모은 것을 정리해 줘');
+
+      const [current] = (await list()).filter((s) => s.id === first.id);
+      const loop = await api.request('PATCH', `/api/schedules/${first.id}`, owner, {
+        ...DAILY,
+        title: '수집',
+        instruction: '모아 줘',
+        trigger: 'after',
+        afterId: next.id,
+        version: current?.version,
+      });
+      assert.equal(loop.status, 422, loop.text);
+      assert.match(loop.text, /고리/);
+    });
   });
 });

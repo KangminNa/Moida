@@ -50,6 +50,7 @@ import { ScheduleController } from './schedule/schedule.api';
 import { ScheduleJob } from './schedule/schedule.job';
 import { ScheduleQuery } from './schedule/schedule.query';
 import { ScheduleService } from './schedule/schedule.service';
+import { ScheduleFollowHandler } from './schedule/schedule-follow.handler';
 import { RepoSkillGateway } from './skill/repo-skill.gateway';
 import { SkillController } from './skill/skill.api';
 import { SkillQuery } from './skill/skill.query';
@@ -153,6 +154,8 @@ import { WebPageGateway } from './web/web-page.gateway';
     ReadUrlTool,
     BeginDownloadTool,
     OutputPurgeJob,
+    // 자동화 레시피 (2차 5단계): 레시피의 일이 끝나면 그 뒤의 레시피 (계기 after)
+    ScheduleFollowHandler,
   ],
   controllers: [
     AgentController,
@@ -198,6 +201,7 @@ export class TaskModule implements OnModuleInit {
     private readonly chatRouteJob: ChatRouteJob,
     private readonly agentless: AgentlessRequestHandler,
     private readonly library: LibraryQuery,
+    private readonly follows: ScheduleFollowHandler,
   ) {}
 
   onModuleInit(): void {
@@ -210,6 +214,7 @@ export class TaskModule implements OnModuleInit {
     for (const topic of ChatResultHandler.TOPICS) this.workers.on(topic, this.chatResults);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
     this.workers.on(Task.CHANGED, this.chatRoutes);
+    this.workers.on(Task.CHANGED, this.follows);
     this.workers.every(this.chatRouteJob, ChatRouteJob.EVERY_MS);
     this.workers.on('*', this.results);
     this.workers.every(this.leases, TaskModule.LEASE_CHECK_MS);

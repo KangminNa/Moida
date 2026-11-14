@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
-import { scheduleLabel, when } from '../../_task/labels';
+import { DESTINATION_LABELS, scheduleLabel, when } from '../../_task/labels';
 import { useAgents, useSchedules } from '../../_task/live';
 import type { Schedule, Task } from '../../_task/types';
 import { type ScheduleBody, ScheduleForm } from './ScheduleForm';
@@ -22,7 +22,8 @@ function todayRuns(s: Schedule): number {
   }
 }
 
-// 스케줄: 정한 시각에 지시대로 작업을 만든다 (하트비트를 넓힌 것). 만들기 · 고치기 · 지금 한 번 · 지우기.
+// 스케줄(자동화 레시피): 계기에 맞춰 지시대로 작업 · 대화 회차 · 페이지 새 버전을 만든다 (하트비트를 넓힌 것).
+// 만들기 · 고치기 · 지금 한 번 · 지우기.
 // 에이전트 화면에서 오면 그 에이전트가 담당인 것만 (주소의 agent).
 export function SchedulesPanel({ agentId }: { agentId: string | null }) {
   const agents = useAgents();
@@ -95,6 +96,7 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
       {open === NEW && (
         <ScheduleForm
           schedule={null}
+          schedules={list ?? []}
           agents={agentList}
           agentId={agentId}
           busy={save.busy !== null}
@@ -115,6 +117,7 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
               <li key={s.id} className="list-cell">
                 <ScheduleForm
                   schedule={s}
+                  schedules={list}
                   agents={agentList}
                   agentId={null}
                   busy={save.busy !== null}
@@ -133,11 +136,13 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
                     {agentList.find((a) => a.id === s.agentId)?.name ?? '자동 배정'} · 오늘{' '}
                     {todayRuns(s)}/{s.dailyMax}
                     {s.nextRunAt ? ` · 다음 ${when(s.nextRunAt)}` : ''}
-                    {s.pageId && (
-                      <>
-                        {' · '}
-                        <Link href={`/admin/library/pages/${s.pageId}`}>페이지</Link>
-                      </>
+                    {' · '}
+                    {s.pageId ? (
+                      <Link href={`/admin/library/pages/${s.pageId}`}>페이지</Link>
+                    ) : s.chatId ? (
+                      <Link href={`/admin/chats/${s.chatId}`}>대화</Link>
+                    ) : (
+                      (DESTINATION_LABELS[s.destination] ?? s.destination)
                     )}
                   </small>
                 </div>

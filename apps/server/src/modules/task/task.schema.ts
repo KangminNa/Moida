@@ -218,6 +218,12 @@ export const schedules = taskSchema.table('schedules', {
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   page_id: uuid('page_id'),
+  destination: text('destination').notNull(),
+  deliver: text('deliver'),
+  rules: text('rules').notNull(),
+  trigger: text('trigger').notNull(),
+  after_id: uuid('after_id'),
+  chat_id: uuid('chat_id'),
 });
 
 /** task.skill_revisions */

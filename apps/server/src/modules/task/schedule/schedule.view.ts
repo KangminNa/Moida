@@ -26,6 +26,14 @@ export class ScheduleView {
       goalId: r.goal_id,
       /** 새 판을 만들 페이지 (자라는 페이지). 없으면 null */
       pageId: r.page_id,
+      /** 레시피 (2차 5단계): 어디로(task · chat · page) · 받을 것 · 지킬 것 · 계기(time · manual · after)와 앞 레시피 */
+      destination: r.destination,
+      deliver: r.deliver,
+      rules: r.rules,
+      trigger: r.trigger,
+      afterId: r.after_id,
+      /** 대화로 보내는 레시피가 회차를 쌓는 대화 (처음 돌 때 연다) */
+      chatId: r.chat_id,
       dailyMax: r.daily_max,
       /** 이 날(시간대 기준)에 만든 작업 수. 화면이 오늘인지 견준다 */
       runDay: r.run_day,

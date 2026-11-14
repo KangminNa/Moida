@@ -186,11 +186,70 @@ describe('Schedule', () => {
     assert.equal(schedule.requestIdFor(slot), `schedule:${schedule.id}:2026-11-06T00:00:00.000Z`);
     assert.match(schedule.titleFor(slot), /^아침 정리 \(11\. 6\. 09:00\)$/);
     assert.equal(schedule.taskInstruction, Schedule.DEFAULT_INSTRUCTION);
-    const task = daily({ agent_id: null, instruction: '뉴스 요약' }).wake(slot, null, NOW);
+    const task = daily({ agent_id: null, instruction: '뉴스 요약' }).wake(
+      slot,
+      null,
+      '뉴스 요약',
+      NOW,
+    );
     const row = task.unsaved;
     assert.equal(row.agent_id, null, '담당이 없으면 빌릴 때 자동 배정');
     assert.equal(row.instruction, '뉴스 요약');
     assert.equal(row.kind, 'general');
     assert.deepEqual((row.payload as { schedule: { at: string } }).schedule.at, slot.toISOString());
+  });
+
+  test('레시피: 어디로 ↔ 페이지 · 담당 · 지시, 받을 것은 대화에만, 계기 ↔ 앞 레시피', () => {
+    const page = daily({ page_id: 'page-1' });
+    assert.equal(page.destination, Schedule.PAGE, '페이지가 있으면 기본은 페이지로');
+    const bad = [
+      { destination: 'mail' },
+      { destination: 'page' },
+      { destination: 'task', page_id: 'page-1' },
+      { destination: 'chat', instruction: '' },
+      { destination: 'chat', agent_id: null, instruction: '요약' },
+      { deliver: 'html' },
+      { destination: 'chat', instruction: '요약', deliver: 'pdf' },
+      { rules: 'x'.repeat(Schedule.RULES_MAX + 1) },
+      { trigger: 'github' },
+      { trigger: 'after' },
+      { after_id: 'other' },
+    ];
+    for (const more of bad) assert.throws(() => daily(more), RuleViolation, JSON.stringify(more));
+    const chat = daily({ destination: 'chat', instruction: '주간 보고', deliver: 'html' });
+    assert.deepEqual([chat.destination, chat.deliver], [Schedule.CHAT, 'html']);
+    assert.throws(
+      () => chat.configure(settings({ trigger: 'after', after_id: chat.id }), NOW),
+      /자기 뒤/,
+    );
+  });
+
+  test('손 · 다른 레시피 뒤는 시각으로 깨우지 않는다. 뒤 레시피는 켜져 있을 때 한도 안에서만 돈다', () => {
+    const manual = daily({ trigger: 'manual' });
+    assert.equal(manual.unsaved.next_run_at, null);
+    assert.equal(manual.dueAt(at('2026-11-07T00:00:00Z')), false);
+    assert.equal(manual.follow(NOW), null, '계기가 after가 아니면 따라 돌지 않는다');
+    const after = daily({ trigger: 'after', after_id: 'other', daily_max: 1 });
+    assert.equal(after.unsaved.next_run_at, null);
+    assert.deepEqual(after.follow(NOW), NOW);
+    assert.equal(after.follow(NOW), null, '하루 한도');
+    assert.equal(daily({ trigger: 'after', after_id: 'other', enabled: false }).follow(NOW), null);
+  });
+
+  test('대화 레시피: 연 대화를 기억하고, 담당 · 받을 것 · 어디로가 바뀌면 다음 차례에 새 대화', () => {
+    const recipe = settings({ destination: 'chat', instruction: '주간 보고' });
+    const chat = daily(recipe);
+    chat.openedChat('chat-1');
+    chat.configure({ ...recipe, title: '이름만 바꿈' }, NOW);
+    assert.equal(chat.chatId, 'chat-1');
+    chat.configure({ ...recipe, deliver: 'html' }, NOW);
+    assert.equal(chat.chatId, null);
+  });
+
+  test('일을 만든 레시피: 작업의 request_id · 회차의 요청에서', () => {
+    const id = '0193f5a2-0000-7000-8000-000000000001';
+    assert.equal(Schedule.sourceOf(`schedule:${id}:2026-11-06T00:00:00.000Z`), id);
+    assert.equal(Schedule.sourceOf(`chat:${id}:1`), null);
+    assert.equal(Schedule.sourceOf(null), null);
   });
 });

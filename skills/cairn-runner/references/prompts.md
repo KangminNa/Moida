@@ -230,6 +230,15 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 {{direction}}
 {{/direction}}
 
+<!-- recipe -->
+{{instruction}}
+{{#rules}}
+
+# 지킬 것
+관리자가 이 레시피에 정해 둔 규칙이에요. 지시와 함께 지켜요.
+{{rules}}
+{{/rules}}
+
 <!-- goal-round -->
 # 목표 실행 {{round}}회차 (회차 한도 {{maxRounds}})
 ## 지시

@@ -141,6 +141,17 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     });
   }
 
+  /**
+   * 끝난 작업을 만든 요청 (자동화 레시피의 계기 after): 대화 회차면 회차를 보낸 요청(payload.chat.requestId),
+   * 아니면 작업의 request_id. 끝나지(done) 않았거나 없으면 null
+   */
+  async doneRequestOf(spaceId: string, taskId: string): Promise<string | null> {
+    const [row] = await this.sql<{ request: string | null }[]>`
+      SELECT COALESCE(payload->'chat'->>'requestId', request_id) AS request FROM task.tasks
+      WHERE space_id = ${spaceId} AND id = ${taskId} AND status = ${Task.DONE}`;
+    return row?.request ?? null;
+  }
+
   /** 공간 안의 작업 하나 (잠그지 않는다). 없으면 null */
   findIn(spaceId: string, id: string): Promise<Task | null> {
     return this.findOne({ space_id: spaceId, id });

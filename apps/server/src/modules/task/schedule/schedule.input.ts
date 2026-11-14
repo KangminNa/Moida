@@ -4,6 +4,7 @@ import { Schedule } from './schedule';
 
 // 스케줄 입력의 모양. 뜻(주기, 시간대, 요일 범위, 한도)은 Schedule이 검사한다.
 // 설정을 한 번에 바꾸는 입력이라 만들기 · 고치기 모두 칸을 다 읽는다. 시각은 API에서 atTime("09:30"), 칸은 at_minute(570).
+// 레시피 칸(어디로 · 받을 것 · 지킬 것 · 계기 · 앞 레시피)도 같다: 보내지 않으면 기본값으로 돌아간다.
 
 const VERSION_MAX = 2_147_483_647;
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -22,6 +23,12 @@ function settingsOf(f: RequestFields, body: Record<string, unknown>): Partial<Sc
     instruction: f.optionalText('instruction', Schedule.INSTRUCTION_MAX) ?? '',
     goal_id: body.goalId === undefined || body.goalId === null ? null : f.uuid('goalId'),
     page_id: body.pageId === undefined || body.pageId === null ? null : f.uuid('pageId'),
+    // 레시피 칸 (2차 5단계). 보내지 않으면 기본값 (어디로는 페이지가 있으면 page, 아니면 task)
+    destination: f.optionalText('destination', 20) ?? undefined,
+    deliver: f.optionalText('deliver', 20),
+    rules: f.optionalText('rules', Schedule.RULES_MAX) ?? '',
+    trigger: f.optionalText('trigger', 20) ?? undefined,
+    after_id: body.afterId === undefined || body.afterId === null ? null : f.uuid('afterId'),
     daily_max: f.integer('dailyMax', 1, Schedule.DAILY_MAX_LIMIT),
   };
 }

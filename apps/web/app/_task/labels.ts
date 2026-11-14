@@ -125,15 +125,18 @@ export const WEEKDAY_LABELS: Record<number, string> = {
   7: '일',
 };
 
-/** 스케줄 주기를 한 줄로: "매일 09:30 · 평일", "6시간마다", 꺼져 있으면 "꺼짐" */
+/** 스케줄 주기를 한 줄로: "매일 09:30 · 평일", "6시간마다", 꺼져 있으면 "꺼짐", 손으로만 · 앞 레시피 뒤 */
 export function scheduleLabel(schedule: {
   enabled: boolean;
+  trigger: string;
   mode: string;
   atTime: string | null;
   weekdays: readonly number[];
   everyHours: number | null;
 }): string {
+  if (schedule.trigger === 'manual') return '손으로';
   if (!schedule.enabled) return '꺼짐';
+  if (schedule.trigger === 'after') return '앞 레시피 뒤';
   if (schedule.mode === 'hourly') return `${schedule.everyHours}시간마다`;
   const days = schedule.weekdays.join(',');
   const which =
@@ -284,6 +287,20 @@ export const NEWS_KINDS: Record<string, string> = {
   review: '검토',
   question: '질문',
   routed: '맡음',
+};
+
+/** 레시피의 어디로 (schedules.destination) */
+export const DESTINATION_LABELS: Record<string, string> = {
+  task: '작업',
+  chat: '대화',
+  page: '페이지',
+};
+
+/** 레시피의 계기 (schedules.trigger) */
+export const TRIGGER_LABELS: Record<string, string> = {
+  time: '정한 시각',
+  manual: '손으로만',
+  after: '다른 레시피가 끝난 뒤',
 };
 
 /** 대화의 받을 것 (chats.deliver). 비우면 대화 답 */

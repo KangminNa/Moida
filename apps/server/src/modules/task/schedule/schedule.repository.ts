@@ -21,6 +21,27 @@ export class ScheduleRepository extends TableRepository<ScheduleRow, Schedule> {
     return rows.map((r) => this.toEntity(r));
   }
 
+  /** 앞 레시피(afterId)의 일이 끝나면 도는 레시피를 잠근다 (계기 after, 만든 순서) */
+  async lockAfter(spaceId: string, afterId: string): Promise<readonly Schedule[]> {
+    const rows = await this.sql<ScheduleRow[]>`
+      SELECT * FROM task.schedules WHERE space_id = ${spaceId} AND after_id = ${afterId}
+      ORDER BY created_at, id FOR UPDATE`;
+    return rows.map((r) => this.toEntity(r));
+  }
+
+  /** id에서 앞 레시피를 거슬러 올라간 id들 (자기 포함). 고리가 생기지 않게 볼 때 */
+  async chainOf(spaceId: string, id: string): Promise<readonly string[]> {
+    const rows = await this.sql<{ id: string }[]>`
+      WITH RECURSIVE chain (id, after_id) AS (
+        SELECT id, after_id FROM task.schedules WHERE space_id = ${spaceId} AND id = ${id}
+        UNION
+        SELECT s.id, s.after_id FROM task.schedules s JOIN chain c ON s.id = c.after_id
+        WHERE s.space_id = ${spaceId}
+      )
+      SELECT id FROM chain`;
+    return rows.map((r) => r.id);
+  }
+
   /** 지운다 (설정이라 판을 남기지 않는다. 이미 만든 작업은 그대로) */
   async remove(schedule: Schedule): Promise<void> {
     await this.deleteRows(schedules, { space_id: schedule.spaceId, id: schedule.id });

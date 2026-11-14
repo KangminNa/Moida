@@ -1,12 +1,15 @@
 import { BaseEntity, RuleViolation, TableEntity } from '../../platform';
+import { ChatResult } from '../chat/chat-result.policy';
 import type { Goal } from '../goal/goal';
 import { Task } from '../task/task';
 import type { ScheduleNew, ScheduleRow } from '../task.tables';
 import { SchedulePolicy } from './schedule.policy';
 import { ScheduleView } from './schedule.view';
 
-// 스케줄 하나 (task.schedules, 7단계). 정해진 시각에 지시대로 작업을 만든다. 하트비트를 넓힌 것이다:
-// 페이지를 가리키면(page_id, 2차 5단계 자라는 페이지) 그 페이지의 새 판을 만드는 만들기 일이 된다 (payload.page).
+// 스케줄 하나 (task.schedules, 7단계). 정해진 시각에 지시대로 작업을 만든다. 하트비트를 넓힌 것이다.
+// 2차 5단계에서 자동화 레시피가 되었다 (새 표 없이): 언제(계기) · 누가(담당) · 무엇을(지시 · 지킬 것) · 받을 것 · 어디로.
+//   어디로: task(작업 하나) · chat(담당의 대화 회차 하나: 결과 카드 · 검사를 그대로) · page(페이지의 새 판, payload.page)
+//   계기: time(정한 시각) · manual(손으로만) · after(다른 레시피의 일이 끝나면, after_id)
 // 담당이 정해져 있고 지시가 비어 있으면 "정기 확인"(맡은 목표와 진행 중인 일을 확인)이 된다.
 // 주기는 매일(시각 + 요일) 또는 N시간마다. 켜져 있으면 늘 다음 시각(next_run_at)이 있다 (DB CHECK).
 // 하루 한도(daily_max): 스케줄의 시간대 기준 하루에 만드는 작업 수. 구독 AI를 사람 없이 돌리는 양을 묶는다 (기획서 11장).
@@ -24,6 +27,15 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     '정기 확인입니다. 맡은 목표와 진행 중인 일을 확인합니다.',
     '할 일이 있으면 하거나 팀에게 맡기고, 없으면 확인한 것을 짧게 보고하고 끝냅니다.',
   ].join('\n');
+  static readonly TASK = 'task';
+  static readonly CHAT = 'chat';
+  static readonly PAGE = 'page';
+  static readonly DESTINATIONS: readonly string[] = [Schedule.TASK, Schedule.CHAT, Schedule.PAGE];
+  static readonly TIME = 'time';
+  static readonly MANUAL = 'manual';
+  static readonly AFTER = 'after';
+  static readonly TRIGGERS: readonly string[] = [Schedule.TIME, Schedule.MANUAL, Schedule.AFTER];
+  static readonly RULES_MAX = 2000;
   /** 스케줄이 만든 작업의 request_id 앞부분 */
   static readonly REQUEST_PREFIX = 'schedule:';
   private static readonly MINUTES_PER_DAY = 1440;
@@ -46,6 +58,12 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
         instruction: '',
         goal_id: null,
         page_id: null,
+        destination: Schedule.TASK,
+        deliver: null,
+        rules: '',
+        trigger: Schedule.TIME,
+        after_id: null,
+        chat_id: null,
         daily_max: 3,
         run_day: null,
         day_runs: 0,
@@ -84,6 +102,23 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     return this.row.daily_max;
   }
 
+  get destination(): string {
+    return this.row.destination;
+  }
+
+  /** 이 레시피가 회차를 쌓는 대화. 아직 열지 않았으면 null */
+  get chatId(): string | null {
+    return this.row.chat_id;
+  }
+
+  get rules(): string {
+    return this.row.rules;
+  }
+
+  get deliver(): string | null {
+    return this.row.deliver;
+  }
+
   /**
    * 설정을 한 번에 바꾼다. 매일이면 at_minute와 요일, N시간마다면 every_hours만 쓴다.
    * 켜면 지금 뒤의 첫 시각을 다음 시각으로 정하고, 끄면 지운다. 오늘 센 수(day_runs)는 그대로 둔다
@@ -100,9 +135,15 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
       instruction = '',
       goal_id: goalId = null,
       page_id: pageId = null,
+      destination = pageId === null ? Schedule.TASK : Schedule.PAGE,
+      deliver = null,
+      rules = '',
+      trigger = Schedule.TIME,
+      after_id: afterId = null,
       daily_max: dailyMax = 0,
       enabled = false,
     } = settings;
+    this.assertRecipe(destination, pageId, agentId, instruction, deliver, rules, trigger, afterId);
     const name = title.trim();
     if (name.length < 1 || name.length > Schedule.TITLE_MAX)
       throw new RuleViolation(`이름은 1~${Schedule.TITLE_MAX}자예요`);
@@ -132,10 +173,50 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('time_zone', timeZone);
     this.put('instruction', instruction);
     this.put('goal_id', goalId);
+    // 대화의 상대 · 받을 것은 대화를 열 때 정해진다: 바뀌면 다음 차례에 새 대화를 연다
+    const before = this.row;
+    const reopen =
+      before.agent_id !== agentId || before.deliver !== deliver || destination !== Schedule.CHAT;
+    if (reopen) this.put('chat_id', null);
     this.put('page_id', pageId);
+    this.put('destination', destination);
+    this.put('deliver', deliver);
+    this.put('rules', rules);
+    this.put('trigger', trigger);
+    this.put('after_id', afterId);
     this.put('daily_max', dailyMax);
     this.put('enabled', enabled);
-    this.put('next_run_at', enabled ? this.after(now) : null);
+    this.put('next_run_at', enabled && trigger === Schedule.TIME ? this.after(now) : null);
+  }
+
+  /** 레시피의 칸이 서로 맞는가: 어디로 ↔ 페이지 · 담당 · 지시, 받을 것은 대화에만, 계기 ↔ 앞 레시피 */
+  private assertRecipe(
+    destination: string,
+    pageId: string | null,
+    agentId: string | null,
+    instruction: string,
+    deliver: string | null,
+    rules: string,
+    trigger: string,
+    afterId: string | null,
+  ): void {
+    if (!Schedule.DESTINATIONS.includes(destination))
+      throw new RuleViolation(`어디로는 ${Schedule.DESTINATIONS.join(' · ')} 중 하나예요`);
+    if ((destination === Schedule.PAGE) !== (pageId !== null))
+      throw new RuleViolation('페이지로 보내면 페이지를 골라요 (다른 곳이면 비워요)');
+    if (destination === Schedule.CHAT && (agentId === null || instruction.trim() === ''))
+      throw new RuleViolation('대화로 보내면 담당과 지시가 있어야 해요');
+    if (deliver !== null && destination !== Schedule.CHAT)
+      throw new RuleViolation('받을 것은 대화로 보낼 때만 정해요');
+    ChatResult.deliverOf(deliver);
+    if (rules.length > Schedule.RULES_MAX)
+      throw new RuleViolation(`지킬 것은 ${Schedule.RULES_MAX}자까지예요`);
+    if (!Schedule.TRIGGERS.includes(trigger))
+      throw new RuleViolation(`계기는 ${Schedule.TRIGGERS.join(' · ')} 중 하나예요`);
+    if ((trigger === Schedule.AFTER) !== (afterId !== null))
+      throw new RuleViolation('다른 레시피 뒤에 돌리려면 그 레시피를 골라요');
+    if (afterId !== null && afterId === this.id)
+      throw new RuleViolation('자기 뒤에 돌 수는 없어요');
   }
 
   /** 때가 되었는가 (켜져 있고 다음 시각이 지났다) */
@@ -169,6 +250,21 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     return true;
   }
 
+  /**
+   * 앞 레시피의 일이 끝나 이 레시피를 돌릴 차례 (계기 after). 꺼져 있거나 하루 한도에 닿았으면 null (한도는 claimRun이 센다)
+   */
+  follow(now: Date): Date | null {
+    if (!this.row.enabled || this.row.trigger !== Schedule.AFTER) return null;
+    if (!this.claimRun(now)) return null;
+    this.put('last_run_at', now);
+    return now;
+  }
+
+  /** 대화로 보내는 레시피가 처음 연 대화를 기억한다 (다음 차례부터 그 대화의 회차) */
+  openedChat(chatId: string): void {
+    this.put('chat_id', chatId);
+  }
+
   /** 주인이 누른 "지금 한 번". 하루 한도에 함께 센다. 닿았으면 RuleViolation */
   runNow(now: Date): Date {
     if (!this.claimRun(now))
@@ -180,7 +276,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
    * 이 시각에 만드는 작업. 목표가 닫혔으면 목표 없이. 담당이 없으면 빌릴 때 자동 배정.
    * 페이지를 가리키면 그 페이지의 새 판을 만드는 만들기 일 (make 권한이 있는 에이전트가 맡는다)
    */
-  wake(slot: Date, goal: Goal | null, now: Date): Task {
+  wake(slot: Date, goal: Goal | null, instruction: string, now: Date): Task {
     const pageId = this.row.page_id;
     const schedule = { id: this.id, at: slot.toISOString() };
     return Task.open(
@@ -190,7 +286,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
         agent_id: this.row.agent_id,
         kind: pageId ? Task.MAKE : Task.GENERAL,
         title: this.titleFor(slot),
-        instruction: this.taskInstruction,
+        instruction,
         payload: pageId ? { schedule, page: { pageId } } : { schedule },
         goal_id: goal?.active ? goal.id : null,
       },
@@ -219,6 +315,12 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   /** 만드는 작업의 지시. 비어 있으면 정기 확인 */
   get taskInstruction(): string {
     return this.row.instruction.trim() || Schedule.DEFAULT_INSTRUCTION;
+  }
+
+  /** 작업의 request_id(task · page)나 대화 회차의 requestId(chat)에서 그 일을 만든 스케줄. 스케줄의 일이 아니면 null */
+  static sourceOf(requestId: string | null): string | null {
+    const match = /^schedule:([0-9a-f-]{36}):/.exec(requestId ?? '');
+    return match ? (match[1] as string) : null;
   }
 
   /** 이 스케줄이 만든 작업의 request_id 앞부분 (앞 작업이 끝났는지 볼 때) */

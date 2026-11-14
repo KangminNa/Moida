@@ -1,14 +1,12 @@
 'use client';
 
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { usePages } from '../../_blog/live';
-import { flatTree, WEEKDAY_LABELS } from '../../_task/labels';
+import { flatTree } from '../../_task/labels';
 import { useGoals } from '../../_task/live';
 import type { Agent, Schedule } from '../../_task/types';
+import { type Period, PeriodFields, periodBody, periodOf } from './PeriodFields';
+import { type Recipe, RecipeFields, recipeOf } from './RecipeFields';
 
-/** N시간마다에서 고를 수 있는 값: 하루를 나누어떨어지게 하는 수 */
-const EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
-const DAYS = [1, 2, 3, 4, 5, 6, 7];
 /** 하루 한도의 끝 (서버의 Schedule.DAILY_MAX_LIMIT) */
 const DAILY_MAX_LIMIT = 24;
 
@@ -33,8 +31,13 @@ export type ScheduleBody = {
   timeZone: string;
   instruction: string;
   goalId: string | null;
-  /** 차례마다 새 버전을 만들 페이지 (자라는 페이지) */
+  /** 레시피 (2차 5단계): 어디로 · 페이지 · 받을 것 · 지킬 것 · 계기 · 앞 레시피 */
+  destination: string;
   pageId: string | null;
+  deliver: string | null;
+  rules: string;
+  trigger: string;
+  afterId: string | null;
   dailyMax: number;
 };
 
@@ -42,9 +45,11 @@ export type ScheduleBody = {
 // 정한 시각에 지시대로 작업이 생긴다.
 // 담당을 정하고 지시를 비우면 정기 확인(맡은 목표와 진행 중인 일을 확인)이 된다 (예전의 하트비트).
 // 앞 작업이 끝나지 않았거나 담당이 쉬는 중이면 그 차례는 건너뛰고, 하루 한도에 닿으면 그날은 더 만들지 않는다.
-// 페이지를 고르면 차례마다 그 페이지의 새 버전을 만드는 만들기 작업이 된다 (그 페이지를 고치는 일이 돌면 건너뛴다).
+// 자동화 레시피 (2차 5단계): 어디로(작업 · 대화 회차 · 페이지 새 버전) · 받을 것 · 지킬 것 · 계기는 RecipeFields가 그린다.
+// 계기가 정한 시각이 아니면 주기 칸을 숨긴다.
 export function ScheduleForm({
   schedule,
+  schedules,
   agents,
   agentId: presetAgent,
   busy,
@@ -55,6 +60,8 @@ export function ScheduleForm({
 }: {
   /** 고칠 스케줄. 없으면 새로 만든다 */
   schedule: Schedule | null;
+  /** 모든 스케줄 (앞 레시피 고르기) */
+  schedules: readonly Schedule[];
   agents: readonly Agent[];
   /** 새로 만들 때 미리 고를 담당 (에이전트 화면에서 왔을 때) */
   agentId: string | null;
@@ -68,17 +75,13 @@ export function ScheduleForm({
 }) {
   const id = useId();
   const goals = useGoals();
-  const pages = usePages();
   const [title, setTitle] = useState(schedule?.title ?? '정기 확인');
   const [agentId, setAgentId] = useState(schedule?.agentId ?? presetAgent ?? '');
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
-  const [mode, setMode] = useState(schedule?.mode ?? 'daily');
-  const [atTime, setAtTime] = useState(schedule?.atTime ?? '09:00');
-  const [weekdays, setWeekdays] = useState<readonly number[]>(schedule?.weekdays ?? DAYS);
-  const [everyHours, setEveryHours] = useState(schedule?.everyHours ?? 4);
+  const [period, setPeriod] = useState<Period>(periodOf(schedule));
   const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? browserZone());
   const [goalId, setGoalId] = useState(schedule?.goalId ?? '');
-  const [pageId, setPageId] = useState(schedule?.pageId ?? '');
+  const [recipe, setRecipe] = useState<Recipe>(recipeOf(schedule));
   const [instruction, setInstruction] = useState(schedule?.instruction ?? '');
   const [dailyMax, setDailyMax] = useState(schedule?.dailyMax ?? 3);
   // 만들기: 같은 내용을 다시 보내면 같은 requestId (응답을 놓쳐 다시 눌러도 스케줄은 하나)
@@ -93,26 +96,22 @@ export function ScheduleForm({
     apply();
   }
 
-  function toggleDay(day: number) {
-    edit(() =>
-      setWeekdays(
-        weekdays.includes(day) ? weekdays.filter((d) => d !== day) : [...weekdays, day].sort(),
-      ),
-    );
-  }
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     const body: ScheduleBody = {
       title: title.trim(),
       agentId: agentId || null,
       enabled,
-      mode,
-      ...(mode === 'daily' ? { atTime, weekdays } : { everyHours }),
+      ...periodBody(period),
       timeZone: timeZone.trim(),
       instruction: instruction.trim(),
       goalId: goalId || null,
-      pageId: pageId || null,
+      destination: recipe.destination,
+      pageId: recipe.pageId || null,
+      deliver: recipe.deliver || null,
+      rules: recipe.rules.trim(),
+      trigger: recipe.trigger,
+      afterId: recipe.afterId || null,
       dailyMax,
     };
     requestId.current ??= crypto.randomUUID();
@@ -161,66 +160,10 @@ export function ScheduleForm({
           checked={enabled}
           onChange={() => edit(() => setEnabled(!enabled))}
         />
-        정해진 시각에 돌리기
+        켜기
       </label>
-      <div className="field">
-        <label htmlFor={`${id}-mode`}>주기</label>
-        <select
-          id={`${id}-mode`}
-          className="input"
-          value={mode}
-          onChange={(e) => edit(() => setMode(e.target.value))}
-        >
-          <option value="daily">매일 정한 시각</option>
-          <option value="hourly">N시간마다</option>
-        </select>
-      </div>
-      {mode === 'daily' ? (
-        <>
-          <div className="field">
-            <label htmlFor={`${id}-at`}>시각</label>
-            <input
-              id={`${id}-at`}
-              className="input"
-              type="time"
-              value={atTime}
-              required
-              onChange={(e) => edit(() => setAtTime(e.target.value))}
-            />
-          </div>
-          <fieldset className="checks">
-            <legend>요일</legend>
-            {DAYS.map((day) => (
-              <label key={day} className="check">
-                <input
-                  type="checkbox"
-                  checked={weekdays.includes(day)}
-                  onChange={() => toggleDay(day)}
-                />
-                {WEEKDAY_LABELS[day]}
-              </label>
-            ))}
-          </fieldset>
-        </>
-      ) : (
-        <div className="field">
-          <label htmlFor={`${id}-every`}>간격</label>
-          <select
-            id={`${id}-every`}
-            className="input"
-            value={everyHours}
-            onChange={(e) => edit(() => setEveryHours(Number(e.target.value)))}
-          >
-            {EVERY_HOURS.map((n) => (
-              <option key={n} value={n}>
-                {n}시간마다
-              </option>
-            ))}
-          </select>
-          <small>
-            시간대 기준 정각 중 시가 N으로 나누어떨어질 때 (4시간마다 → 0·4·8·12·16·20시)
-          </small>
-        </div>
+      {recipe.trigger === 'time' && (
+        <PeriodFields id={id} value={period} onChange={(next) => edit(() => setPeriod(next))} />
       )}
       <div className="field">
         <label htmlFor={`${id}-max`}>하루 한도</label>
@@ -266,25 +209,6 @@ export function ScheduleForm({
           </select>
         </div>
       )}
-      {(pages.data?.pages.length ?? 0) > 0 && (
-        <div className="field">
-          <label htmlFor={`${id}-page`}>페이지</label>
-          <select
-            id={`${id}-page`}
-            className="input"
-            value={pageId}
-            onChange={(e) => edit(() => setPageId(e.target.value))}
-          >
-            <option value="">없음</option>
-            {pages.data?.pages.map((page) => (
-              <option key={page.id} value={page.id}>
-                {page.title}
-              </option>
-            ))}
-          </select>
-          <small>고르면 차례마다 이 페이지의 새 버전을 만듦. 담당은 만들기 권한이 있어야 함</small>
-        </div>
-      )}
       <div className="field">
         <label htmlFor={`${id}-text`}>지시</label>
         <textarea
@@ -302,12 +226,23 @@ export function ScheduleForm({
         />
         <small>앞 작업이 끝나지 않았거나 담당이 쉬는 중이면 그 차례는 건너뛰어요</small>
       </div>
+      <RecipeFields
+        id={id}
+        value={recipe}
+        others={schedules.filter((s) => s.id !== schedule?.id)}
+        onChange={(next) => edit(() => setRecipe(next))}
+      />
       {problem && <p className="error">{problem}</p>}
       <div className="row">
         <button
           type="submit"
           className="cta small"
-          disabled={busy || noOrder || !title.trim() || (mode === 'daily' && weekdays.length === 0)}
+          disabled={
+            busy ||
+            noOrder ||
+            !title.trim() ||
+            (recipe.trigger === 'time' && period.mode === 'daily' && period.weekdays.length === 0)
+          }
         >
           저장
         </button>

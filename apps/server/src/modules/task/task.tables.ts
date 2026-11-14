@@ -225,6 +225,12 @@ export interface ScheduleRow {
   version: number;
   created_at: Date;
   page_id: string | null;
+  destination: string;
+  deliver: string | null;
+  rules: string;
+  trigger: string;
+  after_id: string | null;
+  chat_id: string | null;
 }
 export type ScheduleNew = Partial<ScheduleRow> & Pick<ScheduleRow, 'id' | 'space_id' | 'title' | 'mode' | 'time_zone'>;
 
