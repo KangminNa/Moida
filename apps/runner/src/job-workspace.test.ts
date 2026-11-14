@@ -111,6 +111,26 @@ describe('AI CLI 부르기', () => {
     await workspace.remove();
   });
 
+  test('모델 · 생각 강도는 정했을 때만 넘긴다 (2차 7단계)', async () => {
+    const tuned = new ClaudeCli('claude', 'oauth-token');
+    const job = Job.from(
+      Json.of({
+        task: { id: 't', title: '정리' },
+        agent: { name: '정리', tool: 'claude', model: 'opus[1m]', effort: 'xhigh' },
+        run_token: 'run-token',
+      }),
+    );
+    const workspace = await tuned.open(job);
+    const args = [...tuned.args(workspace)];
+    assert.equal(args[args.indexOf('--model') + 1], 'opus[1m]');
+    assert.equal(args[args.indexOf('--effort') + 1], 'xhigh');
+    await workspace.remove();
+    const plain = await open();
+    assert.equal(cli.args(plain).includes('--model'), false, '비었으면 CLI의 기본');
+    assert.equal(cli.args(plain).includes('--effort'), false);
+    await plain.remove();
+  });
+
   test('연결 확인은 MCP 설정도 도구도 없이 띄운다', async () => {
     const workspace = await JobWorkspace.open(null, '{"permissions":{}}', null, '/nowhere');
     const args = [...cli.args(workspace)];

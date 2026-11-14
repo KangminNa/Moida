@@ -11,6 +11,7 @@ import { JobTeamMemberView } from '../task/job.view';
 import type { AgentNew, AgentRevisionNew, AgentRow } from '../task.tables';
 import { AgentUsageView } from '../usage/usage.view';
 import { AgentSavedView } from './agent.view';
+import { AgentRuntime } from './agent-runtime.policy';
 import { AgentScopes } from './agent-scopes.policy';
 
 // 일을 맡는 에이전트. 할 수 있는 일(scopes)과 결재를 올려 할 수 있는 동작(approval_actions), 토큰 한도를 가진다.
@@ -37,6 +38,8 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     'plan_stop_percent',
     'reports_to',
     'runner_id',
+    'model',
+    'effort',
   ];
   private static readonly NAME_MAX = 60;
   private static readonly ROLE_MAX = 2000;
@@ -85,6 +88,8 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
         throw new RuleViolation(`구독 사용률은 1~${Agent.PLAN_PERCENT_MAX}%예요`);
       return value;
     },
+    model: (value) => AgentRuntime.model(value),
+    effort: (value) => AgentRuntime.effort(value),
   };
 
   /** 새 에이전트의 빈 칸. 이 순서로 규칙을 지난다 */
@@ -97,6 +102,8 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     monthly_limit: null,
     five_hour_limit: null,
     plan_stop_percent: null,
+    model: '',
+    effort: '',
   };
 
   /** 새 에이전트. fields는 주인이 정한 칸이고, 보고 대상은 reportTo로 정한다 */
@@ -146,6 +153,16 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
 
   get scopes(): readonly string[] {
     return this.row.scopes;
+  }
+
+  /** AI CLI에 넘길 모델. 빈 글이면 CLI의 기본 (2차 7단계) */
+  get model(): string {
+    return this.row.model ?? '';
+  }
+
+  /** AI CLI에 넘길 생각 강도. 빈 글이면 CLI의 기본 */
+  get effort(): string {
+    return this.row.effort ?? '';
   }
 
   get monthlyLimit(): number | null {
@@ -204,6 +221,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     if (runner?.sandbox) throw new RuleViolation('샌드박스에는 묶을 수 없어요');
     if (runner !== undefined) this.put('runner_id', runner?.id ?? null);
     this.accept(changes, Agent.RULES);
+    AgentRuntime.assertFits(this.row.tool, this.row.effort ?? '');
     if (this.row.runner_id && AgentScopes.sandboxed(this.row.scopes ?? []))
       throw new RuleViolation(
         '코드 · 만들기 권한이 있는 에이전트는 샌드박스에서만 돌아 러너에 묶을 수 없어요',

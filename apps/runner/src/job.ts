@@ -1,5 +1,6 @@
 import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
+import { CliRuntime } from './cli-runtime';
 import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
 import { TeamMember } from './team-member';
@@ -161,6 +162,8 @@ export class Job {
     readonly bound = false,
     /** 서버가 실어 보낸 지시문 틀(cairn-runner)의 지금 판. 옛 서버면 null (그때는 러너의 skills/) */
     readonly promptPackage: SkillPackage | null = null,
+    /** 에이전트가 정한 모델 · 생각 강도 (2차 7단계). 비면 CLI의 기본 */
+    readonly runtime: CliRuntime = CliRuntime.NONE,
   ) {}
 
   static from(raw: Json): Job {
@@ -202,6 +205,7 @@ export class Job {
       ),
       agent.flag('bound'),
       raw.field('prompt_package') ? SkillPackage.from(raw.child('prompt_package')) : null,
+      CliRuntime.from(agent),
     );
   }
 
@@ -238,6 +242,7 @@ export class Job {
       this.chat,
       this.bound,
       this.promptPackage,
+      this.runtime,
     );
   }
 

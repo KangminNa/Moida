@@ -102,7 +102,7 @@ export class JobView {
     private readonly revisionNote: string | null,
     /** bound: 정해진 러너에 묶였다 (Agent.bound) */
     private readonly agent: Readonly<
-      Pick<AgentRow, 'id' | 'name' | 'role' | 'tool'> & { bound: boolean }
+      Pick<AgentRow, 'id' | 'name' | 'role' | 'tool' | 'model' | 'effort'> & { bound: boolean }
     > | null,
     private readonly runToken: string | null,
     /** 회사 목표부터 이 작업의 목표까지 (제목) */
@@ -160,8 +160,19 @@ export class JobView {
       chat_updates: this.chat?.toJSON() ?? null,
       revision_note: this.revisionNote,
       // bound: 이 러너에 묶인 에이전트 (묶인 일은 그 러너만 빌린다). 러너는 이때만 나눈 폴더를 연다
+      // model · effort: AI CLI에 넘길 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계)
       agent:
-        a === null ? null : { id: a.id, name: a.name, role: a.role, tool: a.tool, bound: a.bound },
+        a === null
+          ? null
+          : {
+              id: a.id,
+              name: a.name,
+              role: a.role,
+              tool: a.tool,
+              model: a.model,
+              effort: a.effort,
+              bound: a.bound,
+            },
       run_token: this.runToken,
       goal_chain: this.goalChain.map((title) => ({ title })),
       team: this.team.map((m) => m.toJSON()),

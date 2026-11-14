@@ -82,6 +82,21 @@ describe('Codex 설정', () => {
     assert.equal(toml.includes('workspace-write'), false);
   });
 
+  test('모델 · 생각 강도는 맨 위 칸으로. 비었거나 Codex가 받지 않는 강도면 적지 않는다 (2차 7단계)', () => {
+    const tuned = job({
+      agent: { name: '글쓰기', role: '', tool: 'codex', model: 'gpt-5.1', effort: 'high' },
+    });
+    const toml = CodexCli.configToml('http://cairn/mcp', null, false, tuned.runtime);
+    assert.match(toml, /^model = "gpt-5.1"$/m);
+    assert.match(toml, /^model_reasoning_effort = "high"$/m);
+    assert.ok(toml.indexOf('model = ') < toml.indexOf('['), '표보다 앞');
+    const odd = job({
+      agent: { name: '글쓰기', tool: 'codex', model: 'x"\n[evil]', effort: 'max' },
+    });
+    const plain = CodexCli.configToml('http://cairn/mcp', null, false, odd.runtime);
+    assert.equal(plain.includes('model'), false, '모양이 틀린 모델 · 받지 않는 강도는 기본으로');
+  });
+
   test('작업 자리: config/에 config.toml과 auth.json(600), Claude의 settings.json은 없다', async () => {
     const cli = new CodexCli('codex', AUTH, 'http://127.0.0.1:4000/mcp', skills);
     const workspace = await cli.open(job());

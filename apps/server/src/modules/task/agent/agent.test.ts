@@ -119,6 +119,36 @@ describe('한도 칸', () => {
   });
 });
 
+describe('모델 · 생각 강도 (2차 7단계)', () => {
+  test('빈 글은 CLI의 기본. 모델 이름은 설정 파일에 그대로 쓸 수 있는 글자만', () => {
+    const agent = agentWith(null, null);
+    agent.edit({ model: ' opus[1m] ', effort: 'high' });
+    assert.deepEqual(agent.unsaved, { model: 'opus[1m]', effort: 'high', settings_revision: 2 });
+    assert.throws(() => agent.edit({ model: 'opus"; rm' }), RuleViolation);
+    assert.throws(() => agent.edit({ model: 'a'.repeat(81) }), RuleViolation);
+    assert.throws(() => agent.edit({ effort: 'huge' }), RuleViolation);
+    agent.edit({ model: '', effort: '' });
+    assert.equal(agent.model, '');
+    assert.equal(agent.effort, '');
+  });
+
+  test('강도는 도구가 받는 값만: 도구를 바꿀 때도 본다', () => {
+    const agent = agentWith(null, null);
+    agent.edit({ effort: 'max' });
+    assert.throws(() => agent.edit({ tool: 'codex' }), RuleViolation, 'codex는 max를 받지 않는다');
+    assert.throws(() => agent.edit({ tool: 'codex', effort: 'xhigh' }), RuleViolation);
+    agent.edit({ tool: 'codex', effort: 'high' });
+    assert.equal(agent.effort, 'high');
+  });
+
+  test('모델 · 강도도 설정 판에 남는다', () => {
+    const agent = agentWith(null, null);
+    agent.edit({ model: 'sonnet' });
+    const settings = agent.addedRevision?.settings as Record<string, unknown>;
+    assert.equal(settings.model, 'sonnet');
+  });
+});
+
 describe('설정 판', () => {
   test('설정이 바뀌면 판을 하나 올리고 그 판의 설정 전부를 남긴다. 같은 값이면 그대로', () => {
     const agent = agentWith(100, 80);

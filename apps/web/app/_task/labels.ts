@@ -107,6 +107,21 @@ export const EVENT_KINDS: Record<string, string> = {
 
 export const TOOL_LABELS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 
+/** 생각 강도 (2차 7단계). 빈 값은 CLI의 기본 */
+export const EFFORT_LABELS: Record<string, string> = {
+  low: '낮음',
+  medium: '보통',
+  high: '높음',
+  xhigh: '매우 높음',
+  max: '최대',
+};
+
+/** 도구마다 받는 생각 강도 (서버 AgentRuntime.EFFORTS와 맞춘다) */
+export const TOOL_EFFORTS: Record<string, readonly string[]> = {
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
+  codex: ['low', 'medium', 'high'],
+};
+
 /** 팀 템플릿이 다 돌려면 필요한 것 (서버의 AgentTeamRow.needs) */
 export const NEEDS_LABELS: Record<string, string> = {
   'code-runner': '샌드박스 필요 (만들기 · 코드)',

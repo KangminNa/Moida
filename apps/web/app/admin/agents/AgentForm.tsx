@@ -12,9 +12,11 @@ import {
 } from '../../_task/labels';
 import type { RunnerChoice } from '../../_task/live';
 import type { Agent } from '../../_task/types';
+import { BossField } from './BossField';
 import { LimitField } from './LimitField';
 import { ReviewerField } from './ReviewerField';
 import { RunnerField } from './RunnerField';
+import { RuntimeFields, runtimeFor } from './RuntimeFields';
 
 /** 에이전트에게 줄 수 있는 권한. run은 러너의 것이라 없다 (서버의 Agent.SCOPES와 맞춘다) */
 const SCOPES = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'browse', 'code', 'make'];
@@ -43,21 +45,6 @@ function percentOf(text: string): number | null | undefined {
   return Number.isInteger(percent) && percent >= 1 && percent <= 100 ? percent : undefined;
 }
 
-/** 보고 대상으로 고를 수 있는 에이전트: 자기 자신과 자기 아래 팀원은 뺀다 (서버의 Agent.reportTo가 원본) */
-function bossesFor(agent: Agent | null, agents: readonly Agent[]): readonly Agent[] {
-  if (!agent) return agents;
-  const below = new Set([agent.id]);
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const a of agents)
-      if (a.reportsTo && below.has(a.reportsTo) && !below.has(a.id)) {
-        below.add(a.id);
-        grew = true;
-      }
-  }
-  return agents.filter((a) => !below.has(a.id));
-}
-
 /** 저장할 때 보내는 본문 (POST · PATCH /api/agents). 만들기의 requestId와 고치기의 version은 패널이 붙인다 */
 export type AgentBody = {
   name: string;
@@ -70,6 +57,9 @@ export type AgentBody = {
   planStopPercent: number | null;
   reportsTo: string | null;
   runnerId: string | null;
+  /** 모델 · 생각 강도 (빈 글이면 CLI의 기본, 2차 7단계) */
+  model: string;
+  effort: string;
   /** 검토자 짝 (편집에서만, 만들기는 서버가 보지 않는다) */
   reviewerId?: string | null;
 };
@@ -104,6 +94,10 @@ export function AgentForm({
   const [name, setName] = useState(agent?.name ?? '');
   const [role, setRole] = useState(agent?.role ?? '');
   const [tool, setTool] = useState(agent?.tool ?? 'claude');
+  const [runtime, setRuntime] = useState({
+    model: agent?.model ?? '',
+    effort: agent?.effort ?? '',
+  });
   const [reportsTo, setReportsTo] = useState(agent?.reportsTo ?? '');
   const [runnerId, setRunnerId] = useState(agent?.runnerId ?? '');
   const [reviewerId, setReviewerId] = useState(agent?.reviewerId ?? '');
@@ -154,6 +148,8 @@ export function AgentForm({
         reportsTo: reportsTo || null,
         // 코드 · 만들기는 코드 러너 칸에서만 돌아 묶지 않는다 (서버도 막는다)
         runnerId: sandboxed ? null : runnerId || null,
+        model: runtime.model.trim(),
+        effort: runtime.effort,
         ...(agent ? { reviewerId: reviewerId || null } : {}),
       },
       requestId.current,
@@ -194,7 +190,12 @@ export function AgentForm({
           id={`${id}-tool`}
           className="input"
           value={tool}
-          onChange={(e) => change(() => setTool(e.target.value))}
+          onChange={(e) =>
+            change(() => {
+              setTool(e.target.value);
+              setRuntime(runtimeFor(e.target.value, runtime));
+            })
+          }
         >
           {Object.entries(TOOL_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -203,27 +204,20 @@ export function AgentForm({
           ))}
         </select>
       </div>
-      <div className="field">
-        <label htmlFor={`${id}-boss`}>보고 대상</label>
-        <select
-          id={`${id}-boss`}
-          className="input"
-          value={reportsTo}
-          aria-describedby={`${id}-boss-help`}
-          onChange={(e) => change(() => setReportsTo(e.target.value))}
-        >
-          <option value="">{ownerName}</option>
-          {bossesFor(agent, agents).map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <small id={`${id}-boss-help`}>
-          보고 대상은 이 에이전트에게 일을 나눠 맡길 수 있어요. 조직도는 4단계까지, 결재는 늘{' '}
-          {ownerName}
-        </small>
-      </div>
+      <RuntimeFields
+        id={`${id}-runtime`}
+        tool={tool}
+        value={runtime}
+        onChange={(value) => change(() => setRuntime(value))}
+      />
+      <BossField
+        id={`${id}-boss`}
+        value={reportsTo}
+        agent={agent}
+        agents={agents}
+        ownerName={ownerName}
+        onChange={(value) => change(() => setReportsTo(value))}
+      />
       <RunnerField
         id={`${id}-runner`}
         value={runnerId}

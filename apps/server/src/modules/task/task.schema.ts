@@ -36,6 +36,8 @@ export const agents = taskSchema.table('agents', {
   deleted_at: timestamp('deleted_at', { withTimezone: true }),
   runner_id: uuid('runner_id'),
   reviewer_id: uuid('reviewer_id'),
+  model: text('model').notNull(),
+  effort: text('effort').notNull(),
 });
 
 /** task.ai_logins */

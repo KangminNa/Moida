@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { AiProcess } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
+import { CliRuntime } from './cli-runtime';
 import { CodexStream } from './codex-stream';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
@@ -61,6 +62,8 @@ export class CodexCli implements AiTool {
   private browser: BrowserMcp | null = null;
   /** 셸을 여는가: 코드 러너 칸의 자리에서 하는 일(코드 · 만들기)만 */
   private shell = false;
+  /** model_reasoning_effort가 받는 값. 모르는 값은 쓰지 않고 CLI의 기본으로 (서버 AgentRuntime과 같다) */
+  static readonly EFFORTS: readonly string[] = ['low', 'medium', 'high'];
 
   /**
    * CODEX_HOME/config.toml. 이 코드의 고정된 값과 서버 주소뿐이다. mcpUrl이 없으면 MCP 없이 (연결 확인).
@@ -70,6 +73,7 @@ export class CodexCli implements AiTool {
     mcpUrl: string | null,
     browser: BrowserMcp | null = null,
     shell = false,
+    runtime: CliRuntime = CliRuntime.NONE,
   ): string {
     // 셸을 연 칸의 일: Codex의 sandbox는 끄고 칸이 벽이다 (Claude Code와 같은 조건. Docker 안에서 Codex sandbox가 도는지도 불확실).
     // 셸 명령은 Codex가 받은 환경(프록시 · 칸의 홈)을 그대로 쓴다
@@ -77,9 +81,17 @@ export class CodexCli implements AiTool {
       ? ['sandbox_mode = "danger-full-access"']
       : ['sandbox_mode = "workspace-write"'];
     // 러너가 작업마다 만드는 설정이고 작업이 끝나면 지운다 (파일 안에는 주석을 쓰지 않는다: 러너 코드에 # 글을 두지 않는 규칙)
+    // 모델 · 생각 강도는 표([...])보다 앞의 맨 위 칸이다. 비었으면 CLI의 기본 (2차 7단계)
+    const tuning = [
+      ...(runtime.model === '' ? [] : [`model = ${JSON.stringify(runtime.model)}`]),
+      ...(CodexCli.EFFORTS.includes(runtime.effort)
+        ? [`model_reasoning_effort = ${JSON.stringify(runtime.effort)}`]
+        : []),
+    ];
     const lines = [
       'cli_auth_credentials_store = "file"',
       'approval_policy = "never"',
+      ...tuning,
       ...sandbox,
       'web_search = "disabled"',
       ...(shell ? [] : ['', '[sandbox_workspace_write]', 'network_access = false']),
@@ -116,7 +128,7 @@ export class CodexCli implements AiTool {
     this.shell = job.sandboxed && room !== null && mcp !== null;
     await writeFile(
       join(workspace.configDir, 'config.toml'),
-      CodexCli.configToml(mcp, this.browser, this.shell),
+      CodexCli.configToml(mcp, this.browser, this.shell, job.runtime),
       {
         mode: 0o600,
       },

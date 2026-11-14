@@ -15,6 +15,8 @@ const COLUMNS: ColumnReaders<AgentRow> = {
   monthly_limit: (f, n) => f.optionalInteger(n, 1, LIMIT_MAX),
   five_hour_limit: (f, n) => f.optionalInteger(n, 1, LIMIT_MAX),
   plan_stop_percent: (f, n) => f.optionalInteger(n, 1, 100),
+  model: (f, n) => f.optionalText(n, 80) ?? '',
+  effort: (f, n) => f.optionalText(n, 10) ?? '',
 };
 
 /** 보고 대상 칸 (만들기 · 고치기가 함께 쓴다): 보내지 않으면 undefined, null이면 주인에게 보고 */

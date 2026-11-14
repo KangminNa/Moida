@@ -183,3 +183,25 @@ describe('에이전트를 러너에 묶기', () => {
     assert.deepEqual([both.scopes, both.runnerId], [['make'], null], '풀면서 make는 된다');
   });
 });
+
+describe('모델 · 생각 강도 (2차 7단계)', () => {
+  test('정한 값은 목록 · 설정 판에 남고 일과 함께 러너에게 간다. 비우면 CLI의 기본', async () => {
+    const a = await agent('강도', { model: 'opus', effort: 'max' });
+    assert.deepEqual([a.model, a.effort], ['opus', 'max']);
+    await task(a.id);
+    const [job] = await jobs(tokens.mine as string);
+    assert.deepEqual([job?.agent?.model, job?.agent?.effort], ['opus', 'max']);
+    const cleared = ok(await patch(a.id, { model: '', effort: '' }));
+    assert.deepEqual([cleared.model, cleared.effort], ['', '']);
+    const { revisions } = ok(await api.get(`/api/agents/${a.id}/revisions`, owner));
+    assert.equal((revisions as Json[]).find((r) => r.revision === 1)?.settings.effort, 'max');
+  });
+
+  test('도구가 받지 않는 강도 · 설정 파일에 못 쓰는 모델 이름은 422', async () => {
+    const a = await agent('강도 규칙', { effort: 'max' });
+    assert.equal((await patch(a.id, { tool: 'codex' })).status, 422, 'Codex는 max가 없다');
+    assert.equal((await patch(a.id, { model: 'opus "x"' })).status, 422);
+    assert.equal((await patch(a.id, { effort: 'huge' })).status, 422);
+    ok(await patch(a.id, { tool: 'codex', effort: 'high' }));
+  });
+});

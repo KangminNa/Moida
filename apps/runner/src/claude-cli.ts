@@ -2,6 +2,7 @@ import { AiProcess } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
 import { ClaudeStream } from './claude-stream';
+import { CliRuntime } from './cli-runtime';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import type { PromptPack } from './prompt-pack';
@@ -62,6 +63,10 @@ export class ClaudeCli implements AiTool {
   private shell = false;
   /** 웹 검색을 여는가: MCP가 붙는 일 (연결 확인은 도구가 없다) */
   private web = false;
+  /** 에이전트가 정한 모델 · 생각 강도 (2차 7단계) */
+  private runtime = CliRuntime.NONE;
+  /** --effort가 받는 값 (Claude Code 2.1의 도움말). 모르는 값은 넘기지 않고 CLI의 기본으로 */
+  static readonly EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
   constructor(
     readonly bin: string,
@@ -78,6 +83,7 @@ export class ClaudeCli implements AiTool {
     this.browser = runToken === null ? null : BrowserMcp.for(job, this.browserUrl);
     this.shell = job.sandboxed && room !== null && runToken !== null;
     this.web = runToken !== null;
+    this.runtime = job.runtime;
     return JobWorkspace.open(
       runToken === null ? null : ClaudeCli.mcpConfig(this.mcpUrl, runToken, this.browser),
       ClaudeCli.settings(process.env.HOME),
@@ -137,6 +143,7 @@ export class ClaudeCli implements AiTool {
       '--verbose',
       '--no-session-persistence',
       '--strict-mcp-config',
+      ...this.runtimeArgs(),
     ];
     // 연결 확인: MCP도 도구도 없이 답만 받는다. --tools는 값을 여럿 받으므로 맨 뒤에 둔다
     if (!workspace.mcpReady) return [...print, '--tools', ''];
@@ -163,6 +170,15 @@ export class ClaudeCli implements AiTool {
       ...(workspace.inputsDir === null ? [] : ['--add-dir', workspace.inputsDir]),
       '--permission-mode',
       'acceptEdits',
+    ];
+  }
+
+  /** 모델 · 생각 강도. 비었으면 CLI의 기본이라 넘기지 않는다 */
+  private runtimeArgs(): readonly string[] {
+    const { model, effort } = this.runtime;
+    return [
+      ...(model === '' ? [] : ['--model', model]),
+      ...(ClaudeCli.EFFORTS.includes(effort) ? ['--effort', effort] : []),
     ];
   }
 

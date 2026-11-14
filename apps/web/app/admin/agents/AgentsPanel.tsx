@@ -260,7 +260,8 @@ function AgentCard({
           <b>{agent.name}</b>
           <small>
             {agent.role ? `${agent.role} · ` : ''}
-            {TOOL_LABELS[agent.tool] ?? agent.tool} · 보고: {boss}
+            {TOOL_LABELS[agent.tool] ?? agent.tool}
+            {agent.model ? ` ${agent.model}` : ''} · 보고: {boss}
             {runner === undefined ? '' : ` · 실행: ${runnerLabel(runner)}`}
           </small>
         </div>

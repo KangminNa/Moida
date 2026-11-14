@@ -32,6 +32,8 @@ export interface AgentRow {
   deleted_at: Date | null;
   runner_id: string | null;
   reviewer_id: string | null;
+  model: string;
+  effort: string;
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 
