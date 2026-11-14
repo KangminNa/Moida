@@ -1,6 +1,15 @@
 import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseQuery, BlobStore, Database, NotFound, SecretBox } from '../../platform';
+import {
+  type Actor,
+  BaseQuery,
+  BlobStore,
+  Database,
+  LibraryInput,
+  type LibraryRow,
+  NotFound,
+  SecretBox,
+} from '../../platform';
 import type { PageRevisionRow, PageRow } from '../blog.tables';
 import { Page } from './page';
 import type { PageSiteInput, ReadPageInput } from './page.input';
@@ -52,6 +61,8 @@ export class PageSiteAnswer {
 // 바깥 주소(/pages/<이름>/…)는 공개 페이지면 누구나, 비공개면 주인만: 방문자에게는 없는 페이지와 똑같이 답한다.
 @Injectable()
 export class PageQuery extends BaseQuery {
+  /** 보관함의 종류 (페이지) */
+  static readonly LIBRARY_KIND = 'page';
   /** 바깥 주소의 앞부분 (웹이 /pages/…를 api/pages/site/…로 넘긴다) */
   static readonly SITE = '/pages';
   private static readonly MISSING = '없는 페이지예요';
@@ -141,5 +152,27 @@ export class PageQuery extends BaseQuery {
 
   private inSpace(actor: Actor) {
     return actor.spaceId === null ? this.sql`TRUE` : this.sql`p.space_id = ${actor.spaceId}`;
+  }
+
+  /** 보관함의 페이지 (2차 5단계, platform LibraryQuery에 등록). 공개 페이지는 바깥 주소도 */
+  async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    if (filter.project !== null) return [];
+    const rows = await this.sql<
+      Pick<PageRow, 'id' | 'name' | 'title' | 'visibility' | 'updated_at'>[]
+    >`
+      SELECT id, name, title, visibility, updated_at FROM blog.pages
+      WHERE space_id = ${actor.requireSpace()} ${this.libraryWindow('updated_at', 'id', filter)}
+      ORDER BY updated_at DESC, id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    return rows.map((r) => ({
+      kind: PageQuery.LIBRARY_KIND,
+      id: r.id,
+      title: r.title,
+      project: null,
+      at: r.updated_at,
+      href: `/admin/library/pages/${r.id}`,
+      url: r.visibility === Page.PUBLIC ? `/pages/${r.name}/` : null,
+      visibility: r.visibility,
+    }));
   }
 }

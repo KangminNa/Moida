@@ -12,6 +12,8 @@ import { SensitivePolicy } from './base/sensitive-policy';
 import { HealthController } from './health/health.api';
 import { HealthQuery } from './health/health.query';
 import { DomainErrorFilter } from './http/domain-error.filter';
+import { LibraryController } from './library/library.api';
+import { LibraryQuery } from './library/library.query';
 import { NoticeCatalog } from './notice/notice-catalog';
 import { NoticePushJob } from './notice/notice-push.job';
 import { NoticePushService } from './notice/notice-push.service';
@@ -65,6 +67,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     SensitivePolicy,
     ArchiveQuery,
     ArchiveRestoreService,
+    LibraryQuery,
     ChangeStream,
     CoreWorkers,
     OutboxWorker,
@@ -90,6 +93,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     PluginController,
     PackageController,
     StreamController,
+    LibraryController,
   ],
   exports: [
     Database,
@@ -103,6 +107,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     Leases,
     ArchiveQuery,
     ArchiveRestoreService,
+    LibraryQuery,
     ChangeStream,
     CoreWorkers,
     OutboxWorker,

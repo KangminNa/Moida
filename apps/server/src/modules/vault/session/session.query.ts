@@ -5,6 +5,8 @@ import {
   BaseQuery,
   Database,
   Leases,
+  LibraryInput,
+  type LibraryRow,
   NotFound,
   Redaction,
   SensitivePolicy,
@@ -49,6 +51,8 @@ import { SessionTranscript } from './session-transcript';
 // 방문자용 공개 세션 보기는 그래프(M2)에서 따로 만든다.
 @Injectable()
 export class SessionQuery extends BaseQuery {
+  /** 보관함의 종류 (세션) */
+  static readonly LIBRARY_KIND = 'session';
   private static readonly PAGE = 30;
   /** 찾은 결과의 본문 조각: 전체 길이, 그중 찾은 말 앞에 남길 길이 */
   private static readonly EXCERPT = 160;
@@ -241,5 +245,30 @@ export class SessionQuery extends BaseQuery {
 
   private static redactions(note: SessionNote): readonly RedactionView[] {
     return note.redactions.map((r) => new RedactionView(Redaction.SECRET, r.section, r.label));
+  }
+
+  /** 보관함의 세션 (2차 5단계, platform LibraryQuery에 등록). 프로젝트로 거를 수 있는 종류는 세션뿐이다 */
+  async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    const rows = await this.sql<
+      Pick<SessionRow, 'node_id' | 'head_title' | 'project' | 'visibility' | 'last_revision_at'>[]
+    >`
+      SELECT s.node_id, s.head_title, s.project, s.visibility, s.last_revision_at
+      FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
+      WHERE s.space_id = ${actor.requireSpace()} AND n.deleted_at IS NULL
+        AND s.last_revision_at IS NOT NULL
+        ${filter.project === null ? this.sql`` : this.sql`AND s.project = ${filter.project}`}
+        ${this.libraryWindow('s.last_revision_at', 's.node_id', filter)}
+      ORDER BY s.last_revision_at DESC, s.node_id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    return rows.map((r) => ({
+      kind: SessionQuery.LIBRARY_KIND,
+      id: r.node_id,
+      title: r.head_title || '제목 없음',
+      project: r.project,
+      at: r.last_revision_at as Date,
+      href: `/admin/sessions?session=${r.node_id}`,
+      url: null,
+      visibility: r.visibility,
+    }));
   }
 }

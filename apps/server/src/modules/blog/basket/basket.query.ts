@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Actor, BaseQuery } from '../../platform';
+import { Actor, BaseQuery, LibraryInput, type LibraryRow } from '../../platform';
 import type { BasketItemRow } from '../blog.tables';
+import { BasketItem } from './basket';
 import { BasketItemView, BasketView, ToolBasketView } from './basket.view';
 
 // 소재 읽기. 소재에는 비공개 자료가 담기므로 REST는 주인만, MCP는 write 권한으로만 본다.
 // 기기 토큰이 REST로 와도 주인의 화면을 보지 못하게 두 입구의 확인을 나눈다.
 @Injectable()
 export class BasketQuery extends BaseQuery {
+  /** 보관함의 종류 (읽은 글) */
+  static readonly LIBRARY_KIND = 'link';
   /** 넘긴 해시 중 소재가 가리키는 것 (platform의 BlobStore.sweep이 묻는다) */
   async usedBlobs(actor: Actor, hashes: readonly string[]): Promise<readonly string[]> {
     actor.assertOwnerOrSystem();
@@ -33,5 +36,27 @@ export class BasketQuery extends BaseQuery {
       SELECT i.* FROM work.basket_items i JOIN work.baskets b ON b.id = i.basket_id
       WHERE b.space_id = ${actor.spaceId} AND b.archived_at IS NULL
       ORDER BY i.sort, i.id DESC`;
+  }
+
+  /** 보관함의 읽은 글 (2차 5단계, platform LibraryQuery에 등록): 소재의 링크 (페이지 보관 · 콘솔에서 담은 것) */
+  async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    if (filter.project !== null) return [];
+    const rows = await this.sql<Pick<BasketItemRow, 'id' | 'title' | 'url' | 'created_at'>[]>`
+      SELECT i.id, i.title, i.url, i.created_at
+      FROM work.basket_items i JOIN work.baskets b ON b.id = i.basket_id
+      WHERE b.space_id = ${actor.requireSpace()} AND i.kind = ${BasketItem.LINK}
+        ${this.libraryWindow('i.created_at', 'i.id', filter)}
+      ORDER BY i.created_at DESC, i.id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    return rows.map((r) => ({
+      kind: BasketQuery.LIBRARY_KIND,
+      id: r.id,
+      title: r.title || r.url || '제목 없음',
+      project: null,
+      at: r.created_at,
+      href: '/admin/library/basket',
+      url: r.url,
+      visibility: 'private',
+    }));
   }
 }

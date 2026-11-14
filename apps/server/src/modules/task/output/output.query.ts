@@ -5,6 +5,8 @@ import {
   BaseQuery,
   BlobStore,
   Database,
+  LibraryInput,
+  type LibraryRow,
   NotFound,
   RuleViolation,
   SecretBox,
@@ -61,6 +63,8 @@ export class OutputFile {
 // 예외는 만들기 작업의 재료: 그 일의 임대를 쥔 러너가 begin_download로 받은 표로 그 파일 하나만 받는다 (결과물 2차).
 @Injectable()
 export class OutputQuery extends BaseQuery {
+  /** 보관함의 종류 (결과물) */
+  static readonly LIBRARY_KIND = 'output';
   private static readonly PAGE = 50;
 
   constructor(
@@ -203,5 +207,26 @@ export class OutputQuery extends BaseQuery {
       await this.blobs.freeBytes(),
       this.policy.reserveBytes,
     );
+  }
+
+  /** 보관함의 결과물 (2차 5단계, platform LibraryQuery에 등록). 휴지통 밖, 프로젝트를 모르므로 프로젝트로 거르면 없다 */
+  async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    if (filter.project !== null) return [];
+    const rows = await this.sql<Pick<OutputRow, 'id' | 'task_id' | 'name' | 'created_at'>[]>`
+      SELECT id, task_id, name, created_at FROM task.outputs
+      WHERE space_id = ${actor.requireSpace()} AND deleted_at IS NULL
+        ${this.libraryWindow('created_at', 'id', filter)}
+      ORDER BY created_at DESC, id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    return rows.map((r) => ({
+      kind: OutputQuery.LIBRARY_KIND,
+      id: r.id,
+      title: r.name,
+      project: null,
+      at: r.created_at,
+      href: r.task_id ? `/admin/library/outputs?task=${r.task_id}` : '/admin/library/outputs',
+      url: null,
+      visibility: 'private',
+    }));
   }
 }

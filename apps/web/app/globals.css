@@ -1817,6 +1817,31 @@ a.chip {
   gap: 8px 12px;
 }
 
+/* 보관함 한 줄 (2차 5단계): 종류 · 제목과 정보 · 바깥 주소 */
+.list > .library-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.library-row .pill {
+  flex: none;
+  min-width: 56px;
+  text-align: center;
+}
+
+.library-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.library-main b {
+  font-weight: 500;
+}
+
 /* 결과물 한 줄: 작은 그림(또는 확장자) · 이름 · 단추 */
 .list > .output-row {
   display: flex;

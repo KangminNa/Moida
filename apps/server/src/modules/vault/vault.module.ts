@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { CoreWorkers } from '../platform';
+import { CoreWorkers, LibraryQuery } from '../platform';
 import { CategoryController } from './category/category.api';
 import { CategoryQuery } from './category/category.query';
 import { ChangeController } from './change/change.api';
@@ -99,10 +99,16 @@ export class VaultModule implements OnModuleInit {
     private readonly tidy: TidyRequestHandler,
     private readonly postMarks: PostMarkHandler,
     private readonly stale: WikiStaleJob,
+    private readonly library: LibraryQuery,
+    private readonly sessions: SessionQuery,
+    private readonly wikis: WikiQuery,
   ) {}
 
   onModuleInit(): void {
     this.workers.on('vault.session.saved', this.tidy);
+    // 보관함 (2차 5단계): 세션 · 위키
+    this.library.register([SessionQuery.LIBRARY_KIND], (a, f) => this.sessions.library(a, f));
+    this.library.register([WikiQuery.LIBRARY_KIND], (a, f) => this.wikis.library(a, f));
     this.workers.on('blog.post.*', this.postMarks);
     this.workers.every(this.stale, WikiStaleJob.EVERY_MS);
   }

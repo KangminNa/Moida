@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Actor, BaseQuery, Database, NotFound } from '../../platform';
+import {
+  Actor,
+  BaseQuery,
+  Database,
+  LibraryInput,
+  type LibraryRow,
+  NotFound,
+} from '../../platform';
 import { PostWikiQuery } from '../../vault';
 import type { PostRow } from '../blog.tables';
 import { type LoadedPost, Post } from './post';
@@ -20,6 +27,8 @@ import {
 // 방문자는 공간을 모른다: MVP는 공간이 하나라 공간으로 거르지 않는다 (여럿이 되면 Guard가 주소로 공간을 정한다).
 @Injectable()
 export class PostQuery extends BaseQuery {
+  /** 보관함의 종류 (글) */
+  static readonly LIBRARY_KIND = 'post';
   private static readonly PAGE = 20;
 
   constructor(
@@ -145,5 +154,26 @@ export class PostQuery extends BaseQuery {
     return actor.canSeePrivate()
       ? new PostView(r, body, r.revision_count, r.ref_wiki_ids ?? [])
       : new PublicPostView(r, body);
+  }
+
+  /** 보관함의 글 (2차 5단계, platform LibraryQuery에 등록). 휴지통 밖, 공개 · 링크 공개 글은 바깥 주소도 */
+  async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    if (filter.project !== null) return [];
+    const rows = await this.sql<Pick<PostRow, 'id' | 'slug' | 'title' | 'status' | 'updated_at'>[]>`
+      SELECT id, slug, title, status, updated_at FROM blog.posts
+      WHERE space_id = ${actor.requireSpace()} AND deleted_at IS NULL
+        ${this.libraryWindow('updated_at', 'id', filter)}
+      ORDER BY updated_at DESC, id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    return rows.map((r) => ({
+      kind: PostQuery.LIBRARY_KIND,
+      id: r.id,
+      title: r.title || '제목 없음',
+      project: null,
+      at: r.updated_at,
+      href: `/admin/posts/${r.id}`,
+      url: r.status === Post.DRAFT ? null : `/posts/${r.slug}`,
+      visibility: r.status,
+    }));
   }
 }

@@ -2,7 +2,7 @@
   "why": {
     "apps/web/app/_install/InstallWizard.tsx": "계정 만들기 단계는 401에 이 화면만의 문구가 있다 (설치 코드가 10분 지남)",
     "apps/web/app/admin/notices/PushBox.tsx": "브라우저 상태(서비스 워커 · 구독 · 알림 권한)를 함께 읽고, 버튼이 API 앞뒤로 브라우저 일을 한다",
-    "apps/web/app/admin/outputs/MakeForm.tsx": "위키 찾기는 입력할 때 읽는다 (화면이 뜰 때 읽는 것이 아니다)",
+    "apps/web/app/admin/library/outputs/MakeForm.tsx": "위키 찾기는 입력할 때 읽는다 (화면이 뜰 때 읽는 것이 아니다)",
     "apps/web/app/admin/posts/WikiPicker.tsx": "입력하며 찾기와 모르는 id의 이름만 읽기"
   },
   "handWrittenBusy": [
@@ -11,7 +11,7 @@
   ],
   "handWrittenLoad": [
     "apps/web/app/admin/notices/PushBox.tsx",
-    "apps/web/app/admin/outputs/MakeForm.tsx",
+    "apps/web/app/admin/library/outputs/MakeForm.tsx",
     "apps/web/app/admin/posts/WikiPicker.tsx"
   ],
   "longFiles": {

@@ -1,3 +1,4 @@
+import type { LibraryPageView } from '../../../server/src/modules/platform/library/library.view';
 import type { NoticeSettingsView } from '../../../server/src/modules/platform/notice/notice-settings.view';
 import type { NotificationListView } from '../../../server/src/modules/platform/notice/notification.view';
 import type {
@@ -25,3 +26,5 @@ export type PluginList = ReturnType<PluginListView['toJSON']>;
 export type PluginSetting = ReturnType<PluginSettingView['toJSON']>;
 /** 관리 동작의 결과 (예: 연결 확인) */
 export type PluginActionResult = ReturnType<PluginActionResultView['toJSON']>;
+/** 보관함 한 쪽 (2차 5단계): 결과물 · 페이지 · 읽은 글 · 세션 · 위키 · 글, 최근 것부터 */
+export type LibraryPage = ReturnType<LibraryPageView['toJSON']>;

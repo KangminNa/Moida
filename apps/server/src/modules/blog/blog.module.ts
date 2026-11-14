@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { BlobStore, CoreWorkers } from '../platform';
+import { BlobStore, CoreWorkers, LibraryQuery } from '../platform';
 import { VaultModule } from '../vault';
 import { AssetController, FileController } from './asset/asset.api';
 import { AssetQuery } from './asset/asset.query';
@@ -54,6 +54,8 @@ export class BlogModule implements OnModuleInit {
     private readonly basket: BasketQuery,
     private readonly built: PageBuiltHandler,
     private readonly pages: PageQuery,
+    private readonly posts: PostQuery,
+    private readonly library: LibraryQuery,
   ) {}
 
   onModuleInit(): void {
@@ -61,6 +63,10 @@ export class BlogModule implements OnModuleInit {
     this.workers.expect(PublishApprovedHandler.TOPIC);
     // 만들기 작업이 끝나며 알린 페이지 (task가 보낸다)
     this.workers.on(PageBuiltHandler.TOPIC, this.built);
+    // 보관함 (2차 5단계): 페이지 · 글 · 읽은 글(소재의 링크)
+    this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
+    this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
+    this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
     // 파일을 가리키는 칸: 쓰는 동안 platform이 파일을 지우지 않게
     this.blobs.registerUse(
       ['blog.assets.blob_hash', 'blog.posts.cover_blob_hash'],

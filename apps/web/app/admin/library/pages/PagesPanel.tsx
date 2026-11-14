@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { usePages } from '../../_blog/live';
-import { api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
-import { when } from '../../_task/labels';
-import { usePageTasks } from '../../_task/live';
-import { TaskPill } from '../../_task/parts';
-import type { Task } from '../../_task/types';
+import { usePages } from '../../../_blog/live';
+import { api } from '../../../_lib/client-api';
+import { useAction } from '../../../_lib/use-action';
+import { when } from '../../../_task/labels';
+import { usePageTasks } from '../../../_task/live';
+import { TaskPill } from '../../../_task/parts';
+import type { Task } from '../../../_task/types';
 import { PageAskForm } from './PageAskForm';
 
 // 페이지: AI가 만든 HTML 묶음. 만들어 달라고 하면 작업이 돌고, 끝나면 바로 주소가 생긴다 (공개로 바꾸기 전에는 나만 본다).
@@ -24,7 +24,7 @@ export function PagesPanel({ watch }: { watch: string | null }) {
   const made = watch === null ? null : (list?.find((p) => p.lastTaskId === watch) ?? null);
 
   useEffect(() => {
-    if (made) router.replace(`/admin/pages/${made.id}`);
+    if (made) router.replace(`/admin/library/pages/${made.id}`);
   }, [made, router]);
 
   async function create(instruction: string, requestId: string) {
@@ -33,7 +33,7 @@ export function PagesPanel({ watch }: { watch: string | null }) {
       () => api<Task>('POST', '/api/tasks', { requestId, kind: 'make', instruction, page: {} }),
       { done: '작업 등록됨' },
     );
-    if (reply?.ok) router.replace(`/admin/pages?task=${reply.data.id}`);
+    if (reply?.ok) router.replace(`/admin/library/pages?task=${reply.data.id}`);
     return reply?.ok === true;
   }
 
@@ -89,7 +89,7 @@ export function PagesPanel({ watch }: { watch: string | null }) {
         <ul className="list" aria-label="페이지">
           {list.map((p) => (
             <li key={p.id}>
-              <Link className="item" href={`/admin/pages/${p.id}`}>
+              <Link className="item" href={`/admin/library/pages/${p.id}`}>
                 <div className="item-main">
                   <b>{p.title}</b>
                   <small>

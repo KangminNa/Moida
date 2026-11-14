@@ -104,6 +104,8 @@ const ICONS: Record<string, ReactNode> = {
 export const CHAT_HREF = '/admin';
 export const CHATS_HREF = '/admin/chats';
 export const APPROVALS_HREF = '/admin/approvals';
+/** 보관함 (2차 5단계): 결과물 · 페이지 · 읽은 글 · 세션 · 위키 · 글을 한 목록으로. 결과물 · 페이지 · 소재 관리는 그 아래 */
+export const LIBRARY_HREF = '/admin/library';
 /** 설정의 첫 화면 (대화 칸 아래의 "설정") */
 export const SETTINGS_HREF = '/admin/agents';
 
@@ -121,7 +123,7 @@ export const MENU = [
       { href: SETTINGS_HREF, name: '에이전트', icon: 'people' },
       { href: APPROVALS_HREF, name: '결재', icon: 'stamp' },
       { href: '/admin/tasks', name: '작업', icon: 'task' },
-      { href: '/admin/outputs', name: '결과물', icon: 'box' },
+      { href: LIBRARY_HREF, name: '보관함', icon: 'box' },
       { href: '/admin/goals', name: '목표', icon: 'flag' },
       { href: '/admin/runners', name: '러너', icon: 'runner' },
       { href: '/admin/skills', name: '스킬', icon: 'scroll' },
@@ -146,11 +148,7 @@ export const MENU = [
   },
   {
     label: '블로그',
-    items: [
-      { href: '/admin/posts', name: '글', icon: 'post' },
-      { href: '/admin/pages', name: '페이지', icon: 'window' },
-      { href: '/admin/basket', name: '소재', icon: 'basket' },
-    ],
+    items: [{ href: '/admin/posts', name: '글', icon: 'post' }],
   },
   {
     label: '연결',

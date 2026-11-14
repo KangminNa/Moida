@@ -244,7 +244,7 @@ function Outputs({ taskId, outputs }: { taskId: string; outputs: readonly TaskOu
     <section className="panel" aria-labelledby="task-outputs">
       <div className="sec-title flat">
         <h2 id="task-outputs">결과물</h2>
-        <Link className="note" href={`/admin/outputs?task=${taskId}`}>
+        <Link className="note" href={`/admin/library/outputs?task=${taskId}`}>
           결과물 메뉴에서 보기
         </Link>
       </div>

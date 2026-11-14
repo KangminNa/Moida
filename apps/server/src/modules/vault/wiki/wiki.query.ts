@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Actor, BaseQuery, NotFound } from '../../platform';
+import { Actor, BaseQuery, LibraryInput, type LibraryRow, NotFound } from '../../platform';
 import type { WikiRow } from '../vault.tables';
 import { ListWikisInput, type SearchWikisInput, type WikiIdInput } from './wiki.input';
 import {
@@ -23,6 +23,8 @@ import {
 // 방문자는 공간을 모른다 (MVP는 공간 하나).
 @Injectable()
 export class WikiQuery extends BaseQuery {
+  /** 보관함의 종류 (위키) */
+  static readonly LIBRARY_KIND = 'wiki';
   private static readonly PAGE = 30;
   /** 휴지통 목록에 보이는 수 */
   private static readonly TRASH_LIMIT = 200;
@@ -134,5 +136,27 @@ export class WikiQuery extends BaseQuery {
 
   private inSpace(actor: Actor) {
     return actor.spaceId === null ? this.sql`TRUE` : this.sql`w.space_id = ${actor.spaceId}`;
+  }
+
+  /** 보관함의 위키 (2차 5단계, platform LibraryQuery에 등록). 휴지통 밖 */
+  async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    if (filter.project !== null) return [];
+    const rows = await this.sql<Pick<WikiRow, 'node_id' | 'title' | 'visibility' | 'updated_at'>[]>`
+      SELECT w.node_id, w.title, w.visibility, w.updated_at
+      FROM vault.wikis w JOIN vault.nodes n ON n.id = w.node_id
+      WHERE w.space_id = ${actor.requireSpace()} AND n.deleted_at IS NULL
+        ${this.libraryWindow('w.updated_at', 'w.node_id', filter)}
+      ORDER BY w.updated_at DESC, w.node_id DESC LIMIT ${LibraryInput.PAGE + 1}`;
+    return rows.map((r) => ({
+      kind: WikiQuery.LIBRARY_KIND,
+      id: r.node_id,
+      title: r.title,
+      project: null,
+      at: r.updated_at,
+      href: `/admin/wiki?wiki=${r.node_id}`,
+      url: null,
+      visibility: r.visibility,
+    }));
   }
 }

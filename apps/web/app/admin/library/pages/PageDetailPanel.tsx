@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { pagePath } from '../../_blog/format';
-import { usePage } from '../../_blog/live';
-import type { PageDetail, PageRevision } from '../../_blog/types';
-import { api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
-import { when } from '../../_task/labels';
-import { usePageTasks } from '../../_task/live';
-import { TaskPill } from '../../_task/parts';
-import type { Output, OutputPage, Task } from '../../_task/types';
+import { pagePath } from '../../../_blog/format';
+import { usePage } from '../../../_blog/live';
+import type { PageDetail, PageRevision } from '../../../_blog/types';
+import { api } from '../../../_lib/client-api';
+import { useAction } from '../../../_lib/use-action';
+import { when } from '../../../_task/labels';
+import { usePageTasks } from '../../../_task/live';
+import { TaskPill } from '../../../_task/parts';
+import type { Output, OutputPage, Task } from '../../../_task/types';
 import { PageAskForm } from './PageAskForm';
 import { PageTitleForm } from './PageTitleForm';
 
@@ -122,7 +122,7 @@ export function PageDetailPanel({ id }: { id: string }) {
         <div>
           <h1>{p.title}</h1>
           <p>
-            <Link href="/admin/pages">페이지</Link> · /pages/{p.name}
+            <Link href="/admin/library/pages">페이지</Link> · /pages/{p.name}
           </p>
         </div>
         <div className="row">

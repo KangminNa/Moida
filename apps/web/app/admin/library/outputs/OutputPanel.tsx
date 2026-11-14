@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
-import { useLiveValue } from '../../_lib/use-live';
-import { bytes, INLINE_MIMES, OUTPUT_KINDS, TEXT_MIMES, when } from '../../_task/labels';
-import { readPages } from '../../_task/live';
-import { isHtmlOutput, OutputOpen } from '../../_task/parts';
-import type { Output, OutputPage, OutputSaved, OutputUsage, Task } from '../../_task/types';
+import { api } from '../../../_lib/client-api';
+import { useAction } from '../../../_lib/use-action';
+import { useLiveValue } from '../../../_lib/use-live';
+import { bytes, INLINE_MIMES, OUTPUT_KINDS, TEXT_MIMES, when } from '../../../_task/labels';
+import { readPages } from '../../../_task/live';
+import { isHtmlOutput, OutputOpen } from '../../../_task/parts';
+import type { Output, OutputPage, OutputSaved, OutputUsage, Task } from '../../../_task/types';
 import { type MakeBody, MakeForm } from './MakeForm';
 
 type Tab = 'all' | 'trash' | keyof typeof OUTPUT_KINDS;
@@ -110,7 +110,7 @@ export function OutputPanel({ taskId }: { taskId: string | null }) {
       {taskId && (
         <p className="note">
           한 작업의 결과물만 보는 중 · <Link href={`/admin/tasks/${taskId}`}>작업 열기</Link> ·{' '}
-          <Link href="/admin/outputs">전체 보기</Link>
+          <Link href="/admin/library/outputs">전체 보기</Link>
         </p>
       )}
       <div className="row" role="tablist" aria-label="결과물 종류">

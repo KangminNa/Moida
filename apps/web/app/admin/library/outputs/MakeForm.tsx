@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
-import { api, describe } from '../../_lib/client-api';
-import { useAgents } from '../../_task/live';
-import type { Output, Task } from '../../_task/types';
-import type { WikiPage, WikiSummary } from '../../_vault/types';
+import { api, describe } from '../../../_lib/client-api';
+import { useAgents } from '../../../_task/live';
+import type { Output, Task } from '../../../_task/types';
+import type { WikiPage, WikiSummary } from '../../../_vault/types';
 
 /** 결과물 · 위키 각각 (서버의 MakeMaterials.MAX와 맞춘다) */
 const MATERIALS_MAX = 10;

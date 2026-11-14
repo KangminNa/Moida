@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { LibraryInput } from '../library/library.input';
 import type { Actor } from './actor';
 import { Database, type Sql } from './database';
 import { TableReader } from './table-query';
@@ -22,5 +23,17 @@ export abstract class BaseQuery extends TableReader {
    */
   protected visibleTo(actor: Actor, column = 'visibility') {
     return actor.canSeePrivate() ? this.sql`` : this.sql`AND ${this.sql(column)} = 'public'`;
+  }
+
+  /**
+   * 보관함 읽기(2차 5단계)의 기간 · 커서 조건. 시각 칸과 id 칸 이름을 받아 `AND …` 조각을 돌려준다.
+   * 읽기는 `ORDER BY <시각> DESC, <id> DESC LIMIT LibraryInput.PAGE + 1`로 쓴다 (LibraryQuery가 모아 자른다)
+   */
+  protected libraryWindow(at: string, id: string, filter: LibraryInput) {
+    const sql = this.sql;
+    const { from, to, before } = filter;
+    return sql`${from ? sql`AND ${sql(at)} >= ${from}` : sql``}
+      ${to ? sql`AND ${sql(at)} <= ${to}` : sql``}
+      ${before ? sql`AND (${sql(at)}, ${sql(id)}) < (${before[0]}, ${before[1]})` : sql``}`;
   }
 }

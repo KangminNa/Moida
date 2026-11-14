@@ -1,10 +1,10 @@
 'use client';
 
 import { type FormEvent, useRef, useState } from 'react';
-import type { Basket, BasketItem as Item } from '../../_blog/types';
-import { api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
-import { useLiveValue } from '../../_lib/use-live';
+import type { Basket, BasketItem as Item } from '../../../_blog/types';
+import { api } from '../../../_lib/client-api';
+import { useAction } from '../../../_lib/use-action';
+import { useLiveValue } from '../../../_lib/use-live';
 
 type NewKind = 'link' | 'note';
 
