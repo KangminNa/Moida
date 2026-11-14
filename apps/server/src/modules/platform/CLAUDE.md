@@ -33,7 +33,9 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - `NoticeCatalog` · `NoticeKind`: 알림 종류 등록 (7단계). 등급은 `NoticeKind.IMMEDIATE` · `DIGEST` · `LOG`
 - `CoreWorkers`: 코어 모듈의 이벤트 받기·반복 작업 등록 (`on`, `every`, `expect`)
 - `ArchiveQuery`: 보관 형식 파일 묶음. 내용을 가진 모듈이 `onModuleInit`에서 `register`로 자기 파일을, `registerRestore`로 복원을 등록한다
-- `LibraryQuery` · `LibraryInput` · `LibraryRow`: 보관함 (2차 5단계, `api/library`, 주인만). 종류를 가진 모듈이 `onModuleInit`에서 `register(종류들, (actor, filter) => 행들)`로 자기 읽기를 등록하고(같은 종류를 두 번 등록하면 오류), platform은 종류를 모르는 채 시간 · id 내림차순으로 합쳐 30개씩 자른다. 모듈의 읽기는 `BaseQuery.libraryWindow`로 같은 기간 · 커서 조건을 쓴다
+- `AgentDirectory` · `AgentCard`: 에이전트의 표를 갖지 않은 모듈이 "이 id의 에이전트가 있는가, 무슨 권한인가"를 묻는 길 (2차 6단계, task가 `register`, blog 메뉴의 운영 팀 확인). 트랜잭션 밖에서 묻는다
+- `ActionChecks` · `ActionTarget`: 결과 카드에 싣기 전에 결재 동작의 대상을 가진 모듈이 "빠진 점"을 짚는 길 (2차 6단계). 동작마다 한 번 `register(action, (actor, targetId) => 문구 | null)`, task가 `problemsOf`로 묻고 받을 것이 정해진 대화면 다시 맡긴다
+- `LibraryQuery` · `LibraryInput` · `LibraryRow`: 보관함 (2차 5단계, `api/library`, 주인만). 종류를 가진 모듈이 `onModuleInit`에서 `register(종류들, (actor, filter) => 행들)`로 자기 읽기를 등록하고(같은 종류를 두 번 등록하면 오류), platform은 종류를 모르는 채 시간 · id 내림차순으로 합쳐 30개씩 자른다. 줄의 `place` · `placeId`는 놓인 곳(블로그 메뉴)이다. 모듈의 읽기는 `BaseQuery.libraryWindow`로 같은 기간 · 커서 조건을 쓴다
 - `ArchiveRestoreService`: 빈 Cairn에 복원 (`preview` · `apply`). GitHub와 zip이 같은 길이다. 주인과 `SystemActor`만 부른다. `steadyRead`: 복원과 겹치지 않게 읽기
 - `ArchivePart`(모듈의 복원 몫), `ArchiveRecord`(보관 파일의 앞부분·항목 읽기), `ArchiveBlob`, `ArchiveReport`(개수와 알림)
 - `BlobStore`: 내용 주소 파일 저장소 (`Blob`). 트랜잭션 밖에서 부른다. 큰 파일은 `saveStream`(받으며 크기 · 해시를 세고 한도 · 해시가 틀리면 아무것도 남기지 않음), 디스크 여유는 `freeBytes`

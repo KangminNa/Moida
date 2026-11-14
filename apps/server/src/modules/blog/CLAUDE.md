@@ -24,20 +24,27 @@
   자라는 페이지 (2차 5단계): 방향(`pages.direction`, 관리자만 `edit`), 있는 페이지의 새 판은 앞 판 위에 이번 파일을 얹는다(`PageFiles.overlay`, 고칠 페이지가 없는데 문이 없으면 만들지 않는다). 공개 페이지의 새 판은 확인 대기(`pending_seq`, 이벤트 `blog.page.pending` → `BlogNotices` 즉시 알림)이고 `switchTo`로 그 판(이상)을 보이면 풀린다(`blog.page.shown` → 알림 읽음). 대기 판은 판 번호를 봉인한 보기 표(`PageTicket(pageId, seq)`)로 미리 본다.
   바뀐 점 `GET api/pages/:id/revisions/:seq/changes`(`PageDataDiff`: 앞 판과 `data.json`의 잎을 비교, 주인만). MCP `page_base`(run, `page.tool.ts`): 페이지를 고치는 만들기 일을 쥔 러너만(platform `Leases`) 가장 새 판의 글 파일 · 방향을 받는다
 
+- `menu/`: 블로그 메뉴(`Menu`, 2차 6단계, 쓰지 않던 categories를 넓힘). 종류(posts · issues · pages · page, 만들 때만) · 주소(`/m/<주소>`) · 순서 · 편집 방침 · 운영 팀 · RSS. `api/menus`(목록은 누구나 이름 · 주소 · 종류만, 쓰기는 관리자), MCP `blog_menus`(write: 메뉴 · 편집 방침 · 만드는 중인 호).
+  운영 팀은 이 공간의, `read_all` 없는 에이전트만: blog는 task를 모르므로 트랜잭션 전에 platform `AgentDirectory`로 묻는다. 무엇을 담는지는 `Menu.assertHolds`, 누가 올리는지는 `Menu.assertWriter`(관리자 · 기기는 늘, 에이전트는 비공개를 읽지 않고 운영 팀이면). 담긴 것이 있으면 지우지 않는다.
+  올리기: 글은 `POST api/posts/:id/menu`(관리자) · `blog_save_draft`의 `menu_id`(`Post.placeIn`), 페이지는 `PATCH api/pages/:id`의 `menuId`(`Page.placeIn`, 페이지 하나 메뉴는 메뉴를 잠가 하나만). 올린 것은 공개 대기이고 공개는 공개 범위로. 글 · 페이지 목록의 `?menu=`, 보관함 줄의 `place`. 결과 카드 전에 메뉴에 올리지 않은 글의 발행을 짚는다(platform `ActionChecks`, `PostQuery.publishProblem`)
+- `issue/`: 매거진 호(`Issue`, 쓰지 않던 series를 넓힘). 호 목록 메뉴 안의 번호(메뉴를 잠가 다음 수), 글은 `posts.issue_id` · `issue_order`로(`Post.joinIssue`, 메뉴에서는 빠진다). `api/issues`(발행한 호 · `by-number/:menu/:number`는 누구나, 쓰기 · 발행은 관리자), `blog_save_draft`의 `issue_id`.
+  발행은 호 전체를 한 번에: 관리자의 `publish`(못 하면 422)와 결재 동작 `blog.issue.publish`(`IssuePublishHandler` → `IssueService.publishApproved`, 결과 `blog.issue.published` · `publish_failed`, 같은 결재는 `Idempotency`로 앞 결과를 다시). 휴지통 글 · 빈 호 · 결재 뒤 바뀐 호면 아무것도 바꾸지 않는다. 결재한 공개의 요청자 · 결과는 글과 같은 `PostPublish` 정책
+
 엔티티는 `TableEntity`(platform)로 표 한 줄을 들고, Repository(`TableRepository`)는 바뀐 칸만 저장한다 (객체설계 6장). 칼럼을 아는 곳은 `blog.tables.ts`, Entity의 `RULES`, Input의 `COLUMNS`, View의 `toJSON`, 보관·복원이다.
 글의 주소·태그·정렬은 `Post.RULES`를 지나 `edit(content, changes)`로 바뀌고(주소의 모양과 겹침은 `SlugPolicy`가 먼저 본다), 공개 범위·휴지통·wiki 연결은 동사 메서드로만 바뀐다.
 `Post`는 지금 판·판 수·참고 wiki를 함께 읽어(`LoadedPost`) 판과 참고 wiki를 `saveParts`로 저장하고, 같은 값은 적지 않아 바뀐 것이 없으면 버전도 그대로다. `Asset`은 id가 없어 `BaseEntity`다.
 글의 View는 보는 사람마다 둘이다: 비공개까지 보는 요청자는 `PostView` · `PostPageView` · `SavedPostView`, 아니면 `Public…`(wiki 연결 없음). 읽기는 `PostQuery`가, 쓰기 결과는 `Post.view(actor)`가 고른다.
 
 ## 소유 데이터
-스키마 `blog`: categories, series, posts, post_revisions, assets, post_wiki_refs, pages, page_revisions(추가만)
+스키마 `blog`: menus, issues, posts, post_revisions, assets, post_wiki_refs, pages, page_revisions(추가만)
 스키마 `work`: baskets, basket_items
 
 ## 데이터 묶음
 - 글: posts + post_revisions + post_wiki_refs
-- 카테고리: categories
 - 사진: assets
 - 페이지: pages + page_revisions (파일은 platform.blobs를 값으로)
+- 메뉴: menus (2차 6단계)
+- 매거진 호: issues (+ 든 글의 posts.issue_id · issue_order. 호와 글을 한 번에 바꾸는 `IssueService`만 글의 Repository를 함께 쓴다, 객체설계 4장 예외)
 - 소재: baskets + basket_items
 
 ## 공개 API (`index.ts`)
@@ -48,9 +55,10 @@
 결재한 공개의 결과: 성공이면 `blog.post.published`에 `approvalId`·`outcome: 'done'`이 붙고(사람의 공개에는 없다), 실패면 `blog.post.publish_failed` (postId, approvalId, outcome: 'failed', error. 글 상태는 싣지 않아 사본을 고치는 데 쓰지 않는다). task가 받아 작업을 끝낸다.
 
 `blog.page.changed` (v1: pageId, name, currentSeq, visibility. 페이지가 생기거나 판이 붙거나 보이는 판 · 공개 범위 · 제목 · 방향이 바뀔 때. 화면의 변경 신호로 쓴다)
+`blog.issue.published` (v1: issueId, menuId, number, title, 결재한 발행이면 approvalId · outcome done) · `blog.issue.publish_failed` (issueId, approvalId, outcome failed, error). 결재 결과는 task가 받아 작업을 끝낸다. 호와 함께 공개된 글마다 `blog.post.published`도 난다 (approvalId 없이)
 `blog.page.pending` (v1: pageId, title, seq. 공개 페이지에 확인 대기 판이 생김) · `blog.page.shown` (v1: pageId, seq. 대기 판을 보임). 받는 모듈은 없고 알림(`BlogNotices`)만 만든다
 
-받는 이벤트: `task.approval.granted` 중 `action`이 `blog.post.publish`인 것만 (`CoreWorkers.expect`도 여기서 적는다).
+받는 이벤트: `task.approval.granted` 중 `action`이 `blog.post.publish` · `blog.issue.publish`인 것만 (`CoreWorkers.expect`도 여기서 적는다).
 `task.page.built` (taskId, runId, pageId, title, note, files): 페이지의 새 판. 두 번 받아도 판은 하나다 (`page_revisions`의 `UNIQUE(page_id, run_id)`와 `PageRepository.hasRun`)
 
 ## 써도 되는 모듈
