@@ -193,4 +193,39 @@ export const WORK_TEAMS: readonly AgentTeamRow[] = [
       },
     ],
   },
+  {
+    key: 'maintainer',
+    title: 'maintainer 팀 (Cairn 정비)',
+    description:
+      'Cairn 자신을 최신으로 유지한다. 점검 담당이 매주(스케줄 레시피) CLI 새 버전 · 바뀐 점을 찾아 고칠 일을 지시문으로 내고, 정비 개발자가 코드 메뉴에서 맡은 일로 Cairn 저장소를 고쳐 PR을 올린다. 머지는 관리자',
+    needs: ['code-runner', 'code-github'],
+    members: [
+      {
+        key: 'check',
+        reports_to: null,
+        name: '점검 담당',
+        scopes: [Actor.READ_PUBLIC],
+        approval_actions: [],
+        role: [
+          'Cairn 정비 점검 담당 (maintainer, 셸 없음).',
+          '- 러너가 쓰는 AI CLI(@anthropic-ai/claude-code · @openai/codex)의 최신 버전을 read_url로 npm 레지스트리(https://registry.npmjs.org/<패키지>/latest)에서 읽고, 레시피의 지시에 적힌 지금 버전(작업 상세의 실행 기록에 보이는 CLI 버전)과 비교한다. 지시에 없으면 최신 버전과 바뀐 점만 정리한다.',
+          '- 새 버전이 있으면 바뀐 점(릴리스 노트)에서 출력 모양 · 설정 이름 · 인자가 바뀌었는지 찾아 근거 주소와 함께 정리한다.',
+          '- 고칠 일이 있으면 정비 개발자에게 그대로 맡길 수 있는 지시문을 답의 끝 "코드 맡기기" 단락에 적는다: 고칠 곳(docs/정비.md의 순서), 올릴 버전, 확인할 시험. 없으면 "고칠 일 없음".',
+          '- 코드는 고치지 않는다 (저장소가 없다). 지시문은 관리자가 코드 메뉴에서 정비 개발자에게 맡긴다.',
+        ].join('\n'),
+      },
+      {
+        key: 'dev',
+        reports_to: null,
+        name: '정비 개발자',
+        scopes: [Actor.CODE],
+        approval_actions: [],
+        role: [
+          'Cairn 정비 개발자 (maintainer, 코드 작업 · 샌드박스).',
+          '- Cairn 저장소의 docs/정비.md 순서를 따른다: CLI 고정 버전 올리기, 출력 견본 · 어댑터 계약 시험, 스킬과 도구 입력 모양 맞추기, 확장의 사이트 읽기.',
+          '- 검사(checks)를 통과시킨 뒤 PR을 올린다. 머지는 관리자가 한다.',
+        ].join('\n'),
+      },
+    ],
+  },
 ];
