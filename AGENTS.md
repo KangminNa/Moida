@@ -26,7 +26,7 @@ skills/        AI 도구와 러너의 스킬 (cairn-save · cairn-recall · cair
                AI에게 가는 지시문의 글은 코드가 아니라 cairn-runner의 틀(references/prompts.md)에 둔다 (러너 PromptPack · 서버 PromptTemplates가 채운다)
                러너 스킬은 저장소 판이고, 콘솔(스킬 메뉴)에서 그 위에 판을 쌓으면 서버가 일과 함께 그 판을 보낸다
                앱(ChatGPT·Claude)용 zip은 서버가 여기서 만든다(api/skills). 스크립트 테스트는 packages/cli
-docs/          기획 문서 (기획서 · 서브 나 · 테이블 설계 · 객체 설계 · API 설계 · 보관 형식 · 브라우저 · 코드 작업 · wiki 점수 · 정비)
+docs/          기획 문서 (기획서 · 서브 나 · 테이블 설계 · 객체 설계 · API 설계 · 보관 형식 · 브라우저 · 코드 작업 · MCP · wiki 점수 · 정비)
 ```
 
 ## 명령어
