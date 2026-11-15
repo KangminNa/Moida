@@ -96,6 +96,7 @@ class Cairn {
     const [row] = await this.sql`
       SELECT (SELECT count(*) FROM vault.nodes) + (SELECT count(*) FROM vault.edges)
            + (SELECT count(*) FROM vault.session_revisions) + (SELECT count(*) FROM vault.wiki_revisions)
+           + (SELECT count(*) FROM vault.session_transcripts)
            + (SELECT count(*) FROM vault.post_marks) + (SELECT count(*) FROM blog.posts)
            + (SELECT count(*) FROM blog.post_revisions) + (SELECT count(*) FROM blog.assets)
            + (SELECT count(*) FROM blog.post_wiki_refs) AS n`;
@@ -184,6 +185,10 @@ class Cairn {
 class Seed {
   session = '';
   tricky = '';
+  /** 원문만 있고 노트가 아직 없는 세션 */
+  noteless = '';
+  /** 원문 둘에 노트가 있는 세션 */
+  transcripted = '';
   openWiki = '';
   privateWiki = '';
   aiWiki = '';
@@ -283,6 +288,26 @@ async function fill(c: Cairn): Promise<void> {
   await save({ project: '같은 곳', title: '같은 제목', did: '하나' });
   await save({ project: '같은 곳', title: '같은 제목', did: '둘' });
   const dangling = await save({ title: '지운 wiki의 세션', did: '대표가 휴지통에 간다' });
+  const transcript = async (conversation: string, text: string, more: Json = {}) => {
+    const saved = await c.tool(device, 'save_transcript', {
+      request_id: randomUUID(),
+      source_session_id: conversation,
+      tool: 'claude-code',
+      started_at: '2026-11-01T08:00:00.000Z',
+      text,
+      ...more,
+    });
+    return String(saved.session_id);
+  };
+  seed.noteless = await transcript(
+    `conv-${randomUUID()}`,
+    '사람: 원문만 있는 대화\n\nAI: ---\n\n## 한 일\n\n원문 안의 소제목',
+  );
+  const both = `conv-${randomUUID()}`;
+  seed.transcripted = await transcript(both, '사람: 첫 원문', { title: '원문과 노트' });
+  await transcript(both, '사람: 첫 원문\r\nAI: 더 길어진 원문 😀');
+  await save({ source_session_id: both, title: '원문과 노트', did: '원문 둘에 노트 하나' });
+  await c.sql`UPDATE vault.sessions SET noted_seq = 2 WHERE node_id = ${seed.transcripted}`;
   await c.sql`UPDATE vault.sessions SET visibility = 'public' WHERE node_id = ${seed.tricky}`;
 
   await c.submit(tidy, [
@@ -423,13 +448,14 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
       [
         ['카테고리', 2],
         ['wiki', 4],
-        ['세션', 5],
+        ['세션', 7],
+        ['원문', 3],
         ['선', 3],
         ['글', 4],
         ['사진', 3],
       ],
     );
-    assert.match(report.summary, /세션 5개 · 선 3개 · 글 4개 · 사진 3개/);
+    assert.match(report.summary, /세션 7개 · 원문 3개 · 선 3개 · 글 4개 · 사진 3개/);
     assert.equal(await target.rows(), 0);
     const [row] = await target.sql`SELECT count(*)::int AS n FROM platform.blobs`;
     assert.equal(row?.n, 0);
@@ -505,6 +531,45 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     );
   });
 
+  test('원문이 세션 · 번호 · 내용과 맞지 않으면 어느 파일인지 알려 주고 멈춘다', async () => {
+    const first = `vault/transcripts/${seed.transcripted}/1.md`;
+    const second = `vault/transcripts/${seed.transcripted}/2.md`;
+    const body = (text: string) => (t: string) =>
+      t.replace(/\n---\n\n[\s\S]*$/, `\n---\n\n${text}`);
+    await refuses(
+      swap(exported, first, (t) => t.replace(seed.transcripted, randomUUID())),
+      /1\.md: 없는 세션의 원문이에요/,
+    );
+    await refuses(
+      exported.filter((f) => f.path !== first),
+      /2\.md: 원문 번호가 1부터 이어지지 않아요 \(1번이 없어요\)/,
+    );
+    await refuses(
+      swap(exported, second, body('사람: 첫 원문')),
+      /2\.md: 같은 내용의 원문이 이미 있어요/,
+    );
+    await refuses(swap(exported, first, body('')), /1\.md: 원문은 1~1,000,000자예요/);
+    await refuses(swap(exported, first, body('가'.repeat(1_000_001))), /원문은 1~1,000,000자예요/);
+    await refuses(
+      swap(exported, first, (t) => t.replace('seq: 1', 'seq: 0')),
+      /seq는 1 이상의 정수/,
+    );
+    await refuses(
+      swap(exported, first, withUnknownKeys),
+      /모르는 앞부분 키를 둘 수 없어요: my_note, aliases/,
+    );
+    await refuses(
+      swap(exported, pathOf(exported, seed.noteless), (t) => `${t}## 한 일\n\n손으로 씀\n`),
+      /노트 없는 세션\(cairn_note: false\)인데 본문 · 태그가 있어요/,
+    );
+    await refuses(
+      swap(exported, pathOf(exported, seed.transcripted), (t) =>
+        t.replace('cairn_noted_seq: 2', 'cairn_noted_seq: 3'),
+      ),
+      /노트를 쓴 원문\(3번\)이 없어요/,
+    );
+  });
+
   test('사진 내용이 이름의 해시와 다르면 멈추고, 사진이 아닌 파일은 들어오지 못한다', async () => {
     const path = `assets/${sha256(seed.openPhoto)}.png`;
     await refuses(
@@ -574,7 +639,8 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
   });
 
   test('결과를 알린다', () => {
-    assert.equal(report.counts.get('세션'), 5);
+    assert.equal(report.counts.get('세션'), 7);
+    assert.equal(report.counts.get('원문'), 3);
     assert.deepEqual(report.notes, []);
   });
 
@@ -590,7 +656,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
       SELECT s.revision_count, s.head_revision_id, r.id, r.seq, r.kind, r.parent_ids, r.actor_type,
              s.version, s.tidy_requested_seq
       FROM vault.sessions s JOIN vault.session_revisions r ON r.session_id = s.node_id`;
-    assert.equal(heads.length, 5);
+    assert.equal(heads.length, 6, '노트 없는 세션은 판이 없다');
     for (const h of heads) {
       assert.equal(h.head_revision_id, h.id);
       assert.deepEqual(
@@ -628,6 +694,42 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
       SELECT id, slug, status, title, excerpt, head_text, tags, align, main_wiki_id, published_at
       FROM blog.posts WHERE deleted_at IS NULL ORDER BY id`;
     assert.deepEqual([...(await posts(target))], [...(await posts(source))]);
+  });
+
+  test('원문과 노트 없는 세션이 돌아온다 (번호 · 내용 · 해시 · 시각, 노트를 쓴 원문 번호)', async () => {
+    const texts = (c: Cairn) => c.sql`
+      SELECT id, session_id, seq, text, content_hash, created_at
+      FROM vault.session_transcripts ORDER BY session_id, seq`;
+    const restored = [...(await texts(target))];
+    assert.equal(restored.length, 3);
+    assert.deepEqual(restored, [...(await texts(source))]);
+    const [by] = await target.sql`
+      SELECT array_agg(DISTINCT actor_type) AS kinds, bool_and(redactions IS NULL) AS clean
+      FROM vault.session_transcripts`;
+    assert.deepEqual([by?.kinds, by?.clean], [['system'], true]);
+    const sessions = async (c: Cairn) =>
+      (
+        await c.sql`
+          SELECT node_id, head_title, head_revision_id IS NULL AS noteless, revision_count,
+                 transcript_count, noted_seq
+          FROM vault.sessions ORDER BY node_id`
+      ).filter((r) => [seed.noteless, seed.transcripted].includes(String(r.node_id)));
+    const back = await sessions(target);
+    assert.deepEqual(back, await sessions(source));
+    assert.deepEqual(
+      back.map((r) => [
+        r.node_id,
+        r.head_title,
+        r.noteless,
+        r.revision_count,
+        r.transcript_count,
+        r.noted_seq,
+      ]),
+      [
+        [seed.noteless, null, true, 0, 1, 0],
+        [seed.transcripted, '원문과 노트', false, 1, 2, 2],
+      ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    );
   });
 
   test('칸 소제목이 글에 든 세션도 본문은 그대로다', async () => {
@@ -710,7 +812,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     const before = await target.rows();
     await assert.rejects(
       target.restores.preview(system, exported),
-      /빈 Cairn에만 복원할 수 있어요. 지금 카테고리 2개 · wiki 4개 · 세션 5개 · 글 4개가 있어요/,
+      /빈 Cairn에만 복원할 수 있어요. 지금 카테고리 2개 · wiki 4개 · 세션 7개 · 글 4개가 있어요/,
     );
     await assert.rejects(target.restore(exported), /빈 Cairn에만/);
     assert.equal(await target.rows(), before);
@@ -951,7 +1053,7 @@ describe('cairn-admin restore (표준 입력의 zip)', () => {
     const zip = zipOf(exported);
     const preview = admin(cairn, [], zip);
     assert.equal(preview.status, 0, preview.stderr);
-    assert.match(preview.stdout, /들어올 내용: .*세션 5개 · 선 3개 · 글 4개 · 사진 3개/);
+    assert.match(preview.stdout, /들어올 내용: .*세션 7개 · 원문 3개 · 선 3개 · 글 4개 · 사진 3개/);
     assert.match(preview.stdout, /--apply/);
     assert.equal(await cairn.rows(), 0);
 
@@ -1023,7 +1125,7 @@ describe('sync-github: 저장소에서 복원', () => {
 
     const preview = ok(await run(cairn, 'restore-preview'));
     assert.equal(preview.ok, true, preview.message as string);
-    assert.match(String(preview.message), /세션 5개 · 선 3개 · 글 4개 · 사진 3개/);
+    assert.match(String(preview.message), /세션 7개 · 원문 3개 · 선 3개 · 글 4개 · 사진 3개/);
     assert.equal(await cairn.rows(), 0);
 
     const restored = ok(await run(cairn, 'restore'));

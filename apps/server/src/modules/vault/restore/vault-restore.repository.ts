@@ -5,9 +5,10 @@ import type {
   RestoredEdge,
   RestoredPin,
   RestoredPostMark,
-  RestoredSession,
   RestoredWiki,
 } from './restored-items';
+import type { RestoredSession } from './restored-session';
+import type { RestoredTranscript } from './restored-transcript';
 
 // 복원의 vault 쓰기. 여러 데이터 묶음을 새 행으로만 넣는다 (복원은 빈 곳에만 하므로 불러오지 않는다).
 // 칸은 Restored… 항목이 정한다. outbox에는 남기지 않는다.
@@ -34,10 +35,20 @@ export class VaultRestoreRepository {
   }
 
   /** wikiId: 대표 wiki 중 복원되는 것. 파일의 값과 다를 수 있다 */
-  async saveSession(spaceId: string, s: RestoredSession, wikiId: string | null): Promise<void> {
+  /** 세션과 그 첫 판(노트가 있을 때만), 원문. 원문은 하나씩 넣는다: 한 줄이 1,000,000자까지라 묶으면 문장이 커진다 */
+  async saveSession(
+    spaceId: string,
+    s: RestoredSession,
+    wikiId: string | null,
+    transcripts: readonly RestoredTranscript[],
+  ): Promise<void> {
     await this.tx`INSERT INTO vault.nodes ${this.tx(s.nodeIn(spaceId) as never)}`;
-    await this.tx`INSERT INTO vault.sessions ${this.tx(s.rowIn(spaceId, wikiId) as never)}`;
-    await this.tx`INSERT INTO vault.session_revisions ${this.tx(s.revision as never)}`;
+    await this
+      .tx`INSERT INTO vault.sessions ${this.tx(s.rowIn(spaceId, wikiId, transcripts) as never)}`;
+    if (s.revision)
+      await this.tx`INSERT INTO vault.session_revisions ${this.tx(s.revision as never)}`;
+    for (const t of transcripts)
+      await this.tx`INSERT INTO vault.session_transcripts ${this.tx(t.row() as never)}`;
   }
 
   async saveEdge(spaceId: string, e: RestoredEdge): Promise<void> {

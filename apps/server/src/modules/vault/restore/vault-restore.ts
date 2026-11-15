@@ -11,12 +11,13 @@ import {
   RestoredEdge,
   RestoredPin,
   RestoredPostMark,
-  RestoredSession,
   RestoredWiki,
 } from './restored-items';
+import { RestoredSession } from './restored-session';
+import { RestoredTranscript } from './restored-transcript';
 import { VaultRestoreRepository } from './vault-restore.repository';
 
-// 복원에서 vault의 몫: 카테고리, wiki, 세션, 선, 고정한 점 위치, 글 자리 사본.
+// 복원에서 vault의 몫: 카테고리, wiki, 세션과 그 원문, 선, 고정한 점 위치, 글 자리 사본.
 // 이벤트를 남기지 않는다: 정리 요청과 일 요청이 생기지 않고, 일꾼이 할 일도 없다.
 // 공개 저장소에서 받은 묶음에는 vault 파일이 없다. 그때는 빈 채로 넘어가고 글 자리만 채운다.
 export class VaultRestore extends ArchivePart {
@@ -24,12 +25,15 @@ export class VaultRestore extends ArchivePart {
   private static readonly GRAPH = 'vault/graph.json';
   private static readonly WIKI = /^vault\/wikis\/[^/]+\.md$/;
   private static readonly SESSION = /^vault\/sessions\/.+\.md$/;
+  private static readonly TRANSCRIPT = /^vault\/transcripts\/.+\.md$/;
   private static readonly POST = /^blog\/posts\/.+\.md$/;
 
   private constructor(
     private readonly categories: readonly RestoredCategory[],
     private readonly wikis: readonly RestoredWiki[],
     private readonly sessions: readonly RestoredSession[],
+    /** 세션 id → 그 세션의 원문 (번호 순) */
+    private readonly transcripts: ReadonlyMap<string, readonly RestoredTranscript[]>,
     private readonly edges: readonly RestoredEdge[],
     private readonly pins: readonly RestoredPin[],
     private readonly marks: readonly RestoredPostMark[],
@@ -42,6 +46,7 @@ export class VaultRestore extends ArchivePart {
     const categories: RestoredCategory[] = [];
     const wikis: RestoredWiki[] = [];
     const sessions: RestoredSession[] = [];
+    const transcripts: RestoredTranscript[] = [];
     const marks: RestoredPostMark[] = [];
     let graph: ArchiveFile | null = null;
     for (const file of files) {
@@ -59,11 +64,15 @@ export class VaultRestore extends ArchivePart {
         sessions.push(
           RestoredSession.read(VaultRestore.document(file, 'session', ArchiveQuery.FORMAT)),
         );
+      } else if (VaultRestore.TRANSCRIPT.test(file.path)) {
+        transcripts.push(
+          RestoredTranscript.read(VaultRestore.document(file, 'transcript', ArchiveQuery.FORMAT)),
+        );
       } else if (file.path.startsWith('vault/')) {
         throw new RuleViolation(`모르는 파일이에요: ${file.path}`);
       }
     }
-    return VaultRestore.checked(categories, wikis, sessions, graph, marks);
+    return VaultRestore.checked(categories, wikis, sessions, transcripts, graph, marks);
   }
 
   /** 서로 가리키는 것을 맞춰 본다. 휴지통의 wiki·점을 가리키는 값은 옛 백업에 남아 있을 수 있어 멈추지 않고 뺀다 */
@@ -71,6 +80,7 @@ export class VaultRestore extends ArchivePart {
     categories: readonly RestoredCategory[],
     wikis: readonly RestoredWiki[],
     sessions: readonly RestoredSession[],
+    transcripts: readonly RestoredTranscript[],
     graph: ArchiveFile | null,
     marks: readonly RestoredPostMark[],
   ): VaultRestore {
@@ -109,7 +119,46 @@ export class VaultRestore extends ArchivePart {
         ? [`대표 wiki가 없는 세션 ${orphans.length}개는 도착 구역으로 가요`]
         : []),
     ];
-    return new VaultRestore(categories, wikis, sessions, edges, pins, marks, findings);
+    const bySession = VaultRestore.transcriptsOf(sessions, transcripts);
+    return new VaultRestore(categories, wikis, sessions, bySession, edges, pins, marks, findings);
+  }
+
+  /**
+   * 원문을 세션별로 모으고 맞춰 본다: 들어오는 세션의 원문이어야 하고, 세션 안에서 번호가 1부터 이어지고 내용이 겹치지 않는다
+   * (DB의 UNIQUE에 걸리기 전에 어느 파일인지 알린다). 빠진 번호 · 노트를 쓴 원문이 없으면 파일을 잃은 묶음이라 멈춘다
+   */
+  private static transcriptsOf(
+    sessions: readonly RestoredSession[],
+    transcripts: readonly RestoredTranscript[],
+  ): ReadonlyMap<string, readonly RestoredTranscript[]> {
+    VaultRestore.assertUnique(
+      transcripts.map((t) => t.id),
+      '원문 id',
+    );
+    const grouped = new Map<string, RestoredTranscript[]>(sessions.map((s) => [s.id, []]));
+    for (const t of transcripts) {
+      const list = grouped.get(t.sessionId);
+      if (!list) throw new RuleViolation(`${t.path}: 없는 세션의 원문이에요: ${t.sessionId}`);
+      list.push(t);
+    }
+    for (const session of sessions) {
+      const list = (grouped.get(session.id) ?? []).sort((a, b) => a.seq - b.seq);
+      const hashes = new Set<string>();
+      list.forEach((t, i) => {
+        if (t.seq !== i + 1)
+          throw new RuleViolation(
+            `${t.path}: 원문 번호가 1부터 이어지지 않아요 (${i + 1}번이 없어요)`,
+          );
+        if (hashes.has(t.hash))
+          throw new RuleViolation(`${t.path}: 같은 내용의 원문이 이미 있어요`);
+        hashes.add(t.hash);
+      });
+      if (session.notedSeq > list.length)
+        throw new RuleViolation(
+          `세션 ${session.id}: 노트를 쓴 원문(${session.notedSeq}번)이 없어요`,
+        );
+    }
+    return grouped;
   }
 
   private static readGraph(
@@ -136,6 +185,7 @@ export class VaultRestore extends ArchivePart {
       ['카테고리', this.categories.length],
       ['wiki', this.wikis.length],
       ['세션', this.sessions.length],
+      ['원문', [...this.transcripts.values()].reduce((sum, list) => sum + list.length, 0)],
       ['선', this.edges.length],
     ]);
   }
@@ -160,7 +210,8 @@ export class VaultRestore extends ArchivePart {
     for (const wiki of this.wikis) await repository.saveWiki(spaceId, wiki);
     for (const session of this.sessions) {
       const live = session.wikiId !== null && wikiIds.has(session.wikiId);
-      await repository.saveSession(spaceId, session, live ? session.wikiId : null);
+      const transcripts = this.transcripts.get(session.id) ?? [];
+      await repository.saveSession(spaceId, session, live ? session.wikiId : null, transcripts);
     }
     for (const edge of this.edges) await repository.saveEdge(spaceId, edge);
     for (const mark of this.marks) {

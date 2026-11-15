@@ -9,6 +9,7 @@ import type {
   NodeLayoutRow,
   SessionRevisionRow,
   SessionRow,
+  SessionTranscriptRow,
   WikiRevisionRow,
   WikiRow,
 } from './vault.tables';
@@ -28,35 +29,46 @@ interface ArchivedWiki
     >,
     Pick<WikiRevisionRow, 'body_md'> {}
 
-/** 보관 파일로 쓰는 세션 한 줄: 세션의 칸 일부, 살아 있는 대표 wiki, 지금 판의 본문과 노트 */
+/** 보관 파일로 쓰는 세션 한 줄: 세션의 칸 일부, 살아 있는 대표 wiki, 지금 판의 본문과 노트 (노트가 없으면 null) */
 interface ArchivedSession
   extends Pick<
-      SessionRow,
-      | 'node_id'
-      | 'head_title'
-      | 'visibility'
-      | 'tool'
-      | 'project'
-      | 'wiki_id'
-      | 'started_at'
-      | 'last_revision_at'
-      | 'pinned_sections'
-      | 'meta'
-    >,
-    Pick<SessionRevisionRow, 'body_md' | 'sections'> {}
+    SessionRow,
+    | 'node_id'
+    | 'head_title'
+    | 'head_revision_id'
+    | 'noted_seq'
+    | 'visibility'
+    | 'tool'
+    | 'project'
+    | 'wiki_id'
+    | 'started_at'
+    | 'last_revision_at'
+    | 'pinned_sections'
+    | 'meta'
+  > {
+  body_md: SessionRevisionRow['body_md'] | null;
+  sections: SessionRevisionRow['sections'] | null;
+}
+
+/** 보관 파일로 쓰는 세션 원문 한 줄. 지운 민감정보 표시 · 올린 기기는 넣지 않는다 (해시는 복원 때 다시 계산) */
+interface ArchivedTranscript
+  extends Pick<SessionTranscriptRow, 'id' | 'session_id' | 'seq' | 'text' | 'created_at'> {}
 
 /** 보관 파일로 쓰는 고정한 점 위치 하나: 보기의 이름과 점 */
 interface ArchivedPin extends Pick<NodeLayoutRow, 'node_id' | 'x' | 'y'> {
   view: GraphViewRow['name'];
 }
 
-// vault의 보관 파일 (docs/보관형식.md): 카테고리, wiki, 세션, 선. 현재 판만 파일이 되고 지난 판은 git 이력으로 본다.
+// vault의 보관 파일 (docs/보관형식.md): 카테고리, wiki, 세션, 세션 원문, 선. 현재 판만 파일이 되고 지난 판은 git 이력으로 본다.
+// 노트가 아직 없는 세션도 파일이 된다 (`cairn_note: false`, 본문 없음). 원문은 추가만 하는 표라 경로를 세션 id로 둬서 바뀌지 않는다.
 // 검색 조각·임베딩·스냅샷은 다시 계산되는 값이라 뺀다. 첨부(assets/)는 파일 저장소가 생긴 뒤에 더한다.
 // 세션의 `device`(기기 이름)는 account 모듈의 것이라 넣지 않는다 (앞부분의 "있으면" 칸).
 @Injectable()
 export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
   /** 프로젝트가 없는 세션의 폴더 */
   private static readonly NO_PROJECT = 'no-project';
+  /** 세션 원문의 폴더: vault/transcripts/<세션 id>/<번호>.md */
+  private static readonly TRANSCRIPTS = 'vault/transcripts';
 
   constructor(
     db: Database,
@@ -75,6 +87,7 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
       await this.categories(actor),
       ...(await this.wikis(actor)),
       ...(await this.sessions(actor)),
+      ...(await this.transcripts(actor)),
       await this.graph(actor),
     ];
   }
@@ -130,11 +143,11 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
 
   private async sessions(actor: Actor): Promise<ArchiveFile[]> {
     const rows = await this.sql<ArchivedSession[]>`
-      SELECT s.node_id, s.head_title, s.visibility, s.tool, s.project, live.id AS wiki_id, s.started_at,
-             s.last_revision_at, s.pinned_sections, s.meta, r.body_md, r.sections
+      SELECT s.node_id, s.head_title, s.head_revision_id, s.noted_seq, s.visibility, s.tool, s.project,
+             live.id AS wiki_id, s.started_at, s.last_revision_at, s.pinned_sections, s.meta, r.body_md, r.sections
       FROM vault.sessions s
       JOIN vault.nodes n ON n.id = s.node_id
-      JOIN vault.session_revisions r ON r.id = s.head_revision_id
+      LEFT JOIN vault.session_revisions r ON r.id = s.head_revision_id
       LEFT JOIN vault.nodes live ON live.id = s.wiki_id AND live.deleted_at IS NULL
       WHERE ${this.inSpace(actor, 's')} AND n.deleted_at IS NULL
       ORDER BY s.node_id`;
@@ -147,6 +160,7 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
       const name = used.has(wanted) ? SlugPolicy.numbered(wanted, used) : wanted;
       used.add(name);
       const tags = ((r.sections as Record<string, unknown> | null)?.tags ?? []) as string[];
+      const noted = r.head_revision_id !== null;
       return ArchiveFile.markdown(
         `vault/sessions/${name}.md`,
         {
@@ -161,11 +175,38 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
           ...(r.project === null ? {} : { project: r.project }),
           ...(tags.length === 0 ? {} : { tags }),
           cairn_pinned: r.pinned_sections,
+          ...(noted ? {} : { cairn_note: false }),
+          ...(r.noted_seq > 0 ? { cairn_noted_seq: r.noted_seq } : {}),
         },
-        r.body_md,
+        r.body_md ?? '',
         ArchiveFile.keptIn(r.meta),
       );
     });
+  }
+
+  /** 휴지통에 가지 않은 세션의 원문. 쌓인 그대로 (민감정보는 쌓기 전에 지웠다) */
+  private async transcripts(actor: Actor): Promise<ArchiveFile[]> {
+    const rows = await this.sql<ArchivedTranscript[]>`
+      SELECT t.id, t.session_id, t.seq, t.text, t.created_at
+      FROM vault.session_transcripts t
+      JOIN vault.sessions s ON s.node_id = t.session_id
+      JOIN vault.nodes n ON n.id = s.node_id
+      WHERE ${this.inSpace(actor, 's')} AND n.deleted_at IS NULL
+      ORDER BY t.session_id, t.seq`;
+    return rows.map((r) =>
+      ArchiveFile.markdown(
+        `${VaultArchiveQuery.TRANSCRIPTS}/${r.session_id}/${r.seq}.md`,
+        {
+          cairn_format: ArchiveQuery.FORMAT,
+          cairn_type: 'transcript',
+          cairn_id: r.id,
+          cairn_session: r.session_id,
+          seq: r.seq,
+          created: r.created_at,
+        },
+        r.text,
+      ),
+    );
   }
 
   /**

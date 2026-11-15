@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { inflateRawSync } from 'node:zlib';
 import { ApiClient, type ApiResult, TestUser } from '../../testing/api-client';
-import { ArchiveFile, ArchiveQuery, SystemActor } from '../platform';
+import { ArchiveFile, ArchiveQuery, Database, SystemActor } from '../platform';
 
 // 보관 형식 내보내기 (docs/보관형식.md). zip을 실제로 열어 경로와 내용을 보고, 비밀값이 없는지 확인한다.
 
@@ -15,6 +15,8 @@ let device: string;
 let tidy: string;
 let files: Map<string, string>;
 let session: string;
+/** 원문만 있고 노트가 아직 없는 세션 */
+let noteless: string;
 let wiki: Json;
 let category: Json;
 let post: Json;
@@ -52,6 +54,18 @@ async function tool(token: string, name: string, args: Json): Promise<Json> {
   const result = res.json().result as { isError?: boolean; structuredContent?: Json };
   assert.notEqual(result.isError, true, res.text);
   return result.structuredContent ?? {};
+}
+
+/** 원문을 올린다 (수집 훅 · 확장의 길). 노트는 아직 없다 */
+async function transcript(text: string): Promise<string> {
+  const saved = await tool(device, 'save_transcript', {
+    request_id: randomUUID(),
+    source_session_id: `conv-${randomUUID()}`,
+    tool: 'claude-code',
+    started_at: '2026-11-01T08:00:00.000Z',
+    text,
+  });
+  return String(saved.session_id);
 }
 
 const fileWith = (id: unknown): string =>
@@ -110,6 +124,7 @@ before(async () => {
     started_at: '2026-10-31T09:40:00.000Z',
   });
   session = String(saved.session_id);
+  noteless = await transcript(`사람: 원문 ${leaked}\n\nAI: ## 한 일\n원문 안의 소제목`);
   await tool(tidy, 'submit_changes', {
     request_id: randomUUID(),
     message: '대표와 선',
@@ -152,7 +167,7 @@ describe('보관 형식 내보내기', () => {
     for (const path of files.keys())
       assert.match(
         path,
-        /^(cairn\.json|vault\/categories\.yml|vault\/graph\.json|vault\/wikis\/[^/]+\.md|vault\/sessions\/[^/]+\/\d{4}-\d{2}-\d{2}-[^/]+\.md|blog\/posts\/\d{4}\/[^/]+\.md)$/,
+        /^(cairn\.json|vault\/categories\.yml|vault\/graph\.json|vault\/wikis\/[^/]+\.md|vault\/sessions\/[^/]+\/\d{4}-\d{2}-\d{2}-[^/]+\.md|vault\/transcripts\/[0-9a-f-]{36}\/[1-9]\d*\.md|blog\/posts\/\d{4}\/[^/]+\.md)$/,
         path,
       );
     assert.ok(files.has('vault/categories.yml'));
@@ -180,6 +195,30 @@ describe('보관 형식 내보내기', () => {
     assert.match(text, new RegExp(`cairn_wiki: "?${wiki.id}"?\\n`));
     assert.match(text, /tags: \[백업, 보관\]\n/);
     assert.match(text, /## 한 일\n/);
+  });
+
+  test('노트 없는 세션: cairn_note: false, 본문 없음. 원문은 세션 id 폴더의 번호 파일에 그대로', () => {
+    const path = [...files.keys()].find(
+      (p) => p.startsWith('vault/sessions/') && (files.get(p) ?? '').includes(noteless),
+    );
+    // 같은 날 제목 없는 세션이 다른 시험에도 있으면 뒤에 번호가 붙는다
+    assert.match(String(path), /^vault\/sessions\/no-project\/2026-11-01-session[^/]*\.md$/);
+    const text = files.get(String(path)) ?? '';
+    assert.match(text, /title: null\n/);
+    assert.match(text, /cairn_note: false\n/);
+    assert.equal(text.includes('cairn_noted_seq'), false);
+    assert.ok(text.endsWith('\n---\n\n'), '본문이 없다');
+
+    const kept = files.get(`vault/transcripts/${noteless}/1.md`) ?? '';
+    assert.match(kept, /^---\ncairn_format: 1\ncairn_type: transcript\n/);
+    assert.match(kept, new RegExp(`cairn_session: "?${noteless}"?\\n`));
+    assert.match(kept, /seq: 1\ncreated: "[^"]+"\n---\n\n사람: 원문 \[지움: GitHub 토큰\]/);
+    assert.ok(kept.endsWith('AI: ## 한 일\n원문 안의 소제목'), '쌓인 원문 그대로');
+    assert.equal(
+      [...files.keys()].some((p) => p.startsWith(`vault/transcripts/${session}/`)),
+      false,
+      '원문 없이 노트로 저장한 세션은 원문 파일이 없다',
+    );
   });
 
   test('글: 연도 폴더와 앞부분', () => {
@@ -242,9 +281,17 @@ describe('보관 형식 내보내기', () => {
       201,
     );
     ok(await api.request('DELETE', `/api/categories/${gone.id}`, owner, { version: 1 }));
+    const trashed = await transcript('사람: 휴지통에 갈 대화');
+    await api.service(Database)
+      .sql`UPDATE vault.nodes SET deleted_at = now() WHERE id = ${trashed}`;
     const res = await download(owner);
-    const text = unzip(Buffer.from(await res.arrayBuffer())).get('vault/categories.yml') ?? '';
-    assert.equal(text.includes(String(gone.id)), false);
+    const now = unzip(Buffer.from(await res.arrayBuffer()));
+    assert.equal((now.get('vault/categories.yml') ?? '').includes(String(gone.id)), false);
+    assert.equal(
+      [...now.entries()].some(([path, text]) => path.includes(trashed) || text.includes(trashed)),
+      false,
+      '휴지통 세션의 원문도 빠진다',
+    );
   });
 });
 
