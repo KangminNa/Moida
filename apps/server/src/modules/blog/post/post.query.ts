@@ -5,9 +5,9 @@ import {
   Database,
   LibraryInput,
   type LibraryRow,
+  Lookups,
   NotFound,
 } from '../../platform';
-import { PostWikiQuery } from '../../vault';
 import type { PostRow } from '../blog.tables';
 import { type LoadedPost, Post } from './post';
 import { ListPostsInput, type PostSlugInput, type ReadPostInput } from './post.input';
@@ -33,7 +33,7 @@ export class PostQuery extends BaseQuery {
 
   constructor(
     db: Database,
-    private readonly wikis: PostWikiQuery,
+    private readonly lookups: Lookups,
   ) {
     super(db);
   }
@@ -101,7 +101,7 @@ export class PostQuery extends BaseQuery {
     const refs = r.ref_wiki_ids ?? [];
     const seen = actor.canSeePrivate()
       ? null
-      : await this.wikis.visible(actor, [...(main === null ? [] : [main]), ...refs]);
+      : await this.lookups.visible('wiki', actor, [...(main === null ? [] : [main]), ...refs]);
     const shown = (id: string) => seen === null || seen.has(id);
     return new ToolPostView(
       r,

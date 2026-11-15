@@ -27,7 +27,7 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
   `TidyRequestHandler`(`vault.session.saved`)가 켜져 있으면 `task.task.requested`를 outbox로 남긴다. task를 import하지 않는다.
   요청한 판은 같은 트랜잭션에서 `sessions.tidy_requested_seq`에 적는다
   언제(`cadence`, 2차 7단계): save면 저장마다, daily(기본)면 `TidyRequestHandler`는 요청하지 않고 `TidyDailyJob`(마감 작업: 가장 이른 다음 차례에 깨고, 정리 설정을 저장하면 `TidySettingsRepository.save`가 깨운다)이 차례가 된 공간(`daily_at`에서 23시간)의 새 판이 쌓인 세션을 50개까지 요청하고 `daily_at`을 적는다 (`TidyService.daily`, 설정을 잠근 뒤 다시 본다)
-- `post-mark/`: 글 자리 사본(`PostMark`). `PostMarkHandler`(`blog.post.*`)만 쓴다. `PostWikiQuery`: 글이 가리킬 wiki를 볼 수 있는지 blog가 묻는 읽기
+- `post-mark/`: 글 자리 사본(`PostMark`). `PostMarkHandler`(`blog.post.*`)만 쓴다. `PostWikiQuery`: 글이 가리킬 wiki를 볼 수 있는지 blog가 묻는 읽기 (Lookups의 `wiki`로)
 - `graph/`: 그래프 읽기(`GraphQuery`). `api/graph`(주인), `api/graph/public`(방문자), MCP `neighbors`(`read_public`이나 `read_all`)
 - `vault-archive.query.ts`: 보관 형식 파일 (`ArchiveQuery.register`로 등록). 노트가 없는 세션도, 세션 원문도 나간다. `vault-archive.api.ts`: `api/archive.zip`(주인만). platform은 모듈 파일을 모르고, 이 경로의 자리가 다른 곳에 없어 여기 둔다
 - `restore/`: 복원의 vault 몫(`VaultRestore`, `ArchiveQuery.registerRestore`로 등록). 파일을 읽는 `RestoredCategory` · `RestoredWiki` · `RestoredSession`(노트 없는 세션 `cairn_note: false`는 판 없이) · `RestoredTranscript`(세션 원문, 모르는 앞부분 키는 보관할 칸이 없어 거절) · `RestoredEdge` · `RestoredPin` · `RestoredPostMark`, 새 행만 넣는 `VaultRestoreRepository`. 원문은 들어오는 세션을 가리키고 세션 안에서 번호가 1부터 이어지고 내용이 겹치지 않아야 한다 (`VaultRestore.transcriptsOf`). 세션의 `transcript_count`는 원문 수, `noted_seq`는 `cairn_noted_seq`
@@ -59,7 +59,7 @@ change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 - 지울 만한 wiki 알림 기록: stale_wikis (wiki 점수)
 
 ## 공개 API (`index.ts`)
-`VaultModule`, `VaultTools`(세션·wiki·그래프·변경 묶음 도구 목록, mcp 모듈이 모아서 연다), `SessionQuery`·`GetSessionInput`(blog의 소재가 세션을 확인할 때 읽음), `PostWikiQuery`(blog가 글에 이을 wiki를 확인할 때 읽음)
+`VaultModule`, `VaultTools`(세션·wiki·그래프·변경 묶음 도구 목록, mcp 모듈이 모아서 연다). 다른 모듈의 확인은 platform `Lookups`에 등록한다 (리팩토링 R3b): `wiki`(볼 수 있는 wiki의 id → 제목, `PostWikiQuery.visible`) · `session`(볼 수 있는 세션의 id → 노트 제목, `SessionQuery.titles`: 읽기 권한이 없으면 Forbidden)
 
 ## 내보내는 이벤트 / 받는 이벤트
 | 이벤트 | 내용 (모두 v1) |

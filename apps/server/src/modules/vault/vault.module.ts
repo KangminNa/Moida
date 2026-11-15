@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { CoreWorkers, LibraryQuery } from '../platform';
+import { CoreWorkers, LibraryQuery, Lookups } from '../platform';
 import { CategoryController } from './category/category.api';
 import { CategoryQuery } from './category/category.query';
 import { ChangeController } from './change/change.api';
@@ -95,7 +95,7 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
     GraphController,
     ArchiveController,
   ],
-  exports: [VaultTools, SessionQuery, PostWikiQuery],
+  exports: [VaultTools],
 })
 export class VaultModule implements OnModuleInit {
   constructor(
@@ -107,10 +107,15 @@ export class VaultModule implements OnModuleInit {
     private readonly library: LibraryQuery,
     private readonly sessions: SessionQuery,
     private readonly wikis: WikiQuery,
+    private readonly lookups: Lookups,
+    private readonly postWikis: PostWikiQuery,
   ) {}
 
   onModuleInit(): void {
     this.workers.on('vault.session.saved', this.tidy);
+    // 모듈 사이 읽기 (리팩토링 R3b): blog가 글의 wiki · 스크랩의 세션을 vault를 가져오지 않고 확인한다
+    this.lookups.provide('wiki', (a, ids) => this.postWikis.visible(a, ids));
+    this.lookups.provide('session', (a, ids) => this.sessions.titles(a, ids));
     // 보관함 (2차 5단계): 세션 · 위키
     this.library.register([SessionQuery.LIBRARY_KIND], (a, f) => this.sessions.library(a, f));
     this.library.register([WikiQuery.LIBRARY_KIND], (a, f) => this.wikis.library(a, f));

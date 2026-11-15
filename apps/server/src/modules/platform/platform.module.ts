@@ -11,6 +11,7 @@ import { SecretRotation } from './base/secret-rotation';
 import { SensitivePolicy } from './base/sensitive-policy';
 import { ActionChecks } from './directory/action-checks';
 import { AgentDirectory } from './directory/agent-directory';
+import { Lookups } from './directory/lookups';
 import { FailedEvent } from './failed-event/failed-event';
 import { FailedEventController } from './failed-event/failed-event.api';
 import { FailedEventQuery } from './failed-event/failed-event.query';
@@ -87,6 +88,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveRestoreService,
     LibraryQuery,
     AgentDirectory,
+    Lookups,
     ActionChecks,
     SettingKinds,
     PlatformSettings,
@@ -133,6 +135,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveRestoreService,
     LibraryQuery,
     AgentDirectory,
+    Lookups,
     ActionChecks,
     SettingKinds,
     ChangeStream,

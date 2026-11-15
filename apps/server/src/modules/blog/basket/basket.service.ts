@@ -4,10 +4,11 @@ import {
   BaseService,
   Database,
   Idempotency,
+  Lookups,
+  NotFound,
   RuleViolation,
   SensitivePolicy,
 } from '../../platform';
-import { GetSessionInput, SessionQuery } from '../../vault';
 import { ReadPostInput } from '../post/post.input';
 import { PostQuery } from '../post/post.query';
 import { BasketItem } from './basket';
@@ -16,7 +17,7 @@ import { BasketRepository } from './basket.repository';
 import type { KeptPageView } from './basket.view';
 
 // 소재 담기·지우기. 주인만. 세션·글은 볼 수 있는 것만 담는다. 브라우저 확장(upload 기기)은 페이지 보관만 (keep_page).
-// vault는 Query로만 읽고, 트랜잭션을 열기 전에 읽는다 (vault와 한 트랜잭션에 묶지 않는다).
+// 세션은 vault를 가져오지 않고 platform Lookups의 'session'으로 확인하고(리팩토링 R3b), 트랜잭션을 열기 전에 읽는다 (vault와 한 트랜잭션에 묶지 않는다).
 @Injectable()
 export class BasketService extends BaseService {
   private static readonly ADD = 'add_basket_item';
@@ -26,7 +27,7 @@ export class BasketService extends BaseService {
 
   constructor(
     db: Database,
-    private readonly sessions: SessionQuery,
+    private readonly lookups: Lookups,
     private readonly posts: PostQuery,
     private readonly sensitive: SensitivePolicy,
   ) {
@@ -91,8 +92,10 @@ export class BasketService extends BaseService {
   private async titleOf(actor: Actor, req: AddBasketItemInput): Promise<string | null> {
     const { kind, ref_id: refId } = req.fields;
     if (kind === BasketItem.SESSION) {
-      const session = GetSessionInput.from({ session_id: refId });
-      return (await this.sessions.note(actor, session)).summary.title;
+      const id = refId ?? '';
+      const title = (await this.lookups.visible('session', actor, [id])).get(id);
+      if (title === undefined) throw new NotFound('세션을 찾을 수 없어요');
+      return title;
     }
     if (kind === BasketItem.POST)
       return (await this.posts.editable(actor, ReadPostInput.from(refId ?? ''))).title;

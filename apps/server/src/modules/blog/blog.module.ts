@@ -1,6 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { ActionChecks, BlobStore, CoreWorkers, LibraryQuery } from '../platform';
-import { VaultModule } from '../vault';
 import { AssetController, FileController } from './asset/asset.api';
 import { AssetQuery } from './asset/asset.query';
 import { AssetService } from './asset/asset.service';
@@ -36,7 +35,6 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
 // 방문자가 읽는 블로그와 글을 쓰는 재료: 글(쓰기·고치기·공개 범위·휴지통), 사진, 소재, AI 도구의 초안.
 // vault는 소재의 세션을 확인할 때 Query로만 읽는다. 주인이 결재한 공개는 이벤트로 받아 실행한다 (task를 부르지 않는다).
 @Module({
-  imports: [VaultModule],
   providers: [
     BlogNotices,
     BlogSettings,

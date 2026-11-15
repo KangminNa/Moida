@@ -10,6 +10,8 @@
 //   4. SQL(sql`…`, tx`…`)은 자기 모듈이 소유한 스키마만 쓴다
 //   5. 플러그인(plugins/<이름>/)은 자기 폴더 안의 파일, react(화면), node:*·apps/server/src/plugin-api(서버)만 가져온다
 //   6. 모듈의 <이름>.view.ts는 표 인터페이스(<모듈>.tables.ts)의 타입만 가져온다 (웹이 import type으로 가져오는 파일)
+//   7. 모듈 사이 읽기(platform Lookups, 리팩토링 R3b): 코드의 lookups.provide('종류') · lookups.visible|assertVisible('종류')가
+//      modules.json의 lookups.provides · asks와 같고, 묻는 종류는 어느 모듈이든 준다 (한 종류는 한 모듈만 준다)
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -35,6 +37,8 @@ const allSchemas = [
   ...packageSchemas.values(),
 ];
 const problems = [];
+/** 코드에서 찾은 모듈 사이 읽기: 모듈 → { provides, asks } */
+const lookupsFound = new Map();
 
 if (process.argv.includes('--db')) checkDatabase();
 else checkCode();
@@ -53,8 +57,42 @@ function checkCode() {
     for (const { spec, line } of imports(text)) checkImport(file, owner, spec, line);
     if (owner) checkSql(file, owner, text);
     if (owner && file.endsWith('.view.ts')) checkView(file, text);
+    if (owner) noteLookups(owner, text);
   }
   checkPlugins();
+  checkLookups();
+}
+
+function noteLookups(owner, text) {
+  const found = lookupsFound.get(owner) ?? { provides: new Set(), asks: new Set() };
+  for (const m of text.matchAll(/lookups\.provide\(\s*'([\w.-]+)'/g)) found.provides.add(m[1]);
+  for (const m of text.matchAll(/lookups\.(?:visible|assertVisible)\(\s*'([\w.-]+)'/g))
+    found.asks.add(m[1]);
+  lookupsFound.set(owner, found);
+}
+
+function checkLookups() {
+  const givers = new Map();
+  for (const m of moduleNames) {
+    const declared = map.modules[m].lookups ?? {};
+    const found = lookupsFound.get(m) ?? { provides: new Set(), asks: new Set() };
+    for (const key of ['provides', 'asks']) {
+      const want = [...(declared[key] ?? [])].sort().join(', ');
+      const have = [...found[key]].sort().join(', ');
+      if (want !== have)
+        problems.push(
+          `${m}: modules.json의 lookups.${key}(${want || '없음'})와 코드(${have || '없음'})가 다름`,
+        );
+    }
+    for (const kind of declared.provides ?? []) {
+      if (givers.has(kind)) problems.push(`읽기 '${kind}'를 ${givers.get(kind)}와 ${m}이 함께 줌`);
+      givers.set(kind, m);
+    }
+  }
+  for (const m of moduleNames)
+    for (const kind of map.modules[m].lookups?.asks ?? [])
+      if (!givers.has(kind))
+        problems.push(`${m}: 읽기 '${kind}'를 주는 모듈이 없음 (modules.json lookups)`);
 }
 
 function checkView(file, text) {

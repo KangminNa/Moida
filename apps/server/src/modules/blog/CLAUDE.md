@@ -63,11 +63,11 @@
 `task.page.built` (taskId, runId, pageId, title, note, files): 페이지의 새 판. 두 번 받아도 판은 하나다 (`page_revisions`의 `UNIQUE(page_id, run_id)`와 `PageRepository.hasRun`)
 
 ## 써도 되는 모듈
-platform, vault(Query만, 읽기 전용)
+platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄)
 
 ## 지켜야 할 것
 - 글 → wiki 연결은 blog가 값으로 갖는다 (외래키 없음): 대표 `posts.main_wiki_id`, 참고 `post_wiki_refs`. 발행·수정 때 이벤트로 vault에 알린다
-- 이을 wiki는 트랜잭션을 열기 전에 `PostWikiQuery`로 확인한다. 볼 수 없는 wiki는 없는 wiki와 똑같이 404. 연결은 판을 쌓지 않지만 `version`을 올린다 (사본은 `postVersion`이 더 큰 이벤트만 받는다)
+- 이을 wiki는 트랜잭션을 열기 전에 `Lookups.assertVisible('wiki', …)`로 확인한다. 볼 수 없는 wiki는 없는 wiki와 똑같이 404. 연결은 판을 쌓지 않지만 `version`을 올린다 (사본은 `postVersion`이 더 큰 이벤트만 받는다)
 - 한 번의 저장에 공개 글의 이벤트는 하나다: `edit` 뒤에 `linkWikis`를 불러 마지막 모습을 싣는다 (`Post.announceUpdate`). 같은 `postVersion`의 뒤 이벤트는 사본이 버린다
 - wiki id는 진짜 id라 UUIDv7의 날짜가 드러난다. 방문자 응답에 넣지 않고, 비공개를 볼 수 없는 요청자에게는 볼 수 있는 wiki만 준다
 - 방문자 응답에는 공개된 wiki·세션의 정보만 나온다. 비공개면 자리만

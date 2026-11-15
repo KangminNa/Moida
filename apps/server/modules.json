@@ -3,8 +3,16 @@
   "modules": {
     "platform": { "dependsOn": [], "schemas": ["platform"] },
     "account": { "dependsOn": ["platform"], "schemas": ["account"] },
-    "vault": { "dependsOn": ["platform"], "schemas": ["vault"] },
-    "blog": { "dependsOn": ["platform", "vault"], "schemas": ["blog", "work"] },
+    "vault": {
+      "dependsOn": ["platform"],
+      "schemas": ["vault"],
+      "lookups": { "provides": ["wiki", "session"] }
+    },
+    "blog": {
+      "dependsOn": ["platform"],
+      "schemas": ["blog", "work"],
+      "lookups": { "asks": ["wiki", "session"] }
+    },
     "task": { "dependsOn": ["platform"], "schemas": ["task"] },
     "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }
   },

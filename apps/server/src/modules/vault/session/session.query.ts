@@ -16,7 +16,7 @@ import type { SessionRevisionRow, SessionRow } from '../vault.tables';
 import { Session } from './session';
 import {
   type CheckSessionInput,
-  type GetSessionInput,
+  GetSessionInput,
   ListSessionsInput,
   type NoteWorkInput,
   type ReadSessionInput,
@@ -206,6 +206,25 @@ export class SessionQuery extends BaseQuery {
     if (!actor.mayRead(req.id)) this.assertCanRead(actor);
     const session = await this.find(actor, req.id);
     return new SessionNoteView(session, SessionQuery.revision(await this.headOf(session)));
+  }
+
+  /**
+   * ids 중 볼 수 있는 세션의 id → 노트 제목 (blog의 스크랩이 platform Lookups의 'session'으로 묻는다, 리팩토링 R3b).
+   * note와 같은 규칙: 읽기 권한이 없으면 Forbidden, 없거나 볼 수 없거나 노트가 아직 없는 세션은 빠진다
+   */
+  async titles(actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const found = new Map<string, string>();
+    for (const id of ids) {
+      try {
+        found.set(
+          id,
+          (await this.note(actor, GetSessionInput.from({ session_id: id }))).summary.title,
+        );
+      } catch (error) {
+        if (!(error instanceof NotFound)) throw error;
+      }
+    }
+    return found;
   }
 
   /** AI 도구의 읽기는 read_public이나 read_all 중 하나만 있어도 된다 */

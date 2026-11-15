@@ -5,12 +5,12 @@ import {
   Database,
   EntityService,
   Idempotency,
+  Lookups,
   RuleViolation,
   SensitivePolicy,
   type Sql,
   type VersionTarget,
 } from '../../platform';
-import { PostWikiQuery } from '../../vault';
 import { MenuRepository } from '../menu/menu.repository';
 import { Post } from './post';
 import type {
@@ -36,10 +36,12 @@ export class PostService extends EntityService<Post> {
   private static readonly CREATE = 'create_post';
   private static readonly DRAFT = 'blog_save_draft';
   private static readonly PUBLISH = 'publish_approved';
+  /** 글이 가리킬 wiki를 볼 수 없을 때: 없는 wiki와 같은 문구 (vault가 Lookups의 'wiki'로 답한다) */
+  private static readonly NO_WIKI = '찾을 수 없는 위키예요';
 
   constructor(
     db: Database,
-    private readonly wikis: PostWikiQuery,
+    private readonly lookups: Lookups,
     private readonly sensitive: SensitivePolicy,
   ) {
     super(db);
@@ -54,7 +56,7 @@ export class PostService extends EntityService<Post> {
     actor.assertCan(Actor.WRITE);
     const spaceId = Post.spaceOf(actor);
     const content = PostContent.write(req.title, req.body);
-    await this.wikis.assertVisible(actor, req.wikiIds);
+    await this.lookups.assertVisible('wiki', actor, req.wikiIds, PostService.NO_WIKI);
     return this.transaction(async (tx) => {
       const posts = new PostRepository(tx);
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, PostService.CREATE);
@@ -116,7 +118,7 @@ export class PostService extends EntityService<Post> {
     actor.assertCan(Actor.WRITE);
     const spaceId = Post.spaceOf(actor);
     const content = PostContent.write(req.title, req.body);
-    await this.wikis.assertVisible(actor, req.wikiIds);
+    await this.lookups.assertVisible('wiki', actor, req.wikiIds, PostService.NO_WIKI);
     return this.transaction(async (tx) => {
       const posts = new PostRepository(tx);
       const post = await posts.lock(spaceId, req.id);
@@ -143,7 +145,7 @@ export class PostService extends EntityService<Post> {
     const [body] = this.sensitive.scrub('body', req.body);
     const content = PostContent.write(title, body);
     const scope = actor instanceof AgentActor ? actor.taskId : (actor.id ?? spaceId);
-    await this.wikis.assertVisible(actor, req.wikiIds);
+    await this.lookups.assertVisible('wiki', actor, req.wikiIds, PostService.NO_WIKI);
     return this.transaction(async (tx) => {
       const posts = new PostRepository(tx);
       const once = new Idempotency(tx, scope, req.requestId, PostService.DRAFT);
