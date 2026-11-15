@@ -1,0 +1,13 @@
+{
+  "general": { "delegable": true },
+  "draft_post": { "skill": "cairn-write", "delegable": true },
+  "tidy_session": { "skill": "cairn-tidy", "scopes": ["tidy", "read_all"], "delegable": true },
+  "browse": { "skill": "cairn-browse", "scopes": ["browse"], "delegable": true },
+  "code": { "skill": "cairn-code", "scopes": ["code"], "delegable": true, "sandboxed": true },
+  "make": { "skill": "cairn-make", "scopes": ["make"], "delegable": true, "sandboxed": true },
+  "ai_test": { "agentless": true },
+  "ai_signin": { "agentless": true },
+  "chat_route": { "agentless": true },
+  "session_note": { "agentless": true },
+  "tool_check": { "agentless": true }
+}

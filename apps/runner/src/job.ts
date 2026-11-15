@@ -124,6 +124,17 @@ export class Job {
   static readonly CODE = 'code';
   /** 만들기 작업: 코드 러너 칸에서 셸로 PPT · 문서 · 영상을 만든다 (결과물 2차) */
   static readonly MAKE = 'make';
+  /** 러너가 이름으로 알아보는 종류. 서버의 작업 종류 목록(task-kinds.json)에 다 있어야 한다 (job.test) */
+  static readonly KINDS: readonly string[] = [
+    Job.AI_TEST,
+    Job.ROUTE,
+    Job.SESSION_NOTE,
+    Job.AI_SIGNIN,
+    Job.TOOL_CHECK,
+    Job.BROWSE,
+    Job.CODE,
+    Job.MAKE,
+  ];
 
   constructor(
     readonly taskId: string,

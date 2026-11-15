@@ -30,6 +30,7 @@ import { PageOrder } from './page-order';
 import type { RunRecord } from './run-record';
 import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
+import { type TaskKind, TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
 
 // 작업 하나. 러너가 임대로 빌려 가고, 에이전트가 결재를 올리고, 결재 뒤 실행 결과로 끝난다.
@@ -59,50 +60,44 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    */
   static readonly RUN_TOKEN_SECONDS = 24 * 60 * 60;
   /** AI 로그인 연결 확인. 에이전트도 작업 토큰도 없이 러너가 돌린다 */
-  static readonly AI_TEST = 'ai_test';
+  static readonly AI_TEST: TaskKind = 'ai_test';
   /**
    * 웹 AI 로그인. 러너가 로그인 명령을 대신 돌리고, 로그인 주소와 사람이 붙여 넣은 코드는 payload로 오간다.
    * 에이전트도 작업 토큰도 없다 (연결 확인과 같다)
    */
-  static readonly AI_SIGNIN = 'ai_signin';
+  static readonly AI_SIGNIN: TaskKind = 'ai_signin';
   /**
    * 대화의 배정 (2차 1-5): 새 대화를 어느 에이전트가 맡을지 AI가 한 번 고른다. 연결 확인처럼 에이전트 없이 지시문 하나를 돌리고,
    * 답(JSON 한 줄)은 서버가 읽는다 (ChatRoute). payload: { tool, route: { chatId } }
    */
-  static readonly ROUTE = 'chat_route';
+  static readonly ROUTE: TaskKind = 'chat_route';
   /**
    * 세션 노트 (2차 4단계): vault가 원문을 받으면 요청한다 (task.agentless.requested). 에이전트 없이 서버의 로그인으로,
    * 러너가 vault에서 원문을 받아(read_transcript) 지시문 틀 session-note로 쓰고 답을 vault에 보낸다(save_note).
    * 원문은 작업에 싣지 않는다 (비공개 사본이 vault 밖에 남지 않게). 대상은 세션, 대상의 판은 원문 번호
    */
-  static readonly SESSION_NOTE = 'session_note';
+  static readonly SESSION_NOTE: TaskKind = 'session_note';
   /** 커넥터 확인 (2026-11-15 MCP 1단계): 러너가 원격 MCP에 붙어 도구 목록을 받는다. AI 없이, 결과는 커넥터에 적는다 */
-  static readonly TOOL_CHECK = 'tool_check';
-  /** 에이전트 없이 러너가 바로 도는 일 */
-  static readonly AGENTLESS = [
-    Task.AI_TEST,
-    Task.AI_SIGNIN,
-    Task.ROUTE,
-    Task.SESSION_NOTE,
-    Task.TOOL_CHECK,
-  ];
+  static readonly TOOL_CHECK: TaskKind = 'tool_check';
+  /** 에이전트 없이 러너가 바로 도는 일 (task-kinds.json의 agentless) */
+  static readonly AGENTLESS = TaskKinds.AGENTLESS;
   /** 서버 브라우저로 하는 작업. 브라우저가 있다고 알린 러너(next_jobs의 browser)에게만 빌려 준다 */
-  static readonly BROWSE = 'browse';
+  static readonly BROWSE: TaskKind = 'browse';
   /** 코드 작업: 코드 러너 칸에서 셸로 저장소를 고친다 (docs/코드작업.md) */
-  static readonly CODE = 'code';
+  static readonly CODE: TaskKind = 'code';
   /** 만들기 작업: 코드 러너 칸에서 셸로 PPT · 문서 · 영상을 만들어 결과물로 남긴다 (결과물 2차) */
-  static readonly MAKE = 'make';
+  static readonly MAKE: TaskKind = 'make';
   /**
    * 셸이 있는 칸(sandbox 기기)에서만 도는 일. 칸은 이 일만 받고, 다른 러너는 이 일을 받지 않는다 (lockNext).
    * 칸 수가 곧 이 일의 병렬 수라서 칸에 다른 일을 넣지 않는다
    */
-  static readonly SANDBOXED: readonly string[] = [Task.CODE, Task.MAKE];
+  static readonly SANDBOXED = TaskKinds.SANDBOXED;
   /** 웹 로그인의 단계 (payload.step) */
   static readonly SIGNIN_STARTING = 'starting';
   static readonly SIGNIN_OPEN_URL = 'open_url';
   static readonly SIGNIN_WAITING_CODE = 'waiting_code';
   static readonly SIGNIN_VERIFYING = 'verifying';
-  static readonly GENERAL = 'general';
+  static readonly GENERAL: TaskKind = 'general';
   static readonly WAIT_APPROVAL = 'approval';
   static readonly WAIT_SUBTASKS = 'subtasks';
   /**
@@ -111,14 +106,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * make는 재료 없이 지시만 (2026-11-14): 주인이 고른 재료(파일 · 위키)는 물려주지 않는다 (payload.make 없음)
    * browse는 대상(browser_site)이 있으면 그 사이트, 없으면 둘러보기. 맡기는 쪽도 비공개를 읽지 못해야 한다 (DelegationPolicy)
    */
-  static readonly DELEGABLE: readonly string[] = [
-    Task.GENERAL,
-    'draft_post',
-    'tidy_session',
-    Task.CODE,
-    Task.MAKE,
-    Task.BROWSE,
-  ];
+  static readonly DELEGABLE = TaskKinds.DELEGABLE;
   /** 위임 한도: 깊이(주인이 맡긴 작업이 0), 작업 하나가 위임하는 횟수, 한 번에, 작업 하나에 */
   static readonly DEPTH_MAX = 3;
   static readonly ROUNDS_MAX = 3;
@@ -135,21 +123,9 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   /** 실패 이벤트에 싣는 이유의 길이 (알림 본문) */
   private static readonly EVENT_ERROR_MAX = 300;
   /** 깨어난 위 작업에게 보내는 하위 작업 결과의 길이 */
-  private static readonly SKILLS: Readonly<Record<string, string>> = {
-    draft_post: 'cairn-write',
-    tidy_session: 'cairn-tidy',
-    browse: 'cairn-browse',
-    code: 'cairn-code',
-    make: 'cairn-make',
-  };
-  /** 이 종류의 일을 맡으려면 에이전트에게 있어야 하는 권한. 없는 종류는 누구나 맡는다 */
-  static readonly SCOPES: Readonly<Record<string, readonly string[]>> = {
-    // 세션은 기본이 비공개라 정리하려면 비공개까지 읽어야 한다
-    tidy_session: [Actor.TIDY, Actor.READ_ALL],
-    browse: [Actor.BROWSE],
-    code: [Actor.CODE],
-    make: [Actor.MAKE],
-  };
+  private static readonly SKILLS = TaskKinds.SKILLS;
+  /** 이 종류의 일을 맡으려면 에이전트에게 있어야 하는 권한. 없는 종류는 누구나 맡는다 (세션은 기본이 비공개라 정리하려면 비공개까지 읽어야 한다) */
+  static readonly SCOPES = TaskKinds.SCOPES;
 
   private readonly logged: Omit<TaskEventRow, 'id'>[] = [];
   /** 이번 임대의 실행 기록 */
