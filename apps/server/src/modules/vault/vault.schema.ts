@@ -238,6 +238,8 @@ export const tidySettings = vaultSchema.table('tidy_settings', {
   auto_tidy: boolean('auto_tidy').notNull(),
   version: integer('version').notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  cadence: text('cadence').notNull(),
+  daily_at: timestamp('daily_at', { withTimezone: true }),
 });
 
 /** vault.wiki_aliases */

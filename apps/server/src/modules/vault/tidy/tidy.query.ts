@@ -9,6 +9,8 @@ import type { TidySessionRow } from './tidy-settings';
 export class TidyQuery extends BaseQuery {
   /** 한 번에 맡기는 세션 수. 주인의 구독 토큰을 쓰므로 조금씩 */
   private static readonly BACKLOG_BATCH = 20;
+  /** 하루 한 번에 맡기는 세션 수 (남은 것은 다음 날) */
+  private static readonly DAILY_BATCH = 50;
 
   /** 공간의 정리 설정 (공간마다 한 줄, 없으면 꺼짐) */
   async settings(actor: Actor): Promise<TidySettingsView> {
@@ -16,9 +18,32 @@ export class TidyQuery extends BaseQuery {
     const row = await this.row(
       tidySettings,
       { space_id: actor.requireSpace() },
-      { columns: ['auto_tidy', 'version'] },
+      { columns: ['auto_tidy', 'cadence', 'daily_at', 'version'] },
     );
     return new TidySettingsView(row ?? { auto_tidy: false, version: 0 });
+  }
+
+  /** 하루 한 번의 차례가 된 공간 (일꾼, 2차 7단계): 자동 정리가 켜졌고 하루 한 번이고 지난 차례에서 하루가 지났다 */
+  async dailySpaces(actor: Actor): Promise<readonly string[]> {
+    actor.assertOwnerOrSystem();
+    const rows = await this.sql<{ space_id: string }[]>`
+      SELECT space_id FROM vault.tidy_settings
+      WHERE auto_tidy AND cadence = 'daily'
+        AND (daily_at IS NULL OR daily_at < now() - interval '23 hours')
+      ORDER BY space_id`;
+    return rows.map((r) => r.space_id);
+  }
+
+  /** 하루 한 번에 맡길 세션: 지난 요청 뒤로 새 판이 쌓인 세션 (대표 wiki가 있어도). 오래된 순으로 한 묶음 */
+  async daily(actor: Actor, spaceId: string): Promise<readonly TidySessionRow[]> {
+    actor.assertCan(Actor.TIDY);
+    return this.sql<TidySessionRow[]>`
+      SELECT s.node_id, s.head_title, s.revision_count, s.version
+      FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
+      WHERE s.space_id = ${spaceId} AND n.deleted_at IS NULL
+        AND s.tidy_requested_seq < s.revision_count
+      ORDER BY s.node_id
+      LIMIT ${TidyQuery.DAILY_BATCH}`;
   }
 
   /** 저장된 세션 하나. 그사이 지웠으면 null */

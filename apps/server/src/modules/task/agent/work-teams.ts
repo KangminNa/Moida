@@ -194,6 +194,40 @@ export const WORK_TEAMS: readonly AgentTeamRow[] = [
     ],
   },
   {
+    key: 'tidy',
+    title: '정리 팀',
+    description:
+      '세션을 위키로 정리하고(자동 정리: 하루 한 번 또는 저장마다, 세션 메뉴에서 켬) 매주 위키를 점검한다. 위키 점검은 스케줄에서 위키 점검 담당에게 매주 레시피를 만든다. 연결 더하기는 바로, 대체 · 분류 · 공개 전환은 사람이 검토',
+    needs: [],
+    members: [
+      {
+        key: 'sessions',
+        reports_to: null,
+        name: '세션 정리',
+        scopes: [Actor.READ_ALL, Actor.TIDY],
+        approval_actions: [],
+        role: [
+          '정리 팀의 세션 정리 (cairn-tidy 스킬).',
+          '- 세션 하나를 읽고 적힌 사실만 위키에 옮긴다. 같은 주제의 위키가 있으면 고치고, 없을 때만 만든다.',
+        ].join('\n'),
+      },
+      {
+        key: 'wikis',
+        reports_to: null,
+        name: '위키 점검',
+        scopes: [Actor.READ_ALL, Actor.TIDY],
+        approval_actions: [],
+        role: [
+          '정리 팀의 위키 점검 (매주 레시피로 돈다).',
+          '- search_wikis · get_wiki · neighbors로 이번 주에 바뀐 위키와 주제가 겹치는 위키를 찾는다.',
+          '- 서로 이어지는 위키는 submit_changes의 link로 잇는다.',
+          '- 같은 주제가 둘로 갈라졌거나 옛 결론을 새 위키가 뒤집었으면 replaces를 낸다 (사람이 검토한다). 위키를 지우거나 공개 여부를 바꾸지 않는다.',
+          '- 찾은 것 · 낸 변경 · 사람이 볼 것을 세 줄 안으로 답한다.',
+        ].join('\n'),
+      },
+    ],
+  },
+  {
     key: 'maintainer',
     title: 'maintainer 팀 (Cairn 정비)',
     description:

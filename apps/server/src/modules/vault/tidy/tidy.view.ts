@@ -4,10 +4,22 @@ import type { TidySettingRow } from '../vault.tables';
 
 /** 자동 정리 설정. 행이 없으면 꺼짐이고 version은 0이다 */
 export class TidySettingsView {
-  constructor(private readonly row: Readonly<Pick<TidySettingRow, 'auto_tidy' | 'version'>>) {}
+  constructor(
+    private readonly row: Readonly<
+      Pick<TidySettingRow, 'auto_tidy' | 'version'> &
+        Partial<Pick<TidySettingRow, 'cadence' | 'daily_at'>>
+    >,
+  ) {}
 
   toJSON() {
-    return { autoTidy: this.row.auto_tidy, version: this.row.version };
+    return {
+      autoTidy: this.row.auto_tidy,
+      /** save(저장할 때마다) · daily(하루 한 번 몰아서, 2차 7단계) */
+      cadence: this.row.cadence ?? 'daily',
+      /** 하루 한 번의 마지막 차례. 아직 없으면 null */
+      dailyAt: this.row.daily_at?.toISOString() ?? null,
+      version: this.row.version,
+    };
   }
 }
 

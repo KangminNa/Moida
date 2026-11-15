@@ -29,7 +29,7 @@ export class TidyService extends EntityService<TidySettings> {
     const spaceId = actor.requireSpace();
     const target = { id: spaceId, version: req.version };
     const settings = await this.change(spaceId, target, (found) =>
-      found.turn(req.autoTidy, new Date()),
+      found.turn(req.autoTidy, req.cadence, new Date()),
     );
     return settings.view();
   }
@@ -42,10 +42,34 @@ export class TidyService extends EntityService<TidySettings> {
     await this.transaction(async (tx) => {
       const settings = new TidySettingsRepository(tx);
       const found = await settings.lock(spaceId);
-      if (!found.autoTidy) return;
+      // 하루 한 번이면 여기서는 요청하지 않는다: 일꾼(TidyDailyJob)이 하루치 판을 한 번에 맡긴다
+      if (!found.autoTidy || found.daily) return;
       if (!(await new SessionRepository(tx).noteTidyRequested(session.node_id, req.seq))) return;
       found.sessionSaved(session, req.seq);
       await settings.save(found);
+    });
+  }
+
+  /**
+   * 하루 한 번의 차례 (일꾼, 2차 7단계): 새 판이 쌓인 세션을 한 묶음 요청하고 차례를 적는다.
+   * 두 번 돌아도 같다: 설정을 잠근 뒤 차례인지 다시 보고, 세션마다 먼저 적은 쪽만 요청한다
+   */
+  async daily(actor: Actor, spaceId: string): Promise<number> {
+    actor.assertOwnerOrSystem();
+    const page = await this.query.daily(actor, spaceId);
+    return this.transaction(async (tx) => {
+      const settings = new TidySettingsRepository(tx);
+      const sessions = new SessionRepository(tx);
+      const found = await settings.lock(spaceId);
+      const now = new Date();
+      if (!found.dueDaily(now)) return 0;
+      const fresh: TidySessionRow[] = [];
+      for (const session of page)
+        if (await sessions.noteTidyRequested(session.node_id, session.revision_count))
+          fresh.push(session);
+      found.ranDaily(fresh, now);
+      await settings.save(found);
+      return fresh.length;
     });
   }
 

@@ -24,16 +24,18 @@ export function TidyPanel() {
   const problem = action.problem ?? settings.error;
 
   const on = settings.data?.autoTidy ?? false;
+  const cadence = settings.data?.cadence ?? 'daily';
   const tasks = queued.data?.tasks.filter((t) => t.kind === 'tidy_session');
   const able = agents.data?.agents.some((a) => a.status === 'active' && a.scopes.includes('tidy'));
   const stuck = able === false && (on || (tasks?.length ?? 0) > 0);
 
-  function toggle() {
+  /** 켜기 · 끄기와 언제(저장할 때마다 · 하루 한 번)를 함께 보낸다 */
+  function save(autoTidy: boolean, when: string) {
     const seen = settings.data;
     if (!seen) return;
     void action.run(
       'toggle',
-      () => api('PUT', '/api/tidy/settings', { autoTidy: !on, version: seen.version }),
+      () => api('PUT', '/api/tidy/settings', { autoTidy, cadence: when, version: seen.version }),
       { reload: settings.reload },
     );
   }
@@ -51,8 +53,22 @@ export function TidyPanel() {
       <div className="plugin-head">
         <div>
           <b>자동 정리</b>
-          <p>저장할 때마다 구독 토큰 사용</p>
+          <p>
+            {cadence === 'daily'
+              ? '하루 한 번 새로 쌓인 세션을 몰아서 정리'
+              : '저장할 때마다 정리 (구독 토큰을 자주 씀)'}
+          </p>
         </div>
+        <select
+          className="input"
+          aria-label="정리할 때"
+          value={cadence}
+          disabled={action.busy !== null || settings.data === null}
+          onChange={(e) => save(on, e.target.value)}
+        >
+          <option value="daily">하루 한 번</option>
+          <option value="save">저장할 때마다</option>
+        </select>
         <button
           type="button"
           className="switch"
@@ -60,7 +76,7 @@ export function TidyPanel() {
           aria-checked={on}
           aria-label="자동 정리"
           disabled={action.busy !== null || settings.data === null}
-          onClick={toggle}
+          onClick={() => save(!on, cadence)}
         />
       </div>
       <div className="row">

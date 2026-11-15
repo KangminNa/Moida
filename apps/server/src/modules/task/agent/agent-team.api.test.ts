@@ -53,7 +53,7 @@ describe('에이전트 팀 템플릿', () => {
     const { teams } = ok(await api.get('/api/agent-teams', owner)) as { teams: Json[] };
     assert.deepEqual(
       teams.map((t) => t.key),
-      ['contest', 'briefing', 'planning', 'output', 'data', 'blog', 'code', 'maintainer'],
+      ['contest', 'briefing', 'planning', 'output', 'data', 'blog', 'code', 'tidy', 'maintainer'],
     );
     const contest = teams[0] as { needs: string[]; members: Json[] };
     assert.deepEqual(contest.needs, ['code-runner', 'browser']);

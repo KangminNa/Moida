@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
 import { Database, DomainEvent, Outbox, OutboxWorker } from '../../platform';
+import { TidyDailyJob } from './tidy-daily.job';
 
 // 세션 정리 요청: 자동 정리 설정, 저장 뒤 일 요청, 쌓인 세션 요청. 이벤트는 outbox와 일꾼을 실제로 거친다.
 // 마지막은 가짜 러너로 세션 저장부터 그래프까지 한 바퀴 돈다.
@@ -49,10 +50,17 @@ const save = async (source: string, did: string, title = '로그인 고치기'):
 
 const settings = async (): Promise<Json> => ok(await api.get('/api/tidy/settings', owner));
 
-const turn = async (autoTidy: boolean): Promise<Json> => {
+/** 켜고 끈다. 아래 시험은 저장할 때마다 정리하는 경우를 본다 (하루 한 번은 맨 아래 묶음) */
+const turn = async (autoTidy: boolean, cadence = 'save'): Promise<Json> => {
   const { version } = await settings();
-  return ok(await api.request('PUT', '/api/tidy/settings', owner, { autoTidy, version }));
+  return ok(await api.request('PUT', '/api/tidy/settings', owner, { autoTidy, cadence, version }));
 };
+const shown = (autoTidy: boolean, version: number, cadence = 'save') => ({
+  autoTidy,
+  cadence,
+  dailyAt: null,
+  version,
+});
 
 const queued = async (): Promise<Json[]> =>
   ok(await api.get('/api/tasks?status=queued', owner)).tasks as Json[];
@@ -131,13 +139,13 @@ describe('누가 쓸 수 있나', () => {
 
 describe('자동 정리 설정', () => {
   test('행이 없으면 꺼짐이고 version은 0이다', async () => {
-    assert.deepEqual(await settings(), { autoTidy: false, version: 0 });
+    assert.deepEqual(await settings(), shown(false, 0, 'daily'), '처음 켜면 하루 한 번');
   });
 
   test('켜면 행이 생기고 version이 오른다', async () => {
-    assert.deepEqual(await turn(true), { autoTidy: true, version: 1 });
-    assert.deepEqual(await turn(false), { autoTidy: false, version: 2 });
-    assert.deepEqual(await turn(false), { autoTidy: false, version: 2 }, '같은 값이면 그대로');
+    assert.deepEqual(await turn(true), shown(true, 1));
+    assert.deepEqual(await turn(false), shown(false, 2));
+    assert.deepEqual(await turn(false), shown(false, 2), '같은 값이면 그대로');
   });
 
   test('version이 어긋나면 409, 모양이 틀리면 400', async () => {
@@ -149,7 +157,7 @@ describe('자동 정리 설정', () => {
     assert.equal(stale.status, 409);
     const wrong = await api.request('PUT', '/api/tidy/settings', owner, { autoTidy: 'yes' });
     assert.equal(wrong.status, 400);
-    assert.deepEqual(await settings(), { autoTidy: true, version: 1 });
+    assert.deepEqual(await settings(), shown(true, 1));
   });
 });
 
@@ -209,6 +217,40 @@ describe('저장 뒤 자동 정리', () => {
     await db.sql`UPDATE vault.nodes SET deleted_at = now() WHERE id = ${String(id)}`;
     await drain();
     assert.equal((await tidyTasks(id)).length, 0);
+  });
+});
+
+describe('하루 한 번 몰아서 (2차 7단계)', () => {
+  test('저장할 때는 요청하지 않고, 일꾼의 차례에 새 판이 쌓인 세션을 한 번에. 하루 안에는 다시 돌지 않는다', async () => {
+    await turn(true, 'daily');
+    const { session_id: id } = await save('daily', '하루치 첫 판');
+    await drain();
+    assert.equal((await tidyTasks(id)).length, 0, '저장할 때는 없다');
+
+    await api.service(TidyDailyJob).run();
+    await drain();
+    assert.equal((await tidyTasks(id)).length, 1);
+    assert.notEqual((await settings()).dailyAt, null);
+
+    await save('daily', '하루치 둘째 판');
+    await api.service(TidyDailyJob).run();
+    await drain();
+    assert.equal((await tidyTasks(id)).length, 1, '하루가 지나기 전에는 다음 차례가 없다');
+
+    await db.sql`UPDATE vault.tidy_settings SET daily_at = now() - interval '1 day'`;
+    await api.service(TidyDailyJob).run();
+    await drain();
+    assert.equal((await tidyTasks(id)).length, 2, '다음 날 새 판');
+  });
+
+  test('언제는 save · daily만 (422)', async () => {
+    const { version } = await settings();
+    const bad = await api.request('PUT', '/api/tidy/settings', owner, {
+      autoTidy: true,
+      cadence: 'hourly',
+      version,
+    });
+    assert.equal(bad.status, 422);
   });
 });
 

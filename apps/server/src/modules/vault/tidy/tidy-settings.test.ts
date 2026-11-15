@@ -12,11 +12,13 @@ const session = (title = '로그인 고치기'): TidySessionRow => ({
   revision_count: 3,
   version: 7,
 });
-const settingsOf = (autoTidy: boolean) =>
+const settingsOf = (autoTidy: boolean, cadence = 'save', dailyAt: Date | null = null) =>
   TidySettings.restore({
     id: SPACE,
     space_id: SPACE,
     auto_tidy: autoTidy,
+    cadence,
+    daily_at: dailyAt,
     version: 1,
     updated_at: NOW,
   });
@@ -62,5 +64,45 @@ describe('정리 일 요청', () => {
     const [untitled, long] = settings.pullEvents();
     assert.equal(untitled?.data.title, '세션 정리: 제목 없음');
     assert.equal(String(long?.data.title).length, 200);
+  });
+});
+
+describe('하루 한 번 몰아서 (2차 7단계)', () => {
+  const HOUR = 60 * 60 * 1000;
+
+  test('하루 한 번이면 저장할 때 요청하지 않는다. 새로 켜면 기본이 하루 한 번', () => {
+    const daily = settingsOf(true, 'daily');
+    daily.sessionSaved(session(), 3);
+    assert.equal(daily.pullEvents().length, 0);
+    const fresh = TidySettings.absent(SPACE);
+    fresh.turn(true, null, NOW);
+    assert.equal(fresh.daily, true);
+  });
+
+  test('차례는 켜졌고 하루 한 번이고 지난 차례에서 23시간이 지났을 때', () => {
+    assert.equal(settingsOf(true, 'daily').dueDaily(NOW), true, '처음');
+    const ran = new Date(NOW.getTime() - 22 * HOUR);
+    assert.equal(settingsOf(true, 'daily', ran).dueDaily(NOW), false);
+    const old = new Date(NOW.getTime() - 23 * HOUR);
+    assert.equal(settingsOf(true, 'daily', old).dueDaily(NOW), true);
+    assert.equal(settingsOf(false, 'daily').dueDaily(NOW), false, '꺼짐');
+    assert.equal(settingsOf(true, 'save').dueDaily(NOW), false, '저장할 때마다');
+  });
+
+  test('차례에서 세션마다 요청하고 그때를 적는다 (세션이 없어도)', () => {
+    const settings = settingsOf(true, 'daily');
+    settings.ranDaily([session()], NOW);
+    assert.equal(settings.pullEvents()[0]?.data.requestId, `tidy:${SESSION}:3`);
+    assert.deepEqual(settings.unsaved, { daily_at: NOW });
+    const empty = settingsOf(true, 'daily');
+    empty.ranDaily([], NOW);
+    assert.equal(empty.dueDaily(NOW), false);
+  });
+
+  test('언제는 save · daily만', () => {
+    assert.throws(() => settingsOf(true).turn(true, 'hourly', NOW));
+    const settings = settingsOf(true, 'save');
+    settings.turn(true, 'daily', NOW);
+    assert.equal(settings.daily, true);
   });
 });

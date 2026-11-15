@@ -252,6 +252,8 @@ export interface TidySettingRow {
   auto_tidy: boolean;
   version: number;
   updated_at: Date;
+  cadence: string;
+  daily_at: Date | null;
 }
 export type TidySettingNew = Partial<TidySettingRow> & Pick<TidySettingRow, 'space_id'>;
 

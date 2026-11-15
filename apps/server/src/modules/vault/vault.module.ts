@@ -29,6 +29,7 @@ import { ReadTranscriptTool, SaveNoteTool, SaveTranscriptTool } from './session/
 import { TidyController } from './tidy/tidy.api';
 import { TidyQuery } from './tidy/tidy.query';
 import { TidyService } from './tidy/tidy.service';
+import { TidyDailyJob } from './tidy/tidy-daily.job';
 import { TidyRequestHandler } from './tidy/tidy-request.handler';
 import { ArchiveController } from './vault-archive.api';
 import { VaultArchiveQuery } from './vault-archive.query';
@@ -72,6 +73,7 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
     TidyQuery,
     TidyService,
     TidyRequestHandler,
+    TidyDailyJob,
     PostMarkService,
     PostMarkHandler,
     PostWikiQuery,
@@ -97,6 +99,7 @@ export class VaultModule implements OnModuleInit {
   constructor(
     private readonly workers: CoreWorkers,
     private readonly tidy: TidyRequestHandler,
+    private readonly tidyDaily: TidyDailyJob,
     private readonly postMarks: PostMarkHandler,
     private readonly stale: WikiStaleJob,
     private readonly library: LibraryQuery,
@@ -111,5 +114,7 @@ export class VaultModule implements OnModuleInit {
     this.library.register([WikiQuery.LIBRARY_KIND], (a, f) => this.wikis.library(a, f));
     this.workers.on('blog.post.*', this.postMarks);
     this.workers.every(this.stale, WikiStaleJob.EVERY_MS);
+    // 세션 정리를 하루 한 번 몰아서 (2차 7단계)
+    this.workers.every(this.tidyDaily, TidyDailyJob.EVERY_MS);
   }
 }
