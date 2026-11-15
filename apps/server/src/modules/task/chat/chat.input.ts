@@ -1,9 +1,30 @@
-import { BaseRequest } from '../../platform';
+import { BaseRequest, type RequestFields } from '../../platform';
+import { type RefPick, TaskRefs } from '../task/task-refs.policy';
 import { Chat } from './chat';
 
 // 대화 입력의 모양. 뜻(상대가 관리자 바로 아래인지, 덧붙인 말의 한도)은 Chat이 검사한다.
 
-/** POST /api/chats { requestId, agentId?, message, goal?, project?, deliver? }. 대화와 첫 메시지를 함께. 같은 requestId는 처음 만든 대화 */
+/**
+ * 메시지의 참조 (refs, 2026-11-15 B): [{ kind, id }] (보관함: wiki · session · post · page · output · link)
+ * 또는 [{ kind: 'url', url, browser? }] (http · https 주소, browser면 서버 브라우저로 연다). 모양만 보고 뜻은 TaskRefs.resolve가
+ */
+function refsOf(f: RequestFields, body: Record<string, unknown>): readonly RefPick[] {
+  if (body.refs === undefined || body.refs === null) return [];
+  const raw = Array.isArray(body.refs) ? (body.refs as Record<string, unknown>[]) : [];
+  return f.nestedList('refs', TaskRefs.MAX).map((r, i) => {
+    const kind = r.text('kind', 20);
+    if (kind === TaskRefs.URL) {
+      const url = r.text('url', 2000);
+      if (url && !/^https?:\/\//i.test(url)) r.reject('url', 'http · https 주소예요');
+      return { kind, id: null, url, browser: raw[i]?.browser === true };
+    }
+    if (kind && !TaskRefs.KINDS.includes(kind))
+      r.reject('kind', `${TaskRefs.KINDS.join(' · ')} · url 중 하나예요`);
+    return { kind, id: r.uuid('id'), url: null, browser: false };
+  });
+}
+
+/** POST /api/chats { requestId, agentId?, message, goal?, project?, deliver?, refs? }. 대화와 첫 메시지를 함께. 같은 requestId는 처음 만든 대화 */
 export class CreateChatInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
@@ -15,6 +36,7 @@ export class CreateChatInput extends BaseRequest {
     readonly project: string | null,
     /** 받을 것 (html · blog · browser · code, 비우면 대화 답. ChatResult.deliverOf가 본다) */
     readonly deliver: string | null,
+    readonly refs: readonly RefPick[],
   ) {
     super();
   }
@@ -31,13 +53,14 @@ export class CreateChatInput extends BaseRequest {
           f.optionalText('goal', Chat.GOAL_MAX),
           f.optionalText('project', 400),
           f.optionalText('deliver', 20),
+          refsOf(f, body),
         ),
     );
   }
 }
 
 /**
- * POST /api/chats/:id/messages { requestId, version, message, choice? }. 같은 requestId는 한 번만 보낸다.
+ * POST /api/chats/:id/messages { requestId, version, message, choice?, refs? }. 같은 requestId는 한 번만 보낸다.
  * choice: 맡기 전의 대화에서 질문의 고를 것 하나 (에이전트 id, 2차 1-5). message는 화면에 보일 말 (고른 이름)
  */
 export class SendChatInput extends BaseRequest {
@@ -47,6 +70,8 @@ export class SendChatInput extends BaseRequest {
     readonly version: number,
     readonly message: string,
     readonly choice: string | null,
+    /** 이번 회차의 참조 (일하는 중 · 맡기 전에는 받지 않는다) */
+    readonly refs: readonly RefPick[],
   ) {
     super();
   }
@@ -62,6 +87,32 @@ export class SendChatInput extends BaseRequest {
           f.version(),
           f.text('message', Chat.MESSAGE_MAX),
           body.choice === undefined || body.choice === null ? null : f.uuid('choice'),
+          refsOf(f, body),
+        ),
+    );
+  }
+}
+
+/** PATCH /api/chats/:id { version, model, effort }: 대화의 모델 · 생각 강도 (2026-11-15 B). 비우면(null · 빈 글) 상대 에이전트의 설정 */
+export class TuneChatInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly version: number,
+    readonly model: string | null,
+    readonly effort: string | null,
+  ) {
+    super();
+  }
+
+  static from(id: string, raw: unknown): TuneChatInput {
+    return BaseRequest.read(
+      { ...(raw as object), id },
+      (f) =>
+        new TuneChatInput(
+          f.uuid('id'),
+          f.version(),
+          f.optionalText('model', 80),
+          f.optionalText('effort', 20),
         ),
     );
   }

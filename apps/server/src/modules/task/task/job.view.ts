@@ -6,6 +6,11 @@ import type { AgentRow, ChatUpdateRow, ExternalToolRow, OutputRow, TaskRow } fro
 /** 하위 작업이 만든 결과물 한 줄 (깨어난 위 작업에게 보인다) */
 export type SubtaskOutputRow = Pick<OutputRow, 'id' | 'task_id' | 'name' | 'kind'>;
 
+/** 대화의 모델 · 생각 강도 (payload.runtime). 대화의 회차에만 있다 */
+function runtimeOf(r: Readonly<TaskRow>): { model?: string; effort?: string } | null {
+  return (r.payload as { runtime?: { model?: string; effort?: string } } | null)?.runtime ?? null;
+}
+
 /** 작업의 대상. 없으면 null (task.view.ts와 같은 모양) */
 function targetOf(r: Readonly<TaskRow>) {
   return r.target_kind === null
@@ -185,7 +190,8 @@ export class JobView {
       chat_updates: this.chat?.toJSON() ?? null,
       revision_note: this.revisionNote,
       // bound: 이 러너에 묶인 에이전트 (묶인 일은 그 러너만 빌린다). 러너는 이때만 나눈 폴더를 연다
-      // model · effort: AI CLI에 넘길 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계)
+      // model · effort: AI CLI에 넘길 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계).
+      // 대화가 정해 둔 것(payload.runtime, 2026-11-15 B)이 있으면 그 회차에는 그것을 쓴다 (팀원의 일에는 없다)
       agent:
         a === null
           ? null
@@ -194,8 +200,8 @@ export class JobView {
               name: a.name,
               role: a.role,
               tool: a.tool,
-              model: a.model,
-              effort: a.effort,
+              model: runtimeOf(r)?.model || a.model,
+              effort: runtimeOf(r)?.effort || a.effort,
               bound: a.bound,
             },
       run_token: this.runToken,

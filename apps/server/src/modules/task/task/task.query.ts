@@ -92,9 +92,14 @@ export class TaskQuery extends BaseQuery {
    * 재료가 아니면 Forbidden. heldRun처럼 잠그지 않고 읽는다
    */
   async heldMaterial(actor: Actor, taskId: string, outputId: string): Promise<TaskRunRow> {
-    const materials = (await this.heldTask(actor, taskId)).makeMaterials;
-    if (materials === null) throw new RuleViolation('만들기 작업이 아니에요');
-    materials.assertOutput(outputId);
+    const task = await this.heldTask(actor, taskId);
+    // 대화 · 위임으로 넣은 참조 결과물은 어느 일이든 받는다 (2026-11-15 B). 아니면 만들기 작업의 재료만
+    if (!task.refs.outputs.includes(outputId)) {
+      const materials = task.makeMaterials;
+      if (materials === null)
+        throw new RuleViolation('만들기 작업의 재료도, 참조도 아닌 결과물이에요');
+      materials.assertOutput(outputId);
+    }
     return this.runOf(actor, taskId);
   }
 

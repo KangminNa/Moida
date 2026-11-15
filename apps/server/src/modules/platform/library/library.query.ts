@@ -43,4 +43,15 @@ export class LibraryQuery extends BaseQuery {
     );
     return new LibraryPageView(items, next);
   }
+
+  /**
+   * id들이 무엇인지 (대화의 참조, 2026-11-15 B): 종류 · 제목 · 공개 범위. 없거나 휴지통에 있는 id는 빠진다 (주인만).
+   * 모든 종류에 묻는다: id는 UUIDv7이라 종류끼리 겹치지 않는다
+   */
+  async describe(actor: Actor, ids: readonly string[]): Promise<readonly LibraryRow[]> {
+    actor.assertOwner();
+    if (ids.length === 0) return [];
+    const filter = LibraryInput.forIds(ids);
+    return (await Promise.all(this.sources.map((s) => s.read(actor, filter)))).flat();
+  }
 }

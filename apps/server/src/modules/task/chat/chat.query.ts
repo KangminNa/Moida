@@ -12,6 +12,7 @@ import {
   ChatListView,
   type ChatOutputRow,
   type ChatPartnerRow,
+  type ChatTeamRow,
   type ChatTurnTaskRow,
   ChatTurnView,
   type ChatUpdateLine,
@@ -66,7 +67,32 @@ export class ChatQuery extends BaseQuery {
       news,
       chat.agent_id === null ? asked : null,
       await this.card(chat),
+      await this.team(spaceId, chat.id),
     );
+  }
+
+  /**
+   * 이 대화의 일(회차 · 덧붙인 말의 답 · 검토, request_id `chat:<대화>:`)과 그 아래에서 끝나지 않은 작업 (2026-11-15).
+   * 끝나지 않은 하위 작업의 위 작업은 늘 하위 작업을 기다리는 중이라, 끝나지 않은 것만 따라 내려가면 된다
+   */
+  private team(spaceId: string, chatId: string): Promise<ChatTeamRow[]> {
+    const open = ChatQuery.OPEN as string[];
+    return this.sql<ChatTeamRow[]>`
+      WITH RECURSIVE tree AS (
+        SELECT id FROM task.tasks
+        WHERE space_id = ${spaceId} AND request_id LIKE ${`${ChatRequest.TURN_PREFIX}${chatId}:%`}
+          AND status = ANY(${open}::text[])
+        UNION ALL
+        SELECT c.id FROM task.tasks c JOIN tree ON c.parent_id = tree.id
+        WHERE c.status = ANY(${open}::text[])
+      )
+      SELECT t.id, t.agent_id, t.title, t.status, t.wait_reason, t.created_at, t.parent_id,
+        a.name AS agent,
+        (SELECT e.body FROM task.task_events e
+          WHERE e.task_id = t.id AND e.body <> '' ORDER BY e.id DESC LIMIT 1) AS last_event
+      FROM tree JOIN task.tasks t ON t.id = tree.id
+      LEFT JOIN task.agents a ON a.id = t.agent_id
+      ORDER BY t.created_at, t.id`;
   }
 
   /** 기다리는 결과 카드: 실린 결재 · 결과물, 받을 것의 검사, 그 회차의 검토 (2차 2단계) */

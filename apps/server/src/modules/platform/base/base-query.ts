@@ -26,14 +26,17 @@ export abstract class BaseQuery extends TableReader {
   }
 
   /**
-   * 보관함 읽기(2차 5단계)의 기간 · 커서 조건. 시각 칸과 id 칸 이름을 받아 `AND …` 조각을 돌려준다.
+   * 보관함 읽기(2차 5단계)의 기간 · 커서 조건. 시각 · id · 제목 칸 이름을 받아 `AND …` 조각을 돌려준다.
+   * 대화의 참조(2026-11-15 B)를 위해 id 목록(ids)과 제목 찾기(q, 대소문자 무시)도 받는다.
    * 읽기는 `ORDER BY <시각> DESC, <id> DESC LIMIT LibraryInput.PAGE + 1`로 쓴다 (LibraryQuery가 모아 자른다)
    */
-  protected libraryWindow(at: string, id: string, filter: LibraryInput) {
+  protected libraryWindow(at: string, id: string, title: string, filter: LibraryInput) {
     const sql = this.sql;
-    const { from, to, before } = filter;
+    const { from, to, before, ids, q } = filter;
     return sql`${from ? sql`AND ${sql(at)} >= ${from}` : sql``}
       ${to ? sql`AND ${sql(at)} <= ${to}` : sql``}
-      ${before ? sql`AND (${sql(at)}, ${sql(id)}) < (${before[0]}, ${before[1]})` : sql``}`;
+      ${before ? sql`AND (${sql(at)}, ${sql(id)}) < (${before[0]}, ${before[1]})` : sql``}
+      ${ids ? sql`AND ${sql(id)} = ANY(${ids as string[]}::uuid[])` : sql``}
+      ${q ? sql`AND strpos(lower(${sql(title)}), lower(${q})) > 0` : sql``}`;
   }
 }

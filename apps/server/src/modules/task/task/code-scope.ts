@@ -8,6 +8,8 @@ import { RuleViolation } from '../../platform';
 export class CodeScope {
   /** 저장소 전체 */
   static readonly WHOLE = '.';
+  /** 코드 일의 종류 (Task.CODE와 같다: task.ts를 가져오면 서로 가져오게 된다) */
+  static readonly KIND = 'code';
   /** 러너의 CodeSpec과 같은 한도 */
   static readonly PATHS_MAX = 20;
   static readonly PATH_MAX = 200;
@@ -75,6 +77,23 @@ export class CodeScope {
   }
 
   /** 서로 겹치는 것이 있으면 RuleViolation (위임할 때 형제끼리: 겹치면 PR이 부딪친다) */
+  /**
+   * 하위 작업의 payload.code (Task.subtask). code가 아닌 일에는 paths를 적지 않는다.
+   * code는 code 작업(mine)에서만 맡기고, 위 작업의 저장소 · 명령을 물려받아 경로만 그 안으로 좁힌다
+   */
+  static forSubtask(
+    kind: string,
+    paths: readonly string[] | null,
+    mine: CodeScope | null,
+  ): Record<string, unknown> {
+    if (kind !== CodeScope.KIND) {
+      if (paths !== null) throw new RuleViolation('paths는 code 일에만 적어요');
+      return {};
+    }
+    if (mine === null) throw new RuleViolation('코드 일은 코드 작업에서만 나눠 맡겨요');
+    return { code: mine.narrowTo(paths).toPayload() };
+  }
+
   static assertApart(scopes: readonly CodeScope[]): void {
     for (let i = 0; i < scopes.length; i++)
       for (let j = i + 1; j < scopes.length; j++) {

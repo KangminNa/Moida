@@ -46,7 +46,7 @@ export class BasketQuery extends BaseQuery {
       SELECT i.id, i.title, i.url, i.created_at
       FROM work.basket_items i JOIN work.baskets b ON b.id = i.basket_id
       WHERE b.space_id = ${actor.requireSpace()} AND i.kind = ${BasketItem.LINK}
-        ${this.libraryWindow('i.created_at', 'i.id', filter)}
+        ${this.libraryWindow('i.created_at', 'i.id', 'i.title', filter)}
       ORDER BY i.created_at DESC, i.id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: BasketQuery.LIBRARY_KIND,

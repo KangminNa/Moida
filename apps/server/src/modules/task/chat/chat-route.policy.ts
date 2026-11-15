@@ -1,5 +1,6 @@
 import { RuleViolation } from '../../platform';
 import type { Agent } from '../agent/agent';
+import { TaskRefs } from '../task/task-refs.policy';
 import { ChatResult } from './chat-result.policy';
 
 /** 배정 일의 답을 읽은 결과: 맡을 에이전트, 아니면 관리자에게 물을 질문과 고를 에이전트 */
@@ -23,9 +24,11 @@ export class ChatRoute {
   private static readonly QUESTION_MAX = 300;
   private static readonly REASON_MAX = 200;
 
-  static candidates(agents: readonly Agent[]): Agent[] {
+  static candidates(agents: readonly Agent[], refs: TaskRefs = TaskRefs.of(null)): Agent[] {
     const reviewers = new Set(agents.filter((a) => !a.deleted).map((a) => a.reviewerId));
-    return agents.filter((a) => a.topLevel && !a.paused && !a.deleted && !reviewers.has(a.id));
+    return agents.filter(
+      (a) => a.topLevel && !a.paused && !a.deleted && !reviewers.has(a.id) && !refs.problemFor(a),
+    );
   }
 
   /** 기기(MCP ask_agent)가 이름이나 id로 고른 상대. 못 고르면 고를 수 있는 이름을 알린다 (기기의 AI가 다시 부르게) */

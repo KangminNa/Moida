@@ -5,6 +5,7 @@ import {
   Database,
   Forbidden,
   Idempotency,
+  LibraryQuery,
   RuleViolation,
   type Sql,
   SystemActor,
@@ -19,8 +20,9 @@ import type { PromptTemplates } from '../skill/prompt-templates';
 import { SkillQuery } from '../skill/skill.query';
 import { LeasePolicy } from '../task/lease.policy';
 import { TaskRepository } from '../task/task.repository';
+import { type RefPick, TaskRefs } from '../task/task-refs.policy';
 import { Chat } from './chat';
-import type { AskAgentInput, CreateChatInput, SendChatInput } from './chat.input';
+import type { AskAgentInput, CreateChatInput, SendChatInput, TuneChatInput } from './chat.input';
 import { ChatRepository } from './chat.repository';
 import { ChatHistory } from './chat-history.policy';
 import { ChatProject } from './chat-project.policy';
@@ -36,10 +38,14 @@ import { ChatUpdates } from './chat-update.policy';
 @Injectable()
 export class ChatService extends BaseService {
   private static readonly APPEND = 'chat_append';
+  /** 참조는 새 회차에만 (덧붙인 말 · 맡기 전의 답은 회차가 아니다) */
+  private static readonly REFS_WAIT =
+    '일하는 중이나 맡기 전에는 참조를 넣지 못해요. 답이 온 뒤에 보내요';
 
   constructor(
     db: Database,
     private readonly skills: SkillQuery,
+    private readonly library: LibraryQuery,
   ) {
     super(db);
   }
@@ -49,6 +55,7 @@ export class ChatService extends BaseService {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     const prompts = await this.skills.prompts(actor, spaceId);
+    const refs = await this.refsOf(actor, req.refs);
     const now = new Date();
     return this.transaction(async (tx) => {
       const chats = new ChatRepository(tx);
@@ -56,16 +63,12 @@ export class ChatService extends BaseService {
       if (before) return before;
       const agents = new AgentRepository(tx);
       const chosen = req.agentId === null ? null : await agents.load(spaceId, req.agentId);
-      const chat = Chat.open(
-        spaceId,
-        req.requestId,
-        req.message,
-        now,
-        null,
-        req.goal,
-        ChatProject.of(req.project),
-        ChatResult.deliverOf(req.deliver),
-      );
+      const chat = Chat.open(spaceId, req.requestId, req.message, now, {
+        goal: req.goal,
+        project: ChatProject.of(req.project),
+        deliver: ChatResult.deliverOf(req.deliver),
+        pending_refs: refs.empty ? null : refs.lines,
+      });
       await this.start(tx, chat, await agents.all(spaceId), chosen, prompts, now);
       return chat;
     });
@@ -80,14 +83,17 @@ export class ChatService extends BaseService {
     const spaceId = actor.requireSpace();
     const now = new Date();
     const prompts = await this.skills.prompts(actor, spaceId);
+    const refs = await this.refsOf(actor, req.refs);
     return this.transaction(async (tx) => {
       const chats = new ChatRepository(tx);
       const chat = await chats.lock(spaceId, req.id);
       const reply = { requestId: req.requestId, message: req.message, choice: req.choice };
+      if (chat.agentId === null && !refs.empty) throw new RuleViolation(ChatService.REFS_WAIT);
       if (chat.agentId === null)
         return this.answer(tx, actor, chat, reply, prompts, now, null, req.version);
       const agent = await new AgentRepository(tx).load(spaceId, chat.agentId);
-      return this.talk(tx, actor, chat, agent, req.requestId, req.message, now, null, req.version);
+      const text = { requestId: req.requestId, message: req.message, refs };
+      return this.talk(tx, actor, chat, agent, text, now, null, req.version);
     });
   }
 
@@ -112,16 +118,12 @@ export class ChatService extends BaseService {
         if (before) return before;
         const org = await agents.all(spaceId);
         const chosen = req.agent === null ? null : ChatRoute.wanted(org, req.agent);
-        const chat = Chat.open(
-          spaceId,
-          req.requestId,
-          req.message,
-          now,
-          deviceId,
-          req.goal,
-          ChatProject.of(req.project),
-          ChatResult.deliverOf(req.deliver),
-        );
+        const chat = Chat.open(spaceId, req.requestId, req.message, now, {
+          device_id: deviceId,
+          goal: req.goal,
+          project: ChatProject.of(req.project),
+          deliver: ChatResult.deliverOf(req.deliver),
+        });
         await this.start(tx, chat, org, chosen, prompts, now);
         return chat;
       }
@@ -130,7 +132,23 @@ export class ChatService extends BaseService {
       const reply = { requestId: req.requestId, message: req.message, choice: req.choice };
       if (chat.agentId === null) return this.answer(tx, actor, chat, reply, prompts, now, deviceId);
       const agent = await agents.load(spaceId, chat.agentId);
-      return this.talk(tx, actor, chat, agent, req.requestId, req.message, now, deviceId);
+      const text = { requestId: req.requestId, message: req.message, refs: TaskRefs.of(null) };
+      return this.talk(tx, actor, chat, agent, text, now, deviceId);
+    });
+  }
+
+  /** 대화의 모델 · 생각 강도 (2026-11-15 B). 맡은 대화에만: 강도는 상대의 도구가 받는 것만 */
+  async tune(actor: Actor, req: TuneChatInput): Promise<Chat> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    return this.transaction(async (tx) => {
+      const chats = new ChatRepository(tx);
+      const chat = await chats.lock(spaceId, req.id);
+      chat.assertVersion(req.version);
+      const agent = await new AgentRepository(tx).load(spaceId, chat.partnerId);
+      chat.tune(req.model, req.effort, agent.tool, new Date());
+      await chats.save(chat);
+      return chat;
     });
   }
 
@@ -163,7 +181,8 @@ export class ChatService extends BaseService {
       await this.cancelOpen(tx, spaceId, chat.id, now);
       if (!revise || !card.note) return;
       const agent = await new AgentRepository(tx).load(spaceId, chat.partnerId);
-      await this.talk(tx, actor, chat, agent, `card:${card.id}`, card.note, now, null);
+      const text = { requestId: `card:${card.id}`, message: card.note, refs: TaskRefs.of(null) };
+      await this.talk(tx, actor, chat, agent, text, now, null);
     });
   }
 
@@ -206,7 +225,7 @@ export class ChatService extends BaseService {
   ): Promise<void> {
     const chats = new ChatRepository(tx);
     const tasks = new TaskRepository(tx);
-    const candidates = ChatRoute.candidates(agents);
+    const candidates = ChatRoute.candidates(agents, chat.pendingRefs);
     const only = chosen ?? (candidates.length === 1 ? candidates[0] : null);
     if (only) {
       const turn = chat.assign(only, now);
@@ -251,7 +270,7 @@ export class ChatService extends BaseService {
     const chats = new ChatRepository(tx);
     const tasks = new TaskRepository(tx);
     const agents = await new AgentRepository(tx).all(chat.spaceId);
-    const candidates = ChatRoute.candidates(agents);
+    const candidates = ChatRoute.candidates(agents, chat.pendingRefs);
     // 질문이 준 순서대로 (번호가 그 순서를 가리킨다). 그사이 후보에서 빠진 에이전트는 뺀다
     const offered = (await chats.lastChoices(chat.id))
       .map((id) => candidates.find((a) => a.id === id))
@@ -285,8 +304,7 @@ export class ChatService extends BaseService {
     actor: Actor,
     chat: Chat,
     agent: Agent,
-    requestId: string,
-    message: string,
+    { requestId, message, refs }: { requestId: string; message: string; refs: TaskRefs },
     now: Date,
     deviceId: string | null,
     version?: number,
@@ -300,6 +318,7 @@ export class ChatService extends BaseService {
     const current = previous.at(-1);
     const tasks = new TaskRepository(tx);
     if (current && ChatHistory.waiting(current)) {
+      if (!refs.empty) throw new RuleViolation(ChatService.REFS_WAIT);
       const appended = await chats.countUpdates(current.id, [ChatUpdates.APPENDED]);
       const reply = chat.appendTo(
         current,
@@ -316,9 +335,15 @@ export class ChatService extends BaseService {
       await once.remember({ chatId: chat.id });
       return chat;
     }
-    const task = chat.send(agent, requestId, message, previous, now, deviceId);
+    const task = chat.send(agent, requestId, message, previous, now, { deviceId, refs });
     await chats.save(chat);
     await tasks.insertOnce(task);
     return chat;
+  }
+
+  /** 고른 참조를 보관함으로 확인한다 (트랜잭션 밖에서, 관리자만). 없으면 빈 참조 */
+  private async refsOf(actor: Actor, picks: readonly RefPick[]): Promise<TaskRefs> {
+    if (picks.length === 0) return TaskRefs.of(null);
+    return TaskRefs.resolve(picks, await this.library.describe(actor, TaskRefs.idsOf(picks)));
   }
 }

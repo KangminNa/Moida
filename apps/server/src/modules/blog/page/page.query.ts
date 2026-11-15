@@ -248,7 +248,7 @@ export class PageQuery extends BaseQuery {
     >`
       SELECT p.id, p.name, p.title, p.visibility, p.updated_at, p.menu_id, m.name AS menu
       FROM blog.pages p LEFT JOIN blog.menus m ON m.id = p.menu_id
-      WHERE p.space_id = ${actor.requireSpace()} ${this.libraryWindow('p.updated_at', 'p.id', filter)}
+      WHERE p.space_id = ${actor.requireSpace()} ${this.libraryWindow('p.updated_at', 'p.id', 'p.title', filter)}
       ORDER BY p.updated_at DESC, p.id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: PageQuery.LIBRARY_KIND,

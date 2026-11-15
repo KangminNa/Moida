@@ -6,6 +6,22 @@ import { Agent } from '../agent/agent';
 import type { TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
 import { Task } from './task';
+import type { SubtaskOrder } from './task.input';
+
+/** 위임 입력 하나 (delegate_task의 subtasks 한 줄). 참조는 넘기지 않는다 */
+function subtaskOrder(
+  fields: SubtaskOrder['fields'],
+  paths: string[] | null,
+  refs: string[] | null = null,
+) {
+  return {
+    requestId: randomUUID(),
+    toAgentId: randomUUID(),
+    fields,
+    paths,
+    refs,
+  } as unknown as SubtaskOrder;
+}
 
 // 작업의 상태 기계: 허용된 변경만 메서드로 받고, 나머지는 RuleViolation. DB 없이 돈다.
 
@@ -261,16 +277,17 @@ describe('위임', () => {
     task.subtask(
       lead,
       worker,
-      randomUUID(),
-      {
-        kind,
-        title: '조사',
-        instruction: '자료를 모아 주세요',
-        target_kind: null,
-        target_id: null,
-        base_version: null,
-      },
-      null,
+      subtaskOrder(
+        {
+          kind,
+          title: '조사',
+          instruction: '자료를 모아 주세요',
+          target_kind: null,
+          target_id: null,
+          base_version: null,
+        },
+        null,
+      ),
       NOW,
     );
 
@@ -408,16 +425,17 @@ describe('코드 일 나눠 맡기기 (코드 작업 5단계)', () => {
     parent.subtask(
       lead,
       coder,
-      randomUUID(),
-      {
-        kind,
-        title: '고치기',
-        instruction: '고쳐 주세요',
-        target_kind: null,
-        target_id: null,
-        base_version: null,
-      },
-      paths,
+      subtaskOrder(
+        {
+          kind,
+          title: '고치기',
+          instruction: '고쳐 주세요',
+          target_kind: null,
+          target_id: null,
+          base_version: null,
+        },
+        paths,
+      ),
       NOW,
     );
 

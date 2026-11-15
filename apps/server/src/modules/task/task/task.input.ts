@@ -305,6 +305,8 @@ export class SubtaskOrder extends BaseRequest {
   /** 모양만 넉넉히 막는다. 개수 · 길이 · 위 작업 안인지는 도메인(CodeScope)이 본다 */
   private static readonly PATHS_SHAPE = 40;
   private static readonly PATH_SHAPE = 1_000;
+  private static readonly REFS_SHAPE = 10;
+  private static readonly REF_SHAPE = 2_000;
 
   private constructor(
     readonly requestId: string,
@@ -313,6 +315,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly fields: Omit<TaskNew, 'id' | 'space_id'>,
     /** code 일의 고칠 수 있는 곳 (위 code 작업의 경로 안). 다른 일에는 없다 */
     readonly paths: readonly string[] | null,
+    /** 넘길 참조: 위 작업의 참조 가운데 id나 주소 (TaskRefs.handOn이 고른다) */
+    readonly refs: readonly string[] | null,
   ) {
     super();
   }
@@ -332,6 +336,7 @@ export class SubtaskOrder extends BaseRequest {
           targetKind === null ? null : f.optionalInteger('target_version', 0, VERSION_MAX),
       },
       f.optionalTextList('paths', SubtaskOrder.PATHS_SHAPE, SubtaskOrder.PATH_SHAPE),
+      f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
     );
   }
 }

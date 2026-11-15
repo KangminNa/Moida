@@ -136,7 +136,8 @@ export class SessionQuery extends BaseQuery {
 
   /** 원문 하나 (관리 화면의 원문 보기). 지운 민감정보는 [지움: 종류]로 남아 있다 */
   async transcriptOf(actor: Actor, req: ReadSessionInput): Promise<TranscriptView> {
-    actor.assertCan(Actor.READ_ALL);
+    // 이 작업에만 읽기를 허락받은 세션(대화의 참조, Actor.mayRead)은 비공개를 읽는 권한 없이도 (2026-11-15 B)
+    if (!actor.mayRead(req.id)) actor.assertCan(Actor.READ_ALL);
     await this.find(actor, req.id);
     const row = await this.row(sessionTranscripts, { session_id: req.id, seq: req.seq ?? 0 });
     if (!row) throw new NotFound(`원문 ${req.seq}이 없어요`);
@@ -202,7 +203,7 @@ export class SessionQuery extends BaseQuery {
 
   /** 세션 하나의 지금 판 (AI 도구의 get_session). 볼 수 없는 세션은 없는 세션과 똑같이 NotFound */
   async note(actor: Actor, req: GetSessionInput): Promise<SessionNoteView> {
-    this.assertCanRead(actor);
+    if (!actor.mayRead(req.id)) this.assertCanRead(actor);
     const session = await this.find(actor, req.id);
     return new SessionNoteView(session, SessionQuery.revision(await this.headOf(session)));
   }
@@ -224,7 +225,7 @@ export class SessionQuery extends BaseQuery {
     const [row] = await this.sql<SessionRow[]>`
       SELECT s.* FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
       WHERE s.node_id = ${id} AND s.space_id = ${actor.spaceId} AND n.deleted_at IS NULL
-        ${this.visibleTo(actor, 's.visibility')}`;
+        ${actor.mayRead(id) ? this.sql`` : this.visibleTo(actor, 's.visibility')}`;
     if (!row) throw new NotFound('세션을 찾을 수 없어요');
     return row;
   }
@@ -258,7 +259,7 @@ export class SessionQuery extends BaseQuery {
       WHERE s.space_id = ${actor.requireSpace()} AND n.deleted_at IS NULL
         AND s.last_revision_at IS NOT NULL
         ${filter.project === null ? this.sql`` : this.sql`AND s.project = ${filter.project}`}
-        ${this.libraryWindow('s.last_revision_at', 's.node_id', filter)}
+        ${this.libraryWindow('s.last_revision_at', 's.node_id', 's.head_title', filter)}
       ORDER BY s.last_revision_at DESC, s.node_id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: SessionQuery.LIBRARY_KIND,

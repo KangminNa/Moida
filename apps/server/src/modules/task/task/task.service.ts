@@ -221,14 +221,7 @@ export class TaskService extends BaseService {
       const manager = org.find((a) => a.id === agentId);
       if (!manager) throw new Forbidden(Actor.AGENT);
       const made = req.subtasks.map((s) =>
-        parent.subtask(
-          manager,
-          org.find((a) => a.id === s.toAgentId) ?? null,
-          s.requestId,
-          s.fields,
-          s.paths,
-          now,
-        ),
+        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now),
       );
       // 코드 하위 작업끼리(아직 안 끝난 형제 포함) 고칠 곳이 겹치면 PR이 부딪친다
       CodeScope.assertApart(

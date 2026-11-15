@@ -1,6 +1,6 @@
 import { RuleViolation } from '../../platform';
 import { Task } from '../task/task';
-import type { TaskRow } from '../task.tables';
+import type { ChatUpdateNew, TaskRow } from '../task.tables';
 
 /** 끝난 작업과 그 작업이 속한 대화 (ChatRepository.placeOf가 위로 올라가 찾는다) */
 export type ChatPlaceRow = Pick<
@@ -33,6 +33,38 @@ export class ChatUpdates {
   static readonly POST_MAX = 20;
   /** 덧붙인 말은 회차마다 이만큼 */
   static readonly APPEND_MAX = 5;
+
+  /** 소식 한 줄 (Chat.note가 쌓고 ChatRepository.saveParts가 넣는다) */
+  static line(
+    id: string,
+    chat: { spaceId: string; id: string },
+    kind: string,
+    text: string,
+    taskId: string | null,
+    agentId: string | null,
+    now: Date,
+    choices: readonly string[] | null,
+  ): ChatUpdateNew {
+    return {
+      id,
+      space_id: chat.spaceId,
+      chat_id: chat.id,
+      kind,
+      text: ChatUpdates.text(text),
+      task_id: taskId,
+      agent_id: agentId,
+      choices: choices ? [...choices] : null,
+      created_at: now,
+    };
+  }
+
+  /** post_update로 남길 수 있는가: 종류와 작업마다의 개수 (posted: 그 작업이 이미 남긴 수) */
+  static assertPostable(kind: string, posted: number): void {
+    if (!ChatUpdates.POSTED.includes(kind))
+      throw new RuleViolation(`종류는 ${ChatUpdates.POSTED.join(' · ')} 중 하나예요`);
+    if (posted >= ChatUpdates.POST_MAX)
+      throw new RuleViolation(`소식은 작업마다 ${ChatUpdates.POST_MAX}개까지예요`);
+  }
 
   /** 소식의 글: 앞뒤 공백을 떼고 TEXT_MAX자로 자른다. 비었으면 RuleViolation */
   static text(raw: string): string {

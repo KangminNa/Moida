@@ -1,9 +1,10 @@
 import { BaseRequest } from '../base/base-request';
 
 /**
- * 보관함 읽기 (GET /api/library?kind=&project=&from=&to=&cursor=). 모듈마다 같은 거르기를 받는다.
+ * 보관함 읽기 (GET /api/library?kind=&project=&from=&to=&q=&cursor=). 모듈마다 같은 거르기를 받는다.
  * kind: 한 종류만 (없으면 모두), project: 프로젝트를 아는 종류(세션)만 남는다, from · to: 그 사이에 바뀐 것,
- * cursor: 앞 쪽 응답의 next 그대로 (그보다 앞선 것부터)
+ * q: 제목에 이 글자가 든 것 (대화의 참조 고르기, 2026-11-15), cursor: 앞 쪽 응답의 next 그대로 (그보다 앞선 것부터).
+ * ids: 이 id들만 (서버 안에서만, LibraryQuery.describe가 대화의 참조를 확인할 때)
  */
 export class LibraryInput extends BaseRequest {
   static readonly PAGE = 30;
@@ -16,8 +17,15 @@ export class LibraryInput extends BaseRequest {
     readonly to: Date | null,
     /** 이 시각 · id보다 앞선 것부터 */
     readonly before: readonly [Date, string] | null,
+    readonly q: string | null = null,
+    readonly ids: readonly string[] | null = null,
   ) {
     super();
+  }
+
+  /** 이 id들의 줄만 (LibraryQuery.describe). 기간 · 커서 없이 */
+  static forIds(ids: readonly string[]): LibraryInput {
+    return new LibraryInput(null, null, null, null, null, null, ids);
   }
 
   static from(query: unknown): LibraryInput {
@@ -33,6 +41,7 @@ export class LibraryInput extends BaseRequest {
         f.optionalDate('from'),
         f.optionalDate('to'),
         match?.[1] && match[2] ? [new Date(match[1]), match[2]] : null,
+        f.optionalText('q', 100)?.trim() || null,
       );
     });
   }

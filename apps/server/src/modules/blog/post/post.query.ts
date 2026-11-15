@@ -91,7 +91,8 @@ export class PostQuery extends BaseQuery {
    * 비공개를 볼 수 없는 요청자에게는 볼 수 있는 wiki만 잇는다
    */
   async editable(actor: Actor, req: ReadPostInput): Promise<ToolPostView> {
-    actor.assertCan(Actor.WRITE);
+    // 이 작업에만 읽기를 허락받은 글(대화의 참조, Actor.mayRead)은 쓰기 권한 없이도 읽는다 (2026-11-15 B)
+    if (!actor.mayRead(req.id)) actor.assertCan(Actor.WRITE);
     const [row] = await this.sql<LoadedPost[]>`
       ${this.selectOne()}
       WHERE ${this.inSpace(actor)} AND p.id = ${req.id} AND p.deleted_at IS NULL`;
@@ -181,7 +182,7 @@ export class PostQuery extends BaseQuery {
       SELECT p.id, p.slug, p.title, p.status, p.updated_at, p.menu_id, m.name AS menu
       FROM blog.posts p LEFT JOIN blog.menus m ON m.id = p.menu_id
       WHERE p.space_id = ${actor.requireSpace()} AND p.deleted_at IS NULL
-        ${this.libraryWindow('p.updated_at', 'p.id', filter)}
+        ${this.libraryWindow('p.updated_at', 'p.id', 'p.title', filter)}
       ORDER BY p.updated_at DESC, p.id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: PostQuery.LIBRARY_KIND,

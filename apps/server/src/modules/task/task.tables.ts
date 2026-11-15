@@ -106,6 +106,9 @@ export interface ChatRow {
   project: string | null;
   deliver: string | null;
   pending: string | null;
+  model: string | null;
+  effort: string | null;
+  pending_refs: unknown;
 }
 export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'title' | 'request_id'>;
 

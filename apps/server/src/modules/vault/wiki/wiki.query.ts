@@ -146,7 +146,7 @@ export class WikiQuery extends BaseQuery {
       SELECT w.node_id, w.title, w.visibility, w.updated_at
       FROM vault.wikis w JOIN vault.nodes n ON n.id = w.node_id
       WHERE w.space_id = ${actor.requireSpace()} AND n.deleted_at IS NULL
-        ${this.libraryWindow('w.updated_at', 'w.node_id', filter)}
+        ${this.libraryWindow('w.updated_at', 'w.node_id', 'w.title', filter)}
       ORDER BY w.updated_at DESC, w.node_id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: WikiQuery.LIBRARY_KIND,

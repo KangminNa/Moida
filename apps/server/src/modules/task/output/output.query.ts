@@ -216,7 +216,7 @@ export class OutputQuery extends BaseQuery {
     const rows = await this.sql<Pick<OutputRow, 'id' | 'task_id' | 'name' | 'created_at'>[]>`
       SELECT id, task_id, name, created_at FROM task.outputs
       WHERE space_id = ${actor.requireSpace()} AND deleted_at IS NULL
-        ${this.libraryWindow('created_at', 'id', filter)}
+        ${this.libraryWindow('created_at', 'id', 'name', filter)}
       ORDER BY created_at DESC, id DESC LIMIT ${LibraryInput.PAGE + 1}`;
     return rows.map((r) => ({
       kind: OutputQuery.LIBRARY_KIND,

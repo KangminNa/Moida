@@ -1,6 +1,7 @@
 import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
+import { JobRefs } from './job-refs';
 import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
 import { TeamMember } from './team-member';
@@ -164,6 +165,8 @@ export class Job {
     readonly promptPackage: SkillPackage | null = null,
     /** 에이전트가 정한 모델 · 생각 강도 (2차 7단계). 비면 CLI의 기본 */
     readonly runtime: CliRuntime = CliRuntime.NONE,
+    /** 관리자가 대화에 넣은 참조 (payload.refs, 2026-11-15 B) */
+    readonly refs: JobRefs = JobRefs.NONE,
   ) {}
 
   static from(raw: Json): Job {
@@ -206,6 +209,7 @@ export class Job {
       agent.flag('bound'),
       raw.field('prompt_package') ? SkillPackage.from(raw.child('prompt_package')) : null,
       CliRuntime.from(agent, raw.list('tools')),
+      JobRefs.from(task.child('payload')),
     );
   }
 
@@ -243,6 +247,7 @@ export class Job {
       this.bound,
       this.promptPackage,
       this.runtime,
+      this.refs,
     );
   }
 
@@ -336,6 +341,7 @@ export class Job {
     const tools = this.runToken === null || this.sandboxed ? [] : this.runtime.tools;
     if (tools.length > 0)
       parts.push(prompts.fill('tools', { names: tools.map((t) => t.server).join(', ') }));
+    if (!this.refs.empty) parts.push(this.refs.brief(prompts, this.kind === Job.MAKE));
     return parts.join('\n\n');
   }
 }

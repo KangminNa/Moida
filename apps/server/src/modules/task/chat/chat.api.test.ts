@@ -288,6 +288,87 @@ describe('대화', () => {
   });
 });
 
+describe('대화 입력창 (2026-11-15 B): 참조 · 모델', () => {
+  test('주소 참조는 회차 작업의 payload.refs와 회차에 실린다. 모양이 틀리면 400, 없는 참조는 422', async () => {
+    const lead = await agent('참조 상대');
+    const refs = [{ kind: 'url', url: 'https://example.com/a', browser: false }];
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        agentId: lead.id,
+        message: '이 글 요약해 줘',
+        refs,
+      }),
+      201,
+    );
+    const turn = (await detail(chat.id)).turns[0];
+    assert.deepEqual(
+      turn.refs.map((r: Json) => [r.kind, r.url, r.private]),
+      [['url', 'https://example.com/a', false]],
+    );
+    assert.deepEqual((await task(turn.taskId)).payload.refs.length, 1);
+    const shape = await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      agentId: lead.id,
+      message: '틀린 참조',
+      refs: [
+        { kind: 'url', url: 'ftp://example.com' },
+        { kind: 'nope', id: randomUUID() },
+      ],
+    });
+    assert.equal(shape.status, 400, shape.text);
+    const missing = await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      agentId: lead.id,
+      message: '없는 위키',
+      refs: [{ kind: 'wiki', id: randomUUID() }],
+    });
+    assert.equal(missing.status, 422, missing.text);
+  });
+
+  test('일하는 중에 보낸 참조는 422 (덧붙인 말은 회차가 아니다)', async () => {
+    const lead = await agent('일하는 상대');
+    const chat = ok(await open(lead.id, '첫 일'), 201);
+    const res = await api.request('POST', `/api/chats/${chat.id}/messages`, owner, {
+      requestId: randomUUID(),
+      version: chat.version,
+      message: '이것도 봐 줘',
+      refs: [{ kind: 'url', url: 'https://example.com/b' }],
+    });
+    assert.equal(res.status, 422, res.text);
+  });
+
+  test('대화의 모델 · 생각 강도: 그 회차의 일에 실리고 도구가 받지 않는 강도는 422, 낡은 version은 409', async () => {
+    const lead = await agent('모델 상대', { tool: 'codex' });
+    const chat = ok(await open(lead.id, '첫 일'), 201);
+    const bad = await api.request('PATCH', `/api/chats/${chat.id}`, owner, {
+      version: chat.version,
+      model: 'gpt-5',
+      effort: 'max',
+    });
+    assert.equal(bad.status, 422, bad.text);
+    const tuned = ok(
+      await api.request('PATCH', `/api/chats/${chat.id}`, owner, {
+        version: chat.version,
+        model: 'gpt-5',
+        effort: 'high',
+      }),
+    );
+    assert.deepEqual([tuned.model, tuned.effort], ['gpt-5', 'high']);
+    const stale = await api.request('PATCH', `/api/chats/${chat.id}`, owner, {
+      version: chat.version,
+      model: null,
+      effort: null,
+    });
+    assert.equal(stale.status, 409, stale.text);
+    const visitor = await api.request('PATCH', `/api/chats/${chat.id}`, TestUser.visitor, {
+      version: tuned.version,
+      model: null,
+    });
+    assert.equal(visitor.status, 403);
+  });
+});
+
 describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent · agent_updates, 기기 권한 delegate)', () => {
   test('권한이 없는 기기에는 도구가 보이지 않고, 부르면 delegate 권한을 알린다', async () => {
     const plain = await device(`plain-${randomUUID().slice(0, 6)}`);

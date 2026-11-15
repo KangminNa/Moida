@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { type Actor, CurrentActor, VersionInput } from '../../platform';
-import { ChatIdInput, CreateChatInput, SendChatInput } from './chat.input';
+import { ChatIdInput, CreateChatInput, SendChatInput, TuneChatInput } from './chat.input';
 import { ChatQuery } from './chat.query';
 import { ChatService } from './chat.service';
 import type { ChatDetailView, ChatListView, ChatView } from './chat.view';
@@ -36,6 +36,16 @@ export class ChatController {
     @Body() body: unknown,
   ): Promise<ChatView> {
     return (await this.service.send(actor, SendChatInput.from(id, body))).view();
+  }
+
+  /** 대화의 모델 · 생각 강도 (2026-11-15 B). 비우면 상대 에이전트의 설정 */
+  @Patch(':id')
+  async tune(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<ChatView> {
+    return (await this.service.tune(actor, TuneChatInput.from(id, body))).view();
   }
 
   /** 멈추기 (2차 2단계): 도는 일 · 기다리는 결재 · 결과 카드를 모두 취소한다 */

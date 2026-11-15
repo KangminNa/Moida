@@ -201,16 +201,7 @@ export class ScheduleService extends EntityService<Schedule> {
     const chats = new ChatRepository(tx);
     const requestId = schedule.requestIdFor(slot);
     if (chatId === null) {
-      const chat = Chat.open(
-        spaceId,
-        requestId,
-        instruction,
-        now,
-        null,
-        null,
-        null,
-        schedule.deliver,
-      );
+      const chat = Chat.open(spaceId, requestId, instruction, now, { deliver: schedule.deliver });
       const turn = chat.assign(agent, now);
       await chats.save(chat);
       schedule.openedChat(chat.id);

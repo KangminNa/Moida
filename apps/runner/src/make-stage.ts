@@ -118,7 +118,8 @@ export class MakeStage implements SandboxStage {
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
     const room = await SandboxRoom.open(this.config.workDir, this.job.taskId, this.agent);
     this.room = room;
-    const { outputs } = this.materials;
+    // 재료(payload.make)와 대화 · 위임으로 넣은 참조 결과물(payload.refs)을 함께 받는다 (2026-11-15 B)
+    const outputs = [...new Set([...this.materials.outputs, ...this.job.refs.outputs])];
     let page: PageBase | null = null;
     if (this.job.page) {
       try {

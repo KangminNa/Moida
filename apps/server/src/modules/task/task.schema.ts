@@ -106,6 +106,9 @@ export const chats = taskSchema.table('chats', {
   project: text('project'),
   deliver: text('deliver'),
   pending: text('pending'),
+  model: text('model'),
+  effort: text('effort'),
+  pending_refs: jsonb('pending_refs'),
 });
 
 /** task.external_tools */

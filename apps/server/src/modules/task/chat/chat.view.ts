@@ -31,6 +31,23 @@ export type ChatUpdateLine = ChatUpdateRow & {
  * working · waiting_approval · done · failed), 지금 도는 작업 수 (마지막 회차와 그 덧붙인 말의 답 아래 전부)
  */
 export type ChatBoardRow = ChatRow & { partner: string | null; state: string; active: number };
+/** 이 대화에서 시작해 아직 끝나지 않은 작업 하나 (팀이 동시에 일하는 칸, 2026-11-15) */
+export type ChatTeamRow = Pick<
+  TaskRow,
+  'id' | 'agent_id' | 'title' | 'status' | 'wait_reason' | 'created_at' | 'parent_id'
+> & { agent: string | null; last_event: string | null };
+
+/** 참조의 칸 (payload.refs · chats.pending_refs). 서버가 적은 값이지만 내보낼 칸은 여기서 고른다 */
+function refsOf(raw: unknown) {
+  return (Array.isArray(raw) ? (raw as Record<string, unknown>[]) : []).map((r) => ({
+    kind: String(r.kind ?? ''),
+    id: typeof r.id === 'string' ? r.id : null,
+    title: String(r.title ?? ''),
+    private: r.private === true,
+    url: typeof r.url === 'string' ? r.url : null,
+    browser: r.browser === true,
+  }));
+}
 
 /** 대화 하나 (만들기 · 보내기의 응답, 목록 · 상세의 머리) */
 export class ChatView {
@@ -53,6 +70,11 @@ export class ChatView {
       project: r.project ?? null,
       /** 받을 것 (html · blog · browser · code). null이면 대화 답 */
       deliver: r.deliver ?? null,
+      /** 대화의 모델 · 생각 강도 (2026-11-15 B). null이면 상대 에이전트의 설정 */
+      model: r.model ?? null,
+      effort: r.effort ?? null,
+      /** 맡기 전 첫 메시지의 참조 (맡으면 첫 회차로 옮겨져 빈다) */
+      pendingRefs: refsOf(r.pending_refs),
       version: r.version,
       createdAt: r.created_at.toISOString(),
       updatedAt: r.updated_at.toISOString(),
@@ -103,6 +125,8 @@ export class ChatTurnView {
       error: typeof result.error === 'string' ? result.error : null,
       progress: t.last_event,
       openSubtasks: t.open_subtasks,
+      /** 이 회차에 넣은 참조 (2026-11-15 B) */
+      refs: refsOf((t.payload as { refs?: unknown } | null)?.refs),
       /** 받을 것이 없어 서버가 다시 맡긴 회차 (메시지는 관리자의 글이 아니라 지시문 틀 result-check) */
       fix: (t.payload as { chat?: { fix?: unknown } } | null)?.chat?.fix === true,
       outputs: this.outputs
@@ -178,6 +202,8 @@ export class ChatDetailView {
     private readonly news: readonly ChatUpdateLine[],
     private readonly question: Readonly<ChatUpdateLine> | null,
     private readonly card: ChatCardView | null,
+    /** 이 대화에서 시작해 아직 끝나지 않은 작업 (오래된 것부터) */
+    private readonly team: readonly ChatTeamRow[] = [],
   ) {}
 
   toJSON() {
@@ -211,6 +237,18 @@ export class ChatDetailView {
       question: q ? { text: q.text, choices: q.choice_list ?? [] } : null,
       /** 기다리는 결과 카드 (없으면 null) */
       card: this.card?.toJSON() ?? null,
+      /** 팀이 동시에 일하는 칸 (2026-11-15): 회차 · 덧붙인 말의 답 · 검토와 그 아래에서 끝나지 않은 작업. parentId로 맡긴 사슬 */
+      team: this.team.map((t) => ({
+        taskId: t.id,
+        agentId: t.agent_id,
+        agent: t.agent,
+        title: t.title,
+        status: t.status,
+        waitReason: t.wait_reason,
+        parentId: t.parent_id,
+        createdAt: t.created_at.toISOString(),
+        lastEvent: t.last_event,
+      })),
     };
   }
 }

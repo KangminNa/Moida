@@ -26,7 +26,9 @@ import {
 import { MakeMaterials } from './make-materials';
 import { PageOrder } from './page-order';
 import type { RunRecord } from './run-record';
+import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
+import { TaskRefs } from './task-refs.policy';
 
 // 작업 하나. 러너가 임대로 빌려 가고, 에이전트가 결재를 올리고, 결재 뒤 실행 결과로 끝난다.
 //   queued → running → waiting → running → done, 그리고 failed · cancelled
@@ -293,6 +295,11 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   /** 만들기 작업의 재료 (주인이 고른 결과물 · 위키). 만들기 작업이 아니면 null */
+  /** 대화 · 위임으로 넣은 참조 (payload.refs, 2026-11-15 B) */
+  get refs(): TaskRefs {
+    return TaskRefs.of(this.row.payload);
+  }
+
   get makeMaterials(): MakeMaterials | null {
     return this.row.kind === Task.MAKE ? MakeMaterials.of(this.row.payload) : null;
   }
@@ -478,26 +485,25 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   /**
    * 하위 작업 하나를 만든다. 받는 쪽은 manager의 바로 아래 팀원이어야 하고, 그 에이전트의 권한으로 할 수 있는 종류여야 한다 (DelegationPolicy).
    * 하위 작업은 이 작업의 목표와 우선순위를 물려받고, 담당은 worker로 정해진다.
-   * code는 code 작업에서만 맡긴다: 이 작업의 저장소 · 명령을 물려받고 경로(paths)는 이 작업의 경로 안으로 좁힌다
+   * code는 code 작업에서만 맡긴다: 이 작업의 저장소 · 명령을 물려받고 경로(paths)는 이 작업의 경로 안으로 좁힌다 (CodeScope).
+   * 참조(refs)는 이 작업의 참조 가운데 고른 것만 넘긴다 (TaskRefs.handOn)
    */
-  subtask(
-    manager: Agent,
-    worker: Agent | null,
-    requestId: string,
-    fields: Omit<TaskNew, 'id' | 'space_id'>,
-    paths: readonly string[] | null,
-    now: Date,
-  ): Task {
+  subtask(manager: Agent, worker: Agent | null, order: SubtaskOrder, now: Date): Task {
+    const { fields, paths, refs } = order;
     const { kind } = fields;
     DelegationPolicy.assert(manager, worker, kind, Task.DELEGABLE, Task.SCOPES[kind] ?? []);
     const r = this.row;
     return Task.open(
       r.space_id,
-      this.subtaskRequestId(requestId),
+      this.subtaskRequestId(order.requestId),
       {
         ...fields,
         agent_id: worker.id,
-        payload: { delegatedBy: this.id, ...this.codeFor(kind, paths) },
+        payload: {
+          delegatedBy: this.id,
+          ...CodeScope.forSubtask(kind, paths, this.codeScope),
+          ...TaskRefs.of(r.payload).handOn(refs, worker).payload,
+        },
         priority: r.priority,
         goal_id: r.goal_id,
         parent_id: this.id,
@@ -505,17 +511,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
       },
       now,
     );
-  }
-
-  /** 하위 작업의 payload.code. code가 아닌 일에는 paths를 적지 않는다 */
-  private codeFor(kind: string, paths: readonly string[] | null): Record<string, unknown> {
-    if (kind !== Task.CODE) {
-      if (paths !== null) throw new RuleViolation('paths는 code 일에만 적어요');
-      return {};
-    }
-    const mine = this.codeScope;
-    if (mine === null) throw new RuleViolation('코드 일은 코드 작업에서만 나눠 맡겨요');
-    return { code: mine.narrowTo(paths).toPayload() };
   }
 
   /**
@@ -652,7 +647,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 만들기 작업이면 주인이 고른 재료 위키에 읽기 허락을 더한다 (get_wiki만 본다)
    */
   actorFor(agentId: string, scopes: readonly string[]): AgentActor {
-    const reads = this.makeMaterials?.wikis ?? [];
+    const reads = [...(this.makeMaterials?.wikis ?? []), ...this.refs.readIds];
     return new AgentActor(this.row.space_id, agentId, this.id, new Set(scopes), new Set(reads));
   }
 

@@ -5,6 +5,7 @@ import type { DelegatedView } from './job.view';
 import { Task } from './task';
 import { DelegateTaskInput } from './task.input';
 import { TaskService } from './task.service';
+import { TaskRefs } from './task-refs.policy';
 
 // MCP 도구 delegate_task: 에이전트가 바로 아래 팀에게 하위 작업을 맡긴다 (에이전트 조직, 객체설계 13장).
 // 작업 토큰으로만 부른다. 누가 어느 작업에서 맡기는지는 입력이 아니라 토큰에서 나온다.
@@ -46,6 +47,11 @@ export class DelegateTaskTool extends BaseTool {
               minItems: 1,
               maxItems: CodeScope.PATHS_MAX,
               items: { type: 'string', maxLength: CodeScope.PATH_MAX },
+            },
+            refs: {
+              type: 'array',
+              maxItems: TaskRefs.MAX,
+              items: { type: 'string', maxLength: 2000 },
             },
           },
           required: ['request_id', 'to_agent_id', 'title', 'instruction'],

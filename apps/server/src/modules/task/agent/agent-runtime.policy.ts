@@ -33,6 +33,20 @@ export class AgentRuntime {
     return value;
   }
 
+  /**
+   * 대화가 정해 둔 모델 · 강도로 회차 작업에 실을 칸 (payload.runtime, 2026-11-15 B). 정한 것이 없으면 빈 객체.
+   * 상대의 도구가 바뀌어 강도가 맞지 않으면 RuleViolation (조용히 빼지 않는다)
+   */
+  static turnPayload(
+    tool: string,
+    model: string | null,
+    effort: string | null,
+  ): Record<string, unknown> {
+    if (!model && !effort) return {};
+    AgentRuntime.assertFits(tool, effort ?? '');
+    return { runtime: { model: model ?? '', effort: effort ?? '' } };
+  }
+
   /** 이 도구가 이 강도를 받는가. 도구 · 강도를 다 바꾼 뒤에 한 번 본다 */
   static assertFits(tool: string, effort: string): void {
     if (effort === '') return;
