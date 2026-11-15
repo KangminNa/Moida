@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import type { AiStream } from './ai-tool';
+import type { ConnectorCall } from './connector-calls';
 import type { Json } from './json';
 import type { Redactor } from './redactor';
 
@@ -152,13 +154,43 @@ export class RunResult {
     readonly status: string,
     readonly text: string | null,
     readonly error: string | null,
+    /** 결과에 함께 싣는 칸 (커넥터 확인의 tools, 에이전트 일의 connector_calls) */
+    readonly extra: Readonly<Record<string, unknown>> = {},
   ) {}
 
   static done(text: string, redactor: Redactor): RunResult {
     return new RunResult('done', Clip.text(redactor.clean(text), RunResult.TEXT_MAX), null);
   }
 
-  static failed(error: string, redactor: Redactor): RunResult {
-    return new RunResult('failed', null, Clip.text(redactor.clean(error), RunResult.ERROR_MAX));
+  /**
+   * 실패. calls가 있으면 이 실행에서 부른 커넥터를 함께 (2026-11-15 MCP 1단계): 오류 글은 지운 뒤에
+   */
+  static failed(
+    error: string,
+    redactor: Redactor,
+    calls: readonly ConnectorCall[] = [],
+  ): RunResult {
+    const text = Clip.text(redactor.clean(error), RunResult.ERROR_MAX);
+    return new RunResult('failed', null, text, RunResult.callsOf(calls, redactor));
+  }
+
+  /** AI CLI의 마지막 답과 이 실행에서 부른 커넥터 */
+  static from(
+    stream: Pick<AiStream, 'finalText' | 'connectorCalls'>,
+    redactor: Redactor,
+  ): RunResult {
+    const text = Clip.text(redactor.clean(stream.finalText), RunResult.TEXT_MAX);
+    return new RunResult('done', text, null, RunResult.callsOf(stream.connectorCalls, redactor));
+  }
+
+  /** 결과에 칸을 더한 새 결과 (요청 id는 새로) */
+  with(extra: Readonly<Record<string, unknown>>): RunResult {
+    return new RunResult(this.status, this.text, this.error, { ...this.extra, ...extra });
+  }
+
+  private static callsOf(calls: readonly ConnectorCall[], redactor: Redactor) {
+    if (calls.length === 0) return {};
+    const clean = calls.map((c) => (c.error ? { ...c, error: redactor.clean(c.error) } : c));
+    return { connector_calls: clean };
   }
 }

@@ -269,6 +269,17 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     );
   }
 
+  /** 커넥터의 끝나지 않은 확인 (tool_check, 2026-11-15 MCP 1단계) */
+  async findPendingToolCheck(spaceId: string, toolId: string): Promise<Task | null> {
+    return this.maybeOne(
+      await this.sql`
+        SELECT * FROM task.tasks
+        WHERE space_id = ${spaceId} AND kind = ${Task.TOOL_CHECK} AND payload->>'toolId' = ${toolId}
+          AND status IN (${Task.QUEUED}, ${Task.RUNNING})
+        LIMIT 1`,
+    );
+  }
+
   /** 도구의 끝나지 않은 연결 확인 */
   async findPendingAiTest(spaceId: string, tool: string): Promise<Task | null> {
     return this.maybeOne(

@@ -39,7 +39,10 @@ import { ExternalToolController } from './external-tool/external-tool.api';
 import { ExternalToolQuery } from './external-tool/external-tool.query';
 import { ExternalToolService } from './external-tool/external-tool.service';
 import { ProposeToolTool } from './external-tool/external-tool.tool';
+import { ExternalToolCheckJob } from './external-tool/external-tool-check.job';
+import { ExternalToolCheckService } from './external-tool/external-tool-check.service';
 import { ExternalToolPlugHandler } from './external-tool/external-tool-plug.handler';
+import { ExternalToolTaskHandler } from './external-tool/external-tool-task.handler';
 import { GoalController } from './goal/goal.api';
 import { GoalQuery } from './goal/goal.query';
 import { GoalService } from './goal/goal.service';
@@ -178,6 +181,10 @@ import { WebPageGateway } from './web/web-page.gateway';
     ExternalToolQuery,
     ExternalToolPlugHandler,
     ProposeToolTool,
+    // MCP 먼저 1단계 (2026-11-15): 커넥터 확인 · 사용 기록
+    ExternalToolCheckService,
+    ExternalToolTaskHandler,
+    ExternalToolCheckJob,
     // 설정 바꾸기 제안 (2026-11-15 C): 미리 해 보고 결재로, 승인 뒤 그 설정의 Service가 적용
     SettingQuery,
     SettingChangeService,
@@ -238,6 +245,8 @@ export class TaskModule implements OnModuleInit {
     private readonly externalTools: ExternalToolService,
     private readonly agentSettings: AgentSettingHandler,
     private readonly scheduleSettings: ScheduleSettingHandler,
+    private readonly toolTasks: ExternalToolTaskHandler,
+    private readonly toolChecks: ExternalToolCheckJob,
   ) {}
 
   onModuleInit(): void {
@@ -261,6 +270,9 @@ export class TaskModule implements OnModuleInit {
     // 설정 바꾸기 (2026-11-15 C): 승인되면 그 설정을 가진 쪽이 적용하고 결과(task.setting.changed)를 남긴다
     this.workers.on(AgentSettingHandler.TOPIC, this.agentSettings);
     this.workers.on(ScheduleSettingHandler.TOPIC, this.scheduleSettings);
+    // MCP 먼저 (2026-11-15): 끝난 작업에서 커넥터 확인 결과 · 사용을 적고, 때가 된 커넥터에 확인을 맡긴다
+    this.workers.on(Task.CHANGED, this.toolTasks);
+    this.workers.every(this.toolChecks, ExternalToolCheckJob.EVERY_MS);
     this.rotation.register('task.external_tools', (actor) =>
       this.externalTools.resealSecrets(actor),
     );

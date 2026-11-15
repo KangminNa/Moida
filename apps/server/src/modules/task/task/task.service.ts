@@ -368,7 +368,7 @@ export class TaskService extends BaseService {
     const view = task.jobView(agent, this.box, goals, org, children, skill?.jobView() ?? null);
     view.withOutputs(made).withChat(await this.chats.forJob(actor, task.id));
     // 외부 도구 (2차 7단계): 이 에이전트에게 허락한 것만, 토큰은 여기서 풀려 이 일과 함께만 나간다
-    const tools = await this.tools.forJob(actor, agent);
+    const tools = await this.tools.forJob(actor, agent, task.checkedToolId);
     return view.withPrompt(prompt?.jobView() ?? null).withTools(tools);
   }
 

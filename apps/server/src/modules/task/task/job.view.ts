@@ -105,11 +105,19 @@ export class JobToolView {
     private readonly row: Readonly<Pick<ExternalToolRow, 'name' | 'title' | 'url'>>,
     /** 푼 머리글. 머리글이 없는 도구는 빈 객체 */
     private readonly headers: Readonly<Record<string, string>>,
+    /** 지시문에 싣는 도구 한 줄씩 ("search — 문서 찾기", 2026-11-15 MCP 1단계). MCP 먼저의 순서를 정할 만큼만 */
+    private readonly catalog: readonly string[] = [],
   ) {}
 
   toJSON() {
     const r = this.row;
-    return { name: r.name, title: r.title, url: r.url, headers: this.headers };
+    return {
+      name: r.name,
+      title: r.title,
+      url: r.url,
+      headers: this.headers,
+      catalog: this.catalog,
+    };
   }
 }
 

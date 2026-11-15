@@ -67,6 +67,7 @@ export const MENU = [
     advanced: false,
     items: [
       { href: SETTINGS_HREF, name: 'AI 계정', icon: 'key' },
+      { href: '/admin/external-tools', name: '커넥터', icon: 'plug' },
       { href: '/admin/site', name: '사이트', icon: 'site' },
       { href: '/admin/notices', name: '알림', icon: 'bell' },
       { href: '/admin/account', name: '계정', icon: 'user' },
@@ -97,7 +98,6 @@ export const MENU = [
     label: '연결',
     advanced: true,
     items: [
-      { href: '/admin/external-tools', name: '커넥터', icon: 'plug' },
       { href: '/admin/runners', name: '러너', icon: 'runner' },
       { href: '/admin/devices', name: '연결된 기기', icon: 'device' },
       { href: '/admin/plugins', name: '플러그인', icon: 'brick' },

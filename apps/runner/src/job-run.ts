@@ -357,11 +357,11 @@ export class JobRun {
 
   private fromExit(exit: ChildExit, stream: AiStream, child: AiProcess): RunEnding {
     if (exit.code === 0 && stream.failure === null)
-      return RunEnding.submit('끝났어요', RunResult.done(stream.finalText, this.redactor));
+      return RunEnding.submit('끝났어요', RunResult.from(stream, this.redactor));
     const how = exit.signal ? `신호 ${exit.signal}` : `코드 ${exit.code}`;
     const why = stream.failure || child.stderrTail;
     const error = why ? `AI CLI가 ${how}로 끝났어요: ${why}` : `AI CLI가 ${how}로 끝났어요`;
-    return RunEnding.submit(error, RunResult.failed(error, this.redactor));
+    return RunEnding.submit(error, RunResult.failed(error, this.redactor, stream.connectorCalls));
   }
 
   private async conclude(ending: RunEnding): Promise<void> {

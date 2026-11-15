@@ -116,6 +116,8 @@ export class Job {
   private static readonly SESSION_NOTE = 'session_note';
   /** 웹 AI 로그인: 러너가 로그인 명령을 대신 돌린다 (SigninRun) */
   static readonly AI_SIGNIN = 'ai_signin';
+  /** 커넥터 확인 (2026-11-15 MCP 1단계): AI 없이 원격 MCP의 도구 목록을 받는다 (ToolCheckRun) */
+  private static readonly TOOL_CHECK = 'tool_check';
   /** 서버 브라우저로 하는 일: 어디서 돌지는 러너가 browser_job으로 받고(BrowseStage) Playwright MCP를 붙인다 */
   static readonly BROWSE = 'browse';
   /** 코드 작업: 코드 러너 칸에서 셸로 저장소를 고친다 (docs/코드작업.md) */
@@ -271,6 +273,11 @@ export class Job {
     return this.kind === Job.AI_SIGNIN;
   }
 
+  /** 커넥터 확인. 확인할 커넥터 하나가 tools에 실려 온다 */
+  get isToolCheck(): boolean {
+    return this.kind === Job.TOOL_CHECK;
+  }
+
   /** 서버 브라우저로 하는 일 */
   get isBrowse(): boolean {
     return this.kind === Job.BROWSE;
@@ -340,7 +347,12 @@ export class Job {
     // 외부 도구 (2차 7단계): 어댑터가 붙이는 조건과 같다 (MCP가 붙는 일, 셸이 없는 일)
     const tools = this.runToken === null || this.sandboxed ? [] : this.runtime.tools;
     if (tools.length > 0)
-      parts.push(prompts.fill('tools', { names: tools.map((t) => t.server).join(', ') }));
+      parts.push(
+        prompts.fill('tools', {
+          names: tools.map((t) => t.server).join(', '),
+          list: tools.map((t) => t.promptLines).join('\n'),
+        }),
+      );
     if (!this.refs.empty) parts.push(this.refs.brief(prompts, this.kind === Job.MAKE));
     return parts.join('\n\n');
   }

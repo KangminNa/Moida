@@ -128,6 +128,12 @@ export const externalTools = taskSchema.table('external_tools', {
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  catalog: jsonb('catalog').notNull(),
+  checked_at: timestamp('checked_at', { withTimezone: true }),
+  check_error: text('check_error'),
+  last_used_at: timestamp('last_used_at', { withTimezone: true }),
+  last_failed_at: timestamp('last_failed_at', { withTimezone: true }),
+  last_error: text('last_error'),
 });
 
 /** task.goal_rounds */

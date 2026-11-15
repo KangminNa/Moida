@@ -129,6 +129,12 @@ export interface ExternalToolRow {
   version: number;
   created_at: Date;
   updated_at: Date;
+  catalog: unknown;
+  checked_at: Date | null;
+  check_error: string | null;
+  last_used_at: Date | null;
+  last_failed_at: Date | null;
+  last_error: string | null;
 }
 export type ExternalToolNew = Partial<ExternalToolRow> & Pick<ExternalToolRow, 'id' | 'space_id' | 'name' | 'title' | 'url'>;
 

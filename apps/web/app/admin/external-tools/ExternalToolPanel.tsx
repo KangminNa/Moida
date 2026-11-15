@@ -5,20 +5,15 @@ import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useExternalTools } from '../../_task/live';
 import type { ExternalTool } from '../../_task/types';
+import { ConnectorHealth, checkable, connectorState } from './ConnectorHealth';
 import { type ExternalToolBody, ExternalToolForm } from './ExternalToolForm';
 
 const NEW = 'new';
 const CONFLICT = '이미 바뀐 도구예요. 최신 내용을 다시 읽었어요';
 
-/** 줄의 상태 표시: 제안 · 토큰 필요 · 켜짐 · 꺼짐 */
-function stateOf(tool: ExternalTool): string {
-  if (tool.status === 'proposed') return '제안 · 승인 대기';
-  if (tool.status === 'off') return '꺼짐';
-  return tool.headerName && !tool.hasSecret ? '토큰 필요' : '켜짐';
-}
-
 // 외부 도구 (2차 7단계): 바깥 서비스의 원격 MCP 서버. 에이전트 편집에서 허락하면 러너가 그 에이전트의 일에만 붙인다.
 // AI가 제안한 도구는 승인(결과 카드)로 정한다. 토큰은 넣기만 하고 다시 보이지 않는다.
+// 연결 확인(2026-11-15 MCP 1단계)은 러너가 하고(도구 목록 · 실패 까닭), 에이전트의 일에서 부른 때 · 오류가 함께 보인다.
 export function ExternalToolPanel() {
   const tools = useExternalTools();
   const action = useAction();
@@ -27,6 +22,8 @@ export function ExternalToolPanel() {
   const [open, setOpen] = useState<string | null>(null);
   const [secretFor, setSecretFor] = useState<string | null>(null);
   const [secret, setSecret] = useState('');
+  /** 연결 확인을 맡긴 도구 → 그때의 checkedAt (결과가 오면 값이 달라져 "확인 중"이 풀린다) */
+  const [checking, setChecking] = useState<Readonly<Record<string, string | null>>>({});
   const list = tools.data?.tools ?? null;
   const problem = action.problem ?? tools.error;
 
@@ -55,6 +52,15 @@ export function ExternalToolPanel() {
       () => api('PATCH', `/api/external-tools/${tool.id}`, { enabled: on, version: tool.version }),
       { done: `${tool.title} ${on ? '켬' : '끔'}`, reload: tools.reload, conflict: CONFLICT },
     );
+  }
+
+  async function check(tool: ExternalTool) {
+    const reply = await action.run(
+      tool.id,
+      () => api('POST', `/api/external-tools/${tool.id}/check`, {}),
+      { done: `${tool.title} 연결 확인 맡김`, reload: tools.reload },
+    );
+    if (reply?.ok) setChecking((c) => ({ ...c, [tool.id]: tool.checkedAt }));
   }
 
   function remove(tool: ExternalTool) {
@@ -97,7 +103,7 @@ export function ExternalToolPanel() {
       <header className="page-head">
         <div>
           <h1>커넥터</h1>
-          <p>바깥 서비스의 MCP. 팀 화면에서 허락한 에이전트의 일에만 붙음</p>
+          <p>바깥 서비스의 MCP. 팀 화면에서 허락한 에이전트의 일에만 붙고, 일할 때 먼저 씀</p>
         </div>
         {open !== NEW && (
           <button type="button" className="cta small" onClick={() => setOpen(NEW)}>
@@ -119,10 +125,13 @@ export function ExternalToolPanel() {
                 {form(t)}
               </li>
             ) : (
-              <li key={t.id} className="list-cell schedule-row">
+              <li key={t.id} className="list-cell schedule-row connector-row">
                 <div className="item-main">
                   <b>
-                    {t.title} <span className="pill">{stateOf(t)}</span>
+                    {t.title}{' '}
+                    <span className="pill">
+                      {connectorState(t, checking[t.id] === t.checkedAt)}
+                    </span>
                   </b>
                   <small>
                     x-{t.name} · {t.url}
@@ -130,6 +139,7 @@ export function ExternalToolPanel() {
                     {t.agents.map((a) => a.name).join(', ') || '없음'}
                   </small>
                   {t.note && <small className="clamp">제안한 까닭: {t.note}</small>}
+                  <ConnectorHealth tool={t} />
                   {secretFor === t.id && (
                     <form className="row" onSubmit={(e) => putSecret(e, t)}>
                       <input
@@ -154,6 +164,16 @@ export function ExternalToolPanel() {
                   {secretFor === t.id && token.problem && <p className="error">{token.problem}</p>}
                 </div>
                 <div className="row">
+                  {checkable(t) && (
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={action.busy === t.id}
+                      onClick={() => void check(t)}
+                    >
+                      연결 확인
+                    </button>
+                  )}
                   {t.headerName && t.status !== 'proposed' && (
                     <button
                       type="button"

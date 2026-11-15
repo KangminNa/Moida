@@ -74,8 +74,16 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 원문은 작업에 싣지 않는다 (비공개 사본이 vault 밖에 남지 않게). 대상은 세션, 대상의 판은 원문 번호
    */
   static readonly SESSION_NOTE = 'session_note';
+  /** 커넥터 확인 (2026-11-15 MCP 1단계): 러너가 원격 MCP에 붙어 도구 목록을 받는다. AI 없이, 결과는 커넥터에 적는다 */
+  static readonly TOOL_CHECK = 'tool_check';
   /** 에이전트 없이 러너가 바로 도는 일 */
-  static readonly AGENTLESS = [Task.AI_TEST, Task.AI_SIGNIN, Task.ROUTE, Task.SESSION_NOTE];
+  static readonly AGENTLESS = [
+    Task.AI_TEST,
+    Task.AI_SIGNIN,
+    Task.ROUTE,
+    Task.SESSION_NOTE,
+    Task.TOOL_CHECK,
+  ];
   /** 서버 브라우저로 하는 작업. 브라우저가 있다고 알린 러너(next_jobs의 browser)에게만 빌려 준다 */
   static readonly BROWSE = 'browse';
   /** 코드 작업: 코드 러너 칸에서 셸로 저장소를 고친다 (docs/코드작업.md) */
@@ -187,32 +195,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     );
     task.announce();
     return task;
-  }
-
-  /**
-   * 웹 AI 로그인 (tool: claude · codex). 러너가 로그인 명령을 PTY 안에서 돌리고 주소를 알린다.
-   * Claude는 사람이 브라우저의 코드를 붙여 넣어야 하고, Codex는 주소와 코드만 보여 주면 된다
-   */
-  static aiSignin(spaceId: string, tool: string, now: Date): Task {
-    const fields = {
-      kind: Task.AI_SIGNIN,
-      title: `${tool} 로그인`,
-      payload: { tool, step: Task.SIGNIN_STARTING },
-      priority: Task.AI_TEST_PRIORITY,
-    };
-    return Task.open(spaceId, BaseEntity.newId(), fields, now);
-  }
-
-  /** AI 로그인의 연결 확인. 어느 판의 로그인을 보는지 함께 적어 둔다 */
-  static aiTest(spaceId: string, tool: string, loginVersion: number, now: Date): Task {
-    const fields = {
-      kind: Task.AI_TEST,
-      title: 'AI 연결 확인',
-      instruction: Task.AI_TEST_PROMPT,
-      payload: { tool, loginVersion },
-      priority: Task.AI_TEST_PRIORITY,
-    };
-    return Task.open(spaceId, BaseEntity.newId(), fields, now);
   }
 
   static restore(row: TaskRow): Task {
@@ -576,7 +558,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     if (this.isAiSignin && status === Task.DONE)
       throw new RuleViolation('웹 로그인은 ai_signin으로 자격을 보내야 끝나요');
     if (status === Task.DONE) this.finish(result, now);
-    else if (status === Task.FAILED) this.fail(error ?? '러너가 실패로 끝냈어요', now);
+    else if (status === Task.FAILED) this.fail(error ?? '러너가 실패로 끝냈어요', now, result);
     else throw new RuleViolation(`결과는 ${Task.DONE} · ${Task.FAILED} 중 하나예요`);
     if (page && made) this.record(page.built(this.row, made));
   }
@@ -598,10 +580,10 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.log(Task.LOG_RESULT, '', 0, now);
   }
 
-  /** 실패로 끝낸다: running → failed */
-  fail(error: string, now: Date): void {
+  /** 실패로 끝낸다: running → failed. 러너가 함께 보낸 결과 칸(커넥터 사용 connector_calls 등)도 남긴다 */
+  fail(error: string, now: Date, result: Readonly<Record<string, unknown>> = {}): void {
     this.move([Task.RUNNING], Task.FAILED, null, { error: error.slice(0, Task.EVENT_ERROR_MAX) });
-    this.close({ error }, now);
+    this.close({ ...result, error }, now);
     this.log(Task.LOG_ERROR, error, 0, now);
   }
 
@@ -711,6 +693,11 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   /** 에이전트 없는 일(연결 확인 · 웹 로그인 · 배정 · 세션 노트)의 도구. 없으면 null */
+  /** 커넥터 확인(tool_check)이면 확인할 도구, 아니면 null */
+  get checkedToolId(): string | null {
+    return this.row.kind === Task.TOOL_CHECK ? String(this.payload.toolId ?? '') || null : null;
+  }
+
   get payloadTool(): string | null {
     const tool = this.payload.tool;
     return typeof tool === 'string' ? tool : null;

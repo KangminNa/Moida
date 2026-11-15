@@ -1558,6 +1558,26 @@ a.chip {
   margin-bottom: 10px;
 }
 
+/* 커넥터 한 줄: 단추가 많아 정보는 한 줄을 다 쓰고 단추는 아래로 */
+.connector-row > .item-main {
+  flex-basis: 100%;
+}
+
+/* 커넥터가 가진 도구 목록 (확인한 것) */
+.connector-tools {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.connector-tools code {
+  font-size: 12.5px;
+}
+
 .log {
   margin: 0;
   padding: 0;

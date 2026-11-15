@@ -29,6 +29,17 @@ export class ExternalToolView {
       version: r.version,
       createdAt: r.created_at.toISOString(),
       updatedAt: r.updated_at.toISOString(),
+      /** 러너가 확인한 도구 목록 (2026-11-15 MCP 1단계). 확인하지 않았으면 빈 목록 */
+      catalog: Array.isArray(r.catalog)
+        ? (r.catalog as { name: string; description: string }[])
+        : [],
+      /** 마지막 확인 · 실패 까닭 (성공이면 null) */
+      checkedAt: r.checked_at?.toISOString() ?? null,
+      checkError: r.check_error,
+      /** 에이전트의 일에서 마지막으로 부른 때 · 실패 */
+      lastUsedAt: r.last_used_at?.toISOString() ?? null,
+      lastFailedAt: r.last_failed_at?.toISOString() ?? null,
+      lastError: r.last_error,
     };
   }
 }

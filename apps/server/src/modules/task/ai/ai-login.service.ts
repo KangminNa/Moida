@@ -25,6 +25,7 @@ import { AiLoginQuery } from './ai-login.query';
 import { AiLoginRepository } from './ai-login.repository';
 import type { AiSigninRelayView, AiTokenView } from './ai-login.view';
 import { AiSigninPolicy } from './ai-signin.policy';
+import { AiTasks } from './ai-task';
 
 // AI 로그인 쓰기: 토큰 넣기, 연결 확인 맡기기(주인), 서버 키를 바꾼 뒤 다시 잠그기, 러너에게 건네기(ai_login),
 // 웹 로그인(주인이 시작하고 코드를 넣고, 러너가 로그인 명령을 대신 돌려 주소를 알리고 자격을 넘긴다).
@@ -94,7 +95,7 @@ export class AiLoginService extends BaseService {
       const tasks = new TaskRepository(tx);
       const pending = await tasks.findPendingAiTest(spaceId, login.tool);
       if (pending) return pending;
-      const task = Task.aiTest(spaceId, login.tool, login.version, now);
+      const task = AiTasks.test(spaceId, login.tool, login.version, now);
       await tasks.insertOnce(task);
       return task;
     });
@@ -110,7 +111,7 @@ export class AiLoginService extends BaseService {
       await tasks.lockSigninSlot(spaceId, req.tool);
       const pending = await tasks.findPendingAiSignin(spaceId, req.tool);
       if (pending) return pending;
-      const task = Task.aiSignin(spaceId, req.tool, new Date());
+      const task = AiTasks.signin(spaceId, req.tool, new Date());
       await tasks.insertOnce(task);
       return task;
     });

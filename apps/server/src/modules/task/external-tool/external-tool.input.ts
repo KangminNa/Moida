@@ -112,6 +112,33 @@ export class RemoveExternalToolInput extends BaseRequest {
   }
 }
 
+/** POST /api/external-tools/:id/check: 연결 확인 (2026-11-15 MCP 1단계) */
+export class CheckExternalToolInput extends BaseRequest {
+  private constructor(readonly id: string) {
+    super();
+  }
+
+  static from(id: string): CheckExternalToolInput {
+    return BaseRequest.read({ id }, (f) => new CheckExternalToolInput(f.uuid('id')));
+  }
+}
+
+/** 끝난 작업 (task.task.changed): 커넥터 확인이면 결과를, 에이전트의 일이면 커넥터 사용을 적는다 */
+export class ToolTaskInput extends BaseRequest {
+  private constructor(readonly taskId: string) {
+    super();
+  }
+
+  /** 끝난 상태의 변경만 (대기 · 실행 · 기다림은 넘어간다) */
+  static carriedBy(data: Readonly<Record<string, unknown>>): boolean {
+    return ['done', 'failed', 'cancelled'].includes(String(data.status));
+  }
+
+  static from(data: Readonly<Record<string, unknown>>): ToolTaskInput {
+    return BaseRequest.read(data, (f) => new ToolTaskInput(f.uuid('taskId')));
+  }
+}
+
 /** MCP propose_tool: AI가 새 도구를 제안한다. 토큰은 받지 않는다 */
 export class ProposeToolInput extends BaseRequest {
   private constructor(

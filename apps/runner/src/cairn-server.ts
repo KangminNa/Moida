@@ -97,7 +97,9 @@ export class CairnServer {
       task_id: taskId,
       request_id: result.requestId,
       status: result.status,
-      ...(result.text === null ? {} : { result: { text: result.text } }),
+      ...(result.text === null && Object.keys(result.extra).length === 0
+        ? {}
+        : { result: { ...(result.text === null ? {} : { text: result.text }), ...result.extra } }),
       ...(result.error === null ? {} : { error: result.error }),
     });
   }

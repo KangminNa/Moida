@@ -1,4 +1,5 @@
 import type { AiStream } from './ai-tool';
+import { type ConnectorCall, ConnectorCalls } from './connector-calls';
 import { Json } from './json';
 import { type PlanWindow, RunEvent } from './progress';
 
@@ -17,6 +18,8 @@ import { type PlanWindow, RunEvent } from './progress';
 export class CodexStream implements AiStream {
   /** 늘 허락하는 MCP 서버. 브라우저 작업에서만 playwright를 더한다 (BrowserMcp) */
   static readonly SERVER = 'cairn';
+  /** 커넥터(x-<이름>)를 부른 수 · 실패 */
+  private readonly calls = new ConnectorCalls();
   private static readonly READ_TOOLS: ReadonlySet<string> = new Set([
     'search_sessions',
     'get_session',
@@ -119,7 +122,7 @@ export class CodexStream implements AiStream {
         this.lastText = item.text('text') || this.lastText;
         return [];
       case 'mcp_tool_call':
-        return CodexStream.toolFailed(item);
+        return this.toolFailed(item);
       case 'command_execution':
         return this.shellAllowed ? CodexStream.shellFailed(item) : this.shellOpened(item);
       case 'file_change': {
@@ -142,16 +145,22 @@ export class CodexStream implements AiStream {
       this.breachText ??= `허락하지 않은 MCP 서버: ${server || '(이름 없음)'}`;
       return [];
     }
+    this.calls.called(server, item.text('id'));
     const tool = item.text('tool');
     const kind = CodexStream.READ_TOOLS.has(tool) ? RunEvent.READ : RunEvent.WRITE;
     return [new RunEvent(kind, CodexStream.describe(tool, item.child('arguments')), 0)];
   }
 
-  private static toolFailed(item: Json): readonly RunEvent[] {
+  private toolFailed(item: Json): readonly RunEvent[] {
     const failed = item.text('status') === 'failed' || item.child('error').text('message') !== '';
     if (!failed) return [];
     const why = item.child('error').text('message') || '도구가 실패했어요';
+    this.calls.failed(item.text('server'), why);
     return [new RunEvent(RunEvent.ERROR, `${item.text('tool')}: ${why}`, 0)];
+  }
+
+  get connectorCalls(): readonly ConnectorCall[] {
+    return this.calls.lines;
   }
 
   /** 셸을 연 일에서 실패한 명령만 기록한다 (시작은 started에서 적었다) */

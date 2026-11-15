@@ -1,6 +1,7 @@
 import type { AiProcess } from './ai-process';
 import { ClaudeCli } from './claude-cli';
 import { CodexCli } from './codex-cli';
+import type { ConnectorCall } from './connector-calls';
 import type { Job } from './job';
 import type { JobWorkspace } from './job-workspace';
 import type { PlanWindow, RunEvent } from './progress';
@@ -23,6 +24,8 @@ export interface AiStream {
   takePlanUsage(): readonly PlanWindow[];
   /** CLI가 알린 모델. 모르면 null */
   readonly model: string | null;
+  /** 이 실행에서 커넥터(x-<이름>)를 부른 수 · 실패 (2026-11-15 MCP 1단계). 서버가 마지막 사용 · 실패를 적는다 */
+  readonly connectorCalls: readonly ConnectorCall[];
 }
 
 /**

@@ -8,10 +8,13 @@ import {
   TableEntity,
 } from '../../platform';
 import type { Agent } from '../agent/agent';
+import { AiTasks } from '../ai/ai-task';
 import { JobToolView } from '../task/job.view';
+import { Task } from '../task/task';
 import type { ExternalToolNew, ExternalToolRow } from '../task.tables';
 import { ExternalToolView, ProposedToolView } from './external-tool.view';
 import { ExternalToolUrl } from './external-tool-url.policy';
+import { ToolCatalog } from './tool-catalog.policy';
 
 // 외부 도구 하나 (task.external_tools, 2차 7단계): 바깥 서비스의 원격 MCP 서버. 에이전트마다 허락하면 러너가 그 일에만 붙인다.
 // 붙이는 길은 둘: 관리자가 콘솔에서 더하면 바로 쓴다(active). AI가 제안하면(propose_tool) proposed로 두고,
@@ -158,6 +161,21 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     );
   }
 
+  /**
+   * 연결 확인 일 하나 (tool_check, 2026-11-15 MCP 1단계). 에이전트 없이 러너가 원격 MCP에 붙어 tools/list를 받고,
+   * 결과는 ExternalToolTaskHandler가 이 도구에 적는다. 붙일 수 없는 도구(꺼짐 · 제안 · 토큰 없음)는 확인하지 않는다
+   */
+  checkTask(now: Date): Task {
+    if (!this.ready) throw new RuleViolation('켜져 있고 토큰이 갖춰진 커넥터만 확인해요');
+    const fields = {
+      kind: Task.TOOL_CHECK,
+      title: `커넥터 확인: ${this.row.title}`,
+      payload: { toolId: this.id, toolVersion: this.row.version ?? 1 },
+      priority: AiTasks.PRIORITY,
+    };
+    return Task.open(this.row.space_id, BaseEntity.newId(), fields, now);
+  }
+
   /** 주인이 고친 칸을 적는다. 머리글을 비우면 토큰도 지운다 */
   edit(changes: Partial<ExternalToolRow>, now: Date): void {
     this.accept(changes, ExternalTool.RULES);
@@ -221,6 +239,14 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     });
   }
 
+  /**
+   * 확인 결과 · 사용 기록을 적었다는 알림 (화면이 다시 읽는다). 이 칸들은 주인의 편집과 겨루지 않게 버전 없이 적어서
+   * (ExternalToolRepository.noteCheck · noteUsage) 엔티티를 거치지 않고 이벤트만 여기서 만든다
+   */
+  static noted(spaceId: string, data: { toolId: string } | { names: string[] }): DomainEvent {
+    return new DomainEvent('task.external_tool.noted', 1, spaceId, data);
+  }
+
   /** 서버 키를 바꾼 뒤 지금 키로 다시 잠근다. 바꿨으면 true */
   reseal(box: SecretBox): boolean {
     if (this.row.secret === null || this.row.nonce === null) return false;
@@ -245,7 +271,8 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   jobView(box: SecretBox): JobToolView {
     const { secret, nonce, header_name: header } = this.row;
     const value = secret && nonce && header ? box.open(new SealedSecret(secret, nonce)) : null;
-    return new JobToolView(this.row, header && value ? { [header]: value } : {});
+    const headers = header && value ? { [header]: value } : {};
+    return new JobToolView(this.row, headers, ToolCatalog.jobLines(this.row.catalog));
   }
 
   private plugProblem(targetVersion: number | null, agent: Agent | null): string | null {

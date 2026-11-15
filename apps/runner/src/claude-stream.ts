@@ -1,4 +1,5 @@
 import type { AiStream } from './ai-tool';
+import { type ConnectorCall, ConnectorCalls } from './connector-calls';
 import { Json } from './json';
 import { PlanWindow, RunEvent } from './progress';
 
@@ -37,6 +38,8 @@ export class ClaudeStream implements AiStream {
   private static readonly SHELL = 'Bash';
 
   private readonly countedByMessage = new Map<string, number>();
+  /** 커넥터(x-<이름>)를 부른 수 · 실패 */
+  private readonly calls = new ConnectorCalls();
   private counted = 0;
   /** 아직 어느 기록에도 싣지 않은 토큰 */
   private owed = 0;
@@ -141,6 +144,7 @@ export class ClaudeStream implements AiStream {
         this.lastText = block.text('text') || this.lastText;
       } else if (block.text('type') === 'tool_use') {
         const name = block.text('name');
+        this.calls.called(ConnectorCalls.serverOf(name) ?? '', block.text('id'));
         if (name === ClaudeStream.SHELL && !this.shellAllowed)
           this.shellUsed ??= block.child('input').text('command') || '(명령)';
         const kind = ClaudeStream.kindOf(name);
@@ -153,11 +157,17 @@ export class ClaudeStream implements AiStream {
   }
 
   private user(event: Json): readonly RunEvent[] {
-    return event
+    const failed = event
       .child('message')
       .list('content')
-      .filter((block) => block.text('type') === 'tool_result' && block.flag('is_error'))
-      .map((block) => new RunEvent(RunEvent.ERROR, ClaudeStream.resultBody(block), 0));
+      .filter((block) => block.text('type') === 'tool_result' && block.flag('is_error'));
+    for (const block of failed)
+      this.calls.failed(block.text('tool_use_id'), ClaudeStream.resultBody(block));
+    return failed.map((block) => new RunEvent(RunEvent.ERROR, ClaudeStream.resultBody(block), 0));
+  }
+
+  get connectorCalls(): readonly ConnectorCall[] {
+    return this.calls.lines;
   }
 
   private result(event: Json): readonly RunEvent[] {

@@ -350,3 +350,157 @@ describe('AI의 제안 → 결재 → 붙음', () => {
     assert.equal(await one('leak'), undefined);
   });
 });
+
+describe('연결 확인 · 도구 목록 · 사용 기록 (2026-11-15 MCP 1단계)', () => {
+  /** 확인 일 하나를 러너가 빌린다 (다른 시험이 남긴 일이 먼저 올 수 있어 그 일이 올 때까지) */
+  async function takeCheck(taskId: unknown): Promise<Json> {
+    for (let i = 0; i < 50; i++) {
+      const { jobs } = (await call(runner, 'next_jobs')) as { jobs: Json[] };
+      const mine = jobs.find((j) => j.task.id === taskId);
+      if (mine) return mine;
+      if (jobs.length === 0) break;
+    }
+    throw new Error('확인 일을 빌리지 못했어요');
+  }
+
+  test('방문자 · write 기기는 확인을 맡기지 못한다 (403), 없는 도구는 404', async () => {
+    const made = ok(
+      await create({ name: 'check-auth', title: '확인', url: 'https://mcp.check.example.com' }),
+      201,
+    );
+    for (const headers of [{}, writer]) {
+      const res = await api.request(
+        'POST',
+        `/api/external-tools/${made.id}/check`,
+        TestUser.visitor,
+        {},
+        headers,
+      );
+      assert.equal(res.status, 403, res.text);
+    }
+    const missing = await api.request(
+      'POST',
+      `/api/external-tools/${randomUUID()}/check`,
+      owner,
+      {},
+    );
+    assert.equal(missing.status, 404);
+  });
+
+  test('확인을 맡기면 tool_check 일 하나 (다시 눌러도 같은 일). 러너는 그 도구와 토큰만 받는다', async () => {
+    const made = ok(
+      await create({
+        name: 'check-ok',
+        title: '확인됨',
+        url: 'https://mcp.ok.example.com',
+        headerName: 'Authorization',
+        secret: SECRET,
+      }),
+      201,
+    );
+    const first = ok(
+      await api.request('POST', `/api/external-tools/${made.id}/check`, owner, {}),
+      202,
+    );
+    const again = ok(
+      await api.request('POST', `/api/external-tools/${made.id}/check`, owner, {}),
+      202,
+    );
+    assert.equal(first.kind, 'tool_check');
+    assert.equal(again.id, first.id, '기다리는 확인이 있으면 그 일');
+    const job = await takeCheck(first.id);
+    assert.equal(job.run_token ?? null, null, '에이전트 없는 일이라 작업 토큰이 없다');
+    const tools = job.tools as Json[];
+    assert.deepEqual(
+      tools.map((t) => t.name),
+      ['check-ok'],
+    );
+    assert.deepEqual(tools[0]?.headers, { Authorization: SECRET });
+
+    await call(runner, 'submit_result', {
+      task_id: first.id,
+      request_id: randomUUID(),
+      status: 'done',
+      result: {
+        tools: [
+          { name: 'search', description: '문서 찾기' },
+          { name: 'bad name', description: 'x' },
+        ],
+      },
+    });
+    await drain();
+    const checked = await one('check-ok');
+    assert.deepEqual(checked?.catalog, [{ name: 'search', description: '문서 찾기' }]);
+    assert.equal(checked?.checkError, null);
+    assert.ok(checked?.checkedAt);
+    assert.equal(checked?.version, made.version, '확인은 판을 올리지 않는다');
+  });
+
+  test('확인이 실패하면 앞 목록을 두고 까닭만 남긴다 (토큰 값은 없다)', async () => {
+    const made = ok(
+      await create({ name: 'check-fail', title: '실패', url: 'https://mcp.fail.example.com' }),
+      201,
+    );
+    const task = ok(
+      await api.request('POST', `/api/external-tools/${made.id}/check`, owner, {}),
+      202,
+    );
+    await takeCheck(task.id);
+    await call(runner, 'submit_result', {
+      task_id: task.id,
+      request_id: randomUUID(),
+      status: 'failed',
+      error: '401 토큰을 확인해요',
+    });
+    await drain();
+    const failed = await one('check-fail');
+    assert.equal(failed?.checkError, '401 토큰을 확인해요');
+    assert.deepEqual(failed?.catalog, []);
+  });
+
+  test('꺼진 도구는 확인하지 않는다 (422)', async () => {
+    const made = ok(
+      await create({ name: 'check-off', title: '꺼짐', url: 'https://mcp.off.example.com' }),
+      201,
+    );
+    ok(
+      await api.request('PATCH', `/api/external-tools/${made.id}`, owner, {
+        version: made.version,
+        enabled: false,
+      }),
+    );
+    const res = await api.request('POST', `/api/external-tools/${made.id}/check`, owner, {});
+    assert.equal(res.status, 422, res.text);
+  });
+
+  test('에이전트의 일 결과에 실린 커넥터 사용은 허락받은 이름만 남는다', async () => {
+    ok(
+      await create({ name: 'used-one', title: '쓰는 것', url: 'https://mcp.used.example.com' }),
+      201,
+    );
+    ok(
+      await create({ name: 'not-mine', title: '남의 것', url: 'https://mcp.other.example.com' }),
+      201,
+    );
+    const a = await agent({ externalTools: ['used-one'] });
+    const job = await take(a.id);
+    await call(runner, 'submit_result', {
+      task_id: job.task.id,
+      request_id: randomUUID(),
+      status: 'done',
+      result: {
+        text: '끝',
+        connector_calls: [
+          { name: 'used-one', calls: 2, failures: 1, error: '시간이 지났어요' },
+          { name: 'not-mine', calls: 1, failures: 0 },
+        ],
+      },
+    });
+    await drain();
+    const used = await one('used-one');
+    assert.ok(used?.lastUsedAt);
+    assert.ok(used?.lastFailedAt);
+    assert.equal(used?.lastError, '시간이 지났어요');
+    assert.equal((await one('not-mine'))?.lastUsedAt, null, '허락받지 않은 이름은 남기지 않는다');
+  });
+});

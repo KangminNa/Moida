@@ -22,6 +22,7 @@ import { SandboxRoom } from './sandbox-room';
 import type { SandboxStage } from './sandbox-stage';
 import { SigninRun } from './signin-run';
 import { TabReader } from './tab-reader';
+import { ToolCheckRun } from './tool-check-run';
 
 /** 다시 시도해도 소용없음: 토큰이나 설치를 사람이 고쳐야 한다 */
 export class RunnerHalted extends Error {}
@@ -229,6 +230,14 @@ export class Runner {
       );
       return signin.perform();
     }
+    if (job.isToolCheck)
+      return new ToolCheckRun(
+        job,
+        this.server,
+        this.redactor,
+        this.log,
+        this.stopper.signal,
+      ).perform();
     let stage: SandboxStage | null = null;
     if (job.sandboxed) {
       // 코드 · 만들기 작업은 칸 안에서 셸과 함께 한다 (CodeStage · MakeStage). 칸이 아닌 러너는 서버가 주지 않지만 여기서도 막는다:
