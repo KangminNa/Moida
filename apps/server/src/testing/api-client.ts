@@ -1,9 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../app.module';
+import { CairnApp } from '../cairn-app';
 import { InstallPolicy, ServerRunnerPolicy } from '../modules/account';
-import { Database, HttpSetup, SecretBox } from '../modules/platform';
+import { Database, type RequestLogSink, SecretBox } from '../modules/platform';
 
 /** 테스트에서 요청하는 사람: 쿠키 묶음. 방문자는 쿠키가 없다 */
 export class TestUser {
@@ -73,12 +72,17 @@ export class ApiClient {
     readonly baseUrl: string,
   ) {}
 
-  static async start(): Promise<ApiClient> {
+  /** 운영과 같은 길(CairnApp.api)로 서버를 띄운다. log: 요청 로그를 모아 볼 때 */
+  static async start(options: { log?: RequestLogSink } = {}): Promise<ApiClient> {
     // compose는 값이 없으면 빈 문자열로 넘긴다
     process.env.CAIRN_SECRET_KEY ||= SecretBox.newKey();
-    const app = await NestFactory.create(AppModule, { logger: false });
-    HttpSetup.apply(app);
-    await app.listen(0, '127.0.0.1');
+    const app = await CairnApp.api({
+      port: 0,
+      host: '127.0.0.1',
+      quiet: true,
+      signals: false,
+      log: options.log ?? (() => {}),
+    });
     return new ApiClient(app, await app.getUrl());
   }
 

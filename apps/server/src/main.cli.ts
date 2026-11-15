@@ -1,6 +1,5 @@
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { CairnApp } from './cairn-app';
 import { InstallPolicy, OwnerService, SpaceQuery } from './modules/account';
 import {
   ArchiveFile,
@@ -34,7 +33,7 @@ const owner = new OwnerActor('local', 'cli');
 
 async function main() {
   const [command, ...args] = process.argv.slice(2);
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
+  const app = await CairnApp.cli();
   try {
     if (command === 'install-code')
       return await installCode(app.get(SpaceQuery), app.get(InstallPolicy));

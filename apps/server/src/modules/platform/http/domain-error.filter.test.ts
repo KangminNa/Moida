@@ -101,3 +101,40 @@ describe('오류 필터: 거부된 접근 기록', () => {
     assert.deepEqual(statuses, [401]);
   });
 });
+
+// 알 수 없는 오류 (리팩토링 6단계): 응답에는 요청 번호만, 스택은 서버 로그에
+describe('오류 필터: 알 수 없는 오류', () => {
+  test('500 { code: internal, 요청 번호 } 로 답하고 오류 글은 응답에 싣지 않는다', () => {
+    let sent: { status: number; body: Record<string, unknown> } | null = null;
+    const filter = new DomainErrorFilter({} as SecurityLogService);
+    const host = {
+      switchToHttp: () => ({
+        getRequest: () => ({
+          method: 'GET',
+          originalUrl: '/api/x',
+          headers: {},
+          query: {},
+          protocol: 'https',
+          requestId: '0192d2a0-0000-7000-8000-0000000000aa',
+        }),
+        getResponse: () => ({
+          headersSent: false,
+          status: (status: number) => ({
+            json: (body: Record<string, unknown>) => {
+              sent = { status, body };
+            },
+          }),
+        }),
+      }),
+    } as unknown as ArgumentsHost;
+    filter.catch(new Error('relation "secret_table" does not exist'), host);
+    assert.deepEqual(sent, {
+      status: 500,
+      body: {
+        code: 'internal',
+        message: '서버 오류예요 (요청 번호 0192d2a0-0000-7000-8000-0000000000aa)',
+        requestId: '0192d2a0-0000-7000-8000-0000000000aa',
+      },
+    });
+  });
+});

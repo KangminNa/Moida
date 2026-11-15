@@ -28,6 +28,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
   권한은 `assertCan(권한)`(기기·에이전트가 받은 권한. `Actor.AGENT_OUT`은 받은 권한이 아니라 `KEEPS_PRIVATE`(전체 읽기 · 초안 · 코드 · 만들기)가 없는 작업 토큰이면 통과, 2026-11-16), 관리 일은 종류로 묻는다: `assertOwner()`(주인만), `assertOwnerOrSystem()`(주인과 명령줄·일꾼: 플러그인, 서버 키 교체, 복원).
   `mayRead(id)` · `hasReadGrants()`: 작업 토큰에 함께 봉인한 id 하나씩의 읽기 허락 (`AgentActor`의 `reads`). 권한이 아니라 id로 하나를 읽을 때만 본다 (무엇의 id인지는 모른다)
 - 같은 트랜잭션에 들어가는 것: `Outbox`(이벤트, 변경 신호, 일꾼 깨우기. `wake(이름)`: 이벤트 없이 마감을 바꾸는 쓰기가 그 마감 작업을 깨운다 (신호 `due:<이름>`). `Outbox.listen`: 이벤트를 쓰기 전에 같은 트랜잭션에서 부르는 듣는 쪽, 지금은 알림과 account의 보안 기록 둘), `ChangeSignal`(내용 없는 신호), `Idempotency`(같은 request_id는 한 번만), `Notices`(콘솔 알림, 변경 신호 `platform.notification`), `SecurityLog`(보안 기록, 2026-11-15)
+- `HttpSetup` · `RequestTrace` (리팩토링 6단계): 서버와 시험이 같은 HTTP 설정(`CairnApp.api`가 건다). 맨 앞에서 요청 번호(UUIDv7, 들어온 `X-Request-Id`는 믿지 않음)를 붙여 응답 머리글로 돌려주고, 응답이 끝나거나 끊길 때 한 줄을 남긴다 (번호 · 메서드 · 쿼리 없는 경로 · 상태 · 걸린 시간 · 요청자 종류 · MCP 도구, 건강 확인의 2xx는 빼고, 5xx는 오류 등급). 알 수 없는 오류는 `DomainErrorFilter`가 `RequestTrace.fail`로 스택을 번호와 함께 남기고 500 `internal` + 번호로 답한다. MCP 입구는 `McpEndpoint.handle`의 `McpTrace`(부른 것 · 알 수 없는 오류)로 같은 로그에 잇는다
 - `ChangeStream`: Postgres LISTEN 연결 하나(`Listener`)로 변경 신호를 나눠 준다. SSE와 긴 폴링이 쓴다. 신호는 깨우기용이고 내용은 늘 테이블에 있다
 - `SecretRotation`: 서버 키 교체. 비밀값을 가진 모듈이 `register`로 다시 잠그는 방법을 등록
 - `SensitivePolicy` · `Redaction`: AI가 보낸 글이 판이 되기 전에 비밀값(토큰 · 키 · 비밀번호 값)을 `[지움: 종류]`로 바꾼다. 모양만 보고, 어느 칸을 지울지는 쓰는 모듈이 정한다 (vault 세션 · wiki, blog 초안)

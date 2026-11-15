@@ -41,10 +41,11 @@ export class McpClient {
       throw new AccessDenied('기기 토큰이 맞지 않아요. 관리 화면 → 기기에서 확인해 주세요');
     if (!res.ok) throw new ServerUnreachable(await McpClient.failureOf(res));
     const body = Json.parse(await this.read(res));
-    if (body === null) throw new ServerUnreachable('서버의 답을 읽지 못했어요');
+    if (body === null)
+      throw new ServerUnreachable(`서버의 답을 읽지 못했어요${McpClient.traceOf(res)}`);
     const failure = body.child('error');
     if (failure.optionalText('message') !== null)
-      throw new ServerUnreachable(`서버 오류: ${failure.text('message')}`);
+      throw new ServerUnreachable(`서버 오류: ${failure.text('message')}${McpClient.traceOf(res)}`);
     const result = body.child('result');
     if (result.flag('isError')) throw McpClient.refusal(result);
     return result.child('structuredContent');
@@ -90,9 +91,20 @@ export class McpClient {
   private static async failureOf(res: Response): Promise<string> {
     const body = await res.text().catch(() => '');
     const reason = Json.parse(body)?.optionalText('message');
+    // 서버의 500 문구에는 번호가 이미 있다 (DomainErrorFilter)
+    const trace = res.status >= 500 && !body.includes('요청 번호') ? McpClient.traceOf(res) : '';
     return reason
-      ? `서버가 ${res.status}로 답했어요: ${reason}`
-      : `서버가 ${res.status}로 답했어요`;
+      ? `서버가 ${res.status}로 답했어요: ${reason}${trace}`
+      : `서버가 ${res.status}로 답했어요${trace}`;
+  }
+
+  /**
+   * 서버의 요청 번호 (응답 머리글 X-Request-Id, 리팩토링 6단계). 서버 로그에서 같은 요청을 찾는 실마리라
+   * 서버 쪽 실패 문구에 붙인다. 없거나 모양이 이상하면 붙이지 않는다 (앞의 프록시가 답한 경우)
+   */
+  private static traceOf(res: Response): string {
+    const id = res.headers.get('x-request-id') ?? '';
+    return /^[0-9a-f-]{36}$/.test(id) ? ` (요청 번호 ${id})` : '';
   }
 
   /**

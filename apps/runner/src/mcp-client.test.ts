@@ -114,6 +114,37 @@ describe('MCP 부르기', () => {
     }
   });
 
+  test('서버 쪽 실패에는 서버의 요청 번호를 붙인다 (서버 로그에서 같은 요청을 찾는다)', async () => {
+    const id = '0192d2a0-0000-7000-8000-0000000000aa';
+    const withId =
+      (status: number, body: string) => (_req: IncomingMessage, res: ServerResponse) => {
+        res.writeHead(status, { 'content-type': 'application/json', 'x-request-id': id });
+        res.end(body);
+      };
+    answer = withId(502, 'Bad Gateway');
+    await assert.rejects(client().call('next_jobs', {}), {
+      message: `서버가 502로 답했어요 (요청 번호 ${id})`,
+    });
+    answer = withId(
+      200,
+      JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'Internal error' } }),
+    );
+    await assert.rejects(client().call('next_jobs', {}), {
+      message: `서버 오류: Internal error (요청 번호 ${id})`,
+    });
+    answer = withId(
+      500,
+      JSON.stringify({ code: 'internal', message: `서버 오류예요 (요청 번호 ${id})` }),
+    );
+    await assert.rejects(client().call('next_jobs', {}), {
+      message: `서버가 500로 답했어요: 서버 오류예요 (요청 번호 ${id})`,
+    });
+    answer = withId(422, JSON.stringify({ code: 'rule_violation', message: '고쳐 주세요' }));
+    await assert.rejects(client().call('next_jobs', {}), {
+      message: '서버가 422로 답했어요: 고쳐 주세요',
+    });
+  });
+
   test('서버가 이유를 적어 거절하면 그 이유를 보여 주고 다시 보낼 수 있다', async () => {
     answer = refused(422, { code: 'rule_violation', message: '사이트 주소부터 정해 주세요' });
     await assert.rejects(

@@ -66,6 +66,7 @@ export { Cookies } from './http/cookies';
 export { CurrentActor } from './http/current-actor';
 export { HttpSetup } from './http/http-setup';
 export type { HttpRequest, HttpResponse, HttpUpload } from './http/http-types';
+export { type RequestLogSink, RequestTrace } from './http/request-trace';
 export { LibraryInput } from './library/library.input';
 export { LibraryQuery } from './library/library.query';
 export type { LibraryRow } from './library/library.view';

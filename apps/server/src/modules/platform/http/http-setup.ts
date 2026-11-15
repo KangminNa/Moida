@@ -1,7 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
 import { TooLarge } from '../base/errors';
+import { type RequestLogSink, RequestTrace } from './request-trace';
 
-// 서버(main.api.ts)와 API 테스트 도구가 똑같이 거는 HTTP 설정.
+// 서버와 API 테스트 도구가 똑같이 거는 HTTP 설정 (CairnApp.api가 건다).
+// - 맨 앞에서 요청 번호를 붙이고 요청 로그를 남긴다 (RequestTrace, 리팩토링 6단계).
 // - 리버스 프록시 뒤에서 https·접속 IP를 바르게 읽도록, 같은 컴퓨터·내부망의 프록시만 믿는다.
 // - 모든 응답은 캐시에 남지 않게(no-store) 하고, 서버 종류를 알리지 않는다.
 //   나중에 캐시해도 되는 공개 응답(글 등)은 그 Response에서만 Cache-Control을 바꾼다.
@@ -16,7 +18,7 @@ export class HttpSetup {
   static readonly JSON_LIMIT = '512kb';
   static readonly IMAGE_LIMIT = '10mb';
 
-  static apply(app: INestApplication): void {
+  static apply(app: INestApplication, log?: RequestLogSink): void {
     const express = app.getHttpAdapter().getInstance() as {
       set(key: string, value: unknown): void;
       disable(key: string): void;
@@ -37,6 +39,7 @@ export class HttpSetup {
       ): void;
     };
     express.set('trust proxy', 'loopback, linklocal, uniquelocal');
+    express.use(RequestTrace.middleware(log) as never);
     express.disable('x-powered-by');
     express.use((_req, res, next) => {
       res.setHeader('Cache-Control', 'no-store');

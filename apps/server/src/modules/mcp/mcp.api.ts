@@ -1,7 +1,14 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Controller, Delete, Get, Post, Req, Res } from '@nestjs/common';
 import { DeviceQuery } from '../account';
-import { type Actor, CurrentActor, McpEndpoint, Unauthenticated } from '../platform';
+import {
+  type Actor,
+  CurrentActor,
+  type HttpRequest,
+  McpEndpoint,
+  RequestTrace,
+  Unauthenticated,
+} from '../platform';
 import { TaskQuery } from '../task';
 import { McpToolbox } from './mcp-toolbox';
 import { ToolTextQuery } from './tool-text/tool-text.query';
@@ -59,6 +66,11 @@ export class McpController {
         '연결된 기기의 토큰이 필요해요. AI 도구에서 이 MCP 서버에 로그인해 주세요',
       );
     }
-    await this.endpoint.handle(actor, siteUrl, req, res, req.body);
+    // 요청 로그에 부른 도구를 덧붙이고, 알 수 없는 오류는 요청 번호와 함께 서버 로그에 (리팩토링 6단계)
+    const traced = req as unknown as HttpRequest;
+    await this.endpoint.handle(actor, siteUrl, req, res, req.body, {
+      called: (what) => RequestTrace.note(traced, what),
+      failed: (error) => RequestTrace.fail(traced, error),
+    });
   }
 }

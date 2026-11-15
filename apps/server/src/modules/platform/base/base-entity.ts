@@ -39,8 +39,8 @@ export abstract class BaseEntity {
     return this.events.splice(0);
   }
 
-  /** 시간순으로 정렬되는 UUIDv7 */
-  protected static newId(): string {
+  /** 시간순으로 정렬되는 UUIDv7. 엔티티의 id와 요청 번호(RequestTrace)가 같은 모양을 쓴다 */
+  static newId(): string {
     const bytes = randomBytes(16);
     const ms = BigInt(Date.now());
     for (let i = 0; i < 6; i++) bytes[i] = Number((ms >> BigInt(8 * (5 - i))) & 0xffn);

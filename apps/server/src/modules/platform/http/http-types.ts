@@ -11,6 +11,10 @@ export type HttpRequest = {
   ip?: string;
   protocol: string;
   actor?: unknown;
+  /** 요청 번호 (RequestTrace가 맨 앞에서 붙인다) */
+  requestId?: string;
+  /** 요청 로그에 덧붙일, 이 요청이 한 일 (MCP 도구 이름) */
+  traced?: string;
 };
 
 /** 본문을 흘려 읽는 요청 (JSON으로 읽지 않은 본문: 결과물 올리기). 받는 쪽이 크기를 세며 읽는다 */

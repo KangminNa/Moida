@@ -7,6 +7,12 @@ import type { BaseTool } from './base-tool';
 import { Database } from './database';
 import { DomainError, Forbidden } from './errors';
 
+/** 입구가 요청 로그에 남길 것 (리팩토링 6단계): 부른 것(도구 이름 · tools/list), 알 수 없는 오류 */
+export interface McpTrace {
+  called(what: string): void;
+  failed(error: unknown): void;
+}
+
 // MCP 입구. MCP SDK를 가져오는 유일한 파일이다 (외부 라이브러리는 platform/base 안에서만, 객체설계 10장).
 // 요청마다 서버를 새로 만드는 상태 없는 방식이라, 서버를 여러 개 띄워도 그대로 동작한다.
 // 도구는 BaseTool만 알면 되고, 오류는 DomainError.toJSON()으로 AI가 고칠 수 있게 돌려준다.
@@ -35,6 +41,7 @@ export class McpEndpoint {
     req: IncomingMessage,
     res: ServerResponse,
     body: unknown,
+    trace?: McpTrace,
   ): Promise<void> {
     const server = new Server(
       { name: this.name, version: this.version },
@@ -43,6 +50,7 @@ export class McpEndpoint {
     const tools = this.toolsNow();
     const visible = tools.filter((t) => t.allows(actor));
     server.setRequestHandler(ListToolsRequestSchema, async () => {
+      trace?.called('tools/list');
       const described = await this.describe(actor, visible);
       return {
         tools: visible.map((t, i) => {
@@ -63,6 +71,7 @@ export class McpEndpoint {
     });
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const tool = tools.find((t) => t.name === request.params.name);
+      trace?.called(request.params.name);
       try {
         if (!tool) throw new Forbidden('tool', `${request.params.name} 도구가 없어요`);
         if (!tool.allows(actor)) throw new Forbidden(tool.scope);
@@ -74,7 +83,10 @@ export class McpEndpoint {
       } catch (error) {
         // DB 시간 제한에 걸린 오류는 busy로 알린다 (러너는 busy를 받으면 같은 요청을 다시 보낸다)
         const known = error instanceof DomainError ? error : Database.busy(error);
-        if (!known) throw error;
+        if (!known) {
+          trace?.failed(error);
+          throw error;
+        }
         return {
           isError: true,
           content: [{ type: 'text' as const, text: JSON.stringify(known.toJSON()) }],
