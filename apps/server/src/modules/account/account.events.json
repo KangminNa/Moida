@@ -1,0 +1,25 @@
+{
+  "topics": {
+    "account.device.connected": {
+      "fields": ["deviceId", "name", "client"]
+    },
+    "account.device.revoked": {
+      "fields": ["deviceId", "name", "reason"]
+    },
+    "account.login.succeeded": {
+      "fields": ["userId", "sessionId", "method", "ip", "userAgent", "newPlace"]
+    },
+    "account.owner.claimed": {
+      "fields": ["userId", "login"]
+    },
+    "account.password.changed": {
+      "fields": ["userId", "via"]
+    },
+    "account.session.ended": {
+      "fields": ["userId", "how", "ip?", "userAgent?"]
+    },
+    "account.setting.changed": {
+      "fields": ["approvalId", "outcome", "error?"]
+    }
+  }
+}

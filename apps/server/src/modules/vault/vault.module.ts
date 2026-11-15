@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { CoreWorkers, LibraryQuery, Lookups } from '../platform';
+import { CoreWorkers, EventCatalog, LibraryQuery, Lookups } from '../platform';
 import { CategoryController } from './category/category.api';
 import { CategoryQuery } from './category/category.query';
 import { ChangeController } from './change/change.api';
@@ -31,6 +31,7 @@ import { TidyQuery } from './tidy/tidy.query';
 import { TidyService } from './tidy/tidy.service';
 import { TidyDailyJob } from './tidy/tidy-daily.job';
 import { TidyRequestHandler } from './tidy/tidy-request.handler';
+import events from './vault.events.json';
 import { ArchiveController } from './vault-archive.api';
 import { VaultArchiveQuery } from './vault-archive.query';
 import { VaultNotices } from './vault-notices';
@@ -112,6 +113,7 @@ export class VaultModule implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    EventCatalog.define('vault', events);
     this.workers.on('vault.session.saved', this.tidy);
     // 모듈 사이 읽기 (리팩토링 R3b): blog가 글의 wiki · 스크랩의 세션을 vault를 가져오지 않고 확인한다
     this.lookups.provide('wiki', (a, ids) => this.postWikis.visible(a, ids));

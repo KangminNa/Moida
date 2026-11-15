@@ -62,6 +62,8 @@ change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 `VaultModule`, `VaultTools`(세션·wiki·그래프·변경 묶음 도구 목록, mcp 모듈이 모아서 연다). 다른 모듈의 확인은 platform `Lookups`에 등록한다 (리팩토링 R3b): `wiki`(볼 수 있는 wiki의 id → 제목, `PostWikiQuery.visible`) · `session`(볼 수 있는 세션의 id → 노트 제목, `SessionQuery.titles`: 읽기 권한이 없으면 Forbidden)
 
 ## 내보내는 이벤트 / 받는 이벤트
+칸의 원본은 `vault.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.
+
 | 이벤트 | 내용 (모두 v1) |
 |---|---|
 | `vault.session.saved` | sessionId, revisionId, seq, deviceId, project, created |

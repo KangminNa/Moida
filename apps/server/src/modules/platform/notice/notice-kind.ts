@@ -51,6 +51,11 @@ export class NoticeKind {
     return this;
   }
 
+  /** 이 종류가 듣는 주제 (만들기 · 읽음): 서버가 뜰 때 이벤트 목록과 맞춰 본다 */
+  get watched(): readonly string[] {
+    return [...this.topics, ...this.settleTopics];
+  }
+
   /** 설정에 없을 때의 경로: 기록만은 알림 센터에만, 나머지는 푸시까지 */
   get defaultRoute(): NoticeRoute {
     return this.severity === NoticeKind.LOG ? 'center' : 'push';

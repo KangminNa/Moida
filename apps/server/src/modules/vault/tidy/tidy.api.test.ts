@@ -193,10 +193,16 @@ describe('저장 뒤 자동 정리', () => {
     await turn(true);
     const { session_id: id } = await save('again', '한 일');
     await drain();
-    const [row] = await db.sql`SELECT space_id FROM vault.sessions WHERE node_id = ${String(id)}`;
+    const [row] = await db.sql`
+      SELECT space_id, head_revision_id, device_id, project FROM vault.sessions WHERE node_id = ${String(id)}`;
+    // 처음 저장이 남긴 것과 같은 이벤트 (칸은 vault.events.json의 약속대로)
     const event = new DomainEvent('vault.session.saved', 1, String(row?.space_id), {
       sessionId: id,
+      revisionId: row?.head_revision_id,
       seq: 1,
+      deviceId: row?.device_id,
+      project: row?.project,
+      created: true,
     });
     await db.transaction((tx) => new Outbox(tx).publish([event]));
     await drain();

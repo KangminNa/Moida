@@ -397,7 +397,12 @@ describe('글 자리 사본', () => {
 
   test('글 버전이 없는 이벤트는 건너뛰고, 없는 wiki를 가리켜도 일꾼이 멈추지 않는다', async () => {
     const postId = randomUUID();
-    await postEvent('blog.post.publish_failed', { postId, approvalId: randomUUID() });
+    await postEvent('blog.post.publish_failed', {
+      postId,
+      approvalId: randomUUID(),
+      outcome: 'failed',
+      error: '공개하지 못했어요',
+    });
     assert.equal(await mark(postId), undefined);
     assert.equal(await api.unprocessed('blog.post.publish_failed'), 0);
 

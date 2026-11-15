@@ -44,6 +44,7 @@ export {
   UnsupportedType,
 } from './base/errors';
 export { DomainEvent } from './base/event';
+export { EventCatalog } from './base/event-catalog';
 export { FileSniff } from './base/file-sniff';
 export { Idempotency } from './base/idempotency';
 export { McpEndpoint } from './base/mcp-endpoint';

@@ -66,6 +66,8 @@
 `TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상 · 지시)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). 다른 모듈에게는 platform의 `AgentDirectory`에 `AgentQuery.card`(이름 · 권한, 지운 에이전트는 없음)를 등록한다 (2차 6단계, blog 메뉴의 운영 팀)
 
 ## 내보내는 이벤트
+칸의 원본은 `task.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.
+
 | 이벤트 | 내용 |
 |---|---|
 | `task.task.changed` | `taskId, status, title`, 실패면 `error`(앞 300자). 상태가 바뀔 때마다 |

@@ -39,6 +39,8 @@ M1 A(설치·주인 로그인)와 B(기기 연결, MCP OAuth 2.1)까지 있다.
 `ServerRunnerPolicy`: 테스트가 서버 러너 · 칸처럼 연결할 때 (`ApiClient.codeRunner`, 러너 통합 테스트)
 
 ## 내보내는 이벤트 / 받는 이벤트
+칸의 원본은 `account.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.
+
 `account.owner.claimed`(주인이 정해짐), `account.device.connected`, `account.device.revoked`(`reason`: owner · token_reused), `account.login.succeeded`(`sessionId, method, newPlace, ip, userAgent`), `account.session.ended`(`how`: logout · ended · others), `account.password.changed`(`via`: web · command), `account.setting.changed { approvalId, outcome, error? }`(승인한 사이트 설정 바꾸기의 결과, 2026-11-15 D) / 없음 (승인한 설정 바꾸기는 task의 처리기가 platform `SettingKinds`로 넘긴다)
 
 알리는 것 (`AccountNotices`, 7단계. platform `NoticeCatalog`에 등록): `account.device.connected` 새 기기 연결 (즉시, 기기마다 묶음 키). 보안 화면 (2026-11-15): `account.login.new_place` 새 곳에서 로그인 (즉시, 로그인 사건의 `newPlace`), `account.login.blocked` 로그인 막힘 (즉시, 관리자의 아이디로 막혔을 때 `OwnerService`가 `Notices.post`로, 같은 곳은 1분에 한 번)

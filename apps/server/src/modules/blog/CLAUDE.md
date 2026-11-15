@@ -51,6 +51,8 @@
 `BlogModule`, `BlogTools`(블로그 도구 목록, mcp 모듈이 모아서 연다)
 
 ## 내보내는 이벤트 / 받는 이벤트
+칸의 원본은 `blog.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.
+
 `blog.post.published` · `blog.post.updated` · `blog.post.unpublished` · `blog.post.deleted` (v1: postId, slug, title, status, postVersion, mainWikiId, refWikiIds. vault가 글 자리 사본을 갱신한다). 임시 글은 알리지 않아 공개해야 그래프에 나온다.
 결재한 공개의 결과: 성공이면 `blog.post.published`에 `approvalId`·`outcome: 'done'`이 붙고(사람의 공개에는 없다), 실패면 `blog.post.publish_failed` (postId, approvalId, outcome: 'failed', error. 글 상태는 싣지 않아 사본을 고치는 데 쓰지 않는다). task가 받아 작업을 끝낸다.
 

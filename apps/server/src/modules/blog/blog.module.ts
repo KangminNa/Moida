@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { ActionChecks, BlobStore, CoreWorkers, LibraryQuery } from '../platform';
+import { ActionChecks, BlobStore, CoreWorkers, EventCatalog, LibraryQuery } from '../platform';
 import { AssetController, FileController } from './asset/asset.api';
 import { AssetQuery } from './asset/asset.query';
 import { AssetService } from './asset/asset.service';
@@ -7,6 +7,7 @@ import { BasketController } from './basket/basket.api';
 import { BasketQuery } from './basket/basket.query';
 import { BasketService } from './basket/basket.service';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
+import events from './blog.events.json';
 import { BlogNotices } from './blog-notices';
 import { BlogSettings } from './blog-settings';
 import { BlogTools } from './blog-tools';
@@ -91,6 +92,7 @@ export class BlogModule implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    EventCatalog.define('blog', events);
     this.workers.on(PublishApprovedHandler.TOPIC, this.approved);
     this.workers.on(PublishApprovedHandler.TOPIC, this.issuePublish);
     this.workers.expect(PublishApprovedHandler.TOPIC);

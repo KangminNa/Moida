@@ -1,0 +1,10 @@
+{
+  "topics": {
+    "platform.plugin.changed": {
+      "fields": ["plugin"]
+    },
+    "platform.setting.changed": {
+      "fields": ["approvalId", "outcome", "error?"]
+    }
+  }
+}

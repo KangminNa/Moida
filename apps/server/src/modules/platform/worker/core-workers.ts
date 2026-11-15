@@ -60,6 +60,15 @@ export class CoreWorkers {
     return [...new Set(this.dueWakes.filter(([p]) => event.matches(p)).map(([, job]) => job))];
   }
 
+  /** 듣는 무늬 전부 (받기 · 마감 작업을 깨우는 주제 · 필수 주제): 일꾼이 시작할 때 이벤트 목록과 맞춰 본다 */
+  patterns(): readonly string[] {
+    return [
+      ...this.subscriptions.map((s) => s.pattern),
+      ...this.dueWakes.map(([p]) => p),
+      ...this.expected,
+    ];
+  }
+
   /** 받는 쪽이 없는 필수 주제 */
   missing(): readonly string[] {
     return [...this.expected].filter(

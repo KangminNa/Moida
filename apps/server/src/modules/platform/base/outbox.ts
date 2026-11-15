@@ -1,5 +1,6 @@
 import type { Sql } from './database';
 import type { DomainEvent } from './event';
+import { EventCatalog } from './event-catalog';
 import { Trace } from './trace';
 
 /**
@@ -56,6 +57,7 @@ export class Outbox {
 
   async publish(events: readonly DomainEvent[]): Promise<void> {
     if (events.length === 0) return;
+    for (const event of events) EventCatalog.check(event);
     for (const listener of Outbox.listeners.values()) await listener(this.tx, events);
     const trace = Trace.current();
     const rows = events.map((e) => ({

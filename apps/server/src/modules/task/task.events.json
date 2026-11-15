@@ -1,0 +1,134 @@
+{
+  "topics": {
+    "task.task.changed": {
+      "fields": ["taskId", "status", "title", "error?"]
+    },
+    "task.task.requested": {
+      "fields": [
+        "requestId",
+        "kind",
+        "title",
+        "instruction?",
+        "payload?",
+        "targetKind?",
+        "targetId?",
+        "baseVersion?",
+        "agentId?",
+        "priority?"
+      ],
+      "from": ["vault", "plugin"]
+    },
+    "task.agentless.requested": {
+      "fields": ["requestId", "kind", "title", "targetKind", "targetId", "baseVersion"],
+      "from": ["vault"]
+    },
+    "task.agent.changed": {
+      "fields": ["agentId", "status"]
+    },
+    "task.approval.requested": {
+      "fields": [
+        "approvalId",
+        "taskId",
+        "agentId",
+        "action",
+        "targetKind",
+        "targetId",
+        "targetVersion",
+        "decidedBy",
+        "note",
+        "chatId?",
+        "payload"
+      ]
+    },
+    "task.approval.granted": {
+      "fields": [
+        "approvalId",
+        "taskId",
+        "agentId",
+        "action",
+        "targetKind",
+        "targetId",
+        "targetVersion",
+        "decidedBy",
+        "note",
+        "chatId",
+        "payload"
+      ]
+    },
+    "task.approval.rejected": {
+      "fields": [
+        "approvalId",
+        "taskId",
+        "agentId",
+        "action",
+        "targetKind",
+        "targetId",
+        "targetVersion",
+        "decidedBy",
+        "note",
+        "chatId",
+        "payload"
+      ]
+    },
+    "task.approval.revision_requested": {
+      "fields": [
+        "approvalId",
+        "taskId",
+        "agentId",
+        "action",
+        "targetKind",
+        "targetId",
+        "targetVersion",
+        "decidedBy",
+        "note",
+        "chatId",
+        "payload"
+      ]
+    },
+    "task.approval.cancelled": {
+      "fields": [
+        "approvalId",
+        "taskId",
+        "agentId",
+        "action",
+        "targetKind",
+        "targetId",
+        "targetVersion",
+        "decidedBy",
+        "note",
+        "chatId",
+        "payload"
+      ]
+    },
+    "task.chat.changed": {
+      "fields": ["chatId", "title", "turns"]
+    },
+    "task.chat.asked": {
+      "fields": ["chatId", "title", "question"]
+    },
+    "task.chat.routed": {
+      "fields": ["chatId", "title", "agent"]
+    },
+    "task.chat.answered": {
+      "fields": ["chatId", "title", "text"]
+    },
+    "task.goal_run.changed": {
+      "fields": ["goalRunId", "goalId", "status", "round?"]
+    },
+    "task.page.built": {
+      "fields": ["taskId", "runId", "pageId", "title", "note", "files"]
+    },
+    "task.external_tool.noted": {
+      "fields": ["toolId?", "names?"]
+    },
+    "task.external_tool.plugged": {
+      "fields": ["toolId", "name", "agentId", "approvalId", "outcome"]
+    },
+    "task.external_tool.plug_failed": {
+      "fields": ["toolId", "approvalId", "outcome", "error"]
+    },
+    "task.setting.changed": {
+      "fields": ["approvalId", "outcome", "error?"]
+    }
+  }
+}

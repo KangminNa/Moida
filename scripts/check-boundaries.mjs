@@ -12,6 +12,8 @@
 //   6. 모듈의 <이름>.view.ts는 표 인터페이스(<모듈>.tables.ts)의 타입만 가져온다 (웹이 import type으로 가져오는 파일)
 //   7. 모듈 사이 읽기(platform Lookups, 리팩토링 R3b): 코드의 lookups.provide('종류') · lookups.visible|assertVisible('종류')가
 //      modules.json의 lookups.provides · asks와 같고, 묻는 종류는 어느 모듈이든 준다 (한 종류는 한 모듈만 준다)
+//   8. 이벤트 목록(리팩토링 R3c): <모듈>.events.json의 주제는 그 모듈 이름으로 시작하고, from은 모듈 이름이나 plugin이다.
+//      플러그인 목록 파일의 event:<무늬>는 어느 모듈의 주제나 플러그인 주제(plugin.*)에 맞아야 한다
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -61,6 +63,40 @@ function checkCode() {
   }
   checkPlugins();
   checkLookups();
+  checkEvents();
+}
+
+function checkEvents() {
+  const topics = [];
+  for (const m of moduleNames) {
+    const file = join(modulesDir, m, `${m}.events.json`);
+    if (!existsSync(file)) continue;
+    for (const [topic, spec] of Object.entries(JSON.parse(readFileSync(file, 'utf8')).topics)) {
+      if (!topic.startsWith(`${m}.`)) problems.push(`${m}.events.json: 다른 모듈의 주제 ${topic}`);
+      for (const from of spec.from ?? [])
+        if (from !== 'plugin' && !moduleNames.includes(from))
+          problems.push(`${m}.events.json: ${topic}의 from에 없는 모듈 ${from}`);
+      topics.push(topic);
+    }
+  }
+  const pluginsDir = join(root, 'plugins');
+  if (!existsSync(pluginsDir)) return;
+  for (const name of readdirSync(pluginsDir)) {
+    const file = join(pluginsDir, name, 'cairn-plugin.json');
+    if (!existsSync(file)) continue;
+    for (const use of JSON.parse(readFileSync(file, 'utf8')).uses ?? []) {
+      if (!use.startsWith('event:')) continue;
+      const pattern = use.slice('event:'.length);
+      const known =
+        pattern === '*' ||
+        pattern.startsWith('plugin.') ||
+        (pattern.endsWith('.*')
+          ? topics.some((t) => t.startsWith(pattern.slice(0, -1)))
+          : topics.includes(pattern));
+      if (!known)
+        problems.push(`plugins/${name}: ${use}에 맞는 이벤트 주제가 없음 (<모듈>.events.json)`);
+    }
+  }
 }
 
 function noteLookups(owner, text) {

@@ -1,0 +1,31 @@
+{
+  "topics": {
+    "vault.session.saved": {
+      "fields": ["sessionId", "revisionId", "seq", "deviceId", "project", "created"]
+    },
+    "vault.session.assigned": {
+      "fields": ["sessionId", "wikiId"]
+    },
+    "vault.wiki.saved": {
+      "fields": ["wikiId", "revisionId", "seq", "kind", "changeSetId"]
+    },
+    "vault.category.changed": {
+      "fields": ["categoryId", "name", "deleted"]
+    },
+    "vault.edge.changed": {
+      "fields": ["edgeId", "src", "dst", "kind", "deleted"]
+    },
+    "vault.change.submitted": {
+      "fields": ["changeSetId", "kind", "status"]
+    },
+    "vault.change.decided": {
+      "fields": ["changeSetId", "seq", "status"]
+    },
+    "vault.change.reverted": {
+      "fields": ["changeSetId", "revertId"]
+    },
+    "vault.setting.changed": {
+      "fields": ["approvalId", "outcome", "error?"]
+    }
+  }
+}

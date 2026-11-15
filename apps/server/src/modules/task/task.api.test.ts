@@ -8,9 +8,21 @@ import {
   CoreWorkers,
   Database,
   DomainEvent,
+  EventCatalog,
   Outbox,
   OutboxWorker,
 } from '../platform';
+
+// 시험이 흉내 내는 주제: 결과 이벤트는 어느 주제든 approvalId · outcome을 실으면 결과다 (ApprovalResultHandler).
+// 다른 모듈의 진짜 주제를 칸을 덜 채워 흉내 내지 않고, 시험용 주제를 이벤트 목록에 더한다 (EventCatalog, 리팩토링 R3c)
+const PROBE_RESULT = 'task.probe.result';
+EventCatalog.define('task', {
+  topics: {
+    [PROBE_RESULT]: { fields: ['approvalId', 'outcome', 'error?'] },
+    'task.probe.committed': { fields: ['id'] },
+    'task.probe.rolled_back': { fields: ['id'] },
+  },
+});
 
 // 작업과 결재. 러너는 MCP로, 주인은 REST로 들어온다. 이벤트는 outbox와 일꾼을 실제로 거친다.
 
@@ -286,8 +298,7 @@ describe('가짜 러너', () => {
     // 받는 모듈이 없으니 결과가 오기 전까지 그대로다. 가짜 결과 이벤트로 끝낸다
     assert.equal((await getTask(task.id)).status, 'running');
     await publish(
-      new DomainEvent('blog.post.published', 1, await spaceId(), {
-        postId,
+      new DomainEvent(PROBE_RESULT, 1, await spaceId(), {
         approvalId: approval?.id,
         outcome: 'done',
       }),
@@ -301,7 +312,7 @@ describe('가짜 러너', () => {
 
     // 같은 결과가 또 와도 그대로
     await publish(
-      new DomainEvent('blog.post.published', 1, await spaceId(), {
+      new DomainEvent(PROBE_RESULT, 1, await spaceId(), {
         approvalId: approval?.id,
         outcome: 'failed',
         error: '늦게 온 실패',
@@ -319,7 +330,7 @@ describe('가짜 러너', () => {
     const approval = await getApproval(asked.body.approval_id);
     ok(await decide(approval.id, approval.version, 'approve'));
     await publish(
-      new DomainEvent('blog.post.publish_failed', 1, await spaceId(), {
+      new DomainEvent(PROBE_RESULT, 1, await spaceId(), {
         approvalId: approval.id,
         outcome: 'failed',
         error: '판이 바뀌었어요',

@@ -1,6 +1,7 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { BlobStore, PasswordHasher, SecretBox } from '../platform';
+import { BlobStore, EventCatalog, PasswordHasher, SecretBox } from '../platform';
+import events from './account.events.json';
 import { AccountNotices } from './account-notices';
 import { AccountSecurity } from './account-security';
 import { AccountSettings } from './account-settings';
@@ -78,6 +79,7 @@ export class AccountModule implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    EventCatalog.define('account', events);
     // 로고가 가리키는 파일: 쓰는 동안 platform이 지우지 않게
     this.blobs.registerUse(['account.spaces.logo_blob_hash'], (actor, hashes) =>
       this.spaces.usedBlobs(actor, hashes),

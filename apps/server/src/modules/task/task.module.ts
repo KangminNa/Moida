@@ -3,6 +3,7 @@ import {
   AgentDirectory,
   BlobStore,
   CoreWorkers,
+  EventCatalog,
   Leases,
   LibraryQuery,
   SecretRotation,
@@ -90,6 +91,7 @@ import {
   SubmitResultTool,
 } from './task/task.tool';
 import { TaskRequestedHandler } from './task/task-requested.handler';
+import events from './task.events.json';
 import { TaskNotices } from './task-notices';
 import { TaskSettings } from './task-settings';
 import { TaskTools } from './task-tools';
@@ -247,6 +249,7 @@ export class TaskModule implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    EventCatalog.define('task', events);
     this.workers.on(Task.REQUESTED, this.requested);
     this.workers.on(AgentlessRequestHandler.TOPIC, this.agentless);
     this.workers.on(Task.CHANGED, this.settled);

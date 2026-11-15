@@ -1,0 +1,47 @@
+{
+  "topics": {
+    "blog.post.published": {
+      "fields": [
+        "postId",
+        "slug",
+        "title",
+        "status",
+        "postVersion",
+        "mainWikiId",
+        "refWikiIds",
+        "approvalId?",
+        "outcome?"
+      ]
+    },
+    "blog.post.updated": {
+      "fields": ["postId", "slug", "title", "status", "postVersion", "mainWikiId", "refWikiIds"]
+    },
+    "blog.post.unpublished": {
+      "fields": ["postId", "slug", "title", "status", "postVersion", "mainWikiId", "refWikiIds"]
+    },
+    "blog.post.deleted": {
+      "fields": ["postId", "slug", "title", "status", "postVersion", "mainWikiId", "refWikiIds"]
+    },
+    "blog.post.publish_failed": {
+      "fields": ["postId", "approvalId", "outcome", "error"]
+    },
+    "blog.issue.published": {
+      "fields": ["issueId", "menuId", "number", "title", "approvalId?", "outcome?"]
+    },
+    "blog.issue.publish_failed": {
+      "fields": ["issueId", "approvalId", "outcome", "error"]
+    },
+    "blog.page.changed": {
+      "fields": ["pageId", "name", "visibility", "currentSeq"]
+    },
+    "blog.page.pending": {
+      "fields": ["pageId", "seq", "title"]
+    },
+    "blog.page.shown": {
+      "fields": ["pageId", "seq"]
+    },
+    "blog.setting.changed": {
+      "fields": ["approvalId", "outcome", "error?"]
+    }
+  }
+}

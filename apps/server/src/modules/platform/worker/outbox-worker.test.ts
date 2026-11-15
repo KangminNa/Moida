@@ -481,8 +481,15 @@ describe('신호와 마감으로 깨우기 (쉬는 동안에는 DB를 보지 않
     await publish('probe.wake.retry');
     await until(() => inbox.names.length === 1);
     assert.deepEqual(inbox.names, ['probe.wake.retry']);
-    const [row] = await db.sql`
-      SELECT attempts, processed_at FROM platform.outbox WHERE topic = 'probe.wake.retry'`;
+    // 받는 쪽이 이름을 적은 뒤에 일꾼이 처리 표시를 커밋한다: 그 커밋까지 기다린다
+    let row: { attempts?: number; processed_at?: Date | null } | undefined;
+    const deadline = Date.now() + 5000;
+    do {
+      [row] = await db.sql<{ attempts: number; processed_at: Date | null }[]>`
+        SELECT attempts, processed_at FROM platform.outbox WHERE topic = 'probe.wake.retry'`;
+      if (row?.processed_at) break;
+      await sleep(5);
+    } while (Date.now() < deadline);
     assert.equal(row?.attempts, 2);
     assert.ok(row?.processed_at);
   });

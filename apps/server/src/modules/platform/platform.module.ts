@@ -1,10 +1,11 @@
 import { resolve } from 'node:path';
-import { Global, Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnApplicationBootstrap, type OnModuleInit } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { ArchiveQuery } from './archive/archive.query';
 import { ArchiveRestoreService } from './archive/archive-restore.service';
 import { BlobStore } from './base/blob-store';
 import { Database } from './base/database';
+import { EventCatalog } from './base/event-catalog';
 import { Outbox } from './base/outbox';
 import { SecretBox } from './base/secret-box';
 import { SecretRotation } from './base/secret-rotation';
@@ -35,6 +36,7 @@ import { PushController } from './notice/push.api';
 import { PushGateway } from './notice/push.gateway';
 import { PushQuery } from './notice/push.query';
 import { PushService } from './notice/push.service';
+import events from './platform.events.json';
 import { Leases } from './plugin/leases';
 import { PackageController } from './plugin/package.api';
 import { PackageService } from './plugin/package.service';
@@ -146,7 +148,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     FailedEventService,
   ],
 })
-export class PlatformModule implements OnModuleInit {
+export class PlatformModule implements OnModuleInit, OnApplicationBootstrap {
   constructor(
     private readonly rotation: SecretRotation,
     private readonly plugins: PluginService,
@@ -158,6 +160,7 @@ export class PlatformModule implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    EventCatalog.define('platform', events);
     // 모듈이 등록한 알림 종류로, 이벤트를 남기는 같은 트랜잭션에서 알림도 남긴다
     Outbox.listen('notices', (tx, events) => this.notices.onEvents(tx, events));
     // 일꾼이 8번 실패한 이벤트를 멈출 때 남기는 알림 (이벤트 없이, 리팩토링 R1)
@@ -166,5 +169,17 @@ export class PlatformModule implements OnModuleInit {
     this.workers.every(this.sweep, BlobSweepJob.EVERY_MS);
     this.workers.due(this.push);
     this.workers.every(this.securityPurge, SecurityLogPurgeJob.EVERY_MS);
+  }
+
+  /** 모든 모듈이 등록을 마친 뒤: 듣는 무늬(받기 · 마감 작업 · 알림)가 이벤트 목록의 주제와 맞는지. 틀리면 서버가 뜨지 않는다 */
+  onApplicationBootstrap(): void {
+    const unknown = EventCatalog.unknownPatterns([
+      ...this.workers.patterns(),
+      ...this.notices.all().flatMap((kind) => kind.watched),
+    ]);
+    if (unknown.length > 0)
+      throw new Error(
+        `이벤트 목록(<모듈>.events.json)에 없는 주제를 들어요: ${unknown.join(', ')}`,
+      );
   }
 }
