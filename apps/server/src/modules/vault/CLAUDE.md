@@ -8,7 +8,7 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
   2차 민감정보 제거(platform의 `SensitivePolicy`를 `SessionNote.scrubbedBy`로), 저장 결과(`SessionReceipt`: saved · unchanged · duplicate).
   MCP 도구 `check_session`(`CheckSessionTool`: 올리기 전 검사, 저장하지 않음. request_id·대화 id·같은 대화의 판 수·지울 민감정보)과 `save_session`(`SaveSessionTool`),
   `search_sessions`(`SearchSessionsTool`: 제목·지금 판 본문의 키워드 찾기, pg_bigm `LIKE likequery()`라 대소문자 구분. 순서와 커서는 바뀌지 않는 세션 id)와
-  `get_session`(`GetSessionTool`: 지금 판 하나). 두 읽기 도구는 `read_public`이나 `read_all` 중 하나로 열리고(`BaseTool.orScope`), 볼 수 없는 세션은 없는 세션과 똑같이 답한다.
+  `get_session`(`GetSessionTool`: 지금 판 하나). 두 읽기 도구는 `read_public`이나 `read_all` 중 하나로 열리고(`BaseTool.orScope`), 볼 수 없는 세션은 없는 세션과 똑같이 답한다. 작업 토큰에 봉인된 읽기 허락(`Actor.mayRead`, 대화의 참조 2026-11-15 B)이 있는 세션은 비공개를 읽는 권한 없이도 그 작업에서 읽힌다 (노트 · 원문 읽기도 같다).
   관리 화면 API `api/sessions`(목록·상세·지난 판 · 원문, 비공개까지 볼 수 있는 요청자만)
   원문 (2차 4단계, `SessionTranscript`, `session_transcripts` 추가만): 수집 훅 · 확장이 MCP `save_transcript`(upload, `transcript.tool.ts`)로 올린다. 같은 대화 자리를 잠그고(`lockBySource`), 같은 원문은 쌓지 않고, 새 원문이면 `Session.receiveTranscript`가 원문을 쌓고 세션 노트 일을 요청한다 (`task.agentless.requested`, kind `session_note`, 대상 세션 · 판은 원문 번호, requestId `note:<세션>:<번호>`. 원문은 이벤트에 싣지 않는다). 노트가 아직 없는 세션은 `head_revision_id` NULL이고 보낸 제목을 보인다.
   세션 노트 일을 쥔 러너만(platform `Leases`, `Session.noteWork`) MCP `read_transcript`(run)로 원문을 받고(`forPrompt`: 앞 4만 · 뒤 8만 자), `save_note`(run)로 AI의 답을 보낸다: `SessionNote.fromAnswer`가 JSON을 읽고(글 목록은 줄마다 "- ", 길면 자름) 민감정보를 지운 뒤 `Session.writeNote`가 원본 판(`actor_type` ai)으로 쌓는다. 더 새 원문의 노트가 이미 있으면(`noted_seq`) 쌓지 않는다(skipped)

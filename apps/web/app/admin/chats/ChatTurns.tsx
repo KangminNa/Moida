@@ -4,6 +4,7 @@ import { clock, NEWS_KINDS, OUTPUT_KINDS } from '../../_task/labels';
 import { MarkdownText } from '../../_task/MarkdownText';
 import { OutputOpen } from '../../_task/parts';
 import type { ChatNews, ChatTurn } from '../../_task/types';
+import { RefChips } from './ChatRefs';
 
 /** 일하는 중인 회차의 상태 */
 const OPEN = ['queued', 'running', 'waiting'];
@@ -22,6 +23,7 @@ export function ChatTurns({
   turns,
   news,
   pending,
+  pendingRefs,
   me,
   partner,
   busy,
@@ -31,6 +33,8 @@ export function ChatTurns({
   news: readonly ChatNews[];
   /** 맡기 전의 첫 메시지 (맡았으면 null) */
   pending: string | null;
+  /** 맡기 전의 첫 메시지와 함께 넣은 참조 (맡으면 첫 회차로 옮겨 간다) */
+  pendingRefs: ChatTurn['refs'];
   me: string;
   /** 맡은 에이전트 (맡기 전이면 null) */
   partner: string | null;
@@ -44,6 +48,7 @@ export function ChatTurns({
       {pending !== null && turns.length === 0 && (
         <li className="chat-turn">
           <Mine who={me} text={pending} />
+          <RefChips refs={pendingRefs} />
           <Before items={before} me={me} />
         </li>
       )}
@@ -60,6 +65,7 @@ export function ChatTurns({
               at={t.createdAt}
               text={t.message}
             />
+            <RefChips refs={t.refs} />
             {i === 0 && <Before items={before} me={me} />}
             {within
               .filter((n) => n.kind === 'appended' || n.kind === 'reply')

@@ -103,6 +103,10 @@ export type ChatDetail = ReturnType<ChatDetailView['toJSON']>;
 /** 대화 하나의 머리 (만들기 · 보내기의 응답도 이 모양) */
 export type Chat = ChatDetail['chat'];
 export type ChatTurn = ChatDetail['turns'][number];
+/** 회차에 넣은 참조 하나 (2026-11-15 B) */
+export type ChatRef = ChatTurn['refs'][number];
+/** 팀이 동시에 일하는 칸의 한 줄 */
+export type ChatTeamMember = ChatDetail['team'][number];
 /** 기다리는 결과 카드 (2차 2단계) */
 export type ChatCard = NonNullable<ChatDetail['card']>;
 /** 대화의 소식 한 줄 (과정 · 맡기 전의 질문 · 답 · 맡음) */

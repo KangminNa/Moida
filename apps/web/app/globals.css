@@ -3076,3 +3076,101 @@ a.chip {
 .result-actions {
   flex-wrap: wrap;
 }
+
+/* 대화 입력창의 참조 넣기 (2026-11-15 B): 입력 칸 위에 열리는 고르기 칸 */
+.ref-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.ref-picker .ghost.on {
+  border-color: var(--fg);
+  font-weight: 600;
+}
+
+.ref-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ref-results {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ref-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ref-result:hover,
+.ref-result:focus-visible {
+  background: var(--raised);
+}
+
+.ref-result .clamp-1 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 보낸 메시지 아래의 참조: 말풍선처럼 오른쪽 */
+.chat-turn > .picked {
+  align-self: flex-end;
+  justify-content: flex-end;
+  max-width: min(720px, 100%);
+}
+
+.chat-turn > .picked .chip {
+  max-width: 100%;
+  font-size: 12px;
+}
+
+/* 대화 머리의 모델 · 생각 강도 (맡은 에이전트의 값 대신 이 대화만) */
+.chat-runtime {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.chat-runtime .input.small {
+  width: auto;
+  max-width: 140px;
+}
+
+@media (max-width: 640px) {
+  .chat-top {
+    flex-wrap: wrap;
+  }
+
+  .chat-runtime {
+    order: 3;
+    width: 100%;
+  }
+}

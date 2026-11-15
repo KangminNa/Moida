@@ -2,19 +2,23 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMe } from '../../_account/live';
-import { api } from '../../_lib/client-api';
+import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
-import { CHAT_DETAIL_TOPICS } from '../../_task/live';
-import type { Chat, ChatDetail } from '../../_task/types';
+import { CHAT_DETAIL_TOPICS, useAgents } from '../../_task/live';
+import type { Chat, ChatDetail, OutputSaved } from '../../_task/types';
 import { ChatCardForm } from './ChatCardForm';
-import { ChatForm } from './ChatForm';
+import { ChatForm, type ChatMessageBody } from './ChatForm';
 import { ChatQuestion } from './ChatQuestion';
+import type { RefChoice } from './ChatRefs';
+import { ChatRuntimeForm } from './ChatRuntimeForm';
 import { ChatTeamPanel } from './ChatTeamPanel';
 import { ChatTurns } from './ChatTurns';
 
 /** 도는 상태 (멈추기가 보인다) */
 const RUNNING = ['routing', 'working'];
+/** 끝나지 않은 회차 작업의 상태 (이때 보내면 덧붙인 말) */
+const TURN_OPEN = ['queued', 'running', 'waiting'];
 
 // 대화 하나 (2차 1-5, ChatGPT · Claude 같은 모양): 가운데 주고받음, 아래 입력 칸 하나.
 // 팀이 일하는 동안에는 오른쪽에 "팀이 동시에 일하는 중" 칸이 붙는다 (ChatTeamPanel, 좁은 화면에서는 숨긴다).
@@ -32,6 +36,9 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const cancelling = useAction();
   const deciding = useAction();
   const stopping = useAction();
+  const tuning = useAction();
+  const uploading = useAction();
+  const agents = useAgents();
   /** 응답을 못 받아 다시 보내도 메시지가 한 번만 가게 (보낸 뒤에만 바꾼다) */
   const requestId = useRef('');
   if (!requestId.current) requestId.current = crypto.randomUUID();
@@ -73,7 +80,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
         ? '일하는 중. 보내면 덧붙인 말이 되고 짧게 답해요 (회차마다 5개)'
         : null;
 
-  async function send(body: { message: string; choice?: string }) {
+  async function send(body: ChatMessageBody & { choice?: string }) {
     const reply = await sending.run(
       'send',
       () =>
@@ -109,6 +116,34 @@ export function ChatThreadPanel({ id }: { id: string }) {
       conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요',
     });
 
+  const tune = (body: { model: string | null; effort: string | null }) =>
+    tuning.run(
+      'tune',
+      () => api('PATCH', `/api/chats/${id}`, { version: d.chat.version, ...body }),
+      {
+        done: '이 대화의 모델을 바꿨어요',
+        reload: detail.reload,
+        conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요',
+      },
+    );
+
+  /** 파일을 올려 결과물로 만들고 참조로 넣는다 (올린 파일은 보관함의 결과물이 된다) */
+  async function upload(file: File): Promise<RefChoice | null> {
+    const reply = await uploading.run('upload', () =>
+      uploadFile<OutputSaved>(
+        `/api/outputs/files?name=${encodeURIComponent(file.name)}`,
+        file,
+        'application/octet-stream',
+      ),
+    );
+    if (!reply?.ok) return null;
+    return { kind: 'output', id: reply.data.id, title: file.name, url: null, browser: false };
+  }
+
+  const tool = agents.data?.agents.find((a) => a.id === d.chat.agentId)?.tool ?? null;
+  // 참조는 새 회차에만: 앞 회차가 끝나지 않았으면 덧붙인 말, 맡기 전이면 질문의 답이라 받지 않는다 (서버 ChatHistory.waiting과 같은 규칙)
+  const refsEnabled = !!partner && !question && !TURN_OPEN.includes(d.turns.at(-1)?.status ?? '');
+
   const cancel = (taskId: string, version: number) =>
     cancelling.run(taskId, () => api('POST', `/api/tasks/${taskId}/cancel`, { version }), {
       done: '답을 멈췄어요',
@@ -122,6 +157,16 @@ export function ChatThreadPanel({ id }: { id: string }) {
         <header className="chat-top">
           <h1 className="clamp-1">{d.chat.title}</h1>
           {d.chat.deviceId && <span className="pill">기기에서</span>}
+          {tool && partner && !partner.deleted && (
+            <ChatRuntimeForm
+              key={d.chat.version}
+              tool={tool}
+              model={d.chat.model}
+              effort={d.chat.effort}
+              busy={tuning.busy !== null}
+              onSubmit={tune}
+            />
+          )}
           {(RUNNING.includes(d.state) || d.card) && (
             <button
               type="button"
@@ -135,10 +180,12 @@ export function ChatThreadPanel({ id }: { id: string }) {
         </header>
         {detail.error && <p className="error">{detail.error}</p>}
         {stopping.problem && <p className="error">{stopping.problem}</p>}
+        {tuning.problem && <p className="error">{tuning.problem}</p>}
         <ChatTurns
           turns={d.turns}
           news={d.news}
           pending={d.chat.pending}
+          pendingRefs={d.chat.pendingRefs}
           me={me.data?.name ?? '관리자'}
           partner={partner?.name ?? null}
           busy={cancelling.busy}
@@ -169,15 +216,17 @@ export function ChatThreadPanel({ id }: { id: string }) {
         <ChatForm
           key={sent}
           busy={sending.busy !== null}
-          problem={sending.problem}
+          problem={sending.problem ?? uploading.problem}
           blocked={blocked}
           hint={hint}
+          refsEnabled={refsEnabled}
+          onUpload={upload}
           onSubmit={send}
         />
         {/* 입력 칸 아래: 여기로 내리면 입력 칸이 마지막 말풍선을 가리지 않는다 */}
         <div ref={bottom} />
       </div>
-      <ChatTeamPanel taskIds={d.turns.map((t) => t.taskId)} />
+      <ChatTeamPanel team={d.team} />
     </div>
   );
 }

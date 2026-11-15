@@ -119,6 +119,25 @@ export const EFFORT_LABELS: Record<string, string> = {
   max: '최대',
 };
 
+/** 참조의 종류 (보관함의 종류 · 주소) */
+export const REF_KINDS: Record<string, string> = {
+  wiki: '위키',
+  session: '세션',
+  post: '글',
+  page: '페이지',
+  output: '결과물',
+  link: '스크랩',
+  url: '주소',
+};
+
+/** 대화에서 고를 수 있는 모델 (Claude는 별칭, Codex는 직접 적는다. 빈 값은 에이전트의 설정) */
+export const CLAUDE_MODELS: readonly (readonly [string, string])[] = [
+  ['', '에이전트 설정'],
+  ['opus', 'Opus'],
+  ['sonnet', 'Sonnet'],
+  ['haiku', 'Haiku'],
+];
+
 /** 도구마다 받는 생각 강도 (서버 AgentRuntime.EFFORTS와 맞춘다) */
 export const TOOL_EFFORTS: Record<string, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
