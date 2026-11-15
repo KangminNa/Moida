@@ -489,6 +489,21 @@ describe('Idempotency (M1)', () => {
     );
   });
 
+  test('peek은 자리를 잡지 않는다: 처음 · 처리 중 · 다른 도구는 null, 남긴 뒤에는 그 결과', async () => {
+    const requestId = `req-peek-${Date.now()}`;
+    const peek = (action = 'sample') =>
+      db.transaction((tx) => new Idempotency(tx, device, requestId, action).peek());
+    assert.equal(await peek(), null);
+    await db.transaction(async (tx) => {
+      const once = new Idempotency(tx, device, requestId, 'sample');
+      assert.equal(await once.previous(), null, 'peek 뒤에도 처음 온 요청');
+      assert.equal(await once.peek(), null, '처리 중(자리만 잡힘)');
+      await once.remember({ approvalId: 'a1' });
+    });
+    assert.deepEqual(await peek(), { approvalId: 'a1' });
+    assert.equal(await peek('other'), null);
+  });
+
   test('같은 요청이 동시에 오면 뒤의 요청은 앞의 결과를 받는다', async () => {
     const requestId = `req-race-${Date.now()}`;
     const results = await Promise.all(

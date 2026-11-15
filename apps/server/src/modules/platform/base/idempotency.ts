@@ -37,6 +37,18 @@ export class Idempotency {
     return (row?.response as Record<string, unknown> | undefined) ?? null;
   }
 
+  /**
+   * 이미 처리한 요청의 결과를 보기만 한다 (자리를 잡지 않는다). 무거운 일(다른 모듈의 미리 해 보기)을 하기 전에
+   * 같은 요청인지 볼 때. 처리 중(자리만 잡힘)이거나 다른 도구의 것이면 null이고, 판정은 previous()가 다시 한다
+   */
+  async peek(): Promise<Readonly<Record<string, unknown>> | null> {
+    const [row] = await this.tx`
+      SELECT tool, response FROM platform.idempotency
+      WHERE device_id = ${this.deviceId} AND request_id = ${this.requestId}`;
+    const response = (row?.response ?? {}) as Record<string, unknown>;
+    return row && row.tool === this.action && Object.keys(response).length > 0 ? response : null;
+  }
+
   /** 처리 결과를 남긴다. previous()가 null이었을 때, 같은 트랜잭션의 마지막에 부른다 */
   async remember(result: object): Promise<void> {
     await this.tx`

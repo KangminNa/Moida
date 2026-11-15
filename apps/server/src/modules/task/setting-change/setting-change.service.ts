@@ -96,7 +96,10 @@ export class SettingChangeService extends BaseService {
     );
   }
 
-  /** 이미 올린 같은 request_id의 결재 (미리 해 보기 전에 본다: 그사이 적용됐으면 바뀌는 칸이 없다) */
+  /**
+   * 이미 올린 같은 request_id의 결재 (미리 해 보기 전에 본다: 그사이 적용됐으면 바뀌는 칸이 없다).
+   * 보기만 한다 (peek): 자리는 결재를 쓰는 트랜잭션의 previous()가 잡는다
+   */
   private earlier(spaceId: string, taskId: string, requestId: string): Promise<Approval | null> {
     return this.transaction(async (tx) => {
       const done = await new Idempotency(
@@ -104,7 +107,7 @@ export class SettingChangeService extends BaseService {
         taskId,
         requestId,
         SettingChangeService.PROPOSE,
-      ).previous();
+      ).peek();
       return done ? new ApprovalRepository(tx).load(spaceId, String(done.approvalId)) : null;
     });
   }

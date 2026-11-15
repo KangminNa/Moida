@@ -25,7 +25,22 @@ const events = async (query = '') =>
     events: Json[];
     next: string | null;
   };
-const mine = (list: Json[]) => list.filter((e) => e.userAgent === agent);
+/** 이 시험이 시작한 때. 1분 안의 같은 사건(종류 · 곳 · 내용)은 앞 시험의 줄에 합쳐져 그 줄의 user-agent가 남는다 */
+const started = new Date().toISOString();
+/** 이 시험이 남긴 줄: 이 시험의 user-agent이거나, 시작한 뒤 합쳐진 줄 */
+const mine = (list: Json[]) =>
+  list.filter((e) => e.userAgent === agent || (e.count > 1 && e.lastAt >= started));
+
+/** 거부된 접근은 응답을 늦추지 않게 기다리지 않고 남긴다: 나타날 때까지 잠깐 다시 읽는다 */
+async function deniedUntil(found: (list: Json[]) => boolean): Promise<Json[]> {
+  let denied: Json[] = [];
+  for (let i = 0; i < 40; i++) {
+    denied = mine((await events('group=access')).events);
+    if (found(denied)) break;
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  return denied;
+}
 
 /** 이 시험의 머리글(user-agent)로 로그인 */
 const login = (name: string, password: string) =>
@@ -124,11 +139,10 @@ describe('보안 기록: 거부된 접근', () => {
       { authorization: `Bearer ${bad}`, 'user-agent': agent },
     );
     assert.equal(res.status, 401);
-    const denied = mine((await events('group=access')).events);
-    assert.ok(
-      denied.some((e) => e.detail.path === '/mcp' && e.detail.credential === 'bearer'),
-      JSON.stringify(denied),
-    );
+    assert.match(String(res.header('www-authenticate')), /resource_metadata=/);
+    const fromMcp = (e: Json) => e.detail.path === '/mcp' && e.detail.credential === 'bearer';
+    const denied = await deniedUntil((list) => list.some(fromMcp));
+    assert.ok(denied.some(fromMcp), JSON.stringify(denied));
     assert.ok(!JSON.stringify(denied).includes(bad));
   });
 
@@ -138,9 +152,10 @@ describe('보안 기록: 거부된 접근', () => {
     });
     assert.equal(me.status, 401);
     await api.request('GET', '/api/agents', TestUser.visitor, undefined, { 'user-agent': agent });
-    const denied = mine((await events('group=access')).events);
+    const agents = (e: Json) => e.detail.path === '/api/agents' && e.detail.status === 403;
+    const denied = await deniedUntil((list) => list.some(agents));
     assert.ok(!denied.some((e) => e.detail.path === '/api/auth/me'));
-    assert.ok(denied.some((e) => e.detail.path === '/api/agents' && e.detail.status === 403));
+    assert.ok(denied.some(agents));
   });
 });
 

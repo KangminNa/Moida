@@ -153,7 +153,8 @@ describe('설정 바꾸기: 읽기와 제안', () => {
     const changed = await current(member.id);
     assert.equal(changed.model, 'opus');
     assert.deepEqual(changed.scopes, ['read_public', 'write']);
-    assert.equal(ok(await api.get(`/api/tasks/${job.task.id}`, owner)).status, 'running');
+    // 승인한 동작을 실행하면 기다리던 작업이 끝난다 (다른 결재와 같다, ApprovalResultHandler)
+    assert.equal(ok(await api.get(`/api/tasks/${job.task.id}`, owner)).status, 'done');
   });
 
   test('규칙에 어긋나면 제안하는 자리에서 막힌다 (브라우저 + 전체 읽기)', async () => {
@@ -297,11 +298,13 @@ describe('설정 바꾸기: 목록과 목표 (D)', () => {
       '승인 전에는 없다',
     );
     await decide(made.approval_id);
-    const { goals } = await call(token, 'get_settings', { kind: 'goals' });
+    // 승인으로 앞 작업은 끝났다: 다음 제안은 새 대화 상대의 일에서
+    const { token: next } = await partner();
+    const { goals } = await call(next, 'get_settings', { kind: 'goals' });
     const goal = (goals as Json[]).find((g) => g.title === title) as Json;
     assert.equal(goal.status, 'active');
 
-    const moved = await tool(token, 'propose_setting', {
+    const moved = await tool(next, 'propose_setting', {
       request_id: randomUUID(),
       setting: 'goal',
       op: 'edit',
@@ -311,7 +314,7 @@ describe('설정 바꾸기: 목록과 목표 (D)', () => {
       note: '옮겨요',
     });
     assert.equal(moved.body.code, 'rule_violation');
-    const done = await call(token, 'propose_setting', {
+    const done = await call(next, 'propose_setting', {
       request_id: randomUUID(),
       setting: 'goal',
       op: 'edit',
@@ -393,17 +396,18 @@ describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
       version: site.version,
       fields: { description },
     });
-    await decide(proposed.approval_id);
-    assert.equal(ok(await api.get('/api/space', owner)).description, description);
-    const url = await tool(token, 'propose_setting', {
+    const { token: other } = await partner();
+    const url = await tool(other, 'propose_setting', {
       request_id: randomUUID(),
       setting: 'site',
       op: 'edit',
-      version: site.version + 1,
+      version: site.version,
       fields: { site_url: 'https://evil.example' },
       note: '왜',
     });
     assert.equal(url.body.code, 'invalid_request', '사이트 주소는 대화로 바꾸지 않는다');
+    await decide(proposed.approval_id);
+    assert.equal(ok(await api.get('/api/space', owner)).description, description);
   });
 
   test('세션 정리 · 프로젝트별 모으기: 승인 뒤 바뀌고, 그사이 관리자가 바꾼 프로젝트는 실패로 끝난다', async () => {
@@ -419,7 +423,8 @@ describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
     assert.equal(ok(await api.get('/api/tidy/settings', owner)).autoTidy, !tidy.auto_tidy);
 
     const project = `proj-${randomUUID().slice(0, 6)}`;
-    const off = await propose(token, {
+    const { token: next } = await partner();
+    const off = await propose(next, {
       setting: 'projects',
       op: 'edit',
       fields: { collect: { [project]: false } },
@@ -456,10 +461,11 @@ describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
       fields: { name, kind: 'posts', slug: `m-${randomUUID().slice(0, 6)}`, policy: '짧게' },
     });
     await decide(made.approval_id);
-    const { menus } = await call(token, 'get_settings', { kind: 'menus' });
+    const { token: next } = await partner();
+    const { menus } = await call(next, 'get_settings', { kind: 'menus' });
     const menu = (menus as Json[]).find((m) => m.name === name) as Json;
     assert.deepEqual([menu.kind, menu.policy], ['posts', '짧게']);
-    const kind = await tool(token, 'propose_setting', {
+    const kind = await tool(next, 'propose_setting', {
       request_id: randomUUID(),
       setting: 'menu',
       op: 'edit',
@@ -489,6 +495,20 @@ describe('설정 바꾸기: 플러그인 설정 (D)', () => {
       const secret = (sync.settings as Json[]).find((s) => s.key === 'token') as Json;
       assert.deepEqual(['value' in secret, typeof secret.set], [false, 'boolean']);
 
+      const off = await tool(token, 'propose_setting', {
+        request_id: randomUUID(),
+        setting: 'plugin',
+        op: 'edit',
+        target_name: 'sync-github',
+        fields: { token: 'x' },
+        note: '왜',
+      });
+      assert.equal(
+        off.body.code,
+        'rule_violation',
+        '꺼진 플러그인 · 비밀 칸은 대화로 바꾸지 않는다',
+      );
+
       const proposed = await call(token, 'propose_setting', {
         request_id: randomUUID(),
         setting: 'plugin',
@@ -507,20 +527,6 @@ describe('설정 바꾸기: 플러그인 설정 (D)', () => {
       assert.equal(
         ok(await api.get('/api/plugins/comments-giscus/settings')).settings.repo,
         'me/other',
-      );
-
-      const off = await tool(token, 'propose_setting', {
-        request_id: randomUUID(),
-        setting: 'plugin',
-        op: 'edit',
-        target_name: 'sync-github',
-        fields: { token: 'x' },
-        note: '왜',
-      });
-      assert.equal(
-        off.body.code,
-        'rule_violation',
-        '꺼진 플러그인 · 비밀 칸은 대화로 바꾸지 않는다',
       );
     } finally {
       await api.request('POST', '/api/plugins/comments-giscus/disable', owner);
