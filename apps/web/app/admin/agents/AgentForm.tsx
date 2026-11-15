@@ -4,12 +4,12 @@ import { type FormEvent, useId, useRef, useState } from 'react';
 import { TOOL_LABELS } from '../../_task/labels';
 import type { RunnerChoice } from '../../_task/live';
 import type { Agent, ExternalTool } from '../../_task/types';
-import { AccessFields } from './AccessFields';
+import { type Access, AccessFields } from './AccessFields';
 import { BossField } from './BossField';
 import { LimitField } from './LimitField';
 import { ReviewerField } from './ReviewerField';
 import { RunnerField } from './RunnerField';
-import { RuntimeFields, runtimeFor } from './RuntimeFields';
+import { type Runtime, RuntimeFields, runtimeFor } from './RuntimeFields';
 
 /** 빈 칸은 한도 없음. 맞지 않는 값이면 undefined */
 function limitOf(text: string): number | null | undefined {
@@ -80,15 +80,16 @@ export function AgentForm({
   const id = useId();
   const [name, setName] = useState(agent?.name ?? '');
   const [role, setRole] = useState(agent?.role ?? '');
-  const [tool, setTool] = useState(agent?.tool ?? 'claude');
-  const [runtime, setRuntime] = useState({
+  // 칸의 값은 고른 글자 그대로 둔다 (값 목록은 서버가 본다)
+  const [tool, setTool] = useState<string>(agent?.tool ?? 'claude');
+  const [runtime, setRuntime] = useState<Runtime>({
     model: agent?.model ?? '',
     effort: agent?.effort ?? '',
   });
   const [reportsTo, setReportsTo] = useState(agent?.reportsTo ?? '');
   const [runnerId, setRunnerId] = useState(agent?.runnerId ?? '');
   const [reviewerId, setReviewerId] = useState(agent?.reviewerId ?? '');
-  const [access, setAccess] = useState({
+  const [access, setAccess] = useState<Access>({
     scopes: agent?.scopes ?? [],
     actions: agent?.approvalActions ?? [],
     tools: agent?.externalTools ?? [],

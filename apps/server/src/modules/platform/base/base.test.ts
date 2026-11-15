@@ -29,6 +29,7 @@ import { SecretRotation } from './secret-rotation';
 import { TableEntity, type TableRow } from './table-entity';
 import { Rule, TableQuery } from './table-query';
 import { TableRepository } from './table-repository';
+import { ValueList } from './value-list';
 import { ZipFile } from './zip-file';
 
 // 기반 클래스가 약속한 동작을 실제 DB로 확인한다.
@@ -127,6 +128,16 @@ describe('BaseEntity', () => {
     const b = Sample.open().id;
     assert.match(a, /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     assert.ok(a.slice(0, 13) <= b.slice(0, 13));
+  });
+});
+
+describe('ValueList', () => {
+  test('생성된 값 목록에 든 글자만 통과한다 (리팩토링 R2)', () => {
+    const modes = ['daily', 'hourly'] as const;
+    assert.equal(ValueList.has(modes, 'daily'), true);
+    assert.equal(ValueList.has(modes, 'weekly'), false);
+    assert.equal(ValueList.has(modes, ''), false);
+    assert.equal(ValueList.has(modes, null), false);
   });
 });
 

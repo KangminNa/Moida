@@ -1,11 +1,11 @@
-import { RuleViolation } from '../../platform';
+import { RuleViolation, ValueList } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { TaskRefs } from '../task/task-refs.policy';
-import { ChatResult } from './chat-result.policy';
+import { CHAT_DELIVER, type ChatDeliver } from '../task.tables';
 
 /** 배정 일의 답을 읽은 결과: 맡을 에이전트, 아니면 관리자에게 물을 질문과 고를 에이전트 */
 export type ChatRouteDecision =
-  | { kind: 'agent'; agent: Agent; reason: string; deliver: string | null }
+  | { kind: 'agent'; agent: Agent; reason: string; deliver: ChatDeliver | null }
   | { kind: 'question'; question: string; choices: readonly Agent[] };
 
 // 배정 (2차 1-5 · 기획서 결정 2026-11-14): 새 대화는 "맡는 일"(역할의 첫 줄)이 맞는 에이전트가 맡는다.
@@ -84,7 +84,7 @@ export class ChatRoute {
         kind: 'agent',
         agent,
         reason: ChatRoute.cut(json.reason, ChatRoute.REASON_MAX),
-        deliver: ChatResult.DELIVERS.includes(deliver) ? deliver : null,
+        deliver: ValueList.has(CHAT_DELIVER, deliver) ? deliver : null,
       };
     }
     const question = ChatRoute.cut(json.question, ChatRoute.QUESTION_MAX);

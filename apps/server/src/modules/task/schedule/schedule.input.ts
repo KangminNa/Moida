@@ -1,4 +1,4 @@
-import { BaseRequest, type RequestFields } from '../../platform';
+import { BaseRequest, type RequestFields, type Unchecked } from '../../platform';
 import type { ScheduleRow } from '../task.tables';
 import { Schedule } from './schedule';
 
@@ -10,7 +10,10 @@ const VERSION_MAX = 2_147_483_647;
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /** 만들기 · 고치기의 설정 칸. 매일이면 atTime과 weekdays(월 1 ~ 일 7), N시간마다면 everyHours */
-function settingsOf(f: RequestFields, body: Record<string, unknown>): Partial<ScheduleRow> {
+function settingsOf(
+  f: RequestFields,
+  body: Record<string, unknown>,
+): Partial<Unchecked<ScheduleRow>> {
   return {
     title: f.text('title', Schedule.TITLE_MAX),
     agent_id: body.agentId === undefined || body.agentId === null ? null : f.uuid('agentId'),
@@ -58,7 +61,7 @@ function weekdaysOf(f: RequestFields, value: unknown): readonly number[] {
 export class CreateScheduleInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
-    readonly settings: Partial<ScheduleRow>,
+    readonly settings: Partial<Unchecked<ScheduleRow>>,
   ) {
     super();
   }
@@ -77,7 +80,7 @@ export class UpdateScheduleInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
-    readonly settings: Partial<ScheduleRow>,
+    readonly settings: Partial<Unchecked<ScheduleRow>>,
   ) {
     super();
   }

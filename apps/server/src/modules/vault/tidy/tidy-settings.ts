@@ -1,6 +1,12 @@
-import { DomainEvent, RuleViolation, TableEntity } from '../../platform';
+import { DomainEvent, RuleViolation, TableEntity, ValueList } from '../../platform';
 import type { NewNode } from '../change/change-target';
-import type { SessionRow, TidySettingNew, TidySettingRow } from '../vault.tables';
+import {
+  type SessionRow,
+  TIDY_SETTING_CADENCE,
+  type TidySettingCadence,
+  type TidySettingNew,
+  type TidySettingRow,
+} from '../vault.tables';
 import { TidySettingsView } from './tidy.view';
 
 /** tidy_settings 한 줄. 공간마다 한 행이라 엔티티의 id는 공간 id다 */
@@ -28,9 +34,8 @@ export class TidySettings extends TableEntity<LoadedTidySettings, NewNode<TidySe
   private static readonly TITLE_MAX = 200;
   private static readonly TITLE_PREFIX = '세션 정리: ';
   private static readonly UNTITLED = '제목 없음';
-  static readonly SAVE = 'save';
-  static readonly DAILY = 'daily';
-  private static readonly CADENCES: readonly string[] = [TidySettings.SAVE, TidySettings.DAILY];
+  static readonly SAVE: TidySettingCadence = 'save';
+  static readonly DAILY: TidySettingCadence = 'daily';
   /** 하루 한 번의 간격. 일꾼이 한 시간마다 보므로 조금 일찍 와도 그날 것으로 친다 */
   private static readonly DAY_MS = 23 * 60 * 60 * 1000;
 
@@ -61,7 +66,7 @@ export class TidySettings extends TableEntity<LoadedTidySettings, NewNode<TidySe
 
   /** 자동 정리를 켜거나 끄고, 언제 할지 정한다 (보내지 않으면 그대로) */
   turn(on: boolean, cadence: string | null, now: Date): void {
-    if (cadence !== null && !TidySettings.CADENCES.includes(cadence))
+    if (cadence !== null && !ValueList.has(TIDY_SETTING_CADENCE, cadence))
       throw new RuleViolation('정리는 저장할 때마다(save)나 하루 한 번(daily)이에요');
     const next = cadence ?? this.row.cadence ?? TidySettings.DAILY;
     if (on === this.row.auto_tidy && next === this.row.cadence) return;

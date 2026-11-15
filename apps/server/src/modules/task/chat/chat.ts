@@ -10,7 +10,7 @@ import type { Agent } from '../agent/agent';
 import { AgentRuntime } from '../agent/agent-runtime.policy';
 import { Task } from '../task/task';
 import { TaskRefs } from '../task/task-refs.policy';
-import type { ChatNew, ChatRow, ChatUpdateNew } from '../task.tables';
+import type { ChatDeliver, ChatNew, ChatRow, ChatUpdateKind, ChatUpdateNew } from '../task.tables';
 import { ChatView } from './chat.view';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatRequest } from './chat-request.policy';
@@ -183,9 +183,10 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * 상대의 회차에만 쓴다 (팀원은 각자의 설정)
    */
   tune(model: string | null, effort: string | null, tool: string, now: Date): void {
-    AgentRuntime.assertFits(tool, AgentRuntime.effort(effort ?? ''));
+    const checked = AgentRuntime.effort(effort ?? '');
+    AgentRuntime.assertFits(tool, checked);
     this.put('model', AgentRuntime.model(model ?? '') || null);
-    this.put('effort', effort || null);
+    this.put('effort', checked || null);
     this.touch(now);
   }
 
@@ -274,7 +275,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     agent: Agent,
     now: Date,
     reason = '',
-    deliver: string | null = null,
+    deliver: ChatDeliver | null = null,
     routeTaskId: string | null = null,
   ): Task {
     const message = this.row.pending;
@@ -330,14 +331,14 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   }
 
   /** 끝난 작업의 소식 (ChatUpdateService). 회차의 최종 답이면 알림 이벤트도 (답은 앞부분만) */
-  settled(kind: string, text: string, taskId: string, agentId: string | null, now: Date): void {
+  settled(kind: ChatUpdateKind, text: string, taskId: string, agentId: string | null, now: Date) {
     this.note(kind, text, taskId, agentId, now);
     if (kind === ChatUpdates.FINAL) this.announce(Chat.ANSWERED, { text: text.slice(0, 300) });
   }
 
   /** 소식 한 줄을 남긴다 (끝난 작업 · post_update · 덧붙인 말). 저장할 때 함께 쌓인다 */
   note(
-    kind: string,
+    kind: ChatUpdateKind,
     text: string,
     taskId: string | null,
     agentId: string | null,

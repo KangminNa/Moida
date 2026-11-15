@@ -1,6 +1,6 @@
-import { RuleViolation } from '../../platform';
+import { RuleViolation, ValueList } from '../../platform';
 import { Task } from '../task/task';
-import type { ChatUpdateNew, TaskRow } from '../task.tables';
+import type { ChatUpdateKind, ChatUpdateNew, TaskRow } from '../task.tables';
 
 /** 끝난 작업과 그 작업이 속한 대화 (ChatRepository.placeOf가 위로 올라가 찾는다) */
 export type ChatPlaceRow = Pick<
@@ -29,7 +29,7 @@ export class ChatUpdates {
   /** 에이전트가 대화를 맡았다 (agent_id, 글은 고른 까닭이나 이름) */
   static readonly ROUTED = 'routed';
   /** 에이전트가 post_update로 남기는 종류 (작업마다 POST_MAX개) */
-  static readonly POSTED: readonly string[] = ['progress', 'decision', 'assumption'];
+  static readonly POSTED: readonly ChatUpdateKind[] = ['progress', 'decision', 'assumption'];
   static readonly POST_MAX = 20;
   /** 덧붙인 말은 회차마다 이만큼 */
   static readonly APPEND_MAX = 5;
@@ -38,7 +38,7 @@ export class ChatUpdates {
   static line(
     id: string,
     chat: { spaceId: string; id: string },
-    kind: string,
+    kind: ChatUpdateKind,
     text: string,
     taskId: string | null,
     agentId: string | null,
@@ -59,8 +59,8 @@ export class ChatUpdates {
   }
 
   /** post_update로 남길 수 있는가: 종류와 작업마다의 개수 (posted: 그 작업이 이미 남긴 수) */
-  static assertPostable(kind: string, posted: number): void {
-    if (!ChatUpdates.POSTED.includes(kind))
+  static assertPostable(kind: string, posted: number): asserts kind is ChatUpdateKind {
+    if (!ValueList.has(ChatUpdates.POSTED, kind))
       throw new RuleViolation(`종류는 ${ChatUpdates.POSTED.join(' · ')} 중 하나예요`);
     if (posted >= ChatUpdates.POST_MAX)
       throw new RuleViolation(`소식은 작업마다 ${ChatUpdates.POST_MAX}개까지예요`);
@@ -74,7 +74,7 @@ export class ChatUpdates {
   }
 
   /** 끝난 작업이 남기는 소식의 종류와 글. 소식이 아니면 null (취소 · 아직 안 끝남) */
-  static settled(place: ChatPlaceRow): { kind: string; text: string } | null {
+  static settled(place: ChatPlaceRow): { kind: ChatUpdateKind; text: string } | null {
     const result = (place.result ?? {}) as { text?: unknown; error?: unknown };
     const said = typeof result.text === 'string' ? result.text.trim() : '';
     const error = typeof result.error === 'string' ? result.error : '';

@@ -1,4 +1,5 @@
 import { BaseRequest, type RequestFields } from '../base/base-request';
+import type { Unchecked } from '../base/table-entity';
 import type { NoticeSettingRow } from '../platform.tables';
 
 // 알림 설정 입력의 모양. 뜻(간격 이름, 시간대, 알려진 종류)은 NoticeSettings가 검사한다.
@@ -11,7 +12,7 @@ const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export class SaveNoticeSettingsInput extends BaseRequest {
   private constructor(
     readonly version: number,
-    readonly settings: Partial<NoticeSettingRow>,
+    readonly settings: Partial<Unchecked<NoticeSettingRow>>,
   ) {
     super();
   }
@@ -35,14 +36,14 @@ export class SaveNoticeSettingsInput extends BaseRequest {
 
 /** 대화로 바꾸는 알림 설정 (2026-11-15 D, get_settings notices와 같은 snake_case 칸). 보낸 칸만, 나머지는 지금 값 */
 export class NoticeSettingChangeInput extends BaseRequest {
-  private constructor(readonly changes: Partial<NoticeSettingRow>) {
+  private constructor(readonly changes: Partial<Unchecked<NoticeSettingRow>>) {
     super();
   }
 
   static from(body: Readonly<Record<string, unknown>>): NoticeSettingChangeInput {
     const has = (name: string) => name in body;
     return BaseRequest.read(body, (f) => {
-      const changes: Partial<NoticeSettingRow> = {};
+      const changes: Partial<Unchecked<NoticeSettingRow>> = {};
       if (has('digest')) changes.digest = f.text('digest', 20);
       if (has('digest_time'))
         changes.digest_minute = minuteOf(f, 'digest_time', body.digest_time) ?? -1;

@@ -1,6 +1,6 @@
-import { RuleViolation } from '../../platform';
+import { RuleViolation, ValueList } from '../../platform';
 import { Task } from '../task/task';
-import type { TaskRow } from '../task.tables';
+import { CHAT_DELIVER, type ChatDeliver, type TaskRow } from '../task.tables';
 import type { ChatTurnRow } from './chat-history.policy';
 
 /** 지금 회차의 맨 위 작업과 그 회차의 검토 작업 (ChatRepository.turnState. 없으면 칸이 비어 있다) */
@@ -17,7 +17,6 @@ export type ChatTurnStateRow = {
 //   받을 것(chats.deliver)의 검사, 카드에서 고른 항목.
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. 결과 카드의 서비스 · 읽기가 함께 쓴다
 export class ChatResult {
-  static readonly DELIVERS: readonly string[] = ['html', 'blog', 'browser', 'code'];
   /** 검사에 떨어져 팀에게 다시 맡기는 회차 수 (넘으면 떨어진 채로 카드에 보인다) */
   static readonly FIX_MAX = 2;
   /** 다음에 할 일 */
@@ -38,11 +37,11 @@ export class ChatResult {
     code: { actions: ['code.pr.merge'] },
   };
 
-  /** 받을 것의 모양 검사 (DB CHECK와 같은 목록). 비우면 null (대화 답) */
-  static deliverOf(raw: string | null): string | null {
+  /** 받을 것의 모양 검사 (DB의 값 목록). 비우면 null (대화 답) */
+  static deliverOf(raw: string | null): ChatDeliver | null {
     if (raw === null) return null;
-    if (!ChatResult.DELIVERS.includes(raw))
-      throw new RuleViolation(`받을 것은 ${ChatResult.DELIVERS.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(CHAT_DELIVER, raw))
+      throw new RuleViolation(`받을 것은 ${CHAT_DELIVER.join(' · ')} 중 하나예요`);
     return raw;
   }
 

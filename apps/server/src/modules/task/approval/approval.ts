@@ -2,7 +2,7 @@ import { BaseEntity, DomainEvent, RuleViolation, SettingKinds, TableEntity } fro
 import type { Agent } from '../agent/agent';
 import type { GoalRun } from '../goal-run/goal-run';
 import { Task } from '../task/task';
-import type { ApprovalNew, ApprovalRow } from '../task.tables';
+import type { ApprovalNew, ApprovalRow, ApprovalStatus } from '../task.tables';
 import { ApprovalProposedView, ApprovalRequestedView, ApprovalView } from './approval.view';
 
 // 결재 하나. 위험한 동작을 대상·판 번호와 함께 저장만 하고, 주인이 승인한 뒤에 다른 모듈이 실행한다.
@@ -286,7 +286,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     return new ApprovalProposedView(this.row);
   }
 
-  private close(status: string, deciderId: string, note: string | null, now: Date): void {
+  private close(status: ApprovalStatus, deciderId: string, note: string | null, now: Date): void {
     this.assertPending();
     this.put('status', status);
     this.put('decided_by', deciderId);

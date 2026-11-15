@@ -1,6 +1,6 @@
-import { TableRepository } from '../../platform';
+import { TableRepository, ValueList } from '../../platform';
 import { aiLogins } from '../task.schema';
-import type { AiLoginRow } from '../task.tables';
+import { AI_LOGIN_TOOL, type AiLoginRow } from '../task.tables';
 import { AiLogin } from './ai-login';
 
 // task.ai_logins ↔ AiLogin. 공간과 도구마다 한 줄이다. 고치기는 기반이 하고, 처음 넣기만 여기서 한다.
@@ -14,11 +14,14 @@ export class AiLoginRepository extends TableRepository<AiLoginRow, AiLogin> {
 
   /** 공간의 이 도구 로그인. 없으면 null */
   async byTool(spaceId: string, tool: string): Promise<AiLogin | null> {
+    // 값 목록 밖의 도구는 줄이 있을 수 없다 (CHECK)
+    if (!ValueList.has(AI_LOGIN_TOOL, tool)) return null;
     return this.findOne({ space_id: spaceId, tool });
   }
 
   /** 공간과 도구의 로그인 한 줄을 잠근다. 없으면 null */
   async lockTool(spaceId: string, tool: string): Promise<AiLogin | null> {
+    if (!ValueList.has(AI_LOGIN_TOOL, tool)) return null;
     return this.findOne({ space_id: spaceId, tool }, { lock: true });
   }
 

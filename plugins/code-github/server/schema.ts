@@ -4,6 +4,7 @@
 import { TableColumns } from '../../../apps/server/src/plugin-api';
 
 const { integer, jsonb, pgSchema, text, timestamp, uuid } = TableColumns;
+import type { PullStatus, TaskAskStatus } from './tables';
 
 const codeGithubSchema = pgSchema('code_github');
 
@@ -18,7 +19,7 @@ export const pulls = codeGithubSchema.table('pulls', {
   url: text('url').notNull(),
   head_sha: text('head_sha').notNull(),
   checks: jsonb('checks').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<PullStatus>().notNull(),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
@@ -49,7 +50,7 @@ export const taskAsks = codeGithubSchema.table('task_asks', {
   instruction: text('instruction').notNull(),
   agent_id: uuid('agent_id'),
   asked_by: uuid('asked_by').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<TaskAskStatus>().notNull(),
   approval_id: uuid('approval_id'),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),

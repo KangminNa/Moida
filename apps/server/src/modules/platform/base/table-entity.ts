@@ -6,8 +6,21 @@ export interface TableRow {
   version?: number;
 }
 
+/**
+ * 입력에서 온 칸 (리팩토링 R2): 값 목록 CHECK가 걸린 칸(표 인터페이스의 유니온)도 아직 거르지 않은 글자다.
+ * Input은 이 모양으로 넘기고, 엔티티의 RULES · 메서드가 값 목록(`ValueList.has`)으로 좁힌다. 그래서 목록 밖의 값은 지금처럼 422다
+ */
+export type Unchecked<R> = { [K in keyof R]: Widened<R[K]> };
+type Widened<T> = T extends string
+  ? string
+  : T extends readonly (infer E)[]
+    ? E extends string
+      ? readonly string[]
+      : T
+    : T;
+
 /** 칸마다의 규칙: 들어온 값을 검사해 저장할 값을 돌려준다. 여기 없는 칸은 밖에서 바꿀 수 없다 */
-export type ColumnRules<R> = { readonly [K in keyof R]?: (value: R[K]) => R[K] };
+export type ColumnRules<R> = { readonly [K in keyof R]?: (value: Unchecked<R>[K]) => R[K] };
 
 // 표 한 줄을 들고 있는 엔티티의 기반. 행은 안에 숨기고 밖에는 동작과 view만 내놓는다.
 // 칼럼이 늘어도 하위 클래스의 생성자, restore, Repository, Service는 그대로다.
@@ -35,7 +48,7 @@ export abstract class TableEntity<R extends TableRow, N extends TableRow = R> ex
   }
 
   /** 들어온 칸을 규칙에 통과시켜 적는다. undefined는 그대로 둔다는 뜻이다 */
-  protected accept(changes: Partial<R>, rules: ColumnRules<R>): void {
+  protected accept(changes: Partial<Unchecked<R>>, rules: ColumnRules<R>): void {
     for (const column of Object.keys(changes) as (keyof R)[]) {
       const value = changes[column];
       if (value === undefined) continue;

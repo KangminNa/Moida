@@ -1,13 +1,13 @@
 import { type Actor, TableEntity, type TableRow } from '../../platform';
 import { SlugPolicy } from '../slug.policy';
-import type { NodeRow } from '../vault.tables';
+import type { ChangeSetActorType, NodeRow, WikiOrigin } from '../vault.tables';
 
 /** 변경 하나를 적용할 때의 맥락: 어느 묶음에서, 누가, 언제. 엔티티는 이것을 보고 판과 표시를 남긴다 */
 export class ChangeWork {
-  static readonly AI = 'ai';
-  static readonly HUMAN = 'human';
+  static readonly AI: WikiOrigin = 'ai';
+  static readonly HUMAN: WikiOrigin = 'human';
   /** Actor 종류 → change_sets.actor_type */
-  private static readonly ACTOR_TYPES: Readonly<Record<string, string>> = {
+  private static readonly ACTOR_TYPES: Readonly<Record<string, ChangeSetActorType>> = {
     owner: 'user',
     device: 'device',
     agent: 'ai',
@@ -17,14 +17,14 @@ export class ChangeWork {
   constructor(
     readonly spaceId: string,
     readonly setId: string,
-    readonly actorType: string,
+    readonly actorType: ChangeSetActorType,
     readonly actorId: string | null,
     readonly now: Date,
     /** 사람이 승인해서 적용하는가 (내용은 AI의 것이어도 사람이 지운 연결은 사람의 것으로 남긴다) */
     readonly approved: boolean,
   ) {}
 
-  static actorTypeOf(actor: Actor): string {
+  static actorTypeOf(actor: Actor): ChangeSetActorType {
     return ChangeWork.ACTOR_TYPES[actor.kind] ?? 'system';
   }
 
@@ -33,7 +33,8 @@ export class ChangeWork {
     return this.actorType === 'user';
   }
 
-  get origin(): string {
+  /** 사람 · AI (wiki · 카테고리 · 선의 origin은 같은 값 목록이다) */
+  get origin(): WikiOrigin {
     return this.human ? ChangeWork.HUMAN : ChangeWork.AI;
   }
 }

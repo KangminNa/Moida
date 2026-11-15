@@ -46,7 +46,7 @@ export function NoticeForm({
   onSubmit: (body: NoticeSettingsBody) => void;
 }) {
   const id = useId();
-  const [digest, setDigest] = useState(settings.digest);
+  const [digest, setDigest] = useState<string>(settings.digest);
   const [digestTime, setDigestTime] = useState(settings.digestTime);
   const [quiet, setQuiet] = useState(settings.quietStart !== null);
   const [quietStart, setQuietStart] = useState(settings.quietStart ?? '23:00');

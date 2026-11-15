@@ -1,4 +1,11 @@
-import { RuleViolation } from '../../platform';
+import { RuleViolation, ValueList } from '../../platform';
+import {
+  AGENT_EFFORT,
+  AGENT_TOOL,
+  type AgentEffort,
+  type AgentTool,
+  CHAT_EFFORT,
+} from '../task.tables';
 
 // 에이전트의 런타임 칸: 모델 · 생각 강도 (2차 7단계). 빈 글이면 AI CLI의 기본값을 쓴다.
 // 강도는 도구마다 받는 값이 달라 도구와 함께 본다: 도구를 바꿀 때도, 강도를 바꿀 때도.
@@ -14,8 +21,13 @@ export class AgentRuntime {
     claude: ['low', 'medium', 'high', 'xhigh', 'max'],
     codex: ['low', 'medium', 'high'],
   };
-  /** 어느 도구든 받을 수 있는 값 전부 (DB CHECK와 같다) */
-  static readonly ALL_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+  /** AI 도구 (agents.tool의 값 목록) */
+  static tool(value: string): AgentTool {
+    if (!ValueList.has(AGENT_TOOL, value))
+      throw new RuleViolation(`AI 도구는 ${AGENT_TOOL.join(' · ')} 중 하나예요`);
+    return value;
+  }
 
   static model(value: string): string {
     const model = value.trim();
@@ -27,9 +39,10 @@ export class AgentRuntime {
     return model;
   }
 
-  static effort(value: string): string {
-    if (value !== '' && !AgentRuntime.ALL_EFFORTS.includes(value))
-      throw new RuleViolation(`생각 강도는 ${AgentRuntime.ALL_EFFORTS.join(' · ')} 중 하나예요`);
+  /** 빈 글(CLI의 기본)이나 어느 도구든 받을 수 있는 값 (agents.effort의 값 목록, 대화의 값 목록은 빈 글만 없다) */
+  static effort(value: string): AgentEffort {
+    if (!ValueList.has(AGENT_EFFORT, value))
+      throw new RuleViolation(`생각 강도는 ${CHAT_EFFORT.join(' · ')} 중 하나예요`);
     return value;
   }
 

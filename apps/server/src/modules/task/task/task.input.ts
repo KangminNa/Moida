@@ -1,4 +1,4 @@
-import { BaseRequest, type RequestFields } from '../../platform';
+import { BaseRequest, type RequestFields, type Unchecked } from '../../platform';
 import type { PlanUsageRow, TaskNew } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { MakeMaterials } from './make-materials';
@@ -204,7 +204,7 @@ export class ReportedEvent extends BaseRequest {
 export class ReportedPlanUsage extends BaseRequest {
   private constructor(
     /** period는 API의 window다 (Postgres 예약어라 칸 이름이 다르다) */
-    readonly fields: Pick<PlanUsageRow, 'period' | 'percent' | 'resets_at' | 'status'>,
+    readonly fields: Pick<Unchecked<PlanUsageRow>, 'period' | 'percent' | 'resets_at' | 'status'>,
   ) {
     super();
   }

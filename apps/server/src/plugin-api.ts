@@ -4,6 +4,7 @@
 // 0.3 (2026-11-10): work.leased(id) — 러너가 부른 도구를 그 러너가 임대를 쥔 일(LeasedWork)에 묶는다 (code-github)
 // 0.4 (2026-11-14): LeasedWork의 대상(targetKind · targetId · targetVersion) — 작업이 가리키는 패키지의 줄 (browser-tabs의 사이트 · 클릭)
 // 0.5 (2026-11-16): LeasedWork의 지시(instruction) — 되풀이되는 일 알아채기 (browser-tabs의 사이트 도구 제안)
+// 0.6 (리팩토링 R2): ValueList — 생성된 값 목록(tables.ts의 `as const`)으로 글자를 좁힌다
 export {
   ActionResult,
   Actor,
@@ -36,6 +37,7 @@ export {
   SystemActor,
   TableColumns,
   type ToolAnswer,
+  ValueList,
   VisitorActor,
   type Where,
   Work,

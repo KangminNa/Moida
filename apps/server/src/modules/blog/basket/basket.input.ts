@@ -1,4 +1,4 @@
-import { BaseRequest, type RequestFields } from '../../platform';
+import { BaseRequest, type RequestFields, type Unchecked, ValueList } from '../../platform';
 import type { BasketItemRow } from '../blog.tables';
 import { BasketItem } from './basket';
 
@@ -10,7 +10,7 @@ import { BasketItem } from './basket';
 export class AddBasketItemInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
-    readonly fields: Partial<BasketItemRow>,
+    readonly fields: Partial<Unchecked<BasketItemRow>>,
   ) {
     super();
   }
@@ -18,7 +18,7 @@ export class AddBasketItemInput extends BaseRequest {
   static from(raw: unknown): AddBasketItemInput {
     return BaseRequest.read(raw, (f) => {
       const kind = f.text('kind', 20);
-      if (kind && !BasketItem.KINDS.includes(kind))
+      if (kind && !ValueList.has(BasketItem.KINDS, kind))
         f.reject('kind', `${BasketItem.KINDS.join(' · ')} 중 하나예요`);
       const refers = kind === BasketItem.SESSION || kind === BasketItem.POST;
       return new AddBasketItemInput(f.uuid('requestId'), {

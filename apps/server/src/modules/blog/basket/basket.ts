@@ -1,5 +1,18 @@
-import { type Actor, BaseEntity, TableEntity } from '../../platform';
-import type { BasketItemNew, BasketItemRow } from '../blog.tables';
+import {
+  type Actor,
+  BaseEntity,
+  RuleViolation,
+  TableEntity,
+  type Unchecked,
+  ValueList,
+} from '../../platform';
+import {
+  BASKET_ITEM_KIND,
+  type BasketItemActorType,
+  type BasketItemKind,
+  type BasketItemNew,
+  type BasketItemRow,
+} from '../blog.tables';
 import { BasketItemView, KeptPageView } from './basket.view';
 
 // 소재 하나 (work.basket_items). 글을 쓰려고 모아 두는 세션·글·링크·메모.
@@ -12,7 +25,7 @@ export class BasketItem extends TableEntity<BasketItemRow, BasketItemNew> {
   static readonly POST = 'post';
   static readonly LINK = 'link';
   static readonly NOTE = 'note';
-  static readonly KINDS: readonly string[] = [
+  static readonly KINDS: readonly BasketItemKind[] = [
     BasketItem.SESSION,
     BasketItem.POST,
     BasketItem.LINK,
@@ -23,17 +36,26 @@ export class BasketItem extends TableEntity<BasketItemRow, BasketItemNew> {
   static readonly URL_MAX = 2000;
   private static readonly PROTOCOLS: readonly string[] = ['http:', 'https:'];
   /** 담은 쪽 (basket_items.actor_type): 주인은 콘솔에서, 기기는 브라우저 확장의 "이 페이지 보관"으로 (keep_page) */
-  private static readonly ACTOR_TYPES: Readonly<Record<string, string>> = {
+  private static readonly ACTOR_TYPES: Readonly<Record<string, BasketItemActorType>> = {
     owner: 'user',
     device: 'device',
   };
 
-  /** 종류마다 필요한 칸(세션·글의 id, 링크, 메모)은 입력이 맞춰 온다 */
-  static open(basketId: string, fields: Partial<BasketItemRow>, by: Actor, now: Date): BasketItem {
+  /** 종류마다 필요한 칸(세션·글의 id, 링크, 메모)은 입력이 맞춰 온다. 종류는 입력이 이미 거른 것이다 */
+  static open(
+    basketId: string,
+    fields: Partial<Unchecked<BasketItemRow>>,
+    by: Actor,
+    now: Date,
+  ): BasketItem {
+    const kind = fields.kind;
+    // 표의 값 목록과 같다: 예전에는 DB가 막던 값을 저장 전에 막는다
+    if (!ValueList.has(BASKET_ITEM_KIND, kind))
+      throw new RuleViolation(`모르는 소재 종류예요: ${kind ?? ''}`);
     return new BasketItem(
       {
-        kind: '',
         ...fields,
+        kind,
         id: BaseEntity.newId(),
         basket_id: basketId,
         actor_type: BasketItem.ACTOR_TYPES[by.kind] ?? 'system',

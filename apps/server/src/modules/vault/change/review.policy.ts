@@ -1,21 +1,22 @@
 import { Injectable } from '@nestjs/common';
+import type { ChangeOpStatus, ChangeOpVerdict } from '../vault.tables';
 import { ChangeOp } from './change-op';
 import type { ChangeTarget } from './change-target';
 
 /** 변경 하나의 판정: 바로 합치기 · 검토 · 거부, 걸린 규칙, 이유 */
 export class Verdict {
-  static readonly MERGE = 'merge';
-  static readonly REVIEW = 'review';
-  static readonly REJECT = 'reject';
-  /** 느슨한 순서 */
-  private static readonly ORDER: readonly string[] = [
+  static readonly MERGE: ChangeOpVerdict = 'merge';
+  static readonly REVIEW: ChangeOpVerdict = 'review';
+  static readonly REJECT: ChangeOpVerdict = 'reject';
+  /** 느슨한 순서 (값 목록이 아니라 순서라서 따로 둔다) */
+  private static readonly ORDER: readonly ChangeOpVerdict[] = [
     Verdict.MERGE,
     Verdict.REVIEW,
     Verdict.REJECT,
   ];
 
   constructor(
-    readonly action: string,
+    readonly action: ChangeOpVerdict,
     readonly rule: string | null,
     readonly reason: string | null,
   ) {}
@@ -26,12 +27,12 @@ export class Verdict {
   }
 
   /** 둘 중 더 엄한 동작 */
-  static stricter(a: string, b: string): string {
+  static stricter(a: ChangeOpVerdict, b: ChangeOpVerdict): ChangeOpVerdict {
     return Verdict.ORDER.indexOf(a) >= Verdict.ORDER.indexOf(b) ? a : b;
   }
 
   /** 판정에 따른 변경의 상태 */
-  get status(): string {
+  get status(): ChangeOpStatus {
     if (this.action === Verdict.MERGE) return ChangeOp.APPLIED;
     return this.action === Verdict.REVIEW ? ChangeOp.WAITING : ChangeOp.REJECTED;
   }
@@ -45,13 +46,13 @@ export class Verdict {
 /** 주인이 고른 규칙 값 (vault.review_rules). 행이 없으면 규칙의 기본값. 묶음의 크기도 함께 들고 다닌다 */
 export class ReviewRules {
   constructor(
-    private readonly actions: ReadonlyMap<string, string>,
+    private readonly actions: ReadonlyMap<string, ChangeOpVerdict>,
     private readonly values: ReadonlyMap<string, number>,
     /** 이 묶음이 건드리는 대상 수 */
     readonly targets: number,
   ) {}
 
-  actionOf(key: string): string | null {
+  actionOf(key: string): ChangeOpVerdict | null {
     return this.actions.get(key) ?? null;
   }
 
@@ -65,11 +66,11 @@ export abstract class ReviewRule {
   /** vault.review_rules.key */
   abstract readonly key: string;
   /** 행이 없을 때의 동작 */
-  abstract readonly fallback: string;
+  abstract readonly fallback: ChangeOpVerdict;
   /** 사람이나 AI가 읽을 이유. 바로 합치면 남기지 않는다 */
   abstract readonly reason: string;
   /** 주인이 값을 바꿔도 이보다 느슨해지지 않는다 (사람이 정한 것을 AI가 덮지 못하게) */
-  protected readonly floor: string = Verdict.MERGE;
+  protected readonly floor: ChangeOpVerdict = Verdict.MERGE;
 
   abstract applies(op: ChangeOp, target: ChangeTarget | null, rules: ReviewRules): boolean;
 

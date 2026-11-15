@@ -652,7 +652,7 @@ function WikiEdit({
           id="wiki-visibility"
           className="input"
           value={visibility}
-          onChange={(e) => setVisibility(e.target.value)}
+          onChange={(e) => setVisibility(e.target.value as WikiDetail['visibility'])}
         >
           {Object.entries(VISIBILITY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>

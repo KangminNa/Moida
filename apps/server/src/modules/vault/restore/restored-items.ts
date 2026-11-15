@@ -1,13 +1,20 @@
 import { ArchiveFile, type ArchiveRecord, BaseEntity } from '../../platform';
 import { ChangeWork } from '../change/change-target';
 import { SlugPolicy } from '../slug.policy';
-import type {
-  CategoryNew,
-  EdgeNew,
-  NodeNew,
-  PostMarkNew,
-  WikiNew,
-  WikiRevisionNew,
+import {
+  CATEGORY_ORIGIN,
+  type CategoryNew,
+  EDGE_DELETED_BY_TYPE,
+  EDGE_ORIGIN,
+  type EdgeNew,
+  type NodeNew,
+  type PostMarkNew,
+  type PostMarkStatus,
+  WIKI_ORIGIN,
+  WIKI_VISIBILITY,
+  type WikiNew,
+  type WikiRevisionActorType,
+  type WikiRevisionNew,
 } from '../vault.tables';
 import { Wiki } from '../wiki/wiki';
 import { WikiBody } from '../wiki/wiki-body';
@@ -17,9 +24,8 @@ import { WikiBody } from '../wiki/wiki-body';
 // 지금 판이 첫 판이 되고(판 번호 1), 판을 만든 쪽은 system이다.
 // 판 id는 파일에 없어 새로 짓는다 (지난 판은 복원하지 않는다). 행의 공간은 넣을 때 정해진다.
 
-const ORIGINS: readonly string[] = [ChangeWork.AI, ChangeWork.HUMAN];
 /** 복원한 판·선을 만든 쪽 (actor_type) */
-const SYSTEM = 'system';
+const SYSTEM: WikiRevisionActorType = 'system';
 
 /** vault/categories.yml의 항목 하나. 출처·고정이 없는 옛 백업은 사람의 것으로 본다 (AI가 덮지 못하게) */
 export class RestoredCategory extends BaseEntity {
@@ -39,7 +45,7 @@ export class RestoredCategory extends BaseEntity {
       color: record.optionalText('color'),
       description: record.optionalText('description'),
       sort: record.number('sort'),
-      origin: record.has('origin') ? record.oneOf('origin', ORIGINS) : ChangeWork.HUMAN,
+      origin: record.has('origin') ? record.oneOf('origin', CATEGORY_ORIGIN) : ChangeWork.HUMAN,
       pinned: record.flag('pinned', true),
     };
     return new RestoredCategory(fields, record.createdAt);
@@ -90,9 +96,11 @@ export class RestoredWiki extends BaseEntity {
       node_id: record.id(),
       slug: record.attempt(() => SlugPolicy.check(name)),
       title: record.text('title'),
-      visibility: record.oneOf('visibility', Wiki.VISIBILITIES),
+      visibility: record.oneOf('visibility', WIKI_VISIBILITY),
       category_id: record.optionalId('cairn_category'),
-      origin: record.has('cairn_origin') ? record.oneOf('cairn_origin', ORIGINS) : ChangeWork.HUMAN,
+      origin: record.has('cairn_origin')
+        ? record.oneOf('cairn_origin', WIKI_ORIGIN)
+        : ChangeWork.HUMAN,
       // 옛 백업에는 사람이 고친 칸의 표시가 없다. 모두 사람의 것으로 두어 AI가 바로 덮지 못하게 한다
       pinned_sections: record.has('cairn_pinned')
         ? record.texts('cairn_pinned')
@@ -148,11 +156,15 @@ export class RestoredEdge extends BaseEntity {
       dst: record.id('dst'),
       kind: record.text('kind'),
       weight: record.optionalNumber('weight'),
-      origin: record.oneOf('origin', ORIGINS),
+      origin: record.oneOf('origin', EDGE_ORIGIN),
       pinned: record.flag('pinned', false),
       actor_type: SYSTEM,
       deleted_at: record.date('deleted_at'),
-      deleted_by_type: record.optionalText('deleted_by'),
+      // 값 목록 밖이면 예전에는 넣을 때 DB의 CHECK가 막았다. 이제 파일을 읽을 때 알린다
+      deleted_by_type:
+        record.optionalText('deleted_by') === null
+          ? null
+          : record.oneOf('deleted_by', EDGE_DELETED_BY_TYPE),
       created_at: record.createdAt,
     });
   }
@@ -197,8 +209,8 @@ export class RestoredPin extends BaseEntity {
  * blog의 표나 코드가 아니라 보관 형식의 글 파일 앞부분을 읽어 채운다. 글 버전은 복원된 글의 첫 버전이다.
  */
 export class RestoredPostMark extends BaseEntity {
-  private static readonly PUBLISHED = 'published';
-  private static readonly DRAFT = 'draft';
+  private static readonly PUBLISHED: PostMarkStatus = 'published';
+  private static readonly DRAFT: PostMarkStatus = 'draft';
 
   private constructor(
     private readonly fields: Omit<PostMarkNew, 'space_id' | 'main_wiki_id'>,

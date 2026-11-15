@@ -5,10 +5,11 @@ import {
   Forbidden,
   RuleViolation,
   TableEntity,
+  type Unchecked,
 } from '../../platform';
 import type { Runner } from '../runner/runner';
 import { JobTeamMemberView } from '../task/job.view';
-import type { AgentNew, AgentRevisionNew, AgentRow } from '../task.tables';
+import { AGENT_TOOL, type AgentNew, type AgentRevisionNew, type AgentRow } from '../task.tables';
 import { AgentUsageView } from '../usage/usage.view';
 import { AgentSavedView } from './agent.view';
 import { AgentOrg } from './agent-org.policy';
@@ -22,9 +23,8 @@ import { AgentScopes } from './agent-scopes.policy';
 export class Agent extends TableEntity<AgentRow, AgentNew> {
   /** 이번 저장에서 쌓을 설정 판 */
   private pendingRevision: AgentRevisionNew | null = null;
-  static readonly ACTIVE = 'active';
-  static readonly PAUSED = 'paused';
-  static readonly TOOLS: readonly string[] = ['claude', 'codex'];
+  static readonly ACTIVE: AgentRow['status'] = 'active';
+  static readonly PAUSED: AgentRow['status'] = 'paused';
   /** 에이전트에게 줄 수 있는 권한 (AgentScopes) */
   static readonly SCOPES: readonly string[] = AgentScopes.ALL;
   /** 설정 판에 남기는 칸: 주인이 정하는 것 전부 (상태 · 사용량은 빼고) */
@@ -65,11 +65,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
         throw new RuleViolation(`역할은 ${Agent.ROLE_MAX}자까지예요`);
       return value;
     },
-    tool: (value) => {
-      if (!Agent.TOOLS.includes(value))
-        throw new RuleViolation(`AI 도구는 ${Agent.TOOLS.join(' · ')} 중 하나예요`);
-      return value;
-    },
+    tool: (value) => AgentRuntime.tool(value),
     scopes: (value) => AgentScopes.check(value),
     approval_actions: (value) => {
       const wrong = value.filter((a) => !Agent.ACTION.test(a) || a === Agent.SERVER_ACTION);
@@ -95,8 +91,8 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     external_tools: (value) => AgentScopes.tools(value),
   };
 
-  /** 새 에이전트의 빈 칸. 이 순서로 규칙을 지난다 */
-  private static readonly BLANK: Partial<AgentRow> = {
+  /** 새 에이전트의 빈 칸. 이 순서로 규칙을 지난다 (빈 도구는 규칙이 막는다) */
+  private static readonly BLANK: Partial<Unchecked<AgentRow>> = {
     name: '',
     role: '',
     tool: '',
@@ -110,13 +106,14 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   };
 
   /** 새 에이전트. fields는 주인이 정한 칸이고, 보고 대상은 reportTo로 정한다 */
-  static open(spaceId: string, fields: Partial<AgentRow>, now: Date): Agent {
+  static open(spaceId: string, fields: Partial<Unchecked<AgentRow>>, now: Date): Agent {
     const agent = new Agent(
       {
         id: BaseEntity.newId(),
         space_id: spaceId,
         name: '',
-        tool: '',
+        // 자리만: 바로 아래 edit이 BLANK의 도구 칸부터 규칙으로 덮는다 (틀리면 저장 전에 RuleViolation)
+        tool: AGENT_TOOL[0],
         reports_to: null,
         status: Agent.ACTIVE,
         created_at: now,
@@ -150,7 +147,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return this.row.role.trim().split('\n')[0]?.trim() ?? '';
   }
 
-  get tool(): string {
+  get tool(): AgentRow['tool'] {
     return this.row.tool;
   }
 
@@ -164,7 +161,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   }
 
   /** AI CLI에 넘길 생각 강도. 빈 글이면 CLI의 기본 */
-  get effort(): string {
+  get effort(): AgentRow['effort'] {
     return this.row.effort ?? '';
   }
 
@@ -241,7 +238,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
    * 묶이면 그 러너만 이 에이전트의 일을 빌리고, 꺼져 있으면 일이 기다린다. 코드 러너 칸에는 묶지 않고,
    * 칸에서만 도는 권한(code · make)이 있으면 묶지 않는다: 묶인 러너가 그 일을 영영 받지 못한다. 다 바꾼 뒤에 한 번 본다
    */
-  edit(changes: Partial<AgentRow>, runner?: Runner | null): void {
+  edit(changes: Partial<Unchecked<AgentRow>>, runner?: Runner | null): void {
     const before = this.settingsSnapshot();
     if (runner?.sandbox) throw new RuleViolation('샌드박스에는 묶을 수 없어요');
     if (runner !== undefined) this.put('runner_id', runner?.id ?? null);
@@ -391,7 +388,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return new JobTeamMemberView(this.row, kinds);
   }
 
-  private moveTo(status: string): void {
+  private moveTo(status: AgentRow['status']): void {
     if (this.row.status === status) return;
     this.put('status', status);
     this.announce();

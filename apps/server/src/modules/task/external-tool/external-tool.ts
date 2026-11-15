@@ -6,12 +6,13 @@ import {
   SealedSecret,
   type SecretBox,
   TableEntity,
+  type Unchecked,
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiTasks } from '../ai/ai-task';
 import { JobToolView } from '../task/job.view';
 import { Task } from '../task/task';
-import type { ExternalToolNew, ExternalToolRow } from '../task.tables';
+import type { ExternalToolNew, ExternalToolRow, ExternalToolStatus } from '../task.tables';
 import { ExternalToolView, ProposedToolView } from './external-tool.view';
 import { ExternalToolUrl } from './external-tool-url.policy';
 import { ToolCatalog } from './tool-catalog.policy';
@@ -77,7 +78,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   static open(
     spaceId: string,
     name: string,
-    fields: Partial<ExternalToolRow>,
+    fields: Partial<Unchecked<ExternalToolRow>>,
     now: Date,
   ): ExternalTool {
     return ExternalTool.start(spaceId, name, fields, ExternalTool.ACTIVE, null, now);
@@ -88,7 +89,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     spaceId: string,
     agentId: string,
     name: string,
-    fields: Partial<ExternalToolRow>,
+    fields: Partial<Unchecked<ExternalToolRow>>,
     now: Date,
   ): ExternalTool {
     return ExternalTool.start(spaceId, name, fields, ExternalTool.PROPOSED, agentId, now);
@@ -97,8 +98,8 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   private static start(
     spaceId: string,
     name: string,
-    fields: Partial<ExternalToolRow>,
-    status: string,
+    fields: Partial<Unchecked<ExternalToolRow>>,
+    status: ExternalToolStatus,
     proposedBy: string | null,
     now: Date,
   ): ExternalTool {
@@ -179,7 +180,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   }
 
   /** 주인이 고친 칸을 적는다. 머리글을 비우면 토큰도 지운다 */
-  edit(changes: Partial<ExternalToolRow>, now: Date): void {
+  edit(changes: Partial<Unchecked<ExternalToolRow>>, now: Date): void {
     this.accept(changes, ExternalTool.RULES);
     if (this.row.header_name === null && this.row.secret !== null) this.clearSecret();
     this.put('updated_at', now);

@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Actor, BaseQuery, Database, Forbidden, RuleViolation, SecretBox } from '../../platform';
 import { Task } from '../task/task';
 import { aiLogins, tasks } from '../task.schema';
-import type { TaskRow } from '../task.tables';
-import { AiLogin } from './ai-login';
+import { AI_LOGIN_TOOL, type TaskRow } from '../task.tables';
 import type { AiLoginInput } from './ai-login.input';
 import { AiLoginRepository } from './ai-login.repository';
 import { AiSigninView, type AiTokenView, AiToolListView, AiToolView } from './ai-login.view';
@@ -34,7 +33,7 @@ export class AiLoginQuery extends BaseQuery {
       { columns: ['id', 'status', 'payload'], order: ['id desc'] },
     );
     return new AiToolListView(
-      AiLogin.TOOLS.map((tool) => {
+      AI_LOGIN_TOOL.map((tool) => {
         const row = logins.find((r) => r.tool === tool) ?? null;
         const signin = signins.find((r) => AiLoginQuery.toolOf(r) === tool);
         const expiresAt = row?.expires_at ?? null;

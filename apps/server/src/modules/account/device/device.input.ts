@@ -1,4 +1,10 @@
-import { BaseRequest, type ColumnReaders, InvalidRequest, type SecretBox } from '../../platform';
+import {
+  BaseRequest,
+  type ColumnReaders,
+  InvalidRequest,
+  type SecretBox,
+  type Unchecked,
+} from '../../platform';
 import type { DeviceRow } from '../account.tables';
 import { OAuthError } from './oauth-error';
 
@@ -252,7 +258,7 @@ const COLUMNS: ColumnReaders<DeviceRow> = {
 export class UpdateDeviceInput extends BaseRequest {
   private constructor(
     readonly id: string,
-    readonly changes: Partial<DeviceRow>,
+    readonly changes: Partial<Unchecked<DeviceRow>>,
     readonly version: number,
   ) {
     super();

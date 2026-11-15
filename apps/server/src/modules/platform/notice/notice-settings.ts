@@ -1,6 +1,12 @@
 import { RuleViolation } from '../base/errors';
-import { TableEntity } from '../base/table-entity';
-import type { NoticeSettingNew, NoticeSettingRow } from '../platform.tables';
+import { TableEntity, type Unchecked } from '../base/table-entity';
+import { ValueList } from '../base/value-list';
+import {
+  NOTICE_SETTING_DIGEST,
+  type NoticeSettingDigest,
+  type NoticeSettingNew,
+  type NoticeSettingRow,
+} from '../platform.tables';
 import { NoticeKind, type NoticeRoute } from './notice-kind';
 import { NoticeSettingsView, NoticeSettingView } from './notice-settings.view';
 
@@ -17,9 +23,8 @@ export class NoticeSettings extends TableEntity<
   LoadedNoticeSettings,
   NoticeSettingNew & { id: string }
 > {
-  static readonly HOURLY = 'hourly';
-  static readonly DAILY = 'daily';
-  static readonly DIGESTS: readonly string[] = [NoticeSettings.HOURLY, NoticeSettings.DAILY];
+  static readonly HOURLY: NoticeSettingDigest = 'hourly';
+  static readonly DAILY: NoticeSettingDigest = 'daily';
   private static readonly MINUTES_PER_DAY = 1440;
 
   /** 아직 행이 없는 공간: 기본값, version 0. 처음 저장할 때 넣는다 */
@@ -43,7 +48,11 @@ export class NoticeSettings extends TableEntity<
   }
 
   /** 설정을 한 번에 바꾼다. known: 등록한 알림 종류 (경로를 적을 수 있는 것) */
-  configure(settings: Partial<NoticeSettingRow>, known: readonly string[], now: Date): void {
+  configure(
+    settings: Partial<Unchecked<NoticeSettingRow>>,
+    known: readonly string[],
+    now: Date,
+  ): void {
     const {
       digest = '',
       digest_minute: digestMinute = -1,
@@ -52,8 +61,8 @@ export class NoticeSettings extends TableEntity<
       time_zone: timeZone = '',
       routes = {},
     } = settings;
-    if (!NoticeSettings.DIGESTS.includes(digest))
-      throw new RuleViolation(`묶음 간격은 ${NoticeSettings.DIGESTS.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(NOTICE_SETTING_DIGEST, digest))
+      throw new RuleViolation(`묶음 간격은 ${NOTICE_SETTING_DIGEST.join(' · ')} 중 하나예요`);
     if (!NoticeSettings.minute(digestMinute))
       throw new RuleViolation('묶음을 보낼 시각은 00:00~23:59예요');
     if ((quietStart === null) !== (quietEnd === null))
@@ -80,7 +89,7 @@ export class NoticeSettings extends TableEntity<
    * 칸 몇 개만 바꾼다 (대화로 바꾸는 설정, 2026-11-15 D). 나머지는 지금 값, 경로는 지금 정한 경로 위에 얹는다.
    * 규칙은 configure와 같다
    */
-  adjust(changes: Partial<NoticeSettingRow>, known: readonly string[], now: Date): void {
+  adjust(changes: Partial<Unchecked<NoticeSettingRow>>, known: readonly string[], now: Date): void {
     const r = this.row;
     const routes = (r.routes ?? {}) as Record<string, unknown>;
     this.configure(

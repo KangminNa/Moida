@@ -4,6 +4,7 @@ import {
   type SettingChangeInput,
   type SettingShape,
   type Sql,
+  type Unchecked,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
 import { GoalRepository } from '../goal/goal.repository';
@@ -80,7 +81,7 @@ export class ScheduleEdit {
     );
   }
 
-  private async assertRefs(settings: Partial<ScheduleRow>, self: string | null = null) {
+  private async assertRefs(settings: Partial<Unchecked<ScheduleRow>>, self: string | null = null) {
     const agent = settings.agent_id
       ? await new AgentRepository(this.tx).load(this.spaceId, settings.agent_id)
       : null;

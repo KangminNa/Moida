@@ -8,11 +8,13 @@ import {
   RuleViolation,
   type SecretBox,
   TableEntity,
+  ValueList,
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
+import { TASK_EVENT_KIND } from '../task.tables';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import {
@@ -127,12 +129,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   static readonly LOG_WRITE = 'write';
   static readonly LOG_RESULT = 'result';
   static readonly LOG_ERROR = 'error';
-  static readonly LOG_KINDS: readonly string[] = [
-    Task.LOG_READ,
-    Task.LOG_WRITE,
-    Task.LOG_RESULT,
-    Task.LOG_ERROR,
-  ];
   /** 연결 확인은 쌓인 일보다 먼저 돈다 */
   private static readonly AI_TEST_PRIORITY = 1000;
   private static readonly AI_TEST_PROMPT = 'ok라고만 답하세요.';
@@ -619,8 +615,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   log(kind: string, body: string, tokens: number, now: Date): void {
-    if (!Task.LOG_KINDS.includes(kind))
-      throw new RuleViolation(`기록 종류는 ${Task.LOG_KINDS.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(TASK_EVENT_KIND, kind))
+      throw new RuleViolation(`기록 종류는 ${TASK_EVENT_KIND.join(' · ')} 중 하나예요`);
     this.logged.push({ task_id: this.id, at: now, kind, body, tokens });
   }
 
@@ -773,8 +769,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    */
   private move(
     from: readonly string[],
-    to: string,
-    waitReason: string | null = null,
+    to: TaskRow['status'],
+    waitReason: TaskRow['wait_reason'] = null,
     more: Readonly<Record<string, unknown>> = {},
   ): void {
     if (!from.includes(this.row.status))

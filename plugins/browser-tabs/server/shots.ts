@@ -12,6 +12,7 @@ import {
 import { ShotImageView, ShotListView, type ShotMeta, ShotSavedView } from './click-views';
 import { leasedBrowse } from './job';
 import { shots } from './schema';
+import type { ShotKind, ShotMime } from './tables';
 
 // 브라우저 작업의 화면 (단계 캡처, 2026-11-14). 결과물이 아니라 이 패키지에 남는다: 결과를 고르지 않아도 증거가 사라지지 않게.
 //   step: AI가 단계마다 찍은 것을 러너가 일이 끝난 뒤 올린다. 작업마다 30장, 30일이 지나면 새로 저장할 때 지운다
@@ -26,7 +27,7 @@ const STEP_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** 받은 그림: 바이트와 형식 */
-export type ShotImage = { bytes: Buffer; mime: string };
+export type ShotImage = { bytes: Buffer; mime: ShotMime };
 
 /** base64 칸 하나 (모양만: 300KB · 형식은 run에서 decodeImage가 RuleViolation). required가 아니면 비었을 때 null */
 export function imageOf(f: RequestFields, field: string, required: boolean): string | null {
@@ -56,7 +57,7 @@ export async function addShot(
   work: Work,
   spaceId: string,
   taskId: string,
-  kind: string,
+  kind: ShotKind,
   image: ShotImage,
   page: { url: string; title: string },
   clickId: string | null = null,

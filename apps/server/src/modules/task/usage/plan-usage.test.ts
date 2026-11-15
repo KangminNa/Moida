@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { RuleViolation } from '../../platform';
+import type { PlanUsageTool } from '../task.tables';
 import { PlanUsage } from './plan-usage';
 
 // 구독 사용률 창의 규칙. DB 없이 돈다.
@@ -9,7 +10,7 @@ const NOW = new Date('2026-11-01T00:00:00Z');
 const LATER = new Date(NOW.getTime() + 60_000);
 const EARLIER = new Date(NOW.getTime() - 60_000);
 
-const seen = (period: string, percent: number, resets_at: Date, tool = 'claude') =>
+const seen = (period: string, percent: number, resets_at: Date, tool: PlanUsageTool = 'claude') =>
   PlanUsage.seen('space', tool, { period, percent, resets_at, status: 'allowed' }, NOW);
 
 describe('PlanUsage', () => {

@@ -1,7 +1,14 @@
 import { ArchiveFile, type ArchiveRecord, BaseEntity } from '../../platform';
 import { Session } from '../session/session';
 import { SessionNote } from '../session/session-note';
-import type { NodeNew, SessionNew, SessionRevisionNew } from '../vault.tables';
+import {
+  type NodeNew,
+  SESSION_VISIBILITY,
+  type SessionNew,
+  type SessionRevisionActorType,
+  type SessionRevisionKind,
+  type SessionRevisionNew,
+} from '../vault.tables';
 import type { RestoredTranscript } from './restored-transcript';
 
 // 보관 파일에서 읽은 세션 (restored-items.ts의 다른 항목들과 같은 길). 지금 판이 첫 판이 되고(판 번호 1), 판을 만든 쪽은 system이다.
@@ -16,7 +23,6 @@ export class RestoredSession extends BaseEntity {
    * 복원 전의 대화를 다시 저장해도 그 세션의 새 판이 아니라 새 세션이 된다.
    */
   static readonly NO_DEVICE = '00000000-0000-7000-8000-000000000000';
-  private static readonly VISIBILITIES: readonly string[] = [Session.PRIVATE, Session.PUBLIC];
   private static readonly KNOWN: ReadonlySet<string> = new Set([
     'cairn_format',
     'cairn_type',
@@ -33,9 +39,9 @@ export class RestoredSession extends BaseEntity {
     'cairn_noted_seq',
   ]);
   /** 복원한 판을 만든 쪽 (actor_type) */
-  private static readonly SYSTEM = 'system';
+  private static readonly SYSTEM: SessionRevisionActorType = 'system';
   /** 복원한 판 (session_revisions.kind) */
-  private static readonly ORIGIN = 'origin';
+  private static readonly ORIGIN: SessionRevisionKind = 'origin';
 
   private constructor(
     private readonly fields: Omit<SessionNew, 'space_id'>,
@@ -53,7 +59,7 @@ export class RestoredSession extends BaseEntity {
     const wikiId = record.optionalId('cairn_wiki');
     const fields = {
       node_id: record.id(),
-      visibility: record.oneOf('visibility', RestoredSession.VISIBILITIES),
+      visibility: record.oneOf('visibility', SESSION_VISIBILITY),
       tool: record.text('tool'),
       project: record.optionalText('project'),
       started_at: record.date('started'),

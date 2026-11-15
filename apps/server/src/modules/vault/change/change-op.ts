@@ -1,8 +1,8 @@
-import { RequestFields, RuleViolation } from '../../platform';
+import { RequestFields, RuleViolation, type Unchecked } from '../../platform';
 import { Category } from '../category/category';
 import { Edge, EdgeKind } from '../edge/edge';
 import { Session } from '../session/session';
-import type { CategoryRow, ChangeOpRow } from '../vault.tables';
+import type { CategoryRow, ChangeOpRow, ChangeOpStatus, ChangeRow } from '../vault.tables';
 import { Wiki } from '../wiki/wiki';
 import { WikiBody } from '../wiki/wiki-body';
 import type { ChangeTarget, ChangeWork } from './change-target';
@@ -94,7 +94,7 @@ export abstract class ChangeOp {
   private static readonly MADE = /^@[1-9]\d{0,3}$/;
 
   abstract readonly name: string;
-  abstract readonly targetKind: string;
+  abstract readonly targetKind: ChangeOpRow['target_kind'];
   /** bind가 찾은 대상. 새로 만드는 변경은 적용한 뒤에 채운다 */
   target: ChangeTarget | null = null;
   /** bind가 찾은 대상의 자리 */
@@ -186,7 +186,7 @@ export abstract class ChangeOp {
   }
 
   /** vault.changes.op */
-  recordAs(before: Readonly<Record<string, unknown>> | null): string {
+  recordAs(before: Readonly<Record<string, unknown>> | null): ChangeRow['op'] {
     return before === null ? 'insert' : 'update';
   }
 
@@ -303,7 +303,7 @@ export abstract class ChangeOp {
     this.touched = false;
   }
 
-  private close(status: string, by: string | null, now: Date, reason: string | null): void {
+  private close(status: ChangeOpStatus, by: string | null, now: Date, reason: string | null): void {
     this.write({ status, reason, decided_at: now, decided_by: by });
   }
 
@@ -429,7 +429,7 @@ export class WikiTrashOp extends ChangeOp {
     super(seq, targetId, baseVersion);
   }
 
-  override recordAs(): string {
+  override recordAs(): ChangeRow['op'] {
     return 'delete';
   }
 
@@ -460,7 +460,7 @@ export class WikiRestoreOp extends ChangeOp {
     this.missing = this.target === null;
   }
 
-  override recordAs(): string {
+  override recordAs(): ChangeRow['op'] {
     return 'restore';
   }
 
@@ -664,7 +664,7 @@ export class EdgeRemoveOp extends EdgeOp {
     super(seq, baseVersion, src, dst, kind);
   }
 
-  override recordAs(): string {
+  override recordAs(): ChangeRow['op'] {
     return 'delete';
   }
 
@@ -693,7 +693,7 @@ export class CategoryCreateOp extends ChangeOp {
     seq: number,
     targetId: string | null,
     /** 주소가 없으면 이름에서 만든다 */
-    private fields: Partial<CategoryRow>,
+    private fields: Partial<Unchecked<CategoryRow>>,
   ) {
     super(seq, targetId, null);
   }
@@ -788,7 +788,7 @@ export class CategoryUpdateOp extends ChangeOp {
     seq: number,
     targetId: string,
     baseVersion: number,
-    private readonly changes: Partial<CategoryRow>,
+    private readonly changes: Partial<Unchecked<CategoryRow>>,
   ) {
     super(seq, targetId, baseVersion);
   }
@@ -816,7 +816,7 @@ export class CategoryDeleteOp extends ChangeOp {
     super(seq, targetId, baseVersion);
   }
 
-  override recordAs(): string {
+  override recordAs(): ChangeRow['op'] {
     return 'delete';
   }
 
@@ -838,7 +838,7 @@ export class RevertOp extends ChangeOp {
 
   constructor(
     seq: number,
-    readonly targetKind: string,
+    readonly targetKind: ChangeOpRow['target_kind'],
     targetId: string,
     /** 앞 묶음이 남긴 version. 지금 대상이 이 version이 아니면 그사이 바뀐 것이다 */
     baseVersion: number,
@@ -868,7 +868,7 @@ export class RevertOp extends ChangeOp {
     this.missing = this.target === null;
   }
 
-  override recordAs(): string {
+  override recordAs(): ChangeRow['op'] {
     return 'restore';
   }
 
@@ -908,7 +908,7 @@ export class SettledOp extends ChangeOp {
   constructor(
     seq: number,
     readonly name: string,
-    readonly targetKind: string,
+    readonly targetKind: ChangeOpRow['target_kind'],
     targetId: string | null,
     baseVersion: number | null,
     private readonly payload: Record<string, unknown>,

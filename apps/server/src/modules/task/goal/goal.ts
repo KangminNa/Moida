@@ -1,5 +1,12 @@
-import { BaseEntity, type ColumnRules, RuleViolation, TableEntity } from '../../platform';
-import type { GoalNew, GoalRow } from '../task.tables';
+import {
+  BaseEntity,
+  type ColumnRules,
+  RuleViolation,
+  TableEntity,
+  type Unchecked,
+  ValueList,
+} from '../../platform';
+import { GOAL_STATUS, type GoalNew, type GoalRow } from '../task.tables';
 import { GoalView } from './goal.view';
 
 // 목표 하나 (task.goals). 목표는 나무다: 맨 위가 회사 목표이고, 작업은 목표 하나에 이어진다.
@@ -10,7 +17,6 @@ export class Goal extends TableEntity<GoalRow, GoalNew> {
   static readonly ACTIVE = 'active';
   static readonly DONE = 'done';
   static readonly DROPPED = 'dropped';
-  static readonly STATUSES: readonly string[] = [Goal.ACTIVE, Goal.DONE, Goal.DROPPED];
   static readonly TITLE_MAX = 200;
   static readonly DESCRIPTION_MAX = 4000;
   /** 회사 목표부터 이만큼 아래까지 (회사 › 영역 › 분기 › 달 › 주) */
@@ -39,7 +45,7 @@ export class Goal extends TableEntity<GoalRow, GoalNew> {
     spaceId: string,
     parent: Goal | null,
     parentDepth: number,
-    fields: Partial<GoalRow>,
+    fields: Partial<Unchecked<GoalRow>>,
     now: Date,
   ): Goal {
     if (parent) {
@@ -75,14 +81,14 @@ export class Goal extends TableEntity<GoalRow, GoalNew> {
   }
 
   /** 주인이 고친 칸을 적는다 */
-  edit(changes: Partial<GoalRow>): void {
+  edit(changes: Partial<Unchecked<GoalRow>>): void {
     this.accept(changes, Goal.RULES);
   }
 
   /** 진행 중 · 끝남 · 그만둠 사이는 어느 쪽으로든 바꿀 수 있다 (다시 열기 포함). 같으면 그대로 */
   changeStatus(status: string): void {
-    if (!Goal.STATUSES.includes(status))
-      throw new RuleViolation(`목표 상태는 ${Goal.STATUSES.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(GOAL_STATUS, status))
+      throw new RuleViolation(`목표 상태는 ${GOAL_STATUS.join(' · ')} 중 하나예요`);
     if (status === this.row.status) return;
     this.put('status', status);
   }

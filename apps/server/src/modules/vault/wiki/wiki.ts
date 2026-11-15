@@ -1,7 +1,13 @@
-import { BaseEntity, DomainEvent, RuleViolation } from '../../platform';
+import { BaseEntity, DomainEvent, RuleViolation, ValueList } from '../../platform';
 import { type ChangeWork, GraphNode, type NewNode } from '../change/change-target';
 import { SlugPolicy } from '../slug.policy';
-import type { WikiNew, WikiRevisionNew, WikiRow } from '../vault.tables';
+import {
+  WIKI_VISIBILITY,
+  type WikiNew,
+  type WikiRevisionNew,
+  type WikiRow,
+  type WikiVisibility,
+} from '../vault.tables';
 import { WikiSavedView } from './wiki.view';
 import { WikiBody } from './wiki-body';
 
@@ -16,9 +22,8 @@ export interface LoadedWiki extends WikiRow {
 // 판(wiki_revisions)은 추가만 한다: 고칠 때마다 덮어쓰지 않고 쌓는다.
 // 새 wiki는 늘 비공개이고, 공개 여부는 사람만 바꾼다. 쓰기는 모두 변경 묶음(ChangeService)을 거친다.
 export class Wiki extends GraphNode<LoadedWiki, NewNode<WikiNew>> {
-  static readonly PRIVATE = 'private';
-  static readonly PUBLIC = 'public';
-  static readonly VISIBILITIES: readonly string[] = [Wiki.PRIVATE, Wiki.PUBLIC];
+  static readonly PRIVATE: WikiVisibility = 'private';
+  static readonly PUBLIC: WikiVisibility = 'public';
   static readonly TITLE_MAX = 200;
   /** 사람이 정한 제목을 pinned_sections에 적는 이름. 칸 이름과 겹치지 않는다 */
   static readonly TITLE_KEY = '#title';
@@ -111,8 +116,8 @@ export class Wiki extends GraphNode<LoadedWiki, NewNode<WikiNew>> {
   /** 공개 여부. 사람만 바꾼다 (AI는 묶음 판정에서 막히고, 여기가 마지막 벽이다) */
   setVisibility(visibility: string, work: ChangeWork): void {
     if (!work.human) throw new RuleViolation('공개 여부는 사람만 바꿔요');
-    if (!Wiki.VISIBILITIES.includes(visibility))
-      throw new RuleViolation(`공개 여부는 ${Wiki.VISIBILITIES.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(WIKI_VISIBILITY, visibility))
+      throw new RuleViolation(`공개 여부는 ${WIKI_VISIBILITY.join(' · ')} 중 하나예요`);
     if (visibility === this.row.visibility) return;
     this.put('visibility', visibility);
     this.touch(work.now);
@@ -169,6 +174,9 @@ export class Wiki extends GraphNode<LoadedWiki, NewNode<WikiNew>> {
     if (!body.sameAs(this.body)) this.addRevision(body, work);
     this.moveTo(before.category_id === null ? null : String(before.category_id), work);
     const visibility = String(before.visibility);
+    // 기록(vault.changes.before)은 JSON이라 값 목록으로 좁힌다. 틀린 값은 예전에도 DB의 CHECK가 막았다
+    if (!ValueList.has(WIKI_VISIBILITY, visibility))
+      throw new Error(`되돌릴 위키의 기록이 틀렸어요: visibility ${visibility}`);
     if (visibility !== this.row.visibility) this.put('visibility', visibility);
     this.put('pinned_sections', before.pinned_sections as string[]);
     this.touch(work.now);

@@ -1,4 +1,5 @@
 import { RuleViolation } from '../base/errors';
+import { ValueList } from '../base/value-list';
 
 // 보관 파일 안의 항목 하나: md의 앞부분과 본문, yml 목록의 항목, graph.json의 행.
 // 복원이 읽는 쪽이다. ArchiveFile이 쓰는 모양과 손으로 고친 파일에 흔한 모양(옵시디언의 줄 목록)을 읽고,
@@ -98,9 +99,9 @@ export class ArchiveRecord {
     return String(value);
   }
 
-  oneOf(key: string, allowed: readonly string[]): string {
+  oneOf<V extends string>(key: string, allowed: readonly V[]): V {
     const value = this.text(key);
-    if (!allowed.includes(value))
+    if (!ValueList.has(allowed, value))
       throw this.problem(`${key}은(는) ${allowed.join(' · ')} 중 하나예요: ${value}`);
     return value;
   }

@@ -1,11 +1,11 @@
 import { type Actor, BaseEntity, TableEntity } from '../../platform';
-import type { PostRevisionNew, PostRevisionRow } from '../blog.tables';
+import type { PostRevisionActorType, PostRevisionNew, PostRevisionRow } from '../blog.tables';
 import type { PostContent } from './post-content';
 
 /** 글의 판 하나 (blog.post_revisions, 추가만): 그때의 제목과 본문 */
 export class PostRevision extends TableEntity<PostRevisionRow, PostRevisionNew> {
   /** Actor 종류 → 판에 남기는 만든 쪽 (post_revisions.actor_type). 기기와 에이전트는 둘 다 AI 도구다 */
-  private static readonly ACTOR_TYPES: Readonly<Record<string, string>> = {
+  private static readonly ACTOR_TYPES: Readonly<Record<string, PostRevisionActorType>> = {
     owner: 'user',
     device: 'ai',
     agent: 'ai',

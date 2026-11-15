@@ -11,8 +11,7 @@ import {
   type Sql,
 } from '../../platform';
 import { ImagePolicy } from '../asset/image.policy';
-import type { PostNew, PostRevisionNew } from '../blog.tables';
-import { Post } from './post';
+import { POST_ALIGN, POST_STATUS, type PostNew, type PostRevisionNew } from '../blog.tables';
 import { PostContent } from './post-content';
 import { PostRestoreRepository } from './post-restore.repository';
 import { SlugPolicy } from './slug.policy';
@@ -55,12 +54,12 @@ export class RestoredPost extends BaseEntity {
     const fields = {
       id: record.id(),
       slug: record.attempt(() => SlugPolicy.check(record.text('slug'))),
-      status: record.oneOf('status', Post.STATUSES),
+      status: record.oneOf('status', POST_STATUS),
       title: content.title,
       excerpt: content.excerpt,
       head_text: content.searchText,
       tags: record.texts('tags'),
-      align: record.has('align') ? record.oneOf('align', Post.ALIGNS) : 'left',
+      align: record.has('align') ? record.oneOf('align', POST_ALIGN) : 'left',
       main_wiki_id: record.optionalId('cairn_main_wiki'),
       published_at: publishedAt,
     };

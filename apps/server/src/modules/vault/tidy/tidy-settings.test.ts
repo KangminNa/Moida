@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import type { TidySettingCadence } from '../vault.tables';
 import { type TidySessionRow, TidySettings } from './tidy-settings';
 
 const SPACE = '00000000-0000-7000-8000-000000000001';
@@ -12,7 +13,11 @@ const session = (title = '로그인 고치기'): TidySessionRow => ({
   revision_count: 3,
   version: 7,
 });
-const settingsOf = (autoTidy: boolean, cadence = 'save', dailyAt: Date | null = null) =>
+const settingsOf = (
+  autoTidy: boolean,
+  cadence: TidySettingCadence = 'save',
+  dailyAt: Date | null = null,
+) =>
   TidySettings.restore({
     id: SPACE,
     space_id: SPACE,

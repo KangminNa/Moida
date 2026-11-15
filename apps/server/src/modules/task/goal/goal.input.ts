@@ -1,4 +1,4 @@
-import { BaseRequest, type ColumnReaders } from '../../platform';
+import { BaseRequest, type ColumnReaders, type Unchecked } from '../../platform';
 import type { GoalRow } from '../task.tables';
 import { Goal } from './goal';
 
@@ -18,7 +18,7 @@ export class CreateGoalInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
     readonly parentId: string | null,
-    readonly fields: Partial<GoalRow>,
+    readonly fields: Partial<Unchecked<GoalRow>>,
   ) {
     super();
   }
@@ -43,7 +43,7 @@ export class UpdateGoalInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
-    readonly changes: Partial<GoalRow>,
+    readonly changes: Partial<Unchecked<GoalRow>>,
   ) {
     super();
   }

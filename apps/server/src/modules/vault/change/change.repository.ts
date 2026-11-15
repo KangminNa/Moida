@@ -1,6 +1,6 @@
-import { TableRepository } from '../../platform';
+import { TableRepository, ValueList } from '../../platform';
 import { changeSets, changes, reviewRules } from '../vault.schema';
-import type { ChangeNew, ChangeOpRow } from '../vault.tables';
+import { CHANGE_OP_TARGET_KIND, type ChangeNew, type ChangeOpRow } from '../vault.tables';
 import { type ChangeOp, ChangeOps, RevertOp, SettledOp } from './change-op';
 import { ChangeSet, type LoadedChangeSet } from './change-set';
 import type { ChangeTarget, ChangeWork } from './change-target';
@@ -141,16 +141,18 @@ export class ChangeRepository extends TableRepository<LoadedChangeSet, ChangeSet
       { columns: ['entity', 'entity_id', 'before', 'after'], order: ['id'] },
     );
     return RevertOp.squash(
-      rows.map(
-        (r, i) =>
-          new RevertOp(
-            i + 1,
-            r.entity,
-            r.entity_id,
-            Number((r.after as Record<string, unknown>).version),
-            r.before as Record<string, unknown> | null,
-          ),
-      ),
+      rows.map((r, i) => {
+        // 기록의 entity는 값 목록이 없는 글자다. 되돌릴 변경(change_ops.target_kind)의 값 목록으로 좁힌다 (예전에도 CHECK가 막았다)
+        if (!ValueList.has(CHANGE_OP_TARGET_KIND, r.entity))
+          throw new Error(`되돌릴 수 없는 대상 종류예요: ${r.entity}`);
+        return new RevertOp(
+          i + 1,
+          r.entity,
+          r.entity_id,
+          Number((r.after as Record<string, unknown>).version),
+          r.before as Record<string, unknown> | null,
+        );
+      }),
     );
   }
 

@@ -1,5 +1,5 @@
 import { JobSkillView } from '../task/job.view';
-import type { SkillRevisionRow } from '../task.tables';
+import type { SkillRevisionRow, TaskRunSkillSource } from '../task.tables';
 import { SkillFiles } from './skill-files';
 
 // 일 하나에 실어 보내는 스킬 한 판. 콘솔 판이 있으면 그것(사람이 정한 것이 우선), 없으면 저장소 판.
@@ -10,7 +10,8 @@ export class SkillPackage {
 
   private constructor(
     readonly name: string,
-    readonly source: string,
+    /** 콘솔 판 · 저장소 판 (실행 기록의 skill_source · prompt_source와 같은 값 목록) */
+    readonly source: TaskRunSkillSource,
     /** 콘솔 판 번호. 저장소 판이면 null */
     readonly revision: number | null,
     readonly files: SkillFiles,

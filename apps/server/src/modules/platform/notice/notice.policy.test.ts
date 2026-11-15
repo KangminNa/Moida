@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import type { NotificationSeverity } from '../platform.tables';
 import { NoticePolicy, type PendingNotice } from './notice.policy';
 import { NoticeKind } from './notice-kind';
 import { NoticeSettings } from './notice-settings';
@@ -14,7 +15,12 @@ const KINDS = [
 ];
 const at = (iso: string) => new Date(iso);
 let seq = 0;
-const notice = (kind: string, severity: string, created: string, title = kind): PendingNotice => ({
+const notice = (
+  kind: string,
+  severity: NotificationSeverity,
+  created: string,
+  title = kind,
+): PendingNotice => ({
   id: `n${++seq}`,
   kind,
   severity,

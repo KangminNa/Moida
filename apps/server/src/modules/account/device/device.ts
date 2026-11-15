@@ -8,6 +8,8 @@ import {
   InvalidRequest,
   RuleViolation,
   TableEntity,
+  type Unchecked,
+  ValueList,
 } from '../../platform';
 import type { DeviceNew, DeviceRow, DeviceTokenNew, OauthTokenNew } from '../account.tables';
 import { DeviceSavedView, TokenView } from './device.view';
@@ -65,7 +67,7 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
   static readonly ACCESS_MS = 60 * 60_000;
   static readonly REFRESH_MS = 30 * 86_400_000;
   /** 새 기기의 기본 권한: 올리기 + 공개 읽기. 나머지는 관리 화면에서 켠다 */
-  static readonly DEFAULT_SCOPES: readonly string[] = [Actor.UPLOAD, Actor.READ_PUBLIC];
+  static readonly DEFAULT_SCOPES: DeviceRow['scopes'] = [Actor.UPLOAD, Actor.READ_PUBLIC];
   /**
    * 앱이 승인 요청의 scope에 이름 하나를 실어 고르는 기기 모양 (이름 → 권한). 섞어 요청하지 못한다 (AuthorizationPolicy).
    *   news: 소식 기기 (2차 1-3, cairn connect의 훅 · 상태 줄). 다른 권한과 함께 두지 않아 관리자가 주거나 바꾸지 못한다
@@ -73,12 +75,12 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
    *   collect: 수집 기기 (2차 4단계, 세션이 끝날 때 원문을 올리는 훅). 올리기만
    *   extension: 브라우저 확장 (2차 4단계). 원문 · 페이지 올리기, 서버 팀에 맡기기, 기다리는 결재 · 질문 보기
    */
-  static readonly PROFILES: Readonly<Record<string, readonly string[]>> = {
+  static readonly PROFILES: Readonly<Record<string, DeviceRow['scopes']>> = {
     news: [Actor.NEWS],
     collect: [Actor.UPLOAD],
     extension: [Actor.UPLOAD, Actor.DELEGATE, Actor.INBOX],
   };
-  static readonly ALL_SCOPES: readonly string[] = [
+  static readonly ALL_SCOPES: DeviceRow['scopes'] = [
     Actor.UPLOAD,
     Actor.READ_PUBLIC,
     Actor.READ_ALL,
@@ -98,13 +100,13 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
    * 권한은 run · sandbox로 정해져 있고 주인이 바꾸지 못한다 (sandbox는 이 기기만 가진다, DB CHECK devices_sandbox_only)
    */
   static readonly CODE_RUNNER = '코드 러너';
-  private static readonly CODE_RUNNER_SCOPES: readonly string[] = [Actor.RUN, Actor.SANDBOX];
+  private static readonly CODE_RUNNER_SCOPES: DeviceRow['scopes'] = [Actor.RUN, Actor.SANDBOX];
 
   /** 주인이 정하는 칸과 그 규칙. 권한은 정해진 순서로 둔다 */
   private static readonly RULES: ColumnRules<DeviceRow> = {
     name: (value) => Device.checkName(value),
     scopes: (value) => {
-      const unknown = value.filter((s) => !Device.ALL_SCOPES.includes(s));
+      const unknown = value.filter((s) => !ValueList.has(Device.ALL_SCOPES, s));
       if (unknown.length > 0)
         throw new InvalidRequest(new Map([['scopes', `모르는 권한이에요: ${unknown.join(', ')}`]]));
       return Device.ALL_SCOPES.filter((s) => value.includes(s));
@@ -142,7 +144,7 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
   }
 
   /** 앱이 요청한 기기 모양(PROFILES의 이름 하나)의 권한. 요청이 없거나 모르는 이름이면 기본 권한 */
-  static scopesFor(requested: readonly string[] | null): readonly string[] {
+  static scopesFor(requested: readonly string[] | null): DeviceRow['scopes'] {
     const [name] = requested ?? [];
     return (requested?.length === 1 && name && Device.PROFILES[name]) || Device.DEFAULT_SCOPES;
   }
@@ -194,7 +196,7 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
     spaceId: string,
     userId: string | null,
     name: string,
-    scopes: readonly string[],
+    scopes: DeviceRow['scopes'],
     clientId: string | null,
     clientName: string,
     now: Date,
@@ -254,16 +256,21 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
 
   /** 저장할 새 OAuth 토큰들. 해시만 들어간다 (id는 DB가 정한다) */
   get newOAuthTokens(): readonly Omit<OauthTokenNew, 'id'>[] {
-    return this.issued
-      .filter((c) => c.kind !== DeviceCredential.DEVICE)
-      .map((c) => ({
-        device_id: this.id,
-        client_id: this.clientId,
-        kind: c.kind,
-        token_hash: c.hash,
-        scopes: this.row.scopes,
-        expires_at: c.expiresAt as Date,
-      }));
+    // OAuth 토큰은 access · refresh 둘뿐이다 (oauth_tokens.kind의 값 목록. 예비 기기 토큰은 device_tokens로)
+    return this.issued.flatMap((c) =>
+      c.kind !== DeviceCredential.ACCESS && c.kind !== DeviceCredential.REFRESH
+        ? []
+        : [
+            {
+              device_id: this.id,
+              client_id: this.clientId,
+              kind: c.kind,
+              token_hash: c.hash,
+              scopes: this.row.scopes,
+              expires_at: c.expiresAt as Date,
+            },
+          ],
+    );
   }
 
   /** 저장할 새 예비 기기 토큰들. 해시와 화면에 보일 앞부분만 들어간다 (id는 DB가 정한다) */
@@ -289,7 +296,7 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
   }
 
   /** 주인이 고친 칸 (이름·권한) */
-  edit(changes: Partial<DeviceRow>): void {
+  edit(changes: Partial<Unchecked<DeviceRow>>): void {
     // 칸은 이름으로 다시 찾고(연결할 때), 권한은 칸에 맞춰 정해져 있다. 바꾸면 칸이 새 기기를 만들어 쌓인다
     if (this.isCodeRunner && (changes.name !== undefined || changes.scopes !== undefined))
       throw new RuleViolation('샌드박스 기기의 이름 · 권한은 바꿀 수 없어요');

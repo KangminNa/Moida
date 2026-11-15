@@ -1,4 +1,5 @@
-import { BaseRequest } from '../../platform';
+import { BaseRequest, ValueList } from '../../platform';
+import { OUTPUT_KIND } from '../task.tables';
 import { OutputPolicy } from './output.policy';
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -60,8 +61,8 @@ export class ListOutputsInput extends BaseRequest {
     const query = raw as Record<string, unknown>;
     return BaseRequest.read(raw, (f) => {
       const kind = f.optionalText('kind', 20);
-      if (kind !== null && !(OutputPolicy.KINDS as readonly string[]).includes(kind))
-        f.reject('kind', `${OutputPolicy.KINDS.join(' · ')} 중 하나예요`);
+      if (kind !== null && !ValueList.has(OUTPUT_KIND, kind))
+        f.reject('kind', `${OUTPUT_KIND.join(' · ')} 중 하나예요`);
       return new ListOutputsInput(
         kind,
         query.taskId ? f.uuid('taskId') : null,

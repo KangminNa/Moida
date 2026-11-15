@@ -10,7 +10,7 @@ paths:
 - 테이블은 그 모듈의 스키마를 붙여 만든다 (`apps/server/modules.json`: `platform` · `account` · `vault` · `blog`·`work` · `task` · `mcp`). 모듈 사이 외래키 금지 (`pnpm db:check`가 막는다).
 - 기본키는 `uuid DEFAULT platform.uuid_v7()`, 시간은 `timestamptz NOT NULL DEFAULT now()`.
 - 판(revision) 테이블은 `platform.forbid_update_delete()` 트리거를 붙여 추가만 허용한다.
-- 값의 범위는 `CHECK`로 DB에서 막는다 (상태값, 권한 목록, 해시 길이 등).
+- 값의 범위는 `CHECK`로 DB에서 막는다 (상태값, 권한 목록, 해시 길이 등). 값 목록은 칸 하나에 `col IN ('a', 'b')`(배열 칸은 `col <@ ARRAY['a', 'b']`)만 따로 걸면 `pnpm db:rows`가 그 칸을 유니온 타입과 `as const` 목록으로 만든다 (다른 조건과 섞으면 읽지 않는다).
 - 인덱스는 실제 조회를 위해서만 만들고, 왜 필요한지 주석이나 [테이블 설계](../../docs/테이블설계.md)에 남긴다. 자주 거르는 조건은 부분 인덱스(`WHERE deleted_at IS NULL`)로.
 - 한국어 검색은 `gin (col gin_bigm_ops)`, 벡터는 모델별 부분 HNSW 인덱스.
 - 적용한 뒤 `pnpm db:rows`로 표 인터페이스를 다시 만든다. 다르면 `pnpm db:check`와 CI가 실패한다.

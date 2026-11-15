@@ -1,4 +1,4 @@
-import { BaseRequest, type RequestFields } from '../../platform';
+import { BaseRequest, type RequestFields, type Unchecked } from '../../platform';
 import type { GoalRoundRow, GoalRunRow } from '../task.tables';
 import { GoalRound } from './goal-round';
 import { GoalRun } from './goal-run';
@@ -11,7 +11,7 @@ export class CreateGoalRunInput extends BaseRequest {
     readonly requestId: string,
     readonly goalId: string,
     readonly agentId: string,
-    readonly fields: Partial<GoalRunRow>,
+    readonly fields: Partial<Unchecked<GoalRunRow>>,
   ) {
     super();
   }

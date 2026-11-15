@@ -11,6 +11,9 @@ export interface AssetRow {
 }
 export type AssetNew = Partial<AssetRow> & Pick<AssetRow, 'post_id' | 'blob_hash'>;
 
+/** blog.issues.status (값 목록 CHECK) */
+export const ISSUE_STATUS = ['draft', 'published'] as const;
+export type IssueStatus = (typeof ISSUE_STATUS)[number];
 /** blog.issues */
 export interface IssueRow {
   id: string;
@@ -20,13 +23,16 @@ export interface IssueRow {
   created_at: Date;
   menu_id: string;
   number: number;
-  status: string;
+  status: IssueStatus;
   published_at: Date | null;
   version: number;
   updated_at: Date;
 }
 export type IssueNew = Partial<IssueRow> & Pick<IssueRow, 'id' | 'space_id' | 'title' | 'menu_id' | 'number'>;
 
+/** blog.menus.kind (값 목록 CHECK) */
+export const MENU_KIND = ['posts', 'issues', 'pages', 'page'] as const;
+export type MenuKind = (typeof MENU_KIND)[number];
 /** blog.menus */
 export interface MenuRow {
   id: string;
@@ -35,7 +41,7 @@ export interface MenuRow {
   slug: string;
   sort: number;
   version: number;
-  kind: string;
+  kind: MenuKind;
   policy: string;
   agent_id: string | null;
   rss: boolean;
@@ -57,13 +63,16 @@ export interface PageRevisionRow {
 }
 export type PageRevisionNew = Partial<PageRevisionRow> & Pick<PageRevisionRow, 'id' | 'page_id' | 'seq' | 'files' | 'task_id' | 'run_id'>;
 
+/** blog.pages.visibility (값 목록 CHECK) */
+export const PAGE_VISIBILITY = ['private', 'public'] as const;
+export type PageVisibility = (typeof PAGE_VISIBILITY)[number];
 /** blog.pages */
 export interface PageRow {
   id: string;
   space_id: string;
   name: string;
   title: string;
-  visibility: string;
+  visibility: PageVisibility;
   current_seq: number;
   revisions: number;
   version: number;
@@ -75,6 +84,9 @@ export interface PageRow {
 }
 export type PageNew = Partial<PageRow> & Pick<PageRow, 'id' | 'space_id' | 'name' | 'title' | 'current_seq' | 'revisions'>;
 
+/** blog.post_revisions.actor_type (값 목록 CHECK) */
+export const POST_REVISION_ACTOR_TYPE = ['user', 'device', 'ai', 'system'] as const;
+export type PostRevisionActorType = (typeof POST_REVISION_ACTOR_TYPE)[number];
 /** blog.post_revisions */
 export interface PostRevisionRow {
   id: string;
@@ -83,7 +95,7 @@ export interface PostRevisionRow {
   body_md: string;
   base_revision_id: string | null;
   request_id: string | null;
-  actor_type: string;
+  actor_type: PostRevisionActorType;
   actor_id: string | null;
   created_at: Date;
   title: string;
@@ -98,12 +110,18 @@ export interface PostWikiRefRow {
 }
 export type PostWikiRefNew = Partial<PostWikiRefRow> & Pick<PostWikiRefRow, 'post_id' | 'wiki_id'>;
 
+/** blog.posts.status (값 목록 CHECK) */
+export const POST_STATUS = ['draft', 'published', 'unlisted'] as const;
+export type PostStatus = (typeof POST_STATUS)[number];
+/** blog.posts.align (값 목록 CHECK) */
+export const POST_ALIGN = ['left', 'center'] as const;
+export type PostAlign = (typeof POST_ALIGN)[number];
 /** blog.posts */
 export interface PostRow {
   id: string;
   space_id: string;
   slug: string;
-  status: string;
+  status: PostStatus;
   title: string | null;
   excerpt: string | null;
   head_text: string | null;
@@ -114,7 +132,7 @@ export interface PostRow {
   issue_order: number | null;
   tags: readonly string[];
   cover_blob_hash: string | null;
-  align: string;
+  align: PostAlign;
   published_at: Date | null;
   updated_at: Date;
   deleted_at: Date | null;
@@ -124,18 +142,24 @@ export interface PostRow {
 }
 export type PostNew = Partial<PostRow> & Pick<PostRow, 'id' | 'space_id' | 'slug'>;
 
+/** work.basket_items.kind (값 목록 CHECK) */
+export const BASKET_ITEM_KIND = ['session', 'post', 'photo', 'file', 'link', 'note'] as const;
+export type BasketItemKind = (typeof BASKET_ITEM_KIND)[number];
+/** work.basket_items.actor_type (값 목록 CHECK) */
+export const BASKET_ITEM_ACTOR_TYPE = ['user', 'device', 'ai', 'system'] as const;
+export type BasketItemActorType = (typeof BASKET_ITEM_ACTOR_TYPE)[number];
 /** work.basket_items */
 export interface BasketItemRow {
   id: string;
   basket_id: string;
-  kind: string;
+  kind: BasketItemKind;
   ref_id: string | null;
   blob_hash: string | null;
   url: string | null;
   title: string | null;
   note: string | null;
   sort: number;
-  actor_type: string;
+  actor_type: BasketItemActorType;
   actor_id: string | null;
   created_at: Date;
 }

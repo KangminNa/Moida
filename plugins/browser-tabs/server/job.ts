@@ -8,7 +8,7 @@ import {
   type Work,
 } from '../../../apps/server/src/plugin-api';
 import { clicks, integrations, sites } from './schema';
-import type { ClickRow, IntegrationRow, SiteRow } from './tables';
+import type { ClickRow, ClickStatus, IntegrationRow, SiteRow } from './tables';
 
 // 브라우저 작업(browse) 하나가 어디서 도는지: 작업의 대상이 사이트(browser_site)면 그 사이트, 클릭(browser_click, 클릭 결재에서
 // 고쳐 달라로 다시 온 일)이면 그 클릭의 사이트, 사이트 도구(browser_integration, 굳히기)면 그 도구의 사이트, 대상이 없으면 둘러보기.
@@ -32,7 +32,7 @@ export const RUN_TARGET = 'browser_run';
 /** 결재 뒤 실행의 결과 (코어의 결과 처리가 approvalId · outcome을 보고 작업을 끝낸다) */
 const CLICK_DONE = 'plugin.browser_tabs.click_done';
 /** 열린 클릭 (작업 하나에 하나뿐, DB의 부분 유일 인덱스) */
-export const OPEN_CLICK = ['held', 'approved', 'clicking'];
+export const OPEN_CLICK: readonly ClickStatus[] = ['held', 'approved', 'clicking'];
 
 /** 작업이 도는 자리: 사이트 일이면 사이트(와 앞에서 붙잡은 클릭 · 굳히는 도구), 둘러보기면 모두 null */
 export type BrowsePlace = {

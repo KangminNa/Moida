@@ -7,8 +7,16 @@ import {
   Forbidden,
   RuleViolation,
   TableEntity,
+  type Unchecked,
+  ValueList,
 } from '../../platform';
-import type { PostNew, PostRow } from '../blog.tables';
+import {
+  POST_ALIGN,
+  POST_STATUS,
+  type PostNew,
+  type PostRow,
+  type PostStatus,
+} from '../blog.tables';
 import type { Menu } from '../menu/menu';
 import { PublicSavedPostView, SavedPostView, ToolDraftView } from './post.view';
 import { PostContent } from './post-content';
@@ -30,11 +38,9 @@ export interface LoadedPost extends PostRow {
 // 주인이 결재한 공개 하나만 예외다 (publishApproved).
 // 글 → wiki 연결(대표 하나 + 참고 여럿)은 판 없이 글에 둔다. vault에는 이벤트로 알린다 (외래키 없음).
 export class Post extends TableEntity<PostRow, PostNew> {
-  static readonly DRAFT = 'draft';
-  static readonly PUBLISHED = 'published';
-  static readonly UNLISTED = 'unlisted';
-  static readonly STATUSES: readonly string[] = [Post.DRAFT, Post.PUBLISHED, Post.UNLISTED];
-  static readonly ALIGNS: readonly string[] = ['left', 'center'];
+  static readonly DRAFT: PostStatus = 'draft';
+  static readonly PUBLISHED: PostStatus = 'published';
+  static readonly UNLISTED: PostStatus = 'unlisted';
   static readonly TAGS_MAX = 20;
   static readonly TAG_MAX = 40;
   /** 글 하나의 참고 wiki */
@@ -62,8 +68,8 @@ export class Post extends TableEntity<PostRow, PostNew> {
       return clean;
     },
     align: (value) => {
-      if (!Post.ALIGNS.includes(value))
-        throw new RuleViolation(`정렬은 ${Post.ALIGNS.join(' · ')} 중 하나예요`);
+      if (!ValueList.has(POST_ALIGN, value))
+        throw new RuleViolation(`정렬은 ${POST_ALIGN.join(' · ')} 중 하나예요`);
       return value;
     },
   };
@@ -98,7 +104,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
   static open(
     by: Actor,
     content: PostContent,
-    fields: Omit<PostNew, 'id' | 'space_id'>,
+    fields: Omit<Unchecked<PostNew>, 'id' | 'space_id'>,
     requestId: string,
     now: Date,
   ): Post {
@@ -155,7 +161,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
    * 고쳐 쓰기. 제목·본문이 바뀌었으면 새 판을 쌓는다. 주소·태그·정렬은 판 없이 바꾸고, 적지 않은 칸은 그대로다.
    * 공개된 글(공개·링크만)은 주인만 고친다.
    */
-  edit(content: PostContent, changes: Partial<PostRow>, by: Actor, now: Date): void {
+  edit(content: PostContent, changes: Partial<Unchecked<PostRow>>, by: Actor, now: Date): void {
     this.assertLive();
     if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
     const before = this.row;
@@ -239,8 +245,8 @@ export class Post extends TableEntity<PostRow, PostNew> {
   changeStatus(status: string, by: Actor, now: Date): void {
     Post.assertOwner(by);
     this.assertLive();
-    if (!Post.STATUSES.includes(status))
-      throw new RuleViolation(`공개 범위는 ${Post.STATUSES.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(POST_STATUS, status))
+      throw new RuleViolation(`공개 범위는 ${POST_STATUS.join(' · ')} 중 하나예요`);
     const was = this.row.status;
     if (status === was) return;
     this.put('status', status);

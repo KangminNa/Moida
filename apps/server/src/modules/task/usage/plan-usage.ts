@@ -1,5 +1,11 @@
-import { BaseEntity, RuleViolation } from '../../platform';
-import type { PlanUsageRow } from '../task.tables';
+import { BaseEntity, RuleViolation, type Unchecked, ValueList } from '../../platform';
+import {
+  PLAN_USAGE_PERIOD,
+  PLAN_USAGE_STATUS,
+  type PlanUsagePeriod,
+  type PlanUsageRow,
+  type PlanUsageTool,
+} from '../task.tables';
 import { PlanWindowView } from './usage.view';
 
 // AI 도구 구독의 사용률 창 하나. 러너가 본 마지막 값만 두고, 초기화 시각이 지나면 확인 전으로 본다.
@@ -8,9 +14,8 @@ export class PlanUsage extends BaseEntity {
   static readonly FIVE_HOUR = 'five_hour';
   static readonly SEVEN_DAY = 'seven_day';
   /** 저장하는 창. 늘 이 순서로 저장해서 동시에 온 보고가 서로를 막지 않는다 */
-  static readonly WINDOWS: readonly string[] = [PlanUsage.FIVE_HOUR, PlanUsage.SEVEN_DAY];
+  static readonly WINDOWS: readonly PlanUsagePeriod[] = PLAN_USAGE_PERIOD;
   static readonly PERCENT_MAX = 1000;
-  static readonly STATUSES: readonly string[] = ['allowed', 'allowed_warning', 'rejected'];
 
   private constructor(private readonly row: Readonly<PlanUsageRow>) {
     super(`${row.space_id}/${row.tool}/${row.period}`, 1);
@@ -19,18 +24,18 @@ export class PlanUsage extends BaseEntity {
   /** 러너가 지금 본 값. 어느 도구의 값인지는 작업의 에이전트가 정한다. 상태는 CLI가 알리지 않으면 null */
   static seen(
     spaceId: string,
-    tool: string,
-    fields: Pick<PlanUsageRow, 'period' | 'percent' | 'resets_at' | 'status'>,
+    tool: PlanUsageTool,
+    fields: Pick<Unchecked<PlanUsageRow>, 'period' | 'percent' | 'resets_at' | 'status'>,
     now: Date,
   ): PlanUsage {
     const { period, percent, status } = fields;
-    if (!PlanUsage.WINDOWS.includes(period))
+    if (!ValueList.has(PlanUsage.WINDOWS, period))
       throw new RuleViolation(`구독 사용률 창은 ${PlanUsage.WINDOWS.join(' · ')} 중 하나예요`);
     if (percent < 0 || percent > PlanUsage.PERCENT_MAX)
       throw new RuleViolation(`구독 사용률은 0~${PlanUsage.PERCENT_MAX}이에요`);
-    if (status !== null && !PlanUsage.STATUSES.includes(status))
+    if (status !== null && !ValueList.has(PLAN_USAGE_STATUS, status))
       throw new RuleViolation(`모르는 구독 상태예요: ${status}`);
-    return new PlanUsage({ ...fields, space_id: spaceId, tool, seen_at: now });
+    return new PlanUsage({ ...fields, period, status, space_id: spaceId, tool, seen_at: now });
   }
 
   static restore(row: PlanUsageRow): PlanUsage {

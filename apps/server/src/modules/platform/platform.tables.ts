@@ -24,10 +24,13 @@ export interface IdempotencyRow {
 }
 export type IdempotencyNew = Partial<IdempotencyRow> & Pick<IdempotencyRow, 'device_id' | 'request_id' | 'tool' | 'response'>;
 
+/** platform.notice_settings.digest (값 목록 CHECK) */
+export const NOTICE_SETTING_DIGEST = ['hourly', 'daily'] as const;
+export type NoticeSettingDigest = (typeof NOTICE_SETTING_DIGEST)[number];
 /** platform.notice_settings */
 export interface NoticeSettingRow {
   space_id: string;
-  digest: string;
+  digest: NoticeSettingDigest;
   digest_minute: number;
   quiet_start: number | null;
   quiet_end: number | null;
@@ -38,12 +41,15 @@ export interface NoticeSettingRow {
 }
 export type NoticeSettingNew = Partial<NoticeSettingRow> & Pick<NoticeSettingRow, 'space_id'>;
 
+/** platform.notifications.severity (값 목록 CHECK) */
+export const NOTIFICATION_SEVERITY = ['immediate', 'digest', 'log'] as const;
+export type NotificationSeverity = (typeof NOTIFICATION_SEVERITY)[number];
 /** platform.notifications */
 export interface NotificationRow {
   id: string;
   space_id: string;
   kind: string;
-  severity: string;
+  severity: NotificationSeverity;
   group_key: string | null;
   title: string;
   body: string | null;

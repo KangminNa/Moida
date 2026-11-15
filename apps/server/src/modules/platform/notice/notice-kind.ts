@@ -1,4 +1,6 @@
 import type { DomainEvent } from '../base/event';
+import { ValueList } from '../base/value-list';
+import { NOTIFICATION_SEVERITY, type NotificationSeverity } from '../platform.tables';
 import type { NoticeNew } from './notices';
 
 /** 알림을 어디로 보내는가: 푸시까지 · 콘솔 알림 센터만 · 남기지 않음 */
@@ -14,14 +16,9 @@ type NoticeBody = Omit<NoticeNew, 'kind' | 'severity' | 'space_id'>;
 //     .from(['task.approval.requested'], (e) => ({ title: …, group_key: … }))
 //     .settledOn(['task.approval.granted'], (e) => `approval:${e.data.approvalId}`)
 export class NoticeKind {
-  static readonly IMMEDIATE = 'immediate';
-  static readonly DIGEST = 'digest';
-  static readonly LOG = 'log';
-  static readonly SEVERITIES: readonly string[] = [
-    NoticeKind.IMMEDIATE,
-    NoticeKind.DIGEST,
-    NoticeKind.LOG,
-  ];
+  static readonly IMMEDIATE: NotificationSeverity = 'immediate';
+  static readonly DIGEST: NotificationSeverity = 'digest';
+  static readonly LOG: NotificationSeverity = 'log';
   static readonly ROUTES: readonly NoticeRoute[] = ['push', 'center', 'off'];
 
   private topics: readonly string[] = [];
@@ -34,9 +31,9 @@ export class NoticeKind {
     readonly kind: string,
     /** 설정 화면에 보이는 이름 */
     readonly label: string,
-    readonly severity: string,
+    readonly severity: NotificationSeverity,
   ) {
-    if (!NoticeKind.SEVERITIES.includes(severity))
+    if (!ValueList.has(NOTIFICATION_SEVERITY, severity))
       throw new Error(`알림 등급이 틀렸어요: ${severity}`);
   }
 

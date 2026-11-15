@@ -1,4 +1,9 @@
-import { BaseRequest, type ColumnReaders, type RequestFields } from '../../platform';
+import {
+  BaseRequest,
+  type ColumnReaders,
+  type RequestFields,
+  type Unchecked,
+} from '../../platform';
 import type { AgentRow } from '../task.tables';
 
 // 에이전트 입력의 모양. 뜻(도구 이름, 권한 목록)은 Agent가 검사한다.
@@ -45,7 +50,7 @@ function reviewerOf(f: RequestFields, raw: unknown): string | null | undefined {
 export class CreateAgentInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
-    readonly fields: Partial<AgentRow>,
+    readonly fields: Partial<Unchecked<AgentRow>>,
     /** 보고 대상. 없으면 주인에게 보고한다 */
     readonly reportsTo: string | null,
     /** 일을 맡을 러너 (task.runners의 id). 없으면 아무 러너 */
@@ -135,7 +140,7 @@ export class UpdateAgentInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
-    readonly changes: Partial<AgentRow>,
+    readonly changes: Partial<Unchecked<AgentRow>>,
     readonly reportsTo: string | null | undefined,
     readonly runnerId: string | null | undefined,
     readonly reviewerId: string | null | undefined,

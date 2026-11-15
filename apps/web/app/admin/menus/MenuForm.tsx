@@ -43,7 +43,7 @@ export function MenuForm({
   onClose: () => void;
 }) {
   const id = useId();
-  const [kind, setKind] = useState(menu?.kind ?? 'posts');
+  const [kind, setKind] = useState<string>(menu?.kind ?? 'posts');
   const [name, setName] = useState(menu?.name ?? '');
   const [slug, setSlug] = useState(menu?.slug ?? '');
   const [sort, setSort] = useState(menu?.sort ?? 0);

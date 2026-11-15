@@ -1,19 +1,11 @@
-import { Actor, RuleViolation } from '../../platform';
+import { Actor, RuleViolation, ValueList } from '../../platform';
+import { AGENT_SCOPE, type AgentScope } from '../task.tables';
 
 // 에이전트에게 줄 수 있는 권한과 함께 줄 수 없는 조합 (Agent의 scopes 규칙). DB CHECK와 같다.
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. Agent의 규칙과 러너 묶기가 함께 쓴다
 export class AgentScopes {
   /** 에이전트에게 줄 수 있는 권한. run은 러너의 것이라 없다: 에이전트가 스스로 일을 빌릴 수 없게 */
-  static readonly ALL: readonly string[] = [
-    Actor.UPLOAD,
-    Actor.READ_PUBLIC,
-    Actor.READ_ALL,
-    Actor.TIDY,
-    Actor.WRITE,
-    Actor.BROWSE,
-    Actor.CODE,
-    Actor.MAKE,
-  ];
+  static readonly ALL: readonly AgentScope[] = AGENT_SCOPE;
   /** browse와 함께 줄 수 없는 권한: 비공개(세션 · wiki)와 임시 글 · 소재를 여는 것. DB CHECK agents_browse_not_private와 같다 */
   private static readonly NOT_WITH_BROWSE: readonly string[] = [Actor.READ_ALL, Actor.WRITE];
   /**
@@ -25,8 +17,8 @@ export class AgentScopes {
   private static readonly SANDBOXED: readonly string[] = [Actor.CODE, Actor.MAKE];
 
   /** 들어온 권한 목록을 검사하고 정한 순서로 돌려준다 */
-  static check(value: readonly string[]): string[] {
-    const unknown = value.filter((s) => !AgentScopes.ALL.includes(s));
+  static check(value: readonly string[]): AgentScope[] {
+    const unknown = value.filter((s) => !ValueList.has(AgentScopes.ALL, s));
     if (unknown.length > 0)
       throw new RuleViolation(`에이전트에게 줄 수 없는 권한이에요: ${unknown.join(', ')}`);
     // 로그인된 브라우저 + 비공개 + 밖으로 보내기가 한 에이전트에 모이지 않게 (브라우저 작업은 비공개를 못 읽는다).

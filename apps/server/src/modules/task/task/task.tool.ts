@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseTool } from '../../platform';
+import { PLAN_USAGE_STATUS } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { type JobStateView, NextJobsView, type ProgressView } from './job.view';
 import {
@@ -119,7 +120,7 @@ export class ReportProgressTool extends BaseTool {
             resets_at: { type: 'string', format: 'date-time' },
             status: {
               type: 'string',
-              enum: PlanUsage.STATUSES,
+              enum: PLAN_USAGE_STATUS,
             },
           },
           required: ['window', 'percent', 'resets_at'],

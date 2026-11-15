@@ -1,5 +1,11 @@
 import { BaseEntity, Conflict, DomainEvent, NotFound, TableEntity } from '../../platform';
-import type { ChangeOpRow, ChangeSetNew, ChangeSetRow } from '../vault.tables';
+import type {
+  ChangeOpRow,
+  ChangeSetActorType,
+  ChangeSetKind,
+  ChangeSetNew,
+  ChangeSetRow,
+} from '../vault.tables';
 import { ChangeSetView, SubmittedChangesView } from './change.view';
 import type { ChangeOp, RevertOp } from './change-op';
 import { type ChangeTarget, ChangeWork } from './change-target';
@@ -33,8 +39,8 @@ export class ChangeSet extends TableEntity<LoadedChangeSet, ChangeSetNew> {
 
   static open(
     spaceId: string,
-    kind: string,
-    actorType: string,
+    kind: ChangeSetKind,
+    actorType: ChangeSetActorType,
     actorId: string | null,
     /** 작업 토큰으로 낸 묶음의 작업 id. 작업 하나에 묶음 하나 */
     jobId: string | null,

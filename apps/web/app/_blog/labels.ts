@@ -8,7 +8,7 @@ export const POST_STATUS_LABELS: Record<PostStatus, string> = {
   unlisted: '링크 공개',
 };
 
-/** 메뉴 종류 (서버 Menu.KINDS) */
+/** 메뉴 종류 (서버 blog.tables의 MENU_KIND) */
 export const MENU_KIND_LABELS: Record<string, string> = {
   posts: '글 목록',
   issues: '호 목록',

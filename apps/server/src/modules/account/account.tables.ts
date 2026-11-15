@@ -14,13 +14,16 @@ export interface DeviceTokenRow {
 }
 export type DeviceTokenNew = Partial<DeviceTokenRow> & Pick<DeviceTokenRow, 'id' | 'device_id' | 'token_hash' | 'prefix'>;
 
+/** account.devices.scopes (값 목록 CHECK) */
+export const DEVICE_SCOPE = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'run', 'sandbox', 'delegate', 'news', 'inbox'] as const;
+export type DeviceScope = (typeof DEVICE_SCOPE)[number];
 /** account.devices */
 export interface DeviceRow {
   id: string;
   space_id: string;
   user_id: string | null;
   name: string;
-  scopes: readonly string[];
+  scopes: readonly DeviceScope[];
   meta: unknown;
   created_at: Date;
   last_seen_at: Date | null;
@@ -62,12 +65,15 @@ export interface OauthCodeRow {
 }
 export type OauthCodeNew = Partial<OauthCodeRow> & Pick<OauthCodeRow, 'code_hash' | 'client_id' | 'code_challenge' | 'expires_at' | 'redirect_uri'>;
 
+/** account.oauth_tokens.kind (값 목록 CHECK) */
+export const OAUTH_TOKEN_KIND = ['access', 'refresh'] as const;
+export type OauthTokenKind = (typeof OAUTH_TOKEN_KIND)[number];
 /** account.oauth_tokens */
 export interface OauthTokenRow {
   id: string;
   device_id: string;
   client_id: string | null;
-  kind: string;
+  kind: OauthTokenKind;
   token_hash: string;
   scopes: readonly string[];
   expires_at: Date;
@@ -85,11 +91,14 @@ export interface SettingRow {
 }
 export type SettingNew = Partial<SettingRow> & Pick<SettingRow, 'space_id' | 'key' | 'value'>;
 
+/** account.space_members.role (값 목록 CHECK) */
+export const SPACE_MEMBER_ROLE = ['owner', 'editor', 'viewer'] as const;
+export type SpaceMemberRole = (typeof SPACE_MEMBER_ROLE)[number];
 /** account.space_members */
 export interface SpaceMemberRow {
   space_id: string;
   user_id: string;
-  role: string;
+  role: SpaceMemberRole;
   created_at: Date;
 }
 export type SpaceMemberNew = Partial<SpaceMemberRow> & Pick<SpaceMemberRow, 'space_id' | 'user_id' | 'role'>;

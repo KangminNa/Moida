@@ -1,4 +1,9 @@
-import { BaseRequest, type ColumnReaders, type RequestFields } from '../../platform';
+import {
+  BaseRequest,
+  type ColumnReaders,
+  type RequestFields,
+  type Unchecked,
+} from '../../platform';
 import type { ExternalToolRow } from '../task.tables';
 import { ExternalTool } from './external-tool';
 import { ExternalToolUrl } from './external-tool-url.policy';
@@ -25,7 +30,7 @@ export class CreateExternalToolInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
     readonly name: string,
-    readonly fields: Partial<ExternalToolRow>,
+    readonly fields: Partial<Unchecked<ExternalToolRow>>,
     /** 머리글의 값. 없으면 토큰 없이 (나중에 넣을 수 있다) */
     readonly secret: string | null,
   ) {
@@ -55,7 +60,7 @@ export class UpdateExternalToolInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
-    readonly changes: Partial<ExternalToolRow>,
+    readonly changes: Partial<Unchecked<ExternalToolRow>>,
     /** 켜기 · 끄기. 보내지 않으면 그대로 */
     readonly enabled: boolean | null,
   ) {
@@ -144,7 +149,7 @@ export class ProposeToolInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
     readonly name: string,
-    readonly fields: Partial<ExternalToolRow>,
+    readonly fields: Partial<Unchecked<ExternalToolRow>>,
   ) {
     super();
   }

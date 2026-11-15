@@ -2,6 +2,9 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** code_github.pulls.status (값 목록 CHECK) */
+export const PULL_STATUS = ['open', 'merged', 'closed'] as const;
+export type PullStatus = (typeof PULL_STATUS)[number];
 /** code_github.pulls */
 export interface PullRow {
   id: string;
@@ -13,7 +16,7 @@ export interface PullRow {
   url: string;
   head_sha: string;
   checks: unknown;
-  status: string;
+  status: PullStatus;
   version: number;
   created_at: Date;
   updated_at: Date;
@@ -36,6 +39,9 @@ export interface RepoRow {
 }
 export type RepoNew = Partial<RepoRow> & Pick<RepoRow, 'id' | 'space_id' | 'name' | 'url' | 'base'>;
 
+/** code_github.task_asks.status (값 목록 CHECK) */
+export const TASK_ASK_STATUS = ['asked', 'started', 'dropped'] as const;
+export type TaskAskStatus = (typeof TASK_ASK_STATUS)[number];
 /** code_github.task_asks */
 export interface TaskAskRow {
   id: string;
@@ -46,7 +52,7 @@ export interface TaskAskRow {
   instruction: string;
   agent_id: string | null;
   asked_by: string;
-  status: string;
+  status: TaskAskStatus;
   approval_id: string | null;
   version: number;
   created_at: Date;

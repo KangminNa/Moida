@@ -5,13 +5,17 @@ import {
   type LeasedWork,
   Redaction,
   RuleViolation,
+  ValueList,
 } from '../../platform';
 import { type ChangeWork, type NewNode, TargetEntity } from '../change/change-target';
-import type {
-  SessionNew,
-  SessionRevisionNew,
-  SessionRow,
-  SessionTranscriptNew,
+import {
+  SESSION_TRANSCRIPT_ACTOR_TYPE,
+  type SessionNew,
+  type SessionRevisionActorType,
+  type SessionRevisionNew,
+  type SessionRow,
+  type SessionTranscriptNew,
+  type SessionVisibility,
 } from '../vault.tables';
 import { SessionSavedView, TranscriptSavedView } from './session.view';
 import { SessionNote } from './session-note';
@@ -99,8 +103,8 @@ export interface LoadedSession extends SessionRow {
 // 원문(session_transcripts, 2차 4단계)도 추가만 한다: 수집 훅 · 확장이 원문을 올리면 노트 없이 세션이 생기고,
 // 서버 러너가 그 원문으로 쓴 노트가 원본 판이 된다 (세션 노트 일, 에이전트 없이 서버의 로그인으로).
 export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
-  static readonly PRIVATE = 'private';
-  static readonly PUBLIC = 'public';
+  static readonly PRIVATE: SessionVisibility = 'private';
+  static readonly PUBLIC: SessionVisibility = 'public';
   /** 사람이 정한 대표 wiki를 pinned_sections에 적는 이름. 칸 이름과 겹치지 않는다 */
   static readonly WIKI_KEY = '#wiki';
   /** 도구 이름: claude-code, codex … */
@@ -116,9 +120,9 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
   private static readonly NOTE_TITLE = '세션 노트 · ';
   private static readonly UNTITLED = '제목 없는 세션';
   /** 서버 러너가 쓴 노트의 만든 쪽 (session_revisions.actor_type) */
-  private static readonly AI = 'ai';
+  private static readonly AI: SessionRevisionActorType = 'ai';
   /** Actor 종류 → 판에 남기는 만든 쪽 (session_revisions.actor_type) */
-  private static readonly ACTOR_TYPES: Readonly<Record<string, string>> = {
+  private static readonly ACTOR_TYPES: Readonly<Record<string, SessionRevisionActorType>> = {
     owner: 'user',
     device: 'device',
     system: 'system',
@@ -263,6 +267,10 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     const same = this.transcripts.get(transcript.hash);
     if (same !== undefined) return SessionReceipt.unchanged(this.id, same, transcript.redactions);
     const seq = (this.row.transcript_count ?? 0) + 1;
+    // 원문을 올린 쪽은 기기 · 시스템뿐이다 (session_transcripts의 값 목록). 그 밖은 예전에도 DB의 CHECK가 막았다
+    const actorType = Session.ACTOR_TYPES[by.kind] ?? 'system';
+    if (!ValueList.has(SESSION_TRANSCRIPT_ACTOR_TYPE, actorType))
+      throw new Error(`원문을 올릴 수 없는 요청자예요: ${by.kind}`);
     this.addedText = {
       id: BaseEntity.newId(),
       session_id: this.id,
@@ -272,7 +280,7 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
       redactions: transcript.redactions.length
         ? transcript.redactions.map((r) => r.toJSON())
         : null,
-      actor_type: Session.ACTOR_TYPES[by.kind] ?? 'system',
+      actor_type: actorType,
       actor_id: by.id,
       created_at: now,
     };
@@ -318,7 +326,7 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
    */
   private addRevision(
     note: SessionNote,
-    actorType: string,
+    actorType: SessionRevisionActorType,
     actorId: string | null,
     now: Date,
   ): SessionRevisionNew {

@@ -9,7 +9,16 @@ import { useAction } from '../../_lib/use-action';
 import { ConnectGuide } from './ConnectGuide';
 
 /** 켤 수 있는 권한. delegate: 이 기기의 AI 도구가 서버 팀에 일을 맡기고 답을 받는다 (MCP ask_agent, 승인은 콘솔에서만). inbox: 기다리는 승인 · 질문 수 (MCP inbox) */
-const SCOPES = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'run', 'delegate', 'inbox'];
+const SCOPES: readonly Device['scopes'][number][] = [
+  'upload',
+  'read_public',
+  'read_all',
+  'tidy',
+  'write',
+  'run',
+  'delegate',
+  'inbox',
+];
 /** 정해진 권한: 코드 러너 칸(sandbox) · 소식 기기(news). 관리자가 주거나 뺄 수 없다 (서버가 거절한다) */
 const FIXED: Record<string, string> = { sandbox: '샌드박스 기기', news: '소식 기기' };
 /** 권한 바꾸기 · 마지막 로그인에는 변경 신호가 없다. 첫 기기가 붙기를 기다리는 동안에도 이 간격으로 읽는다 */
@@ -61,7 +70,7 @@ export function DevicesPanel({
     return reply?.ok ? reply.data : null;
   }
 
-  async function toggle(device: Device, scope: string) {
+  async function toggle(device: Device, scope: Device['scopes'][number]) {
     const scopes = device.scopes.includes(scope)
       ? device.scopes.filter((s) => s !== scope)
       : [...device.scopes, scope];

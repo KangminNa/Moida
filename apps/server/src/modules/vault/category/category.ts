@@ -1,4 +1,10 @@
-import { BaseEntity, type ColumnRules, DomainEvent, RuleViolation } from '../../platform';
+import {
+  BaseEntity,
+  type ColumnRules,
+  DomainEvent,
+  RuleViolation,
+  type Unchecked,
+} from '../../platform';
 import { type ChangeWork, GraphNode, type NewNode } from '../change/change-target';
 import { SlugPolicy } from '../slug.policy';
 import type { CategoryNew, CategoryRow } from '../vault.tables';
@@ -41,7 +47,7 @@ export class Category extends GraphNode<LoadedCategory, NewNode<CategoryNew>> {
   readonly targetKind = 'category';
 
   /** 새 카테고리. 주소가 없으면 이름에서 만들고, 겹치면 저장할 때 번호를 붙인다 */
-  static open(work: ChangeWork, fields: Partial<CategoryRow>): Category {
+  static open(work: ChangeWork, fields: Partial<Unchecked<CategoryRow>>): Category {
     const id = BaseEntity.newId();
     const category = new Category(
       {
@@ -68,7 +74,7 @@ export class Category extends GraphNode<LoadedCategory, NewNode<CategoryNew>> {
   }
 
   /** 사람이 고친 칸을 적는다 */
-  edit(changes: Partial<CategoryRow>): void {
+  edit(changes: Partial<Unchecked<CategoryRow>>): void {
     this.accept(changes, Category.RULES);
   }
 

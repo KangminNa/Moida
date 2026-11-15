@@ -12,17 +12,29 @@ export interface AgentRevisionRow {
 }
 export type AgentRevisionNew = Partial<AgentRevisionRow> & Pick<AgentRevisionRow, 'id' | 'agent_id' | 'revision' | 'settings'>;
 
+/** task.agents.tool (값 목록 CHECK) */
+export const AGENT_TOOL = ['claude', 'codex'] as const;
+export type AgentTool = (typeof AGENT_TOOL)[number];
+/** task.agents.scopes (값 목록 CHECK) */
+export const AGENT_SCOPE = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'browse', 'code', 'make'] as const;
+export type AgentScope = (typeof AGENT_SCOPE)[number];
+/** task.agents.status (값 목록 CHECK) */
+export const AGENT_STATUS = ['active', 'paused'] as const;
+export type AgentStatus = (typeof AGENT_STATUS)[number];
+/** task.agents.effort (값 목록 CHECK) */
+export const AGENT_EFFORT = ['', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type AgentEffort = (typeof AGENT_EFFORT)[number];
 /** task.agents */
 export interface AgentRow {
   id: string;
   space_id: string;
   name: string;
   role: string;
-  tool: string;
-  scopes: readonly string[];
+  tool: AgentTool;
+  scopes: readonly AgentScope[];
   approval_actions: readonly string[];
   monthly_limit: number | null;
-  status: string;
+  status: AgentStatus;
   version: number;
   created_at: Date;
   five_hour_limit: number | null;
@@ -33,16 +45,19 @@ export interface AgentRow {
   runner_id: string | null;
   reviewer_id: string | null;
   model: string;
-  effort: string;
+  effort: AgentEffort;
   external_tools: readonly string[];
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 
+/** task.ai_logins.tool (값 목록 CHECK) */
+export const AI_LOGIN_TOOL = ['claude', 'codex'] as const;
+export type AiLoginTool = (typeof AI_LOGIN_TOOL)[number];
 /** task.ai_logins */
 export interface AiLoginRow {
   id: string;
   space_id: string;
-  tool: string;
+  tool: AiLoginTool;
   secret: Buffer;
   nonce: Buffer;
   expires_at: Date | null;
@@ -53,6 +68,9 @@ export interface AiLoginRow {
 }
 export type AiLoginNew = Partial<AiLoginRow> & Pick<AiLoginRow, 'id' | 'space_id' | 'tool' | 'secret' | 'nonce'>;
 
+/** task.approvals.status (값 목록 CHECK) */
+export const APPROVAL_STATUS = ['pending', 'revision_requested', 'approved', 'rejected', 'cancelled'] as const;
+export type ApprovalStatus = (typeof APPROVAL_STATUS)[number];
 /** task.approvals */
 export interface ApprovalRow {
   id: string;
@@ -63,7 +81,7 @@ export interface ApprovalRow {
   target_kind: string;
   target_id: string;
   target_version: number;
-  status: string;
+  status: ApprovalStatus;
   decided_by: string | null;
   decided_at: Date | null;
   note: string | null;
@@ -75,6 +93,9 @@ export interface ApprovalRow {
 }
 export type ApprovalNew = Partial<ApprovalRow> & Pick<ApprovalRow, 'id' | 'space_id' | 'action' | 'target_kind' | 'target_id' | 'target_version'>;
 
+/** task.chat_updates.kind (값 목록 CHECK) */
+export const CHAT_UPDATE_KIND = ['member_done', 'member_failed', 'progress', 'decision', 'assumption', 'appended', 'reply', 'final', 'failed', 'review', 'question', 'routed'] as const;
+export type ChatUpdateKind = (typeof CHAT_UPDATE_KIND)[number];
 /** task.chat_updates */
 export interface ChatUpdateRow {
   id: string;
@@ -82,7 +103,7 @@ export interface ChatUpdateRow {
   tx: string;
   space_id: string;
   chat_id: string;
-  kind: string;
+  kind: ChatUpdateKind;
   task_id: string | null;
   agent_id: string | null;
   text: string;
@@ -91,6 +112,12 @@ export interface ChatUpdateRow {
 }
 export type ChatUpdateNew = Partial<ChatUpdateRow> & Pick<ChatUpdateRow, 'id' | 'space_id' | 'chat_id' | 'kind' | 'text'>;
 
+/** task.chats.deliver (값 목록 CHECK) */
+export const CHAT_DELIVER = ['html', 'blog', 'browser', 'code'] as const;
+export type ChatDeliver = (typeof CHAT_DELIVER)[number];
+/** task.chats.effort (값 목록 CHECK) */
+export const CHAT_EFFORT = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type ChatEffort = (typeof CHAT_EFFORT)[number];
 /** task.chats */
 export interface ChatRow {
   id: string;
@@ -105,14 +132,17 @@ export interface ChatRow {
   device_id: string | null;
   goal: string | null;
   project: string | null;
-  deliver: string | null;
+  deliver: ChatDeliver | null;
   pending: string | null;
   model: string | null;
-  effort: string | null;
+  effort: ChatEffort | null;
   pending_refs: unknown | null;
 }
 export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'title' | 'request_id'>;
 
+/** task.external_tools.status (값 목록 CHECK) */
+export const EXTERNAL_TOOL_STATUS = ['proposed', 'active', 'off'] as const;
+export type ExternalToolStatus = (typeof EXTERNAL_TOOL_STATUS)[number];
 /** task.external_tools */
 export interface ExternalToolRow {
   id: string;
@@ -123,7 +153,7 @@ export interface ExternalToolRow {
   header_name: string | null;
   secret: Buffer | null;
   nonce: Buffer | null;
-  status: string;
+  status: ExternalToolStatus;
   note: string;
   proposed_by: string | null;
   version: number;
@@ -156,6 +186,12 @@ export interface GoalRoundRow {
 }
 export type GoalRoundNew = Partial<GoalRoundRow> & Pick<GoalRoundRow, 'id' | 'space_id' | 'run_id' | 'round' | 'task_id' | 'summary' | 'done' | 'milestone'>;
 
+/** task.goal_runs.checkpoint (값 목록 CHECK) */
+export const GOAL_RUN_CHECKPOINT = ['every', 'milestone', 'final'] as const;
+export type GoalRunCheckpoint = (typeof GOAL_RUN_CHECKPOINT)[number];
+/** task.goal_runs.status (값 목록 CHECK) */
+export const GOAL_RUN_STATUS = ['running', 'waiting', 'done', 'stopped'] as const;
+export type GoalRunStatus = (typeof GOAL_RUN_STATUS)[number];
 /** task.goal_runs */
 export interface GoalRunRow {
   id: string;
@@ -165,10 +201,10 @@ export interface GoalRunRow {
   title: string;
   instruction: string;
   criteria: readonly string[];
-  checkpoint: string;
+  checkpoint: GoalRunCheckpoint;
   round: number;
   max_rounds: number;
-  status: string;
+  status: GoalRunStatus;
   request_id: string;
   version: number;
   created_at: Date;
@@ -176,6 +212,9 @@ export interface GoalRunRow {
 }
 export type GoalRunNew = Partial<GoalRunRow> & Pick<GoalRunRow, 'id' | 'space_id' | 'goal_id' | 'agent_id' | 'title' | 'instruction' | 'checkpoint' | 'max_rounds' | 'status' | 'request_id'>;
 
+/** task.goals.status (값 목록 CHECK) */
+export const GOAL_STATUS = ['active', 'done', 'dropped'] as const;
+export type GoalStatus = (typeof GOAL_STATUS)[number];
 /** task.goals */
 export interface GoalRow {
   id: string;
@@ -183,13 +222,16 @@ export interface GoalRow {
   parent_id: string | null;
   title: string;
   description: string;
-  status: string;
+  status: GoalStatus;
   sort: number;
   version: number;
   created_at: Date;
 }
 export type GoalNew = Partial<GoalRow> & Pick<GoalRow, 'id' | 'space_id' | 'title'>;
 
+/** task.outputs.kind (값 목록 CHECK) */
+export const OUTPUT_KIND = ['document', 'slides', 'sheet', 'image', 'video', 'other'] as const;
+export type OutputKind = (typeof OUTPUT_KIND)[number];
 /** task.outputs */
 export interface OutputRow {
   id: string;
@@ -197,7 +239,7 @@ export interface OutputRow {
   task_id: string | null;
   run_id: string | null;
   name: string;
-  kind: string;
+  kind: OutputKind;
   mime: string;
   size_bytes: number;
   blob_hash: string;
@@ -210,14 +252,23 @@ export interface OutputRow {
 }
 export type OutputNew = Partial<OutputRow> & Pick<OutputRow, 'id' | 'space_id' | 'name' | 'kind' | 'mime' | 'size_bytes' | 'blob_hash'>;
 
+/** task.plan_usage.tool (값 목록 CHECK) */
+export const PLAN_USAGE_TOOL = ['claude', 'codex'] as const;
+export type PlanUsageTool = (typeof PLAN_USAGE_TOOL)[number];
+/** task.plan_usage.period (값 목록 CHECK) */
+export const PLAN_USAGE_PERIOD = ['five_hour', 'seven_day'] as const;
+export type PlanUsagePeriod = (typeof PLAN_USAGE_PERIOD)[number];
+/** task.plan_usage.status (값 목록 CHECK) */
+export const PLAN_USAGE_STATUS = ['allowed', 'allowed_warning', 'rejected'] as const;
+export type PlanUsageStatus = (typeof PLAN_USAGE_STATUS)[number];
 /** task.plan_usage */
 export interface PlanUsageRow {
   space_id: string;
-  tool: string;
-  period: string;
+  tool: PlanUsageTool;
+  period: PlanUsagePeriod;
   percent: number;
   resets_at: Date;
-  status: string | null;
+  status: PlanUsageStatus | null;
   seen_at: Date;
 }
 export type PlanUsageNew = Partial<PlanUsageRow> & Pick<PlanUsageRow, 'space_id' | 'tool' | 'period' | 'percent' | 'resets_at'>;
@@ -235,13 +286,25 @@ export interface RunnerRow {
 }
 export type RunnerNew = Partial<RunnerRow> & Pick<RunnerRow, 'id' | 'space_id' | 'device_id'>;
 
+/** task.schedules.mode (값 목록 CHECK) */
+export const SCHEDULE_MODE = ['daily', 'hourly'] as const;
+export type ScheduleMode = (typeof SCHEDULE_MODE)[number];
+/** task.schedules.destination (값 목록 CHECK) */
+export const SCHEDULE_DESTINATION = ['task', 'chat', 'page'] as const;
+export type ScheduleDestination = (typeof SCHEDULE_DESTINATION)[number];
+/** task.schedules.deliver (값 목록 CHECK) */
+export const SCHEDULE_DELIVER = ['html', 'blog', 'browser', 'code'] as const;
+export type ScheduleDeliver = (typeof SCHEDULE_DELIVER)[number];
+/** task.schedules.trigger (값 목록 CHECK) */
+export const SCHEDULE_TRIGGER = ['time', 'manual', 'after'] as const;
+export type ScheduleTrigger = (typeof SCHEDULE_TRIGGER)[number];
 /** task.schedules */
 export interface ScheduleRow {
   id: string;
   space_id: string;
   title: string;
   agent_id: string | null;
-  mode: string;
+  mode: ScheduleMode;
   at_minute: number | null;
   weekdays: readonly number[];
   every_hours: number | null;
@@ -257,10 +320,10 @@ export interface ScheduleRow {
   version: number;
   created_at: Date;
   page_id: string | null;
-  destination: string;
-  deliver: string | null;
+  destination: ScheduleDestination;
+  deliver: ScheduleDeliver | null;
   rules: string;
-  trigger: string;
+  trigger: ScheduleTrigger;
   after_id: string | null;
   chat_id: string | null;
 }
@@ -292,17 +355,26 @@ export interface SkillRow {
 }
 export type SkillNew = Partial<SkillRow> & Pick<SkillRow, 'id' | 'space_id' | 'name'>;
 
+/** task.task_events.kind (값 목록 CHECK) */
+export const TASK_EVENT_KIND = ['read', 'write', 'result', 'error'] as const;
+export type TaskEventKind = (typeof TASK_EVENT_KIND)[number];
 /** task.task_events */
 export interface TaskEventRow {
   id: number;
   task_id: string;
   at: Date;
-  kind: string;
+  kind: TaskEventKind;
   body: string;
   tokens: number;
 }
 export type TaskEventNew = Partial<TaskEventRow> & Pick<TaskEventRow, 'id' | 'task_id' | 'kind'>;
 
+/** task.task_runs.skill_source (값 목록 CHECK) */
+export const TASK_RUN_SKILL_SOURCE = ['repo', 'console'] as const;
+export type TaskRunSkillSource = (typeof TASK_RUN_SKILL_SOURCE)[number];
+/** task.task_runs.prompt_source (값 목록 CHECK) */
+export const TASK_RUN_PROMPT_SOURCE = ['repo', 'console'] as const;
+export type TaskRunPromptSource = (typeof TASK_RUN_PROMPT_SOURCE)[number];
 /** task.task_runs */
 export interface TaskRunRow {
   id: string;
@@ -313,19 +385,25 @@ export interface TaskRunRow {
   agent_id: string | null;
   agent_revision: number | null;
   skill: string | null;
-  skill_source: string | null;
+  skill_source: TaskRunSkillSource | null;
   skill_revision: number | null;
   skill_hash: string | null;
   runner_build: string | null;
   cli_version: string | null;
   model: string | null;
   started_at: Date;
-  prompt_source: string | null;
+  prompt_source: TaskRunPromptSource | null;
   prompt_revision: number | null;
   prompt_hash: string | null;
 }
 export type TaskRunNew = Partial<TaskRunRow> & Pick<TaskRunRow, 'id' | 'space_id' | 'task_id' | 'seq' | 'runner_id'>;
 
+/** task.tasks.status (값 목록 CHECK) */
+export const TASK_STATUS = ['queued', 'running', 'waiting', 'done', 'failed', 'cancelled'] as const;
+export type TaskStatus = (typeof TASK_STATUS)[number];
+/** task.tasks.wait_reason (값 목록 CHECK) */
+export const TASK_WAIT_REASON = ['approval', 'subtasks'] as const;
+export type TaskWaitReason = (typeof TASK_WAIT_REASON)[number];
 /** task.tasks */
 export interface TaskRow {
   id: string;
@@ -339,7 +417,7 @@ export interface TaskRow {
   target_kind: string | null;
   target_id: string | null;
   base_version: number | null;
-  status: string;
+  status: TaskStatus;
   priority: number;
   lease_until: Date | null;
   leased_by: string | null;
@@ -351,7 +429,7 @@ export interface TaskRow {
   goal_id: string | null;
   parent_id: string | null;
   depth: number;
-  wait_reason: string | null;
+  wait_reason: TaskWaitReason | null;
   rounds: number;
 }
 export type TaskNew = Partial<TaskRow> & Pick<TaskRow, 'id' | 'space_id' | 'kind' | 'title'>;

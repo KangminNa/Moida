@@ -2,6 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { bigint, boolean, customType, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason } from './task.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const xid8Column = customType<{ data: string }>({ dataType: () => 'xid8' });
@@ -22,11 +23,11 @@ export const agents = taskSchema.table('agents', {
   space_id: uuid('space_id').notNull(),
   name: text('name').notNull(),
   role: text('role').notNull(),
-  tool: text('tool').notNull(),
-  scopes: text('scopes').array().notNull(),
+  tool: text('tool').$type<AgentTool>().notNull(),
+  scopes: text('scopes').array().$type<AgentScope[]>().notNull(),
   approval_actions: text('approval_actions').array().notNull(),
   monthly_limit: bigint('monthly_limit', { mode: 'number' }),
-  status: text('status').notNull(),
+  status: text('status').$type<AgentStatus>().notNull(),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   five_hour_limit: bigint('five_hour_limit', { mode: 'number' }),
@@ -37,7 +38,7 @@ export const agents = taskSchema.table('agents', {
   runner_id: uuid('runner_id'),
   reviewer_id: uuid('reviewer_id'),
   model: text('model').notNull(),
-  effort: text('effort').notNull(),
+  effort: text('effort').$type<AgentEffort>().notNull(),
   external_tools: text('external_tools').array().notNull(),
 });
 
@@ -45,7 +46,7 @@ export const agents = taskSchema.table('agents', {
 export const aiLogins = taskSchema.table('ai_logins', {
   id: uuid('id').notNull(),
   space_id: uuid('space_id').notNull(),
-  tool: text('tool').notNull(),
+  tool: text('tool').$type<AiLoginTool>().notNull(),
   secret: byteaColumn('secret').notNull(),
   nonce: byteaColumn('nonce').notNull(),
   expires_at: timestamp('expires_at', { withTimezone: true }),
@@ -65,7 +66,7 @@ export const approvals = taskSchema.table('approvals', {
   target_kind: text('target_kind').notNull(),
   target_id: uuid('target_id').notNull(),
   target_version: integer('target_version').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<ApprovalStatus>().notNull(),
   decided_by: uuid('decided_by'),
   decided_at: timestamp('decided_at', { withTimezone: true }),
   note: text('note'),
@@ -83,7 +84,7 @@ export const chatUpdates = taskSchema.table('chat_updates', {
   tx: xid8Column('tx').notNull(),
   space_id: uuid('space_id').notNull(),
   chat_id: uuid('chat_id').notNull(),
-  kind: text('kind').notNull(),
+  kind: text('kind').$type<ChatUpdateKind>().notNull(),
   task_id: uuid('task_id'),
   agent_id: uuid('agent_id'),
   text: text('text').notNull(),
@@ -105,10 +106,10 @@ export const chats = taskSchema.table('chats', {
   device_id: uuid('device_id'),
   goal: text('goal'),
   project: text('project'),
-  deliver: text('deliver'),
+  deliver: text('deliver').$type<ChatDeliver>(),
   pending: text('pending'),
   model: text('model'),
-  effort: text('effort'),
+  effort: text('effort').$type<ChatEffort>(),
   pending_refs: jsonb('pending_refs'),
 });
 
@@ -122,7 +123,7 @@ export const externalTools = taskSchema.table('external_tools', {
   header_name: text('header_name'),
   secret: byteaColumn('secret'),
   nonce: byteaColumn('nonce'),
-  status: text('status').notNull(),
+  status: text('status').$type<ExternalToolStatus>().notNull(),
   note: text('note').notNull(),
   proposed_by: uuid('proposed_by'),
   version: integer('version').notNull(),
@@ -162,10 +163,10 @@ export const goalRuns = taskSchema.table('goal_runs', {
   title: text('title').notNull(),
   instruction: text('instruction').notNull(),
   criteria: text('criteria').array().notNull(),
-  checkpoint: text('checkpoint').notNull(),
+  checkpoint: text('checkpoint').$type<GoalRunCheckpoint>().notNull(),
   round: integer('round').notNull(),
   max_rounds: integer('max_rounds').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<GoalRunStatus>().notNull(),
   request_id: text('request_id').notNull(),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
@@ -179,7 +180,7 @@ export const goals = taskSchema.table('goals', {
   parent_id: uuid('parent_id'),
   title: text('title').notNull(),
   description: text('description').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<GoalStatus>().notNull(),
   sort: integer('sort').notNull(),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
@@ -192,7 +193,7 @@ export const outputs = taskSchema.table('outputs', {
   task_id: uuid('task_id'),
   run_id: uuid('run_id'),
   name: text('name').notNull(),
-  kind: text('kind').notNull(),
+  kind: text('kind').$type<OutputKind>().notNull(),
   mime: text('mime').notNull(),
   size_bytes: bigint('size_bytes', { mode: 'number' }).notNull(),
   blob_hash: text('blob_hash').notNull(),
@@ -207,11 +208,11 @@ export const outputs = taskSchema.table('outputs', {
 /** task.plan_usage */
 export const planUsage = taskSchema.table('plan_usage', {
   space_id: uuid('space_id').notNull(),
-  tool: text('tool').notNull(),
-  period: text('period').notNull(),
+  tool: text('tool').$type<PlanUsageTool>().notNull(),
+  period: text('period').$type<PlanUsagePeriod>().notNull(),
   percent: integer('percent').notNull(),
   resets_at: timestamp('resets_at', { withTimezone: true }).notNull(),
-  status: text('status'),
+  status: text('status').$type<PlanUsageStatus>(),
   seen_at: timestamp('seen_at', { withTimezone: true }).notNull(),
 });
 
@@ -233,7 +234,7 @@ export const schedules = taskSchema.table('schedules', {
   space_id: uuid('space_id').notNull(),
   title: text('title').notNull(),
   agent_id: uuid('agent_id'),
-  mode: text('mode').notNull(),
+  mode: text('mode').$type<ScheduleMode>().notNull(),
   at_minute: integer('at_minute'),
   weekdays: integer('weekdays').array().notNull(),
   every_hours: integer('every_hours'),
@@ -249,10 +250,10 @@ export const schedules = taskSchema.table('schedules', {
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   page_id: uuid('page_id'),
-  destination: text('destination').notNull(),
-  deliver: text('deliver'),
+  destination: text('destination').$type<ScheduleDestination>().notNull(),
+  deliver: text('deliver').$type<ScheduleDeliver>(),
   rules: text('rules').notNull(),
-  trigger: text('trigger').notNull(),
+  trigger: text('trigger').$type<ScheduleTrigger>().notNull(),
   after_id: uuid('after_id'),
   chat_id: uuid('chat_id'),
 });
@@ -286,7 +287,7 @@ export const taskEvents = taskSchema.table('task_events', {
   id: bigint('id', { mode: 'number' }).notNull(),
   task_id: uuid('task_id').notNull(),
   at: timestamp('at', { withTimezone: true }).notNull(),
-  kind: text('kind').notNull(),
+  kind: text('kind').$type<TaskEventKind>().notNull(),
   body: text('body').notNull(),
   tokens: integer('tokens').notNull(),
 });
@@ -301,14 +302,14 @@ export const taskRuns = taskSchema.table('task_runs', {
   agent_id: uuid('agent_id'),
   agent_revision: integer('agent_revision'),
   skill: text('skill'),
-  skill_source: text('skill_source'),
+  skill_source: text('skill_source').$type<TaskRunSkillSource>(),
   skill_revision: integer('skill_revision'),
   skill_hash: text('skill_hash'),
   runner_build: text('runner_build'),
   cli_version: text('cli_version'),
   model: text('model'),
   started_at: timestamp('started_at', { withTimezone: true }).notNull(),
-  prompt_source: text('prompt_source'),
+  prompt_source: text('prompt_source').$type<TaskRunPromptSource>(),
   prompt_revision: integer('prompt_revision'),
   prompt_hash: text('prompt_hash'),
 });
@@ -326,7 +327,7 @@ export const tasks = taskSchema.table('tasks', {
   target_kind: text('target_kind'),
   target_id: uuid('target_id'),
   base_version: integer('base_version'),
-  status: text('status').notNull(),
+  status: text('status').$type<TaskStatus>().notNull(),
   priority: integer('priority').notNull(),
   lease_until: timestamp('lease_until', { withTimezone: true }),
   leased_by: uuid('leased_by'),
@@ -338,6 +339,6 @@ export const tasks = taskSchema.table('tasks', {
   goal_id: uuid('goal_id'),
   parent_id: uuid('parent_id'),
   depth: integer('depth').notNull(),
-  wait_reason: text('wait_reason'),
+  wait_reason: text('wait_reason').$type<TaskWaitReason>(),
   rounds: integer('rounds').notNull(),
 });

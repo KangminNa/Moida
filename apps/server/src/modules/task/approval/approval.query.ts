@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseQuery, NotFound, Rule } from '../../platform';
+import { type Actor, BaseQuery, NotFound, Rule, ValueList } from '../../platform';
 import { approvals } from '../task.schema';
+import { APPROVAL_STATUS } from '../task.tables';
 import type { ApprovalIdInput, ListApprovalsInput } from './approval.input';
 import { ApprovalPageView, ApprovalView } from './approval.view';
 
@@ -11,10 +12,14 @@ export class ApprovalQuery extends BaseQuery {
 
   async list(actor: Actor, req: ListApprovalsInput): Promise<ApprovalPageView> {
     actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    // 값 목록 밖의 상태에 맞는 결재는 없다 (CHECK)
+    if (req.status !== null && !ValueList.has(APPROVAL_STATUS, req.status))
+      return new ApprovalPageView([], null);
     const rows = await this.rows(
       approvals,
       {
-        space_id: actor.requireSpace(),
+        space_id: spaceId,
         // 대화의 일에서 올라온 결재는 결과 카드에서 정한다 (목록에는 카드가 보인다)
         chat_id: null,
         status: Rule.maybe(req.status),

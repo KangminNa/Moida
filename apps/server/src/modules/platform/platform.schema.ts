@@ -2,6 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { bigint, boolean, customType, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { NoticeSettingDigest, NotificationSeverity } from './platform.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const platformSchema = pgSchema('platform');
@@ -29,7 +30,7 @@ export const idempotency = platformSchema.table('idempotency', {
 /** platform.notice_settings */
 export const noticeSettings = platformSchema.table('notice_settings', {
   space_id: uuid('space_id').notNull(),
-  digest: text('digest').notNull(),
+  digest: text('digest').$type<NoticeSettingDigest>().notNull(),
   digest_minute: integer('digest_minute').notNull(),
   quiet_start: integer('quiet_start'),
   quiet_end: integer('quiet_end'),
@@ -44,7 +45,7 @@ export const notifications = platformSchema.table('notifications', {
   id: uuid('id').notNull(),
   space_id: uuid('space_id').notNull(),
   kind: text('kind').notNull(),
-  severity: text('severity').notNull(),
+  severity: text('severity').$type<NotificationSeverity>().notNull(),
   group_key: text('group_key'),
   title: text('title').notNull(),
   body: text('body'),

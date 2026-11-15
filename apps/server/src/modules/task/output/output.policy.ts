@@ -1,4 +1,5 @@
 import { FileSniff, RuleViolation } from '../../platform';
+import type { OutputKind } from '../task.tables';
 
 // 결과물의 규칙 한 곳: 이름, 종류 · 형식, 미리 보기를 열어도 되는 형식, 한도 (기획서 결정 2026-11-10).
 // 형식은 파일의 앞부분(FileSniff)을 먼저 믿고, 앞부분에 표시가 없는 글자 파일 · 문서는 이름으로 정한다.
@@ -9,7 +10,6 @@ export class OutputPolicy {
   static readonly RUN_FILES_MAX = 200;
   static readonly RUN_BYTES_MAX = 1024 * 1024 * 1024;
   static readonly NAME_MAX = 120;
-  static readonly KINDS = ['document', 'slides', 'sheet', 'image', 'video', 'other'] as const;
   static readonly OCTET = 'application/octet-stream';
   private static readonly GB = 1024 * 1024 * 1024;
   /** 디스크 200GB에서 OS · 이미지 · DB · 블로그 사진 몫을 남긴 값 */
@@ -27,7 +27,7 @@ export class OutputPolicy {
     FileSniff.WEBM,
   ]);
   /** 앞부분으로 알아본 형식의 종류 */
-  private static readonly SNIFFED_KIND: Readonly<Record<string, string>> = {
+  private static readonly SNIFFED_KIND: Readonly<Record<string, OutputKind>> = {
     [FileSniff.PNG]: 'image',
     [FileSniff.JPEG]: 'image',
     [FileSniff.GIF]: 'image',
@@ -37,7 +37,7 @@ export class OutputPolicy {
     [FileSniff.WEBM]: 'video',
   };
   /** 확장자 → [종류, 형식]. 앞부분에 표시가 없거나 zip인 것 (docx · pptx · xlsx는 zip이다) */
-  private static readonly BY_EXTENSION: Readonly<Record<string, readonly [string, string]>> = {
+  private static readonly BY_EXTENSION: Readonly<Record<string, readonly [OutputKind, string]>> = {
     html: ['document', 'text/html'],
     htm: ['document', 'text/html'],
     md: ['document', 'text/markdown'],
@@ -90,9 +90,9 @@ export class OutputPolicy {
   }
 
   /** 종류. 앞부분으로 알아본 형식이 먼저다 */
-  static kindOf(name: string, sniffed: string | null): string {
-    if (sniffed !== null && OutputPolicy.SNIFFED_KIND[sniffed])
-      return OutputPolicy.SNIFFED_KIND[sniffed] as string;
+  static kindOf(name: string, sniffed: string | null): OutputKind {
+    const known = sniffed === null ? undefined : OutputPolicy.SNIFFED_KIND[sniffed];
+    if (known) return known;
     return OutputPolicy.BY_EXTENSION[OutputPolicy.extension(name)]?.[0] ?? 'other';
   }
 

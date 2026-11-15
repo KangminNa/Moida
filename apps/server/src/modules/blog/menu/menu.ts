@@ -5,8 +5,9 @@ import {
   Forbidden,
   RuleViolation,
   TableEntity,
+  ValueList,
 } from '../../platform';
-import type { MenuNew, MenuRow } from '../blog.tables';
+import { MENU_KIND, type MenuNew, type MenuRow } from '../blog.tables';
 import { SlugPolicy } from '../post/slug.policy';
 import { MenuView } from './menu.view';
 
@@ -20,7 +21,6 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
   static readonly ISSUES = 'issues';
   static readonly PAGES = 'pages';
   static readonly PAGE = 'page';
-  static readonly KINDS: readonly string[] = [Menu.POSTS, Menu.ISSUES, Menu.PAGES, Menu.PAGE];
   static readonly NAME_MAX = 40;
   static readonly SLUG_MAX = 60;
   static readonly POLICY_MAX = 4000;
@@ -56,8 +56,8 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
 
   /** 새 메뉴. 주소를 정하지 않으면 이름에서 만든다 (겹치면 409, Service) */
   static open(spaceId: string, kind: string, fields: Partial<MenuRow>, now: Date): Menu {
-    if (!Menu.KINDS.includes(kind))
-      throw new RuleViolation(`메뉴 종류는 ${Menu.KINDS.join(' · ')} 중 하나예요`);
+    if (!ValueList.has(MENU_KIND, kind))
+      throw new RuleViolation(`메뉴 종류는 ${MENU_KIND.join(' · ')} 중 하나예요`);
     const name = fields.name ?? '';
     const slug = fields.slug ?? SlugPolicy.fromTitle(name).slice(0, Menu.SLUG_MAX);
     const menu = new Menu(

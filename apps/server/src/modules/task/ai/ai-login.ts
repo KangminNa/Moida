@@ -4,8 +4,9 @@ import {
   SealedSecret,
   type SecretBox,
   TableEntity,
+  ValueList,
 } from '../../platform';
-import type { AiLoginNew, AiLoginRow } from '../task.tables';
+import { AI_LOGIN_TOOL, type AiLoginNew, type AiLoginRow, type AiLoginTool } from '../task.tables';
 import { AiLoginVersionView, AiTokenView, AiToolView } from './ai-login.view';
 
 // AI 도구의 로그인 하나. 콘솔에서 넣거나 웹 로그인으로 받은 자격을 서버 키로 잠가 두었다가 러너에게 건넨다.
@@ -20,12 +21,11 @@ export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
    * 서버는 이 도구의 일을 한 번에 하나만 빌려 준다 (LeasePolicy)
    */
   static readonly ROTATING: readonly string[] = [AiLogin.CODEX];
-  /** 로그인을 받는 도구 (task.ai_logins의 CHECK와 같다) */
-  static readonly TOOLS: readonly string[] = [AiLogin.CLAUDE, AiLogin.CODEX];
   /** setup-token의 토큰은 1년 간다. CLI가 남은 기간을 알려 주지 않아 저장한 날부터 센다 */
   private static readonly TERM_YEARS = 1;
 
   static open(spaceId: string, tool: string, sealed: SealedSecret, now: Date): AiLogin {
+    AiLogin.assertTool(tool);
     return new AiLogin(
       {
         id: BaseEntity.newId(),
@@ -50,10 +50,10 @@ export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
       throw new RuleViolation(`${tool}의 자격은 실행해도 바뀌지 않아요`);
   }
 
-  /** 도구가 로그인을 받는가. 아니면 RuleViolation */
-  static assertTool(tool: string): void {
-    if (!AiLogin.TOOLS.includes(tool))
-      throw new RuleViolation(`로그인할 수 있는 도구는 ${AiLogin.TOOLS.join(' · ')}예요`);
+  /** 도구가 로그인을 받는가 (task.ai_logins의 값 목록). 아니면 RuleViolation */
+  static assertTool(tool: string): asserts tool is AiLoginTool {
+    if (!ValueList.has(AI_LOGIN_TOOL, tool))
+      throw new RuleViolation(`로그인할 수 있는 도구는 ${AI_LOGIN_TOOL.join(' · ')}예요`);
   }
 
   /** Claude는 저장한 날부터 1년. Codex는 CLI가 스스로 갱신해 만료를 알 수 없다 */

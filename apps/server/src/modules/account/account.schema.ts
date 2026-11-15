@@ -2,6 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { inet, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { DeviceScope, OauthTokenKind, SpaceMemberRole } from './account.tables';
 
 const accountSchema = pgSchema('account');
 
@@ -22,7 +23,7 @@ export const devices = accountSchema.table('devices', {
   space_id: uuid('space_id').notNull(),
   user_id: uuid('user_id'),
   name: text('name').notNull(),
-  scopes: text('scopes').array().notNull(),
+  scopes: text('scopes').array().$type<DeviceScope[]>().notNull(),
   meta: jsonb('meta').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
@@ -65,7 +66,7 @@ export const oauthTokens = accountSchema.table('oauth_tokens', {
   id: uuid('id').notNull(),
   device_id: uuid('device_id').notNull(),
   client_id: text('client_id'),
-  kind: text('kind').notNull(),
+  kind: text('kind').$type<OauthTokenKind>().notNull(),
   token_hash: text('token_hash').notNull(),
   scopes: text('scopes').array().notNull(),
   expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -85,7 +86,7 @@ export const settings = accountSchema.table('settings', {
 export const spaceMembers = accountSchema.table('space_members', {
   space_id: uuid('space_id').notNull(),
   user_id: uuid('user_id').notNull(),
-  role: text('role').notNull(),
+  role: text('role').$type<SpaceMemberRole>().notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 

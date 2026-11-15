@@ -1,4 +1,5 @@
 import { InvalidRequest } from './errors';
+import type { Unchecked } from './table-entity';
 
 // 유스케이스 입력의 기반. `static from(raw)`에서 모양(필드 유무, 자료형, 길이)만 검사한다.
 // 의미 검사(예: 도구 이름 규칙)는 도메인이 한다.
@@ -38,7 +39,7 @@ export class VersionInput extends BaseRequest {
  * name은 칸 이름의 camelCase(API의 이름)다. undefined를 돌려주면 그 칸은 그대로 둔다.
  */
 export type ColumnReaders<R> = {
-  readonly [K in keyof R]?: (fields: RequestFields, name: string) => R[K] | undefined;
+  readonly [K in keyof R]?: (fields: RequestFields, name: string) => Unchecked<R>[K] | undefined;
 };
 
 /** raw(JSON)에서 필드를 꺼낸다. 틀린 필드는 모아 두었다가 한 번에 InvalidRequest로 알린다 */
@@ -106,8 +107,11 @@ export class RequestFields {
    * 표의 칸들을 읽는다. 보낸 칸만 담아 돌려주므로 받은 쪽은 칼럼을 몰라도 된다.
    * required에 적은 칸은 없으면 틀린 필드가 된다.
    */
-  columns<R>(readers: ColumnReaders<R>, required: readonly (keyof R)[] = []): Partial<R> {
-    const found: Partial<R> = {};
+  columns<R>(
+    readers: ColumnReaders<R>,
+    required: readonly (keyof R)[] = [],
+  ): Partial<Unchecked<R>> {
+    const found: Partial<Unchecked<R>> = {};
     for (const column of Object.keys(readers) as (keyof R & string)[]) {
       const name = column.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
       const value = name in this.source ? readers[column]?.(this, name) : undefined;

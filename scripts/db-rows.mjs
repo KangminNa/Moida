@@ -1,6 +1,8 @@
 // 표마다 인터페이스 하나와 Drizzle 표 하나를 만든다. 칼럼의 원본은 마이그레이션이고, 코드는 이 파일들로 표를 안다.
 // 모듈마다 modules/<모듈>/<모듈>.tables.ts(행 타입, 웹도 가져옴)와 <모듈>.schema.ts(조건 규칙이 쓰는 Drizzle 표).
 // 기능 패키지(plugins/<이름>/, 목록 파일에 schema가 있는 것)는 plugins/<이름>/server/tables.ts · schema.ts.
+// 값 목록 CHECK(`col = ANY (ARRAY['a', …])`, 배열 칸은 `col <@ ARRAY[…]`)가 걸린 text 칸은 그 값들의 유니온 타입이다
+// (리팩토링 R2): `TASK_STATUS = ['queued', …] as const`와 `TaskStatus`를 표 인터페이스 앞에 만든다. 오타가 컴파일 오류가 된다.
 // 마이그레이션 뒤 다시 만든다. Docker의 db가 떠 있어야 함.
 //
 //   node scripts/db-rows.mjs           파일을 다시 쓴다
@@ -56,12 +58,19 @@ const schemas = [
   ...packages.map(([, schema]) => schema),
 ];
 const columns = readColumns(schemas);
+const checks = readChecks(schemas);
 const stale = [];
 
 const targets = [
   ...Object.entries(map.modules).map(([module, { schemas: owned }]) => {
     const dir = join(root, 'apps/server/src/modules', module);
-    return [owned, join(dir, `${module}.tables.ts`), join(dir, `${module}.schema.ts`)];
+    return [
+      owned,
+      join(dir, `${module}.tables.ts`),
+      join(dir, `${module}.schema.ts`),
+      undefined,
+      `./${module}.tables`,
+    ];
   }),
   ...packages.map(([name, schema]) => {
     const dir = join(pluginsDir, name, 'server');
@@ -70,14 +79,15 @@ const targets = [
       join(dir, 'tables.ts'),
       join(dir, 'schema.ts'),
       '../../../apps/server/src/plugin-api',
+      './tables',
     ];
   }),
 ];
-for (const [owned, tablesFile, schemaFile, pluginApi] of targets) {
+for (const [owned, tablesFile, schemaFile, pluginApi, tablesImport] of targets) {
   const mine = columns.filter((c) => owned.includes(c.schema));
   for (const [file, text] of [
     [tablesFile, render(mine)],
-    [schemaFile, renderSchema(mine, pluginApi)],
+    [schemaFile, renderSchema(mine, pluginApi, tablesImport)],
   ]) {
     if (process.argv.includes('--check')) {
       if (!existsSync(file) || readFileSync(file, 'utf8') !== text) stale.push(file);
@@ -104,12 +114,62 @@ function readColumns(names) {
         ON t.table_schema = col.table_schema AND t.table_name = col.table_name
       WHERE col.table_schema IN (${list}) AND t.table_type = 'BASE TABLE'
     ) c`;
+  return psql(sql);
+}
+
+/** Docker의 db에 쿼리 하나 (JSON 한 칸을 돌려주는 쿼리) */
+function psql(sql) {
   const out = execFileSync(
     'docker',
     ['compose', 'exec', '-T', 'db', 'psql', '-U', 'cairn', '-d', 'cairn', '-tA', '-c', sql],
     { cwd: root, encoding: 'utf8' },
   );
   return JSON.parse(out);
+}
+
+/** 칸 하나에만 걸린 값 목록 CHECK. 열쇠는 `스키마.표.칸`, 값은 { values, array } (두 모양 말고는 읽지 않는다) */
+function readChecks(names) {
+  const list = names.map((s) => `'${s}'`).join(',');
+  const sql = `
+    SELECT coalesce(json_agg(x ORDER BY x.schema, x.name, x.column), '[]')
+    FROM (
+      SELECT n.nspname AS schema, t.relname AS name, a.attname AS column, pg_get_constraintdef(c.oid) AS def
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+      WHERE c.contype = 'c' AND array_length(c.conkey, 1) = 1 AND n.nspname IN (${list})
+    ) x`;
+  const found = new Map();
+  for (const { schema, name, column, def } of psql(sql)) {
+    const scalar = /^CHECK \(\((\w+) = ANY \(ARRAY\[(.+)\]\)\)\)$/.exec(def);
+    const array = /^CHECK \(\((\w+) <@ ARRAY\[(.+)\]\)\)$/.exec(def);
+    const match = scalar ?? array;
+    if (!match || match[1] !== column) continue;
+    const values = [...match[2].matchAll(/'((?:[^']|'')*)'::text/g)].map((m) =>
+      m[1].replaceAll("''", "'"),
+    );
+    if (values.length === 0) continue;
+    const key = `${schema}.${name}.${column}`;
+    if (found.has(key)) throw new Error(`값 목록 CHECK가 둘인 칸이에요: ${key}`);
+    found.set(key, { values, array: array !== null });
+  }
+  return found;
+}
+
+/** 값 목록 CHECK가 걸린 칸의 타입 이름: 행 이름 + 칸 이름 (tasks.status → TaskStatus). 배열 칸은 원소라 단수 (agents.scopes → AgentScope) */
+function checkTypeOf(table, column, array) {
+  return rowTypeOf(table) + (array ? rowTypeOf(column) : pascal(column));
+}
+
+/** wait_reason → WaitReason */
+function pascal(name) {
+  return name.replace(/(^|_)([a-z0-9])/g, (_, __, c) => c.toUpperCase());
+}
+
+/** TaskStatus → TASK_STATUS */
+function constOf(type) {
+  return type.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
 }
 
 function render(found) {
@@ -126,10 +186,21 @@ function render(found) {
 
 function renderTable(name, cols) {
   const base = rowTypeOf(name.split('.')[1]);
+  const lists = cols.flatMap((c) => {
+    const check = checkOf(c);
+    if (!check) return [];
+    const values = check.values.map((v) => `'${v.replaceAll("'", "\\'")}'`).join(', ');
+    return [
+      `/** ${name}.${c.column} (값 목록 CHECK) */`,
+      `export const ${constOf(check.type)} = [${values}] as const;`,
+      `export type ${check.type} = (typeof ${constOf(check.type)})[number];`,
+    ];
+  });
   const fields = cols.map((c) => `  ${c.column}: ${tsType(c)};`);
   const required = cols.filter((c) => c.column === 'id' || (!c.nullable && !c.filled));
   const keys = required.map((c) => `'${c.column}'`).join(' | ') || 'never';
   return [
+    ...lists,
     `/** ${name} */`,
     `export interface ${base}Row {`,
     ...fields,
@@ -139,19 +210,30 @@ function renderTable(name, cols) {
   ].join('\n');
 }
 
-function tsType({ type, nullable }) {
+function tsType(c) {
+  const { type, nullable } = c;
+  const named = checkOf(c)?.type;
   const value = type.startsWith('_')
-    ? `readonly ${TS_TYPES[type.slice(1)] ?? 'string'}[]`
-    : (TS_TYPES[type] ?? 'string');
+    ? `readonly ${named ?? TS_TYPES[type.slice(1)] ?? 'string'}[]`
+    : (named ?? TS_TYPES[type] ?? 'string');
   return nullable ? `${value} | null` : value;
 }
 
+/** 이 칸의 값 목록 CHECK와 타입 이름 (text 칸만, 없으면 null) */
+function checkOf(c) {
+  const check = checks.get(`${c.schema}.${c.name}.${c.column}`);
+  if (!check || (c.type !== 'text' && c.type !== '_text')) return null;
+  return { ...check, type: checkTypeOf(c.name, c.column, check.array) };
+}
+
 /** 쿼리 템플릿이 쓰는 Drizzle 표. 칸 이름(객체의 열쇠)은 DB 그대로라 고른 행이 <모듈>.tables.ts의 행과 같다 */
-/** pluginApi: 기능 패키지면 plugin-api 경로 (drizzle-orm 대신 TableColumns로 가져온다) */
-function renderSchema(found, pluginApi) {
+/** pluginApi: 기능 패키지면 plugin-api 경로 (drizzle-orm 대신 TableColumns로 가져온다). tablesImport: 값 목록 타입을 가져올 표 인터페이스 파일 */
+function renderSchema(found, pluginApi, tablesImport) {
   const tables = Map.groupBy(found, (c) => `${c.schema}.${c.name}`);
   const builders = new Set(['pgSchema']);
   const custom = new Map();
+  /** 값 목록 타입: 표 인터페이스 파일에서 가져온다 */
+  const named = new Set();
   const columnOf = (c) => {
     const base = c.type.startsWith('_') ? c.type.slice(1) : c.type;
     let made;
@@ -164,6 +246,11 @@ function renderSchema(found, pluginApi) {
       made = `${base}Column('${c.column}')`;
     }
     if (c.type.startsWith('_')) made += '.array()';
+    const check = checkOf(c);
+    if (check) {
+      named.add(check.type);
+      made += `.$type<${check.type}${check.array ? '[]' : ''}>()`;
+    }
     if (!c.nullable) made += '.notNull()';
     return `  ${c.column}: ${made},`;
   };
@@ -185,6 +272,9 @@ function renderSchema(found, pluginApi) {
     pluginApi
       ? `import { TableColumns } from '${pluginApi}';\n\nconst { ${[...builders].sort().join(', ')} } = TableColumns;`
       : `import { ${[...builders].sort().join(', ')} } from 'drizzle-orm/pg-core';`,
+    ...(named.size > 0
+      ? [`import type { ${[...named].sort().join(', ')} } from '${tablesImport}';`]
+      : []),
     '',
     ...[...custom].map(
       ([type, ts]) =>

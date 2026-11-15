@@ -21,7 +21,7 @@ import {
 import { clickDone, pageUrlOf, siteOfJob } from './job';
 import { clicks, shots, sites } from './schema';
 import { addShot, decodeImage, imageOf, shotsOf } from './shots';
-import type { ClickRow } from './tables';
+import { CLICK_STATUS, type ClickRow, type ClickStatus } from './tables';
 
 // 결재된 클릭 (2차 3단계, 2026-11-14). AI는 마지막 버튼(제출 · 결제 · 게시) 앞에서 멈추고, 러너(AI 없음)가
 // 그 버튼을 역할 + 이름으로 다시 찾아 지문 · 화면과 함께 붙잡는다(browser_click_hold) → 러너가 결재를 올린다.
@@ -133,7 +133,7 @@ export class HoldClick extends Command<HoldInput> {
 async function close(
   work: Work,
   row: ClickRow,
-  status: string,
+  status: ClickStatus,
   reason: string | null,
   extra: { after_url?: string | null } = {},
 ): Promise<number> {
@@ -190,7 +190,7 @@ export class NextClick extends Command<null> {
 type SaveInput = {
   id: string;
   version: number;
-  outcome: string;
+  outcome: ClickStatus;
   reason: string | null;
   afterUrl: string | null;
   image: string | null;
@@ -210,7 +210,8 @@ export class SaveClick extends Command<SaveInput> {
       return {
         id: f.uuid('id'),
         version: versionOf(f),
-        outcome,
+        // 거절하지 않은 값은 clicked · changed 둘뿐이다 (틀리면 이 입력은 쓰이지 않는다)
+        outcome: outcome === 'clicked' ? 'clicked' : 'changed',
         reason: f.optionalText('reason', 500),
         afterUrl: after && /^https?:\/\//i.test(after) ? after : null,
         image: imageOf(f, 'image', false),
@@ -305,9 +306,12 @@ export class ListClicks extends Read<{ status: string | null }> {
 
   async run(work: Work, actor: Actor, input: { status: string | null }): Promise<ClickListView> {
     const space = actor.requireSpace();
+    // 값 목록 밖의 상태에 맞는 클릭은 없다 (CHECK)
+    const status = CLICK_STATUS.find((s) => s === input.status);
+    if (input.status !== null && !status) return new ClickListView([]);
     const rows = await work.rows(
       clicks,
-      { space_id: space, status: Rule.maybe(input.status) },
+      { space_id: space, status: Rule.maybe(status) },
       { order: ['id desc'], limit: ListClicks.LIMIT },
     );
     const names = new Map(

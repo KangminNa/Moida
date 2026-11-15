@@ -1,5 +1,10 @@
-import { BaseRequest, type ColumnReaders, type RequestFields } from '../../platform';
-import type { PostRow } from '../blog.tables';
+import {
+  BaseRequest,
+  type ColumnReaders,
+  type RequestFields,
+  type Unchecked,
+} from '../../platform';
+import { POST_STATUS, type PostRow } from '../blog.tables';
 import { Post } from './post';
 import { PostContent } from './post-content';
 import { SlugPolicy } from './slug.policy';
@@ -22,7 +27,7 @@ const COLUMNS: ColumnReaders<PostRow> = {
 };
 
 /** 편집기는 태그와 정렬을 늘 함께 저장한다: 보내지 않으면 태그는 비고 정렬은 left다 */
-function editorColumns(f: RequestFields): Partial<PostRow> {
+function editorColumns(f: RequestFields): Partial<Unchecked<PostRow>> {
   return { tags: [], align: 'left', ...f.columns(COLUMNS) };
 }
 
@@ -60,7 +65,7 @@ export class CreatePostInput extends BaseRequest {
     readonly requestId: string,
     readonly title: string,
     readonly body: string,
-    readonly fields: Partial<PostRow>,
+    readonly fields: Partial<Unchecked<PostRow>>,
     readonly mainWikiId: string | null | undefined,
     readonly refWikiIds: readonly string[] | undefined,
   ) {
@@ -95,7 +100,7 @@ export class SavePostInput extends BaseRequest {
     readonly version: number,
     readonly title: string,
     readonly body: string,
-    readonly changes: Partial<PostRow>,
+    readonly changes: Partial<Unchecked<PostRow>>,
     /** 보내지 않으면 지금 연결 그대로. 대표 null·참고 []는 비우기 */
     readonly mainWikiId: string | null | undefined,
     readonly refWikiIds: readonly string[] | undefined,
@@ -165,7 +170,7 @@ export class PostVersionInput extends BaseRequest {
 /** 글 목록 (GET /api/posts?status=&cursor=). status: draft · published · unlisted · trash, 없으면 휴지통 말고 전부 */
 export class ListPostsInput extends BaseRequest {
   static readonly TRASH = 'trash';
-  private static readonly FILTERS = [...Post.STATUSES, ListPostsInput.TRASH];
+  private static readonly FILTERS: readonly string[] = [...POST_STATUS, ListPostsInput.TRASH];
   private static readonly CURSOR = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\|([0-9a-f-]{36})$/;
 
   private constructor(
@@ -230,7 +235,7 @@ export class SaveDraftInput extends BaseRequest {
     readonly baseVersion: number | null,
     readonly title: string,
     readonly body: string,
-    readonly changes: Partial<PostRow>,
+    readonly changes: Partial<Unchecked<PostRow>>,
     /** 보내지 않으면 지금 연결 그대로. 대표 null·참고 []는 비우기 */
     readonly mainWikiId: string | null | undefined,
     readonly refWikiIds: readonly string[] | undefined,

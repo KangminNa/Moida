@@ -1,5 +1,12 @@
-import { BaseEntity, DomainEvent, NotFound, RuleViolation, TableEntity } from '../../platform';
-import type { PageNew, PageRevisionNew, PageRow } from '../blog.tables';
+import {
+  BaseEntity,
+  DomainEvent,
+  NotFound,
+  RuleViolation,
+  TableEntity,
+  ValueList,
+} from '../../platform';
+import { PAGE_VISIBILITY, type PageNew, type PageRevisionNew, type PageRow } from '../blog.tables';
 import { Menu } from '../menu/menu';
 import { SlugPolicy } from '../post/slug.policy';
 import { PageView } from './page.view';
@@ -13,7 +20,6 @@ import type { PageFiles } from './page-files';
 export class Page extends TableEntity<PageRow, PageNew> {
   static readonly PRIVATE = 'private';
   static readonly PUBLIC = 'public';
-  static readonly VISIBILITIES: readonly string[] = [Page.PRIVATE, Page.PUBLIC];
   static readonly TITLE_MAX = 120;
   static readonly NOTE_MAX = 4000;
   static readonly CHANGED = 'blog.page.changed';
@@ -97,8 +103,8 @@ export class Page extends TableEntity<PageRow, PageNew> {
     if (title !== null) this.put('title', Page.titleOf(title));
     if (direction !== null) this.put('direction', direction.trim().slice(0, Page.DIRECTION_MAX));
     if (visibility !== null) {
-      if (!Page.VISIBILITIES.includes(visibility))
-        throw new RuleViolation(`공개 범위는 ${Page.VISIBILITIES.join(' · ')} 중 하나예요`);
+      if (!ValueList.has(PAGE_VISIBILITY, visibility))
+        throw new RuleViolation(`공개 범위는 ${PAGE_VISIBILITY.join(' · ')} 중 하나예요`);
       this.put('visibility', visibility);
     }
     this.put('updated_at', now);

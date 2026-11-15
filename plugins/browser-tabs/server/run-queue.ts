@@ -1,10 +1,17 @@
-import { Actor, Command, NotFound, Rule, type Work } from '../../../apps/server/src/plugin-api';
+import {
+  Actor,
+  Command,
+  NotFound,
+  Rule,
+  ValueList,
+  type Work,
+} from '../../../apps/server/src/plugin-api';
 import { NextRunView, RunSavedView } from './integration-views';
 import { requestBuild } from './integrations';
 import { integrationRevisions, integrations, runs, sites } from './schema';
 import { Shape } from './shape';
 import { liveOf } from './site-runs';
-import type { IntegrationRow, RunRow } from './tables';
+import { type IntegrationRow, RUN_ERROR_KIND, type RunErrorKind, type RunRow } from './tables';
 import { runDone } from './write-runs';
 
 // 사이트 도구 실행의 러너 쪽 (2026-11-16 MCP 2 · 3단계): 서버 브라우저가 있는 러너가 site_run_next로 하나 꺼내 AI 없이 돌리고
@@ -18,7 +25,6 @@ const LEASE_MS = 90_000;
 const TRIES_MAX = 2;
 const BROKEN_AFTER = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const KINDS = ['login', 'timeout', 'shape', 'code', 'lost', 'off'];
 /** 도구 탓이 아닌 실패: 연속 실패에 넣지 않는다 (로그인이 풀림 · 러너가 멈춤 · 도구를 끔) */
 const NOT_THE_TOOL = ['login', 'lost', 'off'];
 const UNKNOWN =
@@ -119,7 +125,7 @@ type SaveInput = {
   status: string;
   output: Readonly<Record<string, unknown>>;
   error: string | null;
-  errorKind: string | null;
+  errorKind: RunErrorKind | null;
   ms: number | null;
 };
 
@@ -141,14 +147,15 @@ export class SaveRun extends Command<SaveInput> {
       const status = f.text('status', 10);
       if (status !== 'done' && status !== 'failed') f.reject('status', 'done · failed 중 하나예요');
       const kind = f.optionalText('error_kind', 20);
-      if (kind !== null && !KINDS.includes(kind))
-        f.reject('error_kind', `${KINDS.join(' · ')} 중 하나예요`);
+      if (kind !== null && !ValueList.has(RUN_ERROR_KIND, kind))
+        f.reject('error_kind', `${RUN_ERROR_KIND.join(' · ')} 중 하나예요`);
       return {
         runId: f.uuid('run_id'),
         status,
         output: f.optionalRecord('output'),
         error: f.optionalText('error', 500),
-        errorKind: kind,
+        // 틀린 값은 위에서 거절한다
+        errorKind: ValueList.has(RUN_ERROR_KIND, kind) ? kind : null,
         ms: f.optionalInteger('ms', 0, 600_000),
       };
     });
@@ -238,6 +245,6 @@ async function repair(work: Work, row: Readonly<IntegrationRow>): Promise<void> 
   );
   if (changed === 0) return;
   const day = new Date().toISOString().slice(0, 10);
-  const next = { ...row, status: 'building', version: row.version + 1 };
+  const next: Readonly<IntegrationRow> = { ...row, status: 'building', version: row.version + 1 };
   requestBuild(work, row.space_id, next, `repair:${row.id}:${day}`, row.agent_id);
 }

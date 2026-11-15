@@ -6,13 +6,18 @@ import {
   Read,
   Rule,
   RuleViolation,
+  ValueList,
   type Work,
 } from '../../../apps/server/src/plugin-api';
 import { requestBuild } from './integrations';
 import { ENABLE_ACTION, INTEGRATION_TARGET } from './job';
 import { ReviewMaterialView, ReviewSavedView } from './review-views';
 import { integrationReviews, integrationRevisions, integrations, sites } from './schema';
-import type { IntegrationRow } from './tables';
+import {
+  INTEGRATION_REVIEW_VERDICT,
+  type IntegrationReviewVerdict,
+  type IntegrationRow,
+} from './tables';
 
 // 쓰기 사이트 도구의 검토자 짝 (2026-11-16 MCP 3단계, docs/MCP.md 7장). 쓰기 굳히기가 시험(마른 실행)을 통과하면 켜기 결재
 // 대신 검토 일을 그 도구의 검토자(굳힌 에이전트와 다른 에이전트)에게 맡긴다. 검토자는 site_review_get으로 읽고
@@ -78,7 +83,7 @@ export class ReviewMaterial extends Read<{ id: string }> {
   }
 }
 
-type ReviewInput = { id: string; seq: number; verdict: string; notes: string };
+type ReviewInput = { id: string; seq: number; verdict: IntegrationReviewVerdict; notes: string };
 
 /**
  * MCP site_review { integration_id, seq, verdict: pass · fix, notes }: 판정을 남긴다 (그 도구의 검토자만, 버전마다 한 번).
@@ -91,11 +96,13 @@ export class SaveReview extends Command<ReviewInput> {
   input(raw: unknown): ReviewInput {
     return this.fields(raw, (f) => {
       const verdict = f.text('verdict', 10);
-      if (verdict !== 'pass' && verdict !== 'fix') f.reject('verdict', 'pass · fix 중 하나예요');
+      const known = ValueList.has(INTEGRATION_REVIEW_VERDICT, verdict);
+      if (!known) f.reject('verdict', 'pass · fix 중 하나예요');
       return {
         id: f.uuid('integration_id'),
         seq: f.integer('seq', 1, 100_000),
-        verdict,
+        // 틀리면 위에서 거절해 이 입력은 쓰이지 않는다 (RequestFields가 틀린 칸에 기본값을 주는 것과 같다)
+        verdict: known ? verdict : 'fix',
         notes: f.optionalText('notes', NOTES_MAX) ?? '',
       };
     });
@@ -155,7 +162,7 @@ export class SaveReview extends Command<ReviewInput> {
       { status: 'building', hint, version, updated_at: Rule.now },
       { id: row.id, version: row.version },
     );
-    const next = { ...row, status: 'building', hint, version };
+    const next: Readonly<IntegrationRow> = { ...row, status: 'building', hint, version };
     requestBuild(work, row.space_id, next, `review-fix:${row.id}:${input.seq}`, row.agent_id);
     return new ReviewSavedView('fix', null);
   }

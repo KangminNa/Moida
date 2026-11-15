@@ -4,13 +4,20 @@ import {
   DomainEvent,
   RuleViolation,
   TableEntity,
+  type Unchecked,
+  ValueList,
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { Approval } from '../approval/approval';
 import type { Goal } from '../goal/goal';
 import type { PromptTemplates } from '../skill/prompt-templates';
 import { Task } from '../task/task';
-import type { GoalRunNew, GoalRunRow } from '../task.tables';
+import {
+  GOAL_RUN_CHECKPOINT,
+  type GoalRunNew,
+  type GoalRunRow,
+  type GoalRunStatus,
+} from '../task.tables';
 import type { GoalRound } from './goal-round';
 import { GoalRunView } from './goal-run.view';
 
@@ -31,11 +38,6 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
   static readonly EVERY = 'every';
   static readonly MILESTONE = 'milestone';
   static readonly FINAL = 'final';
-  static readonly CHECKPOINTS: readonly string[] = [
-    GoalRun.EVERY,
-    GoalRun.MILESTONE,
-    GoalRun.FINAL,
-  ];
   static readonly TITLE_MAX = 120;
   static readonly INSTRUCTION_MAX = 4000;
   static readonly CRITERIA_MAX = 20;
@@ -68,8 +70,8 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
       return items;
     },
     checkpoint: (value) => {
-      if (!GoalRun.CHECKPOINTS.includes(value))
-        throw new RuleViolation(`승인 시점은 ${GoalRun.CHECKPOINTS.join(' · ')} 중 하나예요`);
+      if (!ValueList.has(GOAL_RUN_CHECKPOINT, value))
+        throw new RuleViolation(`승인 시점은 ${GOAL_RUN_CHECKPOINT.join(' · ')} 중 하나예요`);
       return value;
     },
     max_rounds: (value) => {
@@ -85,7 +87,7 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
     requestId: string,
     goal: Goal,
     lead: Agent,
-    fields: Partial<GoalRunRow>,
+    fields: Partial<Unchecked<GoalRunRow>>,
     now: Date,
   ): GoalRun {
     goal.assertActive();
@@ -250,7 +252,7 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
     return new GoalRunView(this.row);
   }
 
-  private finish(status: string, now: Date): void {
+  private finish(status: GoalRunStatus, now: Date): void {
     this.put('status', status);
     this.put('finished_at', now);
     this.changed();

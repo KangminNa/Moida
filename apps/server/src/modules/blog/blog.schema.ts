@@ -2,6 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { BasketItemActorType, BasketItemKind, IssueStatus, MenuKind, PageVisibility, PostAlign, PostRevisionActorType, PostStatus } from './blog.tables';
 
 const blogSchema = pgSchema('blog');
 const workSchema = pgSchema('work');
@@ -23,7 +24,7 @@ export const issues = blogSchema.table('issues', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   menu_id: uuid('menu_id').notNull(),
   number: integer('number').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<IssueStatus>().notNull(),
   published_at: timestamp('published_at', { withTimezone: true }),
   version: integer('version').notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
@@ -37,7 +38,7 @@ export const menus = blogSchema.table('menus', {
   slug: text('slug').notNull(),
   sort: integer('sort').notNull(),
   version: integer('version').notNull(),
-  kind: text('kind').notNull(),
+  kind: text('kind').$type<MenuKind>().notNull(),
   policy: text('policy').notNull(),
   agent_id: uuid('agent_id'),
   rss: boolean('rss').notNull(),
@@ -63,7 +64,7 @@ export const pages = blogSchema.table('pages', {
   space_id: uuid('space_id').notNull(),
   name: text('name').notNull(),
   title: text('title').notNull(),
-  visibility: text('visibility').notNull(),
+  visibility: text('visibility').$type<PageVisibility>().notNull(),
   current_seq: integer('current_seq').notNull(),
   revisions: integer('revisions').notNull(),
   version: integer('version').notNull(),
@@ -82,7 +83,7 @@ export const postRevisions = blogSchema.table('post_revisions', {
   body_md: text('body_md').notNull(),
   base_revision_id: uuid('base_revision_id'),
   request_id: text('request_id'),
-  actor_type: text('actor_type').notNull(),
+  actor_type: text('actor_type').$type<PostRevisionActorType>().notNull(),
   actor_id: uuid('actor_id'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   title: text('title').notNull(),
@@ -100,7 +101,7 @@ export const posts = blogSchema.table('posts', {
   id: uuid('id').notNull(),
   space_id: uuid('space_id').notNull(),
   slug: text('slug').notNull(),
-  status: text('status').notNull(),
+  status: text('status').$type<PostStatus>().notNull(),
   title: text('title'),
   excerpt: text('excerpt'),
   head_text: text('head_text'),
@@ -111,7 +112,7 @@ export const posts = blogSchema.table('posts', {
   issue_order: integer('issue_order'),
   tags: text('tags').array().notNull(),
   cover_blob_hash: text('cover_blob_hash'),
-  align: text('align').notNull(),
+  align: text('align').$type<PostAlign>().notNull(),
   published_at: timestamp('published_at', { withTimezone: true }),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
   deleted_at: timestamp('deleted_at', { withTimezone: true }),
@@ -124,14 +125,14 @@ export const posts = blogSchema.table('posts', {
 export const basketItems = workSchema.table('basket_items', {
   id: uuid('id').notNull(),
   basket_id: uuid('basket_id').notNull(),
-  kind: text('kind').notNull(),
+  kind: text('kind').$type<BasketItemKind>().notNull(),
   ref_id: uuid('ref_id'),
   blob_hash: text('blob_hash'),
   url: text('url'),
   title: text('title'),
   note: text('note'),
   sort: integer('sort').notNull(),
-  actor_type: text('actor_type').notNull(),
+  actor_type: text('actor_type').$type<BasketItemActorType>().notNull(),
   actor_id: uuid('actor_id'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });

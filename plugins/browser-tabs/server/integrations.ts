@@ -237,7 +237,12 @@ export class RebuildIntegration extends Command<RebuildInput> {
       { id: row.id, version: input.version },
     );
     if (changed === 0) throw new Conflict('다른 곳에서 먼저 고쳤어요. 새로 불러와 주세요');
-    const next = { ...row, status: 'building', hint, version: row.version + 1 };
+    const next: Readonly<IntegrationRow> = {
+      ...row,
+      status: 'building',
+      hint,
+      version: row.version + 1,
+    };
     return requestBuild(work, actor.requireSpace(), next, input.requestId, input.agentId);
   }
 }

@@ -4,16 +4,6 @@ import type { PostRow } from '../blog.tables';
 // 표의 칸 중 무엇을 내보내는지는 여기 한 곳에만 적는다.
 // 보는 사람마다 View가 다르다: 비공개를 볼 수 없는 요청자(방문자)용은 Public…, 주인용은 이름 그대로. Query가 고른다.
 
-/** 공개 범위. DB의 CHECK가 Post.STATUSES만 받으니 그대로 좁힌다 */
-function statusOf(r: Readonly<PostRow>) {
-  return r.status as 'draft' | 'published' | 'unlisted';
-}
-
-/** 정렬. DB의 CHECK가 Post.ALIGNS만 받으니 그대로 좁힌다 */
-function alignOf(r: Readonly<PostRow>) {
-  return r.align as 'left' | 'center';
-}
-
 /** 누구에게나 보이는 칸 */
 function publicColumns(r: Readonly<PostRow>) {
   return {
@@ -29,7 +19,7 @@ function publicColumns(r: Readonly<PostRow>) {
 function ownerColumns(r: Readonly<PostRow>, revisionCount: number) {
   return {
     id: r.id,
-    status: statusOf(r),
+    status: r.status,
     revisionCount,
     updatedAt: r.updated_at.toISOString(),
     deletedAt: r.deleted_at?.toISOString() ?? null,
@@ -45,7 +35,7 @@ function pageColumns(r: Readonly<PostRow>, body: string) {
   return {
     ...publicColumns(r),
     body,
-    align: alignOf(r),
+    align: r.align,
     listed: r.status === 'published',
   };
 }
@@ -61,8 +51,8 @@ function savedColumns(r: Readonly<PostRow>, body: string, revisionCount: number,
     body,
     excerpt: r.excerpt ?? '',
     tags: [...r.tags],
-    align: alignOf(r),
-    status: statusOf(r),
+    align: r.align,
+    status: r.status,
     version: r.version,
     revisionCount,
     revised,

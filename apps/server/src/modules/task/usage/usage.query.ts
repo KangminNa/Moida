@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { type Actor, BaseQuery } from '../../platform';
-import { Agent } from '../agent/agent';
 import { AgentRepository } from '../agent/agent.repository';
+import { AGENT_TOOL } from '../task.tables';
 import { PlanUsage } from './plan-usage';
 import { PlanUsageRepository } from './plan-usage.repository';
 import { PlanWindowView, UsageView } from './usage.view';
@@ -18,7 +18,7 @@ export class UsageQuery extends BaseQuery {
     const agents = usage.map((u) => u.view());
     // 값이 없는 창도 보낸다: 화면이 확인 전으로 보여 준다
     const tools = new Set([...usage.map((u) => u.agent.tool), ...seen.map((p) => p.tool)]);
-    const plan = Agent.TOOLS.filter((tool) => tools.has(tool)).flatMap((tool) =>
+    const plan = AGENT_TOOL.filter((tool) => tools.has(tool)).flatMap((tool) =>
       PlanUsage.WINDOWS.map(
         (window) =>
           seen.find((p) => p.covers(tool, window))?.view(now) ??

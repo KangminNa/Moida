@@ -1,6 +1,13 @@
-import { BaseEntity, DomainEvent, RuleViolation } from '../../platform';
+import { BaseEntity, DomainEvent, RuleViolation, ValueList } from '../../platform';
 import { ChangeWork, TargetEntity } from '../change/change-target';
-import type { EdgeNew, EdgeRow } from '../vault.tables';
+import {
+  EDGE_DELETED_BY_TYPE,
+  EDGE_ORIGIN,
+  type EdgeDeletedByType,
+  type EdgeNew,
+  type EdgeOrigin,
+  type EdgeRow,
+} from '../vault.tables';
 
 /** 연결 종류 하나 (vault.edge_kinds). 방향 없는 종류는 (작은 id, 큰 id)로 저장한다 */
 export class EdgeKind {
@@ -23,7 +30,7 @@ export class EdgeKind {
 // 사람이 만든 선(pinned)은 AI가 지우려 하면 검토로 간다.
 export class Edge extends TargetEntity<EdgeRow, EdgeNew> {
   /** 사람이 지웠음을 나타내는 deleted_by_type (actor_type과 같은 값) */
-  static readonly BY_HUMAN = 'user';
+  static readonly BY_HUMAN: EdgeDeletedByType = 'user';
 
   readonly targetKind = 'edge';
 
@@ -100,18 +107,25 @@ export class Edge extends TargetEntity<EdgeRow, EdgeNew> {
       this.setDeleted(work.now, work.actorType);
     } else {
       const at = before.deleted_at === null ? null : new Date(String(before.deleted_at));
-      this.setDeleted(at, before.deleted_by_type === null ? null : String(before.deleted_by_type));
-      this.setOwner(String(before.origin), Boolean(before.pinned));
+      const by = before.deleted_by_type === null ? null : String(before.deleted_by_type);
+      const origin = String(before.origin);
+      // 기록(vault.changes.before)은 JSON이라 값 목록으로 좁힌다. 틀린 값은 예전에도 DB의 CHECK가 막았다
+      if (by !== null && !ValueList.has(EDGE_DELETED_BY_TYPE, by))
+        throw new Error(`되돌릴 선의 기록이 틀렸어요: deleted_by_type ${by}`);
+      if (!ValueList.has(EDGE_ORIGIN, origin))
+        throw new Error(`되돌릴 선의 기록이 틀렸어요: origin ${origin}`);
+      this.setDeleted(at, by);
+      this.setOwner(origin, Boolean(before.pinned));
     }
     this.announce();
   }
 
-  private setDeleted(at: Date | null, by: string | null): void {
+  private setDeleted(at: Date | null, by: EdgeDeletedByType | null): void {
     this.put('deleted_at', at);
     this.put('deleted_by_type', by);
   }
 
-  private setOwner(origin: string, pinned: boolean): void {
+  private setOwner(origin: EdgeOrigin, pinned: boolean): void {
     this.put('origin', origin);
     this.put('pinned', pinned);
   }

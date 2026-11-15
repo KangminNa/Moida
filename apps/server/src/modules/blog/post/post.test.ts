@@ -10,6 +10,7 @@ import {
   RuleViolation,
   VisitorActor,
 } from '../../platform';
+import type { PostStatus } from '../blog.tables';
 import { type LoadedPost, Post } from './post';
 import type { SavedPostView } from './post.view';
 import { PostContent } from './post-content';
@@ -148,7 +149,7 @@ describe('Post', () => {
 
   test('에이전트도 공개된 글은 고칠 수 없고 공개 범위를 바꿀 수 없다', () => {
     const agent = new AgentActor(SPACE, 'a', 't', new Set(['write']));
-    const open = (status: string) => stored({ status, published_at: now });
+    const open = (status: PostStatus) => stored({ status, published_at: now });
     for (const status of [Post.PUBLISHED, Post.UNLISTED])
       assert.throws(
         () =>
@@ -238,7 +239,7 @@ describe('글 → wiki 연결', () => {
   const B = '0192d2a0-0000-7000-8000-00000000000b';
   const C = '0192d2a0-0000-7000-8000-00000000000c';
   const agent = new AgentActor(SPACE, 'a', 't', new Set(['write']));
-  const linked = (status: string, main: string | null = A, refs: readonly string[] = [B]) =>
+  const linked = (status: PostStatus, main: string | null = A, refs: readonly string[] = [B]) =>
     stored({ status, published_at: now, main_wiki_id: main, ref_wiki_ids: refs });
 
   test('보내지 않은 칸은 그대로, 대표 null과 참고 []는 비우기', () => {
@@ -352,8 +353,11 @@ describe('결재한 공개', () => {
   const APPROVAL = '0192d2a0-0000-7000-8000-0000000000b1';
   const approved = new ApprovedActor(SPACE, String(owner.id), APPROVAL, Post.PUBLISH_ACTION);
   const later = new Date('2026-10-30T00:00:00Z');
-  const saved = (status: string, publishedAt: Date | null = null, deletedAt: Date | null = null) =>
-    stored({ status, published_at: publishedAt, deleted_at: deletedAt });
+  const saved = (
+    status: PostStatus,
+    publishedAt: Date | null = null,
+    deletedAt: Date | null = null,
+  ) => stored({ status, published_at: publishedAt, deleted_at: deletedAt });
 
   test('결재한 버전 그대로면 공개하고, 원래 내용에 결재 결과를 더해 돌려준다', () => {
     const post = saved(Post.DRAFT);
