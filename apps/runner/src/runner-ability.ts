@@ -148,6 +148,7 @@ export class RunnerAbility {
     signin_tools: string[];
     own_logins: string[];
     browser: boolean;
+    connector_check: boolean;
     runner_build?: string;
     cli_versions?: Record<string, string>;
   } {
@@ -156,6 +157,8 @@ export class RunnerAbility {
       signin_tools: [...this.signinTools],
       own_logins: [...this.ownLogins],
       browser: this.browser,
+      // 커넥터 확인(ToolCheckRun)은 AI 없이 도니 어느 러너든 한다. 칸은 서버가 코드 일만 준다
+      connector_check: true,
       ...(this.runnerBuild === null ? {} : { runner_build: this.runnerBuild }),
       ...(Object.keys(this.cliVersions).length === 0
         ? {}

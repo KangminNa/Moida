@@ -38,7 +38,7 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
    * 연결 확인과 웹 로그인은 에이전트가 필요 없어 일을 받을 에이전트가 없어도 빌려 준다.
    * 그 둘은 도구로 거른다 (null이면 거르지 않는다): 연결 확인 · 대화의 배정 · 세션 노트는 testTools(서버의 로그인이 쓸 수 있는 도구),
    * 웹 로그인은 signinTools의 도구만.
-   * 브라우저 작업(browse)은 브라우저에 붙어 있다고 알린 러너(browser)에게만
+   * 브라우저 작업(browse)은 브라우저에 붙어 있다고 알린 러너(browser)에게만, 커넥터 확인(tool_check)은 할 수 있다고 알린 러너에게만
    */
   async lockNext(
     spaceId: string,
@@ -48,6 +48,8 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       testTools: readonly string[] | null;
       signinTools: readonly string[] | null;
       browser: boolean;
+      /** 커넥터 확인(tool_check)을 할 수 있다고 알린 러너인가 */
+      connectorCheck: boolean;
       /** 코드 러너 칸(sandbox 기기)인가. 칸은 SANDBOXED만, 다른 러너는 SANDBOXED가 아닌 일만 */
       sandbox: boolean;
     },
@@ -65,6 +67,7 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
         ${this.byTool(Task.SESSION_NOTE, tools.testTools)}
         ${this.byTool(Task.AI_SIGNIN, tools.signinTools)}
         ${tools.browser ? this.sql`` : this.sql`AND kind <> ${Task.BROWSE}`}
+        ${tools.connectorCheck ? this.sql`` : this.sql`AND kind <> ${Task.TOOL_CHECK}`}
         ${
           tools.sandbox
             ? this.sql`AND kind = ANY(${Task.SANDBOXED as string[]}::text[])`

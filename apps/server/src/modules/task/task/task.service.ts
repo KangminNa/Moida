@@ -312,8 +312,7 @@ export class TaskService extends BaseService {
       const look = sandbox ? req.limit + TaskService.CODE_LOOKAHEAD : req.limit;
       const picked = await tasks.lockNext(spaceId, ready, look, {
         testTools: LeasePolicy.testTools(req.tools, usable),
-        signinTools: req.signinTools,
-        browser: req.browser,
+        ...req.leaseFilter,
         sandbox,
       });
       const busy = [...running];

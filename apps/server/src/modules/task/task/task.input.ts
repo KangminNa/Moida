@@ -145,12 +145,24 @@ export class NextJobsInput extends BaseRequest {
     readonly runnerBuild: string | null,
     /** 도구마다 CLI 버전 (claude → "2.1.302 (Claude Code)"). 실행 기록에 남긴다 */
     readonly cliVersions: ReadonlyMap<string, string>,
+    /** 커넥터 확인(tool_check)을 할 수 있는가. 알리지 않으면 false: 옛 러너가 확인 일을 AI로 돌리지 않게 (2026-11-15) */
+    readonly connectorCheck: boolean,
   ) {
     super();
   }
 
+  /** 빌릴 일을 거르는 러너의 능력 (TaskRepository.lockNext) */
+  get leaseFilter() {
+    return {
+      signinTools: this.signinTools,
+      browser: this.browser,
+      connectorCheck: this.connectorCheck,
+    };
+  }
+
   static from(raw: unknown): NextJobsInput {
-    const told = (raw as { browser?: unknown } | null | undefined)?.browser !== undefined;
+    const told = (name: string) =>
+      (raw as Record<string, unknown> | null | undefined)?.[name] !== undefined;
     return BaseRequest.read(
       raw,
       (f) =>
@@ -160,9 +172,10 @@ export class NextJobsInput extends BaseRequest {
           f.optionalTextList('tools', NextJobsInput.TOOLS_MAX, 40),
           f.optionalTextList('signin_tools', NextJobsInput.TOOLS_MAX, 40),
           f.optionalTextList('own_logins', NextJobsInput.TOOLS_MAX, 40) ?? [],
-          told ? f.boolean('browser') : false,
+          told('browser') ? f.boolean('browser') : false,
           f.optionalText('runner_build', NextJobsInput.BUILD_MAX),
           f.textMap('cli_versions', NextJobsInput.BUILD_MAX),
+          told('connector_check') ? f.boolean('connector_check') : false,
         ),
     );
   }

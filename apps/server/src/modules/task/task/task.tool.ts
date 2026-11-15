@@ -56,6 +56,9 @@ export class NextJobsTool extends BaseTool {
       browser: {
         type: 'boolean',
       },
+      connector_check: {
+        type: 'boolean',
+      },
     },
   };
 

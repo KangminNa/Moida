@@ -355,7 +355,9 @@ describe('연결 확인 · 도구 목록 · 사용 기록 (2026-11-15 MCP 1단�
   /** 확인 일 하나를 러너가 빌린다 (다른 시험이 남긴 일이 먼저 올 수 있어 그 일이 올 때까지) */
   async function takeCheck(taskId: unknown): Promise<Json> {
     for (let i = 0; i < 50; i++) {
-      const { jobs } = (await call(runner, 'next_jobs')) as { jobs: Json[] };
+      const { jobs } = (await call(runner, 'next_jobs', { connector_check: true })) as {
+        jobs: Json[];
+      };
       const mine = jobs.find((j) => j.task.id === taskId);
       if (mine) return mine;
       if (jobs.length === 0) break;

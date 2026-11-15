@@ -97,6 +97,7 @@ describe('실행 기록에 남기는 것', () => {
     assert.equal(ability.runnerBuild, 'abc1234');
     assert.deepEqual(ability.toArgs().cli_versions, { claude: '2.1.302 (Claude Code)' });
     assert.equal(ability.toArgs().runner_build, 'abc1234');
+    assert.equal(ability.toArgs().connector_check, true, '커넥터 확인은 AI 없이 어느 러너든');
     assert.equal(RunnerAbility.versionOf('/없는/실행파일', {}), null);
   });
 });
