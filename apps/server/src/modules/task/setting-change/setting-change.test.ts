@@ -1,22 +1,65 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { Forbidden, InvalidRequest, RuleViolation } from '../../platform';
+import {
+  Conflict,
+  Forbidden,
+  InvalidRequest,
+  RuleViolation,
+  SettingChangeInput,
+  SettingKinds,
+  type SettingShape,
+} from '../../platform';
 import { Agent } from '../agent/agent';
+import { AgentEdit } from '../agent/agent-edit';
 import { Approval } from '../approval/approval';
+import { GoalEdit } from '../goal/goal-edit';
+import { ScheduleEdit } from '../schedule/schedule-edit';
 import { Task } from '../task/task';
 import type { AgentRow } from '../task.tables';
-import { ApprovedSettingInput, ProposeSettingInput } from './setting-change.input';
+import { GetSettingsInput, ProposeSettingInput } from './setting-change.input';
 import { SettingChanges } from './setting-change.policy';
 
-// 설정 바꾸기 제안 (2026-11-15 C): 바뀐 점 · 권한 줄 · 입력 모양 · 결재 칸 · 대화 상대의 기본 동작. DB 없이 돈다.
+// 설정 바꾸기 제안 (2026-11-15 C · D): 바뀐 점 · 굵은 줄 · 펼친 줄 · 입력 모양 · 결재 칸 · 승인 뒤 값 비교 ·
+// 대화 상대의 기본 동작. 등록부에는 가짜 읽기 · 적용을 단다. DB 없이 돈다.
 
 const NOW = new Date('2026-11-15T00:00:00Z');
 const SPACE = '00000000-0000-7000-8000-00000000000a';
 const TARGET = '00000000-0000-7000-8000-000000000001';
 const REQUEST = '00000000-0000-7000-8000-000000000002';
 
+/** 알림 설정처럼 공간에 하나이고 목록형 칸이 있는 설정, 플러그인처럼 이름형 · 모든 줄이 굵은 설정 (시험용 모양) */
+const NOTICE: SettingShape = {
+  setting: 'notice',
+  list: 'notices',
+  ops: ['edit'],
+  fields: ['quiet_start', 'routes'],
+  target: 'one',
+  versioned: true,
+  grants: [],
+  maps: ['routes'],
+};
+const PLUGIN: SettingShape = {
+  setting: 'plugin',
+  list: 'plugins',
+  ops: ['edit'],
+  fields: null,
+  target: 'name',
+  versioned: false,
+  grants: 'all',
+};
+
+const kinds = new SettingKinds();
+for (const shape of [AgentEdit.SETTING, ScheduleEdit.SETTING, GoalEdit.SETTING, NOTICE, PLUGIN])
+  kinds.register({
+    ...shape,
+    read: async () => ({ toJSON: () => ({}) }),
+    current: async () => null,
+    rehearse: async () => {},
+    apply: async () => {},
+  });
+
 const propose = (raw: Record<string, unknown>) =>
-  ProposeSettingInput.from({ request_id: REQUEST, note: '왜', ...raw });
+  ProposeSettingInput.from({ request_id: REQUEST, note: '왜', ...raw }, kinds);
 
 function agent(reportsTo: string | null, actions: readonly string[] = []): Agent {
   return Agent.restore({
@@ -47,6 +90,7 @@ function running(who: Agent): Task {
 describe('SettingChanges.diff', () => {
   test('바뀐 칸만, 지금 값과 함께', () => {
     const lines = SettingChanges.diff(
+      AgentEdit.SETTING,
       { model: 'sonnet', effort: 'medium', name: '리서처' },
       { model: 'opus', name: '리서처' },
     );
@@ -55,21 +99,66 @@ describe('SettingChanges.diff', () => {
 
   test('권한 · 승인 동작 · 커넥터를 더하면 grant, 빼면 아니다', () => {
     const before = { scopes: ['read_public', 'draft'], external_tools: ['linear'] };
-    const [more] = SettingChanges.diff(before, { scopes: ['read_public', 'draft', 'read_all'] });
-    const [less] = SettingChanges.diff(before, { scopes: ['read_public'] });
-    const [tools] = SettingChanges.diff(before, { external_tools: ['linear', 'notion'] });
+    const [more] = SettingChanges.diff(AgentEdit.SETTING, before, {
+      scopes: ['read_public', 'draft', 'read_all'],
+    });
+    const [less] = SettingChanges.diff(AgentEdit.SETTING, before, { scopes: ['read_public'] });
+    const [tools] = SettingChanges.diff(AgentEdit.SETTING, before, {
+      external_tools: ['linear', 'notion'],
+    });
     assert.equal(more?.grant, true);
     assert.equal(less?.grant, false);
     assert.equal(tools?.grant, true);
   });
 
   test('만들기는 지금 값이 없다 (권한이 있으면 grant)', () => {
-    const lines = SettingChanges.diff(null, { name: '코더', scopes: ['code'] });
+    const lines = SettingChanges.diff(AgentEdit.SETTING, null, { name: '코더', scopes: ['code'] });
     assert.deepEqual(
       lines.map((l) => [l.field, l.before, l.grant]),
       [
         ['name', null, false],
         ['scopes', null, true],
+      ],
+    );
+  });
+
+  test('목록형 칸은 키마다 한 줄 (이름표와 함께), 같은 키는 빠진다', () => {
+    const now = {
+      quiet_start: null,
+      routes: { 'task.approval.requested': 'push', other: 'center' },
+    };
+    const lines = SettingChanges.diff(
+      NOTICE,
+      now,
+      { routes: { 'task.approval.requested': 'off', other: 'center' }, quiet_start: '23:00' },
+      (f) => (f === 'routes.task.approval.requested' ? '승인 요청' : null),
+    );
+    assert.deepEqual(lines, [
+      {
+        field: 'routes.task.approval.requested',
+        label: '승인 요청',
+        before: 'push',
+        after: 'off',
+        grant: false,
+      },
+      { field: 'quiet_start', before: null, after: '23:00', grant: false },
+    ]);
+  });
+
+  test('모든 줄이 굵은 설정(플러그인)은 바뀐 줄마다 grant, 비우는 줄은 아니다', () => {
+    const lines = SettingChanges.diff(
+      PLUGIN,
+      { repo: 'me/a', branch: 'main' },
+      {
+        repo: 'me/b',
+        branch: null,
+      },
+    );
+    assert.deepEqual(
+      lines.map((l) => [l.field, l.grant]),
+      [
+        ['repo', true],
+        ['branch', false],
       ],
     );
   });
@@ -146,7 +235,7 @@ describe('ProposeSettingInput', () => {
       version: 1,
       fields: { reports_to: null, approval_actions: ['blog.post.publish'] },
     });
-    assert.deepEqual(agentEdit.bodyOver({ name: '리서처', model: 'sonnet' }), {
+    assert.deepEqual(SettingChanges.restBody(agentEdit.fields), {
       reportsTo: null,
       approvalActions: ['blog.post.publish'],
     });
@@ -157,12 +246,16 @@ describe('ProposeSettingInput', () => {
       version: 3,
       fields: { at_time: '10:00' },
     });
-    const body = scheduleEdit.bodyOver({
-      title: '주간 정리',
-      at_time: '09:30',
-      daily_max: 1,
-      id: TARGET,
-    });
+    const body = SettingChanges.restBodyOver(
+      ScheduleEdit.SETTING.fields ?? [],
+      scheduleEdit.fields,
+      {
+        title: '주간 정리',
+        at_time: '09:30',
+        daily_max: 1,
+        id: TARGET,
+      },
+    );
     assert.equal(body.atTime, '10:00');
     assert.equal(body.title, '주간 정리');
     assert.equal(body.dailyMax, 1);
@@ -194,26 +287,111 @@ describe('ProposeSettingInput', () => {
   });
 });
 
-describe('ApprovedSettingInput', () => {
+describe('ProposeSettingInput (D)', () => {
+  test('모르는 설정 · 동작은 400, 목표는 고치기에 대상 · 버전', () => {
+    assert.throws(
+      () => propose({ setting: 'secret', op: 'edit', fields: { a: 1 } }),
+      InvalidRequest,
+    );
+    assert.throws(
+      () => propose({ setting: 'goal', op: 'pause', target_id: TARGET, version: 1 }),
+      InvalidRequest,
+    );
+    const goal = propose({
+      setting: 'goal',
+      op: 'edit',
+      target_id: TARGET,
+      version: 3,
+      fields: { status: 'done' },
+    });
+    assert.deepEqual([goal.targetId, goal.version], [TARGET, 3]);
+  });
+
+  test('공간에 하나인 설정은 대상 없이 version(처음이면 0), 결재 대상은 공간', () => {
+    const notice = propose({
+      setting: 'notice',
+      op: 'edit',
+      version: 0,
+      fields: { quiet_start: '23:00' },
+    });
+    assert.equal(notice.targetId, null);
+    assert.deepEqual(
+      [notice.approvalFields(SPACE).target_kind, notice.approvalFields(SPACE).target_id],
+      ['space', SPACE],
+    );
+    assert.throws(
+      () => propose({ setting: 'notice', op: 'edit', fields: { quiet_start: '1' } }),
+      InvalidRequest,
+    );
+  });
+
+  test('이름형 설정은 target_name, 칸은 그 모듈이 보고(아무 칸이나 받음), version이 없다', () => {
+    assert.throws(
+      () => propose({ setting: 'plugin', op: 'edit', fields: { repo: 'x' } }),
+      InvalidRequest,
+    );
+    const plugin = propose({
+      setting: 'plugin',
+      op: 'edit',
+      target_name: 'sync-github',
+      fields: { repo: 'x' },
+    });
+    assert.deepEqual([plugin.targetName, plugin.version], ['sync-github', 0]);
+    const change = plugin.change(plugin.fields, []);
+    assert.deepEqual(change.payload(), {
+      setting: 'plugin',
+      op: 'edit',
+      body: { repo: 'x' },
+      changes: [],
+      target_name: 'sync-github',
+    });
+  });
+
+  test('get_settings는 등록한 kind만, 없으면 목록', () => {
+    assert.equal(GetSettingsInput.from({}, kinds).kind, null);
+    assert.equal(GetSettingsInput.from({ kind: 'goals' }, kinds).kind, 'goals');
+    assert.throws(() => GetSettingsInput.from({ kind: 'secrets' }, kinds), InvalidRequest);
+  });
+});
+
+describe('SettingChangeInput (승인 뒤 적용)', () => {
   const data = {
     approvalId: REQUEST,
     decidedBy: TARGET,
     action: Approval.SETTING_CHANGE,
+    targetKind: 'agent',
     targetId: TARGET,
     targetVersion: 2,
     payload: { setting: 'agent', op: 'edit', body: { model: 'opus' }, changes: [] },
   };
 
-  test('그 설정의 바꾸기만 받는다', () => {
-    assert.equal(ApprovedSettingInput.carries(data, SettingChanges.AGENT), true);
-    assert.equal(ApprovedSettingInput.carries(data, SettingChanges.SCHEDULE), false);
-    assert.equal(
-      ApprovedSettingInput.carries({ ...data, action: 'blog.post.publish' }, 'agent'),
-      false,
+  test('설정 바꾸기의 승인만 받고, 결재 칸에서 대상 · 판을 읽는다 (공간 대상이면 대상 없음)', () => {
+    assert.equal(SettingChangeInput.carries(data), true);
+    assert.equal(SettingChangeInput.carries({ ...data, action: 'blog.post.publish' }), false);
+    const change = SettingChangeInput.approved(data);
+    assert.deepEqual(
+      [change.key, change.setting, change.op, change.targetId, change.version, change.decidedBy],
+      [REQUEST, 'agent', 'edit', TARGET, 2, TARGET],
     );
-    const req = ApprovedSettingInput.from(data);
-    assert.equal(req.op, 'edit');
-    assert.deepEqual(req.body, { model: 'opus' });
+    assert.deepEqual(change.body, { model: 'opus' });
+    const space = SettingChangeInput.approved({ ...data, targetKind: 'space', targetId: SPACE });
+    assert.equal(space.targetId, null);
+  });
+
+  test('version이 없는 설정: 지금 값이 제안 때 본 값과 다르면 Conflict (목록형 칸은 키를 본다)', () => {
+    const change = SettingChangeInput.approved({
+      ...data,
+      payload: {
+        setting: 'projects',
+        op: 'edit',
+        target_name: null,
+        body: { collect: { blog: false } },
+        changes: [{ field: 'collect.blog', before: true, after: false, grant: false }],
+      },
+    });
+    assert.doesNotThrow(() => change.assertUnchanged({ collect: { blog: true } }));
+    assert.throws(() => change.assertUnchanged({ collect: { blog: false } }), Conflict);
+    assert.throws(() => change.assertUnchanged(null), Conflict);
   });
 });
 

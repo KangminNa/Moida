@@ -1,4 +1,9 @@
-import { RuleViolation, type Sql } from '../../platform';
+import {
+  RuleViolation,
+  type SettingChangeInput,
+  type SettingShape,
+  type Sql,
+} from '../../platform';
 import { ExternalToolRepository } from '../external-tool/external-tool.repository';
 import { RunnerRepository } from '../runner/runner.repository';
 import { Agent } from './agent';
@@ -11,6 +16,32 @@ import { AgentRepository } from './agent.repository';
  * 필요한 것만 잠그고 읽어 엔티티 메서드를 부른다. 저장은 부르는 쪽이 정한다 (미리 해 보기는 저장하지 않는다)
  */
 export class AgentEdit {
+  /** 대화로 바꾸는 에이전트 (get_settings team · propose_setting agent, 2026-11-15 C). 굵게: 권한을 더하는 칸 */
+  static readonly SETTING: SettingShape = {
+    setting: 'agent',
+    list: 'team',
+    ops: ['create', 'edit', 'pause', 'resume'],
+    fields: [
+      'name',
+      'role',
+      'tool',
+      'model',
+      'effort',
+      'scopes',
+      'approval_actions',
+      'reports_to',
+      'reviewer_id',
+      'runner_id',
+      'external_tools',
+      'monthly_limit',
+      'five_hour_limit',
+      'plan_stop_percent',
+    ],
+    target: 'id',
+    versioned: true,
+    grants: ['scopes', 'approval_actions', 'external_tools', 'runner_id'],
+  };
+
   constructor(
     private readonly tx: Sql,
     private readonly spaceId: string,
@@ -45,8 +76,11 @@ export class AgentEdit {
    * 설정 바꾸기 하나 (2026-11-15 C): 제안의 미리 해 보기와 승인 뒤 적용이 같은 줄.
    * body는 관리자 REST(POST · PATCH api/agents)와 같은 본문, key는 만들기의 requestId (결재 id)
    */
-  apply(op: string, id: string, version: number, body: object, key: string, now: Date) {
-    if (op === 'create') return this.open(CreateAgentInput.from({ ...body, requestId: key }), now);
+  apply(change: SettingChangeInput, now: Date): Promise<Agent> {
+    const { op, body, version } = change;
+    const id = String(change.targetId);
+    if (op === 'create')
+      return this.open(CreateAgentInput.from({ ...body, requestId: change.key }), now);
     if (op === 'edit') return this.update(UpdateAgentInput.from(id, { ...body, version }));
     return this.toggle(id, version, op === 'pause');
   }

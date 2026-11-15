@@ -5,7 +5,7 @@
 요청이 들어오면 Guard가 토큰·쿠키를 확인해 Actor(`OwnerActor` · `DeviceActor` · `AgentActor` · `VisitorActor`)를 만든다.
 M1 A(설치·주인 로그인)와 B(기기 연결, MCP OAuth 2.1)까지 있다.
 
-- `space/`: 공간 (`Space`), 설치 코드·통행증 규칙(`InstallPolicy`), `api/install`(코드 확인, 주인 계정 만들기)·`api/space`(+ `PUT api/space/hosted-apps`: ChatGPT·Claude 앱 연결 허용, 사이트 로고 `PUT api/space/logo` · `POST api/space/logo/delete` · 누구나 보는 `GET api/space/logo`)
+- `space/`: 공간 (`Space`, 이름 · 소개는 대화로도 바꾼다: `SpaceEdit` · `AccountSettings`, 2026-11-15 D. 사이트 주소 · 앱 연결 · 로고는 화면에서만), 설치 코드·통행증 규칙(`InstallPolicy`), `api/install`(코드 확인, 주인 계정 만들기)·`api/space`(+ `PUT api/space/hosted-apps`: ChatGPT·Claude 앱 연결 허용, 사이트 로고 `PUT api/space/logo` · `POST api/space/logo/delete` · 누구나 보는 `GET api/space/logo`)
 - `owner/`: 주인 (`Owner` + `WebSession` + `LoginLink`), 비밀번호 규칙(`PasswordPolicy`), `api/auth`(로그인·로그아웃·비밀번호 바꾸기, 화면에 보일 이름 `PUT api/auth/me/profile`)
   보안 화면 (2026-11-15): `api/auth/sessions`(끝나지 않은 로그인 · 보안 설정 값, `OwnerQuery.sessions`), `POST api/auth/sessions/:id/end`(다른 곳의 로그인 하나, `Owner.endSessionById`: 지금 로그인은 422), `POST api/auth/sessions/end-others`(`Owner.endOtherSessions`). 로그인 · 로그아웃 · 끝내기 · 비밀번호는 `Owner`가 사건(`account.login.succeeded` · `account.session.ended` · `account.password.changed`)으로 남기고 `AccountSecurity`(`Outbox.listen`)가 같은 트랜잭션에서 platform의 보안 기록으로 옮긴다. 로그인 사건의 `newPlace`는 최근 90일 로그인한 곳(IPv4, IPv6는 /64)과 다른지다 (설치 때는 보지 않음). 틀린 · 막힌 로그인과 틀린 설치 코드 · 러너 연결은 엔티티의 사건이 없어 Service가 `SecurityLog`에 바로 남기고 오류에 `markRecorded()`. 틀린 아이디는 관리자의 것일 때만 적는다. 마지막 접근은 Guard가 알아본 로그인 · 기기마다 `OwnerService.seen` · `DeviceService.seen`(프로세스마다 5분에 한 번, version 안 올림, 실패해도 요청은 막지 않고 서버 로그)
   외부 로그인(`ExternalLoginQuery`·`ExternalLoginController`): 로그인 플러그인(`login:<이름>`)의 경로·확인값·쿠키, 계정 연결·끊기
@@ -39,7 +39,7 @@ M1 A(설치·주인 로그인)와 B(기기 연결, MCP OAuth 2.1)까지 있다.
 `ServerRunnerPolicy`: 테스트가 서버 러너 · 칸처럼 연결할 때 (`ApiClient.codeRunner`, 러너 통합 테스트)
 
 ## 내보내는 이벤트 / 받는 이벤트
-`account.owner.claimed`(주인이 정해짐), `account.device.connected`, `account.device.revoked`(`reason`: owner · token_reused), `account.login.succeeded`(`sessionId, method, newPlace, ip, userAgent`), `account.session.ended`(`how`: logout · ended · others), `account.password.changed`(`via`: web · command) / 없음
+`account.owner.claimed`(주인이 정해짐), `account.device.connected`, `account.device.revoked`(`reason`: owner · token_reused), `account.login.succeeded`(`sessionId, method, newPlace, ip, userAgent`), `account.session.ended`(`how`: logout · ended · others), `account.password.changed`(`via`: web · command), `account.setting.changed { approvalId, outcome, error? }`(승인한 사이트 설정 바꾸기의 결과, 2026-11-15 D) / 없음 (승인한 설정 바꾸기는 task의 처리기가 platform `SettingKinds`로 넘긴다)
 
 알리는 것 (`AccountNotices`, 7단계. platform `NoticeCatalog`에 등록): `account.device.connected` 새 기기 연결 (즉시, 기기마다 묶음 키). 보안 화면 (2026-11-15): `account.login.new_place` 새 곳에서 로그인 (즉시, 로그인 사건의 `newPlace`), `account.login.blocked` 로그인 막힘 (즉시, 관리자의 아이디로 막혔을 때 `OwnerService`가 `Notices.post`로, 같은 곳은 1분에 한 번)
 

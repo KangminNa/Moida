@@ -262,6 +262,29 @@ export class ApprovedActor extends Actor {
   }
 }
 
+/**
+ * 설정 바꾸기를 제안하는 에이전트 (2026-11-15 D). task가 "설정을 읽어도 되는 에이전트"(대화 상대거나 승인 동작에
+ * 설정 바꾸기를 넣어 준 것, 바깥길이 없는 것)인지 확인한 뒤에 만든다. 설정을 가진 모듈은 첫 줄에서 spaceOf로 묻는다.
+ * 설정의 지금 값을 읽고 미리 해 보기(저장하지 않음)만 한다. 권한 이름으로는 아무것도 통과하지 않는다
+ */
+export class SettingActor extends Actor {
+  readonly kind = 'setting';
+
+  constructor(spaceId: string, agentId: string) {
+    super(spaceId, agentId);
+  }
+
+  /** 확인을 거친 제안자인가. 공간을 돌려준다 */
+  static spaceOf(actor: Actor): string {
+    if (!(actor instanceof SettingActor)) throw new Forbidden(Actor.AGENT);
+    return actor.requireSpace();
+  }
+
+  can(): boolean {
+    return false;
+  }
+}
+
 /** 로그인하지 않은 방문자. 공개된 것만 */
 export class VisitorActor extends Actor {
   readonly kind = 'visitor';

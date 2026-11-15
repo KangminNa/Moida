@@ -3215,6 +3215,11 @@ a.chip {
   overflow-wrap: anywhere;
 }
 
+/* 어떤 설정의 칸인지 (2026-11-15 D) */
+.change-lines .change-setting {
+  font-weight: 600;
+}
+
 .change-lines .change-field {
   color: var(--muted);
 }

@@ -123,6 +123,57 @@ export class PluginSettingsView {
   }
 }
 
+/**
+ * 대화로 바꾸는 플러그인 설정 (2026-11-15 D, get_settings plugins). 플러그인 하나의 설정 칸과 지금 값.
+ * 비밀 칸은 값 없이 넣어 두었는지(set)만. 바꿀 수 있는 것은 켜진 플러그인의 비밀이 아닌 칸이다
+ */
+export class PluginConfigView {
+  constructor(
+    private readonly name: string,
+    private readonly enabled: boolean,
+    private readonly settings: readonly {
+      key: string;
+      label: string;
+      type: string;
+      options: readonly string[];
+      value: string | null;
+      set: boolean;
+    }[],
+  ) {}
+
+  toJSON() {
+    return {
+      name: this.name,
+      enabled: this.enabled,
+      settings: this.settings.map((s) => ({
+        key: s.key,
+        label: s.label,
+        type: s.type,
+        ...(s.options.length > 0 ? { options: [...s.options] } : {}),
+        ...(s.type === 'secret' ? { set: s.set } : { value: s.value }),
+      })),
+    };
+  }
+}
+
+/** 제안한 플러그인의 비밀이 아닌 칸의 지금 값 (바뀐 줄의 바탕): { 칸: 값 } */
+export class PluginValuesView {
+  constructor(private readonly values: Readonly<Record<string, string>>) {}
+
+  toJSON() {
+    return { ...this.values };
+  }
+}
+
+/** get_settings { kind: plugins }: 들어 있는 플러그인 전부 */
+export class PluginConfigListView {
+  constructor(private readonly plugins: readonly PluginConfigView[]) {}
+
+  toJSON() {
+    return { plugins: this.plugins.map((p) => p.toJSON()) };
+  }
+}
+
 /** 켜기·끄기·설정 저장의 결과. 화면은 이 뒤에 목록을 다시 불러온다 */
 export class PluginStateView {
   constructor(private readonly row: Readonly<Pick<PluginRow, 'name' | 'enabled'>>) {}

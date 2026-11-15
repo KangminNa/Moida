@@ -40,6 +40,8 @@ import { SecurityEventController } from './security/security-event.api';
 import { SecurityEventQuery } from './security/security-event.query';
 import { SecurityLogService } from './security/security-log.service';
 import { SecurityLogPurgeJob } from './security/security-log-purge.job';
+import { PlatformSettings } from './setting/platform-settings';
+import { SettingKinds } from './setting/setting-kinds';
 import { ChangeStream } from './stream/change-stream';
 import { StreamController } from './stream/stream.api';
 import { BlobSweepJob } from './worker/blob-sweep.job';
@@ -79,6 +81,8 @@ import { OutboxWorker } from './worker/outbox-worker';
     LibraryQuery,
     AgentDirectory,
     ActionChecks,
+    SettingKinds,
+    PlatformSettings,
     ChangeStream,
     CoreWorkers,
     OutboxWorker,
@@ -122,6 +126,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     LibraryQuery,
     AgentDirectory,
     ActionChecks,
+    SettingKinds,
     ChangeStream,
     CoreWorkers,
     OutboxWorker,

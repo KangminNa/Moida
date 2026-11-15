@@ -94,7 +94,10 @@ export const TARGET_LABELS: Record<string, string> = {
   [GOAL_RUN]: '목표 실행',
   chat: '대화',
   schedule: '스케줄',
-  space: '새로 만들기',
+  goal: '목표',
+  menu: '블로그 메뉴',
+  /** 새로 만들기, 또는 공간에 하나인 설정(알림 · 사이트 · 세션 정리 …)의 바꾸기 (2026-11-15 D) */
+  space: '공간',
   code_github_ask: '코드 작업 요청',
 };
 

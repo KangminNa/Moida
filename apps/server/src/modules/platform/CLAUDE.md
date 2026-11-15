@@ -35,6 +35,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - `CoreWorkers`: 코어 모듈의 이벤트 받기·반복 작업 등록 (`on`, `every`, `expect`)
 - `ArchiveQuery`: 보관 형식 파일 묶음. 내용을 가진 모듈이 `onModuleInit`에서 `register`로 자기 파일을, `registerRestore`로 복원을 등록한다
 - `AgentDirectory` · `AgentCard`: 에이전트의 표를 갖지 않은 모듈이 "이 id의 에이전트가 있는가, 무슨 권한인가"를 묻는 길 (2차 6단계, task가 `register`, blog 메뉴의 운영 팀 확인). 트랜잭션 밖에서 묻는다
+- `SettingKinds` · `SettingKind` · `SettingShape` (`setting/`, 2026-11-15 D): 대화로 바꾸는 설정의 등록부. 설정을 가진 모듈이 시작할 때(`<모듈>-settings.ts`) 설정 하나를 `register`한다: 모양(`<X>Edit.SETTING`: 동작 · 칸 · 대상 id · one · name · version 여부 · 굵은 칸 · 펼칠 목록형 칸)과 읽기(`read` · `current`) · 미리 해 보기(`rehearse`) · 적용(`apply`), 필요하면 `normalize` · `bodyOf` · `labelOf`. task가 `get_settings` · `propose_setting` · 승인 뒤 적용(`SettingApplyHandler`)에서 찾는다. 읽기 · 미리 해 보기는 `SettingActor`(task가 제안자를 확인한 뒤 만든다, 모듈은 첫 줄에서 `SettingActor.spaceOf`), 적용은 `ApprovedActor`(`SettingOutcome.spaceOf`). `SettingChangeInput`: 제안과 승인 이벤트가 같은 모양 (version 없는 설정은 `assertUnchanged`로 제안 때 본 값과 비교). `SettingOutcome.settle`: 결재마다 한 번 적용하고 `<모듈>.setting.changed`를 남긴다 (`topicOf`). platform이 등록하는 것: 알림 설정(`NoticeSettingsEdit`), 플러그인 설정(`PluginEdit`, 켜진 것의 비밀이 아닌 칸만, 줄은 모두 굵게) — `PlatformSettings`
 - `ActionChecks` · `ActionTarget`: 결과 카드에 싣기 전에 결재 동작의 대상을 가진 모듈이 "빠진 점"을 짚는 길 (2차 6단계). 동작마다 한 번 `register(action, (actor, targetId) => 문구 | null)`, task가 `problemsOf`로 묻고 받을 것이 정해진 대화면 다시 맡긴다
 - `LibraryQuery` · `LibraryInput` · `LibraryRow`: 보관함 (2차 5단계, `api/library`, 주인만). 종류를 가진 모듈이 `onModuleInit`에서 `register(종류들, (actor, filter) => 행들)`로 자기 읽기를 등록하고(같은 종류를 두 번 등록하면 오류), platform은 종류를 모르는 채 시간 · id 내림차순으로 합쳐 30개씩 자른다. 줄의 `place` · `placeId`는 놓인 곳(블로그 메뉴)이다. 모듈의 읽기는 `BaseQuery.libraryWindow`로 같은 기간 · 커서 조건을 쓴다
 - `ArchiveRestoreService`: 빈 Cairn에 복원 (`preview` · `apply`). GitHub와 zip이 같은 길이다. 주인과 `SystemActor`만 부른다. `steadyRead`: 복원과 겹치지 않게 읽기
@@ -54,7 +55,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - 일 빌리기는 `SKIP LOCKED`, 잠그는 순서는 모듈 규칙대로 (task: 작업 → 결재 → 에이전트), 줄이 없을 수도 있는 자리는 advisory 잠금(`pg_advisory_xact_lock`, 트랜잭션이 끝나면 풀림)
 
 ## 내보내는 이벤트 / 받는 이벤트
-없음 / 없음. 대신 `Outbox.listen`으로 모든 이벤트를 쓰는 트랜잭션 안에서 보고, 모듈이 등록한 종류의 알림을 남긴다 (`NoticeCatalog.onEvents`)
+`platform.setting.changed { approvalId, outcome, error? }` (승인한 알림 · 플러그인 설정 바꾸기의 결과, 2026-11-15 D. task의 `ApprovalResultHandler`가 결재를 끝낸다) / 없음. 대신 `Outbox.listen`으로 모든 이벤트를 쓰는 트랜잭션 안에서 보고, 모듈이 등록한 종류의 알림을 남긴다 (`NoticeCatalog.onEvents`)
 
 ## 써도 되는 모듈
 없음. platform은 다른 모듈을 모른다.

@@ -1,95 +1,72 @@
-import { Actor, Forbidden } from '../../platform';
+import { Actor, Forbidden, type SettingChangeLine, type SettingShape } from '../../platform';
 
-/** 바뀐 칸 한 줄 (결재의 payload.changes, 화면이 "칸: 전 → 후"로 그린다). grant는 권한을 더하는 줄 */
-export type SettingChangeLine = { field: string; before: unknown; after: unknown; grant: boolean };
+type Values = Readonly<Record<string, unknown>>;
 
-// 설정 바꾸기 제안 (2026-11-15 C, 기획서 결정): 무엇을 바꿀 수 있는지(설정 · 동작 · 칸), 바뀐 점, 누가 읽고 제안하는지.
-// 바꾸는 규칙 자체는 엔티티(Agent · Schedule)가 AgentEdit · ScheduleEdit을 거쳐 본다 (관리자의 고치기와 같은 줄).
-// 지우기는 C에 없다 (화면에서만)
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** snake_case 칸 이름 → 관리자 REST 본문의 이름 (reports_to → reportsTo, at_time → atTime) */
+const restName = (field: string) => field.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+
+// 설정 바꾸기 제안 (2026-11-15 C · D, 기획서 결정): 바뀐 점과 굵게 보일 줄, 누가 읽고 제안하는지.
+// 무엇을 바꿀 수 있는지(설정 · 동작 · 칸)는 설정을 가진 모듈의 Edit이 SETTING으로 갖고 platform SettingKinds에 등록한다.
+// 바꾸는 규칙 자체는 엔티티가 그 Edit을 거쳐 본다 (관리자의 고치기와 같은 줄). 지우기는 없다 (화면에서만)
 export class SettingChanges {
-  static readonly AGENT = 'agent';
-  static readonly SCHEDULE = 'schedule';
+  /** task가 가진 설정(에이전트 · 스케줄 · 목표)을 적용한 결과 (task.setting.changed { approvalId, outcome, error? }) */
+  static readonly TOPIC = 'task.setting.changed';
   static readonly CREATE = 'create';
-  /** 설정마다 할 수 있는 동작 */
-  static readonly OPS: Readonly<Record<string, readonly string[]>> = {
-    agent: ['create', 'edit', 'pause', 'resume'],
-    schedule: ['create', 'edit'],
-  };
   /** 칸을 받지 않는 동작 (바뀌는 것은 상태 하나) */
   static readonly SWITCHES: readonly string[] = ['pause', 'resume'];
-  /** 제안할 수 있는 칸 (get_settings의 이름과 같다. 관리자 REST의 칸을 snake_case로) */
-  static readonly FIELDS: Readonly<Record<string, readonly string[]>> = {
-    agent: [
-      'name',
-      'role',
-      'tool',
-      'model',
-      'effort',
-      'scopes',
-      'approval_actions',
-      'reports_to',
-      'reviewer_id',
-      'runner_id',
-      'external_tools',
-      'monthly_limit',
-      'five_hour_limit',
-      'plan_stop_percent',
-    ],
-    schedule: [
-      'title',
-      'agent_id',
-      'enabled',
-      'mode',
-      'at_time',
-      'weekdays',
-      'every_hours',
-      'time_zone',
-      'instruction',
-      'goal_id',
-      'page_id',
-      'destination',
-      'deliver',
-      'rules',
-      'trigger',
-      'after_id',
-      'daily_max',
-    ],
-  };
-  /** 권한을 더하는 칸: 화면이 굵게, "권한"으로 보인다 */
-  private static readonly GRANTS: readonly string[] = [
-    'scopes',
-    'approval_actions',
-    'external_tools',
-    'runner_id',
-  ];
 
-  /** 바뀐 칸만 (지금 값과 함께). 만들기는 지금 값이 없다 (before null) */
+  /**
+   * 바뀐 칸만 (지금 값과 함께). 만들기는 지금 값이 없다 (before null, 모든 칸이 줄).
+   * 목록형 칸(shape.maps)은 키마다 "칸.키" 한 줄. label은 화면이 미리 모르는 이름 (labelOf)
+   */
   static diff(
-    before: Readonly<Record<string, unknown>> | null,
-    fields: Readonly<Record<string, unknown>>,
+    shape: SettingShape,
+    now: Values | null,
+    fields: Values,
+    labelOf: (field: string) => string | null = () => null,
   ): SettingChangeLine[] {
-    return Object.entries(fields).flatMap(([field, after]) => {
-      const was = before ? (before[field] ?? null) : null;
-      if (before && JSON.stringify(was) === JSON.stringify(after ?? null)) return [];
+    const line = (path: string, field: string, was: unknown, after: unknown) => {
+      if (now && JSON.stringify(was ?? null) === JSON.stringify(after ?? null)) return [];
+      const label = labelOf(path);
       return [
         {
-          field,
-          before: was,
+          field: path,
+          ...(label ? { label } : {}),
+          before: was ?? null,
           after: after ?? null,
-          grant: SettingChanges.grants(field, was, after),
+          grant: SettingChanges.grants(shape, field, was ?? null, after),
         },
       ];
+    };
+    return Object.entries(fields).flatMap(([field, after]) => {
+      if (!shape.maps?.includes(field) || !isRecord(after))
+        return line(field, field, now ? now[field] : null, after);
+      const was = now && isRecord(now[field]) ? now[field] : {};
+      return Object.entries(after).flatMap(([key, v]) =>
+        line(`${field}.${key}`, field, now ? was[key] : null, v),
+      );
     });
   }
 
   /** 멈추기 · 재개의 바뀐 점 (상태 하나) */
-  static switched(
-    before: Readonly<Record<string, unknown>> | null,
-    op: string,
-  ): SettingChangeLine[] {
+  static switched(before: Values | null, op: string): SettingChangeLine[] {
     const after = op === 'pause' ? 'paused' : 'active';
     const was = before?.status ?? null;
     return was === after ? [] : [{ field: 'status', before: was, after, grant: false }];
+  }
+
+  /** 관리자 REST 본문 (에이전트: 보낸 칸만). C에서 결재에 실은 모양이라 그대로 둔다 */
+  static restBody(fields: Values): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(fields).map(([k, v]) => [restName(k), v]));
+  }
+
+  /** 관리자 REST 본문 (스케줄: 고치기는 설정 전부를 받으므로 지금 값 위에 바꿀 칸을 얹는다) */
+  static restBodyOver(names: readonly string[], fields: Values, now: Values | null) {
+    const base = now ? Object.fromEntries(names.map((k) => [k, now[k] ?? null] as const)) : {};
+    return SettingChanges.restBody({ ...base, ...fields });
   }
 
   /** 바깥으로 나가는 길(브라우저 · 커넥터)이 있는 에이전트는 설정을 읽거나 제안하지 못한다: 지시 · 레시피 글에 비공개가 섞인다 */
@@ -101,9 +78,11 @@ export class SettingChanges {
       );
   }
 
-  private static grants(field: string, before: unknown, after: unknown): boolean {
-    if (!SettingChanges.GRANTS.includes(field) || after === null || after === undefined)
-      return false;
+  /** 굵게 보일 줄: 권한을 더하는 칸이 새 값을 얻거나(목록은 새 항목), 모든 줄이 굵은 설정(플러그인)에서 바뀐 줄 */
+  private static grants(shape: SettingShape, field: string, before: unknown, after: unknown) {
+    if (after === null || after === undefined) return false;
+    if (shape.grants === 'all') return true;
+    if (!shape.grants.includes(field)) return false;
     if (!Array.isArray(after)) return after !== before;
     const had: readonly unknown[] = Array.isArray(before) ? before : [];
     return after.some((v) => !had.includes(v));

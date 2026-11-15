@@ -11,6 +11,7 @@ export {
   ApprovedActor,
   DeviceActor,
   OwnerActor,
+  SettingActor,
   SystemActor,
   VisitorActor,
 } from './base/actor';
@@ -81,6 +82,10 @@ export { LoginMethod } from './plugin/plugin-context';
 export { PluginManifest } from './plugin/plugin-manifest';
 export { PluginRegistry } from './plugin/plugin-registry';
 export { SecurityLog, type SecurityNew } from './security/security-log';
+export { SettingCatalogView, SettingOneView, type SettingShape } from './setting/setting.view';
+export { SettingChangeInput } from './setting/setting-change.input';
+export { type SettingChangeLine, type SettingKind, SettingKinds } from './setting/setting-kinds';
+export { SettingOutcome } from './setting/setting-outcome';
 export { ChangeStream } from './stream/change-stream';
 export { CoreWorkers } from './worker/core-workers';
 export { OutboxWorker } from './worker/outbox-worker';

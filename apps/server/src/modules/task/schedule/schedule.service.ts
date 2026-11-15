@@ -7,6 +7,9 @@ import {
   NoticeKind,
   Notices,
   RuleViolation,
+  SettingActor,
+  type SettingChangeInput,
+  SettingOutcome,
   type Sql,
   type VersionInput,
 } from '../../platform';
@@ -16,8 +19,7 @@ import { Chat } from '../chat/chat';
 import { ChatRepository } from '../chat/chat.repository';
 import { ChatHistory } from '../chat/chat-history.policy';
 import { GoalRepository } from '../goal/goal.repository';
-import type { ApprovedSettingInput } from '../setting-change/setting-change.input';
-import { SettingOutcome } from '../setting-change/setting-outcome';
+import { SettingChanges } from '../setting-change/setting-change.policy';
 import type { PromptTemplates } from '../skill/prompt-templates';
 import { SkillQuery } from '../skill/skill.query';
 import type { Task } from '../task/task';
@@ -77,26 +79,27 @@ export class ScheduleService extends EntityService<Schedule> {
     });
   }
 
+  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 C · D): 관리자의 고치기와 같은 줄(ScheduleEdit)을 지나고 저장하지 않는다 */
+  async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingActor.spaceOf(actor);
+    await this.transaction(async (tx) => {
+      await new ScheduleEdit(tx, spaceId).apply(change, new Date());
+    });
+  }
+
   /**
-   * 승인한 설정 바꾸기 (2026-11-15 C, ScheduleSettingHandler): 관리자의 고치기와 같은 줄(ScheduleEdit).
+   * 승인한 설정 바꾸기 (2026-11-15 C, SettingApplyHandler): 관리자의 고치기와 같은 줄(ScheduleEdit).
    * 결재마다 한 번만 적용하고 결과(task.setting.changed)를 남긴다. 승인한 뒤 바뀌었으면 실패로 끝난다
    */
-  async applyApproved(actor: Actor, req: ApprovedSettingInput): Promise<void> {
-    const spaceId = SettingOutcome.spaceOf(actor, req.approvalId);
+  async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, change.key);
     await SettingOutcome.settle(
       (work) => this.transaction(work),
+      SettingChanges.TOPIC,
       spaceId,
-      req.approvalId,
+      change.key,
       async (tx) => {
-        const edit = new ScheduleEdit(tx, spaceId);
-        const schedule = await edit.apply(
-          req.op,
-          req.targetId,
-          req.targetVersion,
-          req.body,
-          req.approvalId,
-          new Date(),
-        );
+        const schedule = await new ScheduleEdit(tx, spaceId).apply(change, new Date());
         await new ScheduleRepository(tx).save(schedule);
       },
     );

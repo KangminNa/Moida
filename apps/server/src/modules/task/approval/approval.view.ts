@@ -7,8 +7,20 @@ import type { ApprovalRow } from '../task.tables';
 function changesOf(payload: unknown) {
   const lines = (payload as { changes?: unknown } | null)?.changes;
   return Array.isArray(lines)
-    ? (lines as { field: string; before: unknown; after: unknown; grant: boolean }[])
+    ? (lines as {
+        field: string;
+        label?: string;
+        before: unknown;
+        after: unknown;
+        grant: boolean;
+      }[])
     : null;
+}
+
+/** 바꾸는 설정 (agent · goal · notice …, 2026-11-15 D). 설정 바꾸기가 아니면 null */
+function settingOf(payload: unknown): string | null {
+  const setting = (payload as { setting?: unknown } | null)?.setting;
+  return typeof setting === 'string' ? setting : null;
 }
 
 /** 결재 하나. 읽기와 쓰기가 같은 모양이다 */
@@ -30,6 +42,7 @@ export class ApprovalView {
       version: r.version,
       createdAt: r.created_at.toISOString(),
       changes: changesOf(r.payload),
+      setting: settingOf(r.payload),
     };
   }
 }
@@ -67,6 +80,7 @@ export class ApprovalProposedView {
       status: r.status,
       version: r.version,
       changes: changesOf(r.payload) ?? [],
+      setting: settingOf(r.payload),
     };
   }
 }

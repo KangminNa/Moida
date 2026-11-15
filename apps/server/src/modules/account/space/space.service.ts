@@ -9,6 +9,9 @@ import {
   Forbidden,
   NotFound,
   SecurityLog,
+  SettingActor,
+  type SettingChangeInput,
+  SettingOutcome,
 } from '../../platform';
 import { InstallPolicy } from './install.policy';
 import { Space } from './space';
@@ -21,8 +24,10 @@ import type {
 } from './space.input';
 import { SpaceQuery } from './space.query';
 import { SpaceRepository } from './space.repository';
+import { SpaceEdit } from './space-edit';
 
 // 공간 쓰기: 설치 코드 확인(공간 만들기), 블로그 이름·소개·사이트 주소 바꾸기, 로고, 앱 연결 허용.
+// 이름 · 소개는 대화에서 AI가 제안한 것을 승인해서도 바꾼다 (2026-11-15 D, SpaceEdit).
 @Injectable()
 export class SpaceService extends BaseService {
   /** 설치 코드는 한 곳에서 1분에 5번까지 */
@@ -94,6 +99,28 @@ export class SpaceService extends BaseService {
   }
 
   /** 주인만. 공간은 하나뿐이라 id 없이 잠근다. 나머지 순서는 EntityService.change와 같다 */
+  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 D): 같은 줄(SpaceEdit)을 지나고 저장하지 않는다 */
+  async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingActor.spaceOf(actor);
+    await this.transaction(async (tx) => {
+      await new SpaceEdit(tx, spaceId).apply(change);
+    });
+  }
+
+  /** 승인한 설정 바꾸기 (블로그 이름 · 소개): 결재마다 한 번 적용하고 결과(account.setting.changed)를 남긴다 */
+  async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, change.key);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      SettingOutcome.topicOf('account'),
+      spaceId,
+      change.key,
+      async (tx) => {
+        await new SpaceRepository(tx).save(await new SpaceEdit(tx, spaceId).apply(change));
+      },
+    );
+  }
+
   private change(actor: Actor, version: number, apply: (space: Space) => void): Promise<Space> {
     actor.assertOwner();
     return this.transaction(async (tx) => {

@@ -31,3 +31,37 @@ export class NoticeSettingsView {
     return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
   }
 }
+
+/**
+ * 대화로 바꾸는 알림 설정 (2026-11-15 D, get_settings notices). MCP라 snake_case, 칸 이름은 propose_setting의 fields와 같다.
+ * routes는 종류마다 지금 가는 곳 (정하지 않았으면 등급의 기본), kinds는 바꿀 수 있는 종류와 이름
+ */
+export class NoticeSettingView {
+  constructor(
+    private readonly row: Readonly<NoticeSettingRow>,
+    private readonly kinds: readonly {
+      kind: string;
+      label: string;
+      severity: string;
+      route: string;
+    }[],
+  ) {}
+
+  toJSON() {
+    const r = this.row;
+    const time = (m: number | null) =>
+      m === null
+        ? null
+        : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    return {
+      version: r.version,
+      digest: r.digest,
+      digest_time: time(r.digest_minute),
+      quiet_start: time(r.quiet_start),
+      quiet_end: time(r.quiet_end),
+      time_zone: r.time_zone,
+      routes: Object.fromEntries(this.kinds.map((k) => [k.kind, k.route])),
+      kinds: this.kinds.map((k) => ({ kind: k.kind, label: k.label, severity: k.severity })),
+    };
+  }
+}

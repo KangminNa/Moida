@@ -4,7 +4,7 @@ import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
 import { Database, OutboxWorker } from '../../platform';
 
-// 설정 바꾸기 제안 (2026-11-15 C): get_settings → propose_setting(미리 해 보기 + 결재 task.setting.change) → 승인 → 적용.
+// 설정 바꾸기 제안 (2026-11-15 C · D): get_settings → propose_setting(미리 해 보기 + 결재 task.setting.change) → 승인 → 적용.
 // 러너는 MCP로, 관리자는 REST로 들어오고 승인 뒤 적용은 outbox와 일꾼을 실제로 거친다. AI는 띄우지 않는다.
 
 // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 시험 (모양은 assert가 본다)
@@ -252,6 +252,278 @@ describe('설정 바꾸기: 읽기와 제안', () => {
     await decide(made.approval_id);
     const { schedules } = ok(await api.get('/api/schedules', owner));
     assert.ok((schedules as Json[]).some((s) => s.title === title));
+  });
+});
+
+describe('설정 바꾸기: 목록과 목표 (D)', () => {
+  test('kind 없이 읽으면 바꿀 수 있는 설정의 목록 (모듈이 등록한 것)', async () => {
+    const { token } = await partner();
+    const { kinds } = await call(token, 'get_settings');
+    const lists = (kinds as Json[]).map((k) => k.kind);
+    for (const kind of [
+      'team',
+      'schedules',
+      'goals',
+      'menus',
+      'site',
+      'notices',
+      'tidy',
+      'projects',
+      'plugins',
+    ])
+      assert.ok(lists.includes(kind), kind);
+    const goal = (kinds as Json[]).find((k) => k.kind === 'goals') as Json;
+    assert.deepEqual([goal.setting, goal.target], ['goal', 'id']);
+  });
+
+  test('목표 만들기 · 끝내기 제안은 승인 뒤에 적용된다. 상위 목표는 만들 때만', async () => {
+    const { token } = await partner();
+    const title = `분기 목표 ${randomUUID().slice(0, 6)}`;
+    const made = await call(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'goal',
+      op: 'create',
+      fields: { title, description: '이번 분기' },
+      note: '목표를 세워요',
+    });
+    assert.deepEqual(
+      (made.changes as Json[]).map((c) => c.field),
+      ['title', 'description'],
+    );
+    assert.equal(
+      (ok(await api.get('/api/goals', owner)).goals as Json[]).some((g) => g.title === title),
+      false,
+      '승인 전에는 없다',
+    );
+    await decide(made.approval_id);
+    const { goals } = await call(token, 'get_settings', { kind: 'goals' });
+    const goal = (goals as Json[]).find((g) => g.title === title) as Json;
+    assert.equal(goal.status, 'active');
+
+    const moved = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'goal',
+      op: 'edit',
+      target_id: goal.id,
+      version: goal.version,
+      fields: { parent_id: randomUUID() },
+      note: '옮겨요',
+    });
+    assert.equal(moved.body.code, 'rule_violation');
+    const done = await call(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'goal',
+      op: 'edit',
+      target_id: goal.id,
+      version: goal.version,
+      fields: { status: 'done' },
+      note: '끝났어요',
+    });
+    assert.deepEqual(
+      (done.changes as Json[]).map((c) => [c.field, c.before, c.after]),
+      [['status', 'active', 'done']],
+    );
+    await decide(done.approval_id);
+    const after = (ok(await api.get('/api/goals', owner)).goals as Json[]).find(
+      (g) => g.id === goal.id,
+    ) as Json;
+    assert.equal(after.status, 'done');
+  });
+});
+
+describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
+  const propose = (token: string, fields: Json) =>
+    call(token, 'propose_setting', { request_id: randomUUID(), note: '바꿔요', ...fields });
+
+  test('알림: 경로는 종류마다 한 줄(이름표와 함께), 승인 뒤 조용한 시간 · 경로가 바뀐다', async () => {
+    const { token } = await partner();
+    const { notices } = await call(token, 'get_settings', { kind: 'notices' });
+    const proposed = await propose(token, {
+      setting: 'notice',
+      op: 'edit',
+      version: notices.version,
+      fields: {
+        quiet_start: '23:00',
+        quiet_end: '07:00',
+        routes: { 'task.approval.requested': 'center' },
+      },
+    });
+    const route = (proposed.changes as Json[]).find(
+      (c) => c.field === 'routes.task.approval.requested',
+    ) as Json;
+    assert.deepEqual([route.label, route.before, route.after], ['승인 요청', 'push', 'center']);
+    await decide(proposed.approval_id);
+    const after = ok(await api.get('/api/notice-settings', owner));
+    assert.deepEqual([after.quietStart, after.quietEnd], ['23:00', '07:00']);
+    const kind = (after.kinds as Json[]).find((k) => k.kind === 'task.approval.requested') as Json;
+    assert.equal(kind.route, 'center');
+  });
+
+  test('알림: 모르는 종류 · 맞지 않는 시각은 제안하는 자리에서 막힌다', async () => {
+    const { token } = await partner();
+    const { notices } = await call(token, 'get_settings', { kind: 'notices' });
+    const strange = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'notice',
+      op: 'edit',
+      version: notices.version,
+      fields: { routes: { 'no.such.kind': 'off' } },
+      note: '왜',
+    });
+    assert.equal(strange.body.code, 'rule_violation');
+    const half = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'notice',
+      op: 'edit',
+      version: notices.version,
+      fields: { quiet_start: notices.quiet_start === null ? '22:00' : null },
+      note: '왜',
+    });
+    assert.equal(half.body.code, 'rule_violation', '조용한 시간은 시작과 끝을 함께');
+  });
+
+  test('사이트: 이름 · 소개만, 승인 뒤 바뀐다', async () => {
+    const { token } = await partner();
+    const { site } = await call(token, 'get_settings', { kind: 'site' });
+    const description = `소개 ${randomUUID().slice(0, 6)}`;
+    const proposed = await propose(token, {
+      setting: 'site',
+      op: 'edit',
+      version: site.version,
+      fields: { description },
+    });
+    await decide(proposed.approval_id);
+    assert.equal(ok(await api.get('/api/space', owner)).description, description);
+    const url = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'site',
+      op: 'edit',
+      version: site.version + 1,
+      fields: { site_url: 'https://evil.example' },
+      note: '왜',
+    });
+    assert.equal(url.body.code, 'invalid_request', '사이트 주소는 대화로 바꾸지 않는다');
+  });
+
+  test('세션 정리 · 프로젝트별 모으기: 승인 뒤 바뀌고, 그사이 관리자가 바꾼 프로젝트는 실패로 끝난다', async () => {
+    const { token } = await partner();
+    const { tidy } = await call(token, 'get_settings', { kind: 'tidy' });
+    const turned = await propose(token, {
+      setting: 'tidy',
+      op: 'edit',
+      version: tidy.version,
+      fields: { auto_tidy: !tidy.auto_tidy, cadence: 'daily' },
+    });
+    await decide(turned.approval_id);
+    assert.equal(ok(await api.get('/api/tidy/settings', owner)).autoTidy, !tidy.auto_tidy);
+
+    const project = `proj-${randomUUID().slice(0, 6)}`;
+    const off = await propose(token, {
+      setting: 'projects',
+      op: 'edit',
+      fields: { collect: { [project]: false } },
+    });
+    assert.deepEqual(
+      (off.changes as Json[]).map((c) => [c.field, c.before, c.after]),
+      [[`collect.${project}`, true, false]],
+    );
+    await decide(off.approval_id);
+    const rules = ok(await api.get('/api/project-rules', owner)).projects as Json[];
+    assert.equal(rules.find((r) => r.project === project)?.collect, false);
+
+    const { job, token: other } = await partner();
+    const later = `proj-${randomUUID().slice(0, 6)}`;
+    const stale = await propose(other, {
+      setting: 'projects',
+      op: 'edit',
+      fields: { collect: { [later]: false } },
+    });
+    ok(await api.request('PUT', '/api/project-rules', owner, { project: later, collect: false }));
+    await decide(stale.approval_id);
+    const task = ok(await api.get(`/api/tasks/${job.task.id}`, owner));
+    assert.notEqual(task.status, 'waiting');
+    const approval = ok(await api.get(`/api/approvals/${stale.approval_id}`, owner));
+    assert.notEqual(approval.status, 'pending');
+  });
+
+  test('블로그 메뉴: 만들기는 승인 뒤에 생기고, 종류는 만들 때만', async () => {
+    const { token } = await partner();
+    const name = `메뉴 ${randomUUID().slice(0, 6)}`;
+    const made = await propose(token, {
+      setting: 'menu',
+      op: 'create',
+      fields: { name, kind: 'posts', slug: `m-${randomUUID().slice(0, 6)}`, policy: '짧게' },
+    });
+    await decide(made.approval_id);
+    const { menus } = await call(token, 'get_settings', { kind: 'menus' });
+    const menu = (menus as Json[]).find((m) => m.name === name) as Json;
+    assert.deepEqual([menu.kind, menu.policy], ['posts', '짧게']);
+    const kind = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'menu',
+      op: 'edit',
+      target_id: menu.id,
+      version: menu.version,
+      fields: { kind: 'issues' },
+      note: '왜',
+    });
+    assert.equal(kind.body.code, 'rule_violation');
+  });
+});
+
+describe('설정 바꾸기: 플러그인 설정 (D)', () => {
+  const giscus = { repo: 'me/blog', repoId: 'R_1', category: 'Comments', categoryId: 'DIC_1' };
+
+  test('켜진 플러그인의 비밀이 아닌 칸만. 줄은 모두 굵고 이름표는 목록 파일의 label, 비밀 칸은 값을 보이지 않는다', async () => {
+    ok(
+      await api.request('PUT', '/api/plugins/comments-giscus/settings', owner, { values: giscus }),
+    );
+    ok(await api.request('POST', '/api/plugins/comments-giscus/enable', owner));
+    try {
+      const { token } = await partner();
+      const { plugins } = await call(token, 'get_settings', { kind: 'plugins' });
+      const listed = (plugins as Json[]).find((p) => p.name === 'comments-giscus') as Json;
+      assert.equal(listed.enabled, true);
+      const sync = (plugins as Json[]).find((p) => p.name === 'sync-github') as Json;
+      const secret = (sync.settings as Json[]).find((s) => s.key === 'token') as Json;
+      assert.deepEqual(['value' in secret, typeof secret.set], [false, 'boolean']);
+
+      const proposed = await call(token, 'propose_setting', {
+        request_id: randomUUID(),
+        setting: 'plugin',
+        op: 'edit',
+        target_name: 'comments-giscus',
+        fields: { repo: 'me/other' },
+        note: '저장소를 옮겼어요',
+      });
+      const [line] = proposed.changes as Json[];
+      assert.deepEqual(
+        [line?.field, line?.before, line?.after, line?.grant],
+        ['repo', 'me/blog', 'me/other', true],
+      );
+      assert.equal(typeof line?.label, 'string');
+      await decide(proposed.approval_id);
+      assert.equal(
+        ok(await api.get('/api/plugins/comments-giscus/settings')).settings.repo,
+        'me/other',
+      );
+
+      const off = await tool(token, 'propose_setting', {
+        request_id: randomUUID(),
+        setting: 'plugin',
+        op: 'edit',
+        target_name: 'sync-github',
+        fields: { token: 'x' },
+        note: '왜',
+      });
+      assert.equal(
+        off.body.code,
+        'rule_violation',
+        '꺼진 플러그인 · 비밀 칸은 대화로 바꾸지 않는다',
+      );
+    } finally {
+      await api.request('POST', '/api/plugins/comments-giscus/disable', owner);
+    }
   });
 });
 

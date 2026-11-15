@@ -14,4 +14,14 @@ export class ProjectRuleRepository extends BaseRepository<ProjectRule> {
       ON CONFLICT (space_id, project) DO UPDATE
         SET collect = EXCLUDED.collect, updated_at = EXCLUDED.updated_at`;
   }
+
+  /** 프로젝트마다 지금 모으는가 (규칙이 없으면 모은다). 잠그지 않는다: 규칙은 늘 덮어쓴다 */
+  async collects(spaceId: string, projects: readonly string[]): Promise<Record<string, boolean>> {
+    const rows = await this.sql<Pick<ProjectRuleRow, 'project' | 'collect'>[]>`
+      SELECT project, collect FROM vault.project_rules
+      WHERE space_id = ${spaceId} AND project = ANY(${projects as string[]})`;
+    return Object.fromEntries(
+      projects.map((p) => [p, rows.find((r) => r.project === p)?.collect ?? true]),
+    );
+  }
 }

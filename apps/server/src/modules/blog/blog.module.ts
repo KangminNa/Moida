@@ -9,6 +9,7 @@ import { BasketQuery } from './basket/basket.query';
 import { BasketService } from './basket/basket.service';
 import { BasketGetTool, KeepPageTool } from './basket/basket.tool';
 import { BlogNotices } from './blog-notices';
+import { BlogSettings } from './blog-settings';
 import { BlogTools } from './blog-tools';
 import { Issue } from './issue/issue';
 import { IssueController } from './issue/issue.api';
@@ -38,6 +39,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
   imports: [VaultModule],
   providers: [
     BlogNotices,
+    BlogSettings,
     PostService,
     PostQuery,
     PostArchiveQuery,

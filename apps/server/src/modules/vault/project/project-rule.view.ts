@@ -21,3 +21,27 @@ export class ProjectRuleListView {
     };
   }
 }
+
+/** 대화로 바꾸는 프로젝트별 모으기 (2026-11-15 D, get_settings projects). MCP라 snake_case */
+export class ProjectSettingsView {
+  constructor(private readonly rows: readonly ProjectLine[]) {}
+
+  toJSON() {
+    return {
+      projects: this.rows.map((r) => ({
+        project: r.project,
+        collect: r.collect,
+        sessions: r.sessions,
+      })),
+    };
+  }
+}
+
+/** 제안한 프로젝트들의 지금 값 (바뀐 줄의 바탕): { collect: { 프로젝트: 모으는가 } } */
+export class ProjectCollectView {
+  constructor(private readonly collect: Readonly<Record<string, boolean>>) {}
+
+  toJSON() {
+    return { collect: this.collect };
+  }
+}

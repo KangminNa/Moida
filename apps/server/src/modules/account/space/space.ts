@@ -1,6 +1,6 @@
 import { BaseEntity, type ColumnRules, RuleViolation, TableEntity } from '../../platform';
 import type { SpaceNew, SpaceRow } from '../account.tables';
-import { type LoadedSpace, SpaceView } from './space.view';
+import { type LoadedSpace, SpaceSettingView, SpaceView } from './space.view';
 
 // 블로그 공간 하나: 이름·소개와 사이트 주소(방문자가 들어오는 바깥 주소), 앱 연결 허용. 지금은 공간이 하나뿐이다.
 // 이름만 spaces의 칸이고 나머지는 settings 표의 값이다. 저장할 때 설정을 모두 다시 적는다 (빈 값은 행을 지운다).
@@ -63,6 +63,11 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
   /** ChatGPT·Claude 앱 연결 허용 (왜 기본이 꺼짐인지는 SpaceView.hostedApps) */
   allowHostedApps(on: boolean): void {
     this.settings = { ...this.settings, [SpaceView.HOSTED_APPS]: on };
+  }
+
+  /** 대화로 바꾸는 사이트의 지금 값 (2026-11-15 D, get_settings site) */
+  settingView(): SpaceSettingView {
+    return new SpaceSettingView({ ...this.row, settings: this.settings });
   }
 
   /** installed: 주인이 있는가. 저장한 공간은 주인만 고칠 수 있으니 설치가 끝난 공간이다 */

@@ -7,6 +7,20 @@ import type { SpaceRow } from '../account.tables';
 /** 공간 한 줄과 함께 읽은 설정들 (키 → 값) */
 export type LoadedSpace = SpaceRow & { settings: Readonly<Record<string, unknown>> | null };
 
+/** 대화로 바꾸는 사이트 (2026-11-15 D, get_settings site). MCP라 snake_case, 이름 · 소개만 */
+export class SpaceSettingView {
+  constructor(private readonly row: Readonly<LoadedSpace>) {}
+
+  toJSON() {
+    const description = this.row.settings?.[SpaceView.DESCRIPTION];
+    return {
+      version: this.row.version,
+      name: this.row.name,
+      description: typeof description === 'string' ? description : '',
+    };
+  }
+}
+
 /** 블로그 정보 (누구나). version은 고칠 때 돌려보낸다 */
 export class SpaceView {
   static readonly DESCRIPTION = 'blog.description';

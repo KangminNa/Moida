@@ -1,4 +1,4 @@
-import { BaseEntity, DomainEvent, RuleViolation, TableEntity } from '../../platform';
+import { BaseEntity, DomainEvent, RuleViolation, SettingKinds, TableEntity } from '../../platform';
 import type { Agent } from '../agent/agent';
 import type { GoalRun } from '../goal-run/goal-run';
 import { Task } from '../task/task';
@@ -33,8 +33,8 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   /** 서버가 올리는 동작: 대화 한 회차의 결과 카드 (대상은 대화, 판은 회차) */
   static readonly CARD = 'task.chat.result';
   static readonly CHAT = 'chat';
-  /** 설정 바꾸기 (2026-11-15 C): 바뀔 값은 payload에 (propose_setting이 미리 적용해 보고 올린다) */
-  static readonly SETTING_CHANGE = 'task.setting.change';
+  /** 설정 바꾸기 (2026-11-15 C · D): 바뀔 값은 payload에 (propose_setting이 미리 적용해 보고 올린다). 이름은 platform이 갖는다 */
+  static readonly SETTING_CHANGE = SettingKinds.ACTION;
   /**
    * 대화 상대(관리자 바로 아래)가 승인 동작에 넣지 않아도 올리는 동작 (2026-11-15 C): 설정 바꾸기 · 코드 작업 열기.
    * 대화가 곧 설정 창구라서다. 모두 승인 뒤에만 실행되고, 팀원은 승인 동작에 넣어 준 경우만

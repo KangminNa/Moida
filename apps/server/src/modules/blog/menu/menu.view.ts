@@ -83,3 +83,32 @@ export class ToolMenuView {
     };
   }
 }
+
+/** 대화로 바꾸는 메뉴 한 줄 (2026-11-15 D, get_settings menus). MCP라 snake_case, 칸 이름은 propose_setting의 fields와 같다 */
+export class MenuSettingView {
+  constructor(private readonly row: Readonly<MenuRow>) {}
+
+  toJSON() {
+    const r = this.row;
+    return {
+      id: r.id,
+      version: r.version,
+      name: r.name,
+      slug: r.slug,
+      kind: r.kind,
+      policy: r.policy,
+      agent_id: r.agent_id,
+      rss: r.rss,
+      sort: r.sort,
+    };
+  }
+}
+
+/** get_settings { kind: menus }: 메뉴 줄의 순서대로 */
+export class MenuSettingsView {
+  constructor(private readonly rows: readonly MenuRow[]) {}
+
+  toJSON() {
+    return { menus: this.rows.map((r) => new MenuSettingView(r).toJSON()) };
+  }
+}

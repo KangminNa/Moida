@@ -1,11 +1,19 @@
 import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseQuery, type Blob, BlobStore, Database, NotFound } from '../../platform';
+import {
+  type Actor,
+  BaseQuery,
+  type Blob,
+  BlobStore,
+  Database,
+  NotFound,
+  SettingActor,
+} from '../../platform';
 import { spaceMembers, spaces } from '../account.schema';
 import { InstallPolicy } from './install.policy';
 import { Space } from './space';
 import { SpaceRepository } from './space.repository';
-import { InstallStatusView, SpaceView } from './space.view';
+import { InstallStatusView, type SpaceSettingView, SpaceView } from './space.view';
 
 /** 로고 파일 하나 (누구나 본다: 블로그 머리에 보인다) */
 export class LogoFile {
@@ -33,6 +41,14 @@ export class SpaceQuery extends BaseQuery {
     const space = await new SpaceRepository(this.sql).current();
     const installed = await this.hasOwner();
     return space?.view(installed) ?? new SpaceView(null, installed);
+  }
+
+  /** 대화로 바꾸는 사이트의 지금 값 (2026-11-15 D, get_settings site). 확인을 거친 제안자만 */
+  async setting(actor: Actor): Promise<SpaceSettingView> {
+    const spaceId = SettingActor.spaceOf(actor);
+    const space = await new SpaceRepository(this.sql).current();
+    if (!space || space.id !== spaceId) throw new NotFound('블로그 공간을 찾을 수 없어요');
+    return space.settingView();
   }
 
   /** 사이트 로고 (누구나). 없으면 404: 화면은 Cairn 표시를 그린다 */

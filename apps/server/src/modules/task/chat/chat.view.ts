@@ -141,8 +141,20 @@ export class ChatTurnView {
 function changesOf(payload: unknown) {
   const lines = (payload as { changes?: unknown } | null)?.changes;
   return Array.isArray(lines)
-    ? (lines as { field: string; before: unknown; after: unknown; grant: boolean }[])
+    ? (lines as {
+        field: string;
+        label?: string;
+        before: unknown;
+        after: unknown;
+        grant: boolean;
+      }[])
     : null;
+}
+
+/** 바꾸는 설정 (agent · goal · notice …, 2026-11-15 D). 설정 바꾸기가 아니면 null */
+function settingOf(payload: unknown): string | null {
+  const setting = (payload as { setting?: unknown } | null)?.setting;
+  return typeof setting === 'string' ? setting : null;
 }
 
 /**
@@ -177,6 +189,7 @@ export class ChatCardView {
           note: a.note,
           mime: null as string | null,
           changes: changesOf(a.payload),
+          setting: settingOf(a.payload),
         })),
         ...this.outputs.map((o) => ({
           kind: 'output',
@@ -188,6 +201,7 @@ export class ChatCardView {
           note: null as string | null,
           mime: o.mime as string | null,
           changes: null as ReturnType<typeof changesOf>,
+          setting: null as string | null,
         })),
       ],
       /** 받을 것과 검사 (받을 것을 정하지 않았으면 deliver null, passed true) */

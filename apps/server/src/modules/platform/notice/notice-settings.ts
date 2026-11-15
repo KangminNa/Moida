@@ -2,7 +2,7 @@ import { RuleViolation } from '../base/errors';
 import { TableEntity } from '../base/table-entity';
 import type { NoticeSettingNew, NoticeSettingRow } from '../platform.tables';
 import { NoticeKind, type NoticeRoute } from './notice-kind';
-import { NoticeSettingsView } from './notice-settings.view';
+import { NoticeSettingsView, NoticeSettingView } from './notice-settings.view';
 
 /** notice_settings 한 줄. 공간마다 한 행이라 엔티티의 id는 공간 id다 */
 export interface LoadedNoticeSettings extends NoticeSettingRow {
@@ -76,6 +76,28 @@ export class NoticeSettings extends TableEntity<
     this.put('updated_at', now);
   }
 
+  /**
+   * 칸 몇 개만 바꾼다 (대화로 바꾸는 설정, 2026-11-15 D). 나머지는 지금 값, 경로는 지금 정한 경로 위에 얹는다.
+   * 규칙은 configure와 같다
+   */
+  adjust(changes: Partial<NoticeSettingRow>, known: readonly string[], now: Date): void {
+    const r = this.row;
+    const routes = (r.routes ?? {}) as Record<string, unknown>;
+    this.configure(
+      {
+        digest: r.digest,
+        digest_minute: r.digest_minute,
+        quiet_start: r.quiet_start,
+        quiet_end: r.quiet_end,
+        time_zone: r.time_zone,
+        ...changes,
+        routes: { ...routes, ...((changes.routes ?? {}) as Record<string, unknown>) },
+      },
+      known,
+      now,
+    );
+  }
+
   get timeZone(): string {
     return this.row.time_zone;
   }
@@ -107,6 +129,19 @@ export class NoticeSettings extends TableEntity<
 
   view(kinds: readonly NoticeKind[]): NoticeSettingsView {
     return new NoticeSettingsView(
+      this.row,
+      kinds.map((k) => ({
+        kind: k.kind,
+        label: k.label,
+        severity: k.severity,
+        route: this.routeOf(k),
+      })),
+    );
+  }
+
+  /** 대화로 바꾸는 설정의 지금 값 (get_settings notices). 경로는 종류마다 지금 가는 곳 */
+  settingView(kinds: readonly NoticeKind[]): NoticeSettingView {
+    return new NoticeSettingView(
       this.row,
       kinds.map((k) => ({
         kind: k.kind,

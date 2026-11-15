@@ -68,7 +68,7 @@ export function ChatCardForm({
                     : '결과물 · 고르지 않으면 휴지통'}
                   {item.note ? ` · ${item.note}` : ''}
                 </small>
-                {item.changes && <ChangeLines lines={item.changes} />}
+                {item.changes && <ChangeLines lines={item.changes} setting={item.setting} />}
               </span>
             </label>
             {item.kind === 'output' ? (

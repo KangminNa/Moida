@@ -1,4 +1,10 @@
-import { Actor, RuleViolation, type Sql } from '../../platform';
+import {
+  Actor,
+  RuleViolation,
+  type SettingChangeInput,
+  type SettingShape,
+  type Sql,
+} from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
 import { GoalRepository } from '../goal/goal.repository';
 import type { ScheduleRow } from '../task.tables';
@@ -12,6 +18,35 @@ import { ScheduleRepository } from './schedule.repository';
  * 가리키는 담당 · 목표 · 앞 레시피를 확인하고 엔티티 메서드를 부른다. 저장은 부르는 쪽이 정한다
  */
 export class ScheduleEdit {
+  /** 대화로 바꾸는 스케줄(레시피) (get_settings schedules · propose_setting schedule, 2026-11-15 C) */
+  static readonly SETTING: SettingShape = {
+    setting: 'schedule',
+    list: 'schedules',
+    ops: ['create', 'edit'],
+    fields: [
+      'title',
+      'agent_id',
+      'enabled',
+      'mode',
+      'at_time',
+      'weekdays',
+      'every_hours',
+      'time_zone',
+      'instruction',
+      'goal_id',
+      'page_id',
+      'destination',
+      'deliver',
+      'rules',
+      'trigger',
+      'after_id',
+      'daily_max',
+    ],
+    target: 'id',
+    versioned: true,
+    grants: [],
+  };
+
   constructor(
     private readonly tx: Sql,
     private readonly spaceId: string,
@@ -35,10 +70,14 @@ export class ScheduleEdit {
    * 설정 바꾸기 하나 (2026-11-15 C): 제안의 미리 해 보기와 승인 뒤 적용이 같은 줄.
    * body는 관리자 REST(POST · PATCH api/schedules)와 같은 본문 (고치기는 설정 전부), key는 만들기의 requestId (결재 id)
    */
-  apply(op: string, id: string, version: number, body: object, key: string, now: Date) {
-    if (op === 'create')
-      return this.open(CreateScheduleInput.from({ ...body, requestId: key }), now);
-    return this.update(UpdateScheduleInput.from(id, { ...body, version }), now);
+  apply(change: SettingChangeInput, now: Date): Promise<Schedule> {
+    const { body, version } = change;
+    if (change.op === 'create')
+      return this.open(CreateScheduleInput.from({ ...body, requestId: change.key }), now);
+    return this.update(
+      UpdateScheduleInput.from(String(change.targetId), { ...body, version }),
+      now,
+    );
   }
 
   private async assertRefs(settings: Partial<ScheduleRow>, self: string | null = null) {

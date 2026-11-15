@@ -139,6 +139,20 @@ export class PluginState extends BaseEntity {
     );
   }
 
+  /** 비밀이 아닌 설정의 지금 값 (기본값 적용). 대화로 바꾸는 설정의 지금 값 (2026-11-15 D) */
+  plainValues(manifest: PluginManifest): Record<string, string> {
+    return Object.fromEntries(
+      manifest.settings
+        .filter((spec) => !spec.isSecret)
+        .map((spec) => [spec.key, this.settings.get(spec.key)?.value ?? spec.defaultValue]),
+    );
+  }
+
+  /** 넣어 둔 값이 있는가 (비밀값은 이것만 보인다) */
+  hasValue(key: string): boolean {
+    return this.settings.has(key);
+  }
+
   /** 필수인데 비어 있는 설정 이름 */
   missingRequired(manifest: PluginManifest): readonly string[] {
     return manifest.settings

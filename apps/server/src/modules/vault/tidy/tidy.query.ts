@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Actor, BaseQuery } from '../../platform';
+import { Actor, BaseQuery, SettingActor } from '../../platform';
 import { tidySettings } from '../vault.schema';
-import { TidySettingsView } from './tidy.view';
+import { TidySettingsView, TidySettingView } from './tidy.view';
 import type { TidySessionRow } from './tidy-settings';
 
 // 세션 정리 읽기: 설정(주인), 정리를 맡길 세션. 자동 정리는 일꾼이 SystemActor로 읽는다.
@@ -21,6 +21,16 @@ export class TidyQuery extends BaseQuery {
       { columns: ['auto_tidy', 'cadence', 'daily_at', 'version'] },
     );
     return new TidySettingsView(row ?? { auto_tidy: false, version: 0 });
+  }
+
+  /** 대화로 바꾸는 설정의 지금 값 (2026-11-15 D, get_settings tidy). 확인을 거친 제안자만 */
+  async setting(actor: Actor): Promise<TidySettingView> {
+    const row = await this.row(
+      tidySettings,
+      { space_id: SettingActor.spaceOf(actor) },
+      { columns: ['auto_tidy', 'cadence', 'version'] },
+    );
+    return new TidySettingView(row ?? { auto_tidy: false, version: 0 });
   }
 
   /** 하루 한 번의 차례가 된 공간 (일꾼, 2차 7단계): 자동 정리가 켜졌고 하루 한 번이고 지난 차례에서 하루가 지났다 */

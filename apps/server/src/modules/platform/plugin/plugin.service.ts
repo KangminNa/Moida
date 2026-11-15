@@ -1,16 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { Actor } from '../base/actor';
+import { Actor, SettingActor } from '../base/actor';
 import type { ActionResult } from '../base/base-action';
 import { BaseService } from '../base/base-service';
 import { Database } from '../base/database';
 import { NotFound } from '../base/errors';
 import { SecretBox } from '../base/secret-box';
+import type { SettingChangeInput } from '../setting/setting-change.input';
+import { SettingOutcome } from '../setting/setting-outcome';
 import { PluginRepository } from './plugin.repository';
+import { PluginEdit } from './plugin-edit';
 import type { PluginManifest } from './plugin-manifest';
 import { PluginRegistry } from './plugin-registry';
 import { PluginState } from './plugin-state';
 
 // 플러그인 켜기·끄기·설정 바꾸기. 주인만. 설치 마법사·관리 화면·명령줄이 모두 이것을 부른다.
+// 켜진 플러그인의 비밀이 아닌 설정은 대화에서 AI가 제안한 것을 승인해서도 바꾼다 (2026-11-15 D, PluginEdit).
 // 저장과 함께 platform.plugin.changed 이벤트가 남고, 일꾼이 받아 재시작 없이 다시 등록한다.
 @Injectable()
 export class PluginService extends BaseService {
@@ -53,6 +57,30 @@ export class PluginService extends BaseService {
         state.set(spec, value.trim(), this.box);
       }
     });
+  }
+
+  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 D): 같은 규칙(PluginEdit)을 지나고 저장하지 않는다 */
+  async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    SettingActor.spaceOf(actor);
+    await this.transaction(async (tx) => {
+      await new PluginEdit(tx, this.registry, this.box).apply(change);
+    });
+  }
+
+  /** 승인한 설정 바꾸기: 결재마다 한 번 적용하고 결과(platform.setting.changed)를 남긴 뒤 다시 등록한다 */
+  async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, change.key);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      SettingOutcome.topicOf('platform'),
+      spaceId,
+      change.key,
+      async (tx) => {
+        const state = await new PluginEdit(tx, this.registry, this.box).apply(change);
+        await new PluginRepository(tx).save(state, `${actor.kind}:${actor.id ?? ''}`);
+      },
+    );
+    await this.registry.reload();
   }
 
   /**

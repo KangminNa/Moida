@@ -34,6 +34,7 @@ import { TidyRequestHandler } from './tidy/tidy-request.handler';
 import { ArchiveController } from './vault-archive.api';
 import { VaultArchiveQuery } from './vault-archive.query';
 import { VaultNotices } from './vault-notices';
+import { VaultSettings } from './vault-settings';
 import { VaultTools } from './vault-tools';
 import { WikiController } from './wiki/wiki.api';
 import { WikiQuery } from './wiki/wiki.query';
@@ -48,6 +49,7 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
 @Module({
   providers: [
     VaultNotices,
+    VaultSettings,
     SessionService,
     SessionQuery,
     SaveSessionTool,

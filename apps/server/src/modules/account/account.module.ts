@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { BlobStore, PasswordHasher, SecretBox } from '../platform';
 import { AccountNotices } from './account-notices';
 import { AccountSecurity } from './account-security';
+import { AccountSettings } from './account-settings';
 import { DeviceController } from './device/device.api';
 import { DeviceQuery } from './device/device.query';
 import { DeviceService } from './device/device.service';
@@ -26,6 +27,7 @@ import { SpaceService } from './space/space.service';
 @Module({
   providers: [
     AccountNotices,
+    AccountSettings,
     AccountSecurity,
     {
       provide: InstallPolicy,

@@ -1,10 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, EntityService, Idempotency, type Sql } from '../../platform';
-import { Goal } from './goal';
+import {
+  type Actor,
+  EntityService,
+  Idempotency,
+  SettingActor,
+  type SettingChangeInput,
+  SettingOutcome,
+  type Sql,
+} from '../../platform';
+import { SettingChanges } from '../setting-change/setting-change.policy';
+import type { Goal } from './goal';
 import type { CreateGoalInput, GoalStatusInput, UpdateGoalInput } from './goal.input';
 import { GoalRepository } from './goal.repository';
+import { GoalEdit } from './goal-edit';
 
-// 목표 쓰기: 만들기, 고치기, 상태 바꾸기. 목표를 정하는 건 주인만 (AI는 목표를 읽기만 한다).
+// 목표 쓰기: 만들기, 고치기, 상태 바꾸기. 목표를 정하는 건 주인이다: 화면에서 바로, 또는 대화에서 AI가 제안한 것을
+// 승인해서 (2026-11-15 D, 설정 바꾸기). 만들기는 GoalEdit 한 줄을 함께 지난다.
 @Injectable()
 export class GoalService extends EntityService<Goal> {
   private static readonly CREATE = 'create_goal';
@@ -22,10 +33,7 @@ export class GoalService extends EntityService<Goal> {
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, GoalService.CREATE);
       const before = await once.previous();
       if (before) return goals.load(spaceId, String(before.goalId));
-      // 부모를 잠가 두고 만든다: 그사이 부모가 끝나면 끝난 목표 아래에 생긴다
-      const parent = req.parentId === null ? null : await goals.lock(spaceId, req.parentId);
-      const depth = parent ? await goals.depthOf(parent.id) : 0;
-      const goal = Goal.open(spaceId, parent, depth, req.fields, new Date());
+      const goal = await new GoalEdit(tx, spaceId).open(req, new Date());
       await goals.save(goal);
       await once.remember({ goalId: goal.id });
       return goal;
@@ -40,5 +48,29 @@ export class GoalService extends EntityService<Goal> {
   /** 끝내기 · 그만두기 · 다시 열기. 이어진 작업은 그대로 간다 */
   changeStatus(actor: Actor, req: GoalStatusInput): Promise<Goal> {
     return this.changeAsOwner(actor, req, (goal) => goal.changeStatus(req.status));
+  }
+
+  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 D): 같은 줄(GoalEdit)을 지나고 저장하지 않는다 */
+  async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingActor.spaceOf(actor);
+    await this.transaction(async (tx) => {
+      await new GoalEdit(tx, spaceId).apply(change, new Date());
+    });
+  }
+
+  /** 승인한 설정 바꾸기: 결재마다 한 번 적용하고 결과(task.setting.changed)를 남긴다. 승인한 뒤 바뀌었으면 실패 */
+  async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, change.key);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      SettingChanges.TOPIC,
+      spaceId,
+      change.key,
+      async (tx) => {
+        await new GoalRepository(tx).save(
+          await new GoalEdit(tx, spaceId).apply(change, new Date()),
+        );
+      },
+    );
   }
 }

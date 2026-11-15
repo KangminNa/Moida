@@ -38,3 +38,30 @@ export class GoalListView {
     return { goals: this.goals.map((g) => g.toJSON()), next: null };
   }
 }
+
+/** 대화로 바꾸는 목표 한 줄 (2026-11-15 D, get_settings goals). MCP라 snake_case, 칸 이름은 propose_setting의 fields와 같다 */
+export class GoalSettingView {
+  constructor(private readonly row: Readonly<GoalRow>) {}
+
+  toJSON() {
+    const r = this.row;
+    return {
+      id: r.id,
+      version: r.version,
+      parent_id: r.parent_id,
+      title: r.title,
+      description: r.description,
+      status: r.status,
+      sort: r.sort,
+    };
+  }
+}
+
+/** get_settings { kind: goals }: 목표 전부 (순서 → 만든 순서, 끝난 · 그만둔 것도) */
+export class GoalSettingsView {
+  constructor(private readonly rows: readonly GoalRow[]) {}
+
+  toJSON() {
+    return { goals: this.rows.map((r) => new GoalSettingView(r).toJSON()) };
+  }
+}

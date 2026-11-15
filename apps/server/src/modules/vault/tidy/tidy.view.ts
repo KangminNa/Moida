@@ -24,6 +24,23 @@ export class TidySettingsView {
 }
 
 /** 쌓인 세션 정리를 요청한 결과 */
+/** 대화로 바꾸는 세션 정리 (2026-11-15 D, get_settings tidy). MCP라 snake_case */
+export class TidySettingView {
+  constructor(
+    private readonly row: Readonly<
+      Pick<TidySettingRow, 'auto_tidy' | 'version'> & Partial<Pick<TidySettingRow, 'cadence'>>
+    >,
+  ) {}
+
+  toJSON() {
+    return {
+      version: this.row.version,
+      auto_tidy: this.row.auto_tidy,
+      cadence: this.row.cadence ?? 'daily',
+    };
+  }
+}
+
 export class TidyBacklogView {
   constructor(
     private readonly requested: number,

@@ -56,6 +56,7 @@
 
 `blog.page.changed` (v1: pageId, name, currentSeq, visibility. 페이지가 생기거나 판이 붙거나 보이는 판 · 공개 범위 · 제목 · 방향이 바뀔 때. 화면의 변경 신호로 쓴다)
 `blog.issue.published` (v1: issueId, menuId, number, title, 결재한 발행이면 approvalId · outcome done) · `blog.issue.publish_failed` (issueId, approvalId, outcome failed, error). 결재 결과는 task가 받아 작업을 끝낸다. 호와 함께 공개된 글마다 `blog.post.published`도 난다 (approvalId 없이)
+`blog.setting.changed` (v1: approvalId, outcome, error?. 승인한 블로그 메뉴 설정 바꾸기의 결과, 2026-11-15 D: `MenuEdit` · `BlogSettings`, 관리자의 만들기 · 고치기와 같은 줄. 종류는 만들 때만)
 `blog.page.pending` (v1: pageId, title, seq. 공개 페이지에 확인 대기 판이 생김) · `blog.page.shown` (v1: pageId, seq. 대기 판을 보임). 받는 모듈은 없고 알림(`BlogNotices`)만 만든다
 
 받는 이벤트: `task.approval.granted` 중 `action`이 `blog.post.publish` · `blog.issue.publish`인 것만 (`CoreWorkers.expect`도 여기서 적는다).

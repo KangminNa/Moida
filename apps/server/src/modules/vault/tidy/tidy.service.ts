@@ -1,13 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { Actor, Database, EntityService, type Sql } from '../../platform';
+import {
+  Actor,
+  Database,
+  EntityService,
+  SettingActor,
+  type SettingChangeInput,
+  SettingOutcome,
+  type Sql,
+} from '../../platform';
 import { SessionRepository } from '../session/session.repository';
 import type { SaveTidySettingsInput, SessionSavedInput } from './tidy.input';
 import { TidyQuery } from './tidy.query';
 import { TidyBacklogView, type TidySettingsView } from './tidy.view';
+import { TidyEdit } from './tidy-edit';
 import type { TidySessionRow, TidySettings } from './tidy-settings';
 import { TidySettingsRepository } from './tidy-settings.repository';
 
-// 세션 정리 쓰기: 자동 정리 켜고 끄기(주인), 저장 뒤 자동 요청(일꾼), 쌓인 세션 요청(주인).
+// 세션 정리 쓰기: 자동 정리 켜고 끄기(주인, 대화에서 제안한 것의 승인도 2026-11-15 D), 저장 뒤 자동 요청(일꾼), 쌓인 세션 요청(주인).
 // 일을 직접 만들지 않는다: 일 요청 이벤트를 outbox에 남기고, 같은 판은 requestId로 작업 하나가 된다.
 // 요청한 판은 같은 트랜잭션에서 세션에 적는다 (`tidy_requested_seq`). 이미 적힌 판은 다시 요청하지 않는다.
 @Injectable()
@@ -32,6 +41,30 @@ export class TidyService extends EntityService<TidySettings> {
       found.turn(req.autoTidy, req.cadence, new Date()),
     );
     return settings.view();
+  }
+
+  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 D): 같은 줄(TidyEdit)을 지나고 저장하지 않는다 */
+  async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingActor.spaceOf(actor);
+    await this.transaction(async (tx) => {
+      await new TidyEdit(tx, spaceId).apply(change, new Date());
+    });
+  }
+
+  /** 승인한 설정 바꾸기: 결재마다 한 번 적용하고 결과(vault.setting.changed)를 남긴다 */
+  async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, change.key);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      SettingOutcome.topicOf('vault'),
+      spaceId,
+      change.key,
+      async (tx) => {
+        await new TidySettingsRepository(tx).save(
+          await new TidyEdit(tx, spaceId).apply(change, new Date()),
+        );
+      },
+    );
   }
 
   /** 세션의 새 판이 저장된 뒤 (일꾼이 부른다). 꺼져 있으면 아무 일도 없다 */

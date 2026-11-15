@@ -142,8 +142,8 @@ export function OtherTarget({ approval }: { approval: Approval }) {
   return (
     <section className="preview" aria-label="실행 내용">
       <b>실행 내용</b>
-      {/* 설정 바꾸기 (2026-11-15 C): 승인하면 이 칸들이 바뀐다 (승인한 뒤 대상이 바뀌면 적용하지 않고 실패) */}
-      {approval.changes && <ChangeLines lines={approval.changes} />}
+      {/* 설정 바꾸기 (2026-11-15 C · D): 승인하면 이 칸들이 바뀐다 (승인한 뒤 대상이 바뀌면 적용하지 않고 실패) */}
+      {approval.changes && <ChangeLines lines={approval.changes} setting={approval.setting} />}
       <dl className="kv">
         <dt>종류</dt>
         <dd>{TARGET_LABELS[kind] ?? kind}</dd>

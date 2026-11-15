@@ -73,6 +73,7 @@ change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 | `vault.change.decided` | changeSetId, seq, status |
 | `vault.change.reverted` | changeSetId, revertId |
 | `task.task.requested` | requestId(`tidy:<세션>:<판>`), kind(`tidy_session`), title, targetKind, targetId, baseVersion. task 모듈이 받는 일 요청 |
+| `vault.setting.changed` | approvalId, outcome, error?. 승인한 세션 정리 · 프로젝트별 모으기 설정 바꾸기의 결과 (2026-11-15 D, `VaultSettings`: `TidyEdit` · `ProjectRuleEdit`. 프로젝트 규칙은 version이 없어 제안 때 본 값과 비교) |
 | `task.agentless.requested` | requestId(`note:<세션>:<원문 번호>`), kind(`session_note`), title, targetKind(`session`), targetId, baseVersion(원문 번호). task가 에이전트 없이 서버의 로그인으로 돌릴 세션 노트 일 (2차 4단계). 원문은 싣지 않는다 |
 
 알리는 것 (`VaultNotices`, 7단계. platform `NoticeCatalog`에 등록, 이벤트와 같은 트랜잭션에서 생긴다):
