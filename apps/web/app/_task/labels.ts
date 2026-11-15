@@ -220,6 +220,14 @@ export function when(iso: string): string {
   );
 }
 
+/** 시작한 뒤 지난 시간 (now는 화면이 다시 그릴 때의 시각) */
+export function elapsed(iso: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return '방금';
+  if (minutes < 60) return `${minutes}분째`;
+  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분째`;
+}
+
 /** 실행 로그의 시:분 */
 export function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString('ko-KR', {

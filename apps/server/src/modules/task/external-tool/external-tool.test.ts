@@ -67,9 +67,9 @@ describe('ExternalTool', () => {
     assert.equal(tool.ready, false, '토큰 필요');
     tool.setSecret(box.seal('Bearer abc'), NOW);
     assert.equal(tool.ready, true);
-    assert.deepEqual(tool.jobTool(box).headers, { Authorization: 'Bearer abc' });
+    assert.deepEqual(tool.jobView(box).toJSON().headers, { Authorization: 'Bearer abc' });
     tool.edit({ header_name: null }, NOW);
-    assert.deepEqual(tool.jobTool(box).headers, {});
+    assert.deepEqual(tool.jobView(box).toJSON().headers, {});
     assert.equal(tool.view().toJSON().hasSecret, false);
     assert.throws(() => tool.setSecret(box.seal('x'), NOW), RuleViolation, '머리글 먼저');
     assert.throws(() => ExternalTool.secretOf('a\nb'), RuleViolation, '한 줄만');

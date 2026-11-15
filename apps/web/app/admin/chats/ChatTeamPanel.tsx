@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { taskStatusLabel } from '../../_task/labels';
+import { elapsed, taskStatusLabel } from '../../_task/labels';
 import { useAgents, useTasksIn } from '../../_task/live';
 import type { Task } from '../../_task/types';
 
@@ -9,14 +9,6 @@ import type { Task } from '../../_task/types';
 const TICK_MS = 30_000;
 /** 맡긴 사슬을 거슬러 오르는 깊이의 끝 (위임은 몇 단계뿐이라 넉넉하다) */
 const MAX_DEPTH = 12;
-
-/** 맡긴 뒤 지난 시간 */
-function elapsed(iso: string, now: number): string {
-  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
-  if (minutes < 1) return '방금';
-  if (minutes < 60) return `${minutes}분째`;
-  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분째`;
-}
 
 /** 이 대화의 회차에서 시작한 작업인가: 맡긴 위 작업(parentId)을 거슬러 회차 작업에 닿으면 */
 function inChat(task: Task, roots: ReadonlySet<string>, byId: ReadonlyMap<string, Task>): boolean {

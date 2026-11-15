@@ -91,10 +91,22 @@ export class JobSkillView {
   }
 }
 
-/** 러너에게 가는 외부 도구 하나 (2차 7단계): 표의 칸에 일을 빌려 줄 때 푼 머리글(토큰)을 더했다 */
-export type JobToolRow = Pick<ExternalToolRow, 'name' | 'title' | 'url'> & {
-  headers: Readonly<Record<string, string>>;
-};
+/**
+ * 러너에게 가는 외부 도구 하나 (2차 7단계): 표의 칸에 일을 빌려 줄 때 푼 머리글(토큰)을 더했다.
+ * 봉인한 칸을 푸는 것은 엔티티(`ExternalTool.jobView`)다 (객체설계 4장의 예외: 비밀값을 푸는 읽기)
+ */
+export class JobToolView {
+  constructor(
+    private readonly row: Readonly<Pick<ExternalToolRow, 'name' | 'title' | 'url'>>,
+    /** 푼 머리글. 머리글이 없는 도구는 빈 객체 */
+    private readonly headers: Readonly<Record<string, string>>,
+  ) {}
+
+  toJSON() {
+    const r = this.row;
+    return { name: r.name, title: r.title, url: r.url, headers: this.headers };
+  }
+}
 
 /**
  * 러너가 빌려 간 일 하나 (next_jobs). MCP 도구의 모양이라 snake_case. run_token은 여기서 한 번만 나간다.
@@ -147,9 +159,9 @@ export class JobView {
   }
 
   /** 이 에이전트에게 허락한 외부 도구 (2차 7단계). 러너가 MCP 설정에 더한다. headers에만 토큰이 있다 */
-  private tools: readonly JobToolRow[] = [];
+  private tools: readonly JobToolView[] = [];
 
-  withTools(tools: readonly JobToolRow[]): this {
+  withTools(tools: readonly JobToolView[]): this {
     this.tools = tools;
     return this;
   }
@@ -198,12 +210,7 @@ export class JobView {
         })),
       })),
       rounds_left: this.roundsLeft,
-      tools: this.tools.map((t) => ({
-        name: t.name,
-        title: t.title,
-        url: t.url,
-        headers: t.headers,
-      })),
+      tools: this.tools.map((t) => t.toJSON()),
     };
   }
 }

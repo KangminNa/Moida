@@ -8,7 +8,7 @@ import {
   TableEntity,
 } from '../../platform';
 import type { Agent } from '../agent/agent';
-import type { JobToolRow } from '../task/job.view';
+import { JobToolView } from '../task/job.view';
 import type { ExternalToolNew, ExternalToolRow } from '../task.tables';
 import { ExternalToolView, ProposedToolView } from './external-tool.view';
 import { ExternalToolUrl } from './external-tool-url.policy';
@@ -241,11 +241,11 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     return new ProposedToolView(this.row);
   }
 
-  /** 러너에게 가는 모양: 토큰을 여기서만 푼다 (일을 빌려 줄 때) */
-  jobTool(box: SecretBox): JobToolRow {
-    const { secret, nonce, header_name: header, name, title, url } = this.row;
+  /** 러너에게 가는 모양: 토큰을 여기서만 푼다 (일을 빌려 줄 때). 봉인한 칸을 아는 곳을 이 엔티티 하나로 둔다 */
+  jobView(box: SecretBox): JobToolView {
+    const { secret, nonce, header_name: header } = this.row;
     const value = secret && nonce && header ? box.open(new SealedSecret(secret, nonce)) : null;
-    return { name, title, url, headers: header && value ? { [header]: value } : {} };
+    return new JobToolView(this.row, header && value ? { [header]: value } : {});
   }
 
   private plugProblem(targetVersion: number | null, agent: Agent | null): string | null {
