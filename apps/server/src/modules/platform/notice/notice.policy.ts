@@ -130,6 +130,38 @@ export class NoticePolicy {
     );
   }
 
+  /**
+   * 이번 차례에 다루지 않고 남은 알림을 다시 볼 때 (일꾼의 다음 마감, 리팩토링 2단계). 남은 것이 없으면 null.
+   * 조용한 시간이면 끝나는 때, 아니면 다음 묶음 시각 (남은 것은 아직 때가 안 된 묶음뿐이다).
+   * 시간대의 분으로 세므로 서머타임 경계에서는 이르게 깰 수 있다: 그때 다시 재면 된다
+   */
+  nextAt(remaining: number, settings: NoticeSettings, now: Date): Date | null {
+    if (remaining === 0) return null;
+    const { quietEnd, timeZone } = settings;
+    if (this.quiet(settings, now) && quietEnd !== null)
+      return NoticePolicy.nextMinuteOfDay(quietEnd, timeZone, now);
+    if (settings.daily) return NoticePolicy.nextMinuteOfDay(settings.digestMinute, timeZone, now);
+    const minute = NoticePolicy.minuteOfDay(now, timeZone);
+    return NoticePolicy.afterMinutes(now, 60 - (minute % 60));
+  }
+
+  /** now 뒤로 처음 오는, 시간대에서 하루 중 target분인 때 (지금이 그 분이면 다음 날) */
+  private static nextMinuteOfDay(target: number, timeZone: string, now: Date): Date {
+    const minute = NoticePolicy.minuteOfDay(now, timeZone);
+    const at = NoticePolicy.afterMinutes(now, (target - minute + 1440) % 1440 || 1440);
+    // 서머타임으로 그날의 길이가 다르면 한 번 맞춘다 (한 시간 안의 차이)
+    const off = (target - NoticePolicy.minuteOfDay(at, timeZone) + 1440) % 1440;
+    return off === 0
+      ? at
+      : new Date(at.getTime() + (off > 720 ? off - 1440 : off) * NoticePolicy.MINUTE_MS);
+  }
+
+  /** now가 든 분의 시작에서 n분 뒤 */
+  private static afterMinutes(now: Date, n: number): Date {
+    const floor = Math.floor(now.getTime() / NoticePolicy.MINUTE_MS) * NoticePolicy.MINUTE_MS;
+    return new Date(floor + n * NoticePolicy.MINUTE_MS);
+  }
+
   /** 그 순간이 시간대에서 하루 중 몇 분인가 */
   private static minuteOfDay(at: Date, timeZone: string): number {
     const parts = new Intl.DateTimeFormat('en-US', {

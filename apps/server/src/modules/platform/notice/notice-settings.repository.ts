@@ -1,7 +1,9 @@
 import { BaseRepository } from '../base/base-repository';
 import { Conflict } from '../base/errors';
+import { Outbox } from '../base/outbox';
 import type { EntityStore } from '../base/table-repository';
 import { type LoadedNoticeSettings, NoticeSettings } from './notice-settings';
+import { Notices } from './notices';
 
 // platform.notice_settings ↔ NoticeSettings. 공간마다 한 행이고 열쇠가 space_id다.
 // 행이 없는 공간은 version 0인 기본값으로 읽고, 처음 저장할 때 넣는다.
@@ -33,10 +35,12 @@ export class NoticeSettingsRepository
     );
   }
 
+  /** 묶음 시각 · 조용한 시간이 바뀌면 남은 푸시를 볼 때도 바뀐다: 푸시 마감 작업을 깨운다 */
   async save(settings: NoticeSettings): Promise<void> {
     if (Object.keys(settings.unsaved).length === 0) return;
     if (settings.version === 0) await this.insert(settings);
     else await this.update(settings);
+    await new Outbox(this.sql).wake(Notices.PUSH_JOB);
   }
 
   /** 그사이 다른 쪽이 먼저 넣었으면 Conflict */

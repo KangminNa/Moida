@@ -7,6 +7,7 @@ import { Schedule } from './schedule';
 export class ScheduleRepository extends TableRepository<ScheduleRow, Schedule> {
   protected readonly table = schedules;
   protected readonly noun = '스케줄';
+  protected override readonly dueWake = [Schedule.DUE_JOB, ['next_run_at', 'enabled']] as const;
 
   protected toEntity(row: ScheduleRow): Schedule {
     return Schedule.restore(row);

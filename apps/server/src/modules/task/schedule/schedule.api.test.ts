@@ -190,8 +190,10 @@ describe('스케줄 (/api/schedules)', () => {
     assert.ok(new Date(String(after?.nextRunAt)).getTime() > Date.now(), '다음 시각으로 넘어감');
     assert.equal(after?.dayRuns, 1);
 
-    await job.run();
+    const next = await job.run();
     assert.equal((await tasksOf(schedule)).length, 1, '다음 시각 전에는 더 만들지 않는다');
+    // 마감 작업 (리팩토링 2단계): 켜진 스케줄의 가장 이른 다음 시각을 돌려준다 (일꾼이 그때 깬다)
+    assert.ok(next && next <= new Date(String(after?.nextRunAt)), String(next));
   });
 
   test('담당이 없으면 지시대로 자동 배정 작업, 앞 작업이 끝나지 않았거나 담당이 멈췄으면 건너뛴다', async () => {

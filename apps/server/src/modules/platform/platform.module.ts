@@ -149,7 +149,7 @@ export class PlatformModule implements OnModuleInit {
     Outbox.listen('notices', (tx, events) => this.notices.onEvents(tx, events));
     this.rotation.register('플러그인 설정', (actor) => this.plugins.resealSecrets(actor));
     this.workers.every(this.sweep, BlobSweepJob.EVERY_MS);
-    this.workers.every(this.push, NoticePushJob.EVERY_MS);
+    this.workers.due(this.push);
     this.workers.every(this.securityPurge, SecurityLogPurgeJob.EVERY_MS);
   }
 }

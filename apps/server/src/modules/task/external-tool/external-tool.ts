@@ -27,6 +27,8 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   static readonly TARGET = 'external_tool';
   static readonly PROPOSED = 'proposed';
   static readonly ACTIVE = 'active';
+  /** 확인할 때가 된 커넥터에 확인을 맡기는 마감 작업 (ExternalToolCheckJob). 켜기 · 고치기 · 확인 결과가 바뀌면 저장이 깨운다 */
+  static readonly CHECK_JOB = 'task.external_tools.check';
   static readonly OFF = 'off';
   static readonly NAME_MAX = 30;
   static readonly TITLE_MAX = 60;

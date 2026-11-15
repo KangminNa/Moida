@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type TestUser } from '../../../testing/api-client';
-import { BlobStore, Database, SystemActor } from '../../platform';
+import { BlobStore, Database, Outbox, SystemActor } from '../../platform';
+import { Output } from './output';
 import { OutputPurgeJob } from './output-purge.job';
 
 // 결과물: 러너가 begin_upload로 표를 받아 PUT api/outputs/upload로 파일을 보내고, 주인이 결과물 메뉴에서 보고 지운다.
@@ -396,10 +397,20 @@ describe('주인이 결과물을 본다', () => {
   });
 
   test('일꾼은 30일 지난 휴지통을 지우고, 아무도 쓰지 않게 된 파일은 sweep이 지운다', async () => {
+    const db = api.service(Database);
+    // 휴지통으로 보내면 지울 때가 생겨 비우기 작업을 깨운다 (리팩토링 2단계)
+    const signals: string[] = [];
+    const listener = db.listen(Outbox.CHANNEL, (payload) => {
+      signals.push(payload);
+    });
+    await listener.ready;
     const saved = ok(
       await api.request('POST', `/api/outputs/${note.id}/delete`, owner, { version: note.version }),
     );
-    const db = api.service(Database);
+    for (let i = 0; i < 300 && !signals.includes(Outbox.DUE + Output.PURGE_JOB); i++)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    await listener.stop();
+    assert.ok(signals.includes(Outbox.DUE + Output.PURGE_JOB), JSON.stringify(signals));
     await db.sql`UPDATE task.outputs SET purge_after = now() - interval '1 minute' WHERE id = ${String(saved.id)}`;
     await api.service(OutputPurgeJob).run();
     const [row] = await db.sql`SELECT 1 FROM task.outputs WHERE id = ${String(saved.id)}`;

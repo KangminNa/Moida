@@ -239,6 +239,12 @@ describe('조건 규칙 (코어의 쿼리 도구)', () => {
     static restore(row: NoteRow): NoteEntity {
       return new NoteEntity(row);
     }
+    static fresh(row: NoteRow): NoteEntity {
+      return new NoteEntity(row, true);
+    }
+    set(column: 'name' | 'status', value: string): void {
+      this.put(column, value);
+    }
     get name(): string {
       return this.row.name;
     }
@@ -295,6 +301,44 @@ describe('조건 규칙 (코어의 쿼리 도구)', () => {
     );
   }
   const names = (rows: readonly { name: string }[]) => rows.map((r) => r.name);
+
+  test('dueWake: 새 행과 지켜보는 칸이 바뀐 저장만 같은 트랜잭션에서 그 마감 작업을 깨운다 (리팩토링 2단계)', async (t) => {
+    class Watched extends Notes {
+      protected override readonly dueWake = ['probe.due', ['status']] as const;
+    }
+    const woken: string[] = [];
+    t.mock.method(Outbox.prototype, 'wake', async (name: string) => {
+      woken.push(name);
+    });
+    await inScratch(async (_repo, tx) => {
+      const repo = new Watched(tx);
+      const [first] = await repo.entities({ id: ids[0] });
+      assert.ok(first);
+      first.set('name', '이름만');
+      await repo.save(first);
+      assert.deepEqual(woken, [], '지켜보지 않는 칸');
+      first.set('status', 'done');
+      await repo.save(first);
+      assert.deepEqual(woken, ['probe.due'], '지켜보는 칸');
+      await repo.save(
+        NoteEntity.fresh({
+          id: '0192d2a0-0000-7000-8000-000000000019',
+          space_id: space,
+          name: '새 메모',
+          status: 'open',
+          parent_id: null,
+          tokens: null,
+          tags: [],
+          meta: null,
+          secret: null,
+          done: false,
+          version: 1,
+          created_at: new Date(),
+        }),
+      );
+      assert.deepEqual(woken, ['probe.due', 'probe.due'], '새 행');
+    });
+  });
 
   test('값은 =, 목록은 = ANY, null은 IS NULL, Rule.set은 IS NOT NULL', async () => {
     await inScratch(async (repo) => {

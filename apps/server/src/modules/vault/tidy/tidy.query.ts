@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseQuery, SettingActor } from '../../platform';
 import { tidySettings } from '../vault.schema';
+import type { TidySettingRow } from '../vault.tables';
 import { TidySettingsView, TidySettingView } from './tidy.view';
 import type { TidySessionRow } from './tidy-settings';
 
@@ -34,6 +35,15 @@ export class TidyQuery extends BaseQuery {
   }
 
   /** 하루 한 번의 차례가 된 공간 (일꾼, 2차 7단계): 자동 정리가 켜졌고 하루 한 번이고 지난 차례에서 하루가 지났다 */
+  /** 하루 정리가 켜진 공간의 가장 이른 다음 차례 (지난 차례 + 23시간, 차례가 없었으면 지금). 없으면 null */
+  async nextDaily(actor: Actor): Promise<Date | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<TidySettingRow, 'daily_at'>[]>`
+      SELECT min(coalesce(daily_at + interval '23 hours', now())) AS daily_at FROM vault.tidy_settings
+      WHERE auto_tidy AND cadence = 'daily'`;
+    return row?.daily_at ?? null;
+  }
+
   async dailySpaces(actor: Actor): Promise<readonly string[]> {
     actor.assertOwnerOrSystem();
     const rows = await this.sql<{ space_id: string }[]>`

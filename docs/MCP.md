@@ -61,7 +61,7 @@
 ## 5. 1단계: MCP 먼저 (2026-11-15)
 
 ```
-관리자 "연결 확인" · 2분마다(확인 전 · 고친 뒤 · 하루 지남)
+관리자 "연결 확인" · 일꾼의 마감 작업(확인 전 · 고친 뒤 · 하루 지남, 커넥터를 저장하거나 확인 작업이 끝나면 다시 잰다)
   → 작업 tool_check (에이전트 없음, 도구 하나)
   → 러너 ToolCheckRun: initialize → initialized → tools/list (AI 없음, 15초 · 1MB · 넘기기 안 따라감)
   → submit_result { tools } 또는 실패 까닭 → 서버가 커넥터에 catalog · checked_at · check_error

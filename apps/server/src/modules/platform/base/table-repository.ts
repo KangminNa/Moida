@@ -1,6 +1,7 @@
 import type { PgTable } from 'drizzle-orm/pg-core';
 import { BaseRepository } from './base-repository';
 import type { Row } from './database';
+import { Outbox } from './outbox';
 import type { TableEntity, TableRow } from './table-entity';
 import { type How, TableQuery, type Where } from './table-query';
 
@@ -21,6 +22,11 @@ export abstract class TableRepository<R extends TableRow, E extends TableEntity<
   protected abstract readonly table: PgTable;
   /** 찾지 못했을 때 알리는 이름 */
   protected abstract readonly noun: string;
+  /**
+   * 이 칸이 바뀌면(새 행 포함) 같은 트랜잭션에서 그 마감 작업을 깨운다: [작업 이름, 칸들] (리팩토링 2단계 worker 정책).
+   * 다음 마감을 바꾸는 저장이 일꾼에게 알리는 한 곳이라, 어느 길로 저장해도 빠지지 않는다
+   */
+  protected readonly dueWake: readonly [string, readonly (keyof R)[]] | null = null;
 
   /** 없으면 NotFound */
   async load(spaceId: string, id: string): Promise<E> {
@@ -39,10 +45,13 @@ export abstract class TableRepository<R extends TableRow, E extends TableEntity<
 
   /** 새 행이면 넣고, 아니면 바뀐 칸만 version과 함께 고친다. 그다음 딸린 표와 이벤트 */
   async save(entity: E): Promise<void> {
+    const wake = this.dueWake;
+    const wakes = wake !== null && (entity.isNew || wake[1].some((c) => c in entity.unsaved));
     if (entity.isNew) await this.insert(entity);
     else if (Object.keys(entity.unsaved).length > 0) await this.update(entity);
     await this.saveParts(entity);
     await this.publishEvents(entity);
+    if (wakes) await new Outbox(this.sql).wake(wake[0]);
   }
 
   /** 조건에 맞는 엔티티들 (예: this.find({ space_id: s }, { order: ['id'], lock: true })) */

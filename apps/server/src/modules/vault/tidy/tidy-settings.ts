@@ -19,6 +19,8 @@ export type TidySessionRow = Pick<
 // 정리 일을 요청하는 쪽도 이 객체다: vault는 task를 모르므로 일 요청 이벤트(outbox)로 맡긴다.
 // 같은 판의 요청은 requestId가 같아 몇 번을 보내도 작업은 하나다. 요청한 판은 TidyService가 세션에 적는다.
 export class TidySettings extends TableEntity<LoadedTidySettings, NewNode<TidySettingNew>> {
+  /** 하루 한 번 몰아서 요청하는 마감 작업 (TidyDailyJob). 설정을 저장하면 깨운다 */
+  static readonly DAILY_JOB = 'vault.tidy-daily';
   /** task 모듈이 받는 일 요청. 러너는 kind로 cairn-tidy 스킬을 고른다 */
   private static readonly REQUESTED = 'task.task.requested';
   private static readonly KIND = 'tidy_session';

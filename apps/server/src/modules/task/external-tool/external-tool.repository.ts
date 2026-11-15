@@ -8,6 +8,10 @@ import type { ToolCalls, ToolLine } from './tool-catalog.policy';
 export class ExternalToolRepository extends TableRepository<ExternalToolRow, ExternalTool> {
   protected readonly table = externalTools;
   protected readonly noun = '외부 도구';
+  protected override readonly dueWake = [
+    ExternalTool.CHECK_JOB,
+    ['status', 'updated_at', 'header_name', 'secret'],
+  ] as const;
   /** 켜진 도구를 다시 확인하는 간격 */
   private static readonly RECHECK_MS = 24 * 60 * 60 * 1000;
 
@@ -67,6 +71,18 @@ export class ExternalToolRepository extends TableRepository<ExternalToolRow, Ext
         AND (checked_at IS NULL OR checked_at < updated_at OR checked_at < ${day})
       ORDER BY checked_at NULLS FIRST, id LIMIT ${limit}`;
     return rows.map((r) => this.toEntity(r)).filter((t) => t.ready);
+  }
+
+  /**
+   * 아직 때가 안 된 켜진 커넥터 가운데 가장 이른 다시 확인 시각 (마지막 확인 + 하루). 없으면 null.
+   * 때가 된 것은 지금 확인을 맡겼거나(끝나면 작업이 바뀌어 다시 잰다) 준비가 안 됐다(고치면 저장이 깨운다)
+   */
+  async nextCheck(): Promise<Date | null> {
+    const [row] = await this.sql<Pick<ExternalToolRow, 'checked_at'>[]>`
+      SELECT min(checked_at) AS checked_at FROM task.external_tools
+      WHERE status = ${ExternalTool.ACTIVE} AND checked_at IS NOT NULL AND checked_at >= updated_at`;
+    const last = row?.checked_at ?? null;
+    return last === null ? null : new Date(last.getTime() + ExternalToolRepository.RECHECK_MS);
   }
 
   /** 이 이름들 가운데 공간에 없는 것 (에이전트의 허락 목록을 저장하기 전에, AgentEdit) */

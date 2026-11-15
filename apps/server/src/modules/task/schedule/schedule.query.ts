@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { type Actor, BaseQuery } from '../../platform';
 import { schedules } from '../task.schema';
+import type { ScheduleRow } from '../task.tables';
 import type { ListSchedulesInput } from './schedule.input';
 import { ScheduleListView } from './schedule.view';
 
@@ -8,6 +9,14 @@ import { ScheduleListView } from './schedule.view';
 @Injectable()
 export class ScheduleQuery extends BaseQuery {
   /** 공간의 스케줄 (만든 순서). agentId가 있으면 그 에이전트가 담당인 것만 */
+  /** 켜진 스케줄 가운데 가장 이른 다음 시각. 없으면 null (ScheduleJob의 다음 마감) */
+  async nextRun(actor: Actor): Promise<Date | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<ScheduleRow, 'next_run_at'>[]>`
+      SELECT min(next_run_at) AS next_run_at FROM task.schedules WHERE enabled`;
+    return row?.next_run_at ?? null;
+  }
+
   async list(actor: Actor, req: ListSchedulesInput): Promise<ScheduleListView> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();

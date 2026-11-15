@@ -16,6 +16,8 @@ import { ScheduleView } from './schedule.view';
 // 설정은 configure로 한 번에 바꾸고, 때가 되면 fire가 이번 시각을 돌려주고 다음 시각으로 넘어간다.
 // 작업을 만들 차례인지(하루 한도)는 claimRun이 정한다: 앞 작업이 안 끝났거나 에이전트가 쉬어 건너뛴 것은 세지 않는다.
 export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
+  /** 때가 된 스케줄을 돌리는 마감 작업 (ScheduleJob). 다음 시각 · 켜기가 바뀌면 저장이 깨운다 */
+  static readonly DUE_JOB = 'task.schedules';
   static readonly DAILY = 'daily';
   static readonly HOURLY = 'hourly';
   static readonly MODES: readonly string[] = [Schedule.DAILY, Schedule.HOURLY];

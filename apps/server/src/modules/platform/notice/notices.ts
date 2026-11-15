@@ -1,5 +1,5 @@
 import type { Sql } from '../base/database';
-import { ChangeSignal } from '../base/outbox';
+import { ChangeSignal, Outbox } from '../base/outbox';
 import type { NotificationNew } from '../platform.tables';
 
 /** 남길 알림: id · 시각은 DB가 정한다 */
@@ -14,6 +14,8 @@ export type NoticeNew = Omit<NotificationNew, 'id' | 'created_at' | 'read_at'>;
 export class Notices {
   /** 콘솔이 듣는 변경 신호의 주제 */
   static readonly TOPIC = 'platform.notification';
+  /** 브라우저 푸시를 보내는 마감 작업 (NoticePushJob). 알림이 남거나 바뀌면 깨운다 */
+  static readonly PUSH_JOB = 'platform.notice-push';
 
   constructor(private readonly tx: Sql) {}
 
@@ -39,6 +41,7 @@ export class Notices {
     await ChangeSignal.send(this.tx, [
       new ChangeSignal(notice.space_id, Notices.TOPIC, String(row?.id)),
     ]);
+    await new Outbox(this.tx).wake(Notices.PUSH_JOB);
   }
 
   /** 끝난 일의 알림을 읽음으로 (예: 결재가 끝남). 그 묶음 키의 안 읽은 알림이 없으면 아무 일도 없다 */

@@ -213,7 +213,6 @@ import { WebPageGateway } from './web/web-page.gateway';
 })
 export class TaskModule implements OnModuleInit {
   /** 스케줄의 가장 작은 단위가 분이라 1분마다 본다 */
-  private static readonly SCHEDULE_CHECK_MS = 60_000;
 
   constructor(
     private readonly workers: CoreWorkers,
@@ -258,10 +257,10 @@ export class TaskModule implements OnModuleInit {
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
     this.workers.on(Task.CHANGED, this.chatRoutes);
     this.workers.on(Task.CHANGED, this.follows);
-    this.workers.every(this.chatRouteJob, ChatRouteJob.EVERY_MS);
+    this.workers.due(this.chatRouteJob, Task.CHANGED);
     this.workers.on('*', this.results);
     this.workers.due(this.leases, Task.CHANGED);
-    this.workers.every(this.schedules, TaskModule.SCHEDULE_CHECK_MS);
+    this.workers.due(this.schedules);
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
     // 외부 도구 (2차 7단계): 제안의 결재가 정해지면 붙이거나 지우고, 서버 키를 바꾸면 토큰을 다시 잠근다
     for (const topic of ExternalToolPlugHandler.TOPICS) this.workers.on(topic, this.toolPlugs);
@@ -269,11 +268,11 @@ export class TaskModule implements OnModuleInit {
     this.workers.on(SettingApplyHandler.TOPIC, this.settingApply);
     // MCP 먼저 (2026-11-15): 끝난 작업에서 커넥터 확인 결과 · 사용을 적고, 때가 된 커넥터에 확인을 맡긴다
     this.workers.on(Task.CHANGED, this.toolTasks);
-    this.workers.every(this.toolChecks, ExternalToolCheckJob.EVERY_MS);
+    this.workers.due(this.toolChecks, Task.CHANGED);
     this.rotation.register('task.external_tools', (actor) =>
       this.externalTools.resealSecrets(actor),
     );
-    this.workers.every(this.outputPurge, OutputPurgeJob.EVERY_MS);
+    this.workers.due(this.outputPurge);
     // 기능 패키지의 도구(code-github의 code_credential 등)가 묻는 임대 확인
     this.leaseChecks.register((actor, id) => this.tasks.leasedWork(actor, id));
     // 결과물이 가리키는 파일: 쓰는 동안 platform이 지우지 않게

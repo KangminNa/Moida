@@ -1,4 +1,4 @@
-import { BaseRepository, Conflict, type EntityStore } from '../../platform';
+import { BaseRepository, Conflict, type EntityStore, Outbox } from '../../platform';
 import { type LoadedTidySettings, TidySettings } from './tidy-settings';
 
 // vault.tidy_settings ↔ TidySettings. 공간마다 한 행이고 열쇠가 space_id다. 정리 일 요청도 저장할 때 outbox로 나간다.
@@ -20,10 +20,12 @@ export class TidySettingsRepository
     return found ?? TidySettings.absent(spaceId);
   }
 
+  /** 켜기 · 언제 · 하루 차례(daily_at)가 바뀌면 다음 차례도 바뀐다: 하루 정리 마감 작업을 깨운다 */
   async save(settings: TidySettings): Promise<void> {
     if (Object.keys(settings.unsaved).length > 0) {
       if (settings.version === 0) await this.insert(settings);
       else await this.update(settings);
+      await new Outbox(this.sql).wake(TidySettings.DAILY_JOB);
     }
     await this.publishEvents(settings);
   }

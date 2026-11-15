@@ -9,7 +9,8 @@ import { PushGateway } from './push.gateway';
 import { PushRepository } from './push.repository';
 import { PushSubscription } from './push-subscription';
 
-// 알림을 브라우저 푸시로 보낸다 (7단계, 일꾼이 1분마다). 공간마다:
+// 알림을 브라우저 푸시로 보낸다 (7단계). 일꾼의 마감 작업이 알림이 남거나 바뀌면(Notices.post가 깨움),
+// 그리고 남은 알림을 다시 볼 때(조용한 시간이 끝날 때 · 묶음 시각, NoticePolicy.nextAt) 부른다. 공간마다:
 //   짧은 트랜잭션: 아직 다루지 않은 알림을 잠그고(SKIP LOCKED) NoticePolicy로 정한 뒤, 다룬 것으로 적는다
 //   트랜잭션 밖: 구독마다 보낸다 (먼저 적으므로 많아야 한 번 간다. 닿지 못한 푸시는 다시 보내지 않는다)
 //   짧은 트랜잭션: 구독마다 결과를 적는다 (사라진 구독 · 실패가 쌓인 구독은 지운다)
@@ -28,27 +29,33 @@ export class NoticePushService extends BaseService {
     super(db);
   }
 
-  /** 보낸 푸시 수 */
-  async run(actor: Actor): Promise<number> {
+  /** 보내고, 남은 알림을 다시 볼 가장 이른 때를 돌려준다 (없으면 null) */
+  async run(actor: Actor): Promise<Date | null> {
     actor.assertOwnerOrSystem();
-    let sent = 0;
-    for (const spaceId of await new PushRepository(this.db.sql).pendingSpaces())
-      sent += await this.runSpace(spaceId);
-    return sent;
+    let next: Date | null = null;
+    for (const spaceId of await new PushRepository(this.db.sql).pendingSpaces()) {
+      const at = await this.runSpace(spaceId);
+      if (at !== null && (next === null || at < next)) next = at;
+    }
+    return next;
   }
 
-  private async runSpace(spaceId: string): Promise<number> {
+  /** 공간 하나. 남은 알림을 다시 볼 때 (한 차례에 다 못 다뤘으면 지금) */
+  private async runSpace(spaceId: string): Promise<Date | null> {
     const now = new Date();
     const kinds = this.catalog.all();
-    const { plan, targets } = await this.transaction(async (tx) => {
+    const { plan, targets, next } = await this.transaction(async (tx) => {
       const store = new PushRepository(tx);
       const pending = await store.lockPending(spaceId, NoticePushService.BATCH);
       const settings = await new NoticeSettingsRepository(tx).load(spaceId);
       const decided = this.policy.decide(pending, settings, kinds, now);
       await store.markHandled(decided.handled, now);
-      return { plan: decided, targets: await store.targets(spaceId) };
+      const left = pending.length - decided.handled.length;
+      const full = pending.length === NoticePushService.BATCH;
+      const at = full ? now : this.policy.nextAt(left, settings, now);
+      return { plan: decided, targets: await store.targets(spaceId), next: at };
     });
-    if (plan.messages.length === 0 || targets.length === 0) return 0;
+    if (plan.messages.length === 0 || targets.length === 0) return next;
     const results: [string, number][] = [];
     for (const target of targets)
       for (const message of plan.messages)
@@ -58,6 +65,6 @@ export class NoticePushService extends BaseService {
       for (const [id, status] of results)
         await store.record(id, status, now, PushSubscription.FAILS_MAX);
     });
-    return results.filter(([, status]) => status >= 200 && status < 300).length;
+    return next;
   }
 }

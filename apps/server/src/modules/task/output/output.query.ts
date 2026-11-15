@@ -78,6 +78,14 @@ export class OutputQuery extends BaseQuery {
   }
 
   /** 결과물 메뉴: 최근부터 한 쪽, 쓰는 저장 공간과 함께 */
+  /** 휴지통 결과물의 가장 이른 지울 때. 없으면 null (OutputPurgeJob의 다음 마감) */
+  async nextPurge(actor: Actor): Promise<Date | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<OutputRow, 'purge_after'>[]>`
+      SELECT min(purge_after) AS purge_after FROM task.outputs`;
+    return row?.purge_after ?? null;
+  }
+
   async list(actor: Actor, req: ListOutputsInput): Promise<OutputPageView> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();

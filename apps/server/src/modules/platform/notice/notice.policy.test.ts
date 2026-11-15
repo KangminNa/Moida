@@ -117,4 +117,31 @@ describe('NoticePolicy', () => {
     const morning = policy.decide([a], quiet, KINDS, at('2026-11-11T22:05:00Z'));
     assert.equal(morning.messages.length, 1);
   });
+
+  test('남은 알림을 다시 볼 때: 없으면 null, 조용한 시간이면 끝나는 때, 아니면 다음 묶음 시각', () => {
+    const now = at('2026-11-11T03:10:30Z'); // 12:10:30 KST
+    assert.equal(policy.nextAt(0, settings(), now), null, '남은 것이 없으면 깨지 않는다');
+    assert.deepEqual(policy.nextAt(2, settings(), now), at('2026-11-11T04:00:00Z'), '매시 정각');
+    assert.deepEqual(
+      policy.nextAt(1, settings({ digest: 'daily', digest_minute: 540 }), now),
+      at('2026-11-12T00:00:00Z'),
+      '하루 한 번: 다음 날 09:00 KST',
+    );
+    assert.deepEqual(
+      policy.nextAt(1, settings({ digest: 'daily', digest_minute: 750 }), now),
+      at('2026-11-11T03:30:00Z'),
+      '오늘 12:30 KST가 아직 안 왔다',
+    );
+    const quiet = settings({ quiet_start: 22 * 60, quiet_end: 7 * 60 });
+    const night = at('2026-11-11T14:00:00Z'); // 23:00 KST
+    assert.deepEqual(policy.nextAt(1, quiet, night), at('2026-11-11T22:00:00Z'), '07:00 KST');
+  });
+
+  test('서머타임이 있는 시간대에서도 그 시각(현지)에 깬다', () => {
+    const ny = settings({ digest: 'daily', digest_minute: 9 * 60, time_zone: 'America/New_York' });
+    // 2026-11-01 02:00에 서머타임이 끝난다: 10-31 09:00 EDT(13:00Z) 뒤의 다음 09:00은 11-01 09:00 EST(14:00Z)
+    assert.deepEqual(policy.nextAt(1, ny, at('2026-10-31T13:30:00Z')), at('2026-11-01T14:00:00Z'));
+    // 2026-03-08 02:00에 서머타임이 시작한다: 03-07 09:00 EST(14:00Z) 뒤의 다음 09:00은 03-08 09:00 EDT(13:00Z)
+    assert.deepEqual(policy.nextAt(1, ny, at('2026-03-07T14:30:00Z')), at('2026-03-08T13:00:00Z'));
+  });
 });

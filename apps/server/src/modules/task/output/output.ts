@@ -11,6 +11,8 @@ import type { UploadTicket } from './upload-ticket';
 // 아무도 쓰지 않게 된 파일은 platform의 BlobSweepJob이 지운다. Cairn 안에 두는 것은 발행이 아니라 결재가 없다.
 export class Output extends TableEntity<OutputRow, OutputNew> {
   static readonly TRASH_DAYS = 30;
+  /** 휴지통 기간이 지난 결과물을 지우는 마감 작업 (OutputPurgeJob). 지울 때(purge_after)가 바뀌면 저장이 깨운다 */
+  static readonly PURGE_JOB = 'task.outputs';
   private static readonly DAY_MS = 24 * 60 * 60 * 1000;
 
   /** 올리기 표로 받은 파일. 종류 · 형식은 파일의 앞부분과 이름으로 정한다 */

@@ -7,6 +7,7 @@ import { Output } from './output';
 export class OutputRepository extends TableRepository<OutputRow, Output> {
   protected readonly table = outputs;
   protected readonly noun = '결과물';
+  protected override readonly dueWake = [Output.PURGE_JOB, ['purge_after']] as const;
 
   protected toEntity(row: OutputRow): Output {
     return Output.restore(row);

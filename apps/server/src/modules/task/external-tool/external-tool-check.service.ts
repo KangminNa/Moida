@@ -33,13 +33,17 @@ export class ExternalToolCheckService extends BaseService {
     });
   }
 
-  /** 확인할 때가 된 켜진 도구(처음 · 고친 뒤 · 하루 지남)마다 확인을 맡긴다 (ExternalToolCheckJob) */
-  async checkDue(actor: Actor, now: Date): Promise<number> {
+  /**
+   * 확인할 때가 된 켜진 도구(처음 · 고친 뒤 · 하루 지남)마다 확인을 맡긴다 (ExternalToolCheckJob).
+   * 다음에 다시 볼 때를 돌려준다 (한 묶음을 꽉 채웠으면 지금)
+   */
+  async checkDue(actor: Actor, now: Date): Promise<Date | null> {
     actor.assertOwnerOrSystem();
     return this.transaction(async (tx) => {
-      const due = await new ExternalToolRepository(tx).due(now, ExternalToolCheckService.BATCH);
+      const tools = new ExternalToolRepository(tx);
+      const due = await tools.due(now, ExternalToolCheckService.BATCH);
       for (const tool of due) await this.enqueue(tx, tool, now);
-      return due.length;
+      return due.length === ExternalToolCheckService.BATCH ? now : tools.nextCheck();
     });
   }
 

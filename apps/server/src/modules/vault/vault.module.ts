@@ -117,6 +117,6 @@ export class VaultModule implements OnModuleInit {
     this.workers.on('blog.post.*', this.postMarks);
     this.workers.every(this.stale, WikiStaleJob.EVERY_MS);
     // 세션 정리를 하루 한 번 몰아서 (2차 7단계)
-    this.workers.every(this.tidyDaily, TidyDailyJob.EVERY_MS);
+    this.workers.due(this.tidyDaily);
   }
 }
