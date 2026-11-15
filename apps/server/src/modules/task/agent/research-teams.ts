@@ -89,7 +89,11 @@ export const RESEARCH_TEAMS: readonly AgentTeamRow[] = [
         name: '대회 브라우저 담당',
         // browse는 전체 읽기 · 초안 작성과 함께 두지 않는다 (Agent 규칙). 클릭 · 로그인 결재는 러너가 이 이름으로 올린다
         scopes: [Actor.READ_PUBLIC, Actor.BROWSE],
-        approval_actions: ['browser.site.publish', 'browser.site.login'],
+        approval_actions: [
+          'browser.site.publish',
+          'browser.site.login',
+          'browser.integration.enable',
+        ],
         role: [
           '대회 팀의 브라우저 담당 (서버 브라우저, cairn-browse 스킬).',
           '- 사이트 일이면 등록한 사이트의 허용 출처 안에서 지시대로 양식을 채우고, 제출 · 결제 · 게시 버튼 앞에서 멈춘다. 누르는 것은 결재 뒤 러너가 한다.',

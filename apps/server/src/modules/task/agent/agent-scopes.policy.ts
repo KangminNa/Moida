@@ -52,12 +52,8 @@ export class AgentScopes {
    * 외부 도구(바깥 서비스의 MCP, 2차 7단계)를 붙일 수 없는 권한: 비공개를 여는 것과 셸. 바깥으로 가는 길이라 browse와 같은 규칙.
    * DB CHECK agents_tools_not_private와 같다
    */
-  private static readonly NOT_WITH_TOOLS: readonly string[] = [
-    Actor.READ_ALL,
-    Actor.WRITE,
-    Actor.CODE,
-    Actor.MAKE,
-  ];
+  /** 외부 도구와 함께 두지 않는 권한 (사이트 도구의 Actor.AGENT_OUT과 같은 목록) */
+  private static readonly NOT_WITH_TOOLS: readonly string[] = Actor.KEEPS_PRIVATE;
 
   /** 한 에이전트에 붙일 수 있는 외부 도구 수 (DB CHECK와 같다) */
   private static readonly TOOLS_MAX = 10;

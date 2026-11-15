@@ -12,7 +12,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { DeviceActor, OwnerActor, SystemActor, VisitorActor } from './actor';
+import { Actor, AgentActor, DeviceActor, OwnerActor, SystemActor, VisitorActor } from './actor';
 import { AttemptLimiter } from './attempt-limiter';
 import { BaseEntity } from './base-entity';
 import { BaseQuery } from './base-query';
@@ -153,6 +153,17 @@ describe('Actor', () => {
     assert.equal(new VisitorActor().canManage(), false);
     assert.equal(new OwnerActor('s', 'u').canManage(), true);
     assert.equal(new SystemActor().canManage(), true);
+  });
+
+  test('바깥으로 보내는 도구(agent_out)는 비공개를 읽거나 쓰지 않는 에이전트만, 기기는 아무도', () => {
+    const reader = new AgentActor('s', 'a', 't', new Set([Actor.READ_PUBLIC, Actor.BROWSE]));
+    assert.equal(reader.can(Actor.AGENT_OUT), true);
+    for (const scope of Actor.KEEPS_PRIVATE) {
+      const keeper = new AgentActor('s', 'a', 't', new Set([Actor.READ_PUBLIC, scope]));
+      assert.equal(keeper.can(Actor.AGENT_OUT), false, scope);
+    }
+    const device = new DeviceActor('s', 'd', new Set([DeviceActor.RUN, DeviceActor.READ_PUBLIC]));
+    assert.equal(device.can(Actor.AGENT_OUT), false);
   });
 });
 

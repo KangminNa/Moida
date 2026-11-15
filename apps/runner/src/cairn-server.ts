@@ -7,6 +7,7 @@ import { NoteSource } from './note-source';
 import { PageBase } from './page-base';
 import { type ProgressBatch, ProgressState, type RunResult } from './progress';
 import type { RunnerAbility } from './runner-ability';
+import { SiteToolCalls } from './site-tool-calls';
 
 /** ai_signin의 답: 주인이 붙여 넣은 코드(한 번만), 취소됐는가, 작업의 상태 */
 export class SigninReply {
@@ -23,7 +24,12 @@ export class SigninReply {
 
 // 러너가 쓰는 MCP 도구 (코어 + 기능 패키지 code-github · browser-tabs). 모양의 원본은 docs/API설계.md 4장이다.
 export class CairnServer {
-  constructor(private readonly mcp: McpClient) {}
+  /** browser-tabs 0.5 사이트 도구의 러너 쪽 도구 (실행 꺼내기 · 남기기, 굳힌 결과 남기기) */
+  readonly siteTools: SiteToolCalls;
+
+  constructor(private readonly mcp: McpClient) {
+    this.siteTools = new SiteToolCalls(mcp);
+  }
 
   /** 일을 limit개까지 빌린다. 없으면 waitSeconds까지 기다린다. 서버는 이 러너가 할 수 있는 일만 준다 */
   async nextJobs(

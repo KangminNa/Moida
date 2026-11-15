@@ -1,5 +1,6 @@
 import { ButtonRef } from './browser-page';
 import type { Json } from './json';
+import { SiteBuildPlan } from './site-build';
 
 /** 브라우저 작업의 사이트 (browser_job). 결재 · 로그인 필요의 대상이다 */
 export class BrowseSite {
@@ -33,6 +34,8 @@ export class BrowseJob {
     readonly site: BrowseSite | null,
     readonly loginNeeded: boolean,
     readonly held: HeldPage | null,
+    /** 사이트 도구를 굳히는 일이면 그 몫 (2026-11-16 MCP 2단계, SiteBuild) */
+    readonly build: SiteBuildPlan | null = null,
   ) {}
 
   static from(body: Json): BrowseJob {
@@ -52,6 +55,7 @@ export class BrowseJob {
       held === null
         ? null
         : new HeldPage(held.text('click_id'), held.text('page_url'), held.text('tab_id')),
+      site === null ? null : SiteBuildPlan.from(body),
     );
   }
 

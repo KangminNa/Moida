@@ -1,5 +1,6 @@
-import { Actor, Command, Read, Rule, type Work } from '../../../apps/server/src/plugin-api';
+import { Actor, Command, Rule, type Work } from '../../../apps/server/src/plugin-api';
 import { JobView, LoginNoticedView } from './click-views';
+import { buildPartOf } from './integration-build';
 import { leasedBrowse, pageUrlOf, placeOf, siteOfJob } from './job';
 import { sites } from './schema';
 import { addShot, decodeImage, imageOf } from './shots';
@@ -7,8 +8,11 @@ import { addShot, decodeImage, imageOf } from './shots';
 // 러너가 빌린 browse 작업의 자리(사이트 · 둘러보기)와 로그인 필요. 로그인 필요의 결재(browser.site.login)는 러너가 올리고,
 // 관리자가 콘솔 화면에서 로그인한 뒤 "로그인했어요"(그 결재의 수정 요청)를 누르면 표시를 비우고 같은 작업이 이어서 돈다 (approvals.ts)
 
-/** MCP browser_job: 러너가 빌린 browse 작업이 어디서 도는지 (사이트 · 둘러보기, 로그인 필요, 앞에서 붙잡은 페이지) */
-export class BrowserJob extends Read<{ taskId: string }> {
+/**
+ * MCP browser_job: 러너가 빌린 browse 작업이 어디서 도는지 (사이트 · 둘러보기, 로그인 필요, 앞에서 붙잡은 페이지,
+ * 사이트 도구를 굳히는 일이면 그 몫). 굳히기면 그 작업을 쥔 것을 도구에 적어서 쓰기 동작이다
+ */
+export class BrowserJob extends Command<{ taskId: string }> {
   readonly name = 'job';
   readonly allow = Actor.RUN;
 
@@ -18,7 +22,10 @@ export class BrowserJob extends Read<{ taskId: string }> {
 
   async run(work: Work, actor: Actor, input: { taskId: string }): Promise<JobView> {
     const place = await placeOf(work, actor, await leasedBrowse(work, input.taskId));
-    return new JobView(place.site, place.held);
+    const build = place.integration
+      ? await buildPartOf(work, place.integration, input.taskId)
+      : null;
+    return new JobView(place.site, place.held, build);
   }
 }
 

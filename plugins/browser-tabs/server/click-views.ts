@@ -1,3 +1,4 @@
+import type { BuildPartView } from './integration-views';
 import type { ClickRow, ShotRow, SiteRow } from './tables';
 
 // 브라우저 작업 · 결재된 클릭 · 화면이 내보내는 모양. 콘솔(관리자)은 camelCase, 러너 · 에이전트(MCP)는 snake_case.
@@ -6,11 +7,15 @@ import type { ClickRow, ShotRow, SiteRow } from './tables';
 /** 화면 줄에서 그림을 뺀 것 (목록은 그림 없이 읽는다) */
 export type ShotMeta = Omit<ShotRow, 'image'>;
 
-/** browser_job의 답: 사이트 일인지 둘러보기인지, 사이트의 값, 로그인이 필요한지, 앞에서 붙잡은 페이지 */
+/**
+ * browser_job의 답: 사이트 일인지 둘러보기인지, 사이트의 값, 로그인이 필요한지, 앞에서 붙잡은 페이지,
+ * 사이트 도구를 굳히는 일이면 그 몫(build, 2026-11-16). 굳히기도 사이트 일이라 build를 모르는 러너는 보통 사이트 일로 돈다
+ */
 export class JobView {
   constructor(
     private readonly site: Readonly<SiteRow> | null,
     private readonly held: Readonly<ClickRow> | null,
+    private readonly build: BuildPartView | null = null,
   ) {}
 
   toJSON() {
@@ -28,6 +33,7 @@ export class JobView {
         : null,
       login_needed: site?.login_needed_at != null,
       held: held ? { click_id: held.id, page_url: held.page_url, tab_id: held.tab_id } : null,
+      build: this.build?.toJSON() ?? null,
     };
   }
 }

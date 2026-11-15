@@ -2,10 +2,21 @@ import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-
 import { ApprovalDecided, TaskSettled } from './approvals';
 import { BrowserJob, LoginNeeded } from './browse';
 import { ClickDetail, HoldClick, ListClicks, ManualClick, NextClick, SaveClick } from './clicks';
+import { SaveBuild } from './integration-build';
+import {
+  BuildIntegration,
+  DeleteIntegration,
+  EnableIntegration,
+  IntegrationDetail,
+  ListIntegrations,
+  RebuildIntegration,
+  TurnOffIntegration,
+} from './integrations';
 import { ListReads, PendingReads, RequestRead, SaveRead } from './reads';
 import { ScreenControl, ScreenRead } from './screen';
 import { BrowserScreenGateway } from './screen.gateway';
 import { ListShots, SaveShot, ShotDetail } from './shots';
+import { NextRun, SaveRun, SiteResult, SiteRun, SiteTools } from './site-runs';
 import {
   AgentSites,
   ClearSession,
@@ -24,6 +35,8 @@ import {
 //     같은 페이지 · 같은 버튼인지 다시 보고 누른다 (결재된 클릭). 로그인이 풀려 있으면 "로그인 필요" 결재로 기다린다
 //   단계 화면: AI가 단계마다 찍은 화면과 러너가 찍은 화면을 작업에 남긴다
 //   화면: 콘솔에서 서버 브라우저를 그림으로 보고 클릭 · 입력을 보낸다 (CDP 중계, HTTPS만). 사이트 세션 지우기
+//   사이트 도구 (2026-11-16 MCP 2단계): 되풀이하는 읽기 일을 Playwright 코드로 굳히고(integrations · integration-build),
+//     에이전트가 site_run으로 부르면 서버 러너가 AI 없이 돌린다 (site-runs)
 // 코어를 고치지 않고 자기 표(browser_tabs) · API(/api/p/browser-tabs/…) · MCP 도구 · 콘솔 메뉴를 갖는다.
 export default class BrowserTabsPlugin extends BasePlugin {
   register(cairn: PluginContext): void {
@@ -54,6 +67,19 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new ShotDetail(),
       new ScreenRead(screen),
       new ScreenControl(screen),
+      new ListIntegrations(),
+      new IntegrationDetail(),
+      new BuildIntegration(),
+      new RebuildIntegration(),
+      new EnableIntegration(),
+      new TurnOffIntegration(),
+      new DeleteIntegration(),
+      new SaveBuild(),
+      new SiteTools(),
+      new SiteRun(),
+      new SiteResult(),
+      new NextRun(),
+      new SaveRun(),
     ])
       cairn.addOperation(operation);
     cairn.onEvent('task.approval.granted', new ApprovalDecided('granted'));

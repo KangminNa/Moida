@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pause } from './backoff';
@@ -11,6 +11,7 @@ import { BrowserStop, BrowserStopProblem } from './browser-stop';
 import { BrowserUnavailable, TabUnreadable } from './browser-tabs';
 import { CairnServer } from './cairn-server';
 import { ExploreProxy } from './explore-proxy';
+import { IntegrationExec } from './integration-exec';
 import type { Job } from './job';
 import { RunEnding } from './job-run';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
@@ -19,9 +20,11 @@ import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
 import type { RunnerConfig } from './runner-config';
 import type { SandboxStage } from './sandbox-stage';
+import { SiteBuild } from './site-build';
+import { StepShots } from './step-shots';
 
 /** 러너가 올릴 결재 하나 (작업 토큰으로, 에이전트의 이름으로) */
-type AskedApproval = {
+export type AskedApproval = {
   requestId: string;
   action: string;
   targetKind: string;
@@ -45,7 +48,6 @@ export class BrowseStage implements SandboxStage {
   static readonly LOGIN_ACTION = 'browser.site.login';
   /** 탭을 새로 열고 로그인 화면이 그려지기를 기다리는 시간 */
   private static readonly OPEN_MS = 2_000;
-  private static readonly STEP_FILE = /\.(jpe?g|png)$/i;
   private static readonly STOPPING = '러너가 멈춰요';
 
   readonly workspaceRoom = null;
@@ -133,7 +135,8 @@ export class BrowseStage implements SandboxStage {
       held: plan.held?.pageUrl ?? null,
     });
     const browse = new BrowsePlan(site?.origins ?? [], join(dir, 'steps'), this.proxy?.url ?? null);
-    return this.job.withBrowse(browse, part);
+    const build = plan.build ? `\n\n${SiteBuild.part(prompts, plan.build)}` : '';
+    return this.job.withBrowse(browse, part + build);
   }
 
   async finish(
@@ -144,7 +147,23 @@ export class BrowseStage implements SandboxStage {
     workDir = '',
   ): Promise<RunEnding> {
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
-    await this.shipSteps(signal, note);
+    if (this.dir)
+      await new StepShots(this.server, this.job.taskId).ship(join(this.dir, 'steps'), signal, note);
+    // 사이트 도구 굳히기: 남긴 파일로 시험을 돌려 채점받고, 통과하면 켜기 결재를 올린다 (SiteBuild)
+    if (this.plan?.build && this.plan.site) {
+      const exec = new IntegrationExec(this.config.browserUrl ?? '');
+      const build = new SiteBuild(this.server.siteTools, exec, this.job.taskId);
+      const built = await build.finish(
+        this.plan.build,
+        this.plan.site,
+        workDir,
+        signal,
+        note,
+        redactor,
+      );
+      this.approval = built.approval;
+      return built.ending;
+    }
     const done = RunEnding.submit('끝났어요', RunResult.done(summary, redactor));
     let stop: BrowserStop | null;
     try {
@@ -285,37 +304,6 @@ export class BrowseStage implements SandboxStage {
     const same = (t: BrowserTab) => BrowserPages.withoutHash(t.url) === want;
     const fresh = tabs.filter((t) => !this.before.has(t.id));
     return fresh.find(same) ?? tabs.find(same) ?? (fresh.length === 1 ? (fresh[0] ?? null) : null);
-  }
-
-  /** AI가 단계마다 찍은 화면(--output-dir)을 찍은 차례대로 올린다. 300KB를 넘거나 서버가 받지 않으면 실행 기록에 한 줄 */
-  private async shipSteps(signal: AbortSignal, note: Note): Promise<void> {
-    if (this.dir === null) return;
-    const steps = join(this.dir, 'steps');
-    const names = (await readdir(steps).catch(() => [] as string[])).filter((n) =>
-      BrowseStage.STEP_FILE.test(n),
-    );
-    const files = await Promise.all(
-      names.map(async (name) => ({ name, info: await stat(join(steps, name)) })),
-    );
-    files.sort((a, b) => a.info.mtimeMs - b.info.mtimeMs);
-    let sent = 0;
-    for (const { name, info } of files) {
-      if (signal.aborted) return;
-      if (info.size > BrowserPages.SHOT_MAX) {
-        note(new RunEvent(RunEvent.ERROR, `단계 화면이 300KB를 넘어 올리지 않았어요: ${name}`, 0));
-        continue;
-      }
-      try {
-        const image = (await readFile(join(steps, name))).toString('base64');
-        await this.server.saveShot(this.job.taskId, { url: '', title: name, image });
-        sent++;
-      } catch (error) {
-        if (!(error instanceof ToolRefused || error instanceof ServerUnreachable)) throw error;
-        note(new RunEvent(RunEvent.ERROR, `단계 화면을 더 올리지 못했어요: ${error.message}`, 0));
-        break;
-      }
-    }
-    if (sent > 0) note(new RunEvent(RunEvent.WRITE, `단계 화면 ${sent}장을 남겼어요`, 0));
   }
 
   /** 주소가 사이트의 허용 출처 안인가 */

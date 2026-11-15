@@ -29,6 +29,48 @@ export interface ClickRow {
 }
 export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'runner_id' | 'tab_id' | 'page_url' | 'role' | 'name' | 'box' | 'fingerprint'>;
 
+/** browser_tabs.integration_revisions */
+export interface IntegrationRevisionRow {
+  id: string;
+  space_id: string;
+  integration_id: string;
+  seq: number;
+  input_schema: unknown;
+  output_schema: unknown;
+  code: string;
+  tests: unknown;
+  passed: number;
+  total: number;
+  build_task_id: string;
+  created_at: Date;
+}
+export type IntegrationRevisionNew = Partial<IntegrationRevisionRow> & Pick<IntegrationRevisionRow, 'id' | 'space_id' | 'integration_id' | 'seq' | 'input_schema' | 'output_schema' | 'code' | 'tests' | 'passed' | 'total' | 'build_task_id'>;
+
+/** browser_tabs.integrations */
+export interface IntegrationRow {
+  id: string;
+  space_id: string;
+  site_id: string;
+  name: string;
+  title: string;
+  description: string;
+  hint: string;
+  agent_id: string | null;
+  status: string;
+  live_seq: number | null;
+  draft_seq: number | null;
+  build_task_id: string | null;
+  fail_streak: number;
+  runs_ok: number;
+  runs_failed: number;
+  last_run_at: Date | null;
+  last_error: string | null;
+  created_at: Date;
+  updated_at: Date;
+  version: number;
+}
+export type IntegrationNew = Partial<IntegrationRow> & Pick<IntegrationRow, 'id' | 'space_id' | 'site_id' | 'name' | 'title' | 'description'>;
+
 /** browser_tabs.reads */
 export interface ReadRow {
   id: string;
@@ -43,6 +85,29 @@ export interface ReadRow {
   version: number;
 }
 export type ReadNew = Partial<ReadRow> & Pick<ReadRow, 'id' | 'space_id' | 'url'>;
+
+/** browser_tabs.runs */
+export interface RunRow {
+  id: string;
+  space_id: string;
+  integration_id: string;
+  seq: number;
+  agent_id: string;
+  request_id: string;
+  input: unknown;
+  status: string;
+  output: unknown | null;
+  error: string | null;
+  error_kind: string | null;
+  runner_id: string | null;
+  tries: number;
+  ms: number | null;
+  created_at: Date;
+  started_at: Date | null;
+  finished_at: Date | null;
+  version: number;
+}
+export type RunNew = Partial<RunRow> & Pick<RunRow, 'id' | 'space_id' | 'integration_id' | 'seq' | 'agent_id' | 'request_id' | 'input'>;
 
 /** browser_tabs.shots */
 export interface ShotRow {

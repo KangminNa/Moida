@@ -5,7 +5,15 @@ import {
   Rule,
   type Work,
 } from '../../../apps/server/src/plugin-api';
-import { CLICK_TARGET, clickDone, LOGIN_ACTION, PUBLISH_ACTION, SITE_TARGET } from './job';
+import { buildSettled, enableDecided } from './integration-build';
+import {
+  CLICK_TARGET,
+  clickDone,
+  ENABLE_ACTION,
+  LOGIN_ACTION,
+  PUBLISH_ACTION,
+  SITE_TARGET,
+} from './job';
 import { clicks, sites } from './schema';
 import { ConfirmedView } from './views';
 
@@ -14,7 +22,9 @@ import { ConfirmedView } from './views';
 //     수정 요청 · 반려 · 취소 → dropped (수정 요청이면 AI가 붙잡아 둔 탭에서 다시 고친다)
 //   로그인 결재(browser.site.login, 대상 browser_site): "로그인했어요"(수정 요청) → 사이트의 로그인 필요 표시를 비운다.
 //     같은 작업이 대기열로 돌아가 처음부터 이어서 한다. 승인은 쓰지 않는 길이라 실패로 끝낸다
-//   작업이 실패 · 취소로 끝나면 그 작업의 붙잡힌 · 승인된 클릭을 닫는다 (취소된 작업의 버튼을 누르지 않게)
+//   사이트 도구 켜기(browser.integration.enable, 대상 browser_integration): integration-build.ts의 enableDecided
+//   작업이 실패 · 취소로 끝나면 그 작업의 붙잡힌 · 승인된 클릭을 닫는다 (취소된 작업의 버튼을 누르지 않게).
+//   굳히기 작업이면 굳히는 중인 도구를 끈다
 
 /** 결재 이벤트의 결정: 승인 · 수정 요청 · 그 밖에 닫힘(반려 · 취소) */
 export type Decision = 'granted' | 'revised' | 'closed';
@@ -54,6 +64,7 @@ export class ApprovalDecided extends Command<DecidedInput> {
   async run(work: Work, _actor: Actor, input: DecidedInput): Promise<ConfirmedView> {
     if (input.action === PUBLISH_ACTION) await this.click(work, input);
     else if (input.action === LOGIN_ACTION) await this.login(work, input);
+    else if (input.action === ENABLE_ACTION) await enableDecided(work, this.decision, input);
     else return new ConfirmedView(false);
     return new ConfirmedView(true);
   }
@@ -135,6 +146,7 @@ export class TaskSettled extends Command<SettledInput> {
 
   async run(work: Work, _actor: Actor, input: SettledInput): Promise<ConfirmedView> {
     if (!TaskSettled.ENDED.includes(input.status)) return new ConfirmedView(false);
+    const built = await buildSettled(work, input.spaceId, input.taskId);
     const open = await work.rows(clicks, {
       space_id: input.spaceId,
       task_id: input.taskId,
@@ -146,6 +158,6 @@ export class TaskSettled extends Command<SettledInput> {
         { status: 'dropped', reason: '작업이 끝났어요', version: row.version + 1 },
         { id: row.id, version: row.version },
       );
-    return new ConfirmedView(open.length > 0);
+    return new ConfirmedView(open.length > 0 || built);
   }
 }

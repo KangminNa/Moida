@@ -100,6 +100,29 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 {{/explore}}
 브라우저는 playwright MCP 도구로 움직입니다. 단계마다 browser_take_screenshot을 type: jpeg, 파일 이름 없이 찍어 남깁니다.
 
+<!-- site-build -->
+# 사이트 도구 굳히기: {{name}}
+{{title}}: {{description}}
+이번 일은 답을 내는 것이 아니라, 같은 일을 AI 없이 되풀이할 코드(사이트 도구)를 만드는 것입니다. 위 사이트 단락의 규칙을 그대로 지킵니다.
+1. playwright MCP로 사이트를 둘러보며 읽을 화면과 요소를 찾습니다. 로케이터는 browser_generate_locator로 역할 · 이름 · 레이블에 기대는 것을 고릅니다 (순서 · 클래스에 기대지 않습니다).
+2. 작업 폴더의 site-tool/ 에 세 파일을 씁니다:
+   - tool.json: {"input_schema": {…}, "output_schema": {…}}. 맨 위는 "type": "object"입니다. 쓰는 낱말은 type · properties · required · items · enum · maxLength · maxItems · description · additionalProperties(false)뿐입니다.
+   - code.js: 함수의 본문만 씁니다. page(새 탭) · input(입력) · site({ origin, start_url, loginNeeded(까닭) })를 받고 output_schema 모양의 객체를 return 합니다. 보통 await page.goto(…)로 시작합니다.
+   - tests.json: [{"name": "…", "input": {…}}] 3~10개. 서로 다른 입력으로, 실제로 답이 있는 값을 고릅니다.
+3. 읽기만 합니다: 제출 · 저장 · 전송 · 삭제 버튼을 누르지 않고, 허용 출처 밖으로 가지 않습니다. 로그인 화면이면 site.loginNeeded('까닭')를 부릅니다.
+   러너의 규칙 검사가 막는 것: require · import · process · fetch · eval · Function · constructor · context · browser · newPage · request · route · popup · cookies · download 같은 이름, 글자로 칸에 닿기(obj['…']), \u · \x 이스케이프, 비밀값처럼 생긴 글자.
+4. 끝나면 러너가 시험을 직접 돌려 채점합니다 (70% 이상이면 켜기 승인으로 갑니다). 마지막 답에는 무엇을 굳혔는지 두세 줄로 적습니다.
+{{#last}}
+
+## 앞 버전 (이것을 고칩니다)
+{{last}}
+{{/last}}
+{{#errors}}
+
+## 최근 실행에서 실패한 까닭
+{{errors}}
+{{/errors}}
+
 <!-- team -->
 # 내 팀 (바로 아래)
 {{members}}
@@ -136,6 +159,7 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 {{/browse}}
 {{^browse}}
 - 발행, 전송, 삭제는 직접 하지 않고 request_approval로 올린 뒤 바로 끝냅니다. 승인 뒤 실행은 서버가 합니다.
+- 사이트에서 정보를 찾을 때 site_tools가 보이면 맞는 사이트 도구를 먼저 씁니다 (site_run → site_result, AI 없이 몇 초). 없거나 실패하면 브라우저 담당에게 browse로 맡깁니다.
 {{/browse}}
 {{#outputs}}
 - 사람에게 줄 파일(문서 · 슬라이드 · 표 · 그림 · 영상)을 만들면 {{outputs}} 바로 아래에 둡니다. 일이 잘 끝나면 그 폴더의 파일만 결과물로 주인에게 갑니다 (하나 100MB, 200개까지. 폴더 · 숨김 파일은 빠집니다).

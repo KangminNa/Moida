@@ -30,3 +30,50 @@ export type Click = {
   version: number;
   createdAt: string;
 };
+
+/** 사이트 도구 (2026-11-16 MCP 2단계, server/integration-views.ts의 IntegrationView) */
+export type Integration = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  name: string;
+  title: string;
+  description: string;
+  hint: string;
+  status: string;
+  liveSeq: number | null;
+  draftSeq: number | null;
+  failStreak: number;
+  runsOk: number;
+  runsFailed: number;
+  lastRunAt: string | null;
+  lastError: string | null;
+  version: number;
+  updatedAt: string;
+};
+
+/** 사이트 도구의 상세 (IntegrationDetailView): 최근 버전과 실행 */
+export type IntegrationDetail = {
+  integration: Integration;
+  revisions: {
+    seq: number;
+    passed: number;
+    total: number;
+    inputSchema: unknown;
+    outputSchema: unknown;
+    code: string;
+    tests: { name: string; ok: boolean; problem: string | null; ms: number | null }[];
+    createdAt: string;
+  }[];
+  runs: {
+    id: string;
+    seq: number;
+    status: string;
+    input: string | null;
+    output: string | null;
+    error: string | null;
+    errorKind: string | null;
+    ms: number | null;
+    createdAt: string;
+  }[];
+};

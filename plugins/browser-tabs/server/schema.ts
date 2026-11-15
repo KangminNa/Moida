@@ -34,6 +34,46 @@ export const clicks = browserTabsSchema.table('clicks', {
   version: integer('version').notNull(),
 });
 
+/** browser_tabs.integration_revisions */
+export const integrationRevisions = browserTabsSchema.table('integration_revisions', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  integration_id: uuid('integration_id').notNull(),
+  seq: integer('seq').notNull(),
+  input_schema: jsonb('input_schema').notNull(),
+  output_schema: jsonb('output_schema').notNull(),
+  code: text('code').notNull(),
+  tests: jsonb('tests').notNull(),
+  passed: integer('passed').notNull(),
+  total: integer('total').notNull(),
+  build_task_id: uuid('build_task_id').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+/** browser_tabs.integrations */
+export const integrations = browserTabsSchema.table('integrations', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  site_id: uuid('site_id').notNull(),
+  name: text('name').notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  hint: text('hint').notNull(),
+  agent_id: uuid('agent_id'),
+  status: text('status').notNull(),
+  live_seq: integer('live_seq'),
+  draft_seq: integer('draft_seq'),
+  build_task_id: uuid('build_task_id'),
+  fail_streak: integer('fail_streak').notNull(),
+  runs_ok: integer('runs_ok').notNull(),
+  runs_failed: integer('runs_failed').notNull(),
+  last_run_at: timestamp('last_run_at', { withTimezone: true }),
+  last_error: text('last_error'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  version: integer('version').notNull(),
+});
+
 /** browser_tabs.reads */
 export const reads = browserTabsSchema.table('reads', {
   id: uuid('id').notNull(),
@@ -45,6 +85,28 @@ export const reads = browserTabsSchema.table('reads', {
   error: text('error'),
   requested_at: timestamp('requested_at', { withTimezone: true }).notNull(),
   read_at: timestamp('read_at', { withTimezone: true }),
+  version: integer('version').notNull(),
+});
+
+/** browser_tabs.runs */
+export const runs = browserTabsSchema.table('runs', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  integration_id: uuid('integration_id').notNull(),
+  seq: integer('seq').notNull(),
+  agent_id: uuid('agent_id').notNull(),
+  request_id: text('request_id').notNull(),
+  input: jsonb('input').notNull(),
+  status: text('status').notNull(),
+  output: jsonb('output'),
+  error: text('error'),
+  error_kind: text('error_kind'),
+  runner_id: uuid('runner_id'),
+  tries: integer('tries').notNull(),
+  ms: integer('ms'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  started_at: timestamp('started_at', { withTimezone: true }),
+  finished_at: timestamp('finished_at', { withTimezone: true }),
   version: integer('version').notNull(),
 });
 

@@ -100,6 +100,11 @@ ENV NODE_ENV=production \
     CAIRN_RUNNER_BUILD=$CAIRN_RUNNER_BUILD
 WORKDIR /app/apps/runner
 RUN npm install -g @anthropic-ai/claude-code@2.1.302 @openai/codex@0.164.0
+# 러너의 런타임 의존은 @playwright/mcp 하나 (브라우저 작업의 Playwright MCP, 사이트 도구의 playwright-core는 그 안의 것).
+# 컴파일한 JS가 createRequire로 찾으므로 /app/apps/runner/node_modules에 둔다. 판은 package.json 그대로
+COPY apps/runner/package.json /app/apps/runner/package.json
+RUN npm install --omit=dev --no-package-lock --ignore-scripts --no-audit --no-fund \
+ && npm cache clean --force
 COPY skills /app/skills
 COPY --from=runner-build /repo/apps/runner/dist /app/apps/runner/src
 USER node

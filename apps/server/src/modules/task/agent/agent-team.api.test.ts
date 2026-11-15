@@ -91,9 +91,9 @@ describe('에이전트 팀 템플릿', () => {
       [
         '대회 브라우저 담당',
         ['read_public', 'browse'],
-        ['browser.site.publish', 'browser.site.login'],
+        ['browser.site.publish', 'browser.site.login', 'browser.integration.enable'],
       ],
-      '브라우저 담당: 비공개 없이, 클릭 · 로그인 결재는 러너가 이 이름으로 올린다',
+      '브라우저 담당: 비공개 없이, 클릭 · 로그인 · 사이트 도구 켜기 결재는 러너가 이 이름으로 올린다',
     );
 
     const count = async () =>

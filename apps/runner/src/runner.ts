@@ -8,6 +8,8 @@ import { BrowserTabs } from './browser-tabs';
 import { CairnServer } from './cairn-server';
 import { ClickRunner } from './click-runner';
 import { CodeStage } from './code-stage';
+import { IntegrationExec } from './integration-exec';
+import { IntegrationRunner } from './integration-runner';
 import type { Job } from './job';
 import { JobPool } from './job-pool';
 import { CliUnavailable, JobRun } from './job-run';
@@ -141,11 +143,24 @@ export class Runner {
       this.pages && this.ability.browser
         ? new ClickRunner(this.server, this.pages, this.slot, this.log).run(stop).catch(aside)
         : null;
+    // 사이트 도구 실행 (2026-11-16 MCP 2단계): 브라우저가 있는 러너만, 브라우저 자리를 나눠 쓴다
+    const sites =
+      this.ability.browser && browserUrl
+        ? new IntegrationRunner(
+            this.server.siteTools,
+            new IntegrationExec(browserUrl),
+            this.slot,
+            this.log,
+            this.redactor,
+          )
+            .run(stop)
+            .catch(aside)
+        : null;
     try {
       await this.loop(stop);
     } finally {
       this.stopper.abort();
-      await Promise.all([tabs, clicks]);
+      await Promise.all([tabs, clicks, sites]);
     }
     if (tabFailure instanceof AccessDenied) throw new TokenRejected(tabFailure.message);
     if (tabFailure) throw new RunnerHalted((tabFailure as Error).message);
