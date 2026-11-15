@@ -4,6 +4,8 @@
 /** 들어온 HTTP 요청 */
 export type HttpRequest = {
   method: string;
+  /** 경로와 쿼리 (앞에서 바뀌기 전 그대로) */
+  originalUrl?: string;
   headers: Record<string, unknown>;
   query: Record<string, unknown>;
   ip?: string;

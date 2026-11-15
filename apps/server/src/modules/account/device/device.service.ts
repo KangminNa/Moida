@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { Injectable } from '@nestjs/common';
 import {
   Actor,
@@ -9,6 +10,7 @@ import {
   Idempotency,
   NotFound,
   RuleViolation,
+  SecurityLog,
   type Sql,
   TooManyRequests,
 } from '../../platform';
@@ -39,6 +41,10 @@ export class DeviceService extends EntityService<Device> {
   private readonly registrations = new AttemptLimiter(20, 3_600_000);
   /** 서버 러너 · 코드 러너 칸의 연결은 한 곳(IP)에서 1시간에 30번까지. 러너가 다시 뜰 때마다 한 번이라 넉넉하다 */
   private readonly pairings = new AttemptLimiter(30, 3_600_000);
+  /** 마지막 접근은 프로세스마다 이 간격에 한 번만 적는다 (러너는 몇 초마다 부른다) */
+  private static readonly SEEN_MS = 5 * 60_000;
+  private static readonly TOUCHED_MAX = 1000;
+  private readonly touched = new Map<string, number>();
   private static readonly ADD_RUNNER = 'add_runner';
   /** 하루가 지나도록 토큰을 한 번도 받지 않은 등록은 새 등록이 들어올 때 지운다 */
   private static readonly UNUSED_MS = 86_400_000;
@@ -79,6 +85,7 @@ export class DeviceService extends EntityService<Device> {
       const device = live ?? Device.forServerRunner(spaceId, now);
       if (live) live.rotateDeviceToken(now);
       await devices.save(device);
+      await DeviceService.paired(tx, spaceId, Device.SERVER_RUNNER, ip);
       return device;
     });
   }
@@ -107,6 +114,7 @@ export class DeviceService extends EntityService<Device> {
       const device = live ?? Device.forCodeRunner(spaceId, req.slot, now);
       if (live) live.rotateDeviceToken(now);
       await devices.save(device);
+      await DeviceService.paired(tx, spaceId, name, ip);
       return device;
     });
   }
@@ -246,7 +254,7 @@ export class DeviceService extends EntityService<Device> {
         throw new OAuthError('invalid_grant', '맞지 않거나 끊긴 기기의 갱신 토큰이에요');
       if (device.refreshWasReused()) {
         // 이미 쓴 갱신 토큰이 다시 왔다 = 누군가 훔쳐 먼저 썼을 수 있다. 기기를 끊고 저장한 뒤 거절한다
-        device.revoke(now);
+        device.revoke(now, 'token_reused');
         await devices.save(device);
         return null;
       }
@@ -276,6 +284,27 @@ export class DeviceService extends EntityService<Device> {
       apply(device);
       await devices.save(device);
       return device;
+    });
+  }
+
+  /** 기기의 마지막 접근 (Guard가 기기를 알아본 /mcp 요청마다 부른다). 주소가 IP 모양이 아니면 시각만 */
+  async seen(deviceId: string, ip: string, now: Date): Promise<void> {
+    if (now.getTime() - (this.touched.get(deviceId) ?? 0) < DeviceService.SEEN_MS) return;
+    if (this.touched.size > DeviceService.TOUCHED_MAX) this.touched.clear();
+    this.touched.set(deviceId, now.getTime());
+    await this.transaction((tx) =>
+      new DeviceRepository(tx).touch(deviceId, isIP(ip) ? ip : null, now),
+    );
+  }
+
+  /** 서버 러너 · 코드 러너 칸이 연결 값으로 토큰을 받았다 (보안 기록 runner.paired). 기기를 새로 만들었으면 device.connected도 남는다 */
+  private static async paired(tx: Sql, spaceId: string, name: string, ip: string): Promise<void> {
+    await new SecurityLog(tx).record({
+      space_id: spaceId,
+      kind: 'runner.paired',
+      ip,
+      user_agent: null,
+      detail: { device: name },
     });
   }
 }

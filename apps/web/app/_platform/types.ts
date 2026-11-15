@@ -11,6 +11,7 @@ import type {
   PluginSettingView,
   PluginView,
 } from '../../../server/src/modules/platform/plugin/plugin.view';
+import type { SecurityEventPageView } from '../../../server/src/modules/platform/security/security-event.view';
 
 // 서버가 돌려주는 모양 (platform). 서버 코드가 웹 번들에 들어가지 않게 import type으로만 가져온다.
 
@@ -28,3 +29,6 @@ export type PluginSetting = ReturnType<PluginSettingView['toJSON']>;
 export type PluginActionResult = ReturnType<PluginActionResultView['toJSON']>;
 /** 보관함 한 쪽 (2차 5단계): 결과물 · 페이지 · 읽은 글 · 세션 · 위키 · 글, 최근 것부터 */
 export type LibraryPage = ReturnType<LibraryPageView['toJSON']>;
+/** 보안 기록 한 쪽 (설정 › 보안, 최근부터) */
+export type SecurityEventPage = ReturnType<SecurityEventPageView['toJSON']>;
+export type SecurityEvent = SecurityEventPage['events'][number];

@@ -1,6 +1,7 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 // 서버 컴포넌트에서 서버 API 부르기. 브라우저의 쿠키(로그인·설치 통행증)를 그대로 넘겨 같은 사람으로 묻는다.
+// 앞의 프록시가 붙인 x-forwarded-for도 넘긴다: 서버가 보안 화면의 마지막 접근에 웹 서버의 주소가 아니라 브라우저의 주소를 적게.
 // 웹은 DB에 직접 닿지 않는다 (AGENTS.md 코드 규칙).
 const BASE = process.env.API_URL ?? 'http://localhost:4000';
 
@@ -16,10 +17,14 @@ export async function serverFetch<T>(path: string, asVisitor = false): Promise<S
         .getAll()
         .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
         .join('; ');
+  const forwarded = (await headers()).get('x-forwarded-for');
   try {
     const res = await fetch(`${BASE}${path}`, {
       cache: 'no-store',
-      headers: cookie ? { cookie } : {},
+      headers: {
+        ...(cookie ? { cookie } : {}),
+        ...(forwarded ? { 'x-forwarded-for': forwarded } : {}),
+      },
     });
     return { status: res.status, data: (await res.json().catch(() => null)) as T | null };
   } catch {

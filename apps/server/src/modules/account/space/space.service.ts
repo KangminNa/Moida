@@ -8,6 +8,7 @@ import {
   Database,
   Forbidden,
   NotFound,
+  SecurityLog,
 } from '../../platform';
 import { InstallPolicy } from './install.policy';
 import { Space } from './space';
@@ -39,7 +40,18 @@ export class SpaceService extends BaseService {
   /** 설치 코드가 맞으면 공간을 만들고(없을 때) 10분짜리 설치 통행증을 돌려준다. from: 요청한 곳(IP) */
   async verifyInstallCode(actor: Actor, req: InstallCodeInput, from: string): Promise<string> {
     this.attempts.hit(AttemptLimiter.place(from));
-    if (!this.install.matches(req.code)) throw new Forbidden('install', '맞지 않는 설치 코드예요');
+    if (!this.install.matches(req.code)) {
+      // 보안 기록 (install.failed). 오류에 표시해 오류 필터가 거부된 접근으로 다시 남기지 않게
+      await this.transaction(async (tx) => {
+        await new SecurityLog(tx).record({
+          space_id: null,
+          kind: 'install.failed',
+          ip: from,
+          user_agent: null,
+        });
+      });
+      throw new Forbidden('install', '맞지 않는 설치 코드예요').markRecorded();
+    }
     if ((await this.spaces.installStatus(actor, null)).installed)
       throw new Conflict('이미 설치된 블로그예요. 로그인해 주세요');
     const space = await this.transaction(async (tx) => {

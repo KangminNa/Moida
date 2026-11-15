@@ -43,6 +43,32 @@ export class OwnerRepository extends BaseRepository<Owner> {
     return row ? Owner.restore(row, [WebSession.restore(session)]) : null;
   }
 
+  /** 주인과 그의 로그인 하나 (보안 화면의 끝내기). 끝난 로그인도 불러온다 (두 번 끝내도 같게) */
+  async findWithSession(userId: string, sessionId: string): Promise<Owner | null> {
+    const [session] = await this.sql<WebSessionRow[]>`
+      SELECT * FROM account.web_sessions WHERE id = ${sessionId} AND user_id = ${userId}`;
+    if (!session) return null;
+    const [row] = await this.sql<LoadedOwner[]>`${this.owners} WHERE u.id = ${userId}`;
+    return row ? Owner.restore(row, [WebSession.restore(session)]) : null;
+  }
+
+  /** 이 날 뒤에 로그인한 주소들 (새 곳에서 로그인했는지 보려고) */
+  async recentIps(userId: string, since: Date): Promise<string[]> {
+    const rows = await this.sql<{ ip: string }[]>`
+      SELECT DISTINCT host(ip) AS ip FROM account.web_sessions
+      WHERE user_id = ${userId} AND created_at > ${since} AND ip IS NOT NULL`;
+    return rows.map((r) => r.ip);
+  }
+
+  /** 로그인의 마지막 접근. version도 다른 칸도 건드리지 않는다 (요청마다 부르지 않게 Service가 간격을 둔다) */
+  async touchSession(tokenHash: string, ip: string | null, now: Date): Promise<void> {
+    await this.updateRows(
+      webSessions,
+      { last_seen_at: now, last_ip: ip },
+      { token_hash: tokenHash, revoked_at: null },
+    );
+  }
+
   async save(owner: Owner): Promise<void> {
     try {
       await this.saveAccount(owner);

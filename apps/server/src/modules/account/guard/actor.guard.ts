@@ -1,4 +1,4 @@
-import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import {
   AgentActor,
   Cookies,
@@ -8,8 +8,10 @@ import {
   SystemActor,
 } from '../../platform';
 import { DeviceQuery } from '../device/device.query';
+import { DeviceService } from '../device/device.service';
 import { WebSession } from '../owner/owner';
 import { OwnerQuery } from '../owner/owner.query';
+import { OwnerService } from '../owner/owner.service';
 import { SpaceQuery } from '../space/space.query';
 
 // 모든 요청에서 요청자를 정한다: 작업 토큰 → 에이전트, 그 밖의 Bearer 토큰 → 기기 (둘 다 /mcp에서만),
@@ -18,14 +20,19 @@ import { SpaceQuery } from '../space/space.query';
 // REST의 관리 일에 권한 확인이 하나 빠져도 AI 토큰은 닿지 않게 구조로 막는다 (2026-11-06).
 // 누구인지 정하는 것 말고 막는 일은 하나뿐이다: 로그인 쿠키로 오는 쓰기 요청의 출처 확인.
 // 그 밖의 권한은 Service 첫 줄에서 확인한다 (/mcp는 기기나 살아 있는 작업이 아니면 401).
+// 알아본 로그인 · 기기는 마지막 접근을 남긴다 (보안 화면, Service가 5분에 한 번만 적는다).
+// 마지막 접근을 적지 못해도 요청은 막지 않는다 (서버 로그에 남긴다).
 @Injectable()
 export class ActorGuard implements CanActivate {
   private static readonly READS = new Set(['GET', 'HEAD', 'OPTIONS']);
   private static readonly MCP = '/mcp';
+  private readonly logger = new Logger('마지막 접근');
 
   constructor(
     private readonly owners: OwnerQuery,
     private readonly devices: DeviceQuery,
+    private readonly ownerSessions: OwnerService,
+    private readonly deviceAccess: DeviceService,
     private readonly spaces: SpaceQuery,
     private readonly box: SecretBox,
   ) {}
@@ -37,17 +44,30 @@ export class ActorGuard implements CanActivate {
       // AI 토큰은 MCP 입구에서만 쓴다. 작업 토큰은 호출마다 작업을 확인하는 곳이 거기뿐이고,
       // 기기 토큰이 REST에서 write 권한으로 통하면 기기 권한 바꾸기처럼 주인의 일까지 닿는다
       if (request.path !== ActorGuard.MCP) return true;
-      request.actor =
-        (AgentActor.isToken(bearer)
-          ? AgentActor.open(this.box, bearer)
-          : await this.devices.actorFor(bearer)) ?? undefined;
+      if (AgentActor.isToken(bearer)) {
+        request.actor = AgentActor.open(this.box, bearer) ?? undefined;
+        return true;
+      }
+      const device = await this.devices.actorFor(bearer);
+      request.actor = device ?? undefined;
+      if (device?.id)
+        await this.note(this.deviceAccess.seen(device.id, request.ip ?? '', new Date()));
       return true;
     }
     const token = Cookies.read(request, WebSession.COOKIE);
     if (!token) return true;
     if (!ActorGuard.READS.has(request.method.toUpperCase())) await this.assertSameSite(request);
-    request.actor = (await this.owners.actorFor(token)) ?? undefined;
+    const owner = await this.owners.actorFor(token);
+    request.actor = owner ?? undefined;
+    if (owner) await this.note(this.ownerSessions.seen(token, request.ip ?? '', new Date()));
     return true;
+  }
+
+  /** 마지막 접근 적기를 기다린다. 실패해도 요청은 그대로 */
+  private async note(work: Promise<void>): Promise<void> {
+    await work.catch((error: unknown) =>
+      this.logger.error(`마지막 접근을 적지 못했어요: ${String(error)}`),
+    );
   }
 
   /**

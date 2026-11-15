@@ -341,14 +341,15 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
     this.issueDeviceToken(now);
   }
 
-  /** 끊는다. 모든 토큰이 바로 무효가 된다 */
-  revoke(now: Date): void {
+  /** 끊는다. 모든 토큰이 바로 무효가 된다. reason: owner(관리자가 끊음) · token_reused(갱신 토큰 재사용, 도난 감지) */
+  revoke(now: Date, reason: 'owner' | 'token_reused' = 'owner'): void {
     if (this.revoked) return;
     this.put('revoked_at', now);
     this.record(
       new DomainEvent('account.device.revoked', 1, this.row.space_id, {
         deviceId: this.id,
         name: this.row.name,
+        reason,
       }),
     );
   }

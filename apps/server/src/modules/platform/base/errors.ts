@@ -5,9 +5,21 @@ export abstract class DomainError extends Error {
   abstract readonly code: string;
   abstract readonly status: number;
 
+  /**
+   * 보안 기록에 이미 남겼다 (로그인 실패처럼 모듈이 사건으로 직접 남긴 것).
+   * 오류 필터가 같은 일을 "거부된 접근"으로 한 번 더 남기지 않게 한다
+   */
+  recorded = false;
+
   constructor(message: string) {
     super(message);
     this.name = new.target.name;
+  }
+
+  /** 보안 기록에 남겼다고 표시한다 (던지기 전에) */
+  markRecorded(): this {
+    this.recorded = true;
+    return this;
   }
 
   toJSON(): object {

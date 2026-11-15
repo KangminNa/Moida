@@ -75,3 +75,14 @@ export class ChangePasswordInput extends BaseRequest {
     );
   }
 }
+
+/** 로그인 하나 (POST /api/auth/sessions/:id/end) */
+export class SessionIdInput extends BaseRequest {
+  private constructor(readonly id: string) {
+    super();
+  }
+
+  static from(id: string): SessionIdInput {
+    return BaseRequest.read({ id }, (f) => new SessionIdInput(f.uuid('id')));
+  }
+}

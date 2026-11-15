@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Put, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Req, Res } from '@nestjs/common';
 import {
   type Actor,
   Cookies,
@@ -7,10 +7,17 @@ import {
   type HttpResponse,
 } from '../../platform';
 import { WebSession } from './owner';
-import { ChangePasswordInput, LoginInput, RenameOwnerInput } from './owner.input';
+import { ChangePasswordInput, LoginInput, RenameOwnerInput, SessionIdInput } from './owner.input';
 import { OwnerQuery } from './owner.query';
 import { OwnerService } from './owner.service';
-import { LoggedInView, LoggedOutView, type OwnerView, PasswordChangedView } from './owner.view';
+import {
+  LoggedInView,
+  LoggedOutView,
+  type OwnerView,
+  PasswordChangedView,
+  SessionsEndedView,
+  type WebSessionListView,
+} from './owner.view';
 
 // 주인 로그인 (아이디·비밀번호). 로그인 쿠키는 httpOnly라 웹 화면의 스크립트가 읽을 수 없다.
 @Controller('api/auth')
@@ -55,9 +62,47 @@ export class LoginController {
     @Req() req: HttpRequest,
     @Res({ passthrough: true }) res: HttpResponse,
   ): Promise<LoggedOutView> {
-    await this.service.logout(actor, Cookies.read(req, WebSession.COOKIE));
+    await this.service.logout(
+      actor,
+      Cookies.read(req, WebSession.COOKIE),
+      req.ip ?? '',
+      String(req.headers['user-agent'] ?? ''),
+    );
     Cookies.clear(res, WebSession.COOKIE);
     return new LoggedOutView();
+  }
+
+  /** 끝나지 않은 로그인들과 보안 설정 값 (설정 › 보안) */
+  @Get('sessions')
+  sessions(@CurrentActor() actor: Actor, @Req() req: HttpRequest): Promise<WebSessionListView> {
+    return this.owners.sessions(actor, Cookies.read(req, WebSession.COOKIE));
+  }
+
+  /** 다른 곳의 로그인 하나를 끝낸다 */
+  @HttpCode(200)
+  @Post('sessions/:id/end')
+  async endSession(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Req() req: HttpRequest,
+  ): Promise<SessionsEndedView> {
+    await this.service.endSession(
+      actor,
+      Cookies.read(req, WebSession.COOKIE),
+      SessionIdInput.from(id),
+    );
+    return new SessionsEndedView();
+  }
+
+  /** 지금 로그인 말고 모두 끝낸다 */
+  @HttpCode(200)
+  @Post('sessions/end-others')
+  async endOthers(
+    @CurrentActor() actor: Actor,
+    @Req() req: HttpRequest,
+  ): Promise<SessionsEndedView> {
+    await this.service.endOtherSessions(actor, Cookies.read(req, WebSession.COOKIE));
+    return new SessionsEndedView();
   }
 
   @Put('password')

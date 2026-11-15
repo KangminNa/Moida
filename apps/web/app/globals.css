@@ -2750,6 +2750,70 @@ a.chip {
   box-sizing: border-box;
 }
 
+/* 설정 › 보안: 설정 값 한 줄씩 (이름 · 값) */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.facts li {
+  display: flex;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.facts span {
+  flex: 0 0 120px;
+  color: var(--muted);
+}
+
+.facts b {
+  font-weight: 500;
+}
+
+/* 보안 화면의 칸 제목 줄: 제목은 늘고 단추는 오른쪽 */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.item-main .pill {
+  margin-left: 8px;
+}
+
+/* 보안 기록 한 줄: 점(채움 = 눈여겨볼 사건) · 내용 · 시각 */
+.list > .security-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.security-event > .dot {
+  margin-top: 7px;
+}
+
+.security-event time {
+  flex: none;
+  font-size: 12px;
+}
+
+.input.small {
+  height: 30px;
+  font-size: 13px;
+}
+
 /* 대화와 오른쪽 "팀이 동시에 일하는 중" 칸 (2026-11-15 화면 정리). 칸이 없으면 대화가 가운데에 선다 */
 .chat-split {
   display: flex;

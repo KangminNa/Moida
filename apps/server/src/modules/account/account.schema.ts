@@ -28,6 +28,7 @@ export const devices = accountSchema.table('devices', {
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
   revoked_at: timestamp('revoked_at', { withTimezone: true }),
   version: integer('version').notNull(),
+  last_ip: inet('last_ip'),
 });
 
 /** account.login_links */
@@ -120,4 +121,6 @@ export const webSessions = accountSchema.table('web_sessions', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
   revoked_at: timestamp('revoked_at', { withTimezone: true }),
+  last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
+  last_ip: inet('last_ip'),
 });

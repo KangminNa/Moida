@@ -6,7 +6,7 @@
 **비즈니스 규칙을 두지 않는다.** 세션·글 같은 단어가 여기 코드에 나오면 잘못 들어온 것이다.
 
 ## 소유 데이터
-스키마 `platform`: blobs, idempotency, notifications, notice_settings, push_subscriptions, outbox, plugins, plugin_settings
+스키마 `platform`: blobs, idempotency, notifications, notice_settings, push_subscriptions, outbox, plugins, plugin_settings, security_events
 DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모듈의 테이블이 씀)
 
 ## 데이터 묶음
@@ -16,6 +16,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
   `Outbox.listen`이 이벤트를 쓰는 같은 트랜잭션에서 `NoticeCatalog.onEvents` → `Notices.post`(경로가 off면 안 남김, 같은 `group_key`의 안 읽은 알림은 바꾸고 `push_sent_at`을 비움) · `Notices.settle`(끝난 일의 알림 읽음).
   이벤트 없이 남기는 알림도 종류는 등록한다 (설정 화면에 보이게). 읽기 `api/notifications`(최근 30개 · 안 읽은 수), 읽음 `api/notifications/read`. 주인만
 - 알림 설정(notice_settings, `NoticeSettings`): 공간마다 한 줄, 없으면 기본값. 묶음 간격 · 조용한 시간 · 시간대 · 종류별 경로(push · center · off). `api/notice-settings`(주인만, 종류 목록은 `NoticeCatalog`에서)
+- 보안 기록(security_events, `security/`, 2026-11-15): 무엇의 사건인지 모른다 (종류 · 내용은 기록하는 모듈이). `SecurityLog`는 `Notices`처럼 부르는 쪽의 연결을 받아 한 줄을 남기고, 1분 안의 같은 공간 · 종류 · 곳 · 내용이면 `count` · `last_at`만 올린다 (새 줄이면 true: 알림을 한 번만 보내게). 거부된 접근은 `DomainErrorFilter`가 `/api` · `/mcp` · `/oauth`의 401 · 403 · 429에서 `SecurityLogService.record`로 남긴다 (기다리지 않고, 실패는 서버 로그. 401은 토큰 · 쿠키를 내민 요청만, 모듈이 사건으로 남긴 오류는 `DomainError.recorded`로 건너뜀). 읽기 `api/security/events`(주인만, `SecurityEventQuery`, 공간을 모르는 사건도 함께), 90일 지난 줄은 `SecurityLogPurgeJob`(하루)이 지운다. 비밀번호 · 토큰 · 쿠키 값은 어디에도 넣지 않는다
 - 브라우저 푸시(push_subscriptions, `PushSubscription`): 구독은 알려진 푸시 서비스의 https 주소만 (`CAIRN_PUSH_EXTRA_ORIGINS`는 시험 · 직접 운영하는 서비스). `api/push`(키 · 구독 · 끄기 · 보내 보기, 주인만).
   보내기는 `NoticePushJob`(1분): 짧은 트랜잭션에서 공간의 안 다룬 알림을 `SKIP LOCKED`로 잠그고 `NoticePolicy`가 정한 뒤 `push_sent_at`을 적고, 트랜잭션 밖에서 `PushGateway`가 보낸다 → 결과를 적는다(404 · 410이나 다섯 번 실패면 구독을 지움). 암호화 · VAPID는 `base/web-push.ts`(`WebPush`), 키는 서버 키에서 (`derive('web-push-vapid')`)
 
@@ -26,7 +27,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - `Database`, `Sql`·`Row`(라이브러리 타입 별칭), `Actor`와 `OwnerActor`·`DeviceActor`·`AgentActor`·`ApprovedActor`·`SystemActor`·`VisitorActor`.
   권한은 `assertCan(권한)`(기기·에이전트가 받은 권한), 관리 일은 종류로 묻는다: `assertOwner()`(주인만), `assertOwnerOrSystem()`(주인과 명령줄·일꾼: 플러그인, 서버 키 교체, 복원).
   `mayRead(id)` · `hasReadGrants()`: 작업 토큰에 함께 봉인한 id 하나씩의 읽기 허락 (`AgentActor`의 `reads`). 권한이 아니라 id로 하나를 읽을 때만 본다 (무엇의 id인지는 모른다)
-- 같은 트랜잭션에 들어가는 것: `Outbox`(이벤트, 변경 신호, 일꾼 깨우기. `Outbox.listen`: 이벤트를 쓰기 전에 같은 트랜잭션에서 부르는 듣는 쪽, 지금은 알림 하나), `ChangeSignal`(내용 없는 신호), `Idempotency`(같은 request_id는 한 번만), `Notices`(콘솔 알림, 변경 신호 `platform.notification`)
+- 같은 트랜잭션에 들어가는 것: `Outbox`(이벤트, 변경 신호, 일꾼 깨우기. `Outbox.listen`: 이벤트를 쓰기 전에 같은 트랜잭션에서 부르는 듣는 쪽, 지금은 알림과 account의 보안 기록 둘), `ChangeSignal`(내용 없는 신호), `Idempotency`(같은 request_id는 한 번만), `Notices`(콘솔 알림, 변경 신호 `platform.notification`), `SecurityLog`(보안 기록, 2026-11-15)
 - `ChangeStream`: Postgres LISTEN 연결 하나로 변경 신호를 나눠 준다. SSE와 긴 폴링이 쓴다. 신호는 깨우기용이고 내용은 늘 테이블에 있다
 - `SecretRotation`: 서버 키 교체. 비밀값을 가진 모듈이 `register`로 다시 잠그는 방법을 등록
 - `SensitivePolicy` · `Redaction`: AI가 보낸 글이 판이 되기 전에 비밀값(토큰 · 키 · 비밀번호 값)을 `[지움: 종류]`로 바꾼다. 모양만 보고, 어느 칸을 지울지는 쓰는 모듈이 정한다 (vault 세션 · wiki, blog 초안)

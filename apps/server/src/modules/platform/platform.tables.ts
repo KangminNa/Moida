@@ -108,3 +108,18 @@ export interface PushSubscriptionRow {
   space_id: string;
 }
 export type PushSubscriptionNew = Partial<PushSubscriptionRow> & Pick<PushSubscriptionRow, 'id' | 'user_id' | 'endpoint' | 'p256dh' | 'auth' | 'space_id'>;
+
+/** platform.security_events */
+export interface SecurityEventRow {
+  id: string;
+  space_id: string | null;
+  kind: string;
+  ip: string | null;
+  place: string | null;
+  user_agent: string | null;
+  detail: unknown;
+  count: number;
+  at: Date;
+  last_at: Date;
+}
+export type SecurityEventNew = Partial<SecurityEventRow> & Pick<SecurityEventRow, 'id' | 'kind'>;

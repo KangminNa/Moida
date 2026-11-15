@@ -21,6 +21,11 @@ export class DeviceRepository extends TableRepository<DeviceRow, Device> {
   }
 
   /** 끊지 않은 기기 중에 같은 이름이 있는가 (승인 화면에서 먼저 알려주려고) */
+  /** 기기의 마지막 접근. version은 올리지 않는다 (요청마다 부르지 않게 Service가 간격을 둔다) */
+  async touch(id: string, ip: string | null, now: Date): Promise<void> {
+    await this.updateRows(devices, { last_seen_at: now, last_ip: ip }, { id, revoked_at: null });
+  }
+
   async nameTaken(spaceId: string, name: string): Promise<boolean> {
     return this.exists(devices, { space_id: spaceId, name: name.trim(), revoked_at: null });
   }

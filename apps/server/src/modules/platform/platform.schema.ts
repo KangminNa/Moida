@@ -104,3 +104,17 @@ export const pushSubscriptions = platformSchema.table('push_subscriptions', {
   fail_count: integer('fail_count').notNull(),
   space_id: uuid('space_id').notNull(),
 });
+
+/** platform.security_events */
+export const securityEvents = platformSchema.table('security_events', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id'),
+  kind: text('kind').notNull(),
+  ip: text('ip'),
+  place: text('place'),
+  user_agent: text('user_agent'),
+  detail: jsonb('detail').notNull(),
+  count: integer('count').notNull(),
+  at: timestamp('at', { withTimezone: true }).notNull(),
+  last_at: timestamp('last_at', { withTimezone: true }).notNull(),
+});

@@ -26,6 +26,9 @@ export class DeviceView {
       scopes: [...r.scopes],
       createdAt: r.created_at.toISOString(),
       lastUsedAt: this.lastUsedAt?.toISOString() ?? null,
+      /** 마지막 접근 (5분 단위로 적는다)과 그때의 주소 */
+      lastSeenAt: r.last_seen_at?.toISOString() ?? null,
+      lastIp: r.last_ip,
       revokedAt: r.revoked_at?.toISOString() ?? null,
       version: r.version,
     };

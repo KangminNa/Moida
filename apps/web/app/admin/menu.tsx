@@ -12,6 +12,7 @@ const ICONS: Readonly<Record<string, string>> = {
   box: '\u{1F5C2}︎',
   gear: '⚙︎',
   key: '\u{1F511}︎',
+  lock: '\u{1F512}\uFE0E',
   site: '\u{1F310}︎',
   bell: '\u{1F514}︎',
   user: '\u{1F464}︎',
@@ -69,6 +70,7 @@ export const MENU = [
       { href: '/admin/site', name: '사이트', icon: 'site' },
       { href: '/admin/notices', name: '알림', icon: 'bell' },
       { href: '/admin/account', name: '계정', icon: 'user' },
+      { href: '/admin/security', name: '보안', icon: 'lock' },
     ],
   },
   {

@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { BaseEntity, DomainEvent, RuleViolation, TableEntity } from '../../platform';
+import {
+  AttemptLimiter,
+  BaseEntity,
+  DomainEvent,
+  RuleViolation,
+  TableEntity,
+} from '../../platform';
 import type {
   LoginLinkNew,
   SpaceMemberNew,
@@ -17,6 +23,14 @@ export type LoadedOwner = UserRow & { space_id: string };
 export class WebSession extends TableEntity<WebSessionRow, WebSessionNew> {
   static readonly COOKIE = 'cairn_session';
   static readonly DAYS = 30;
+  /** 마지막 접근은 이 간격에 한 번만 적는다 (요청마다 쓰지 않게) */
+  static readonly SEEN_MS = 5 * 60_000;
+  /** 틀린 로그인을 받는 수: 한 아이디에 · 한 곳(IP)에서, 그 시간(ms) 안에 (맞는 로그인은 세지 않는다). 보안 화면에도 보인다 */
+  static readonly TRIES_PER_LOGIN = 5;
+  static readonly TRIES_PER_PLACE = 10;
+  static readonly TRY_WINDOW_MS = 60_000;
+  /** 새 곳에서 로그인했는지 볼 때 거슬러 보는 날수 */
+  static readonly KNOWN_DAYS = 90;
 
   private constructor(
     row: WebSessionRow | WebSessionNew,
@@ -58,6 +72,11 @@ export class WebSession extends TableEntity<WebSessionRow, WebSessionNew> {
     return this.row.token_hash === tokenHash;
   }
 
+  /** 이미 끝난 로그인인가 (로그아웃 · 끝내기 · 비밀번호 바꾸기) */
+  get ended(): boolean {
+    return this.row.revoked_at !== null && this.row.revoked_at !== undefined;
+  }
+
   end(now: Date): void {
     this.put('revoked_at', now);
   }
@@ -71,14 +90,16 @@ export class Owner extends TableEntity<UserRow, UserNew> {
   /** 화면에 보일 이름의 길이 (DB CHECK users_display_name_len과 같다) */
   static readonly NAME_MAX = 40;
   private readonly sessions: WebSession[] = [];
-  private passwordChanged = false;
-  private keepOnPasswordChange: string | null = null;
+  /** 다른 로그인을 모두 끝낸다 (비밀번호를 바꾸거나 "다른 곳 모두 로그아웃") */
+  private othersEnd = false;
+  private keptSession: string | null = null;
   private readonly linked: LoginLinkNew[] = [];
   private readonly unlinked = new Set<string>();
 
   private constructor(
     row: UserRow | UserNew,
-    private readonly spaceId: string,
+    /** 주인 자리의 공간 (보안 기록 · 알림이 쓴다) */
+    readonly spaceId: string,
     fresh = false,
   ) {
     super(row, fresh);
@@ -119,14 +140,14 @@ export class Owner extends TableEntity<UserRow, UserNew> {
     return { space_id: this.spaceId, user_id: this.id, role: Owner.ROLE };
   }
 
-  /** 비밀번호가 바뀌어 다른 로그인을 끝내야 하는가 */
+  /** 다른 로그인을 끝내야 하는가 */
   get endsOtherSessions(): boolean {
-    return this.passwordChanged;
+    return this.othersEnd;
   }
 
-  /** 비밀번호를 바꿀 때 남겨 둘 로그인 (바꾼 사람의 지금 로그인). 없으면 모두 끝낸다 */
+  /** 다른 로그인을 끝낼 때 남겨 둘 로그인 (지금 로그인). 없으면 모두 끝낸다 */
   get keptSessionId(): string | null {
-    return this.keepOnPasswordChange;
+    return this.keptSession;
   }
 
   /** 저장할 로그인 (새로 만든 것, 끝낸 것) */
@@ -148,8 +169,9 @@ export class Owner extends TableEntity<UserRow, UserNew> {
   setPassword(hash: string, keep: WebSession | null, now: Date): void {
     this.put('password_hash', hash);
     this.put('password_changed_at', now);
-    this.passwordChanged = true;
-    this.keepOnPasswordChange = keep?.id ?? null;
+    this.othersEnd = true;
+    this.keptSession = keep?.id ?? null;
+    this.recordAccess('account.password.changed', { via: keep ? 'web' : 'command' });
   }
 
   /** 같은 비밀번호를 더 강하게 다시 저장한다. 로그인은 그대로 둔다 */
@@ -157,9 +179,31 @@ export class Owner extends TableEntity<UserRow, UserNew> {
     this.put('password_hash', hash);
   }
 
-  startSession(ip: string, userAgent: string, now: Date): WebSession {
+  /**
+   * 새 로그인. 보안 기록 · 알림을 위해 사건(`account.login.succeeded`)을 남긴다.
+   * knownIps: 최근(WebSession.KNOWN_DAYS) 로그인한 주소. 주면 그 곳들과 다른 곳인지(newPlace) 적는다 (설치 때는 주지 않는다)
+   */
+  startSession(
+    ip: string,
+    userAgent: string,
+    now: Date,
+    method = 'password',
+    knownIps: readonly string[] | null = null,
+  ): WebSession {
     const session = WebSession.start(this.id, ip, userAgent, now);
     this.sessions.push(session);
+    const place = ip ? AttemptLimiter.place(ip) : null;
+    const newPlace =
+      knownIps !== null &&
+      place !== null &&
+      !knownIps.some((k) => AttemptLimiter.place(k) === place);
+    this.recordAccess('account.login.succeeded', {
+      sessionId: session.id,
+      method,
+      newPlace,
+      ip,
+      userAgent,
+    });
     return session;
   }
 
@@ -168,8 +212,33 @@ export class Owner extends TableEntity<UserRow, UserNew> {
   }
 
   /** 지금 로그인을 끝낸다 (로그아웃) */
-  endSession(tokenHash: string, now: Date): void {
-    this.session(tokenHash)?.end(now);
+  endSession(tokenHash: string, now: Date, ip = '', userAgent = ''): void {
+    const session = this.session(tokenHash);
+    if (!session || session.ended) return;
+    session.end(now);
+    this.recordAccess('account.session.ended', { how: 'logout', ip, userAgent });
+  }
+
+  /** 다른 곳의 로그인 하나를 끝낸다 (보안 화면). 지금 로그인은 로그아웃으로. 이미 끝났으면 그대로 */
+  endSessionById(id: string, currentHash: string, now: Date): void {
+    const session = this.sessions.find((s) => s.id === id);
+    if (!session) throw new RuleViolation('없는 로그인이에요');
+    if (session.matches(currentHash)) throw new RuleViolation('지금 로그인은 로그아웃으로 끝내요');
+    if (session.ended) return;
+    session.end(now);
+    this.recordAccess('account.session.ended', { how: 'ended' });
+  }
+
+  /** 지금 로그인 말고 모두 끝낸다 ("다른 곳 모두 로그아웃") */
+  endOtherSessions(keep: WebSession): void {
+    this.othersEnd = true;
+    this.keptSession = keep.id;
+    this.recordAccess('account.session.ended', { how: 'others' });
+  }
+
+  /** 보안 기록이 될 사건 (AccountSecurity가 같은 트랜잭션에서 platform의 보안 기록으로 옮긴다) */
+  private recordAccess(name: string, data: Record<string, string | boolean | null>): void {
+    this.record(new DomainEvent(name, 1, this.spaceId, { userId: this.id, ...data }));
   }
 
   /** 외부 계정을 연결한다. 같은 방법으로 이미 연결한 계정이 있으면 바꾼다 */

@@ -36,6 +36,10 @@ import { PluginController } from './plugin/plugin.api';
 import { PluginQuery } from './plugin/plugin.query';
 import { PluginService } from './plugin/plugin.service';
 import { PluginRegistry } from './plugin/plugin-registry';
+import { SecurityEventController } from './security/security-event.api';
+import { SecurityEventQuery } from './security/security-event.query';
+import { SecurityLogService } from './security/security-log.service';
+import { SecurityLogPurgeJob } from './security/security-log-purge.job';
 import { ChangeStream } from './stream/change-stream';
 import { StreamController } from './stream/stream.api';
 import { BlobSweepJob } from './worker/blob-sweep.job';
@@ -62,6 +66,9 @@ import { OutboxWorker } from './worker/outbox-worker';
     PushService,
     NoticePushService,
     NoticePushJob,
+    SecurityLogService,
+    SecurityEventQuery,
+    SecurityLogPurgeJob,
     PluginQuery,
     PluginService,
     { provide: SecretBox, useFactory: () => SecretBox.fromEnv(process.env) },
@@ -98,6 +105,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     PackageController,
     StreamController,
     LibraryController,
+    SecurityEventController,
   ],
   exports: [
     Database,
@@ -128,6 +136,7 @@ export class PlatformModule implements OnModuleInit {
     private readonly sweep: BlobSweepJob,
     private readonly notices: NoticeCatalog,
     private readonly push: NoticePushJob,
+    private readonly securityPurge: SecurityLogPurgeJob,
   ) {}
 
   onModuleInit(): void {
@@ -136,5 +145,6 @@ export class PlatformModule implements OnModuleInit {
     this.rotation.register('플러그인 설정', (actor) => this.plugins.resealSecrets(actor));
     this.workers.every(this.sweep, BlobSweepJob.EVERY_MS);
     this.workers.every(this.push, NoticePushJob.EVERY_MS);
+    this.workers.every(this.securityPurge, SecurityLogPurgeJob.EVERY_MS);
   }
 }

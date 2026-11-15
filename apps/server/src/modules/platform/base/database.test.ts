@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { after, describe, test } from 'node:test';
 import type { ArgumentsHost } from '@nestjs/common';
 import { DomainErrorFilter } from '../http/domain-error.filter';
+import type { SecurityLogService } from '../security/security-log.service';
 import { DeviceActor } from './actor';
 import { BaseTool, type ToolAnswer } from './base-tool';
 import { Database } from './database';
@@ -111,12 +112,15 @@ describe('입구에서 busy로 바꾸기', () => {
     const sent: { status: number; body: object }[] = [];
     const host = {
       switchToHttp: () => ({
+        getRequest: () => undefined,
         getResponse: () => ({
           status: (status: number) => ({ json: (body: object) => sent.push({ status, body }) }),
         }),
       }),
     } as unknown as ArgumentsHost;
-    const filter = new DomainErrorFilter();
+    const filter = new DomainErrorFilter({
+      record: async () => undefined,
+    } as unknown as SecurityLogService);
     filter.catch(await lockTimeout(), host);
     filter.catch(new Conflict('판이 달라요'), host);
     assert.deepEqual(sent, [

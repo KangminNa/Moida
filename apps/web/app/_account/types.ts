@@ -10,7 +10,10 @@ import type {
   LoginMethodListView,
   LoginMethodView,
 } from '../../../server/src/modules/account/owner/external-login.view';
-import type { OwnerView } from '../../../server/src/modules/account/owner/owner.view';
+import type {
+  OwnerView,
+  WebSessionListView,
+} from '../../../server/src/modules/account/owner/owner.view';
 import type {
   InstallStatusView,
   SpaceView,
@@ -34,6 +37,9 @@ export type Consent = ReturnType<ConsentView['toJSON']>;
 export type ConsentResult = ReturnType<ConsentResultView['toJSON']>;
 /** 로그인한 주인 (관리 화면 위쪽) */
 export type Owner = ReturnType<OwnerView['toJSON']>;
+/** 끝나지 않은 로그인들과 보안 설정 값 (설정 › 보안) */
+export type WebSessionList = ReturnType<WebSessionListView['toJSON']>;
+export type WebSessionItem = WebSessionList['sessions'][number];
 /** 로그인 화면의 버튼 (켜진 로그인 플러그인) */
 export type LoginMethod = ReturnType<LoginMethodView['toJSON']>;
 export type LoginMethodList = ReturnType<LoginMethodListView['toJSON']>;

@@ -80,6 +80,7 @@ export type { PluginContext } from './plugin/plugin-context';
 export { LoginMethod } from './plugin/plugin-context';
 export { PluginManifest } from './plugin/plugin-manifest';
 export { PluginRegistry } from './plugin/plugin-registry';
+export { SecurityLog, type SecurityNew } from './security/security-log';
 export { ChangeStream } from './stream/change-stream';
 export { CoreWorkers } from './worker/core-workers';
 export { OutboxWorker } from './worker/outbox-worker';

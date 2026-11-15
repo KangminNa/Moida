@@ -26,6 +26,7 @@ export interface DeviceRow {
   last_seen_at: Date | null;
   revoked_at: Date | null;
   version: number;
+  last_ip: string | null;
 }
 export type DeviceNew = Partial<DeviceRow> & Pick<DeviceRow, 'id' | 'space_id' | 'name'>;
 
@@ -127,5 +128,7 @@ export interface WebSessionRow {
   created_at: Date;
   expires_at: Date;
   revoked_at: Date | null;
+  last_seen_at: Date | null;
+  last_ip: string | null;
 }
 export type WebSessionNew = Partial<WebSessionRow> & Pick<WebSessionRow, 'id' | 'user_id' | 'token_hash' | 'expires_at'>;
