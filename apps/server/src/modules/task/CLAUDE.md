@@ -5,8 +5,13 @@
 설계는 docs/객체설계.md 13장, API는 docs/API설계.md, 표는 docs/테이블설계.md 6장.
 
 - `agent/`: 에이전트 (`Agent`). 권한, 결재로 맡길 동작, 토큰 한도(한 달 · 5시간), 구독 사용률 멈춤값, 보고 대상(조직도). `api/agents`.
-  삭제는 휴지통 (`deleted_at`, 2026-11-14): `Agent.delete`가 팀원을 지운 에이전트의 보고 대상으로 올리고, 팀째 삭제는 `Agent.teamUnder`(아래부터). 진행 중인 작업 · 스케줄 · 도는 목표 실행이 있으면 지우지 않는다 (`AgentQuery.blockers`). 지운 에이전트는 `AgentRepository.load` · `lock`에서 NotFound, `usage`(일 빌리기) · `manages`(위임) · `reportTo`에서 빠진다. 줄은 지우지 않는다 (실행 기록이 가리킨다)
+  삭제는 휴지통 (`deleted_at`, 2026-11-14): `Agent.delete`가 팀원을 지운 에이전트의 보고 대상으로 올리고, 팀째 삭제는 `AgentOrg.teamUnder`(아래부터). 진행 중인 작업 · 스케줄 · 도는 목표 실행이 있으면 지우지 않는다 (`AgentQuery.blockers`). 지운 에이전트는 `AgentRepository.load` · `lock`에서 NotFound, `usage`(일 빌리기) · `manages`(위임) · `reportTo`에서 빠진다. 줄은 지우지 않는다 (실행 기록이 가리킨다)
   팀 템플릿 (`AgentTeams`, 데이터는 `research-teams.ts` · `work-teams.ts`): `api/agent-teams`로 팀 하나를 한 트랜잭션에서 만든다 (`AgentService.createTeam`, 조직도 전체를 잠그고 보고 대상이 앞인 순서로, requestId 하나). 구성원도 `Agent`의 규칙(권한 조합 · 조직도 깊이)을 그대로 지난다
+  모델 · 생각 강도(2차 7단계, `agents.model` · `effort`): 규칙은 `AgentRuntime`(도구별 강도, 도구를 바꿀 때도 본다). 일의 `agent.model` · `effort`로 러너에게 간다. 조직도 계산(`chainUp` · `heightOf` · `teamUnder`)은 `AgentOrg`
+  외부 도구 허락(`agents.external_tools`): 이름 10개까지, `read_all` · `write` · `code` · `make`와 함께 두지 않는다 (`AgentScopes.assertTools` · `toolProblem` + DB CHECK). 없는 이름은 `AgentService`가 `ExternalToolQuery.missing`으로 막는다
+- `external-tool/`: 외부 도구 꽂기 (2차 7단계, `ExternalTool`, 주소 규칙 `ExternalToolUrl`). 원격(https) MCP 하나. `api/external-tools`(관리자만: 목록 · 더하기 · 고치기 · 켜기/끄기 · 토큰 넣기 · 지우기), MCP `propose_tool`(작업 토큰, 비공개 · 셸 권한은 막음). 제안은 `proposed`로 두고 AI가 `request_approval`(`task.tool.plug`, 대상 `external_tool`)을 올린다. `ExternalToolPlugHandler`(`task.approval.*`)가 승인이면 켜고 제안한 에이전트에 붙여 결과(`task.external_tool.plugged` · `plug_failed`, approvalId · outcome)를 남기고, 승인이 아니면 제안을 지운다.
+  토큰(머리글의 값)은 `SecretBox.seal`로 잠그고 어느 View에도 싣지 않는다 (`hasSecret`만). 푸는 곳은 일을 빌려 줄 때 `ExternalToolQuery.forJob` 하나: 그 에이전트가 허락한 이름 중 켜져 있고 토큰이 갖춰진 것만 `next_jobs`의 `tools`로. 서버 키를 바꾸면 `SecretRotation`(`task.external_tools`)이 다시 잠근다.
+  예외 (객체설계 4장): 도구를 붙이고(승인) 떼는(지우기) 일은 에이전트의 허락 목록과 한 트랜잭션이라 `ExternalToolService`가 `AgentRepository`를 함께 쓴다. 잠그는 순서는 도구 → 에이전트
 - `chat/`: 대화 (`Chat`, 이전 대화 `ChatHistory`, 기획서 결정 2026-11-14). 관리자와 바로 아래 에이전트(`Agent.topLevel`, 멈추지 않은)가 채팅처럼 주고받는다. 메시지 하나 = 그 에이전트에게 맡긴 `general` 작업 하나(회차, request_id `chat:<대화>:<회차>`). 대화 줄은 머리(상대 · 제목 · 회차 수)만 들고 메시지 · 답은 작업의 지시 · 결과다. 앞 회차가 끝나지 않았으면 다음 회차가 아니라 덧붙인 말이 된다 (2차 1-1, `Chat.appendTo`): 소식 한 줄, 회차가 이미 돌고 있으면 대표가 짧게 답하는 작업 하나(`chat:<대화>:<회차>:reply:<k>`, `payload.chat.reply`). 회차는 그대로 두어 팀은 계속 일하고, 대기열의 회차는 빌릴 때 덧붙인 말을 받는다(`next_jobs`의 `chat_updates`). 앞 대화(최근 20회차)는 `payload.chat.history`에 자료로 싣고 러너가 "이전 대화"로 그린다 (`apps/runner`의 `ChatTurn`). `read_url`의 기준은 그대로 이번 메시지(작업의 지시)뿐이다. `api/chats`(관리자만: 목록 · 상세 · 열기 · 보내기). 상세는 회차 아래(하위 작업 포함)의 결과물 · 기다리는 결재, 상태판(`ChatUpdateQuery.ownerBoard`) · 최근 소식 · 팀(상대와 그 아래, 사람마다 이 회차에서 도는 작업)을 함께 싣는다. 응답 모양은 대화 · 소식 모두 `chat.view.ts` 한 파일이다 (view끼리 가져오지 못한다).
   기기(권한 `delegate`)도 MCP `ask_agent`(`chat.tool.ts`)로 대화한다: 자기가 연 대화(`chats.device_id`)만 (`Chat.assertSender`), 상대는 이름 · id로(`ChatRoute.wanted`), 비우면 배정(아래), 새 대화의 목표 · 프로젝트(`ChatProject`가 git 주소를 맞춘다). 기기의 메시지는 `payload.chat.via: device`로 남겨 `read_url`의 기준에서 뺀다 (`WebQuery.ownerText`). 기다리지 않는다(`agent_reply`는 없앴다): 답과 소식은 `agent_updates`로 받는다. 결재는 기기가 하지 못한다
   소식 (`task.chat_updates`, 추가만, `ChatUpdates` 규칙): `Chat.note`로 쌓고 `ChatRepository.saveParts`가 넣으며 변경 신호 `task.chat.updated`를 보낸다. 끝난 작업 → 소식은 `ChatUpdateHandler`(`task.task.changed`) → `ChatUpdateService.noteSettled` (작업이 속한 대화는 위로 올라가 찾는다 `ChatRepository.placeOf`). MCP `agent_updates`(`delegate` 자기 대화 · `news` 모든 대화, 커서는 `tx < pg_snapshot_xmin`인 줄만, 없으면 `wait_seconds`까지 신호를 기다림, 대화마다 상태판) · `post_update`(작업 토큰, 대화의 일만, 작업마다 20개). 일을 빌려 줄 때 덧붙인 말 · 팀 소식을 싣는다 (`ChatUpdateQuery.forJob` → `JobChatView`)
@@ -37,10 +42,11 @@
 도구 모양은 docs/API설계.md 4장이 원본이다. `report_progress`는 기록을 모아 받고, 러너가 쓰므로 바꾸면 `apps/runner`도 함께 고친다.
 
 ## 소유 데이터
-스키마 `task`: agents, agent_revisions(추가만), chats, chat_updates(추가만), goals, schedules, tasks, task_events(추가만), task_runs(추가만, model만 한 번), approvals, plan_usage, ai_logins, runners, skills, skill_revisions(추가만), outputs, goal_runs, goal_rounds(추가만)
+스키마 `task`: agents, agent_revisions(추가만), external_tools, chats, chat_updates(추가만), goals, schedules, tasks, task_events(추가만), task_runs(추가만, model만 한 번), approvals, plan_usage, ai_logins, runners, skills, skill_revisions(추가만), outputs, goal_runs, goal_rounds(추가만)
 
 ## 데이터 묶음
 - 에이전트: agents + agent_revisions (조직도는 `reports_to`, 설정 판은 `settings_revision`)
+- 외부 도구: external_tools (허락은 에이전트의 `external_tools`라 에이전트 묶음에 저장한다)
 - 대화: chats + chat_updates (회차 · 덧붙인 말의 답은 tasks의 줄이라 작업 묶음에 저장한다)
 - 목표: goals
 - 스케줄: schedules (에이전트 하나에 여럿, 담당 없이 자동 배정도)
@@ -60,6 +66,7 @@
 | 이벤트 | 내용 |
 |---|---|
 | `task.task.changed` | `taskId, status, title`, 실패면 `error`(앞 300자). 상태가 바뀔 때마다 |
+| `task.external_tool.plugged` · `plug_failed` | `toolId, name?, agentId?, approvalId, outcome`, 실패면 `error`. 제안한 외부 도구의 결재(`task.tool.plug`)를 실행한 결과 (2차 7단계, 받는 쪽은 `ApprovalResultHandler`) |
 | `task.agent.changed` | `agentId, status` |
 | `task.page.built` | `taskId, runId, pageId, title, note, files: [{ name, blobHash, mime, sizeBytes }]`. 결과를 페이지로 내보내는 만들기 작업(`payload.page`)이 `done`으로 끝날 때 한 번 (`PageOrder.built`). blog가 받아 페이지의 판을 만든다 |
 | `task.chat.changed` | `chatId, turns`. 대화를 열거나 메시지를 보낼 때마다 (화면이 다시 읽는다. 받는 모듈은 없다) |

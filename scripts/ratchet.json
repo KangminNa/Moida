@@ -17,7 +17,7 @@
   "longFiles": {
     "apps/runner/src/code-stage.ts": 403,
     "apps/runner/src/job-run.ts": 329,
-    "apps/server/src/modules/task/task/task.service.ts": 370,
+    "apps/server/src/modules/task/task/task.service.ts": 369,
     "apps/server/src/modules/task/task/task.ts": 570,
     "apps/server/src/modules/vault/change/change-op.ts": 797,
     "apps/web/app/_vault/GraphBoard.tsx": 342,
