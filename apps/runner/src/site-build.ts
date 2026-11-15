@@ -3,12 +3,12 @@ import { join } from 'node:path';
 import type { BrowseSite } from './browse-job';
 import type { AskedApproval } from './browse-stage';
 import type { IntegrationExec } from './integration-exec';
-import { RunEnding } from './job-run';
 import type { Json } from './json';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
+import { RunEnding } from './run-ending';
 import type { BuildTest, SiteToolCalls } from './site-tool-calls';
 
 /** browser_job의 build: 굳힐 도구, 앞 버전, 최근 실패 */

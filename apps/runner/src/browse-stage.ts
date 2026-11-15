@@ -13,14 +13,15 @@ import { CairnServer } from './cairn-server';
 import { ExploreProxy } from './explore-proxy';
 import { IntegrationExec } from './integration-exec';
 import type { Job } from './job';
-import { RunEnding } from './job-run';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
+import { RunEnding } from './run-ending';
 import type { RunnerConfig } from './runner-config';
 import type { SandboxStage } from './sandbox-stage';
 import { SiteBuild } from './site-build';
+import type { StageCheck } from './stage-check';
 import { StepShots } from './step-shots';
 
 /** 러너가 올릴 결재 하나 (작업 토큰으로, 에이전트의 이름으로) */
@@ -139,8 +140,14 @@ export class BrowseStage implements SandboxStage {
     return this.job.withBrowse(browse, part + build);
   }
 
+  /** 하네스의 검사가 없다 (사이트 도구 굳히기의 시험은 finish에서 SiteBuild가) */
+  async check(): Promise<StageCheck[]> {
+    return [];
+  }
+
   async finish(
     summary: string,
+    _checks: readonly StageCheck[],
     signal: AbortSignal,
     note: Note,
     redactor: Redactor,

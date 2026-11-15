@@ -3,6 +3,7 @@ import { pause } from './backoff';
 import type { CairnServer } from './cairn-server';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
 import type { OutputFile } from './output-batch';
+import { RunEvent } from './progress';
 
 /** 서버가 이 파일을 받지 않음 (이름 · 한도 · 내용). 그 파일만 빼고 이어 간다 */
 export class OutputRejected extends Error {}
@@ -20,6 +21,32 @@ export class OutputUploader {
     private readonly server: CairnServer,
     private readonly serverUrl: string,
   ) {}
+
+  /**
+   * 파일들을 차례로 올린다. 서버가 받지 않은 파일은 실행 기록에 남기고 이어 간다.
+   * 올린 수, 끝내 서버에 닿지 못하면 그 이유 (만든 파일을 잃은 채 done이 되지 않게 부른 쪽이 실패로 끝낸다)
+   */
+  async uploadAll(
+    taskId: string,
+    files: readonly OutputFile[],
+    signal: AbortSignal,
+    note: (event: RunEvent) => void,
+  ): Promise<number | string> {
+    let sent = 0;
+    for (const file of files) {
+      try {
+        await this.upload(taskId, file, signal);
+        sent++;
+      } catch (error) {
+        if (signal.aborted) return sent;
+        if (!(error instanceof OutputRejected))
+          return `결과물을 올리지 못했어요 (${file.name}): ${(error as Error).message}`;
+        const why = `결과물을 서버가 받지 않았어요: ${file.name}: ${error.message}`;
+        note(new RunEvent(RunEvent.ERROR, why, 0));
+      }
+    }
+    return sent;
+  }
 
   async upload(taskId: string, file: OutputFile, signal?: AbortSignal): Promise<void> {
     let wait = OutputUploader.FIRST_WAIT_MS;

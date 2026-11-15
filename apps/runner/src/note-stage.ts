@@ -1,12 +1,13 @@
 import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
-import { RunEnding } from './job-run';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
 import type { NoteSource } from './note-source';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
+import { RunEnding } from './run-ending';
 import type { SandboxStage } from './sandbox-stage';
+import type { StageCheck } from './stage-check';
 
 type Note = (event: RunEvent) => void;
 
@@ -49,8 +50,14 @@ export class NoteStage implements SandboxStage {
     );
   }
 
+  /** 하네스의 검사가 없다 (답을 읽는 것은 vault의 save_note) */
+  async check(): Promise<StageCheck[]> {
+    return [];
+  }
+
   async finish(
     summary: string,
+    _checks: readonly StageCheck[],
     _signal: AbortSignal,
     note: Note,
     redactor: Redactor,

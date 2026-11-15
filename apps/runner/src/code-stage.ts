@@ -1,22 +1,25 @@
 import { writeFile } from 'node:fs/promises';
-import type { AgentUser, StepOutput } from './agent-user';
+import type { AgentUser } from './agent-user';
 import { CairnServer } from './cairn-server';
+import { CodeReport } from './code-report';
 import { CodeSpec, CodeSpecProblem } from './code-spec';
 import { GitRepo, PatchRejected, type Replayed, RepoRefused, RepoUnreachable } from './git-repo';
 import { GitHubPulls, PullRefused } from './github-pulls';
 import type { Job } from './job';
-import { RunEnding } from './job-run';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
+import { RunEnding } from './run-ending';
 import type { RunnerConfig } from './runner-config';
 import { SandboxRoom } from './sandbox-room';
 import type { SandboxStage } from './sandbox-stage';
+import { StageCheck } from './stage-check';
 
 // 코드 작업의 앞뒤 (docs/코드작업.md 3단계). JobRun이 AI 앞뒤에서 부르고, 그동안에도 보고 고리를 돌려 임대를 늘리고 취소를 듣는다.
 //   앞: 저장소 정보 → 자리 → 깨끗한 clone(러너) → 사본을 agent에게 → setup(agent)
-//   뒤: checks(agent) → 바뀐 것을 patch로(agent) → agent 프로세스 모두 끄기 → 깨끗한 clone에 옮기기(러너)
+//   뒤: checks(agent, check. 떨어지면 JobRun이 같은 자리에서 AI에게 한 번 더 맡기고 다시 돌린다)
+//       → 바뀐 것을 patch로(agent) → agent 프로세스 모두 끄기 → 깨끗한 clone에 옮기기(러너)
 //       → 맡긴 경로 밖이면 실패 → 커밋 하나 → cairn/<작업>에 push(러너)
 // 4단계 (code-github가 맡긴 일, repo.id가 있음): 앞에서 code_credential로 토큰을 받고, 뒤에서 push → draft PR(러너가 GitHub에)
 // → code_pull_opened → 결과물 → 결재(code.pr.merge).
@@ -32,9 +35,6 @@ export class CodeStage implements SandboxStage {
   private static readonly PATCH_MS = 2 * 60_000;
   /** 한 번에 올리는 변경의 한도 */
   private static readonly PATCH_MAX = 20 * 1024 * 1024;
-  /** 결과에 싣는 출력의 끝부분 */
-  private static readonly TAIL_MAX = 2_000;
-  private static readonly FILES_SHOWN = 30;
   private static readonly PUSH_TRIES = 3;
   private static readonly SUMMARY_MAX = 4_000;
   static readonly MERGE_ACTION = 'code.pr.merge';
@@ -93,7 +93,7 @@ export class CodeStage implements SandboxStage {
   private replayBrief(prompts: PromptPack): string {
     const { previous, spec, repo } = this;
     if (previous === null || spec === null || repo === null) return '';
-    const shown = previous.conflicts.slice(0, CodeStage.FILES_SHOWN);
+    const shown = previous.conflicts.slice(0, CodeReport.FILES_SHOWN);
     return prompts.fill('code-replay', {
       branch: spec.branch,
       base: spec.base,
@@ -179,25 +179,19 @@ export class CodeStage implements SandboxStage {
     if (out.aborted) return null;
     if (!out.ok) {
       note(new RunEvent(RunEvent.ERROR, `setup ${out.how}`, 0));
-      return failed(`setup이 ${out.how}로 끝나 AI를 띄우지 않았어요\n${CodeStage.tail(out)}`);
+      return failed(`setup이 ${out.how}로 끝나 AI를 띄우지 않았어요\n${CodeReport.tail(out.tail)}`);
     }
     note(new RunEvent(RunEvent.RESULT, 'setup 통과', 0));
     return null;
   }
 
-  /** AI가 잘 끝난 뒤. AI의 마지막 답(요약)과 함께 결과를 만든다 */
-  async finish(
-    summary: string,
-    signal: AbortSignal,
-    note: (event: RunEvent) => void,
-    redactor: Redactor,
-  ): Promise<RunEnding> {
-    const { spec, room, repo } = this;
-    if (!spec || !room || !repo) throw new Error('준비하지 않은 코드 작업이에요');
-    const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
-
-    const checks: { command: string; out: StepOutput }[] = [];
+  /** AI가 잘 끝난 뒤의 검사 명령들 (agent로, AI의 작업 폴더에서). 그만두게 하면 돌린 데까지 */
+  async check(signal: AbortSignal, note: (event: RunEvent) => void): Promise<StageCheck[]> {
+    const { spec, room, redactor } = this;
+    if (!spec || !room || !redactor) throw new Error('준비하지 않은 코드 작업이에요');
+    const checks: StageCheck[] = [];
     for (const command of spec.checks) {
+      if (signal.aborted) break;
       note(new RunEvent(RunEvent.READ, `검사: ${command}`, 0));
       const out = await this.agent.run(command, {
         cwd: room.workDir,
@@ -205,12 +199,26 @@ export class CodeStage implements SandboxStage {
         timeoutMs: CodeStage.CHECK_MS,
         signal,
       });
-      if (out.aborted) return RunEnding.quiet('검사하다 그만뒀어요');
+      if (out.aborted) break;
       note(
         new RunEvent(out.ok ? RunEvent.RESULT : RunEvent.ERROR, `검사 ${command}: ${out.how}`, 0),
       );
-      checks.push({ command, out });
+      checks.push(StageCheck.ofStep(command, out, redactor));
     }
+    return checks;
+  }
+
+  /** AI가 잘 끝난 뒤. AI의 마지막 답(요약)과 마지막 검사로 결과를 만든다 */
+  async finish(
+    summary: string,
+    checks: readonly StageCheck[],
+    signal: AbortSignal,
+    note: (event: RunEvent) => void,
+    redactor: Redactor,
+  ): Promise<RunEnding> {
+    const { spec, room, repo } = this;
+    if (!spec || !room || !repo) throw new Error('준비하지 않은 코드 작업이에요');
+    const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
 
     // 바뀐 것: agent 권한으로 사본에서 기준 커밋과의 차이를 patch 하나로 (러너는 AI의 .git에서 git을 돌리지 않는다)
     const patch = await this.patchOf(room, repo.baseSha, signal);
@@ -235,10 +243,12 @@ export class CodeStage implements SandboxStage {
       );
     const outside = spec.outside(files);
     if (outside.length > 0)
-      return failed(`맡긴 경로 밖을 고쳐서 올리지 않았어요: ${CodeStage.list(outside).join(', ')}`);
+      return failed(
+        `맡긴 경로 밖을 고쳐서 올리지 않았어요: ${CodeReport.list(outside).join(', ')}`,
+      );
     const marked = await repo.conflictMarkers();
     if (marked.length > 0)
-      return failed(`충돌 표시가 남아 올리지 않았어요: ${CodeStage.list(marked).join(', ')}`);
+      return failed(`충돌 표시가 남아 올리지 않았어요: ${CodeReport.list(marked).join(', ')}`);
 
     const head = await repo.commit(
       [`cairn: ${this.job.title}`.slice(0, 72), '', brief || '(요약 없음)'].join('\n'),
@@ -250,16 +260,16 @@ export class CodeStage implements SandboxStage {
     this.log.info(
       `${this.job.taskId}: ${spec.branch}에 올렸어요 (${head.slice(0, 7)}, 파일 ${files.length}개)`,
     );
-    const report = CodeStage.report(spec, repo, head, files, checks, brief);
+    const report = new CodeReport(spec, repo.baseSha, head, files, checks, brief);
     if (this.credential === null)
-      return RunEnding.submit('올렸어요', RunResult.done(report, redactor));
+      return RunEnding.submit('올렸어요', RunResult.done(report.text(), redactor));
     // code-github: draft PR을 열고(있으면 본문만 고침) 남긴다. 결재는 결과물 뒤에 JobRun이 올린다
-    const opened = await this.openPull(spec, head, checks, report, signal);
+    const opened = await this.openPull(spec, head, report, signal);
     if (typeof opened === 'string') return failed(this.clean(opened));
     note(new RunEvent(RunEvent.WRITE, `PR을 열었어요: ${opened.url}`, 0));
     return RunEnding.submit(
       'PR을 열었어요',
-      RunResult.done(`${opened.url}\n\n${report}`, redactor),
+      RunResult.done(`${opened.url}\n\n${report.text()}`, redactor),
     );
   }
 
@@ -319,8 +329,7 @@ export class CodeStage implements SandboxStage {
   private async openPull(
     spec: CodeSpec,
     head: string,
-    checks: readonly { command: string; out: StepOutput }[],
-    report: string,
+    report: CodeReport,
     signal: AbortSignal,
   ): Promise<{ number: number; url: string } | string> {
     const credential = this.credential;
@@ -331,7 +340,7 @@ export class CodeStage implements SandboxStage {
         spec.branch,
         spec.base,
         `cairn: ${this.job.title}`.slice(0, 120),
-        `${report}\n\n---\nCairn 작업 ${this.job.taskId}가 연 PR이에요. 머지는 Cairn 결재 뒤에 해요.`,
+        `${report.text()}\n\n---\nCairn 작업 ${this.job.taskId}가 연 PR이에요. 머지는 Cairn 결재 뒤에 해요.`,
         signal,
       );
     } catch (error) {
@@ -339,29 +348,16 @@ export class CodeStage implements SandboxStage {
         return `${spec.branch}에 올렸지만 PR을 열지 못했어요: ${error.message}`;
       return `${spec.branch}에 올렸지만 GitHub에 닿지 못해 PR을 열지 못했어요: ${(error as Error).message}`;
     }
-    const results = checks.map((c) => ({ command: c.command, ok: c.out.ok }));
     try {
       const saved = await this.server.codePullOpened(this.job.taskId, {
         number: pull.number,
         url: pull.url,
         branch: spec.branch,
         headSha: head,
-        checks: results,
+        checks: report.checks.map((c) => ({ command: c.name, ok: c.ok })),
       });
-      const failedChecks = results.filter((c) => !c.ok).map((c) => c.command);
-      this.approval = {
-        pullId: saved.pullId,
-        version: saved.version,
-        note: [
-          `PR: ${pull.url}`,
-          results.length === 0
-            ? '검사 명령 없음'
-            : failedChecks.length === 0
-              ? `검사 ${results.length}개 통과`
-              : `실패한 검사: ${failedChecks.join(', ')}`,
-          'GitHub에서 리뷰 · 머지한 뒤 승인해 주세요.',
-        ].join('\n'),
-      };
+      const note = report.approvalNote(pull.url);
+      this.approval = { pullId: saved.pullId, version: saved.version, note };
       return pull;
     } catch (error) {
       return `PR을 열었지만 Cairn에 남기지 못했어요 (${pull.url}): ${(error as Error).message}`;
@@ -431,40 +427,5 @@ export class CodeStage implements SandboxStage {
         await new Promise((done) => setTimeout(done, 2_000 * attempt));
       }
     }
-  }
-
-  /** 결과 글 (4단계부터는 PR 본문 · 결재 메모의 재료) */
-  private static report(
-    spec: CodeSpec,
-    repo: GitRepo,
-    head: string,
-    files: readonly string[],
-    checks: readonly { command: string; out: StepOutput }[],
-    summary: string,
-  ): string {
-    const lines = [
-      `${spec.branch} 브랜치에 올렸어요 (${head.slice(0, 7)}, 파일 ${files.length}개)`,
-      `기준: ${spec.base} (${repo.baseSha.slice(0, 7)})`,
-      '',
-      '바꾼 파일:',
-      ...CodeStage.list(files).map((f) => `- ${f}`),
-    ];
-    if (checks.length > 0) {
-      lines.push('', '검사:', ...checks.map((c) => `- ${c.command}: ${c.out.how}`));
-      for (const failed of checks.filter((c) => !c.out.ok))
-        lines.push('', `--- ${failed.command}의 끝부분 ---`, CodeStage.tail(failed.out));
-    }
-    lines.push('', '요약:', summary || '(요약 없음)');
-    return lines.join('\n');
-  }
-
-  private static list(files: readonly string[]): readonly string[] {
-    const shown = files.slice(0, CodeStage.FILES_SHOWN);
-    const rest = files.length - shown.length;
-    return rest > 0 ? [...shown, `외 ${rest}개`] : shown;
-  }
-
-  private static tail(out: StepOutput): string {
-    return out.tail.slice(-CodeStage.TAIL_MAX) || '(출력 없음)';
   }
 }

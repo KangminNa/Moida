@@ -10,6 +10,9 @@
 //   [fake:delegate]     지시문의 "내 팀"에게 하위 작업을 하나씩 맡기고 끝난다. 결과를 받아 깨어난 실행은 맡기지 않고 끝낸다
 //   [fake:stray]        허락하지 않은 MCP 서버가 붙은 것처럼 보인다
 //   [fake:edit=<경로>]  작업 폴더의 그 경로에 파일을 쓴다 (코드 작업. 여러 번 쓸 수 있다)
+//   [fake:fix=<경로>]   검사에 떨어져 다시 맡긴 실행(지시문 틀 check-fix)에서만 작업 폴더의 그 경로에 파일을 쓴다
+//   [fake:runs=<파일>]  뜰 때마다 그 파일에 한 줄을 더한다 (일 하나에 몇 번 떴는지)
+//   [fake:fix-hang]     검사에 떨어져 다시 맡긴 실행에서만 끝나지 않는다
 //   [fake:make]         만들기 작업: "# 재료"의 파일 폴더와 위키(get_wiki)를 읽어 결과물 폴더에 발표.pptx를 둔다
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
@@ -19,7 +22,14 @@
 // setup-token은 웹 로그인이다: 터미널이어야 뜨고, 주소를 보이고, 붙여 넣은 코드로 토큰을 그린다.
 //   코드에 wrong이 있으면 실패. 코드와 Enter가 한 덩어리로 오면 Ink처럼 붙여 넣기로 보고 제출하지 않는다
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 
 // 러너가 시작할 때 버전을 묻는다 (실행 기록의 cli_version)
@@ -156,8 +166,14 @@ if (spy) {
   );
 }
 
-// 코드 작업: 셸이 있는 AI처럼 작업 폴더(저장소 사본)의 파일을 고친다
-for (const [, path] of prompt.matchAll(/\[fake:edit=([^\]]+)\]/g)) {
+const runs = /\[fake:runs=([^\]]+)\]/.exec(prompt)?.[1];
+if (runs) appendFileSync(runs, `${process.pid}\n`);
+
+// 코드 작업: 셸이 있는 AI처럼 작업 폴더(저장소 사본)의 파일을 고친다. 검사에 떨어져 다시 맡긴 실행이면 fix도
+const fixing = prompt.includes('# 검사에 떨어졌어요');
+const edits = [...prompt.matchAll(/\[fake:edit=([^\]]+)\]/g)].map((m) => m[1]);
+if (fixing) edits.push(...[...prompt.matchAll(/\[fake:fix=([^\]]+)\]/g)].map((m) => m[1]));
+for (const path of edits) {
   const file = join(process.cwd(), path);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, `고친 내용 ${path}\n`);
@@ -360,7 +376,7 @@ async function browse() {
 }
 
 if (has('stubborn')) process.on('SIGTERM', () => {});
-if (has('hang') || has('stubborn')) await forever();
+if (has('hang') || has('stubborn') || (fixing && has('fix-hang'))) await forever();
 
 if (has('fail')) {
   process.stderr.write('치명적 오류: 모델에 닿지 못했어요\n');

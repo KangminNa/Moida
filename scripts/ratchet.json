@@ -15,8 +15,8 @@
     "apps/web/app/admin/posts/WikiPicker.tsx"
   ],
   "longFiles": {
-    "apps/runner/src/code-stage.ts": 403,
-    "apps/runner/src/job-run.ts": 329,
+    "apps/runner/src/code-stage.ts": 367,
+    "apps/runner/src/job-run.ts": 323,
     "apps/server/src/modules/task/task/task.service.ts": 361,
     "apps/server/src/modules/task/task/task.ts": 528,
     "apps/server/src/modules/vault/change/change-op.ts": 797,

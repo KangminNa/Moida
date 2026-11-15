@@ -7,44 +7,18 @@ import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
 import { OutputBatch } from './output-batch';
-import { OutputRejected, OutputUploader } from './output-uploader';
+import { OutputUploader } from './output-uploader';
 import { ProgressState, RunEvent, RunResult } from './progress';
 import { ProgressReporter } from './progress-reporter';
 import { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
+import { RunEnding } from './run-ending';
 import type { RunnerConfig } from './runner-config';
 import type { SandboxStage } from './sandbox-stage';
+import { StageCheck } from './stage-check';
 
 /** AI CLI를 실행조차 못 함. 일마다 똑같이 실패할 테니 러너를 멈춘다 */
 export class CliUnavailable extends Error {}
-
-/** 실행을 어떻게 끝낼지. 서버에 보낼 것이 없으면 note만 남긴다 */
-export class RunEnding {
-  private constructor(
-    readonly note: string,
-    /** release_job의 이유 */
-    readonly releaseReason: string | null,
-    /** submit_result */
-    readonly result: RunResult | null,
-  ) {}
-
-  static quiet(note: string): RunEnding {
-    return new RunEnding(note, null, null);
-  }
-
-  static release(reason: string): RunEnding {
-    return new RunEnding(reason, reason, null);
-  }
-
-  static submit(note: string, result: RunResult): RunEnding {
-    return new RunEnding(note, null, result);
-  }
-
-  /** 잘 끝나 결과를 낼 끝인가 */
-  get succeeded(): boolean {
-    return this.result?.status === 'done';
-  }
-}
 
 // 일 하나의 처음부터 끝까지: 자리를 만들고, AI CLI를 띄우고, 기록을 보내며 서버의 답을 보고, 끝을 알리고, 자리를 지운다.
 //
@@ -56,6 +30,8 @@ export class RunEnding {
 // AI CLI가 스스로 끝나면 남은 기록을 먼저 보내고 답을 본 뒤 제출한다: 결재를 올리자마자 끝난 실행을 done으로 보내면 안 된다.
 // 칸의 일(stage)은 AI 앞뒤가 더 있다: 코드 작업은 clone · setup과 checks · push, 만들기 작업은 재료 받기와 프로세스 끄기.
 // 그동안에도 같은 고리로 보고해 임대를 늘리고 취소를 듣는다.
+// 검증 고리 V: AI가 잘 끝난 뒤 칸의 검사(stage.check)에 떨어지면 같은 작업 폴더에서 AI CLI를 한 번 더 띄워
+// 떨어진 출력을 보이고(틀 check-fix) 다시 검사한 뒤 끝낸다. 마지막 검사는 결과(result.checks)에 싣는다.
 export class JobRun {
   private static readonly REPORT_MS = 3_000;
   private static readonly RETRY_FIRST_MS = 1_000;
@@ -64,11 +40,19 @@ export class JobRun {
   private static readonly STOP_RETRY_MS = 5_000;
   private static readonly STOPPING = '러너가 멈춰요';
   private static readonly PAUSED = '에이전트가 멈췄어요';
+  /** 검사에 떨어졌을 때 AI에게 더 맡기는 횟수 (일 하나에 한 번: 고치지 못하는 일에 구독을 계속 쓰지 않게) */
+  private static readonly CHECK_RETRIES = 1;
 
   private readonly redactor: Redactor;
   private readonly reporter: ProgressReporter;
   /** 이번 실행에서 올린 결과물 수 */
   private sent = 0;
+  /** 마지막 검사 (칸의 일). 제출하는 결과에 싣는다 */
+  private checks: readonly StageCheck[] = [];
+  /** 서버에 있는 로그인의 판. 바뀐 자격을 되돌려 쓸 때마다 새 판이 된다 (AI를 두 번 띄우면 두 번 쓴다) */
+  private loginVersion: number | null;
+  /** 마지막으로 되돌려 쓴 자격 */
+  private written: string | null = null;
   /** 일의 도구 어댑터. 토큰이 없거나 모르는 도구면 null (perform이 시작 전에 끝낸다) */
   private readonly tool: AiTool | null;
 
@@ -90,6 +74,7 @@ export class JobRun {
       redactor.with(job.runToken).with(login.token),
     );
     this.reporter = new ProgressReporter(server, job.taskId, this.redactor, job.leaseUntil);
+    this.loginVersion = login.version;
   }
 
   async perform(): Promise<void> {
@@ -160,11 +145,36 @@ export class JobRun {
     return RunEnding.submit(error, RunResult.failed(error, this.redactor));
   }
 
-  /** place: 이 일의 작업 자리 */
+  /**
+   * place: 이 일의 작업 자리. AI가 잘 끝났는데 칸의 검사에 떨어지면 같은 자리에서 한 번 더 맡긴다 (검증 고리 V).
+   * 두 번째 실행도 첫 실행과 같이 지켜본다: 취소 · 멈춤 · 임대 · 격리가 깨지면 끄고 끝낸다
+   */
   private async supervise(place: JobWorkspace, tool: AiTool, prompts: PromptPack): Promise<void> {
+    const job = this.stage?.aiJob(prompts) ?? place.withShared(this.job, prompts);
+    let run = await this.runAi(job, place, tool, prompts);
+    for (let retries = 0; run.ending.succeeded && this.stage !== null; retries++) {
+      const stopped = await this.check(this.stage, retries > 0);
+      if (stopped) return await this.conclude(stopped);
+      if (retries >= JobRun.CHECK_RETRIES || this.checks.every((c) => c.ok)) break;
+      this.note(new RunEvent(RunEvent.READ, '검사에 떨어져 AI에게 한 번 더 맡겨요', 0));
+      const fix = StageCheck.retryJob(job, prompts, run.stream.finalText, this.checks);
+      run = await this.runAi(fix, place, tool, prompts);
+    }
+    await this.conclude(run.ending.succeeded ? await this.afterExit(run, place) : run.ending);
+  }
+
+  /**
+   * AI CLI를 한 번 띄워 끝날 때까지 지켜본다. 끝낼 이유가 생기면 끄고 그 끝, 스스로 끝났으면 남은 기록을 보내고
+   * 아직 내 일인지 본 뒤 AI의 끝 (잘 끝났으면 succeeded)
+   */
+  private async runAi(
+    job: Job,
+    place: JobWorkspace,
+    tool: AiTool,
+    prompts: PromptPack,
+  ): Promise<{ ending: RunEnding; stream: AiStream }> {
     const stream = tool.stream();
     const wake = new AbortController();
-    const job = this.stage?.aiJob(prompts) ?? place.withShared(this.job, prompts);
     const child = tool.start(job, place, prompts, (line) => {
       this.reporter.add(stream.read(line));
       this.reporter.notePlan(stream.takePlanUsage());
@@ -183,30 +193,37 @@ export class JobRun {
     await this.writeBack(tool, place);
     const ending = decided
       ? ((await this.flush()) ?? decided)
-      : ((await this.flushForSubmit()) ?? (await this.afterExit(exit, stream, child, place)));
-    await this.conclude(ending);
+      : ((await this.flushForSubmit()) ?? this.fromExit(exit, stream, child));
+    return { ending, stream };
+  }
+
+  /** 칸의 검사를 돌려 기억한다 (retried: AI에게 한 번 더 맡긴 뒤). 그사이 끝낼 이유가 생기면 그 끝 */
+  private async check(stage: SandboxStage, retried: boolean): Promise<RunEnding | null> {
+    const found = await this.during((signal) => stage.check(signal, this.note));
+    if (found instanceof RunEnding) return found;
+    // 러너가 멈춰 검사가 돌린 데까지만 돌아왔다
+    if (this.stop.aborted) return RunEnding.release(JobRun.STOPPING);
+    this.checks = retried ? found.map((c) => c.asRetried()) : found;
+    return null;
   }
 
   /**
-   * AI가 스스로 끝난 뒤. 칸의 일이 잘 끝났으면 단계의 뒤(검사 · 올리기)까지 한 결과가 끝이다.
+   * AI가 잘 끝난 뒤. 칸의 일이 잘 끝났으면 단계의 뒤(올리기)까지 한 결과가 끝이다.
    * 만들기 작업이 결과물을 하나도 올리지 못했으면 실패다.
    * 잘 끝났으면 결과물(outputs 폴더의 파일)을 올리고 제출한다: 제출하면 작업이 끝나 표를 받을 수 없다
    */
   private async afterExit(
-    exit: ChildExit,
-    stream: AiStream,
-    child: AiProcess,
+    run: { ending: RunEnding; stream: AiStream },
     workspace: JobWorkspace,
   ): Promise<RunEnding> {
-    const ending = this.fromExit(exit, stream, child);
-    if (!ending.succeeded) return ending;
-    const { stage } = this;
-    let finished = ending;
+    const { stage, checks, note, redactor } = this;
+    let finished = run.ending;
     if (stage !== null) {
+      const { finalText } = run.stream;
       finished = await this.during((signal) =>
-        stage.finish(stream.finalText, signal, this.note, this.redactor, workspace.workDir),
+        stage.finish(finalText, checks, signal, note, redactor, workspace.workDir),
       );
-      // 단계 뒤에 남은 기록(검사 · 올림)을 보내고, 그사이 취소됐는지 한 번 더 본다
+      // 단계 뒤에 남은 기록(올림)을 보내고, 그사이 취소됐는지 한 번 더 본다
       const after = await this.flushForSubmit();
       if (after || !finished.succeeded) return after ?? finished;
     }
@@ -237,26 +254,9 @@ export class JobRun {
       this.note(new RunEvent(RunEvent.ERROR, `결과물에서 뺐어요: ${line}`, 0));
     if (batch.files.length === 0) return null;
     const uploader = new OutputUploader(this.server, this.config.serverUrl);
-    let sent = 0;
-    for (const file of batch.files) {
-      try {
-        await uploader.upload(this.job.taskId, file, signal);
-        sent++;
-      } catch (error) {
-        if (signal.aborted) return null;
-        if (!(error instanceof OutputRejected)) {
-          const message = `결과물을 올리지 못했어요 (${file.name}): ${(error as Error).message}`;
-          return RunEnding.submit(message, RunResult.failed(message, this.redactor));
-        }
-        this.note(
-          new RunEvent(
-            RunEvent.ERROR,
-            `결과물을 서버가 받지 않았어요: ${file.name}: ${error.message}`,
-            0,
-          ),
-        );
-      }
-    }
+    const sent = await uploader.uploadAll(this.job.taskId, batch.files, signal, this.note);
+    if (typeof sent === 'string')
+      return RunEnding.submit(sent, RunResult.failed(sent, this.redactor));
     if (sent > 0) this.note(new RunEvent(RunEvent.WRITE, `결과물 ${sent}개를 올렸어요`, 0));
     this.sent = sent;
     return null;
@@ -339,14 +339,15 @@ export class JobRun {
    * 판이 다르면(주인이 그사이 다시 로그인) 서버가 거절하고 새 로그인이 이긴다
    */
   private async writeBack(tool: AiTool, workspace: JobWorkspace): Promise<void> {
-    const { version } = this.login;
+    const version = this.loginVersion;
     if (version === null) return;
     const credential = await tool.changedCredential(workspace);
-    if (credential === null) return;
+    if (credential === null || credential === this.written) return;
     try {
-      await this.persist(() =>
+      this.loginVersion = await this.persist(() =>
         this.server.aiLoginRefresh(this.job.taskId, tool.id, version, credential),
       );
+      this.written = credential;
       this.log.info(`${this.job.taskId}: 갱신된 ${tool.id} 로그인을 서버에 저장했어요`);
     } catch (error) {
       this.log.info(
@@ -364,9 +365,11 @@ export class JobRun {
     return RunEnding.submit(error, RunResult.failed(error, this.redactor, stream.connectorCalls));
   }
 
+  /** 끝을 알린다. 칸의 검사를 돌렸으면 제출하는 결과에 마지막 검사를 싣는다 */
   private async conclude(ending: RunEnding): Promise<void> {
     this.log.info(this.redactor.clean(`${this.job.taskId}: ${ending.note}`));
-    const { releaseReason, result } = ending;
+    const { releaseReason } = ending;
+    const result = ending.result?.with(StageCheck.resultOf(this.checks)) ?? null;
     try {
       if (releaseReason !== null)
         await this.persist(() => this.server.release(this.job.taskId, releaseReason));

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
+import { AgentUser } from './agent-user';
+import type { CairnServer } from './cairn-server';
 import { ClaudeCli } from './claude-cli';
 import { Job } from './job';
 import { Json } from './json';
-import { MakeMaterials } from './make-stage';
+import { MakeMaterials, MakeStage } from './make-stage';
 import { PageBase } from './page-base';
 import { PromptPack } from './prompt-pack';
+import { Redactor, RunLog } from './redactor';
+import { RunnerConfig } from './runner-config';
 
 // 만들기 작업의 재료 읽기 (서버가 걸렀어도 지시문 · 도구 입력에 쓰기 전에 다시 본다)와 일의 모양.
 
@@ -173,5 +177,106 @@ describe('자라는 페이지의 지금 판 (page_base)', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('만들기 작업의 검사 (검증 고리 V)', () => {
+  const makeJob = (n: number, payload: object) =>
+    Job.from(
+      Json.parse(
+        JSON.stringify({
+          task: { id: id(n), kind: 'make', title: '발표', payload },
+          agent: { name: '만들기', role: '', tool: 'claude' },
+          instruction: '만들어 주세요',
+          run_token: 'cairn_run_x',
+        }),
+      ) as Json,
+    );
+  /** 자리를 열고(self) 검사를 돌린다. made: AI가 outputs에 둔 것 */
+  const checksOf = async (
+    job: Job,
+    made: (outputs: string) => Promise<void>,
+    page: PageBase | null = null,
+  ) => {
+    const work = await mkdtemp(join(tmpdir(), 'cairn-make-check-'));
+    const config = new RunnerConfig(
+      'http://cairn',
+      'device',
+      null,
+      'claude',
+      '/없는',
+      null,
+      'codex',
+      null,
+      '1',
+      AgentUser.parse('self'),
+      work,
+    );
+    const server = { pageBase: async () => page } as unknown as CairnServer;
+    const redactor = new Redactor([]);
+    const stage = new MakeStage(
+      job,
+      config,
+      AgentUser.parse('self') as AgentUser,
+      new RunLog(redactor),
+      server,
+    );
+    try {
+      assert.equal(await stage.prepare(new AbortController().signal, () => {}, redactor), null);
+      await made(stage.workspaceRoom?.outputsDir ?? '');
+      return (await stage.check()).map((c) => ({
+        name: c.name,
+        ok: c.ok,
+        how: c.how,
+        tail: c.tail,
+      }));
+    } finally {
+      await stage.close();
+      await rm(work, { recursive: true, force: true });
+    }
+  };
+
+  test('outputs 폴더 바로 아래에 올릴 파일이 있어야 한다 (폴더 · 숨김 파일 · 링크는 세지 않는다)', async () => {
+    const plain = makeJob(90, { make: { outputs: [], wikis: [] } });
+    const [empty] = await checksOf(plain, async (dir) => {
+      await writeFile(join(dir, '.hidden'), 'x');
+      await mkdir(join(dir, 'nested'));
+      await writeFile(join(dir, 'nested', 'a.txt'), 'x');
+      await symlink('/etc/hostname', join(dir, 'link.txt'));
+    });
+    assert.deepEqual([empty?.name, empty?.ok, empty?.how], ['결과물 파일', false, '없음']);
+    assert.match(empty?.tail ?? '', /outputs 바로 아래에 둔 파일이 없어요/);
+    const made = await checksOf(plain, async (dir) => {
+      await writeFile(join(dir, '발표.pptx'), 'PK');
+      await writeFile(join(dir, '메모.md'), '# 메모');
+    });
+    assert.deepEqual(made, [{ name: '결과물 파일', ok: true, how: '2개', tail: '' }]);
+  });
+
+  test('새 페이지는 문(index.html)도 본다. 고치는 페이지는 바뀐 파일만 내도 된다', async () => {
+    const fresh = makeJob(91, { page: { title: '데이트 코스' } });
+    const noDoor = await checksOf(fresh, (dir) => writeFile(join(dir, 'style.css'), 'p{}'));
+    assert.deepEqual(
+      noDoor.map((c) => [c.name, c.ok, c.how]),
+      [
+        ['결과물 파일', true, '1개'],
+        ['index.html', false, '없음'],
+      ],
+    );
+    assert.match(noDoor[1]?.tail ?? '', /index\.html가 문이에요/);
+    const door = await checksOf(fresh, (dir) => writeFile(join(dir, 'index.html'), '<p>문</p>'));
+    assert.deepEqual(
+      door.map((c) => c.ok),
+      [true, true],
+    );
+    const base = PageBase.from(
+      Json.of({ page_id: id(7), title: '현황판', direction: '', seq: 2, files: [] }),
+    );
+    const growing = makeJob(92, { page: { pageId: id(7) } });
+    const changed = await checksOf(growing, (dir) => writeFile(join(dir, 'data.json'), '{}'), base);
+    assert.deepEqual(
+      changed.map((c) => c.name),
+      ['결과물 파일'],
+    );
   });
 });

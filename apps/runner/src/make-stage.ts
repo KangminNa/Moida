@@ -1,7 +1,7 @@
+import { readdir } from 'node:fs/promises';
 import type { AgentUser } from './agent-user';
 import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
-import { RunEnding } from './job-run';
 import {
   MaterialBroken,
   MaterialDownloader,
@@ -9,13 +9,16 @@ import {
   MaterialGone,
 } from './material-downloader';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import { OutputBatch } from './output-batch';
 import type { PageBase } from './page-base';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
+import { RunEnding } from './run-ending';
 import type { RunnerConfig } from './runner-config';
 import { SandboxRoom } from './sandbox-room';
 import type { SandboxStage } from './sandbox-stage';
+import { StageCheck } from './stage-check';
 
 /** 만들기 작업의 재료 id (payload.make). 서버가 이미 걸렀지만 지시문 · 도구 입력에 쓰기 전에 모양을 다시 본다 */
 export class MakeMaterials {
@@ -45,11 +48,15 @@ export class MakeMaterials {
 // 만들기 작업의 앞뒤 (결과물 2차). 칸 안에서 AI가 셸로 PPT · 문서 · 영상을 만들어 outputs/에 두면 JobRun이 결과물로 올린다.
 //   앞: 자리 → 고칠 페이지의 지금 판(page_base, 글 파일을 inputs/page/에) → 재료 결과물을 표로 받아 inputs/에(러너)
 //       → 빈 작업 폴더 · 재료를 agent에게
+//   검사: outputs 폴더에 올릴 파일이 있는가, 페이지 일이면 문(index.html)이 있는가. 떨어지면 JobRun이 AI에게 한 번 더 맡긴다
 //   뒤: agent 프로세스를 모두 끄고(띄워 둔 변환기 · 서버) 요약을 결과로. 올린 결과물이 없으면 JobRun이 실패로 끝낸다
+//       (검사를 지나도 서버가 받지 않으면 없을 수 있다)
 // 재료 위키는 받지 않는다: 작업 토큰에 봉인한 허락으로 AI가 get_wiki로 읽는다 (지시문에 id만).
 // 결재는 없다: Cairn 안에 보관하는 것은 발행이 아니다.
 export class MakeStage implements SandboxStage {
   private static readonly SUMMARY_MAX = 4_000;
+  /** 페이지의 문 (서버의 PageOrder.ENTRY) */
+  private static readonly ENTRY = 'index.html';
   readonly awaitsApproval = false;
   readonly needsOutputs = true;
 
@@ -173,8 +180,33 @@ export class MakeStage implements SandboxStage {
     return null;
   }
 
+  /**
+   * 만든 파일이 outputs 폴더 바로 아래에 있는가 (OutputBatch가 올리는 이름의 보통 파일).
+   * 새 페이지를 만드는 일이면 문(index.html)도 (고치는 일은 바뀐 파일만 내도 된다: 서버의 PageOrder.refusal).
+   * 목록만 읽고 파일은 열지 않는다 (올릴 때 agent 권한으로 옮긴다)
+   */
+  async check(): Promise<StageCheck[]> {
+    if (this.room === null) return [];
+    const dir = this.room.outputsDir;
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    const names = entries
+      .filter((e) => e.isFile() && OutputBatch.nameProblem(e.name) === null)
+      .map((e) => e.name);
+    const made = names.length > 0;
+    const none = `${dir} 바로 아래에 둔 파일이 없어요 (폴더 · 링크 · 숨김 파일은 올라가지 않아요)`;
+    const checks = [
+      StageCheck.seen('결과물 파일', made, made ? `${names.length}개` : '없음', none),
+    ];
+    if (!this.job.page || this.base !== null) return checks;
+    const entry = names.includes(MakeStage.ENTRY);
+    const why = `새 페이지는 ${dir}/${MakeStage.ENTRY}가 문이에요. 없으면 페이지가 되지 않아요`;
+    checks.push(StageCheck.seen(MakeStage.ENTRY, entry, entry ? '있음' : '없음', why));
+    return checks;
+  }
+
   async finish(
     summary: string,
+    _checks: readonly StageCheck[],
     _signal: AbortSignal,
     _note: (event: RunEvent) => void,
     redactor: Redactor,

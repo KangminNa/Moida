@@ -245,6 +245,24 @@ class Spy {
   }
 }
 
+/** 가짜 CLI가 몇 번 떴는지 (fake:runs) */
+class Runs {
+  readonly path = join(spyDir, `${randomUUID()}.runs`);
+
+  get mark(): string {
+    return `[fake:runs=${this.path}]`;
+  }
+
+  /** 뜬 AI CLI의 pid들 (뜬 차례로) */
+  pids(): string[] {
+    return existsSync(this.path) ? readFileSync(this.path, 'utf8').split('\n').filter(Boolean) : [];
+  }
+
+  count(): number {
+    return this.pids().length;
+  }
+}
+
 const alive = (pid: unknown): boolean => {
   try {
     process.kill(Number(pid), 0);
@@ -934,6 +952,85 @@ describe('코드 작업 (작업 공간)', () => {
     assert.ok(git.head('app', `cairn/${created.id}`));
   });
 
+  // 검증 고리 V: 검사에 떨어지면 같은 작업 폴더에서 AI를 한 번 더 띄워 떨어진 출력을 보이고, 다시 검사한 뒤 끝낸다
+  test('검사에 떨어지면 같은 자리에서 AI에게 한 번 더 맡기고, 고친 뒤 통과한 검사를 결과에 싣는다', async () => {
+    const spy = new Spy();
+    const runs = new Runs();
+    // 제목은 따로: 지시의 첫 줄에서 자른 제목에 반쪽 표시가 남지 않게
+    const created = await newTask(
+      coder,
+      `[fake:edit=src/d.ts] [fake:fix=src/fixed.ts] ${runs.mark} ${spy.mark}`,
+      {
+        kind: 'code',
+        title: '검사 고치기',
+        payload: { code: code({ checks: ['test -f src/d.ts', 'test -f src/fixed.ts'] }) },
+      },
+    );
+    const task = await taskIn(created.id, 'done');
+    assert.equal(runs.count(), 2, 'AI가 두 번 떴다');
+    const result = resultOf(task);
+    assert.deepEqual(result.checks, [
+      { name: 'test -f src/d.ts', ok: true, how: '통과', retried: true },
+      { name: 'test -f src/fixed.ts', ok: true, how: '통과', retried: true },
+    ]);
+    assert.match(
+      String(result.text),
+      /검사 \(떨어져 AI가 한 번 더 고친 뒤\):\n- test -f src\/d.ts: 통과\n- test -f src\/fixed.ts: 통과/,
+    );
+    const branch = `cairn/${created.id}`;
+    assert.deepEqual([...git.changed('app', branch)].sort(), ['src/d.ts', 'src/fixed.ts']);
+    // 두 번째 실행의 지시문: 처음 지시와 앞 답, 떨어진 검사만
+    const prompt = String((await spy.seen()).prompt);
+    assert.match(prompt, /# 할 일: 검사 고치기\n# 검사에 떨어졌어요: 검사 고치기/);
+    assert.match(prompt, /## 앞 실행의 마지막 답\n초안을 저장했어요/);
+    assert.match(prompt, /- test -f src\/fixed.ts: 코드 1\n```\n\(출력 없음\)\n```/);
+    assert.doesNotMatch(prompt, /- test -f src\/d.ts: /, '통과한 검사는 싣지 않는다');
+    assert.match(prompt, /# 고칠 수 있는 곳\n- src/, '단계의 단락은 그대로');
+    const bodies = events(task).map((e) => String(e.body));
+    assert.ok(bodies.includes('검사 test -f src/fixed.ts: 코드 1'), bodies.join(' | '));
+    assert.equal(bodies.filter((b) => b === '검사에 떨어져 AI에게 한 번 더 맡겨요').length, 1);
+    await roomsLeft();
+  });
+
+  test('다시 맡겨도 떨어지면 세 번째로 띄우지 않고 지금처럼 끝낸다', async () => {
+    const runs = new Runs();
+    const created = await codeTask(`[fake:edit=src/e.ts] ${runs.mark}`, {
+      checks: ['test -f src/e.ts', 'echo 여전히 망함 >&2; exit 1'],
+    });
+    const task = await taskIn(created.id, 'done');
+    const result = resultOf(task);
+    assert.deepEqual(result.checks, [
+      { name: 'test -f src/e.ts', ok: true, how: '통과', retried: true },
+      { name: 'echo 여전히 망함 >&2; exit 1', ok: false, how: '코드 1', retried: true },
+    ]);
+    assert.match(String(result.text), /--- echo 여전히 망함 >&2; exit 1의 끝부분 ---\n여전히 망함/);
+    assert.ok(git.head('app', `cairn/${created.id}`), '떨어져도 지금처럼 올린다');
+    assert.equal(runs.count(), 2, 'AI는 두 번까지만');
+    await roomsLeft();
+  });
+
+  test('다시 맡긴 실행도 첫 실행처럼 지켜본다: 주인이 취소하면 끄고 제출하지 않는다', async () => {
+    const runs = new Runs();
+    const created = await codeTask(`[fake:edit=src/f.ts] [fake:fix-hang] ${runs.mark}`, {
+      checks: ['test -f src/never.ts'],
+    });
+    const [, second] = await until('AI가 두 번째로 뜸', () => {
+      const pids = runs.pids();
+      return pids.length === 2 ? pids : null;
+    });
+    assert.equal(alive(second), true);
+
+    await cancelTask(created);
+
+    await gone(second);
+    await slot.logged(`${created.id}: 주인이 취소했어요`);
+    const task = await getTask(created.id);
+    assert.equal(task.status, 'cancelled');
+    assert.equal(task.result, null);
+    assert.equal(git.head('app', `cairn/${created.id}`), null, '올리지 않는다');
+    await roomsLeft();
+  });
+
   test('바꾼 파일이 없으면 올리지 않고 끝낸다. 없는 저장소는 실패', async () => {
     const quiet = await codeTask('');
     const done = await taskIn(quiet.id, 'done');
@@ -1004,9 +1101,14 @@ describe('코드 작업 (작업 공간)', () => {
       await roomsLeft();
     });
 
-    test('만든 파일이 없으면 실패로 끝낸다', async () => {
-      const task = await taskIn((await makeTask('')).id, 'failed');
+    test('만든 파일이 없으면 한 번 더 맡기고, 그래도 없으면 실패로 끝낸다', async () => {
+      const runs = new Runs();
+      const task = await taskIn((await makeTask(runs.mark)).id, 'failed');
       assert.match(String(resultOf(task).error), /만든 파일이 없어요/);
+      assert.deepEqual(resultOf(task).checks, [
+        { name: '결과물 파일', ok: false, how: '없음', retried: true },
+      ]);
+      assert.equal(runs.count(), 2);
       await roomsLeft();
     });
   });

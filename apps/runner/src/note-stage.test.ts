@@ -66,6 +66,7 @@ describe('세션 노트 일', () => {
     const stage = stageOf(server);
     const done = await stage.finish(
       '{"title":"산책"}',
+      [],
       new AbortController().signal,
       quiet,
       redactor,
@@ -74,6 +75,7 @@ describe('세션 노트 일', () => {
     assert.deepEqual(server.saved, ['{"title":"산책"}']);
     const bad = await stage.finish(
       '노트를 못 썼어요',
+      [],
       new AbortController().signal,
       quiet,
       redactor,

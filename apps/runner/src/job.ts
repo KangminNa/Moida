@@ -233,11 +233,20 @@ export class Job {
 
   /** 브라우저 작업이 도는 곳과 그 단락(사이트 · 둘러보기)을 더한 같은 일 (BrowseStage) */
   withBrowse(browse: BrowsePlan | null, brief: string): Job {
+    return this.copy(this.instruction, browse, brief);
+  }
+
+  /** 지시만 바꾼 같은 일 (검사에 떨어져 AI에게 한 번 더 맡길 때. 단락 · 작업 토큰은 그대로) */
+  withInstruction(instruction: string): Job {
+    return this.copy(instruction, this.browse, this.brief);
+  }
+
+  private copy(instruction: string, browse: BrowsePlan | null, brief: string | null): Job {
     return new Job(
       this.taskId,
       this.kind,
       this.title,
-      this.instruction,
+      instruction,
       this.target,
       this.skill,
       this.revisionNote,

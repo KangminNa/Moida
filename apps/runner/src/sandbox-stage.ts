@@ -1,9 +1,10 @@
 import type { Job } from './job';
-import type { RunEnding } from './job-run';
 import type { RunEvent } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
+import type { RunEnding } from './run-ending';
 import type { SandboxRoom } from './sandbox-room';
+import type { StageCheck } from './stage-check';
 
 /**
  * AI 앞뒤에 하네스가 하는 일 (JobRun이 AI 앞뒤에서 부르고, 그동안에도 보고 고리를 돌려 임대를 늘리고 취소를 듣는다).
@@ -26,9 +27,18 @@ export interface SandboxStage {
     note: (event: RunEvent) => void,
     redactor: Redactor,
   ): Promise<RunEnding | null>;
-  /** AI가 잘 끝난 뒤. AI의 마지막 답(요약)과 함께 결과를 만든다. workDir: AI가 돈 작업 폴더 (브라우저 작업의 browser-stop.json) */
+  /**
+   * AI가 잘 끝난 뒤의 검사 (검증 고리 V). 검사가 없으면 빈 목록. 떨어지면 JobRun이 AI에게 한 번 더 맡기고 다시 부른다.
+   * 그만두게 하면(signal) 돌린 데까지
+   */
+  check(signal: AbortSignal, note: (event: RunEvent) => void): Promise<readonly StageCheck[]>;
+  /**
+   * AI가 잘 끝난 뒤. AI의 마지막 답(요약)과 마지막 검사(checks)로 결과를 만든다.
+   * workDir: AI가 돈 작업 폴더 (브라우저 작업의 browser-stop.json)
+   */
   finish(
     summary: string,
+    checks: readonly StageCheck[],
     signal: AbortSignal,
     note: (event: RunEvent) => void,
     redactor: Redactor,
