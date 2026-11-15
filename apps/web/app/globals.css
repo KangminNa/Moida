@@ -2110,7 +2110,9 @@ a.chip {
 }
 
 /* 스케줄 한 줄: 이름 · 주기 · 단추 (좁으면 단추가 아래 줄로) */
-.list > .schedule-row {
+/* 스케줄 한 줄 · 멈춘 이벤트 한 줄: 내용과 단추를 한 줄에, 좁으면 단추가 아래로 */
+.list > .schedule-row,
+.list > .failed-event {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

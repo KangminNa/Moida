@@ -33,6 +33,7 @@ const ICONS: Readonly<Record<string, string>> = {
   office: '\u{1F3E2}︎',
   code: '\u2328\uFE0E',
   tools: '\u{1F9F0}︎',
+  warn: '\u26A0\uFE0E',
   back: '←',
 };
 
@@ -81,6 +82,7 @@ export const MENU = [
       { href: '/admin/goals', name: '목표', icon: 'goal' },
       { href: '/admin/schedules', name: '스케줄', icon: 'clock' },
       { href: '/admin/tasks', name: '작업 기록', icon: 'task' },
+      { href: '/admin/events', name: '처리 실패', icon: 'warn' },
     ],
   },
   {

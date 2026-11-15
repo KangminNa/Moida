@@ -1,5 +1,6 @@
 import type { Sql } from './database';
 import type { DomainEvent } from './event';
+import { Trace } from './trace';
 
 /**
  * 무언가 바뀌었다는 신호 (Postgres NOTIFY). 트랜잭션 안에서 보내면 커밋할 때 전달되고, 취소되면 사라진다.
@@ -29,6 +30,7 @@ export class ChangeSignal {
 // 이벤트를 호출한 쪽의 트랜잭션 안에서 platform.outbox에 남기고 변경 신호를 보낸다.
 // 데이터 변경과 이벤트 기록이 함께 커밋되거나 함께 취소된다.
 // 일꾼을 깨우는 신호는 따로 보낸다: 변경 신호에는 실행 기록도 섞여 있어 일꾼이 헛돌게 된다.
+// 지금 하는 일의 추적 번호(Trace: 요청 번호, 일꾼에서는 그 이벤트의 번호)를 trace_id에 적어 일꾼까지 잇는다 (리팩토링 R1).
 export class Outbox {
   static readonly CHANNEL = 'cairn_outbox';
   /** 마감 작업을 깨우는 신호의 앞부분 (`due:<작업 이름>`). 빈 신호는 outbox를 비우라는 뜻이다 */
@@ -55,13 +57,15 @@ export class Outbox {
   async publish(events: readonly DomainEvent[]): Promise<void> {
     if (events.length === 0) return;
     for (const listener of Outbox.listeners.values()) await listener(this.tx, events);
+    const trace = Trace.current();
     const rows = events.map((e) => ({
       space_id: e.spaceId,
       topic: e.name,
       payload: { v: e.version, ...e.data },
+      trace_id: trace,
     }));
     const saved = await this.tx`
-      INSERT INTO platform.outbox ${this.tx(rows, 'space_id', 'topic', 'payload')}
+      INSERT INTO platform.outbox ${this.tx(rows, 'space_id', 'topic', 'payload', 'trace_id')}
       RETURNING id`;
     await ChangeSignal.send(
       this.tx,
@@ -69,6 +73,11 @@ export class Outbox {
         (e, i) => new ChangeSignal(e.spaceId, e.name, Outbox.subjectOf(e, String(saved[i]?.id))),
       ),
     );
+    await this.poke();
+  }
+
+  /** 일꾼에게 outbox를 비우라고 알린다 (빈 신호). 이벤트를 남기거나, 멈춘 이벤트를 다시 시도하게 돌린 트랜잭션에서 */
+  async poke(): Promise<void> {
     await this.tx`SELECT pg_notify(${Outbox.CHANNEL}, '')`;
   }
 

@@ -67,6 +67,7 @@ export interface OutboxRow {
   next_attempt_at: Date | null;
   last_error: string | null;
   failed_at: Date | null;
+  trace_id: string | null;
 }
 export type OutboxNew = Partial<OutboxRow> & Pick<OutboxRow, 'id' | 'space_id' | 'topic'>;
 

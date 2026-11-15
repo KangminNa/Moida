@@ -1,9 +1,13 @@
 import type { INestApplication } from '@nestjs/common';
 import { TooLarge } from '../base/errors';
+import { Trace } from '../base/trace';
+import type { HttpRequest } from './http-types';
 import { type RequestLogSink, RequestTrace } from './request-trace';
 
 // 서버와 API 테스트 도구가 똑같이 거는 HTTP 설정 (CairnApp.api가 건다).
 // - 맨 앞에서 요청 번호를 붙이고 요청 로그를 남긴다 (RequestTrace, 리팩토링 6단계).
+// - 본문을 읽은 뒤 그 번호 안에서 다음 단계를 부른다 (Trace, 리팩토링 R1): 이 요청이 남긴 이벤트가 같은 번호로 일꾼까지 간다.
+//   본문 읽기보다 앞에서 걸면 읽기의 콜백에서 번호가 끊길 수 있어 뒤에 건다.
 // - 리버스 프록시 뒤에서 https·접속 IP를 바르게 읽도록, 같은 컴퓨터·내부망의 프록시만 믿는다.
 // - 모든 응답은 캐시에 남지 않게(no-store) 하고, 서버 종류를 알리지 않는다.
 //   나중에 캐시해도 되는 공개 응답(글 등)은 그 Response에서만 Cache-Control을 바꾼다.
@@ -55,6 +59,11 @@ export class HttpSetup {
     };
     parsers.useBodyParser('json', { limit: HttpSetup.JSON_LIMIT });
     parsers.useBodyParser('raw', { limit: HttpSetup.IMAGE_LIMIT, type: HttpSetup.isImageUpload });
+    express.use((req, _res, next) => {
+      const id = (req as HttpRequest).requestId;
+      if (id) Trace.run(id, next);
+      else next();
+    });
     express.use(HttpSetup.tooLarge);
   }
 

@@ -4,6 +4,9 @@ import { InstallPolicy, OwnerService, SpaceQuery } from './modules/account';
 import {
   ArchiveFile,
   ArchiveRestoreService,
+  FailedEventInput,
+  FailedEventQuery,
+  FailedEventService,
   InvalidRequest,
   OwnerActor,
   PluginManifest,
@@ -27,6 +30,8 @@ import {
 //   pnpm secret:rotate                           저장된 비밀값을 지금 서버 키로 다시 암호화 (순서는 .env.example)
 //   pnpm run restore < 백업.zip                  백업 zip을 검사하고 무엇이 몇 개 들어올지 보여줌. 아무것도 쓰지 않음
 //   pnpm run restore --apply < 백업.zip          빈 Cairn에 정말 들여옴
+//   pnpm run events failed                       8번 실패해 멈춘 이벤트 (최근 50개)
+//   pnpm run events retry <번호|--all>            멈춘 이벤트를 다시 시도 (웹의 설정 › 일 › 처리 실패와 같다)
 //
 // 컨테이너 안에서는 개발·운영 모두 cairn-admin <명령>으로 부른다 (Dockerfile).
 const owner = new OwnerActor('local', 'cli');
@@ -48,6 +53,8 @@ async function main() {
       );
     if (command === 'restore')
       return await restore(app.get(ArchiveRestoreService), app.get(SpaceQuery), args);
+    if (command === 'events')
+      return await events(app.get(FailedEventQuery), app.get(FailedEventService), args);
     if (command === 'secret' && args[0] === 'rotate')
       return await rotateSecrets(app.get(SecretRotation));
     throw new Error('명령을 알 수 없어요. 쓰는 법은 apps/server/src/main.cli.ts 맨 위에');
@@ -80,6 +87,35 @@ async function rotateSecrets(rotation: SecretRotation): Promise<void> {
   const counts = await rotation.run(owner);
   for (const [name, count] of counts) console.log(`✔ ${name}: ${count}개를 다시 암호화했어요`);
   console.log('모든 비밀값이 지금 서버 키로 풀려요. CAIRN_SECRET_KEY_OLD를 지워도 돼요');
+}
+
+/** 멈춘 이벤트 보기 · 다시 시도 (리팩토링 R1). 서버 자신(SystemActor)이라 모든 공간을 본다 */
+async function events(
+  failed: FailedEventQuery,
+  retries: FailedEventService,
+  args: readonly string[],
+): Promise<void> {
+  const [verb, target] = args;
+  const system = new SystemActor();
+  if (verb === 'failed') {
+    const { items } = (await failed.list(system)).toJSON();
+    if (items.length === 0) return console.log('멈춘 이벤트가 없어요');
+    for (const e of items)
+      console.log(
+        `${e.id}  ${e.failedAt}  ${e.topic}  (요청 번호 ${e.traceId ?? '-'})\n    ${e.lastError ?? ''}`,
+      );
+    return;
+  }
+  if (verb === 'retry' && target === '--all') {
+    console.log(`✔ ${await retries.retryAll(system)}개를 다시 시도하게 돌렸어요`);
+    return;
+  }
+  if (verb === 'retry' && target) {
+    const event = (await retries.retry(system, FailedEventInput.from({ id: target }))).toJSON();
+    console.log(`✔ ${event.id}(${event.topic})를 다시 시도하게 돌렸어요. 일꾼이 곧 처리해요`);
+    return;
+  }
+  throw new Error('쓰는 법: events failed | events retry <번호|--all>');
 }
 
 /** 공간을 아는 주인. 공간에 쓰는 동작(저장소에서 복원)은 진짜 공간 id가 있어야 한다 */

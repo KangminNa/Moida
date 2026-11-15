@@ -1,9 +1,13 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { SystemActor } from '../base/actor';
 import type { BaseDueJob } from '../base/base-due-job';
+import { BaseEntity } from '../base/base-entity';
 import { Database, type Listener } from '../base/database';
 import { DomainEvent } from '../base/event';
 import { Outbox } from '../base/outbox';
+import { Trace } from '../base/trace';
+import { FailedEvent } from '../failed-event/failed-event';
+import { Notices } from '../notice/notices';
 import type { OutboxRow } from '../platform.tables';
 import { Leases } from '../plugin/leases';
 import { PackageService } from '../plugin/package.service';
@@ -20,7 +24,10 @@ import { WorkScheduler } from './work-scheduler';
 //   다시 듣기  처음 들을 때와 끊겼다 다시 들을 때마다 outbox와 모든 마감 작업을 한 번씩 돈다 (놓친 신호를 메운다)
 //   빌리기     한 문장으로 최대 50개를 고르며 다음 시도 시각을 2분 뒤로 미뤄 둔다 (다른 일꾼과 겹치지 않음)
 //   넘기기     트랜잭션 밖에서 Handler를 차례로 부른다 (외부 호출이 있어도 잠금을 잡고 있지 않음)
-//   결과       모두 성공 → processed_at / 실패 → 점점 늦게 다시 / 8번 실패 → failed_at (지우지 않음)
+//   결과       모두 성공 → processed_at / 실패 → 점점 늦게 다시 / 8번 실패 → failed_at (지우지 않음) + 관리자에게 알림
+//              (같은 트랜잭션, FailedEvent.notice). 관리자가 설정 › 일 › 처리 실패 · 명령줄에서 다시 시도한다 (리팩토링 R1)
+//   추적 번호  이벤트를 남긴 요청의 번호(trace_id) 안에서 받는 쪽을 부른다: 로그 · 거기서 남긴 이벤트가 같은 번호를 잇는다.
+//              반복 · 마감 작업은 돌 때마다 새 번호 (Trace)
 // 일꾼은 하나만 띄운다. 반복 작업(every)은 앞 실행이 안 끝났으면 건너뛰고, 마감 작업은 도는 중에 깨우면 끝난 뒤 한 번 더 돈다.
 // DB에 닿지 못하면 1 · 2 · 4 … 10분 뒤에 다시 해 본다.
 @Injectable()
@@ -91,7 +98,7 @@ export class OutboxWorker implements OnApplicationShutdown {
   /** 한 번 돌린다. 처리한 이벤트 수를 돌려준다 (테스트에서 직접 부른다) */
   async tick(): Promise<number> {
     const rows = await this.db.sql<
-      Pick<OutboxRow, 'id' | 'space_id' | 'topic' | 'payload' | 'attempts'>[]
+      Pick<OutboxRow, 'id' | 'space_id' | 'topic' | 'payload' | 'attempts' | 'trace_id'>[]
     >`
       UPDATE platform.outbox o
          SET attempts = o.attempts + 1, next_attempt_at = now() + interval '2 minutes'
@@ -101,43 +108,50 @@ export class OutboxWorker implements OnApplicationShutdown {
             AND (next_attempt_at IS NULL OR next_attempt_at <= now())
           ORDER BY id LIMIT ${OutboxWorker.BATCH}
           FOR UPDATE SKIP LOCKED)
-      RETURNING o.id, o.space_id, o.topic, o.payload, o.attempts`;
-    for (const row of rows) {
-      try {
-        // Outbox.publish가 적은 객체 ({ v, ...data })
-        const payload = row.payload as Record<string, unknown>;
-        const event = DomainEvent.fromOutbox(row.topic, row.space_id, payload);
-        // 마감을 바꾼 쓰기는 이미 커밋됐다: 받는 쪽이 실패해도 다시 잰다
-        for (const job of this.core.duesFor(event)) this.dueWoken.add(job);
-        // 플러그인을 켜거나 끄거나 설정을 바꾸면: 재시작 없이 다시 등록하고 일정을 다시 짠다
-        if (event.name === 'platform.plugin.changed') {
-          await this.registry.reload();
-          if (this.listener !== null && !this.closing) this.scheduleJobs();
-        }
-        for (const handler of this.core.handlersFor(event)) await handler.handle(event);
-        for (const sub of this.registry.handlersFor(event)) await sub.handler.handle(event);
-        for (const reaction of this.registry.reactionsFor(event))
-          await this.packages.run(new SystemActor(), reaction.found, {
-            ...event.data,
-            spaceId: event.spaceId,
-          });
-        await this.db
-          .sql`UPDATE platform.outbox SET processed_at = now(), last_error = NULL WHERE id = ${row.id}`;
-      } catch (error) {
-        await this.fail(row.id, row.attempts, error);
-      }
-    }
+      RETURNING o.id, o.space_id, o.topic, o.payload, o.attempts, o.trace_id`;
+    for (const row of rows)
+      await Trace.run(row.trace_id ?? BaseEntity.newId(), () => this.deliver(row));
     return rows.length;
+  }
+
+  /** 이벤트 하나를 받는 쪽에 넘긴다 (그 이벤트의 추적 번호 안에서) */
+  private async deliver(
+    row: Pick<OutboxRow, 'id' | 'space_id' | 'topic' | 'payload' | 'attempts'>,
+  ): Promise<void> {
+    try {
+      // Outbox.publish가 적은 객체 ({ v, ...data })
+      const payload = row.payload as Record<string, unknown>;
+      const event = DomainEvent.fromOutbox(row.topic, row.space_id, payload);
+      // 마감을 바꾼 쓰기는 이미 커밋됐다: 받는 쪽이 실패해도 다시 잰다
+      for (const job of this.core.duesFor(event)) this.dueWoken.add(job);
+      // 플러그인을 켜거나 끄거나 설정을 바꾸면: 재시작 없이 다시 등록하고 일정을 다시 짠다
+      if (event.name === 'platform.plugin.changed') {
+        await this.registry.reload();
+        if (this.listener !== null && !this.closing) this.scheduleJobs();
+      }
+      for (const handler of this.core.handlersFor(event)) await handler.handle(event);
+      for (const sub of this.registry.handlersFor(event)) await sub.handler.handle(event);
+      for (const reaction of this.registry.reactionsFor(event))
+        await this.packages.run(new SystemActor(), reaction.found, {
+          ...event.data,
+          spaceId: event.spaceId,
+        });
+      await this.db
+        .sql`UPDATE platform.outbox SET processed_at = now(), last_error = NULL WHERE id = ${row.id}`;
+    } catch (error) {
+      await this.fail(row, error);
+    }
   }
 
   async runJob(scheduled: ScheduledJob): Promise<void> {
     const key = `${scheduled.plugin}/${scheduled.job.name}`;
     if (this.runningJobs.has(key)) return;
     this.runningJobs.add(key);
+    const trace = BaseEntity.newId();
     try {
-      await scheduled.job.run();
+      await Trace.run(trace, () => scheduled.job.run());
     } catch (error) {
-      this.logger.warn(`${key} 실패: ${(error as Error).message}`);
+      this.logger.warn(`${trace} ${key} 실패: ${(error as Error).message}`);
     } finally {
       this.runningJobs.delete(key);
     }
@@ -246,14 +260,15 @@ export class OutboxWorker implements OnApplicationShutdown {
 
   /** 마감 작업을 한 번. 실패하면 늦춰서 다시 */
   private async dueOnce(job: BaseDueJob): Promise<Date | null> {
+    const trace = BaseEntity.newId();
     try {
-      const next = await job.run(new Date());
+      const next = await Trace.run(trace, () => job.run(new Date()));
       this.dueFailures.delete(job.name);
       return next;
     } catch (error) {
       const failures = (this.dueFailures.get(job.name) ?? 0) + 1;
       this.dueFailures.set(job.name, failures);
-      this.logger.warn(`${job.name} 실패 (${failures}번째): ${(error as Error).message}`);
+      this.logger.warn(`${trace} ${job.name} 실패 (${failures}번째): ${(error as Error).message}`);
       return new Date(Date.now() + this.retryDelayMs(failures));
     }
   }
@@ -265,14 +280,23 @@ export class OutboxWorker implements OnApplicationShutdown {
     this.scheduler.at(key, at, run);
   }
 
-  private async fail(id: number, attempts: number, error: unknown): Promise<void> {
+  /** 실패: 늦춰서 다시, 8번째면 멈추고 같은 트랜잭션에서 관리자에게 알린다. 로그 줄은 추적 번호로 시작한다 */
+  private async fail(
+    row: Pick<OutboxRow, 'id' | 'space_id' | 'topic' | 'attempts'>,
+    error: unknown,
+  ): Promise<void> {
+    const { id, attempts } = row;
     const message = error instanceof Error ? error.message : String(error);
+    const where = `${Trace.current() ?? '-'} 이벤트 ${id}(${row.topic})`;
     if (attempts >= OutboxWorker.MAX_ATTEMPTS) {
-      await this.db
-        .sql`UPDATE platform.outbox SET failed_at = now(), last_error = ${message} WHERE id = ${id}`;
-      this.logger.error(`이벤트 ${id}를 ${attempts}번 실패해서 멈췄어요: ${message}`);
+      await this.db.transaction(async (tx) => {
+        await tx`UPDATE platform.outbox SET failed_at = now(), last_error = ${message} WHERE id = ${id}`;
+        await new Notices(tx).post(FailedEvent.notice(row.space_id, id, row.topic, message));
+      });
+      this.logger.error(`${where}를 ${attempts}번 실패해서 멈췄어요: ${message}`);
       return;
     }
+    this.logger.warn(`${where} 실패 (${attempts}번째), 다시 시도해요: ${message}`);
     const waitSeconds = this.retryAfterSeconds(attempts);
     await this.db.sql`
       UPDATE platform.outbox

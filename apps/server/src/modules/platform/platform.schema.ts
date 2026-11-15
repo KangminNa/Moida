@@ -67,6 +67,7 @@ export const outbox = platformSchema.table('outbox', {
   next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }),
   last_error: text('last_error'),
   failed_at: timestamp('failed_at', { withTimezone: true }),
+  trace_id: uuid('trace_id'),
 });
 
 /** platform.plugin_settings */

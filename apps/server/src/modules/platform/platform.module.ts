@@ -11,12 +11,17 @@ import { SecretRotation } from './base/secret-rotation';
 import { SensitivePolicy } from './base/sensitive-policy';
 import { ActionChecks } from './directory/action-checks';
 import { AgentDirectory } from './directory/agent-directory';
+import { FailedEvent } from './failed-event/failed-event';
+import { FailedEventController } from './failed-event/failed-event.api';
+import { FailedEventQuery } from './failed-event/failed-event.query';
+import { FailedEventService } from './failed-event/failed-event.service';
 import { HealthController } from './health/health.api';
 import { HealthQuery } from './health/health.query';
 import { DomainErrorFilter } from './http/domain-error.filter';
 import { LibraryController } from './library/library.api';
 import { LibraryQuery } from './library/library.query';
 import { NoticeCatalog } from './notice/notice-catalog';
+import { NoticeKind } from './notice/notice-kind';
 import { NoticePushJob } from './notice/notice-push.job';
 import { NoticePushService } from './notice/notice-push.service';
 import { NoticeSettingsController } from './notice/notice-settings.api';
@@ -71,6 +76,8 @@ import { OutboxWorker } from './worker/outbox-worker';
     SecurityLogService,
     SecurityEventQuery,
     SecurityLogPurgeJob,
+    FailedEventQuery,
+    FailedEventService,
     PluginQuery,
     PluginService,
     { provide: SecretBox, useFactory: () => SecretBox.fromEnv(process.env) },
@@ -110,6 +117,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     StreamController,
     LibraryController,
     SecurityEventController,
+    FailedEventController,
   ],
   exports: [
     Database,
@@ -131,6 +139,8 @@ import { OutboxWorker } from './worker/outbox-worker';
     CoreWorkers,
     OutboxWorker,
     NoticeCatalog,
+    FailedEventQuery,
+    FailedEventService,
   ],
 })
 export class PlatformModule implements OnModuleInit {
@@ -147,6 +157,8 @@ export class PlatformModule implements OnModuleInit {
   onModuleInit(): void {
     // 모듈이 등록한 알림 종류로, 이벤트를 남기는 같은 트랜잭션에서 알림도 남긴다
     Outbox.listen('notices', (tx, events) => this.notices.onEvents(tx, events));
+    // 일꾼이 8번 실패한 이벤트를 멈출 때 남기는 알림 (이벤트 없이, 리팩토링 R1)
+    this.notices.define(new NoticeKind(FailedEvent.NOTICE, '처리 실패', NoticeKind.IMMEDIATE));
     this.rotation.register('플러그인 설정', (actor) => this.plugins.resealSecrets(actor));
     this.workers.every(this.sweep, BlobSweepJob.EVERY_MS);
     this.workers.due(this.push);

@@ -6,6 +6,7 @@ import { after, describe, type TestContext, test } from 'node:test';
 import { ArchiveQuery } from '../archive/archive.query';
 import { ArchiveRestoreService } from '../archive/archive-restore.service';
 import { BaseDueJob } from '../base/base-due-job';
+import { BaseEntity } from '../base/base-entity';
 import { BaseHandler } from '../base/base-handler';
 import { BaseJob } from '../base/base-job';
 import { BlobStore } from '../base/blob-store';
@@ -13,6 +14,8 @@ import { Database, Listener } from '../base/database';
 import { DomainEvent } from '../base/event';
 import { ChangeSignal, Outbox } from '../base/outbox';
 import { SecretBox } from '../base/secret-box';
+import { Trace } from '../base/trace';
+import { FailedEvent } from '../failed-event/failed-event';
 import { PluginRegistry } from '../plugin/plugin-registry';
 import { CoreWorkers } from './core-workers';
 import { OutboxWorker } from './outbox-worker';
@@ -229,6 +232,68 @@ describe('코어 일꾼', () => {
     const [bad] = await db.sql`SELECT last_error FROM platform.outbox WHERE id = ${rows[0]?.id}`;
     assert.match(String(bad?.last_error), /이벤트 이름 형식/);
     await db.sql`DELETE FROM platform.outbox WHERE id = ${rows[0]?.id}`;
+  });
+
+  test('8번째 실패면 멈추고, 같은 트랜잭션에서 관리자에게 "처리 실패" 알림 하나 (리팩토링 R1)', async () => {
+    await db.sql`DELETE FROM platform.notifications WHERE space_id = ${SPACE}`;
+    const core = new CoreWorkers();
+    core.on('task.testcore.stuck', new Failing());
+    const [row] = await db.sql<{ id: number }[]>`
+      INSERT INTO platform.outbox (space_id, topic, payload, attempts) VALUES
+        (${SPACE}, 'task.testcore.stuck', '{"v":1}', 7)
+      RETURNING id`;
+    const id = Number(row?.id);
+    await new OutboxWorker(db, await emptyRegistry(), core).tick();
+    const [stuck] = await db.sql`
+      SELECT attempts, failed_at IS NOT NULL AS stopped, last_error FROM platform.outbox WHERE id = ${id}`;
+    assert.deepEqual(
+      { attempts: stuck?.attempts, stopped: stuck?.stopped, error: stuck?.last_error },
+      { attempts: 8, stopped: true, error: '코어 실패' },
+    );
+    const notices = await db.sql`
+      SELECT kind, severity, title, body, link, group_key FROM platform.notifications WHERE space_id = ${SPACE}`;
+    assert.deepEqual(
+      notices.map((n) => ({ ...n })),
+      [
+        {
+          kind: FailedEvent.NOTICE,
+          severity: 'immediate',
+          title: '처리 실패: task.testcore.stuck',
+          body: '코어 실패',
+          link: '/admin/events',
+          group_key: FailedEvent.NOTICE_GROUP,
+        },
+      ],
+    );
+    await db.sql`DELETE FROM platform.notifications WHERE space_id = ${SPACE}`;
+    await db.sql`DELETE FROM platform.outbox WHERE id = ${id}`;
+  });
+
+  test('받는 쪽은 이벤트를 남긴 요청의 번호 안에서 돌고, 거기서 남긴 이벤트도 같은 번호를 잇는다', async () => {
+    const trace = BaseEntity.newId();
+    const seen: (string | null)[] = [];
+    const core = new CoreWorkers();
+    core.on(
+      'task.testcore.traced',
+      new (class extends BaseHandler {
+        async handle(): Promise<void> {
+          seen.push(Trace.current());
+          await db.transaction((tx) =>
+            new Outbox(tx).publish([new DomainEvent('task.testcore.follow', 1, SPACE, {})]),
+          );
+        }
+      })(),
+    );
+    core.on('task.testcore.follow', new Recorder());
+    await db.sql`
+      INSERT INTO platform.outbox (space_id, topic, payload, trace_id) VALUES
+        (${SPACE}, 'task.testcore.traced', '{"v":1}', ${trace})`;
+    await new OutboxWorker(db, await emptyRegistry(), core).tick();
+    assert.deepEqual(seen, [trace]);
+    const [follow] = await db.sql`
+      SELECT trace_id FROM platform.outbox WHERE space_id = ${SPACE} AND topic = 'task.testcore.follow'`;
+    assert.equal(follow?.trace_id, trace);
+    await db.sql`DELETE FROM platform.outbox WHERE space_id = ${SPACE} AND topic LIKE 'task.testcore.%'`;
   });
 
   test('필수 주제에 받는 쪽이 없으면 일꾼이 시작하지 않는다', async () => {

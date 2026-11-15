@@ -45,6 +45,7 @@ docs/          기획 문서 (기획서 · 서브 나 · 테이블 설계 · 객
 | `pnpm cairn connect <블로그 주소>` | 이 컴퓨터의 Claude Code(`--tool codex`면 Codex)를 블로그에 연결 (스킬·검토자 넣기 · MCP 등록 · 브라우저 로그인 · 연결 확인). `pnpm cairn status`로 상태 |
 | `pnpm runner start` | 이 컴퓨터에서 러너 실행. 설정은 `apps/runner/.env` (`.env.example` 참고). 서버 러너는 compose에 함께 뜨고 스스로 연결한다 |
 | `pnpm run restore` | 표준 입력의 백업 zip을 빈 Cairn에 복원. 기본은 미리 보기, `--apply`로 반영 (`docs/보관형식.md`) |
+| `pnpm run events failed` · `retry <번호\|--all>` | 8번 실패해 멈춘 이벤트 보기 · 다시 시도 (웹은 설정 › 일 › 처리 실패) |
 | `pnpm secret:new` | 서버 키(`CAIRN_SECRET_KEY`) 만들기. 비밀값 암호화에 씀 |
 | `pnpm secret:rotate` | 서버 키를 바꾼 뒤 저장된 비밀값을 새 키로 다시 암호화 (순서는 `.env.example`) |
 | `pnpm new:bundle <모듈>/<묶음> [--menu <그룹>/<이름>] [--tool]` | 새 데이터 묶음(+ 콘솔 메뉴, MCP 도구)의 뼈대. 등록할 줄과 마이그레이션 SQL을 출력한다 (객체설계 6장) |

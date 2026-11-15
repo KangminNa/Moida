@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type TestUser } from '../../../testing/api-client';
+import { Database } from '../base/database';
 
 // 요청 번호와 요청 로그 (리팩토링 6단계): 응답마다 X-Request-Id, 요청마다 로그 한 줄.
 // 로그에는 번호 · 메서드 · 경로(쿼리 없이) · 상태 · 걸린 시간 · 요청자 종류 · MCP 도구만 있고, 토큰 · 쿼리 값은 없다.
@@ -92,5 +94,31 @@ describe('요청 로그', () => {
     assert.equal(res.status, 200);
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.ok(!lines.some((l) => l.line.startsWith(`${res.header('x-request-id')} `)));
+  });
+});
+
+describe('요청 번호를 일꾼까지 (리팩토링 R1)', () => {
+  /** 카테고리를 만들면 vault.category.changed 이벤트가 남는다. 그 이벤트 줄의 trace_id */
+  async function traceOfCategory(): Promise<{ request: string | null; event: string | null }> {
+    const res = await api.request('POST', '/api/categories', owner, {
+      requestId: randomUUID(),
+      name: `추적 ${randomUUID()}`,
+      color: '#000000',
+    });
+    assert.equal(res.status, 201, res.text);
+    const id = String(res.json().id);
+    const [row] = await api.service(Database).sql<{ trace_id: string | null }[]>`
+      SELECT trace_id FROM platform.outbox
+       WHERE topic = 'vault.category.changed' AND payload->>'categoryId' = ${id}`;
+    return { request: res.header('x-request-id'), event: row?.trace_id ?? null };
+  }
+
+  test('요청이 남긴 이벤트에 그 요청의 번호가 적히고, 동시에 온 요청끼리 섞이지 않는다', async () => {
+    const pairs = await Promise.all([traceOfCategory(), traceOfCategory(), traceOfCategory()]);
+    for (const { request, event } of pairs) {
+      assert.match(String(request), UUID7);
+      assert.equal(event, request);
+    }
+    assert.equal(new Set(pairs.map((p) => p.event)).size, 3);
   });
 });
