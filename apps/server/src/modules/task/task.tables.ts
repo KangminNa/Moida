@@ -71,7 +71,7 @@ export interface ApprovalRow {
   created_at: Date;
   chat_id: string | null;
   card_id: string | null;
-  payload: unknown;
+  payload: unknown | null;
 }
 export type ApprovalNew = Partial<ApprovalRow> & Pick<ApprovalRow, 'id' | 'space_id' | 'action' | 'target_kind' | 'target_id' | 'target_version'>;
 
@@ -109,7 +109,7 @@ export interface ChatRow {
   pending: string | null;
   model: string | null;
   effort: string | null;
-  pending_refs: unknown;
+  pending_refs: unknown | null;
 }
 export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'title' | 'request_id'>;
 
