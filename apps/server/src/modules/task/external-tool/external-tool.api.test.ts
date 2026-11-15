@@ -211,6 +211,7 @@ describe('외부 도구 (/api/external-tools)', () => {
         title: '검색',
         url: 'https://mcp.search.example.com/mcp',
         headers: { 'X-Api-Key': 'key-987654' },
+        catalog: [],
       },
     ]);
     const other = await agent();

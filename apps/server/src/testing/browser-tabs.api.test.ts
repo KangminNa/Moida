@@ -255,7 +255,13 @@ describe('브라우저 에이전트: 관리자 입구', () => {
     assert.match(String(task.title), /^둘러보기: 노트북 가격 비교/);
     assert.equal((job.target as Json | null)?.kind ?? null, null);
     const plan = await tool(runner, 'browser_job', { task_id: task.id });
-    assert.deepEqual(plan.body, { mode: 'explore', site: null, login_needed: false, held: null });
+    assert.deepEqual(plan.body, {
+      mode: 'explore',
+      site: null,
+      login_needed: false,
+      held: null,
+      build: null,
+    });
     const held = await hold(String(task.id));
     assert.equal(held.ok, false);
     assert.match(JSON.stringify(held.body), /둘러보기에서는/);
@@ -295,6 +301,7 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
       },
       login_needed: false,
       held: null,
+      build: null,
     });
     const step = await tool(runner, 'browser_shot_save', {
       task_id: taskId,

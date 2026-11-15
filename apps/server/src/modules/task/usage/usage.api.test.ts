@@ -211,7 +211,8 @@ describe('GET /api/usage', () => {
       seenAt: null,
     });
     assert.equal((await windowOf('claude', 'seven_day'))?.percent, null);
-    assert.equal(await windowOf('codex', 'five_hour'), undefined);
+    // 다른 시험이 codex 에이전트를 만들었으면 창이 보이지만 역시 확인 전이다
+    assert.equal((await windowOf('codex', 'five_hour'))?.percent ?? null, null);
   });
 });
 

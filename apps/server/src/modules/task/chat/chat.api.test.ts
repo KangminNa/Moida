@@ -530,9 +530,16 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
       kind: 'assumption',
       text: '본선은 오프라인이라고 가정',
     });
-    // 대화 상세(관리자)는 팀을 싣지 않고 상태와 지금 도는 작업 수만 (화면은 대화만, 2차 1-5)
+    // 대화 상세(관리자)의 "팀이 동시에 일하는 중" 칸 (2026-11-15 B): 이 대화의 일과 그 아래 작업, 상태와 도는 작업 수
     const busy = await detail(chatId);
-    assert.deepEqual([busy.team, busy.state, busy.active], [undefined, 'working', 2]);
+    assert.deepEqual([busy.state, busy.active], ['working', 2]);
+    assert.deepEqual(
+      (busy.team as Json[]).map((t) => [t.title, t.status]),
+      [
+        ['대화 · 대회 요강 정리해 줘', 'waiting'],
+        ['요강 읽기', 'running'],
+      ],
+    );
     await tool(runner, 'submit_result', {
       task_id: sub.task.id,
       request_id: randomUUID(),

@@ -570,7 +570,13 @@ describe('사이트 도구: 쓰기 도구 · 검토자 짝 (MCP 3단계)', () =>
     assert.deepEqual([next.id, next.mode], [held.body.run_id, 'write']);
     await tool(runner, 'site_run_save', { run_id: next.id, status: 'done', output: { price: 1 } });
     await drain();
-    const result = await tool(caller, 'site_result', { run_id: held.body.run_id, wait_seconds: 0 });
-    assert.equal(result.body.status, 'done');
+    // 승인한 실행이 끝나면 기다리던 작업도 끝난다 (다른 결재와 같다): 결과는 관리자 화면에서 본다
+    const detail = ok(
+      await api.get(`${BASE}/integrations/${(await listed('post_write')).id}`, owner),
+    );
+    const ran = (detail.runs as Json[]).find((r) => r.id === held.body.run_id) as Json;
+    assert.equal(ran.status, 'done');
+    const ended = await api.mcp(caller, 'tools/call', { name: 'site_tools', arguments: {} });
+    assert.equal(ended.status, 401, '작업이 끝나 작업 토큰도 끝났다');
   });
 });
