@@ -2,6 +2,7 @@ import { Actor, Command, Rule, type Work } from '../../../apps/server/src/plugin
 import { JobView, LoginNoticedView } from './click-views';
 import { buildPartOf } from './integration-build';
 import { leasedBrowse, pageUrlOf, placeOf, siteOfJob } from './job';
+import { noteBrowse } from './repeats';
 import { sites } from './schema';
 import { addShot, decodeImage, imageOf } from './shots';
 
@@ -21,7 +22,11 @@ export class BrowserJob extends Command<{ taskId: string }> {
   }
 
   async run(work: Work, actor: Actor, input: { taskId: string }): Promise<JobView> {
-    const place = await placeOf(work, actor, await leasedBrowse(work, input.taskId));
+    const job = await leasedBrowse(work, input.taskId);
+    const place = await placeOf(work, actor, job);
+    // 보통 사이트 일이면 되풀이를 센다 (굳히기 · 클릭 고치기는 빼고, 2026-11-16 MCP 3단계)
+    if (place.site && !place.held && !place.integration)
+      await noteBrowse(work, place.site, job.id, job.instruction);
     const build = place.integration
       ? await buildPartOf(work, place.integration, input.taskId)
       : null;

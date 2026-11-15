@@ -16,6 +16,8 @@ export class IntegrationView {
   constructor(
     private readonly row: Readonly<IntegrationRow>,
     private readonly siteName: string,
+    /** 지금 버전의 검토 (쓰기 도구, reviewJson 모양) */
+    private readonly review: unknown = null,
   ) {}
 
   toJSON() {
@@ -29,6 +31,9 @@ export class IntegrationView {
       description: r.description,
       hint: r.hint,
       status: r.status,
+      mode: r.mode,
+      reviewerId: r.reviewer_id,
+      review: this.review,
       liveSeq: r.live_seq,
       draftSeq: r.draft_seq,
       failStreak: r.fail_streak,
@@ -74,6 +79,7 @@ export class IntegrationDetailView {
       })),
       runs: this.runs.map((r) => ({
         id: r.id,
+        version: r.version,
         seq: r.seq,
         status: r.status,
         input: preview(r.input),
@@ -103,6 +109,7 @@ export class SiteToolsView {
         name: row.name,
         title: row.title,
         description: row.description,
+        mode: row.mode,
         site,
         input_schema: revision.input_schema,
         output_schema: revision.output_schema,
@@ -116,17 +123,28 @@ export class RunView {
   static readonly FALLBACK =
     '이 실행은 실패했어요. 같은 일을 브라우저 담당에게 browse 일로 맡겨요 (browser_sites의 사이트)';
 
-  constructor(private readonly row: Readonly<RunRow>) {}
+  constructor(
+    private readonly row: Readonly<RunRow>,
+    /** 쓰기 실행이 결재를 기다리면(held) 올릴 결재의 모양 */
+    private readonly approval: Readonly<Record<string, unknown>> | null = null,
+  ) {}
 
   toJSON() {
     const r = this.row;
     return {
       run_id: r.id,
       status: r.status,
+      ...(this.approval
+        ? {
+            next: 'request_approval로 아래 결재를 올리고 끝낸다 (승인되면 서버가 한 번 돌린다)',
+            approval: this.approval,
+          }
+        : {}),
       ...(r.status === 'done' ? { output: r.output } : {}),
       ...(r.status === 'failed'
         ? { error: r.error, error_kind: r.error_kind, fallback: RunView.FALLBACK }
         : {}),
+      ...(r.status === 'dropped' || r.status === 'unknown' ? { error: r.error } : {}),
     };
   }
 }
@@ -138,16 +156,18 @@ export class NextRunView {
       run: Readonly<RunRow>;
       revision: Readonly<IntegrationRevisionRow>;
       site: Readonly<SiteRow>;
+      mode: string;
       timeoutMs: number;
     } | null,
   ) {}
 
   toJSON() {
     if (!this.next) return { run: null };
-    const { run, revision, site, timeoutMs } = this.next;
+    const { run, revision, site, mode, timeoutMs } = this.next;
     return {
       run: {
         id: run.id,
+        mode,
         input: run.input,
         code: revision.code,
         timeout_ms: timeoutMs,
@@ -180,6 +200,8 @@ export class BuildSavedView {
       total: number;
       /** 이 굳히기 작업이 남긴 버전 수 (러너가 몇 번째 회차인지 안다) */
       rounds: number;
+      /** 쓰기 도구라 검토자에게 넘겼다 (러너는 켜기 결재를 올리지 않는다) */
+      review: boolean;
       problems: readonly { name: string; problem: string }[];
     },
   ) {}
@@ -193,6 +215,7 @@ export class BuildSavedView {
       passed: s.passed,
       total: s.total,
       rounds: s.rounds,
+      review: s.review,
       problems: s.problems,
     };
   }
@@ -211,6 +234,7 @@ export class BuildPartView {
     return {
       integration_id: row.id,
       version: row.version,
+      mode: row.mode,
       name: row.name,
       title: row.title,
       description: row.description,

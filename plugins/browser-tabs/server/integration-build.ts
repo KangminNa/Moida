@@ -9,6 +9,7 @@ import {
 } from '../../../apps/server/src/plugin-api';
 import { BuildPartView, BuildSavedView } from './integration-views';
 import { INTEGRATION_TARGET, leasedBrowse } from './job';
+import { requestReview } from './reviews';
 import { integrationRevisions, integrations, runs } from './schema';
 import { Shape } from './shape';
 import type { IntegrationRow } from './tables';
@@ -52,13 +53,14 @@ async function buildingOf(work: Work, actor: Actor, taskId: string): Promise<Int
 }
 
 /** 시험 하나의 채점: 입력 · 답이 형식에 맞고 오류가 없어야 통과 */
-function grade(input: SaveBuildInput, test: TestCase) {
-  const problem =
-    Shape.valueProblem(input.inputSchema, test.input, '입력') ??
-    test.error ??
-    (test.output === null
+function grade(input: SaveBuildInput, test: TestCase, write: boolean) {
+  // 쓰기 도구의 시험은 마른 실행(commit 앞에서 멈춤)이라 답이 없다: commit까지 오류 없이 왔는지만 본다
+  const answer = write
+    ? null
+    : test.output === null
       ? '답이 없어요'
-      : Shape.valueProblem(input.outputSchema, test.output, '답'));
+      : Shape.valueProblem(input.outputSchema, test.output, '답');
+  const problem = Shape.valueProblem(input.inputSchema, test.input, '입력') ?? test.error ?? answer;
   return {
     name: test.name,
     input: test.input,
@@ -72,7 +74,8 @@ function grade(input: SaveBuildInput, test: TestCase) {
 /**
  * MCP site_build_save { task_id, input_schema, output_schema, code, tests: [{ name, input, output?, error?, ms? }] }:
  * 굳힌 결과를 남긴다 (그 작업을 쥔 러너). 형식이 쓰는 부분을 넘거나 시험이 3개 미만이면 거절. 채점해서 새 버전으로 남기고,
- * 70% 이상이면 받아들여 켜기를 기다린다. 답의 integration_version으로 켜기 결재를 올린다
+ * 70% 이상이면 받아들여 켜기를 기다린다. 답의 integration_version으로 켜기 결재를 올린다.
+ * 쓰기 도구는 시험이 마른 실행이라 답을 채점하지 않고, 받아들이면 켜기 결재 대신 검토자에게 맡긴다 (review: true)
  */
 export class SaveBuild extends Command<SaveBuildInput> {
   readonly name = 'saveBuild';
@@ -105,7 +108,7 @@ export class SaveBuild extends Command<SaveBuildInput> {
       Shape.schemaProblem(input.inputSchema) ?? Shape.schemaProblem(input.outputSchema);
     if (schemaProblem) throw new RuleViolation(`형식이 쓰는 부분을 넘어요: ${schemaProblem}`);
     if (input.tests.length < TESTS_MIN) throw new RuleViolation(`시험은 ${TESTS_MIN}개부터예요`);
-    const tests = input.tests.map((t) => grade(input, t));
+    const tests = input.tests.map((t) => grade(input, t, row.mode === 'write'));
     const passed = tests.filter((t) => t.ok).length;
     const accepted = passed / tests.length >= PASS_RATE;
     const [last] = await work.sql<{ seq: number }[]>`
@@ -128,13 +131,16 @@ export class SaveBuild extends Command<SaveBuildInput> {
       SELECT count(*)::int AS n FROM browser_tabs.integration_revisions
       WHERE integration_id = ${row.id} AND build_task_id = ${input.taskId}`;
     let version = row.version;
+    const review = accepted && row.mode === 'write';
     if (accepted) {
       version = row.version + 1;
       await work.updateRows(
         integrations,
-        { status: 'review', draft_seq: seq, version, updated_at: Rule.now },
+        { status: review ? 'reviewing' : 'review', draft_seq: seq, version, updated_at: Rule.now },
         { id: row.id, version: row.version },
       );
+      // 쓰기 도구는 켜기 결재 대신 검토자 짝에게 (검토자가 통과시키면 켜기 결재를 올린다)
+      if (review) requestReview(work, { ...row, version }, seq);
     }
     const problems = tests
       .filter((t) => !t.ok)
@@ -146,6 +152,7 @@ export class SaveBuild extends Command<SaveBuildInput> {
       passed,
       total: tests.length,
       rounds: made?.n ?? 1,
+      review,
       problems,
     });
   }

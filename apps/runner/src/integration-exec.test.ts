@@ -33,9 +33,23 @@ describe('IntegrationRules', () => {
       ['const s = "\\u0072equire"', /이스케이프/],
       ['const key = "sk-abcdefghijklmnopqrstu"', /비밀값/],
       ['', /비었어요/],
+      ["await site.commit(page.getByRole('button'))", /읽기 도구는 site.commit/],
     ];
     for (const [code, why] of cases)
       assert.match(IntegrationRules.problems(code).join(' '), why, code);
+  });
+});
+
+describe('IntegrationRules (쓰기 도구)', () => {
+  test('쓰기 도구는 site.commit이 정확히 한 번', () => {
+    const one =
+      "await page.goto(site.start_url);\nawait site.commit(page.getByRole('button', { name: '게시' }));";
+    assert.deepEqual(IntegrationRules.problems(one, 'write'), []);
+    assert.match(
+      IntegrationRules.problems('return {};', 'write').join(' '),
+      /정확히 한 번 써요 \(0번\)/,
+    );
+    assert.match(IntegrationRules.problems(`${one}\n${one}`, 'write').join(' '), /\(2번\)/);
   });
 });
 
@@ -59,10 +73,21 @@ describe('IntegrationExec (실제 Chromium)', { skip: TestChromium.skip }, () =>
   let server: Server;
   let origin = '';
   let exec: IntegrationExec;
+  let posts = 0;
 
   before(async () => {
     server = createServer((req, res) => {
       res.setHeader('content-type', 'text/html; charset=utf-8');
+      if (req.method === 'POST') {
+        posts++;
+        return res.end('<h1>올렸어요</h1>');
+      }
+      if (req.url === '/form')
+        return res.end(
+          '<form method="post" action="/submit"><input aria-label="제목" name="t"><button>게시</button></form>' +
+            '<button type="button" onclick="fetch(\'/ping\', { method: \'POST\' }).catch(() => {})">미리 보내기</button>',
+        );
+      if (req.url === '/twice') return res.end('<button>게시</button><button>게시</button>');
       if (req.url?.startsWith('/q/'))
         return res.end(`<h1>${decodeURIComponent(req.url.slice(3))}</h1><p id="price">71000</p>`);
       res.end('<h1>시세</h1>');
@@ -123,5 +148,68 @@ describe('IntegrationExec (실제 Chromium)', { skip: TestChromium.skip }, () =>
       (await chromium.openUrls()).some((u) => u.includes('/q/slow')),
       false,
     );
+  });
+
+  const write = { mode: 'write' as const, dryRun: false };
+  const fill = [
+    "await page.goto(site.origin + '/form');",
+    "await page.getByRole('textbox', { name: '제목' }).fill(input.t);",
+  ];
+
+  test('읽기 도구는 폼 제출(POST 이동)이 막힌다', async () => {
+    posts = 0;
+    const code = [
+      ...fill,
+      "await page.getByRole('button', { name: '게시' }).click();",
+      'await page.waitForTimeout(500);',
+      'return {};',
+    ].join('\n');
+    await exec.run(code, { t: '안녕' }, site(), 30_000, never);
+    assert.equal(posts, 0);
+  });
+
+  test('쓰기 도구의 마른 실행은 commit 앞에서 멈추고 아무것도 보내지 않는다', async () => {
+    posts = 0;
+    const code = [
+      ...fill,
+      "await site.commit(page.getByRole('button', { name: '게시' }));",
+      'return { done: true };',
+    ].join('\n');
+    const result = await exec.run(code, { t: '안녕' }, site(), 30_000, never, {
+      mode: 'write',
+      dryRun: true,
+    });
+    assert.deepEqual(
+      [result.ok, result.ok && result.dry, posts],
+      [true, true, 0],
+      JSON.stringify(result),
+    );
+  });
+
+  test('쓰기 도구는 commit 전의 POST를 막고, commit에서 한 번만 보낸 뒤 결과를 읽는다', async () => {
+    posts = 0;
+    const code = [
+      ...fill,
+      "await page.getByRole('button', { name: '미리 보내기' }).click();",
+      'await page.waitForTimeout(300);',
+      "await site.commit(page.getByRole('button', { name: '게시' }));",
+      "await page.getByRole('heading', { name: '올렸어요' }).waitFor();",
+      "return { said: await page.locator('h1').textContent() };",
+    ].join('\n');
+    const result = await exec.run(code, { t: '안녕' }, site(), 30_000, never, write);
+    assert.deepEqual(result.ok && result.output, { said: '올렸어요' }, JSON.stringify(result));
+    assert.equal(posts, 1, 'commit 전의 클릭은 막히고 commit 한 번만');
+  });
+
+  test('commit 대상이 둘이면 누르지 않고 실패, 마른 실행에서도 실패', async () => {
+    posts = 0;
+    const code =
+      "await page.goto(site.origin + '/twice');\nawait site.commit(page.getByRole('button', { name: '게시' }));\nreturn {};";
+    for (const dryRun of [false, true]) {
+      const result = await exec.run(code, {}, site(), 30_000, never, { mode: 'write', dryRun });
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.match(!result.ok ? result.error : '', /하나가 아니에요 \(2개\)/);
+    }
+    assert.equal(posts, 0);
   });
 });

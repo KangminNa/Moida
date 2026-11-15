@@ -5,6 +5,8 @@ import type { McpClient } from './mcp-client';
 /** site_run_next로 꺼낸 실행 하나 */
 export type QueuedRun = {
   id: string;
+  /** 읽기 · 쓰기 (쓰기는 결재 뒤 한 번, commit에서만 보낸다) */
+  mode: 'read' | 'write';
   code: string;
   input: Readonly<Record<string, unknown>>;
   timeoutMs: number;
@@ -26,6 +28,8 @@ export type BuildVerdict = {
   passed: number;
   total: number;
   rounds: number;
+  /** 쓰기 도구라 검토자에게 넘겼다 (러너는 켜기 결재를 올리지 않는다) */
+  review: boolean;
   problems: readonly string[];
 };
 
@@ -45,6 +49,7 @@ export class SiteToolCalls {
     const site = run.child('site');
     return {
       id: run.text('id'),
+      mode: run.text('mode') === 'write' ? 'write' : 'read',
       code: run.text('code'),
       input: SiteToolCalls.record(run.field('input')),
       timeoutMs: run.number('timeout_ms'),
@@ -95,6 +100,7 @@ export class SiteToolCalls {
       passed: body.number('passed'),
       total: body.number('total'),
       rounds: body.number('rounds'),
+      review: body.flag('review'),
       problems: body.list('problems').map((p) => `${p.text('name')}: ${p.text('problem')}`),
     };
   }

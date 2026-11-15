@@ -15,6 +15,8 @@ import type { BuildTest, SiteToolCalls } from './site-tool-calls';
 export class SiteBuildPlan {
   private constructor(
     readonly integrationId: string,
+    /** 읽기 · 쓰기 (2026-11-16 MCP 3단계): 쓰기면 시험은 마른 실행, 통과하면 검토자에게 */
+    readonly mode: 'read' | 'write',
     readonly name: string,
     readonly title: string,
     readonly description: string,
@@ -30,6 +32,7 @@ export class SiteBuildPlan {
     const last = build.field('last') ? build.child('last') : null;
     return new SiteBuildPlan(
       build.text('integration_id'),
+      build.text('mode') === 'write' ? 'write' : 'read',
       build.text('name'),
       build.text('title'),
       build.text('description'),
@@ -88,6 +91,7 @@ export class SiteBuild {
       name: plan.name,
       title: plan.title,
       description: plan.description,
+      write: plan.mode === 'write',
       last: plan.last,
       errors: plan.errors.map((e) => `- ${e}`).join('\n') || null,
     });
@@ -110,7 +114,10 @@ export class SiteBuild {
     const tests: BuildTest[] = [];
     for (const test of files.tests) {
       if (signal.aborted) return { ending: RunEnding.release('러너가 멈춰요'), approval: null };
-      const raw = await this.exec.run(files.code, test.input, site, SiteBuild.TEST_MS, signal);
+      const raw = await this.exec.run(files.code, test.input, site, SiteBuild.TEST_MS, signal, {
+        mode: plan.mode,
+        dryRun: plan.mode === 'write',
+      });
       const outcome = raw.ok ? raw : { ...raw, error: redactor.clean(raw.error) };
       note(
         new RunEvent(
@@ -129,6 +136,13 @@ export class SiteBuild {
       return failed(`굳힌 결과를 남기지 못했어요: ${error.message}`);
     }
     const score = `시험 ${verdict.passed}/${verdict.total} 통과`;
+    if (verdict.accepted && verdict.review) {
+      const summary = `${plan.title} (${plan.name}, 쓰기) 버전 ${verdict.seq}: ${score} (마른 실행). 검토자에게 넘겼어요`;
+      return {
+        ending: RunEnding.submit('끝났어요', RunResult.done(summary, redactor)),
+        approval: null,
+      };
+    }
     if (verdict.accepted) {
       const summary = `${plan.title} (${plan.name}) 버전 ${verdict.seq}: ${score}. 켜기 승인을 올려요`;
       return {

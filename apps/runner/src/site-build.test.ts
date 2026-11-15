@@ -201,6 +201,40 @@ describe('SiteBuild.finish', () => {
     assert.equal(second.ending.result?.status, 'failed');
   });
 
+  test('쓰기 도구는 시험을 마른 실행으로 돌리고, 받아들여지면 켜기 결재 없이 검토자에게 넘긴다', async () => {
+    await writeTool({
+      ...GOOD,
+      'code.js':
+        "await page.goto(site.start_url);\nawait site.commit(page.getByRole('button', { name: '게시' }));\nreturn {};",
+    });
+    const writePlan = SiteBuildPlan.from(
+      Json.of({
+        build: {
+          integration_id: 'i2',
+          mode: 'write',
+          name: 'post',
+          title: '글',
+          description: '올림',
+        },
+      }),
+    ) as SiteBuildPlan;
+    const modes: unknown[] = [];
+    const exec = {
+      run: async (..._args: unknown[]) => {
+        modes.push(_args[5]);
+        return { ok: true, output: {}, ms: 1, dry: true };
+      },
+    } as never;
+    const built = await new SiteBuild(
+      fakeCalls({ accepted: true, review: true, passed: 3 }).calls,
+      exec,
+      't2',
+    ).finish(writePlan, site, work, never, noop, redactor);
+    assert.equal(built.ending.succeeded, true);
+    assert.equal(built.approval, null, '켜기 결재는 검토자가 올린다');
+    assert.deepEqual(modes[0], { mode: 'write', dryRun: true });
+  });
+
   test('파일이 없으면 시험을 돌리지 않고 실패', async () => {
     await rm(join(work, SiteBuild.DIR), { recursive: true, force: true });
     const { calls, saved } = fakeCalls({});
@@ -219,6 +253,7 @@ describe('IntegrationRunner', () => {
     const stop = new AbortController();
     const run: QueuedRun = {
       id: 'r1',
+      mode: 'read',
       code: 'return {};',
       input: {},
       timeoutMs: 1000,

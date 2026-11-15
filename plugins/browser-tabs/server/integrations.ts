@@ -13,8 +13,10 @@ import {
 } from '../../../apps/server/src/plugin-api';
 import { IntegrationDetailView, IntegrationListView, IntegrationView } from './integration-views';
 import { BROWSE_KIND, INTEGRATION_TARGET } from './job';
-import { integrationRevisions, integrations, runs, sites } from './schema';
-import type { IntegrationRow } from './tables';
+import { suggestionMade } from './repeats';
+import { reviewJson } from './review-views';
+import { integrationReviews, integrationRevisions, integrations, runs, sites } from './schema';
+import type { IntegrationReviewRow, IntegrationRow } from './tables';
 import { AskedView } from './views';
 
 // 사이트 도구 (2026-11-16 MCP 2단계, docs/MCP.md 6장): 사이트에서 되풀이하는 읽기 일을 Playwright 코드로 굳힌 것.
@@ -38,7 +40,7 @@ async function siteNames(work: Work, space: string): Promise<Map<string, string>
 }
 
 /** 굳히기 작업을 코어에 요청한다. 지시는 도구의 이름 · 설명 · 힌트 (어떻게 굳히는지는 러너의 지시문 틀 site-build) */
-function requestBuild(
+export function requestBuild(
   work: Work,
   space: string,
   row: Readonly<IntegrationRow>,
@@ -82,8 +84,15 @@ export class ListIntegrations extends Read<null> {
     const space = actor.requireSpace();
     const names = await siteNames(work, space);
     const rows = await work.rows(integrations, { space_id: space }, { order: ['id desc'] });
+    const reviews = await work.sql<IntegrationReviewRow[]>`
+      SELECT DISTINCT ON (integration_id) * FROM browser_tabs.integration_reviews
+      WHERE space_id = ${space} ORDER BY integration_id, seq DESC`;
+    const latest = new Map(reviews.map((r) => [r.integration_id, r]));
     return new IntegrationListView(
-      rows.map((r) => new IntegrationView(r, names.get(r.site_id) ?? '')),
+      rows.map(
+        (r) =>
+          new IntegrationView(r, names.get(r.site_id) ?? '', reviewJson(latest.get(r.id) ?? null)),
+      ),
     );
   }
 }
@@ -122,7 +131,18 @@ type BuildInput = {
   description: string;
   hint: string;
   agentId: string | null;
+  /** 읽기 · 쓰기 (2026-11-16 MCP 3단계). 쓰기는 검토자가 있어야 한다 */
+  mode: string;
+  reviewerId: string | null;
+  /** 되풀이 제안에서 만들면 그 제안 (만들면 닫는다) */
+  suggestionId: string | null;
 };
+
+/** 고를 수 있는 uuid 칸 (비우면 null) */
+function optionalId(f: RequestFields, raw: unknown, name: string): string | null {
+  const value = (raw as Record<string, unknown> | null)?.[name];
+  return value === undefined || value === null || value === '' ? null : f.uuid(name);
+}
 
 /**
  * POST /api/p/browser-tabs/integrations { requestId, siteId, name, title, description, hint?, agentId? }:
@@ -141,6 +161,9 @@ export class BuildIntegration extends Command<BuildInput> {
       description: f.text('description', 300),
       hint: f.optionalText('hint', 4000) ?? '',
       agentId: agentOf(f, raw),
+      mode: f.optionalText('mode', 10) ?? 'read',
+      reviewerId: optionalId(f, raw, 'reviewerId'),
+      suggestionId: optionalId(f, raw, 'suggestionId'),
     }));
   }
 
@@ -148,6 +171,12 @@ export class BuildIntegration extends Command<BuildInput> {
     const space = actor.requireSpace();
     if (!NAME.test(input.name))
       throw new RuleViolation('이름은 영문 소문자로 시작하는 소문자 · 숫자 · _ 2~40자예요');
+    if (input.mode !== 'read' && input.mode !== 'write')
+      throw new RuleViolation('도구는 읽기(read) · 쓰기(write) 중 하나예요');
+    if (input.mode === 'write' && !input.reviewerId)
+      throw new RuleViolation('쓰기 도구는 검토자(다른 AI 도구의 에이전트)를 정해야 해요');
+    if (input.reviewerId && input.reviewerId === input.agentId)
+      throw new RuleViolation('검토자는 굳히는 에이전트와 달라야 해요');
     if (!(await work.exists(sites, { id: input.siteId, space_id: space })))
       throw new NotFound('없는 사이트예요');
     if (await work.exists(integrations, { space_id: space, name: input.name }))
@@ -160,9 +189,12 @@ export class BuildIntegration extends Command<BuildInput> {
       description: input.description.trim(),
       hint: input.hint,
       agent_id: input.agentId,
+      mode: input.mode,
+      reviewer_id: input.reviewerId,
     });
     const row = await work.row(integrations, { space_id: space, name: input.name });
     if (!row) throw new NotFound('도구를 만들지 못했어요');
+    if (input.suggestionId) await suggestionMade(work, space, input.suggestionId, row.id);
     return requestBuild(work, space, row, input.requestId, input.agentId);
   }
 }
@@ -195,7 +227,8 @@ export class RebuildIntegration extends Command<RebuildInput> {
 
   async run(work: Work, actor: Actor, input: RebuildInput): Promise<AskedView> {
     const row = await integrationOf(work, actor, input.id);
-    if (row.status === 'building') throw new RuleViolation('이미 굳히는 중이에요');
+    if (row.status === 'building' || row.status === 'reviewing')
+      throw new RuleViolation('이미 굳히거나 검토하는 중이에요');
     if (row.status === 'on') throw new RuleViolation('켜진 도구는 끈 뒤에 고쳐요');
     const hint = input.hint ?? row.hint;
     const changed = await work.updateRows(
@@ -246,7 +279,10 @@ export class EnableIntegration extends Command<VersionInput> {
   async run(work: Work, actor: Actor, input: VersionInput): Promise<IntegrationListView> {
     const row = await integrationOf(work, actor, input.id);
     if (row.draft_seq === null) throw new RuleViolation('시험을 통과한 버전이 없어요');
-    if (row.status === 'building') throw new RuleViolation('굳히는 중이에요');
+    if (row.status === 'building' || row.status === 'reviewing')
+      throw new RuleViolation('굳히거나 검토하는 중이에요');
+    if (row.mode === 'write' && !(await passed(work, row.id, row.draft_seq)))
+      throw new RuleViolation('쓰기 도구는 검토자의 통과가 있어야 켜요');
     await change(work, row, input.version, {
       status: 'on',
       live_seq: row.draft_seq,
@@ -289,4 +325,9 @@ export class DeleteIntegration extends Command<VersionInput> {
     if (gone === 0) throw new Conflict('다른 곳에서 먼저 고쳤어요. 새로 불러와 주세요');
     return new ListIntegrations().run(work, actor);
   }
+}
+
+/** 이 버전이 검토자의 통과를 받았는가 (쓰기 도구를 켜기 전에) */
+export async function passed(work: Work, integrationId: string, seq: number): Promise<boolean> {
+  return work.exists(integrationReviews, { integration_id: integrationId, seq, verdict: 'pass' });
 }

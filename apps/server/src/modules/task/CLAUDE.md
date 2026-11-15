@@ -63,7 +63,7 @@
 - 러너: runners (러너 기기마다 한 줄, 처음 닿을 때 생긴다)
 
 ## 공개 API (`index.ts`)
-`TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). 다른 모듈에게는 platform의 `AgentDirectory`에 `AgentQuery.card`(이름 · 권한, 지운 에이전트는 없음)를 등록한다 (2차 6단계, blog 메뉴의 운영 팀)
+`TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상 · 지시)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). 다른 모듈에게는 platform의 `AgentDirectory`에 `AgentQuery.card`(이름 · 권한, 지운 에이전트는 없음)를 등록한다 (2차 6단계, blog 메뉴의 운영 팀)
 
 ## 내보내는 이벤트
 | 이벤트 | 내용 |

@@ -55,8 +55,8 @@ export class IntegrationRules {
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   ];
 
-  /** 틀린 점들. 비면 통과 */
-  static problems(code: string): string[] {
+  /** 틀린 점들. 비면 통과. 쓰기 도구는 site.commit( 이 정확히 한 번, 읽기 도구는 없어야 한다 (2026-11-16 MCP 3단계) */
+  static problems(code: string, mode: 'read' | 'write' = 'read'): string[] {
     if (code.trim() === '') return ['코드가 비었어요'];
     if (code.length > IntegrationRules.CODE_MAX)
       return [`코드는 ${IntegrationRules.CODE_MAX}자까지예요`];
@@ -70,6 +70,10 @@ export class IntegrationRules {
       problems.push("글자로 칸에 닿는 접근(obj['…'])은 쓰지 않아요");
     if (IntegrationRules.SECRETS.some((pattern) => pattern.test(code)))
       problems.push('비밀값처럼 생긴 글자가 있어요');
+    const commits = code.split('site.commit(').length - 1;
+    if (mode === 'write' && commits !== 1)
+      problems.push(`쓰기 도구는 site.commit(…)을 정확히 한 번 써요 (${commits}번)`);
+    if (mode === 'read' && commits > 0) problems.push('읽기 도구는 site.commit을 쓰지 않아요');
     return problems;
   }
 }

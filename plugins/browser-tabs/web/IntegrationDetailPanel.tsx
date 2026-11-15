@@ -4,6 +4,9 @@ import type { Call, IntegrationDetail } from './browser-types';
 // 사이트 도구 하나의 자세히: 최근 버전의 시험 결과 · 입출력 형식 · 코드, 최근 실행. 승인 전에 코드를 읽어 보는 자리다
 
 const RUN: Record<string, string> = {
+  held: '승인 대기',
+  dropped: '닫힘',
+  unknown: '됐는지 모름',
   queued: '기다림',
   running: '도는 중',
   done: '끝남',
@@ -19,9 +22,18 @@ const when = (iso: string) =>
     hour12: false,
   });
 
-export function IntegrationDetailPanel({ call, id }: { call: Call; id: string }) {
+export function IntegrationDetailPanel({
+  call,
+  id,
+  notify,
+}: {
+  call: Call;
+  id: string;
+  notify: (text: string) => void;
+}) {
   const [detail, setDetail] = useState<IntegrationDetail | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -33,7 +45,14 @@ export function IntegrationDetailPanel({ call, id }: { call: Call; id: string })
     return () => {
       live = false;
     };
-  }, [call, id]);
+  }, [call, id, round]);
+
+  /** 눌렸는지 모르는 쓰기 실행을 사이트에서 보고 기록한다 */
+  async function record(runId: string, version: number, done: boolean) {
+    const reply = await call('POST', `runs/${runId}/manual`, { version, done });
+    notify(reply.ok ? '기록했어요' : reply.message);
+    setRound((n) => n + 1);
+  }
 
   if (problem) return <p className="error">{problem}</p>;
   if (!detail) return <p className="note">불러오는 중</p>;
@@ -86,6 +105,24 @@ export function IntegrationDetailPanel({ call, id }: { call: Call; id: string })
                   {r.errorKind ? `${r.errorKind} · ` : ''}
                   {r.error}
                 </span>
+              )}
+              {r.status === 'unknown' && (
+                <div className="row">
+                  <button
+                    type="button"
+                    className="ghost small fit"
+                    onClick={() => record(r.id, r.version, true)}
+                  >
+                    됐어요
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost small fit"
+                    onClick={() => record(r.id, r.version, false)}
+                  >
+                    안 됐어요
+                  </button>
+                </div>
               )}
             </li>
           ))}

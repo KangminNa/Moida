@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import type { Call, Site } from './browser-types';
+import type { BuildSeed, Call, Site } from './browser-types';
 
 // 도구로 만들기 (2026-11-16 MCP 2단계): 사이트에서 되풀이하는 읽기 일을 코드로 굳혀 달라고 맡긴다.
 // 힌트에는 앞선 브라우저 일의 지시와 답을 적는다. 그 사이트에서 끝난 브라우저 일을 고르면 채워 준다 (코어의 작업 읽기)
@@ -11,6 +11,7 @@ type Finished = {
   target: { kind: string; id: string } | null;
 };
 type TaskDetail = { instruction: string; result: { text?: unknown } | null };
+type AgentLine = { id: string; name: string; tool: string; deletedAt: string | null };
 
 const NAME = /^[a-z][a-z0-9_]{1,39}$/;
 
@@ -18,18 +19,24 @@ export function IntegrationForm({
   call,
   notify,
   onMade,
+  seed = null,
 }: {
   call: Call;
   notify: (text: string) => void;
   onMade: () => void;
+  /** 되풀이 제안에서 채워 연다 (key가 바뀌면 패널이 폼을 새로 만든다) */
+  seed?: BuildSeed | null;
 }) {
   const [sites, setSites] = useState<Site[]>([]);
   const [tasks, setTasks] = useState<Finished[]>([]);
-  const [siteId, setSiteId] = useState('');
+  const [agents, setAgents] = useState<AgentLine[]>([]);
+  const [siteId, setSiteId] = useState(seed?.siteId ?? '');
+  const [mode, setMode] = useState('read');
+  const [reviewerId, setReviewerId] = useState('');
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [hint, setHint] = useState('');
+  const [hint, setHint] = useState(seed?.hint ?? '');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -38,6 +45,10 @@ export function IntegrationForm({
     });
     call('GET', '/api/tasks?status=done').then((reply) => {
       if (reply.ok) setTasks((reply.data as { tasks: Finished[] }).tasks);
+    });
+    call('GET', '/api/agents').then((reply) => {
+      if (reply.ok)
+        setAgents((reply.data as { agents: AgentLine[] }).agents.filter((a) => !a.deletedAt));
     });
   }, [call]);
 
@@ -64,6 +75,9 @@ export function IntegrationForm({
       title,
       description,
       hint,
+      mode,
+      ...(mode === 'write' ? { reviewerId } : {}),
+      ...(seed?.suggestionId ? { suggestionId: seed.suggestionId } : {}),
     });
     setBusy(false);
     if (!reply.ok) return notify(reply.message);
@@ -103,6 +117,26 @@ export function IntegrationForm({
         </label>
       )}
       <label className="field">
+        <span>종류</span>
+        <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          <option value="read">읽기 (찾아 읽기만)</option>
+          <option value="write">쓰기 (제출 · 저장, 부를 때마다 승인)</option>
+        </select>
+      </label>
+      {mode === 'write' && (
+        <label className="field">
+          <span>검토자 (코드를 읽고 판정할 에이전트, 다른 AI 도구 권장)</span>
+          <select required value={reviewerId} onChange={(e) => setReviewerId(e.target.value)}>
+            <option value="">고르기</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} · {a.tool}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label className="field">
         <span>이름 (에이전트가 부르는 이름: 소문자 · 숫자 · _)</span>
         <input
           required
@@ -136,13 +170,20 @@ export function IntegrationForm({
         />
       </label>
       <p className="note">
-        브라우저 담당이 사이트를 둘러보며 읽기만 하는 코드를 쓰고, 러너가 시험해 70% 이상 통과하면
-        켜기 승인이 와요
+        브라우저 담당이 사이트를 둘러보며 코드를 쓰고, 러너가 시험해 70% 이상 통과하면 켜기 승인이
+        와요. 쓰기 도구는 시험에서 실제로 보내지 않고, 검토자의 통과 뒤에 승인이 와요
       </p>
       <button
         type="submit"
         className="cta small fit"
-        disabled={busy || !siteId || !NAME.test(name) || !title || !description}
+        disabled={
+          busy ||
+          !siteId ||
+          !NAME.test(name) ||
+          !title ||
+          !description ||
+          (mode === 'write' && !reviewerId)
+        }
       >
         만들기 맡기기
       </button>

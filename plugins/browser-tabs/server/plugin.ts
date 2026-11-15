@@ -13,10 +13,13 @@ import {
   TurnOffIntegration,
 } from './integrations';
 import { ListReads, PendingReads, RequestRead, SaveRead } from './reads';
+import { DismissSuggestion, ListSuggestions } from './repeats';
+import { ReviewMaterial, SaveReview } from './reviews';
+import { NextRun, SaveRun } from './run-queue';
 import { ScreenControl, ScreenRead } from './screen';
 import { BrowserScreenGateway } from './screen.gateway';
 import { ListShots, SaveShot, ShotDetail } from './shots';
-import { NextRun, SaveRun, SiteResult, SiteRun, SiteTools } from './site-runs';
+import { SiteResult, SiteRun, SiteTools } from './site-runs';
 import {
   AgentSites,
   ClearSession,
@@ -27,6 +30,7 @@ import {
   RequestExplore,
   UpdateSite,
 } from './sites';
+import { ManualRun } from './write-runs';
 
 // 첫 기능 패키지: 서버 브라우저를 쓰는 일 (docs/브라우저.md).
 //   탭 읽기: 관리자가 고른 주소를 러너가 탭으로 열어 읽고 남긴다 (AI 없음)
@@ -36,11 +40,14 @@ import {
 //   단계 화면: AI가 단계마다 찍은 화면과 러너가 찍은 화면을 작업에 남긴다
 //   화면: 콘솔에서 서버 브라우저를 그림으로 보고 클릭 · 입력을 보낸다 (CDP 중계, HTTPS만). 사이트 세션 지우기
 //   사이트 도구 (2026-11-16 MCP 2단계): 되풀이하는 읽기 일을 Playwright 코드로 굳히고(integrations · integration-build),
-//     에이전트가 site_run으로 부르면 서버 러너가 AI 없이 돌린다 (site-runs)
+//     에이전트가 site_run으로 부르면 서버 러너가 AI 없이 돌린다 (site-runs · run-queue).
+//     MCP 3단계: 고장 자동 고치기(run-queue), 되풀이되는 일 제안(repeats), 쓰기 도구의 결재(write-runs) · 검토자 짝(reviews)
 // 코어를 고치지 않고 자기 표(browser_tabs) · API(/api/p/browser-tabs/…) · MCP 도구 · 콘솔 메뉴를 갖는다.
 export default class BrowserTabsPlugin extends BasePlugin {
   register(cairn: PluginContext): void {
     const screen = new BrowserScreenGateway();
+    // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 auto_repair, 기본 켬)
+    const autoRepair = cairn.settings().get('auto_repair') !== 'false';
     for (const operation of [
       new ListReads(),
       new RequestRead(),
@@ -79,7 +86,12 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new SiteRun(),
       new SiteResult(),
       new NextRun(),
-      new SaveRun(),
+      new SaveRun(autoRepair),
+      new ListSuggestions(),
+      new DismissSuggestion(),
+      new ReviewMaterial(),
+      new SaveReview(),
+      new ManualRun(),
     ])
       cairn.addOperation(operation);
     cairn.onEvent('task.approval.granted', new ApprovalDecided('granted'));

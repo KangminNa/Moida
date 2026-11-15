@@ -11,6 +11,8 @@ export class LeasedWork {
     readonly targetKind: string | null = null,
     readonly targetId: string | null = null,
     readonly targetVersion: number | null = null,
+    /** 일의 지시 (플러그인 API 0.5, 2026-11-16): 되풀이되는 일을 알아채려고 (browser-tabs의 사이트 도구 제안) */
+    readonly instruction: string = '',
   ) {}
 }
 

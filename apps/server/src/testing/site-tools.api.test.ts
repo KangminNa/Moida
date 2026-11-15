@@ -107,7 +107,7 @@ async function runTokenOf(agentId: string): Promise<string> {
 }
 
 /** 도구로 만들기 → 굳히기 작업을 러너가 빌린다 */
-async function building(name: string) {
+async function building(name: string, more: Json = {}) {
   const site = ok(await api.request('POST', `${BASE}/sites`, owner, SITE));
   ok(
     await api.request('POST', `${BASE}/integrations`, owner, {
@@ -118,6 +118,7 @@ async function building(name: string) {
       description: '종목 코드로 오늘 종가를 읽는다',
       hint: '지시: 005930 종가 / 답: 71,000원',
       agentId: builder,
+      ...more,
     }),
   );
   await drain();
@@ -342,7 +343,7 @@ describe('사이트 도구: 실행', () => {
     assert.equal(other.ok, false, '맡긴 에이전트만 결과를 본다');
   });
 
-  test('형식과 다른 답은 shape 실패, 세 번 연속 실패면 고장으로 두고 맡기기를 거절한다 (대신할 길과 함께)', async () => {
+  test('형식과 다른 답은 shape 실패, 세 번 연속 실패면 고장 → 저절로 다시 굳힌다(auto_repair). 그동안 맡기기는 거절 (대신할 길과 함께)', async () => {
     await liveTool('quote_flaky');
     const outbound = await runTokenOf(await newAgent('시세 담당 2', ['read_public']));
     for (const i of [1, 2, 3]) {
@@ -363,8 +364,17 @@ describe('사이트 도구: 실행', () => {
       assert.equal(saved.body.status, 'failed');
     }
     const flaky = await listed('quote_flaky');
-    assert.equal(flaky.status, 'broken');
+    assert.equal(flaky.status, 'building', '고장 → 자동 고치기');
     assert.equal(flaky.runsFailed, 3);
+    await drain();
+    const repairJob = await leased('시세 quote_flaky');
+    const part = (await tool(runner, 'browser_job', { task_id: (repairJob.task as Json).id })).body
+      .build as Json;
+    assert.deepEqual(part.recent_errors, [
+      '표를 찾지 못했어요',
+      '표를 찾지 못했어요',
+      '답이 형식과 달라요: $.price: number이어야 해요',
+    ]);
     const refused = await tool(outbound, 'site_run', {
       request_id: 'f4',
       name: 'quote_flaky',
@@ -372,5 +382,195 @@ describe('사이트 도구: 실행', () => {
     });
     assert.equal(refused.ok, false);
     assert.match(JSON.stringify(refused.body), /browse/);
+  });
+});
+
+describe('사이트 도구: 되풀이되는 일 (MCP 3단계)', () => {
+  test('같은 사이트에서 숫자만 다른 일이 세 번이면 제안, 그만 보기 · 만들기로 닫힌다', async () => {
+    const browseAgent = await newAgent('되풀이 브라우저 담당', ['read_public', 'browse']);
+    const site = ok(
+      await api.request('POST', `${BASE}/sites`, owner, { ...SITE, name: '되풀이 시세' }),
+    );
+    for (const code of ['005930', '000660', '035720']) {
+      const mark = randomUUID().slice(0, 8);
+      ok(
+        await api.request('POST', `${BASE}/sites/${site.id}/tasks`, owner, {
+          requestId: randomUUID(),
+          instruction: `${code} 오늘 종가 알려줘 (${mark})`,
+          agentId: browseAgent,
+        }),
+      );
+      await drain();
+      const job = await leased(mark);
+      await tool(runner, 'browser_job', { task_id: (job.task as Json).id });
+    }
+    const { suggestions } = ok(await api.get(`${BASE}/suggestions`, owner)) as {
+      suggestions: Json[];
+    };
+    const mine = suggestions.find((s) => s.siteId === site.id);
+    assert.equal(mine, undefined, '표시(괄호 안 글자)가 달라 열쇠가 다르면 세지 않는다');
+  });
+
+  test('지시가 같은 모양이면 세 번째에 제안이 열리고, 만들기에 제안을 넘기면 닫힌다', async () => {
+    const browseAgent = await newAgent('되풀이 담당 2', ['read_public', 'browse']);
+    const site = ok(
+      await api.request('POST', `${BASE}/sites`, owner, { ...SITE, name: '되풀이 2' }),
+    );
+    for (const code of ['005930', '000660', '035720']) {
+      ok(
+        await api.request('POST', `${BASE}/sites/${site.id}/tasks`, owner, {
+          requestId: randomUUID(),
+          instruction: `${code} 오늘 종가 알려줘`,
+          agentId: browseAgent,
+        }),
+      );
+      await drain();
+      const job = await leased('되풀이 2');
+      await tool(runner, 'browser_job', { task_id: (job.task as Json).id });
+    }
+    const listed1 = ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] };
+    const open = listed1.suggestions.find((s) => s.siteId === site.id);
+    assert.equal(open?.count, 3);
+    for (const headers of [{}, writer])
+      assert.equal(
+        (await api.request('GET', `${BASE}/suggestions`, TestUser.visitor, undefined, headers))
+          .status,
+        403,
+      );
+    ok(
+      await api.request('POST', `${BASE}/integrations`, owner, {
+        requestId: randomUUID(),
+        siteId: site.id,
+        name: 'repeat_close',
+        title: '종가',
+        description: '종목 코드로 종가를 읽는다',
+        hint: String(open?.sample),
+        suggestionId: open?.id,
+      }),
+    );
+    const listed2 = ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] };
+    assert.equal(
+      listed2.suggestions.find((s) => s.siteId === site.id),
+      undefined,
+      '만들었으면 닫힘',
+    );
+  });
+});
+
+describe('사이트 도구: 쓰기 도구 · 검토자 짝 (MCP 3단계)', () => {
+  test('쓰기 도구는 검토자가 있어야 하고, 굳힌 에이전트와 같으면 안 된다 (422)', async () => {
+    const site = ok(await api.request('POST', `${BASE}/sites`, owner, SITE));
+    const body = {
+      requestId: randomUUID(),
+      siteId: site.id,
+      name: 'write_bad',
+      title: '글 올리기',
+      description: '제목과 본문으로 글을 올린다',
+      mode: 'write',
+      agentId: builder,
+    };
+    assert.equal((await api.request('POST', `${BASE}/integrations`, owner, body)).status, 422);
+    const same = await api.request('POST', `${BASE}/integrations`, owner, {
+      ...body,
+      reviewerId: builder,
+    });
+    assert.equal(same.status, 422);
+  });
+
+  test('마른 실행 시험 → 검토 → 고칠 점이면 다시 굳히고, 통과면 검토자가 켜기 결재 → 부를 때마다 결재 → 한 번 실행', async () => {
+    const reviewer = await newAgent(
+      '사이트 도구 검토자',
+      ['read_public'],
+      ['browser.integration.enable'],
+    );
+    const { taskId } = await building('post_write', { mode: 'write', reviewerId: reviewer });
+    const dry = await save(taskId, [{}, {}, {}]);
+    assert.deepEqual([dry.body.accepted, dry.body.review], [true, true], JSON.stringify(dry.body));
+    const tool1 = await listed('post_write');
+    assert.equal(tool1.status, 'reviewing');
+    await drain();
+    const reviewJob = await leased('사이트 도구 검토: 시세 post_write');
+    const reviewRun = String(reviewJob.run_token);
+    const material = await tool(reviewRun, 'site_review_get', { integration_id: tool1.id });
+    assert.equal(material.body.mode, 'write');
+    const stranger = await runTokenOf(await newAgent('검토자 아님', ['read_public']));
+    assert.equal((await tool(stranger, 'site_review_get', { integration_id: tool1.id })).ok, false);
+
+    const fix = await tool(reviewRun, 'site_review', {
+      integration_id: tool1.id,
+      seq: material.body.seq,
+      verdict: 'fix',
+      notes: 'commit 전에 제목 칸을 비우지 않아요',
+    });
+    assert.equal(fix.body.verdict, 'fix');
+    assert.equal((await listed('post_write')).status, 'building');
+    await drain();
+    const again = await leased('시세 post_write');
+    const dry2 = await save(String((again.task as Json).id), [{}, {}, {}]);
+    assert.equal(dry2.body.accepted, true);
+    await drain();
+    const review2 = String((await leased('사이트 도구 검토: 시세 post_write')).run_token);
+    const pass = await tool(review2, 'site_review', {
+      integration_id: tool1.id,
+      seq: dry2.body.seq,
+      verdict: 'pass',
+      notes: '입력만 쓰고 commit 한 번',
+    });
+    const enable = pass.body.approval as Json;
+    assert.equal(enable.action, 'browser.integration.enable');
+    const asked = await tool(review2, 'request_approval', {
+      request_id: 'enable-post-write',
+      action: enable.action,
+      target_kind: enable.target_kind,
+      target_id: enable.target_id,
+      target_version: enable.target_version,
+      note: '검토 통과',
+    });
+    const approval = ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner));
+    ok(
+      await api.request('POST', `/api/approvals/${approval.id}/decide`, owner, {
+        version: approval.version,
+        decision: 'approve',
+      }),
+    );
+    await drain();
+    assert.equal((await listed('post_write')).status, 'on');
+
+    const writerAgent = await newAgent(
+      '글 올리는 담당',
+      ['read_public'],
+      ['browser.integration.write'],
+    );
+    const caller = await runTokenOf(writerAgent);
+    const held = await tool(caller, 'site_run', {
+      request_id: 'w1',
+      name: 'post_write',
+      input: { symbol: 'hello' },
+    });
+    assert.equal(held.body.status, 'held');
+    assert.equal((await tool(runner, 'site_run_next')).body.run, null, '결재 전에는 꺼내지 않는다');
+    const write = held.body.approval as Json;
+    const askedWrite = await tool(caller, 'request_approval', {
+      request_id: 'write-w1',
+      action: write.action,
+      target_kind: write.target_kind,
+      target_id: write.target_id,
+      target_version: write.target_version,
+      note: '입력: hello',
+    });
+    const writeApproval = ok(await api.get(`/api/approvals/${askedWrite.body.approval_id}`, owner));
+    ok(
+      await api.request('POST', `/api/approvals/${writeApproval.id}/decide`, owner, {
+        version: writeApproval.version,
+        decision: 'approve',
+      }),
+    );
+    await drain();
+    const next = (await tool(runner, 'site_run_next')).body.run as Json;
+    assert.deepEqual([next.id, next.mode], [held.body.run_id, 'write']);
+    await tool(runner, 'site_run_save', { run_id: next.id, status: 'done', output: { price: 1 } });
+    await drain();
+    const result = await tool(caller, 'site_result', { run_id: held.body.run_id, wait_seconds: 0 });
+    assert.equal(result.body.status, 'done');
   });
 });

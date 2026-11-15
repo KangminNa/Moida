@@ -104,7 +104,7 @@ export class TaskQuery extends BaseQuery {
   }
 
   /**
-   * 기능 패키지가 묻는 임대 확인 (platform의 Leases에 등록한다): 이 러너가 지금 쥔 작업의 id · 종류 · 입력.
+   * 기능 패키지가 묻는 임대 확인 (platform의 Leases에 등록한다): 이 러너가 지금 쥔 작업의 id · 종류 · 입력 · 대상 · 지시.
    * 진행 중이 아니거나 · 다른 러너의 것이거나 · 임대가 끝났으면 RuleViolation. 입력은 상세와 같이 보인 모양만
    */
   async leasedWork(actor: Actor, taskId: string): Promise<LeasedWork> {
@@ -121,6 +121,7 @@ export class TaskQuery extends BaseQuery {
       row.target_kind,
       row.target_id,
       row.base_version,
+      row.instruction,
     );
   }
 

@@ -41,6 +41,11 @@ export type Integration = {
   description: string;
   hint: string;
   status: string;
+  /** read · write (2026-11-16 MCP 3단계) */
+  mode: string;
+  reviewerId: string | null;
+  /** 지금 버전의 검토 (쓰기 도구) */
+  review: { seq: number; verdict: string; notes: string; createdAt: string } | null;
   liveSeq: number | null;
   draftSeq: number | null;
   failStreak: number;
@@ -67,6 +72,7 @@ export type IntegrationDetail = {
   }[];
   runs: {
     id: string;
+    version: number;
     seq: number;
     status: string;
     input: string | null;
@@ -77,3 +83,17 @@ export type IntegrationDetail = {
     createdAt: string;
   }[];
 };
+
+/** 되풀이되는 일 제안 (server/review-views.ts의 SuggestionListView) */
+export type Suggestion = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  count: number;
+  sample: string;
+  version: number;
+  lastSeenAt: string;
+};
+
+/** 도구 만들기 폼을 채워 여는 값 (제안에서) */
+export type BuildSeed = { key: string; siteId: string; hint: string; suggestionId: string | null };

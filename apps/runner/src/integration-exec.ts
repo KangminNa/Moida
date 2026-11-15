@@ -3,72 +3,23 @@ import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { CHILD_SOURCE, PAGE_MARK, RESULT_MARK } from './integration-child';
 import { IntegrationRules } from './integration-rules';
 
 /** 도구가 도는 사이트: 첫 주소와 이동해도 되는 출처 */
 export type ExecSite = { startUrl: string; origins: readonly string[] };
-/** 실행 하나의 끝 */
+/** 실행 하나의 끝. dry: 쓰기 도구의 마른 실행이 commit 앞에서 멈췄다. committed: 쓰기를 한 뒤에 실패했다 */
 export type ExecOutcome =
-  | { ok: true; output: Record<string, unknown>; ms: number }
-  | { ok: false; error: string; kind: 'login' | 'timeout' | 'code'; ms: number };
-
-/** 자식 프로세스의 표시: 결과 · 연 탭 (stdout의 다른 글과 섞이지 않게) */
-const RESULT = '@@cairn-site-result@@';
-const PAGE = '@@cairn-site-page@@';
-
-// 자식 프로세스에서 도는 코드 (CommonJS, -e로 넘긴다: 러너의 TS 등록 없이 돈다). 표준 입력으로 일을 받는다.
-// 지금 브라우저(CDP)의 기본 컨텍스트(유지 로그인)에 새 탭 하나를 열고, 그 탭의 문서 이동은 허용 출처의 GET만 둔다(읽기).
-// 도구 코드는 vm의 빈 맥락에서 page · input · site만 받아 돈다. 끝나면 탭을 닫고 결과 한 줄을 쓴다
-const CHILD = `
-const vm = require('node:vm');
-const chunks = [];
-process.stdin.on('data', (c) => chunks.push(c));
-process.stdin.on('end', async () => {
-  const job = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  const send = (m) => process.stdout.write('\\n${RESULT}' + JSON.stringify(m) + '\\n');
-  let browser = null;
-  let page = null;
-  try {
-    const { chromium } = require(job.playwright);
-    browser = await chromium.connectOverCDP(job.cdp, { timeout: 10000 });
-    const context = browser.contexts()[0] || (await browser.newContext());
-    page = await context.newPage();
-    const cdp = await context.newCDPSession(page);
-    const info = await cdp.send('Target.getTargetInfo');
-    await cdp.detach();
-    process.stdout.write('\\n${PAGE}' + info.targetInfo.targetId + '\\n');
-    const allowed = new Set(job.origins);
-    await page.route('**/*', (route) => {
-      const r = route.request();
-      if (r.isNavigationRequest() && r.frame() === page.mainFrame()) {
-        let origin = '';
-        try { origin = new URL(r.url()).origin; } catch {}
-        if (!allowed.has(origin) || r.method() !== 'GET') return route.abort('blockedbyclient');
-      }
-      return route.continue();
-    });
-    const site = Object.freeze({
-      origin: new URL(job.startUrl).origin,
-      start_url: job.startUrl,
-      loginNeeded: (why) => {
-        const e = new Error(String(why || '로그인이 필요해요'));
-        e.cairnLogin = true;
-        throw e;
-      },
-    });
-    const run = vm.runInNewContext('(async ({ page, input, site }) => {\\n' + job.code + '\\n})', Object.create(null), { timeout: 1000 });
-    const output = await run({ page, input: job.input, site });
-    send({ ok: true, output });
-  } catch (e) {
-    const message = String((e && e.message) || e).split('\\n')[0].slice(0, 500);
-    send({ ok: false, error: message, kind: e && e.cairnLogin ? 'login' : 'code' });
-  } finally {
-    try { if (page) await page.close(); } catch {}
-    try { if (browser) await browser.close(); } catch {}
-    process.exit(0);
-  }
-});
-`;
+  | { ok: true; output: Record<string, unknown>; ms: number; dry?: boolean }
+  | {
+      ok: false;
+      error: string;
+      kind: 'login' | 'timeout' | 'code';
+      ms: number;
+      committed?: boolean;
+    };
+/** 읽기 · 쓰기와 마른 실행 (2026-11-16 MCP 3단계) */
+export type ExecMode = { mode: 'read' | 'write'; dryRun: boolean };
 
 /**
  * 사이트 도구 코드 하나를 돌린다 (2026-11-16 MCP 2단계, AI 없음). 굳히기의 시험과 에이전트의 실행이 같은 길이다.
@@ -97,15 +48,24 @@ export class IntegrationExec {
     site: ExecSite,
     timeoutMs: number,
     signal: AbortSignal,
+    how: ExecMode = { mode: 'read', dryRun: false },
   ): Promise<ExecOutcome> {
     const started = Date.now();
-    const problems = IntegrationRules.problems(code);
+    const problems = IntegrationRules.problems(code, how.mode);
     if (problems.length > 0)
       return { ok: false, error: `규칙 검사: ${problems.join(' · ')}`, kind: 'code', ms: 0 };
     const playwright = await realpath(IntegrationExec.playwrightCore());
     const scratch = await mkdtemp(join(await realpath(tmpdir()), 'cairn-site-'));
     try {
-      const job = { code, input, origins: site.origins, startUrl: site.startUrl, playwright };
+      const job = {
+        code,
+        input,
+        origins: site.origins,
+        startUrl: site.startUrl,
+        playwright,
+        mode: how.mode,
+        dryRun: how.dryRun,
+      };
       const { text, timedOut, tooBig } = await this.spawn(
         job,
         playwright,
@@ -146,7 +106,7 @@ export class IntegrationExec {
         ...reads.map((path) => `--allow-fs-read=${path}`),
         `--allow-fs-write=${scratch}`,
         '-e',
-        CHILD,
+        CHILD_SOURCE,
       ],
       { env: { TMPDIR: scratch }, stdio: ['pipe', 'pipe', 'ignore'] },
     );
@@ -180,8 +140,8 @@ export class IntegrationExec {
 
   /** 자식이 끝내지 못하고 꺼졌으면 연 탭을 닫는다 (지금 브라우저에 탭이 쌓이지 않게) */
   private async closePage(text: string): Promise<void> {
-    const line = text.split('\n').find((l) => l.startsWith(PAGE));
-    const id = line?.slice(PAGE.length).trim();
+    const line = text.split('\n').find((l) => l.startsWith(PAGE_MARK));
+    const id = line?.slice(PAGE_MARK.length).trim();
     if (id && /^[A-Za-z0-9]{1,64}$/.test(id))
       await fetch(`${this.cdpUrl}/json/close/${id}`).catch(() => undefined);
   }
@@ -190,12 +150,19 @@ export class IntegrationExec {
   static outcomeOf(text: string, ms: number): ExecOutcome {
     const line = text
       .split('\n')
-      .filter((l) => l.startsWith(RESULT))
+      .filter((l) => l.startsWith(RESULT_MARK))
       .at(-1);
     if (!line) return { ok: false, error: '실행하지 못했어요 (결과가 없어요)', kind: 'code', ms };
-    let body: { ok?: unknown; output?: unknown; error?: unknown; kind?: unknown };
+    let body: {
+      ok?: unknown;
+      output?: unknown;
+      error?: unknown;
+      kind?: unknown;
+      dry?: unknown;
+      committed?: unknown;
+    };
     try {
-      body = JSON.parse(line.slice(RESULT.length));
+      body = JSON.parse(line.slice(RESULT_MARK.length));
     } catch {
       return { ok: false, error: '실행 결과를 읽지 못했어요', kind: 'code', ms };
     }
@@ -203,9 +170,17 @@ export class IntegrationExec {
       const output = body.output;
       if (typeof output !== 'object' || output === null || Array.isArray(output))
         return { ok: false, error: '답은 객체여야 해요', kind: 'code', ms };
-      return { ok: true, output: output as Record<string, unknown>, ms };
+      return {
+        ok: true,
+        output: output as Record<string, unknown>,
+        ms,
+        ...(body.dry === true ? { dry: true } : {}),
+      };
     }
-    const error = typeof body.error === 'string' && body.error ? body.error : '실행하지 못했어요';
-    return { ok: false, error, kind: body.kind === 'login' ? 'login' : 'code', ms };
+    const said = typeof body.error === 'string' && body.error ? body.error : '실행하지 못했어요';
+    const committed = body.committed === true;
+    // 쓰기를 한 뒤의 실패는 됐을 수 있다: 까닭에 적어 관리자가 사이트에서 보게 한다
+    const error = committed ? `commit 뒤에 실패했어요 (쓰기는 됐을 수 있어요): ${said}` : said;
+    return { ok: false, error, kind: body.kind === 'login' ? 'login' : 'code', ms, committed };
   }
 }

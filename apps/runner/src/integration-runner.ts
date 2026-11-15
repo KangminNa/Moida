@@ -57,7 +57,10 @@ export class IntegrationRunner {
     if (free === null) return;
     let outcome: Awaited<ReturnType<IntegrationExec['run']>>;
     try {
-      outcome = await this.exec.run(run.code, run.input, run.site, run.timeoutMs, stop);
+      outcome = await this.exec.run(run.code, run.input, run.site, run.timeoutMs, stop, {
+        mode: run.mode,
+        dryRun: false,
+      });
     } finally {
       free();
     }

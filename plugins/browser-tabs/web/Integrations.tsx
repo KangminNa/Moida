@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Integration, Props } from './browser-types';
+import type { BuildSeed, Integration, Props } from './browser-types';
 import { IntegrationDetailPanel } from './IntegrationDetailPanel';
 import { IntegrationForm } from './IntegrationForm';
+import { Suggestions } from './Suggestions';
 
 // 사이트 도구 (2026-11-16 MCP 2단계): 되풀이하는 읽기 일을 Playwright 코드로 굳힌 것. 에이전트가 site_run으로 부르면
 // 서버 러너가 AI 없이 돌린다. 켜기는 승인 화면(켜기 승인)이나 여기서, 연속 실패면 고장으로 멈추고 고치기로 다시 굳힌다
 
 const STATUS: Record<string, string> = {
   building: '만드는 중',
+  reviewing: '검토 중',
   review: '켜기 대기',
   on: '켜짐',
   broken: '고장',
@@ -18,6 +20,7 @@ export function Integrations({ call, notify }: Props) {
   const [items, setItems] = useState<Integration[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [seed, setSeed] = useState<BuildSeed | null>(null);
 
   const load = useCallback(async () => {
     const reply = await call('GET', 'integrations');
@@ -55,7 +58,17 @@ export function Integrations({ call, notify }: Props) {
         에이전트는 사이트에서 정보를 찾을 때 켜진 도구를 먼저 써요. 실패하면 브라우저 담당이
         대신해요
       </p>
-      <IntegrationForm call={call} notify={notify} onMade={load} />
+      <Suggestions call={call} notify={notify} onPick={setSeed} />
+      <IntegrationForm
+        key={seed?.key ?? 'new'}
+        call={call}
+        notify={notify}
+        seed={seed}
+        onMade={() => {
+          setSeed(null);
+          load();
+        }}
+      />
       {items === null ? (
         <p className="note">불러오는 중</p>
       ) : items.length === 0 ? (
@@ -66,6 +79,7 @@ export function Integrations({ call, notify }: Props) {
             <li key={t.id} className="panel">
               <b>
                 {t.title} <span className="pill">{STATUS[t.status] ?? t.status}</span>
+                {t.mode === 'write' && <span className="pill strong">쓰기</span>}
               </b>
               <span className="label-mono">
                 {t.name} · {t.siteName || '지운 사이트'}
@@ -73,6 +87,12 @@ export function Integrations({ call, notify }: Props) {
               </span>
               <span className="note">{t.description}</span>
               {t.lastError && <span className="note">마지막 오류: {t.lastError}</span>}
+              {t.review && (
+                <span className="note">
+                  검토(버전 {t.review.seq}): {t.review.verdict === 'pass' ? '통과' : '고칠 점'}
+                  {t.review.notes ? ` · ${t.review.notes}` : ''}
+                </span>
+              )}
               <div className="row">
                 {t.draftSeq !== null && t.status !== 'on' && t.status !== 'building' && (
                   <button
@@ -94,7 +114,7 @@ export function Integrations({ call, notify }: Props) {
                     끄기
                   </button>
                 )}
-                {t.status !== 'on' && t.status !== 'building' && (
+                {t.status !== 'on' && t.status !== 'building' && t.status !== 'reviewing' && (
                   <button
                     type="button"
                     className="ghost small fit"
@@ -126,7 +146,7 @@ export function Integrations({ call, notify }: Props) {
                   </button>
                 )}
               </div>
-              {open === t.id && <IntegrationDetailPanel call={call} id={t.id} />}
+              {open === t.id && <IntegrationDetailPanel call={call} id={t.id} notify={notify} />}
             </li>
           ))}
         </ul>

@@ -2,6 +2,17 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** browser_tabs.browse_seen */
+export interface BrowseSeenRow {
+  id: string;
+  space_id: string;
+  site_id: string;
+  task_id: string;
+  key: string;
+  created_at: Date;
+}
+export type BrowseSeenNew = Partial<BrowseSeenRow> & Pick<BrowseSeenRow, 'id' | 'space_id' | 'site_id' | 'task_id' | 'key'>;
+
 /** browser_tabs.clicks */
 export interface ClickRow {
   id: string;
@@ -28,6 +39,19 @@ export interface ClickRow {
   version: number;
 }
 export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'runner_id' | 'tab_id' | 'page_url' | 'role' | 'name' | 'box' | 'fingerprint'>;
+
+/** browser_tabs.integration_reviews */
+export interface IntegrationReviewRow {
+  id: string;
+  space_id: string;
+  integration_id: string;
+  seq: number;
+  reviewer_id: string;
+  verdict: string;
+  notes: string;
+  created_at: Date;
+}
+export type IntegrationReviewNew = Partial<IntegrationReviewRow> & Pick<IntegrationReviewRow, 'id' | 'space_id' | 'integration_id' | 'seq' | 'reviewer_id' | 'verdict'>;
 
 /** browser_tabs.integration_revisions */
 export interface IntegrationRevisionRow {
@@ -68,6 +92,9 @@ export interface IntegrationRow {
   created_at: Date;
   updated_at: Date;
   version: number;
+  mode: string;
+  reviewer_id: string | null;
+  repaired_at: Date | null;
 }
 export type IntegrationNew = Partial<IntegrationRow> & Pick<IntegrationRow, 'id' | 'space_id' | 'site_id' | 'name' | 'title' | 'description'>;
 
@@ -106,6 +133,7 @@ export interface RunRow {
   started_at: Date | null;
   finished_at: Date | null;
   version: number;
+  approval_id: string | null;
 }
 export type RunNew = Partial<RunRow> & Pick<RunRow, 'id' | 'space_id' | 'integration_id' | 'seq' | 'agent_id' | 'request_id' | 'input'>;
 
@@ -138,3 +166,20 @@ export interface SiteRow {
   login_needed_at: Date | null;
 }
 export type SiteNew = Partial<SiteRow> & Pick<SiteRow, 'id' | 'space_id' | 'name' | 'start_url' | 'origins'>;
+
+/** browser_tabs.suggestions */
+export interface SuggestionRow {
+  id: string;
+  space_id: string;
+  site_id: string;
+  key: string;
+  count: number;
+  sample: string;
+  status: string;
+  integration_id: string | null;
+  last_seen_at: Date;
+  created_at: Date;
+  updated_at: Date;
+  version: number;
+}
+export type SuggestionNew = Partial<SuggestionRow> & Pick<SuggestionRow, 'id' | 'space_id' | 'site_id' | 'key' | 'count' | 'sample'>;

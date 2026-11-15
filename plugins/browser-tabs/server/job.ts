@@ -26,6 +26,9 @@ export const CLICK_TARGET = 'browser_click';
 export const INTEGRATION_TARGET = 'browser_integration';
 /** 시험을 통과한 사이트 도구를 켜는 결재 동작 */
 export const ENABLE_ACTION = 'browser.integration.enable';
+/** 쓰기 사이트 도구를 한 번 부르는 결재 동작과 그 대상 (2026-11-16 MCP 3단계) */
+export const WRITE_ACTION = 'browser.integration.write';
+export const RUN_TARGET = 'browser_run';
 /** 결재 뒤 실행의 결과 (코어의 결과 처리가 approvalId · outcome을 보고 작업을 끝낸다) */
 const CLICK_DONE = 'plugin.browser_tabs.click_done';
 /** 열린 클릭 (작업 하나에 하나뿐, DB의 부분 유일 인덱스) */
