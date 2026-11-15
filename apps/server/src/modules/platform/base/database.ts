@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import postgres from 'postgres';
 import { Busy } from './errors';
 
@@ -9,6 +9,80 @@ import { Busy } from './errors';
 /** SQL 실행기 (연결 또는 트랜잭션). 외부 라이브러리 타입을 가리키는 별칭 */
 export type Sql = postgres.Sql;
 export type Row = postgres.Row;
+
+/**
+ * 채널 하나를 듣는 전용 연결 (Postgres LISTEN, 리팩토링 2단계 worker 정책).
+ * 라이브러리의 sql.listen은 끊기면 한 번만 다시 듣고 그 실패를 삼킨다: 그러면 듣는 쪽은 신호를 영영 못 받는다.
+ * 그래서 연결을 직접 쥐고, 닫히면(onclose) 1 · 2 · 4 … 30초 간격으로 될 때까지 다시 LISTEN한다.
+ * 끊긴 동안의 신호는 사라진다: 신호는 깨우기용이고 내용은 늘 테이블에 있다. 그래서 들을 때마다(처음 · 다시) onReady를 부른다.
+ * 알림은 라이브러리가 sql.listen 안에서 쓰는 옵션(onnotify, 타입에는 없다)으로 받는다. 라이브러리를 올리면 이 자리를 확인한다
+ */
+export class Listener {
+  private static readonly RETRY_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
+  private static readonly logger = new Logger('듣기');
+  /** 처음 들을 때 풀린다. 처음 시도가 실패하면 거절되지만 다시 듣기는 뒤에서 이어진다 */
+  readonly ready: Promise<void>;
+  private readonly sql: Sql;
+  private retry: NodeJS.Timeout | null = null;
+  private failures = 0;
+  private stopped = false;
+
+  constructor(
+    url: string,
+    private readonly channel: string,
+    onMessage: (payload: string) => void,
+    private readonly onReady?: () => void,
+  ) {
+    const options = {
+      max: 1,
+      idle_timeout: null,
+      max_lifetime: null,
+      fetch_types: false,
+      connection: Database.LIMITS,
+      onclose: () => this.schedule(),
+      onnotify: (from: string, payload: string) => {
+        if (from === channel && !this.stopped) onMessage(payload);
+      },
+    };
+    this.sql = postgres(url, options as unknown as postgres.Options<Record<string, never>>);
+    this.ready = this.attempt();
+    this.ready.catch(() => {}); // 기다리는 쪽이 없어도 처리되지 않은 거절이 되지 않게
+  }
+
+  /** 그만 듣는다. 다시 듣기도 멈추고 연결을 닫는다 */
+  async stop(): Promise<void> {
+    this.stopped = true;
+    if (this.retry) clearTimeout(this.retry);
+    this.retry = null;
+    await this.sql.end({ timeout: 5 });
+  }
+
+  private async attempt(): Promise<void> {
+    try {
+      await this.sql.unsafe(`LISTEN "${this.channel.replaceAll('"', '""')}"`);
+    } catch (error) {
+      if (this.failures++ === 0 && !this.stopped)
+        Listener.logger.warn(
+          `${this.channel}을(를) 듣지 못해 다시 시도해요: ${(error as Error).message}`,
+        );
+      this.schedule();
+      throw error;
+    }
+    if (this.failures > 0) Listener.logger.log(`${this.channel}을(를) 다시 들어요`);
+    this.failures = 0;
+    if (!this.stopped) this.onReady?.();
+  }
+
+  /** 연결이 닫혔거나 듣지 못했다: 그만 들은 게 아니면 잠시 뒤 다시 듣는다 (이미 기다리는 중이면 그대로) */
+  private schedule(): void {
+    if (this.stopped || this.retry) return;
+    const wait = Listener.RETRY_MS[Math.min(this.failures, Listener.RETRY_MS.length - 1)];
+    this.retry = setTimeout(() => {
+      this.retry = null;
+      if (!this.stopped) this.attempt().catch(() => {});
+    }, wait);
+  }
+}
 
 @Injectable()
 export class Database implements OnApplicationShutdown {
@@ -31,10 +105,14 @@ export class Database implements OnApplicationShutdown {
   /** bigint도 number로 읽는다. 쓰는 값(토큰 수, 파일 크기, 순번)은 안전한 정수 범위 안이다 */
   private static readonly BIGINT = { to: 20, from: [20], serialize: String, parse: Number };
   readonly sql: Sql;
+  private readonly url: string;
+  /** 이 프로세스가 연 듣기. 내려갈 때 함께 닫는다 */
+  private readonly listeners = new Set<Listener>();
 
   constructor() {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error('DATABASE_URL is not set');
+    this.url = url;
     this.sql = postgres(url, {
       max: 10,
       types: { bigint: Database.BIGINT },
@@ -68,18 +146,14 @@ export class Database implements OnApplicationShutdown {
   }
 
   /**
-   * 채널을 듣는다 (Postgres LISTEN). 라이브러리가 듣기 전용 연결을 하나 따로 쓰고, 끊기면 다시 듣는다.
-   * 끊긴 동안의 신호는 사라진다: 신호는 깨우기용이고 내용은 늘 테이블에 있다. 돌려준 함수로 그만 듣는다.
-   * 단 다시 연결한 뒤에는 이 함수가 듣기를 빼지 못한다 (라이브러리가 받는 쪽을 새로 등록한다). 연결을 닫으면 끝난다.
-   * onReady는 처음 들을 때와 다시 연결해 들을 때마다 불린다. 놓친 신호를 메우려면 여기서 테이블을 다시 본다.
+   * 채널을 듣는다 (Postgres LISTEN, 듣기마다 전용 연결 하나: Listener). 끊기면 될 때까지 다시 듣는다.
+   * onReady는 처음 들을 때와 다시 들을 때마다 불린다. 끊긴 동안 놓친 신호는 여기서 테이블을 다시 봐서 메운다.
+   * 돌려준 Listener의 stop으로 그만 듣는다. 내려갈 때 남은 듣기는 Database가 닫는다
    */
-  async listen(
-    channel: string,
-    onMessage: (payload: string) => void,
-    onReady?: () => void,
-  ): Promise<() => Promise<void>> {
-    const { unlisten } = await this.sql.listen(channel, onMessage, onReady);
-    return unlisten;
+  listen(channel: string, onMessage: (payload: string) => void, onReady?: () => void): Listener {
+    const listener = new Listener(this.url, channel, onMessage, onReady);
+    this.listeners.add(listener);
+    return listener;
   }
 
   /** 유일 제약에 걸린 오류인가 (동시에 같은 것을 만들려 할 때). Repository가 Conflict로 바꾼다 */
@@ -89,6 +163,8 @@ export class Database implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
+    await Promise.all([...this.listeners].map((l) => l.stop()));
+    this.listeners.clear();
     await this.sql.end({ timeout: 5 });
   }
 }

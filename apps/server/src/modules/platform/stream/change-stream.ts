@@ -1,16 +1,16 @@
 import { type BeforeApplicationShutdown, Injectable } from '@nestjs/common';
-import { Database } from '../base/database';
+import { Database, type Listener } from '../base/database';
 import { ChangeSignal } from '../base/outbox';
 
 // 변경 신호를 이 프로세스 안에서 나눠 준다. Postgres LISTEN 연결 하나를 듣고 받는 쪽(SSE, 긴 폴링)에 넘긴다.
 // 듣기는 첫 받는 쪽이 생길 때 시작한다: 일꾼·명령줄은 이 채널을 듣지 않는다 (일꾼은 Outbox.CHANNEL을 따로 듣는다).
 // 서버가 내려갈 때는 받는 쪽을 먼저 끝낸다 (열린 SSE가 있으면 HTTP 서버가 닫히지 않는다).
-// 신호를 놓쳐도 내용은 테이블에 있으므로, 받는 쪽은 신호를 깨우기로만 쓴다.
+// 신호를 놓쳐도 내용은 테이블에 있으므로, 받는 쪽은 신호를 깨우기로만 쓴다. 듣는 연결이 끊기면 Listener가 될 때까지 다시 듣는다.
 @Injectable()
 export class ChangeStream implements BeforeApplicationShutdown {
   private readonly receivers = new Set<(signal: ChangeSignal) => void>();
   private readonly closers = new Set<() => void>();
-  private listening: Promise<unknown> | null = null;
+  private listening: Promise<void> | null = null;
   private closing = false;
 
   constructor(private readonly db: Database) {}
@@ -59,16 +59,18 @@ export class ChangeStream implements BeforeApplicationShutdown {
     for (const close of [...this.closers]) close();
   }
 
-  private listen(): Promise<unknown> {
-    this.listening ??= this.db
-      .listen(ChangeSignal.CHANNEL, (payload) => {
-        const signal = ChangeSignal.parse(payload);
-        for (const receive of [...this.receivers]) receive(signal);
-      })
-      .catch((error: unknown) => {
-        this.listening = null;
-        throw error;
-      });
+  /** 처음 받는 쪽이 생길 때 듣는다. 처음 듣기가 실패하면 그 듣기를 닫고 다음 받는 쪽이 다시 시도한다 */
+  private listen(): Promise<void> {
+    if (this.listening) return this.listening;
+    const listener: Listener = this.db.listen(ChangeSignal.CHANNEL, (payload) => {
+      const signal = ChangeSignal.parse(payload);
+      for (const receive of [...this.receivers]) receive(signal);
+    });
+    this.listening = listener.ready.catch(async (error: unknown) => {
+      this.listening = null;
+      await listener.stop();
+      throw error;
+    });
     return this.listening;
   }
 }

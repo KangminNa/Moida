@@ -5,10 +5,11 @@ import { join, resolve } from 'node:path';
 import { after, describe, type TestContext, test } from 'node:test';
 import { ArchiveQuery } from '../archive/archive.query';
 import { ArchiveRestoreService } from '../archive/archive-restore.service';
+import { BaseDueJob } from '../base/base-due-job';
 import { BaseHandler } from '../base/base-handler';
 import { BaseJob } from '../base/base-job';
 import { BlobStore } from '../base/blob-store';
-import { Database } from '../base/database';
+import { Database, Listener } from '../base/database';
 import { DomainEvent } from '../base/event';
 import { ChangeSignal, Outbox } from '../base/outbox';
 import { SecretBox } from '../base/secret-box';
@@ -252,8 +253,7 @@ describe('코어 일꾼', () => {
   });
 });
 
-describe('신호로 깨우기', () => {
-  const HOUR = 3_600_000; // 주기를 길게 두면 신호로만 처리된다
+describe('신호와 마감으로 깨우기 (쉬는 동안에는 DB를 보지 않는다)', () => {
   const LIMIT = { timeout: 15_000 };
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   after(() => db.sql`DELETE FROM platform.outbox WHERE space_id = ${SPACE}`);
@@ -267,7 +267,7 @@ describe('신호로 깨우기', () => {
     }
   }
 
-  /** 끝낸 바퀴를 세고, 한 바퀴를 일부러 실패시킬 수 있는 일꾼 */
+  /** 끝낸 바퀴를 세고, 한 바퀴를 일부러 실패시킬 수 있는 일꾼. 다시 시도 간격은 짧게 */
   class WatchedWorker extends OutboxWorker {
     ticks = 0;
     failNext = false;
@@ -283,37 +283,77 @@ describe('신호로 깨우기', () => {
         this.ticks++;
       }
     }
-  }
 
-  /** 듣기를 세고, 일부러 실패시킬 수 있는 DB */
-  class ProbeDatabase extends Database {
-    listens = 0;
-    unlistens = 0;
-    broken = false;
+    protected override retryAfterSeconds(): number {
+      return 0.2;
+    }
 
-    override async listen(
-      channel: string,
-      onMessage: (payload: string) => void,
-      onReady?: () => void,
-    ): Promise<() => Promise<void>> {
-      this.listens++;
-      if (this.broken) throw new Error('듣기 실패');
-      const unlisten = await super.listen(channel, onMessage, onReady);
-      return () => {
-        this.unlistens++;
-        return unlisten();
-      };
+    protected override retryDelayMs(): number {
+      return 50;
     }
   }
 
-  /** 받은 이벤트를 적고, hold가 풀릴 때까지 붙들고 있는 받는 쪽 */
+  /** 듣기를 세고, 닿지 않는 곳을 듣게 해 일부러 실패시킬 수 있는 DB */
+  class ProbeDatabase extends Database {
+    listens = 0;
+    broken = false;
+    private readonly opened: Listener[] = [];
+
+    override listen(
+      channel: string,
+      onMessage: (payload: string) => void,
+      onReady?: () => void,
+    ): Listener {
+      this.listens++;
+      if (!this.broken) return super.listen(channel, onMessage, onReady);
+      const nowhere = new Listener(
+        'postgres://nobody:x@127.0.0.1:1/none',
+        channel,
+        onMessage,
+        onReady,
+      );
+      this.opened.push(nowhere);
+      return nowhere;
+    }
+
+    override async onApplicationShutdown(): Promise<void> {
+      await Promise.all(this.opened.map((l) => l.stop()));
+      await super.onApplicationShutdown();
+    }
+  }
+
+  /** 받은 이벤트를 적고, hold가 풀릴 때까지 붙들고 있는 받는 쪽. failOnce면 처음 한 번 실패한다 */
   class Inbox extends BaseHandler {
     readonly names: string[] = [];
     hold: Promise<void> = Promise.resolve();
+    failOnce = false;
 
     async handle(event: DomainEvent): Promise<void> {
+      if (this.failOnce) {
+        this.failOnce = false;
+        throw new Error('일부러 실패');
+      }
       this.names.push(event.name);
       await this.hold;
+    }
+  }
+
+  /** 돈 횟수를 세고, 돌려줄 다음 시각을 정할 수 있는 마감 작업 */
+  class Due extends BaseDueJob {
+    readonly name = 'probe.due';
+    runs = 0;
+    failNext = false;
+    next: Date | null = null;
+
+    async run(): Promise<Date | null> {
+      this.runs++;
+      if (this.failNext) {
+        this.failNext = false;
+        throw new Error('일부러 실패');
+      }
+      const next = this.next;
+      this.next = null;
+      return next;
     }
   }
 
@@ -321,10 +361,12 @@ describe('신호로 깨우기', () => {
     await db.sql`DELETE FROM platform.outbox WHERE processed_at IS NULL`;
     const core = new CoreWorkers();
     const inbox = new Inbox();
+    const due = new Due();
     core.on('probe.wake.*', inbox);
+    core.due(due, 'probe.due.*');
     const worker = new WatchedWorker(database, await emptyRegistry(), core);
     t.after(() => worker.onApplicationShutdown());
-    return { worker, inbox };
+    return { worker, inbox, due };
   }
 
   const publish = (...names: readonly string[]) =>
@@ -335,22 +377,80 @@ describe('신호로 깨우기', () => {
   /** 이 채널에 온 신호를 적는다. 일꾼에게도 같이 도착한 것을 확인할 때 쓴다 */
   async function heard(t: TestContext, channel: string): Promise<string[]> {
     const payloads: string[] = [];
-    t.after(
-      await db.listen(channel, (payload) => {
-        payloads.push(payload);
-      }),
-    );
+    const listener = db.listen(channel, (payload) => {
+      payloads.push(payload);
+    });
+    t.after(() => listener.stop());
+    await listener.ready;
     return payloads;
   }
 
-  test('커밋하면 주기를 기다리지 않고 신호로 처리한다', LIMIT, async (t) => {
+  test(
+    '들으면 outbox와 마감 작업을 한 번씩 돌고, 쉬는 동안에는 더 돌지 않는다',
+    LIMIT,
+    async (t) => {
+      const { worker, due } = await boot(t);
+      worker.start();
+      await until(() => worker.ticks > 0 && due.runs > 0);
+      await sleep(300);
+      assert.deepEqual([worker.ticks, due.runs], [1, 1], '조회하는 주기가 없다');
+    },
+  );
+
+  test('커밋하면 신호로 바로 처리한다', LIMIT, async (t) => {
     const { worker, inbox } = await boot(t);
-    worker.start(HOUR);
+    worker.start();
     await until(() => worker.ticks > 0);
 
     await publish('probe.wake.saved');
     await until(() => inbox.names.length === 1);
     assert.deepEqual(inbox.names, ['probe.wake.saved']);
+  });
+
+  test('실패한 이벤트는 신호 없이 다음 시도 시각에 다시 돈다', LIMIT, async (t) => {
+    const { worker, inbox } = await boot(t);
+    inbox.failOnce = true;
+    worker.start();
+    await until(() => worker.ticks > 0);
+
+    await publish('probe.wake.retry');
+    await until(() => inbox.names.length === 1);
+    assert.deepEqual(inbox.names, ['probe.wake.retry']);
+    const [row] = await db.sql`
+      SELECT attempts, processed_at FROM platform.outbox WHERE topic = 'probe.wake.retry'`;
+    assert.equal(row?.attempts, 2);
+    assert.ok(row?.processed_at);
+  });
+
+  test('마감 작업은 돌려준 시각 · 주제 이벤트 · due 신호로 돈다', LIMIT, async (t) => {
+    const { worker, due } = await boot(t);
+    due.next = new Date(Date.now() + 100);
+    worker.start();
+    await until(() => due.runs === 2, 3000); // 시작 + 돌려준 시각
+
+    await publish('probe.due.changed');
+    await until(() => due.runs === 3);
+
+    await db.transaction((tx) => new Outbox(tx).wake(due.name));
+    await until(() => due.runs === 4);
+
+    await db.transaction((tx) => new Outbox(tx).wake('probe.unknown'));
+    await assert.rejects(
+      db.transaction(async (tx) => {
+        await new Outbox(tx).wake(due.name);
+        throw new Error('되돌리기');
+      }),
+      /되돌리기/,
+    );
+    await sleep(200);
+    assert.equal(due.runs, 4, '모르는 이름과 되돌린 깨우기로는 돌지 않는다');
+  });
+
+  test('마감 작업이 실패하면 늦춰서 다시 돈다', LIMIT, async (t) => {
+    const { worker, due } = await boot(t);
+    due.failNext = true;
+    worker.start();
+    await until(() => due.runs === 2, 3000);
   });
 
   test('처리하는 중에 온 신호를 놓치지 않는다', LIMIT, async (t) => {
@@ -360,7 +460,7 @@ describe('신호로 깨우기', () => {
     inbox.hold = new Promise((resolve) => {
       release = resolve;
     });
-    worker.start(HOUR);
+    worker.start();
     await until(() => worker.ticks > 0);
 
     await publish('probe.wake.first');
@@ -376,7 +476,7 @@ describe('신호로 깨우기', () => {
 
   test('신호 한 번으로 51개를 모두 처리한다', LIMIT, async (t) => {
     const { worker, inbox } = await boot(t);
-    worker.start(HOUR);
+    worker.start();
     await until(() => worker.ticks > 0);
     const before = worker.ticks;
 
@@ -385,21 +485,21 @@ describe('신호로 깨우기', () => {
     assert.equal(inbox.names.length, 51);
   });
 
-  test('듣기에 실패해도 주기로 처리한다', LIMIT, async (t) => {
+  test('처음 듣기에 실패해도 한 번은 처리하고 뒤에서 다시 듣는다', LIMIT, async (t) => {
     const probe = new ProbeDatabase();
     probe.broken = true;
     t.after(() => probe.onApplicationShutdown());
-    const { worker, inbox } = await boot(t, probe);
+    const { worker, inbox, due } = await boot(t, probe);
     await publish('probe.wake.saved');
 
-    worker.start(20);
-    await until(() => inbox.names.length === 1);
+    worker.start();
+    await until(() => inbox.names.length === 1 && due.runs === 1);
     assert.equal(probe.listens, 1);
   });
 
   test('되돌린 트랜잭션은 일꾼을 깨우지 않는다', LIMIT, async (t) => {
     const { worker, inbox } = await boot(t);
-    worker.start(HOUR);
+    worker.start();
     await until(() => worker.ticks > 0);
     const before = worker.ticks;
 
@@ -432,15 +532,15 @@ describe('신호로 깨우기', () => {
   test('내려갈 때 듣기와 타이머를 멈추고 걸리지 않는다', LIMIT, async (t) => {
     const probe = new ProbeDatabase();
     t.after(() => probe.onApplicationShutdown());
-    const { worker } = await boot(t, probe);
+    const { worker, due } = await boot(t, probe);
     const timers = () => process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length;
     const timersBefore = timers();
-    worker.start(20);
-    await until(() => worker.ticks > 1);
+    due.next = new Date(Date.now() + 3_600_000); // 한 시간 뒤의 마감 타이머가 걸려 있다
+    worker.start();
+    await until(() => worker.ticks > 0 && due.runs > 0);
 
     // Nest는 같은 모듈의 훅을 함께 부른다: 듣기를 멈추는 동안 DB도 닫힌다
     await Promise.all([probe.onApplicationShutdown(), worker.onApplicationShutdown()]);
-    assert.equal(probe.unlistens, 1);
     await until(() => timers() <= timersBefore); // 일꾼의 타이머가 남으면 프로세스가 끝나지 않는다
 
     await sleep(50); // 내려가기 전에 돌던 바퀴가 끝나기를 기다린다
@@ -453,57 +553,68 @@ describe('신호로 깨우기', () => {
   test('듣기를 마치기 전에 내려가도 걸리지 않고 깨지 않는다', LIMIT, async (t) => {
     const probe = new ProbeDatabase();
     t.after(() => probe.onApplicationShutdown());
-    const { worker } = await boot(t, probe);
-    worker.start(HOUR);
+    const { worker, due } = await boot(t, probe);
+    worker.start();
 
     await worker.onApplicationShutdown();
-    assert.equal(probe.unlistens, 1);
-    assert.equal(worker.ticks, 0);
+    await sleep(100);
+    assert.deepEqual([worker.ticks, due.runs], [0, 0]);
   });
 
   test('한 바퀴가 실패해도 다음 신호로 다시 돈다', LIMIT, async (t) => {
     const { worker, inbox } = await boot(t);
     worker.failNext = true;
-    worker.start(HOUR);
+    worker.start();
     await until(() => worker.ticks > 0);
 
     await publish('probe.wake.saved');
     await until(() => inbox.names.length === 1);
   });
 
-  test('연결이 끊기면 다시 듣고 한 번만 깨우며, 내려간 뒤에는 깨지 않는다', LIMIT, async (t) => {
-    const probe = new ProbeDatabase();
-    t.after(() => probe.onApplicationShutdown());
-    const { worker, inbox } = await boot(t, probe);
-    worker.start(HOUR);
-    await until(() => worker.ticks > 0);
-    const before = worker.ticks;
+  test(
+    '듣는 연결이 끊기면 다시 듣고 한 번만 깨우며, 내려간 뒤에는 깨지 않는다',
+    LIMIT,
+    async (t) => {
+      const probe = new ProbeDatabase();
+      t.after(() => probe.onApplicationShutdown());
+      const { worker, inbox, due } = await boot(t, probe);
+      worker.start();
+      await until(() => worker.ticks > 0 && due.runs > 0);
+      const before = worker.ticks;
 
-    const killed = await db.sql`
+      const killed = await db.sql`
       SELECT pg_terminate_backend(pid) FROM pg_stat_activity
        WHERE datname = current_database() AND query ILIKE 'listen%'`;
-    assert.equal(killed.length, 1);
-    await until(() => worker.ticks > before);
-    await sleep(100);
-    assert.equal(worker.ticks, before + 1);
+      assert.equal(killed.length, 1);
+      await until(() => worker.ticks > before && due.runs === 2, 5000); // 놓친 신호를 메우려고 한 번씩
+      await sleep(100);
+      assert.equal(worker.ticks, before + 1);
 
-    await publish('probe.wake.saved');
-    await until(() => worker.ticks === before + 2);
-    assert.deepEqual(inbox.names, ['probe.wake.saved']);
+      await publish('probe.wake.saved');
+      await until(() => worker.ticks === before + 2);
+      assert.deepEqual(inbox.names, ['probe.wake.saved'], '다시 들은 연결로 신호가 온다');
 
-    // 다시 연결한 뒤에는 라이브러리의 unlisten이 듣기를 빼지 못한다. 그래도 일꾼은 깨지 않아야 한다
-    await worker.onApplicationShutdown();
-    const ticks = worker.ticks;
-    await publish('probe.wake.late');
-    await sleep(200);
-    assert.equal(worker.ticks, ticks);
-  });
+      // 두 번째로 끊겨도 다시 듣는다 (라이브러리의 듣기는 한 번만 다시 시도하고 실패를 삼켰다)
+      await db.sql`
+      SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+       WHERE datname = current_database() AND query ILIKE 'listen%'`;
+      await until(() => due.runs === 3, 5000);
+      await publish('probe.wake.again');
+      await until(() => inbox.names.length === 2);
+
+      await worker.onApplicationShutdown();
+      const ticks = worker.ticks;
+      await publish('probe.wake.late');
+      await sleep(200);
+      assert.equal(worker.ticks, ticks);
+    },
+  );
 
   test('publish 한 번에 빈 신호 하나만 보내고, 변경 신호로는 깨지 않는다', LIMIT, async (t) => {
     const { worker } = await boot(t);
     const signals = await heard(t, Outbox.CHANNEL);
     const changes = await heard(t, ChangeSignal.CHANNEL);
-    worker.start(HOUR);
+    worker.start();
     await until(() => worker.ticks > 0);
 
     await publish('probe.wake.one', 'probe.wake.two', 'probe.wake.three');

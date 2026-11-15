@@ -31,6 +31,8 @@ export class ChangeSignal {
 // 일꾼을 깨우는 신호는 따로 보낸다: 변경 신호에는 실행 기록도 섞여 있어 일꾼이 헛돌게 된다.
 export class Outbox {
   static readonly CHANNEL = 'cairn_outbox';
+  /** 마감 작업을 깨우는 신호의 앞부분 (`due:<작업 이름>`). 빈 신호는 outbox를 비우라는 뜻이다 */
+  static readonly DUE = 'due:';
 
   /**
    * 이벤트를 남기는 같은 트랜잭션에서 함께 할 일 (이름 → 할 일). 같은 이름을 다시 등록하면 바꾼다.
@@ -68,6 +70,14 @@ export class Outbox {
       ),
     );
     await this.tx`SELECT pg_notify(${Outbox.CHANNEL}, '')`;
+  }
+
+  /**
+   * 마감 작업을 깨운다 (리팩토링 2단계 worker 정책): 이벤트 없이 다음 마감을 바꾸는 쓰기가 같은 트랜잭션에서 부른다.
+   * 커밋될 때 일꾼에게 전달되고 취소되면 사라진다. 일꾼은 그 작업을 바로 돌려 다음에 깰 시각을 다시 잰다
+   */
+  async wake(jobName: string): Promise<void> {
+    await this.tx`SELECT pg_notify(${Outbox.CHANNEL}, ${Outbox.DUE + jobName})`;
   }
 
   /** 화면이 알아볼 id: 이벤트의 주인공(내용에서 처음 나오는 `…Id` 값), 없으면 outbox 행 번호 */

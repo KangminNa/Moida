@@ -17,6 +17,7 @@ export {
 } from './base/actor';
 export { AttemptLimiter } from './base/attempt-limiter';
 export { ActionResult, BaseAction } from './base/base-action';
+export { BaseDueJob } from './base/base-due-job';
 export { BaseEntity } from './base/base-entity';
 export { BaseGateway } from './base/base-gateway';
 export { BaseHandler } from './base/base-handler';

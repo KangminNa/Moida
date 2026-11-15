@@ -31,6 +31,14 @@ export class TaskQuery extends BaseQuery {
   /** 목록 카드에 보이는 마지막 기록의 길이 */
   private static readonly LAST_EVENT = 200;
 
+  /** 진행 중 작업의 임대가 가장 먼저 끝나는 때. 없으면 null (일꾼의 LeaseJob이 그때 깬다) */
+  async nextLeaseEnd(actor: Actor): Promise<Date | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<TaskRow, 'lease_until'>[]>`
+      SELECT min(lease_until) AS lease_until FROM task.tasks WHERE status = ${Task.RUNNING}`;
+    return row?.lease_until ?? null;
+  }
+
   async list(actor: Actor, req: ListTasksInput): Promise<TaskPageView> {
     actor.assertOwner();
     const rows = await this.sql<(TaskRow & { last_event: string | null })[]>`

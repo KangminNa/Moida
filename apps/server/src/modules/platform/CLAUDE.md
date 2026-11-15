@@ -27,12 +27,12 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - `Database`, `Sql`·`Row`(라이브러리 타입 별칭), `Actor`와 `OwnerActor`·`DeviceActor`·`AgentActor`·`ApprovedActor`·`SystemActor`·`VisitorActor`.
   권한은 `assertCan(권한)`(기기·에이전트가 받은 권한. `Actor.AGENT_OUT`은 받은 권한이 아니라 `KEEPS_PRIVATE`(전체 읽기 · 초안 · 코드 · 만들기)가 없는 작업 토큰이면 통과, 2026-11-16), 관리 일은 종류로 묻는다: `assertOwner()`(주인만), `assertOwnerOrSystem()`(주인과 명령줄·일꾼: 플러그인, 서버 키 교체, 복원).
   `mayRead(id)` · `hasReadGrants()`: 작업 토큰에 함께 봉인한 id 하나씩의 읽기 허락 (`AgentActor`의 `reads`). 권한이 아니라 id로 하나를 읽을 때만 본다 (무엇의 id인지는 모른다)
-- 같은 트랜잭션에 들어가는 것: `Outbox`(이벤트, 변경 신호, 일꾼 깨우기. `Outbox.listen`: 이벤트를 쓰기 전에 같은 트랜잭션에서 부르는 듣는 쪽, 지금은 알림과 account의 보안 기록 둘), `ChangeSignal`(내용 없는 신호), `Idempotency`(같은 request_id는 한 번만), `Notices`(콘솔 알림, 변경 신호 `platform.notification`), `SecurityLog`(보안 기록, 2026-11-15)
-- `ChangeStream`: Postgres LISTEN 연결 하나로 변경 신호를 나눠 준다. SSE와 긴 폴링이 쓴다. 신호는 깨우기용이고 내용은 늘 테이블에 있다
+- 같은 트랜잭션에 들어가는 것: `Outbox`(이벤트, 변경 신호, 일꾼 깨우기. `wake(이름)`: 이벤트 없이 마감을 바꾸는 쓰기가 그 마감 작업을 깨운다 (신호 `due:<이름>`). `Outbox.listen`: 이벤트를 쓰기 전에 같은 트랜잭션에서 부르는 듣는 쪽, 지금은 알림과 account의 보안 기록 둘), `ChangeSignal`(내용 없는 신호), `Idempotency`(같은 request_id는 한 번만), `Notices`(콘솔 알림, 변경 신호 `platform.notification`), `SecurityLog`(보안 기록, 2026-11-15)
+- `ChangeStream`: Postgres LISTEN 연결 하나(`Listener`)로 변경 신호를 나눠 준다. SSE와 긴 폴링이 쓴다. 신호는 깨우기용이고 내용은 늘 테이블에 있다
 - `SecretRotation`: 서버 키 교체. 비밀값을 가진 모듈이 `register`로 다시 잠그는 방법을 등록
 - `SensitivePolicy` · `Redaction`: AI가 보낸 글이 판이 되기 전에 비밀값(토큰 · 키 · 비밀번호 값)을 `[지움: 종류]`로 바꾼다. 모양만 보고, 어느 칸을 지울지는 쓰는 모듈이 정한다 (vault 세션 · wiki, blog 초안)
 - `NoticeCatalog` · `NoticeKind`: 알림 종류 등록 (7단계). 등급은 `NoticeKind.IMMEDIATE` · `DIGEST` · `LOG`
-- `CoreWorkers`: 코어 모듈의 이벤트 받기·반복 작업 등록 (`on`, `every`, `expect`)
+- `CoreWorkers`: 코어 모듈의 이벤트 받기 · 반복 작업 · 마감 작업 등록 (`on`, `every`, `due`, `expect`). 마감 작업은 `BaseDueJob`(다음에 깰 시각을 돌려준다, 리팩토링 2단계): 일꾼은 쉬는 동안 DB를 조회하지 않고 신호와 마감 타이머(`WorkScheduler`)로만 깬다. 들을 때마다(처음 · 끊겼다 다시) outbox와 모든 마감 작업을 한 번씩 돈다
 - `ArchiveQuery`: 보관 형식 파일 묶음. 내용을 가진 모듈이 `onModuleInit`에서 `register`로 자기 파일을, `registerRestore`로 복원을 등록한다
 - `AgentDirectory` · `AgentCard`: 에이전트의 표를 갖지 않은 모듈이 "이 id의 에이전트가 있는가, 무슨 권한인가"를 묻는 길 (2차 6단계, task가 `register`, blog 메뉴의 운영 팀 확인). 트랜잭션 밖에서 묻는다
 - `SettingKinds` · `SettingKind` · `SettingShape` (`setting/`, 2026-11-15 D): 대화로 바꾸는 설정의 등록부. 설정을 가진 모듈이 시작할 때(`<모듈>-settings.ts`) 설정 하나를 `register`한다: 모양(`<X>Edit.SETTING`: 동작 · 칸 · 대상 id · one · name · version 여부 · 굵은 칸 · 펼칠 목록형 칸)과 읽기(`read` · `current`) · 미리 해 보기(`rehearse`) · 적용(`apply`), 필요하면 `normalize` · `bodyOf` · `labelOf`. task가 `get_settings` · `propose_setting` · 승인 뒤 적용(`SettingApplyHandler`)에서 찾는다. 읽기 · 미리 해 보기는 `SettingActor`(task가 제안자를 확인한 뒤 만든다, 모듈은 첫 줄에서 `SettingActor.spaceOf`), 적용은 `ApprovedActor`(`SettingOutcome.spaceOf`). `SettingChangeInput`: 제안과 승인 이벤트가 같은 모양 (version 없는 설정은 `assertUnchanged`로 제안 때 본 값과 비교). `SettingOutcome.settle`: 결재마다 한 번 적용하고 `<모듈>.setting.changed`를 남긴다 (`topicOf`). platform이 등록하는 것: 알림 설정(`NoticeSettingsEdit`), 플러그인 설정(`PluginEdit`, 켜진 것의 비밀이 아닌 칸만, 줄은 모두 굵게) — `PlatformSettings`
@@ -48,7 +48,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - 오류: `DomainError`와 단계별 하위 클래스, `DomainEvent`, `CurrentActor`(Controller 인자 데코레이터)
 
 ## DB 연결
-- 프로세스(server · worker · 명령줄)마다 풀 하나, 최대 10개 (`Database`). LISTEN은 전용 연결 하나를 따로 쓴다 (server의 `ChangeStream`, worker의 outbox). web · runner는 DB에 닿지 않는다
+- 프로세스(server · worker · 명령줄)마다 풀 하나, 최대 10개 (`Database`). LISTEN은 듣기마다 전용 연결 하나(`Listener`, server의 `ChangeStream`, worker의 outbox). 끊기면 1 · 2 · 4 … 30초 간격으로 될 때까지 다시 듣고 그때마다 `onReady`로 놓친 것을 메운다 (라이브러리의 `sql.listen`은 한 번만 다시 시도하고 실패를 삼켜 쓰지 않는다). web · runner는 DB에 닿지 않는다
 - 연결마다 시간 제한 (`Database.LIMITS`): 잠금 대기 5초, 쿼리 30초, 트랜잭션을 연 채 쉬기 60초. 앞의 둘은 입구(REST 필터 · MCP)에서 `Busy`(503 `busy`)가 되고 러너는 busy면 같은 요청을 다시 보낸다. 쉬다 끊긴 트랜잭션은 우리 코드의 버그라 500으로 둔다
 - 시간 제한 없는 트랜잭션(`unlimitedTransaction`)은 복원 쓰기와 `steadyRead` 두 곳만. 새로 쓰기 전에 일을 나눌 수 있는지 먼저 본다
 - 트랜잭션은 짧게: 안에서 외부 호출 · AI 응답 · 파일 저장(`BlobStore`)을 기다리지 않는다. 긴 폴링 · SSE는 트랜잭션 밖에서 LISTEN 신호로 기다린다

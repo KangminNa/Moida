@@ -212,7 +212,6 @@ import { WebPageGateway } from './web/web-page.gateway';
   exports: [TaskTools, TaskQuery],
 })
 export class TaskModule implements OnModuleInit {
-  private static readonly LEASE_CHECK_MS = 30_000;
   /** 스케줄의 가장 작은 단위가 분이라 1분마다 본다 */
   private static readonly SCHEDULE_CHECK_MS = 60_000;
 
@@ -261,7 +260,7 @@ export class TaskModule implements OnModuleInit {
     this.workers.on(Task.CHANGED, this.follows);
     this.workers.every(this.chatRouteJob, ChatRouteJob.EVERY_MS);
     this.workers.on('*', this.results);
-    this.workers.every(this.leases, TaskModule.LEASE_CHECK_MS);
+    this.workers.due(this.leases, Task.CHANGED);
     this.workers.every(this.schedules, TaskModule.SCHEDULE_CHECK_MS);
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
     // 외부 도구 (2차 7단계): 제안의 결재가 정해지면 붙이거나 지우고, 서버 키를 바꾸면 토큰을 다시 잠근다
