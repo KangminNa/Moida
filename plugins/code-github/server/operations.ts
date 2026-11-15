@@ -469,9 +469,9 @@ export class ConfirmMerge extends Command<GrantedInput> {
       ? await work.row(pulls, { id: input.targetId, space_id: input.spaceId })
       : null;
     const problem = !pull
-      ? '결재의 PR을 찾을 수 없어요'
+      ? '승인 요청의 PR을 찾을 수 없어요'
       : pull.version !== input.targetVersion
-        ? '결재한 뒤 PR이 바뀌었어요 (다시 올린 버전을 결재해 주세요)'
+        ? '승인한 뒤 PR이 바뀌었어요 (다시 올린 버전을 승인해 주세요)'
         : null;
     if (pull && !problem)
       await work.updateRows(pulls, { status: 'merged', updated_at: Rule.now }, { id: pull.id });

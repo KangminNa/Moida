@@ -14,7 +14,7 @@ export type GoalRunBody = {
   maxRounds: number;
 };
 
-/** 서버의 GoalRun.ROUNDS_LIMIT (주인이 처음 정하는 한도. 결재로 한 회차씩 더 늘린다) */
+/** 서버의 GoalRun.ROUNDS_LIMIT (주인이 처음 정하는 한도. 승인으로 한 회차씩 더 늘린다) */
 const ROUNDS_LIMIT = 20;
 const CRITERIA_MAX = 20;
 
@@ -74,7 +74,7 @@ export function GoalRunForm({
     <form className="panel" onSubmit={submit} aria-label="목표 달성까지 맡기기">
       <b>목표 달성까지 맡기기</b>
       <p className="note">
-        팀장 에이전트가 회차를 이어 돌며 하위 에이전트에게 나눠 맡겨요. 결재는 정한 때와 끝에만 와요
+        팀장 에이전트가 회차를 이어 돌며 하위 에이전트에게 나눠 맡겨요. 승인은 정한 때와 끝에만 와요
       </p>
       <div className="field">
         <label htmlFor={`${id}-goal`}>목표</label>
@@ -141,7 +141,7 @@ export function GoalRunForm({
       </div>
       <div className="field">
         <fieldset className="checks">
-          <legend>중간 결재</legend>
+          <legend>중간 승인</legend>
           {Object.entries(CHECKPOINTS).map(([value, label]) => (
             <label key={value} className="check">
               <input
@@ -156,7 +156,7 @@ export function GoalRunForm({
           ))}
         </fieldset>
         <small>
-          진전이 없거나, 실패하거나, 회차 한도에 닿으면 언제든 결재가 와요. 완료는 늘 최종 결재로
+          진전이 없거나, 실패하거나, 회차 한도에 닿으면 언제든 승인이 와요. 완료는 늘 최종 승인으로
         </small>
       </div>
       <div className="field">

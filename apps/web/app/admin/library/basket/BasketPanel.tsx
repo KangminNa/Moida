@@ -20,7 +20,7 @@ const NEW_KINDS: readonly [NewKind, string][] = [
   ['note', '메모'],
 ];
 
-/** 소재가 가리키는 곳. 메모는 없다 */
+/** 스크랩이 가리키는 곳. 메모는 없다 */
 function hrefOf(item: Item): string | null {
   if (item.kind === 'link') return item.url;
   if (item.kind === 'session') return `/admin/sessions?session=${item.refId}`;
@@ -35,7 +35,7 @@ function headOf(item: Item): string {
 const NAMED_MAX = 30;
 const NAME_MAX = 80;
 
-/** 작업 지시: 소재의 이름만 적는다. 내용은 에이전트가 basket_get으로 읽는다 */
+/** 작업 지시: 스크랩의 이름만 적는다. 내용은 에이전트가 basket_get으로 읽는다 */
 function draftInstruction(items: readonly Item[]): string {
   const names = items.slice(0, NAMED_MAX).map((item) => {
     const name = headOf(item).replace(/\s+/g, ' ').slice(0, NAME_MAX);
@@ -43,7 +43,7 @@ function draftInstruction(items: readonly Item[]): string {
   });
   const rest = items.length - names.length;
   return [
-    '아래 소재로 블로그 초안을 써 주세요.',
+    '아래 스크랩으로 블로그 초안을 써 주세요.',
     ...names,
     ...(rest > 0 ? [`- 외 ${rest}개`] : []),
   ].join('\n');
@@ -55,10 +55,10 @@ function detailOf(item: Item): string | null {
   return [item.url, item.note].filter((t) => t && t !== head).join(' · ') || null;
 }
 
-// 소재: 글을 쓰려고 모아 둔 세션·글·링크·메모. 여기서는 링크와 메모를 담고, 지우고, 초안 작업을 맡긴다.
-// 소재를 지워도 가리키던 세션·글은 그대로다.
+// 스크랩: 글을 쓰려고 모아 둔 세션·글·링크·메모. 여기서는 링크와 메모를 담고, 지우고, 초안 작업을 맡긴다.
+// 스크랩을 지워도 가리키던 세션·글은 그대로다.
 export function BasketPanel() {
-  // 소재가 바뀌는 신호는 없다: 처음과 다시 연결될 때, 그리고 여기서 바꾼 뒤에 읽는다
+  // 스크랩이 바뀌는 신호는 없다: 처음과 다시 연결될 때, 그리고 여기서 바꾼 뒤에 읽는다
   const basket = useLiveValue('basket', () => api<Basket>('GET', '/api/basket/items'), []);
   /** 추가 폼의 동작. 초안 쓰기 · 삭제와 함께 돌 수 있어 따로 둔다 */
   const save = useAction();
@@ -86,7 +86,7 @@ export function BasketPanel() {
           title: title.trim() || null,
           ...(kind === 'link' ? { url: url.trim() } : { note }),
         }),
-      { done: '소재에 추가했어요', reload: basket.reload },
+      { done: '스크랩에 추가했어요', reload: basket.reload },
     );
     if (!reply?.ok) return;
     requestId.current = crypto.randomUUID();
@@ -104,7 +104,7 @@ export function BasketPanel() {
         api('POST', '/api/tasks', {
           requestId: crypto.randomUUID(),
           kind: 'draft_post',
-          title: `소재 ${from.length}개로 초안 쓰기`,
+          title: `스크랩 ${from.length}개로 초안 쓰기`,
           instruction: draftInstruction(from),
         }),
       { done: '초안 작업을 만들었어요' },
@@ -190,7 +190,7 @@ export function BasketPanel() {
             disabled={action.busy === 'draft'}
             onClick={() => draft(items)}
           >
-            {action.busy === 'draft' ? '만드는 중' : '이 소재로 초안 쓰기'}
+            {action.busy === 'draft' ? '만드는 중' : '이 스크랩으로 초안 쓰기'}
           </button>
         </div>
       )}
@@ -198,9 +198,9 @@ export function BasketPanel() {
       {items === null ? (
         !error && <p className="label-mono">불러오는 중…</p>
       ) : items.length === 0 ? (
-        <p className="label-mono">소재 없음</p>
+        <p className="label-mono">스크랩 없음</p>
       ) : (
-        <ul className="list" aria-label="소재 목록">
+        <ul className="list" aria-label="스크랩 목록">
           {items.map((item) => {
             const href = hrefOf(item);
             const detail = detailOf(item);

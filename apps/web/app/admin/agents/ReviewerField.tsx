@@ -38,7 +38,7 @@ export function ReviewerField({
         ))}
       </select>
       <small id={`${id}-help`}>
-        대화의 결과를 결재 전에 다른 AI 도구의 에이전트가 검토해요. 의견은 결과 카드에 실려요
+        대화의 결과를 승인 전에 다른 AI 도구의 에이전트가 검토해요. 의견은 결과 카드에 실려요
       </small>
     </div>
   );

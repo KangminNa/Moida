@@ -15,7 +15,7 @@ import { useNotify } from '../../_ui/notify';
 const COLUMNS = [
   { name: '대기', statuses: ['queued'] },
   { name: '실행 중', statuses: ['running'] },
-  { name: '결재 대기', statuses: ['waiting'] },
+  { name: '승인 대기', statuses: ['waiting'] },
   { name: '완료', statuses: ['done', 'failed', 'cancelled'] },
 ];
 /** 칸에 펼쳐 두는 수. 나머지는 상태별 목록에서 본다 */
@@ -122,7 +122,7 @@ function TaskBoard({ agents }: { agents: readonly Agent[] }) {
 }
 
 function TaskCard({ task, agent }: { task: Task; agent: string | undefined }) {
-  // 끝난 상태와, 결재가 아니라 하위 작업을 기다리는 카드는 상태를 따로 보인다
+  // 끝난 상태와, 승인이 아니라 하위 작업을 기다리는 카드는 상태를 따로 보인다
   const marked =
     task.status === 'failed' || task.status === 'cancelled' || task.waitReason === 'subtasks';
   return (

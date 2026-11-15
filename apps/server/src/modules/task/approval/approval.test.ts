@@ -51,7 +51,7 @@ describe('결재 상태', () => {
     const { approval, task } = pending();
     assert.equal(approval.unsaved.status, Approval.PENDING);
     assert.equal(task.unsaved.status, Task.WAITING);
-    assert.equal(task.addedLog.at(-1)?.body, '결재 요청: blog.post.publish (공개해 주세요)');
+    assert.equal(task.addedLog.at(-1)?.body, '승인 요청: blog.post.publish (공개해 주세요)');
   });
 
   test('맡기지 않은 동작은 올릴 수 없다', () => {

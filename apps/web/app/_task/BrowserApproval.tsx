@@ -8,13 +8,13 @@ import { useLiveValue } from '../_lib/use-live';
 import { LOGGED_IN_NOTE } from './labels';
 import type { Approval, BrowserClick, BrowserShot, BrowserShots } from './types';
 
-// browser-tabs 패키지의 결재 두 가지 (2차 3단계 서버 브라우저 목표). 무엇을 결재하는지는 패키지가 기록한 것을 읽는다 (에이전트의 메모가 아니라).
-//   결재된 클릭(browser.site.publish, 대상 browser_click): 페이지 · 버튼 · 멈춘 화면(버튼 자리에 테두리). 승인하면 러너가 같은 버튼인지 보고 누른다
+// browser-tabs 패키지의 승인 두 가지 (2차 3단계 서버 브라우저 목표). 무엇을 승인하는지는 패키지가 기록한 것을 읽는다 (에이전트의 메모가 아니라).
+//   승인된 클릭(browser.site.publish, 대상 browser_click): 페이지 · 버튼 · 멈춘 화면(버튼 자리에 테두리). 승인하면 러너가 같은 버튼인지 보고 누른다
 //   로그인 필요(browser.site.login, 대상 browser_site): 로그인 화면. 콘솔 화면에서 로그인한 뒤 "로그인했어요"(수정 요청)로 같은 작업을 잇는다
 
 const BROWSER_PAGE = '/admin/p/browser-tabs';
 const CLICK_STATUS: Record<string, string> = {
-  held: '결재 대기',
+  held: '승인 대기',
   approved: '누를 차례',
   clicking: '누르는 중',
   clicked: '눌렀음',
@@ -80,7 +80,7 @@ export function ClickTarget({ approval }: { approval: Approval }) {
     <section className="preview" aria-label="누를 버튼">
       <b>{click.pageTitle || click.pageUrl}</b>
       {click.version !== version && click.status === 'held' && (
-        <p className="warn">결재 뒤 다시 붙잡은 클릭이에요. 승인해도 누르지 않아요</p>
+        <p className="warn">승인 뒤 다시 붙잡은 클릭이에요. 승인해도 누르지 않아요</p>
       )}
       <dl className="kv">
         <dt>사이트</dt>
@@ -149,7 +149,7 @@ export function LoginTarget({ approval }: { approval: Approval }) {
   );
 }
 
-/** 로그인 결재의 결정: "로그인했어요"(같은 작업을 다시 대기열로) · 반려(작업 취소) */
+/** 로그인 승인의 결정: "로그인했어요"(같은 작업을 다시 대기열로) · 반려(작업 취소) */
 export function LoginDecide({
   approval,
   reload,
@@ -170,7 +170,7 @@ export function LoginDecide({
       {
         done: decision === 'revise' ? '이어서 해요' : '반려됨',
         reload,
-        conflict: '이미 바뀐 결재예요. 최신 내용을 다시 읽었어요',
+        conflict: '이미 바뀐 승인이에요. 최신 내용을 다시 읽었어요',
       },
     );
   return (

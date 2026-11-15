@@ -95,7 +95,7 @@ describe('알림 설정 (/api/notice-settings)', () => {
       [of('task.schedule.skipped')?.severity, of('task.schedule.skipped')?.route],
       ['log', 'center'],
     );
-    assert.equal(of('task.approval.requested')?.label, '결재 요청');
+    assert.equal(of('task.approval.requested')?.label, '승인 요청');
   });
 
   test('저장 · version · 모양과 뜻의 검사', async () => {
@@ -204,7 +204,7 @@ describe('모듈이 등록한 알림', () => {
     const [asked] = (await notices('task.approval.requested')).filter((n) =>
       String(n.body).startsWith('공개해 주세요'),
     );
-    assert.equal(asked?.title, '결재를 기다려요');
+    assert.equal(asked?.title, '승인을 기다려요');
     assert.equal(asked?.read, false);
 
     const detail = ok(await api.get(`/api/approvals/${approval.approval_id}`, owner));

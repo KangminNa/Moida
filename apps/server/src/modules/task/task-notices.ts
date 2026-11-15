@@ -27,14 +27,14 @@ export class TaskNotices implements OnModuleInit {
 
   onModuleInit(): void {
     this.catalog.define(
-      new NoticeKind(TaskNotices.APPROVAL, '결재 요청', NoticeKind.IMMEDIATE)
+      new NoticeKind(TaskNotices.APPROVAL, '승인 요청', NoticeKind.IMMEDIATE)
         // 대화의 일에서 올라온 결재(chatId)는 따로 알리지 않는다: 결과 카드(task.chat.result)가 생길 때 한 번 (2차 2단계)
         .from(['task.approval.requested'], (e) =>
           e.data.chatId
             ? null
             : {
                 title:
-                  e.data.action === TaskNotices.CARD ? '결과를 골라 주세요' : '결재를 기다려요',
+                  e.data.action === TaskNotices.CARD ? '결과를 골라 주세요' : '승인을 기다려요',
                 body: [e.data.note, e.data.action]
                   .filter((v) => typeof v === 'string' && v !== '')
                   .join(' · ')

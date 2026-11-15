@@ -286,7 +286,7 @@ export class ClearSession extends Read<{ id: string }> {
     const site = await siteOf(work, actor, input.id);
     const waiting = await work.exists(clicks, { site_id: site.id, status: OPEN_CLICK });
     if (waiting)
-      throw new Conflict('이 사이트에서 기다리는 클릭이 있어요. 결재를 먼저 닫아 주세요');
+      throw new Conflict('이 사이트에서 기다리는 클릭이 있어요. 승인 요청을 먼저 닫아 주세요');
     return new ClearedView(await this.screen.clearSite(site.origins));
   }
 }

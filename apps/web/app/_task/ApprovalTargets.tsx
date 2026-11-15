@@ -10,10 +10,10 @@ import { useGoalRun } from './live';
 import { Criteria, RoundReport } from './RoundReport';
 import type { Agent, Approval, CodePull } from './types';
 
-// 결재 화면의 "무엇을 결재하는지" 칸 가운데 글 · 한도가 아닌 것. 대상은 서버에서 읽는다 (에이전트의 메모가 아니라).
+// 승인 화면의 "무엇을 승인하는지" 칸 가운데 글 · 한도가 아닌 것. 대상은 서버에서 읽는다 (에이전트의 메모가 아니라).
 
 /**
- * 목표 실행의 결재문: 이번 회차의 보고와 완료 조건. 왜 결재가 올라왔는지는 요청 메모에 있다.
+ * 목표 실행의 승인 요청서: 이번 회차의 보고와 완료 조건. 왜 승인이 올라왔는지는 요청 메모에 있다.
  * 보고는 팀장(AI)의 주장이라 근거와 회차 작업을 함께 보여 준다
  */
 export function GoalRunTarget({ approval }: { approval: Approval }) {
@@ -28,16 +28,16 @@ export function GoalRunTarget({ approval }: { approval: Approval }) {
   const asking = r.pendingApprovalId === approval.id;
   const report = asking ? r.rounds.find((x) => x.round === r.round) : undefined;
   return (
-    <section className="preview" aria-label="결재문">
+    <section className="preview" aria-label="승인 요청서">
       <b>
         {r.title} · {r.round}회차 (한도 {r.maxRounds})
       </b>
       <p className="note">
-        목표 {r.goalTitle ?? '–'} · 팀장 {r.agentName ?? '–'} · 결재{' '}
+        목표 {r.goalTitle ?? '–'} · 팀장 {r.agentName ?? '–'} · 승인{' '}
         {CHECKPOINTS[r.checkpoint] ?? r.checkpoint}
       </p>
       {!asking ? (
-        <p className="note">정해진 결재. 실행은 지금 {GOAL_RUN_STATUS[r.status] ?? r.status}</p>
+        <p className="note">정해진 승인. 실행은 지금 {GOAL_RUN_STATUS[r.status] ?? r.status}</p>
       ) : report ? (
         <RoundReport round={report} />
       ) : (
@@ -62,7 +62,7 @@ export function GoalRunTarget({ approval }: { approval: Approval }) {
   );
 }
 
-/** code.pr.merge: 패키지가 기록한 PR (에이전트의 메모가 아니라). 결재 뒤 PR이 바뀌었으면 알린다 */
+/** code.pr.merge: 패키지가 기록한 PR (에이전트의 메모가 아니라). 승인 뒤 PR이 바뀌었으면 알린다 */
 export function PullTarget({ approval }: { approval: Approval }) {
   const { id, version } = approval.target;
   const { data: pull, error } = useLiveValue(
@@ -83,7 +83,7 @@ export function PullTarget({ approval }: { approval: Approval }) {
       </b>
       {pull.version !== version && (
         <p className="warn">
-          결재 뒤 PR이 바뀌었어요 (버전 {version} → {pull.version}). 승인해도 머지로 남지 않아요
+          승인 뒤 PR이 바뀌었어요 (버전 {version} → {pull.version}). 승인해도 머지로 남지 않아요
         </p>
       )}
       <dl className="kv">

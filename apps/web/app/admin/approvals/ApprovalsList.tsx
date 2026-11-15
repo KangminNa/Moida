@@ -13,7 +13,7 @@ import { WikiProposals } from './WikiProposals';
 
 const ALL = 'all';
 const DEFAULT = 'pending';
-/** 위키 제안: 작업 결재가 아니라 vault의 검토 대기 변경이다 */
+/** 위키 제안: 작업 승인이 아니라 vault의 검토 대기 변경이다 */
 const WIKI = 'wiki';
 const FILTERS: readonly string[] = [...Object.keys(APPROVAL_STATUS), ALL];
 /** 목록과 내용을 나란히 놓는 폭 (globals.css의 .split과 맞춘다) */
@@ -23,7 +23,7 @@ function mergePages(before: ApprovalPage, more: ApprovalPage): ApprovalPage {
   return { ...more, approvals: [...before.approvals, ...more.approvals] };
 }
 
-// 결재: 상태 칩 + 왼쪽 목록(기본은 대기) + 오른쪽 내용. 마지막 칩은 AI의 위키 제안이다.
+// 승인: 상태 칩 + 왼쪽 목록(기본은 대기) + 오른쪽 내용. 마지막 칩은 AI의 위키 제안이다.
 export function ApprovalsList({ children }: { children: ReactNode }) {
   const asked = useSearchParams().get('status');
   const filter = asked === WIKI || (asked && FILTERS.includes(asked)) ? asked : DEFAULT;
@@ -31,7 +31,7 @@ export function ApprovalsList({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <nav className="chips" aria-label="결재 상태">
+      <nav className="chips" aria-label="승인 상태">
         {FILTERS.map((s) => (
           <Link
             key={s}
@@ -84,7 +84,7 @@ function TaskApprovals({ filter, children }: { filter: string; children: ReactNo
   const nameOf = (agentId: string | null) =>
     agents.data?.agents.find((a) => a.id === agentId)?.name ?? '서버';
 
-  // 고른 결재를 주소로 고정한다: 신호로 목록이 바뀌어도 읽던 결재가 다른 결재로 바뀌지 않게
+  // 고른 승인을 주소로 고정한다: 신호로 목록이 바뀌어도 읽던 승인이 다른 승인으로 바뀌지 않게
   const first = list.data?.approvals[0]?.id;
   useEffect(() => {
     if (!id && first && window.matchMedia(SIDE_BY_SIDE).matches)
@@ -102,7 +102,7 @@ function TaskApprovals({ filter, children }: { filter: string; children: ReactNo
             !list.error && <p className="label-mono">불러오는 중…</p>
           ) : empty ? (
             <p className="rows-empty">
-              {filter === ALL ? '결재 없음' : `${APPROVAL_STATUS[filter]} 결재 없음`}
+              {filter === ALL ? '승인 없음' : `${APPROVAL_STATUS[filter]} 승인 없음`}
             </p>
           ) : (
             <ul className="list">
@@ -141,7 +141,7 @@ function TaskApprovals({ filter, children }: { filter: string; children: ReactNo
         <div className="split-detail">
           {id && (
             <Link className="ghost split-back" href={`/admin/approvals${query}`}>
-              결재 목록
+              승인 목록
             </Link>
           )}
           {children}

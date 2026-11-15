@@ -8,11 +8,13 @@ import { useActivePackages } from '../_plugins/packages';
 import { countOf, usePendingApprovals } from '../_task/live';
 import { CairnMark } from '../_ui/CairnMark';
 import { NotifyContext } from '../_ui/notify';
+import { SOURCE_URL } from '../_ui/source';
 import { ThemeToggle } from '../_ui/ThemeToggle';
 import { useToast } from '../_ui/useToast';
 import { useWaitingChanges } from '../_vault/live';
 import { ChatNav } from './ChatNav';
-import { APPROVALS_HREF, CHAT_HREF, CHATS_HREF, MENU, MenuIcon } from './menu';
+import { MainLinks } from './MainLinks';
+import { CHAT_HREF, CHATS_HREF, MENU, MenuIcon, PACKAGE_GROUPS, titleOf } from './menu';
 import { NotificationBell } from './NotificationBell';
 
 /** 대화 칸인가 (새 대화 · 대화 하나): 왼쪽이 대화 목록이 된다 */
@@ -21,7 +23,8 @@ function isChat(pathname: string | null): boolean {
 }
 
 // 콘솔의 틀: 왼쪽 칸 + 작업 칸. 좁은 화면에서는 왼쪽 칸이 서랍으로 열린다.
-// 2차 1-5: 대화 칸에서는 왼쪽이 대화 목록(ChatNav, 아래에 결재 · 설정), 그 밖(설정)에서는 메뉴와 "대화로".
+// 2차 1-5: 대화 칸에서는 왼쪽이 대화 목록(ChatNav, 아래에 승인 · 팀 · 보관함 · 설정), 그 밖(설정)에서는 메뉴와 "대화로 돌아가기".
+// 위쪽 줄은 지금 화면의 이름(설정 › 이름)과 알림 종, 아래 프로필 줄에 화면 밝기 · 블로그 열기 · 로그아웃 (2026-11-15 화면 정리).
 // 메뉴는 일반 링크로 둔다: 글 편집기의 "저장 안 한 내용" 확인(beforeunload)이 페이지를 떠날 때 돌아야 한다.
 export function AdminShell({
   ownerName,
@@ -89,13 +92,22 @@ export function AdminShell({
             <SettingsNav pathname={pathname} packages={packages} pendingCount={pendingCount} />
           )}
           <div className="console-foot">
-            <span className="label-mono">{ownerName}</span>
-            <a className="console-link" href="/">
-              블로그 열기
-            </a>
-            <button type="button" className="console-link" onClick={logout}>
-              로그아웃
-            </button>
+            <div className="console-me">
+              <span className="avatar" aria-hidden="true">
+                {ownerName.slice(0, 1)}
+              </span>
+              <span className="clamp-1">{ownerName}</span>
+              <ThemeToggle />
+            </div>
+            <div className="console-foot-links">
+              <a href="/">블로그 열기</a>
+              <button type="button" onClick={logout}>
+                로그아웃
+              </button>
+              <a href={SOURCE_URL} rel="noopener">
+                소스 · AGPL-3.0
+              </a>
+            </div>
           </div>
         </aside>
         <div className="console-work">
@@ -117,9 +129,8 @@ export function AdminShell({
                 <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
               </svg>
             </button>
-            <span className="console-path">{pathname}</span>
+            <PageTitle pathname={pathname} packages={packages} />
             <NotificationBell />
-            <ThemeToggle />
           </header>
           <div className="console-page">{children}</div>
         </div>
@@ -133,7 +144,33 @@ export function AdminShell({
   );
 }
 
-/** 설정 칸의 왼쪽: 대화로 돌아가는 줄, 메뉴 묶음과 그 묶음의 기능 패키지, 묶음이 없는 기능 패키지 */
+/** 위쪽 줄의 제목: 설정 › 이름. 기능 패키지 화면이면 그 메뉴 이름 */
+function PageTitle({
+  pathname,
+  packages,
+}: {
+  pathname: string | null;
+  packages: readonly PackageEntry[];
+}) {
+  const found =
+    titleOf(pathname) ??
+    (() => {
+      const entry = packages.find((p) => pathname?.startsWith(`/admin/p/${p.plugin}`));
+      return entry ? { section: '설정', name: entry.name } : null;
+    })();
+  if (!found) return <span className="console-title" />;
+  return (
+    <span className="console-title">
+      {found.section && <span className="crumb">{found.section} › </span>}
+      <b>{found.name}</b>
+    </span>
+  );
+}
+
+/**
+ * 설정 칸의 왼쪽: 대화로 돌아가는 줄, 네 줄, 설정 묶음, 접어 둔 "고급"(지금 화면이 그 안이면 펼친다).
+ * 기능 패키지는 목록 파일의 묶음(옛 이름 포함, PACKAGE_GROUPS)에 붙고, 모르는 묶음은 고급의 맨 아래
+ */
 function SettingsNav({
   pathname,
   packages,
@@ -143,52 +180,60 @@ function SettingsNav({
   packages: readonly PackageEntry[];
   pendingCount: string | null;
 }) {
+  const groupOf = (p: PackageEntry) => PACKAGE_GROUPS[p.group] ?? '';
+  const settings = MENU.filter((g) => !g.advanced);
+  const advanced = MENU.filter((g) => g.advanced);
+  const inSettings = settings.some((g) => g.items.some((i) => pathname?.startsWith(i.href)));
+  const inAdvanced =
+    advanced.some((g) => g.items.some((i) => pathname?.startsWith(i.href))) ||
+    packages.some((p) => pathname?.startsWith(`/admin/p/${p.plugin}`));
+  const loose = packages.filter((p) => !MENU.some((g) => g.label === groupOf(p)));
+  const group = (g: (typeof MENU)[number]) => (
+    <nav key={g.label} aria-label={g.label}>
+      <div className="console-label">{g.label}</div>
+      {g.items.map((item) => (
+        <a
+          key={item.href}
+          className="console-link"
+          href={item.href}
+          aria-current={pathname?.startsWith(item.href) ? 'page' : undefined}
+        >
+          <MenuIcon name={item.icon} />
+          {item.name}
+        </a>
+      ))}
+      {packages
+        .filter((p) => groupOf(p) === g.label)
+        .map((p) => (
+          <PackageLink key={p.plugin} entry={p} pathname={pathname} />
+        ))}
+    </nav>
+  );
   return (
     <>
       <a className="console-link chat-back" href={CHAT_HREF}>
-        <MenuIcon name="chat" />
-        대화로
+        <MenuIcon name="back" />
+        대화로 돌아가기
       </a>
-      {MENU.map((group) => (
-        <nav key={group.label} aria-label={group.label}>
-          <div className="console-label">{group.label}</div>
-          {packages
-            .filter((p) => p.group === group.label)
-            .map((p) => (
+      <nav aria-label="주요">
+        <MainLinks pathname={pathname} pendingCount={pendingCount} settingsOpen={inSettings} />
+      </nav>
+      {settings.map(group)}
+      <details className="console-more" open={inAdvanced || undefined}>
+        <summary className="console-link">
+          <MenuIcon name="tools" />
+          고급
+        </summary>
+        {advanced.map(group)}
+        {loose.length > 0 && (
+          <nav aria-label="기능 패키지">
+            <div className="console-label">기능 패키지</div>
+            {loose.map((p) => (
               <PackageLink key={p.plugin} entry={p} pathname={pathname} />
             ))}
-          {group.items.map((item) => (
-            <a
-              key={item.href}
-              className="console-link"
-              href={item.href}
-              aria-current={pathname?.startsWith(item.href) ? 'page' : undefined}
-            >
-              <MenuIcon name={item.icon} />
-              {item.name}
-              {item.href === APPROVALS_HREF && pendingCount && (
-                <span className="console-count">
-                  <span className="sr">대기 </span>
-                  {pendingCount}
-                  <span className="sr">건</span>
-                </span>
-              )}
-            </a>
-          ))}
-        </nav>
-      ))}
-      {[...new Set(packages.map((p) => p.group))]
-        .filter((label) => !MENU.some((group) => group.label === label))
-        .map((label) => (
-          <nav key={`package-${label}`} aria-label={label || '기능 패키지'}>
-            <div className="console-label">{label || '기능 패키지'}</div>
-            {packages
-              .filter((p) => p.group === label)
-              .map((p) => (
-                <PackageLink key={p.plugin} entry={p} pathname={pathname} />
-              ))}
           </nav>
-        ))}
+        )}
+      </details>
     </>
   );
 }

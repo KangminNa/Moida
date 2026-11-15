@@ -62,7 +62,7 @@ function toolOf(kinds: readonly string[] | undefined): DeskTool {
   return last === 'read' ? 'Read' : 'Write';
 }
 
-/** 결재를 기다리는 작업이 가장 앞이다: 멈춘 에이전트여도 주인이 볼 일이 남아 있다 */
+/** 승인을 기다리는 작업이 가장 앞이다: 멈춘 에이전트여도 주인이 볼 일이 남아 있다 */
 function stateOf(
   agent: FeedAgent,
   held: boolean,
@@ -103,7 +103,7 @@ function poseOf(desk: Desk): Pose {
 function poseMessages(id: number, before: Pose | null, after: Pose): ServerMessage[] {
   if (after.kind === 'rest') {
     if (before?.kind === 'rest') return [];
-    // Pixel의 waiting은 "차례가 끝남"이다. Cairn의 waiting(결재 대기)은 agentToolPermission으로 간다
+    // Pixel의 waiting은 "차례가 끝남"이다. Cairn의 waiting(승인 대기)은 agentToolPermission으로 간다
     const end: ServerMessage = { type: 'agentStatus', id, status: 'waiting' };
     return before ? [{ type: 'agentToolsClear', id }, end] : [end];
   }

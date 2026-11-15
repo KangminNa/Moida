@@ -31,11 +31,11 @@ export function ToolTextPanel() {
   return (
     <>
       <header className="page-head">
-        <h1>도구 설명</h1>
+        <h1>MCP 도구 설명</h1>
       </header>
       <p className="note">
         AI가 MCP 도구를 고를 때 읽는 글. 저장하면 다음에 도구 목록을 받는 AI부터 그 버전을 봐요.
-        권한 · 결재 · 입력 형식은 설명으로 바뀌지 않아요.
+        권한 · 승인 · 입력 형식은 설명으로 바뀌지 않아요.
       </p>
       <label className="sr" htmlFor="tool-text-find">
         도구 찾기

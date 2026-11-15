@@ -86,7 +86,7 @@ export class ApprovalDecided extends Command<DecidedInput> {
         work,
         input.spaceId,
         input.approvalId,
-        '결재한 클릭이 아니에요 (이미 닫혔거나 바뀌었어요)',
+        '승인한 클릭이 아니에요 (이미 닫혔거나 바뀌었어요)',
       );
     await work.updateRows(
       clicks,
@@ -106,7 +106,7 @@ export class ApprovalDecided extends Command<DecidedInput> {
         work,
         input.spaceId,
         input.approvalId,
-        '로그인 결재는 "로그인했어요"로 이어 가요',
+        '로그인 요청은 "로그인했어요"로 이어 가요',
       );
     if (this.decision === 'revised' && input.targetKind === SITE_TARGET && input.targetId)
       await work.updateRows(

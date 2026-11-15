@@ -2,9 +2,9 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react';
 
 // code-github의 콘솔 화면 (운영 › 코드). 코드 작업을 GitHub와 잇는다.
 //   저장소: 등록 · 고치기 · 보관. 칸이 돌리는 명령(setup · checks)은 여기 적은 것만 쓴다
-//   일 맡기기: 저장소 · 고칠 곳(paths) · 지시 · 담당. 코드 러너 칸이 고쳐 draft PR을 열고 결재를 올린다.
+//   일 맡기기: 저장소 · 고칠 곳(paths) · 지시 · 담당. 코드 러너 칸이 고쳐 draft PR을 열고 승인을 올린다.
 //     팀원이 있는 담당(팀장)은 경로로 나눠 팀원들에게 맡기고, 칸 수만큼 함께 돈다 (코드 작업 5단계)
-//   PR: 러너가 연 PR. 주인이 GitHub에서 머지한 뒤 결재를 승인하면 작업이 끝난다
+//   PR: 러너가 연 PR. 주인이 GitHub에서 머지한 뒤 승인하면 작업이 끝난다
 // 화면은 react와 이 폴더만 가져온다: 서버 호출(call)과 알림(notify)은 콘솔이 넘겨 준다.
 
 type Reply = { ok: true; data: unknown } | { ok: false; message: string };
@@ -71,7 +71,7 @@ export default function CodePage({ call, notify }: Props) {
   return (
     <div className="stack">
       <p className="note">
-        저장소를 등록하고 일을 맡기면 샌드박스의 AI가 고쳐 draft PR을 열고 결재를 올려요. GitHub에서
+        저장소를 등록하고 일을 맡기면 샌드박스의 AI가 고쳐 draft PR을 열고 승인을 올려요. GitHub에서
         머지한 뒤 승인하면 작업이 끝나요. 토큰은 설정 › 플러그인 › code-github에 넣어요
       </p>
       <AddRepo call={call} notify={notify} onAdded={load} />
@@ -258,7 +258,7 @@ function RepoItem({
   );
 }
 
-/** 러너가 연 PR. 결재는 결재 메뉴에서 */
+/** 러너가 연 PR. 승인은 승인 메뉴에서 */
 function Pulls({ pulls }: { pulls: Pull[] | null }) {
   return (
     <section className="panel" aria-label="PR">

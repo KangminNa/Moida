@@ -384,7 +384,7 @@ describe('결재한 공개', () => {
 
   test('공개할 수 없으면 아무것도 바꾸지 않고 실패를 돌려준다', () => {
     const cases: readonly [Post, number, RegExp][] = [
-      [saved(Post.DRAFT), 2, /바뀐 글이라 공개하지 않았어요 \(결재 2, 지금 3\)/],
+      [saved(Post.DRAFT), 2, /바뀐 글이라 공개하지 않았어요 \(요청 때 버전 2, 지금 3\)/],
       [saved(Post.DRAFT, null, now), 3, /휴지통/],
       [saved(Post.PUBLISHED, now), 3, /이미 공개된 글/],
     ];

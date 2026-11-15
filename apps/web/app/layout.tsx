@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { SpaceInfo } from './_account/types';
 import { serverGet } from './_lib/server-api';
 import './globals.css';
+import { SOURCE_URL } from './_ui/source';
 
 /** 사이트 로고를 올렸으면 브라우저 탭 아이콘으로도 쓴다 */
 export async function generateMetadata() {
@@ -14,7 +15,6 @@ export async function generateMetadata() {
 }
 
 // AGPL-3.0: 서비스를 쓰는 사람도 소스를 받을 수 있게 모든 화면에 링크를 둔다
-const SOURCE_URL = 'https://github.com/KangminNa/blog';
 
 // 고른 테마를 첫 그림 전에 적용한다 (고르지 않았으면 기기 설정을 따른다)
 const THEME_SCRIPT =
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Emoji:wght@500&display=swap"
         />
       </head>
       <body>

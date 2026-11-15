@@ -33,9 +33,9 @@ export const GOAL_RUN_TOPICS = ['task.goal_run.changed'];
 export const CHAT_TOPICS = ['task.chat.changed', 'task.task.changed'];
 /** 대화의 소식이 쌓임 (변경 신호, agent_updates와 같은 것: 질문 · 맡음도) */
 const CHAT_NEWS_TOPICS = ['task.chat.updated'];
-/** 대화 목록 (왼쪽 칸): 상태(질문 · 결재)가 소식 · 결재로도 바뀐다 */
+/** 대화 목록 (왼쪽 칸): 상태(질문 · 승인)가 소식 · 승인으로도 바뀐다 */
 const CHAT_LIST_TOPICS = [...CHAT_TOPICS, ...CHAT_NEWS_TOPICS, 'task.approval.*'];
-/** 대화 하나: 진행 기록(생각 중… 줄) · 소식 · 결재까지 따라간다 */
+/** 대화 하나: 진행 기록(생각 중… 줄) · 소식 · 승인까지 따라간다 */
 export const CHAT_DETAIL_TOPICS = [
   ...CHAT_TOPICS,
   ...CHAT_NEWS_TOPICS,
@@ -44,7 +44,7 @@ export const CHAT_DETAIL_TOPICS = [
 ];
 /** 실행 기록이 쌓이면 사용량이 바뀐다 */
 export const AGENT_TOPICS = ['task.agent.changed', 'task.event.added'];
-/** 외부 도구 (2차 7단계): AI의 제안 · 결재로 붙음 · 실패 */
+/** 외부 도구 (2차 7단계): AI의 제안 · 승인으로 붙음 · 실패 */
 const EXTERNAL_TOOL_TOPICS = ['task.external_tool.*', 'task.approval.*'];
 /** 구독 사용률이 오거나 실행 기록이 쌓이면 사용량이 바뀐다 */
 export const USAGE_TOPICS = ['task.usage.changed', 'task.event.added'];

@@ -14,7 +14,7 @@ const NO_TOPICS: readonly string[] = [];
 const STATUS: Record<string, string> = { draft: '만드는 중', published: '발행' };
 
 // 매거진 호 (2차 6단계): 호 목록 메뉴 하나의 호를 새 번호부터. 추가 · 글 고르기 · 발행 · 삭제(발행 전만).
-// 발행은 호와 그 글을 한 번에 공개한다. AI 팀이 만든 호는 결과 카드의 결재(blog.issue.publish)로도 나간다.
+// 발행은 호와 그 글을 한 번에 공개한다. AI 팀이 만든 호는 결과 카드의 승인(blog.issue.publish)로도 나간다.
 export function MenuIssuesPanel({ menuId }: { menuId: string }) {
   const menus = useLiveValue('menus', () => api<MenuList>('GET', '/api/menus'), NO_TOPICS);
   const issues = useLiveValue('issues', () => api<IssueList>('GET', '/api/issues'), NO_TOPICS);

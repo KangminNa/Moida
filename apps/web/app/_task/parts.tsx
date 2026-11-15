@@ -46,7 +46,7 @@ export function AgentUsage({ agent }: { agent: Agent }) {
   return (
     <div className="usage">
       <div className="usage-text">
-        <span>이번 달 사용량</span>
+        <span>이번 달</span>
         <span className={over ? 'mono strong' : 'mono'}>
           {limit === null
             ? `${tokens(used)} 토큰 · 한도 없음`

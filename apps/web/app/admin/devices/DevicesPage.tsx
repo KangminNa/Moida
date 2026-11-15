@@ -8,7 +8,7 @@ export function DevicesPage({ siteUrl }: { siteUrl: string | null }) {
   return (
     <section className="console-inner" aria-label="기기">
       <header className="page-head">
-        <h1>기기</h1>
+        <h1>연결된 기기</h1>
       </header>
       <DevicesPanel runners siteUrl={siteUrl} onMessage={notify} />
     </section>

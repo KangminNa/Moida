@@ -52,7 +52,7 @@ export function BossField({
         ))}
       </select>
       <small id={`${id}-help`}>
-        보고 대상은 이 에이전트에게 일을 나눠 맡길 수 있어요. 조직도는 4단계까지, 결재는 늘{' '}
+        보고 대상은 이 에이전트에게 일을 나눠 맡길 수 있어요. 조직도는 4단계까지, 승인은 늘{' '}
         {ownerName}
       </small>
     </div>

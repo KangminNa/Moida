@@ -237,7 +237,7 @@ export function AgentForm({
         id={`${id}-limit`}
         label="월 한도 (토큰)"
         value={limit}
-        help="비우면 한도 없음. 넘기면 자동 중지 후 결재 요청"
+        help="비우면 한도 없음. 넘기면 자동 중지 후 승인 요청"
         problem={problems.limit}
         onChange={(value) => change(() => setLimit(value))}
       />

@@ -63,7 +63,9 @@ export class ChatResult {
   /** 있어야 하는 것의 이름 (검사 실패 지시문에 싣는다) */
   static needOf(deliver: string): string {
     const need = ChatResult.NEEDS[deliver];
-    return need?.output ? `${need.output} 결과물` : `${need?.actions?.join(' · ') ?? deliver} 결재`;
+    return need?.output
+      ? `${need.output} 결과물`
+      : `${need?.actions?.join(' · ') ?? deliver} 승인 요청`;
   }
 
   /**

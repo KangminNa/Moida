@@ -38,7 +38,7 @@ const POST_MOVED = {
   error: { code: 'moved', message: '바뀐 글이에요. 달라진 내용을 확인한 뒤 다시 승인해 주세요' },
 } as const;
 
-// 결재 하나. 판단은 에이전트의 메모가 아니라 서버에서 읽은 대상 내용으로 한다.
+// 승인 하나. 판단은 에이전트의 메모가 아니라 서버에서 읽은 대상 내용으로 한다.
 export function ApprovalDetail({ id }: { id: string }) {
   const approval = useLiveValue(
     `approval:${id}`,
@@ -51,7 +51,7 @@ export function ApprovalDetail({ id }: { id: string }) {
 
   if (!a)
     return approval.status === 404 ? (
-      <p className="rows-empty">찾을 수 없는 결재</p>
+      <p className="rows-empty">찾을 수 없는 승인</p>
     ) : approval.error ? (
       <p className="error">{approval.error}</p>
     ) : (
@@ -229,7 +229,7 @@ function Decide({
       {
         done: DONE_NOTES[decision] ?? '결정됨',
         reload,
-        conflict: '이미 바뀐 결재예요. 최신 내용을 다시 읽었어요',
+        conflict: '이미 바뀐 승인이에요. 최신 내용을 다시 읽었어요',
       },
     );
   }

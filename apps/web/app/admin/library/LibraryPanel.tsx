@@ -113,7 +113,7 @@ export function LibraryPanel() {
           페이지 관리
         </Link>
         <Link className="ghost small" href="/admin/library/basket">
-          소재 관리
+          스크랩 관리
         </Link>
       </nav>
       <fieldset className="row" style={{ border: 0, margin: 0, padding: 0 }}>

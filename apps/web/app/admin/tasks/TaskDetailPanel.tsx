@@ -89,7 +89,7 @@ export function TaskDetailPanel({ id }: { id: string }) {
       {t.waitReason === 'subtasks' && (
         <p className="warn">하위 작업을 기다리는 중. 모두 끝나면 결과를 받아 다시 실행돼요</p>
       )}
-      {executing && <p className="warn">결재 승인됨. 실행 결과를 기다리는 중</p>}
+      {executing && <p className="warn">승인됨. 실행 결과를 기다리는 중</p>}
       <section className="panel" aria-labelledby="task-instruction">
         <h2 id="task-instruction">지시</h2>
         <p className="text">{t.instruction || '지시 없음'}</p>
@@ -144,7 +144,7 @@ export function TaskDetailPanel({ id }: { id: string }) {
             className="cta small"
             href={approval ? `/admin/approvals/${approval.id}` : '/admin/approvals'}
           >
-            결재 열기
+            승인 열기
           </Link>
         )}
         {CANCELLABLE.includes(t.status) && (

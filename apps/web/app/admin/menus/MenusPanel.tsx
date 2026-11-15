@@ -70,7 +70,7 @@ export function MenusPanel() {
     <>
       <header className="page-head">
         <div>
-          <h1>메뉴</h1>
+          <h1>블로그 메뉴</h1>
           <p>공개 블로그 위쪽 메뉴 줄. 글 · 페이지는 보관함에서 메뉴에 올림</p>
         </div>
         {open !== NEW && (

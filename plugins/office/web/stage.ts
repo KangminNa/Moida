@@ -270,7 +270,7 @@ export class OfficeStage {
     this.moveTags();
   }
 
-  /** 결재 대기 말풍선. upstream은 DOM(ToolOverlay)으로 그리지만 여기서는 캔버스 하나로 끝낸다 */
+  /** 승인 대기 말풍선. upstream은 DOM(ToolOverlay)으로 그리지만 여기서는 캔버스 하나로 끝낸다 */
   private drawBubbles(ctx: CanvasRenderingContext2D): void {
     const { office, zoom } = this;
     const bubble = getCachedSprite(BUBBLE_PERMISSION_SPRITE, zoom);

@@ -3,14 +3,8 @@
 import { CHAT_NEEDS_ME, CHAT_STATE } from '../_task/labels';
 import { useChats } from '../_task/live';
 import type { ChatSummary } from '../_task/types';
-import {
-  APPROVALS_HREF,
-  CHAT_MENU,
-  CHATS_HREF,
-  LIBRARY_HREF,
-  MenuIcon,
-  SETTINGS_HREF,
-} from './menu';
+import { MainLinks } from './MainLinks';
+import { CHAT_MENU, CHATS_HREF, MenuIcon } from './menu';
 
 /** 새 대화 줄 (메뉴 파일의 대화 칸 첫 줄) */
 const [FRESH] = CHAT_MENU;
@@ -18,14 +12,14 @@ const [FRESH] = CHAT_MENU;
 /** 목록에 표시를 다는 상태 (끝난 대화는 표시 없이) */
 const MARKED = ['routing', 'asking', 'working', 'waiting_approval', 'failed'];
 
-// 대화 칸의 왼쪽 (2차 1-5, ChatGPT · Claude 같은 모양): 새 대화, 날짜별 대화 목록, 아래에 결재 · 보관함 · 설정.
-// 나에게 온 것(질문 · 결재)은 채운 표시, 일하는 중 · 실패는 테두리 표시. 누가 맡았는지는 대화 안에서만 보인다
+// 대화 칸의 왼쪽 (2차 1-5, ChatGPT · Claude 같은 모양): 새 대화, 날짜별 대화 목록, 아래에 승인 · 팀 · 보관함 · 설정.
+// 나에게 온 것(질문 · 승인)은 채운 표시, 일하는 중 · 실패는 테두리 표시. 누가 맡았는지는 대화 안에서만 보인다
 export function ChatNav({
   pathname,
   pendingCount,
 }: {
   pathname: string | null;
-  /** 기다리는 결재 수 (콘솔 틀이 센다). 없으면 null */
+  /** 기다리는 승인 수 (콘솔 틀이 센다). 없으면 null */
   pendingCount: string | null;
 }) {
   const list = useChats();
@@ -33,7 +27,7 @@ export function ChatNav({
   return (
     <nav className="chat-nav" aria-label="대화">
       {FRESH && (
-        <a className="cta chat-new" href={FRESH.href}>
+        <a className="chat-new" href={FRESH.href}>
           <MenuIcon name={FRESH.icon} />
           {FRESH.name}
         </a>
@@ -70,33 +64,7 @@ export function ChatNav({
         ))
       )}
       <div className="chat-nav-foot">
-        <a
-          className="console-link"
-          href={APPROVALS_HREF}
-          aria-current={pathname?.startsWith(APPROVALS_HREF) ? 'page' : undefined}
-        >
-          <MenuIcon name="stamp" />
-          결재
-          {pendingCount && (
-            <span className="console-count">
-              <span className="sr">대기 </span>
-              {pendingCount}
-              <span className="sr">건</span>
-            </span>
-          )}
-        </a>
-        <a
-          className="console-link"
-          href={LIBRARY_HREF}
-          aria-current={pathname?.startsWith(LIBRARY_HREF) ? 'page' : undefined}
-        >
-          <MenuIcon name="box" />
-          보관함
-        </a>
-        <a className="console-link" href={SETTINGS_HREF}>
-          <MenuIcon name="wrench" />
-          설정
-        </a>
+        <MainLinks pathname={pathname} pendingCount={pendingCount} settingsOpen={false} />
       </div>
     </nav>
   );

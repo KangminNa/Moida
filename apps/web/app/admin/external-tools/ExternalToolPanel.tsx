@@ -12,13 +12,13 @@ const CONFLICT = '이미 바뀐 도구예요. 최신 내용을 다시 읽었어�
 
 /** 줄의 상태 표시: 제안 · 토큰 필요 · 켜짐 · 꺼짐 */
 function stateOf(tool: ExternalTool): string {
-  if (tool.status === 'proposed') return '제안 · 결재 대기';
+  if (tool.status === 'proposed') return '제안 · 승인 대기';
   if (tool.status === 'off') return '꺼짐';
   return tool.headerName && !tool.hasSecret ? '토큰 필요' : '켜짐';
 }
 
 // 외부 도구 (2차 7단계): 바깥 서비스의 원격 MCP 서버. 에이전트 편집에서 허락하면 러너가 그 에이전트의 일에만 붙인다.
-// AI가 제안한 도구는 결재(결과 카드)로 정한다. 토큰은 넣기만 하고 다시 보이지 않는다.
+// AI가 제안한 도구는 승인(결과 카드)로 정한다. 토큰은 넣기만 하고 다시 보이지 않는다.
 export function ExternalToolPanel() {
   const tools = useExternalTools();
   const action = useAction();
@@ -96,12 +96,12 @@ export function ExternalToolPanel() {
     <>
       <header className="page-head">
         <div>
-          <h1>외부 도구</h1>
-          <p>바깥 서비스의 MCP. 에이전트 편집에서 허락한 에이전트의 일에만 붙음</p>
+          <h1>커넥터</h1>
+          <p>바깥 서비스의 MCP. 팀 화면에서 허락한 에이전트의 일에만 붙음</p>
         </div>
         {open !== NEW && (
           <button type="button" className="cta small" onClick={() => setOpen(NEW)}>
-            도구 추가
+            커넥터 추가
           </button>
         )}
       </header>
@@ -110,9 +110,9 @@ export function ExternalToolPanel() {
       {list === null ? (
         !problem && <p className="label-mono">불러오는 중…</p>
       ) : list.length === 0 ? (
-        <p className="rows-empty">외부 도구 없음</p>
+        <p className="rows-empty">커넥터 없음</p>
       ) : (
-        <ul className="list" aria-label="외부 도구">
+        <ul className="list" aria-label="커넥터">
           {list.map((t) =>
             open === t.id ? (
               <li key={t.id} className="list-cell">

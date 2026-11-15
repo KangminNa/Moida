@@ -1,11 +1,11 @@
 import type { UsageAgent } from './types';
 
-// 작업·결재·에이전트의 화면 이름과 표시 형식
+// 작업·승인·에이전트의 화면 이름과 표시 형식
 
 export const TASK_STATUS: Record<string, string> = {
-  queued: '대기',
-  running: '실행 중',
-  waiting: '결재 대기',
+  queued: '차례 기다리는 중',
+  running: '일하는 중',
+  waiting: '승인 대기',
   done: '완료',
   failed: '실패',
   cancelled: '취소',
@@ -13,13 +13,13 @@ export const TASK_STATUS: Record<string, string> = {
 
 /** 기다리는 작업이 무엇을 기다리는지 (서버의 Task.WAIT_*) */
 export const WAIT_LABELS: Record<string, string> = {
-  approval: '결재 대기',
-  subtasks: '하위 작업 대기',
+  approval: '승인 대기',
+  subtasks: '팀원 기다리는 중',
 };
 
 /** 작업 상태의 이름. 기다리는 중이면 무엇을 기다리는지까지 */
 export function taskStatusLabel(status: string, waitReason: string | null = null): string {
-  if (status === 'waiting' && waitReason) return WAIT_LABELS[waitReason] ?? '결재 대기';
+  if (status === 'waiting' && waitReason) return WAIT_LABELS[waitReason] ?? '승인 대기';
   return TASK_STATUS[status] ?? status;
 }
 
@@ -36,21 +36,21 @@ export const APPROVAL_STATUS: Record<string, string> = {
 
 export const PUBLISH_POST = 'blog.post.publish';
 export const RAISE_LIMIT = 'task.agent.raise_limit';
-/** browser-tabs 패키지의 결재된 클릭: AI가 멈춘 마지막 버튼을 러너가 붙잡아 올린다. 승인하면 러너가 같은 버튼인지 보고 누른다 */
+/** browser-tabs 패키지의 승인된 클릭: AI가 멈춘 마지막 버튼을 러너가 붙잡아 올린다. 승인하면 러너가 같은 버튼인지 보고 누른다 */
 export const PUBLISH_SITE = 'browser.site.publish';
 /** browser-tabs 패키지의 로그인 필요: 콘솔 화면에서 로그인한 뒤 "로그인했어요"(수정 요청)로 같은 작업을 잇는다 */
 export const LOGIN_SITE = 'browser.site.login';
 /** "로그인했어요"가 보내는 수정 요청의 말 */
 export const LOGGED_IN_NOTE = '로그인했어요';
-/** code-github 패키지의 PR 머지 결재 (주인이 GitHub에서 머지한 뒤 승인) */
+/** code-github 패키지의 PR 머지 승인 (주인이 GitHub에서 머지한 뒤 승인) */
 export const MERGE_PULL = 'code.pr.merge';
-/** 외부 도구 꽂기 (2차 7단계): AI가 제안한 도구를 붙이는 결재. 승인하면 켜고 제안한 에이전트에 붙인다 */
+/** 외부 도구 꽂기 (2차 7단계): AI가 제안한 도구를 붙이는 승인. 승인하면 켜고 제안한 에이전트에 붙인다 */
 export const PLUG_TOOL = 'task.tool.plug';
 
-/** 목표 실행의 결재: 다음 회차로 갈지, 목표 실행을 완료로 닫을지 (서버의 Approval.GOAL_*) */
+/** 목표 실행의 승인: 다음 회차로 갈지, 목표 실행을 완료로 닫을지 (서버의 Approval.GOAL_*) */
 export const GOAL_CONTINUE = 'task.goal.continue';
 export const GOAL_COMPLETE = 'task.goal.complete';
-/** 목표 실행 결재의 대상 종류 (서버의 Approval.GOAL_RUN) */
+/** 목표 실행 승인의 대상 종류 (서버의 Approval.GOAL_RUN) */
 export const GOAL_RUN = 'goal_run';
 
 /** 승인 버튼의 말이 다른 동작. 승인이 곧 실행인 것(누르기), 관리자가 직접 하는 것, 목표 실행의 다음 걸음 */
@@ -66,11 +66,11 @@ export const ACTION_LABELS: Record<string, string> = {
   [PUBLISH_SITE]: '브라우저 버튼 누르기',
   [LOGIN_SITE]: '로그인 필요',
   [MERGE_PULL]: 'PR 머지',
-  [PLUG_TOOL]: '외부 도구 붙이기',
+  [PLUG_TOOL]: '커넥터 붙이기',
   [RAISE_LIMIT]: '한도 변경',
-  [GOAL_CONTINUE]: '목표 실행 중간 결재',
-  [GOAL_COMPLETE]: '목표 실행 최종 결재',
-  'task.chat.result': '대화의 결과',
+  [GOAL_CONTINUE]: '목표 실행 중간 승인',
+  [GOAL_COMPLETE]: '목표 실행 최종 승인',
+  'task.chat.result': '결과 확인',
 };
 
 export function actionLabel(action: string): string {
@@ -89,12 +89,12 @@ export const TARGET_LABELS: Record<string, string> = {
 
 export const GOAL_RUN_STATUS: Record<string, string> = {
   running: '회차 진행 중',
-  waiting: '결재 대기',
+  waiting: '승인 대기',
   done: '완료',
   stopped: '멈춤',
 };
 
-/** 결재를 올리는 때 (서버의 GoalRun.CHECKPOINTS) */
+/** 승인을 올리는 때 (서버의 GoalRun.CHECKPOINTS) */
 export const CHECKPOINTS: Record<string, string> = {
   every: '회차마다',
   milestone: '중요 단계마다',
@@ -283,12 +283,12 @@ export const CHAT_STATE: Record<string, string> = {
   routing: '맡길 곳 찾는 중',
   asking: '질문',
   working: '일하는 중',
-  waiting_approval: '결재',
+  waiting_approval: '승인',
   done: '끝남',
   failed: '실패',
 };
 
-/** 나에게 온 것: 목록에서 채운 표시로 (질문 · 결재). 나머지는 테두리 */
+/** 나에게 온 것: 목록에서 채운 표시로 (질문 · 승인). 나머지는 테두리 */
 export const CHAT_NEEDS_ME: readonly string[] = ['asking', 'waiting_approval'];
 
 /** 대화의 소식 종류 (task.chat_updates.kind) */

@@ -8,7 +8,7 @@ export function GraphPanel() {
   const graph = useGraph();
   if (!graph.data)
     return (
-      <section className="console-inner" aria-label="그래프">
+      <section className="console-inner" aria-label="지식 그래프">
         {graph.error ? (
           <p className="error">{graph.error}</p>
         ) : (

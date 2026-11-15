@@ -7,7 +7,7 @@ import { TOOL_LABELS, when } from '../../_task/labels';
 import { AGENT_TOPICS } from '../../_task/live';
 import type { AgentList } from '../../_task/types';
 
-// 삭제한 에이전트 (휴지통). 작업 · 결재 기록은 그대로 남아 있고, 복원하면 다시 일을 받는다.
+// 삭제한 에이전트 (휴지통). 작업 · 승인 기록은 그대로 남아 있고, 복원하면 다시 일을 받는다.
 // 보고 대상이 그사이 삭제됐으면 서버가 관리자 아래로 되돌린다.
 export function DeletedAgents({
   onRestored,
@@ -28,7 +28,7 @@ export function DeletedAgents({
   return (
     <section className="panel" aria-labelledby="deleted-agents">
       <div className="sec-title flat">
-        <h2 id="deleted-agents">삭제한 에이전트</h2>
+        <h2 id="deleted-agents">휴지통</h2>
         <button type="button" className="ghost" onClick={onClose}>
           닫기
         </button>
@@ -39,7 +39,7 @@ export function DeletedAgents({
       {list === undefined ? (
         !deleted.error && <p className="label-mono">불러오는 중…</p>
       ) : list.length === 0 ? (
-        <p className="note">삭제한 에이전트 없음</p>
+        <p className="note">휴지통 비어 있음</p>
       ) : (
         <ul className="list" aria-label="삭제한 에이전트 목록">
           {list.map((a) => (

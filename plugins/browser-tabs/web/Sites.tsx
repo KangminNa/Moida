@@ -188,13 +188,13 @@ function SiteItem({
             rows={8}
             value={instruction}
             placeholder={
-              '채울 제목과 본문을 여기에 적어 주세요.\n마지막 버튼 앞에서 멈추고, 결재하면 러너가 같은 버튼인지 확인하고 눌러요'
+              '채울 제목과 본문을 여기에 적어 주세요.\n마지막 버튼 앞에서 멈추고, 승인하면 러너가 같은 버튼인지 확인하고 눌러요'
             }
             onChange={(e) => setInstruction(e.target.value)}
           />
         </label>
         <p className="note">
-          에이전트는 글 · 소재 · 비공개 세션을 읽지 못해요. 채울 내용은 모두 여기에 적어 주세요
+          에이전트는 글 · 스크랩 · 비공개 세션을 읽지 못해요. 채울 내용은 모두 여기에 적어 주세요
         </p>
         <button type="submit" className="cta small fit" disabled={busy || instruction === ''}>
           맡기기

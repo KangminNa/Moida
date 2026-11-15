@@ -40,7 +40,7 @@ export function ProfileForm({
           onChange={(e) => setName(e.target.value)}
         />
         <small id={`${id}-help`}>
-          조직도 맨 위 · 결재 도장 · 메뉴 아래에 보이는 이름. 비우면 아이디({owner.login})
+          조직도 맨 위 · 승인 도장 · 메뉴 아래에 보이는 이름. 비우면 아이디({owner.login})
         </small>
       </div>
       {problem && <p className="error">{problem}</p>}

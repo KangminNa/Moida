@@ -14,7 +14,7 @@ export function useGraph() {
   return useLiveValue('graph', () => api<Graph>('GET', '/api/graph'), GRAPH_TOPICS);
 }
 
-/** 검토를 기다리는 변경 첫 쪽 (결재 메뉴) */
+/** 검토를 기다리는 변경 첫 쪽 (승인 메뉴) */
 export function useWaitingChanges() {
   return useLiveValue(
     'changes:waiting',

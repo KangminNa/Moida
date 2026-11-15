@@ -45,7 +45,7 @@ export type PostCounts = ReturnType<PostCountsView['toJSON']>;
 export type PostList = ReturnType<PublicPostPageView['toJSON']>;
 /** 목록 한 쪽 (주인): 공개 범위와 탭별 글 수까지 */
 export type AdminPostList = ReturnType<PostPageView['toJSON']>;
-/** 주인이 불러오는 글 (편집기 · 결재): 공개 범위 · 버전 · wiki 연결까지 */
+/** 주인이 불러오는 글 (편집기 · 승인): 공개 범위 · 버전 · wiki 연결까지 */
 export type EditablePost = ReturnType<PostView['toJSON']>;
 /** 글 페이지. 주인이 열면 공개 범위까지 온다 (초안 미리 보기) */
 export type PostPage = ReturnType<PublicPostView['toJSON']> & Partial<Pick<EditablePost, 'status'>>;

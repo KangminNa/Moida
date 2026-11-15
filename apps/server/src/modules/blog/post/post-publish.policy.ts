@@ -14,7 +14,7 @@ export class PostPublish {
   /** 결재로 공개하는 요청자의 결재 id. 그 밖의 요청자(주인도)와 다른 동작의 결재는 이 길로 오지 못한다 */
   static approvalOf(by: Actor, action = PostPublish.ACTION): string {
     if (by instanceof ApprovedActor && by.action === action) return by.approvalId;
-    throw new Forbidden('publish', '결재한 공개만 할 수 있어요');
+    throw new Forbidden('publish', '승인한 공개만 할 수 있어요');
   }
 
   /** 결재한 공개의 실패 결과. 글을 찾지 못해도 작업은 끝나야 해서 글 없이 만든다 */

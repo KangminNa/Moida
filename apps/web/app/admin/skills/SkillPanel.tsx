@@ -31,7 +31,7 @@ export function SkillPanel() {
         <h1>스킬</h1>
       </header>
       <p className="note">
-        러너가 일할 때 따르는 지침. 저장하면 다음 작업부터 모든 러너가 그 버전을 써요. 권한 · 결재 ·
+        러너가 일할 때 따르는 지침. 저장하면 다음 작업부터 모든 러너가 그 버전을 써요. 권한 · 승인 ·
         격리는 스킬로 바뀌지 않아요.
       </p>
       {error && <p className="error">{error}</p>}

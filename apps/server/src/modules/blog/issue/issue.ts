@@ -109,7 +109,7 @@ export class Issue extends TableEntity<IssueRow, IssueNew> {
   private problemOf(posts: readonly Post[], targetVersion: number | null): string | null {
     if (this.row.status === Issue.PUBLISHED) return '이미 발행한 호예요';
     if (targetVersion !== null && this.version !== targetVersion)
-      return `결재를 올린 뒤 바뀐 호라 발행하지 않았어요 (결재 ${targetVersion}, 지금 ${this.version})`;
+      return `승인 요청 뒤 바뀐 호라 발행하지 않았어요 (요청 때 버전 ${targetVersion}, 지금 ${this.version})`;
     if (posts.length === 0) return '글이 없는 호예요';
     return null;
   }

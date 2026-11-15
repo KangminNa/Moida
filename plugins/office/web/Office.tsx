@@ -9,7 +9,7 @@ import { CairnReader, watchCairn } from './cairn-read';
 
 const STATE_LABEL: Record<DeskState, string> = {
   running: '실행 중',
-  waiting: '결재 대기',
+  waiting: '승인 대기',
   paused: '중지',
   held: '쉬는 중',
   idle: '대기',

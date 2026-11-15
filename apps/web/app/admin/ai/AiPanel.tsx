@@ -54,7 +54,7 @@ export function AiPanel() {
   return (
     <>
       <header className="page-head">
-        <h1>AI</h1>
+        <h1>AI 계정</h1>
       </header>
       {tools.error && <p className="error">{tools.error}</p>}
       {tools.data

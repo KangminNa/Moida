@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Click, Props } from './browser-types';
 
-// 결재된 클릭 (2차 3단계): AI가 멈춘 마지막 버튼을 러너가 붙잡고, 결재 뒤 같은 버튼인지 보고 누른다.
+// 승인된 클릭 (2차 3단계): AI가 멈춘 마지막 버튼을 러너가 붙잡고, 승인 뒤 같은 버튼인지 보고 누른다.
 // 바뀌어 누르지 않았거나(changed) 눌렸는지 모르면(unknown) 화면에서 직접 하고 여기서 기록한다.
-// 승인됐는데 러너가 꺼져 있으면 직접 누르거나 그만둘 수 있다. 결재 자체는 결재 화면에서 한다.
+// 승인됐는데 러너가 꺼져 있으면 직접 누르거나 그만둘 수 있다. 승인은 승인 화면에서 한다.
 
 const STATUS: Record<string, string> = {
-  held: '결재 대기',
+  held: '승인 대기',
   approved: '누를 차례',
   clicking: '누르는 중',
   clicked: '눌렀음',
@@ -41,9 +41,9 @@ export function Clicks({ call, notify }: Props) {
   }
 
   return (
-    <section className="stack" aria-label="결재된 클릭">
+    <section className="stack" aria-label="승인된 클릭">
       <div className="row">
-        <b>결재된 클릭</b>
+        <b>승인된 클릭</b>
         <button type="button" className="ghost small fit" onClick={() => load()}>
           새로고침
         </button>

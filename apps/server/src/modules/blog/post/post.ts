@@ -180,7 +180,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
   ): void {
     if (mainWikiId === undefined && refWikiIds === undefined) return;
     if (by instanceof ApprovedActor)
-      throw new Forbidden('publish', '결재한 공개는 wiki 연결을 바꾸지 못해요');
+      throw new Forbidden('publish', '승인한 공개는 wiki 연결을 바꾸지 못해요');
     this.assertLive();
     if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
     const main = mainWikiId === undefined ? this.row.main_wiki_id : mainWikiId;
@@ -359,7 +359,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
   private publishProblem(targetVersion: number): string | null {
     if (this.row.deleted_at) return '휴지통에 있는 글이라 공개하지 않았어요';
     if (this.version !== targetVersion)
-      return `결재를 올린 뒤 바뀐 글이라 공개하지 않았어요 (결재 ${targetVersion}, 지금 ${this.version})`;
+      return `승인 요청 뒤 바뀐 글이라 공개하지 않았어요 (요청 때 버전 ${targetVersion}, 지금 ${this.version})`;
     if (this.row.status === Post.PUBLISHED) return '이미 공개된 글이에요';
     return null;
   }

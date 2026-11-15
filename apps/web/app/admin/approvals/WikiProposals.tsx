@@ -30,7 +30,7 @@ const REFS: readonly (readonly [string, string])[] = [
   ['dst', '끝'],
 ];
 
-// 결재 메뉴의 위키 제안: AI의 변경 중 검토를 기다리는 것. 데이터는 vault가 갖고, 결정도 vault의 경로로 한다.
+// 승인 메뉴의 위키 제안: AI의 변경 중 검토를 기다리는 것. 데이터는 vault가 갖고, 결정도 vault의 경로로 한다.
 export function WikiProposals() {
   const waiting = useWaitingChanges();
   const graph = useGraph();

@@ -69,7 +69,7 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
     },
     checkpoint: (value) => {
       if (!GoalRun.CHECKPOINTS.includes(value))
-        throw new RuleViolation(`결재 시점은 ${GoalRun.CHECKPOINTS.join(' · ')} 중 하나예요`);
+        throw new RuleViolation(`승인 시점은 ${GoalRun.CHECKPOINTS.join(' · ')} 중 하나예요`);
       return value;
     },
     max_rounds: (value) => {

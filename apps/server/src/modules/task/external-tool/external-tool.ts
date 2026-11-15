@@ -167,7 +167,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
 
   /** 켜기 · 끄기. 제안은 결재로만 켠다 */
   switchTo(on: boolean, now: Date): void {
-    if (this.proposed) throw new RuleViolation('제안한 도구는 결재로 정해요');
+    if (this.proposed) throw new RuleViolation('제안한 도구는 승인으로 정해요');
     this.put('status', on ? ExternalTool.ACTIVE : ExternalTool.OFF);
     this.put('updated_at', now);
   }
@@ -251,7 +251,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   private plugProblem(targetVersion: number | null, agent: Agent | null): string | null {
     if (!this.proposed) return '이미 정한 제안이에요';
     if (targetVersion !== null && this.version !== targetVersion)
-      return `결재를 올린 뒤 바뀐 제안이라 붙이지 않았어요 (결재 ${targetVersion}, 지금 ${this.version})`;
+      return `승인 요청 뒤 바뀐 제안이라 붙이지 않았어요 (요청 때 버전 ${targetVersion}, 지금 ${this.version})`;
     return agent?.toolProblem(this.row.name) ?? null;
   }
 

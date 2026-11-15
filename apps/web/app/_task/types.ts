@@ -90,9 +90,9 @@ export type AiTools = ReturnType<AiToolListView['toJSON']>;
 export type AiTool = AiTools['tools'][number];
 /** 맡긴 연결 확인 · 웹 로그인의 작업 */
 export type AiTest = ReturnType<AiTestView['toJSON']>;
-/** code-github 패키지의 PR (결재 화면의 code.pr.merge 대상). 패키지의 view가 원본이다 */
+/** code-github 패키지의 PR (승인 화면의 code.pr.merge 대상). 패키지의 view가 원본이다 */
 export type CodePull = ReturnType<PullView['toJSON']>;
-/** browser-tabs 패키지의 결재된 클릭 하나 (결재 화면이 그린다) */
+/** browser-tabs 패키지의 승인된 클릭 하나 (승인 화면이 그린다) */
 export type BrowserClick = ReturnType<ClickDetailView['toJSON']>;
 /** browser-tabs 패키지의 작업 화면 목록 · 하나 */
 export type BrowserShots = ReturnType<ShotListView['toJSON']>;

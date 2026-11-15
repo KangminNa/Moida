@@ -74,7 +74,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     approval_actions: (value) => {
       const wrong = value.filter((a) => !Agent.ACTION.test(a) || a === Agent.SERVER_ACTION);
       if (wrong.length > 0)
-        throw new RuleViolation(`결재로 맡길 수 없는 동작이에요: ${wrong.join(', ')}`);
+        throw new RuleViolation(`승인 요청으로 맡길 수 없는 동작이에요: ${wrong.join(', ')}`);
       return [...new Set(value)];
     },
     monthly_limit: (value) => {

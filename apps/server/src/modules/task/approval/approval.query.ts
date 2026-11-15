@@ -32,7 +32,7 @@ export class ApprovalQuery extends BaseQuery {
   async get(actor: Actor, req: ApprovalIdInput): Promise<ApprovalView> {
     actor.assertOwner();
     const row = await this.row(approvals, { space_id: actor.requireSpace(), id: req.id });
-    if (!row) throw new NotFound('결재를 찾을 수 없어요');
+    if (!row) throw new NotFound('승인 요청을 찾을 수 없어요');
     return new ApprovalView(row);
   }
 }

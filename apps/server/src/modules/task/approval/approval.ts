@@ -63,7 +63,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     );
     task.waitFor(now);
     // 주인이 결정하며 남기는 말이 note를 덮으므로, 에이전트의 말은 실행 기록에 남긴다 (원칙 2)
-    task.log(Task.LOG_WRITE, `결재 요청: ${action}${note ? ` (${note})` : ''}`, 0, now);
+    task.log(Task.LOG_WRITE, `승인 요청: ${action}${note ? ` (${note})` : ''}`, 0, now);
     approval.announce('task.approval.requested');
     return approval;
   }
@@ -188,9 +188,9 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   /** 이 결재를 카드에 싣는다 (기다리는 것만, 한 번만) */
   bundleInto(card: Approval): void {
-    if (!this.bundled || !card.isCard) throw new RuleViolation('카드에 실을 결재가 아니에요');
+    if (!this.bundled || !card.isCard) throw new RuleViolation('카드에 실을 승인 요청이 아니에요');
     this.assertPending();
-    if (this.row.card_id !== null) throw new RuleViolation('이미 카드에 실린 결재예요');
+    if (this.row.card_id !== null) throw new RuleViolation('이미 카드에 실린 승인 요청이에요');
     this.put('card_id', card.id);
   }
 
@@ -205,7 +205,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   /** 하나씩 정해도 되는 결재인가 (카드에 실리는 결재는 카드에서) */
   assertOwnDecision(): void {
-    if (this.bundled) throw new RuleViolation('대화의 결재예요. 결과 카드에서 정해요');
+    if (this.bundled) throw new RuleViolation('대화의 승인 요청이에요. 결과 카드에서 정해요');
   }
 
   get approved(): boolean {
@@ -277,7 +277,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   private assertPending(): void {
     if (this.row.status !== Approval.PENDING)
-      throw new RuleViolation(`이미 끝난 결재예요 (${this.row.status})`);
+      throw new RuleViolation(`이미 끝난 승인 요청이에요 (${this.row.status})`);
   }
 
   private announce(topic: string): void {

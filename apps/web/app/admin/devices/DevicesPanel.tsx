@@ -8,7 +8,7 @@ import { SCOPE_LABELS } from '../../_lib/types';
 import { useAction } from '../../_lib/use-action';
 import { ConnectGuide } from './ConnectGuide';
 
-/** 켤 수 있는 권한. delegate: 이 기기의 AI 도구가 서버 팀에 일을 맡기고 답을 받는다 (MCP ask_agent, 결재는 콘솔에서만). inbox: 기다리는 결재 · 질문 수 (MCP inbox) */
+/** 켤 수 있는 권한. delegate: 이 기기의 AI 도구가 서버 팀에 일을 맡기고 답을 받는다 (MCP ask_agent, 승인은 콘솔에서만). inbox: 기다리는 승인 · 질문 수 (MCP inbox) */
 const SCOPES = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'run', 'delegate', 'inbox'];
 /** 정해진 권한: 코드 러너 칸(sandbox) · 소식 기기(news). 관리자가 주거나 뺄 수 없다 (서버가 거절한다) */
 const FIXED: Record<string, string> = { sandbox: '샌드박스 기기', news: '소식 기기' };

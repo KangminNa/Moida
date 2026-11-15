@@ -17,7 +17,7 @@ const isBefore = (n: ChatNews) =>
 
 // 대화의 주고받음 (2차 1-5, ChatGPT · Claude 같은 모양): 관리자의 말풍선(오른쪽)과 답(왼쪽).
 // 맡기 전에는 첫 메시지(pending)와 질문 · 답, 맡은 뒤에는 회차마다 메시지 → 덧붙인 말 · 짧은 답 → 과정(접힘) → 답.
-// 팀이 무엇을 하는지는 과정을 펼쳐야 보인다. 결과 카드에 싣지 않는 결재(사이트 로그인 등)만 답 아래에 둔다
+// 팀이 무엇을 하는지는 과정을 펼쳐야 보인다. 결과 카드에 싣지 않는 승인(사이트 로그인 등)만 답 아래에 둔다
 export function ChatTurns({
   turns,
   news,
@@ -155,7 +155,7 @@ function Before({ items, me }: { items: readonly ChatNews[]; me: string }) {
 function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[] }) {
   const open = OPEN.includes(t.status);
   if (!open && items.length === 0) return null;
-  // 지금 하는 일 한 줄은 도는 동안만 (결재를 기다리는 동안의 기록은 결재 요청이라 카드가 대신 보인다)
+  // 지금 하는 일 한 줄은 도는 동안만 (승인을 기다리는 동안의 기록은 승인 요청이라 카드가 대신 보인다)
   const doing =
     t.status === 'running'
       ? (t.progress ?? (t.openSubtasks > 0 ? `팀원 ${t.openSubtasks}명이 일하는 중` : null))
@@ -188,7 +188,7 @@ function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[
 /** 답: 끝났으면 글, 아니면 지금 상태 한 줄 */
 function Reply({ turn: t }: { turn: ChatTurn }) {
   if (t.status === 'done')
-    // 결재한 일을 서버가 실행해 끝난 회차에는 글 답이 없다
+    // 승인한 일을 서버가 실행해 끝난 회차에는 글 답이 없다
     return t.reply?.trim() ? <MarkdownText text={t.reply} /> : <p className="note">완료</p>;
   if (t.status === 'failed') return <p className="error">{t.error ?? '실패'}</p>;
   if (t.status === 'cancelled') return <p className="note">멈춤</p>;
@@ -196,7 +196,7 @@ function Reply({ turn: t }: { turn: ChatTurn }) {
     t.status === 'queued'
       ? '곧 시작해요'
       : t.waitReason === 'approval'
-        ? '결재를 기다려요 · 아래 결과 카드에서 정하면 이어서 해요'
+        ? '승인을 기다려요 · 아래 결과 카드에서 정하면 이어서 해요'
         : '일하는 중…';
   return <p className="note">{doing}</p>;
 }

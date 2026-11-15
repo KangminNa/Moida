@@ -11,7 +11,7 @@ import type { GoalRun } from '../../_task/types';
 /** 멈출 수 있는 상태 (서버의 GoalRun.stop과 맞춘다) */
 const STOPPABLE: readonly string[] = ['running', 'waiting'];
 
-// 목표 실행 하나: 지시 · 완료 조건 · 회차 보고(최근부터). 주인이 할 일은 결재와 멈추기뿐이다.
+// 목표 실행 하나: 지시 · 완료 조건 · 회차 보고(최근부터). 주인이 할 일은 승인과 멈추기뿐이다.
 export function GoalRunPanel({ id }: { id: string }) {
   const run = useGoalRun(id);
   const action = useAction();
@@ -67,7 +67,7 @@ export function GoalRunPanel({ id }: { id: string }) {
         {r.pendingApprovalId && (
           <div className="row">
             <Link className="cta small" href={`/admin/approvals/${r.pendingApprovalId}`}>
-              결재문 보기
+              승인 요청서 보기
             </Link>
           </div>
         )}
@@ -80,7 +80,7 @@ export function GoalRunPanel({ id }: { id: string }) {
           <dd>
             {r.round} / 한도 {r.maxRounds}
           </dd>
-          <dt>중간 결재</dt>
+          <dt>중간 승인</dt>
           <dd>{CHECKPOINTS[r.checkpoint] ?? r.checkpoint}</dd>
           <dt>시작</dt>
           <dd>{when(r.createdAt)}</dd>
@@ -108,7 +108,7 @@ export function GoalRunPanel({ id }: { id: string }) {
             >
               멈추기
             </button>
-            <small className="note">도는 회차 작업과 기다리는 결재도 함께 취소해요</small>
+            <small className="note">도는 회차 작업과 기다리는 승인도 함께 취소해요</small>
           </div>
         )}
       </article>

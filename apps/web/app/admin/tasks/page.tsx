@@ -10,7 +10,7 @@ export default async function TasksPage({
   return (
     <section className="console-inner wide" aria-label="작업">
       <header className="page-head">
-        <h1>작업</h1>
+        <h1>작업 기록</h1>
       </header>
       <TasksPanel status={status ?? null} ask={ask === '1'} />
     </section>

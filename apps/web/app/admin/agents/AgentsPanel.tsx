@@ -1,22 +1,19 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { useMe } from '../../_account/live';
 import { api } from '../../_lib/client-api';
-import { SCOPE_LABELS } from '../../_lib/types';
 import { useAction } from '../../_lib/use-action';
-import { actionLabel, flatTree, holdLabel, TOOL_LABELS, taskStatusLabel } from '../../_task/labels';
+import { flatTree, holdLabel, taskStatusLabel } from '../../_task/labels';
 import {
-  type RunnerChoice,
   useAgents,
   useExternalTools,
   useRunnerChoices,
   useTasksIn,
   useUsage,
 } from '../../_task/live';
-import { AgentUsage } from '../../_task/parts';
 import type { Agent } from '../../_task/types';
+import { AgentCard } from './AgentCard';
 import { type AgentBody, AgentForm } from './AgentForm';
 import { AgentTeamsPanel } from './AgentTeamsPanel';
 import { DeletedAgents } from './DeletedAgents';
@@ -45,7 +42,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   const list = agents.data?.agents;
   const problem = agents.error ?? action.problem;
 
-  /** 실행 중이거나 기다리는 작업이 있으면 그 상태 이름 (결재 · 하위 작업 대기를 나눈다) */
+  /** 실행 중이거나 기다리는 작업이 있으면 그 상태 이름 (승인 · 하위 작업 대기를 나눈다) */
   function workOf(agent: Agent): string | null {
     if (running.data?.tasks.some((t) => t.agentId === agent.id)) return taskStatusLabel('running');
     const waits = waiting.data?.tasks.find((t) => t.agentId === agent.id);
@@ -77,7 +74,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
       : members > 0
         ? `${agent.name}을(를) 삭제할까요? 아래 팀원 ${members}명은 ${boss}에게 보고하게 바뀌어요.`
         : `${agent.name}을(를) 삭제할까요?`;
-    if (!window.confirm(`${what} 작업 기록은 남고 "삭제한 에이전트"에서 복원할 수 있어요`)) return;
+    if (!window.confirm(`${what} 작업 기록은 남고 휴지통에서 복원할 수 있어요`)) return;
     void action.run(
       agent.id,
       () => api('POST', `/api/agents/${agent.id}/delete`, { version: agent.version, team }),
@@ -114,17 +111,22 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   return (
     <>
       <header className="page-head">
-        <h1>에이전트</h1>
+        <div>
+          <h1>팀</h1>
+          <p>
+            일을 맡는 AI 에이전트. 역할 · 모델 · 권한 · 한도를 정하고, 대화에서 맡기면 동시에 일해요
+          </p>
+        </div>
         {list && list.length > 0 && open !== NEW && (
           <div className="row">
             <button type="button" className="ghost" onClick={() => setTrash(!trash)}>
-              삭제한 에이전트
+              휴지통
             </button>
             <button type="button" className="ghost" onClick={() => setTeams(!teams)}>
               팀 템플릿
             </button>
             <button type="button" className="cta small" onClick={() => show(NEW)}>
-              에이전트 추가
+              ＋ 에이전트 추가
             </button>
           </div>
         )}
@@ -216,7 +218,7 @@ function OrgChart({ agents, ownerName }: { agents: readonly Agent[]; ownerName: 
       <h2 id="org-chart">조직도</h2>
       <ol className="org" aria-label="보고 순서">
         <li>
-          <b>{ownerName}</b> <small className="note">결재 · 발행</small>
+          <b>{ownerName}</b> <small className="note">승인 · 발행</small>
         </li>
         {rows.map(({ item, depth }) => (
           <li key={item.id} style={{ paddingLeft: (depth + 1) * 20 }}>
@@ -228,93 +230,4 @@ function OrgChart({ agents, ownerName }: { agents: readonly Agent[]; ownerName: 
       </ol>
     </section>
   );
-}
-
-function AgentCard({
-  agent,
-  work,
-  hold,
-  boss,
-  runner,
-  busy,
-  members,
-  onFlip,
-  onEdit,
-  onRemove,
-}: {
-  agent: Agent;
-  work: string | null;
-  hold: string | null;
-  /** 보고 대상의 이름 (없으면 관리자의 이름) */
-  boss: string;
-  /** 묶인 러너 (undefined: 아무 러너, null: 묶였지만 그 러너의 기기가 끊김) */
-  runner?: RunnerChoice | null;
-  busy: boolean;
-  /** 바로 아래 팀원 수 (있으면 "팀째 삭제"도) */
-  members: number;
-  onFlip: () => void;
-  onEdit: () => void;
-  onRemove: (team: boolean) => void;
-}) {
-  const paused = agent.status === 'paused';
-  return (
-    <article className="agent" aria-label={agent.name}>
-      <div className="agent-top">
-        <div className="item-main">
-          <b>{agent.name}</b>
-          <small>
-            {agent.role ? `${agent.role} · ` : ''}
-            {TOOL_LABELS[agent.tool] ?? agent.tool}
-            {agent.model ? ` ${agent.model}` : ''} · 보고: {boss}
-            {runner === undefined ? '' : ` · 실행: ${runnerLabel(runner)}`}
-          </small>
-        </div>
-        {!paused && hold && <span className="pill strong">{hold}</span>}
-        {(paused || work || !hold) && (
-          <span className={paused ? 'pill off' : work ? 'pill on' : 'pill'}>
-            {paused ? '중지' : (work ?? '대기')}
-          </span>
-        )}
-      </div>
-      <ul className="perm" aria-label="권한">
-        {agent.scopes.map((s) => (
-          <li key={s}>{SCOPE_LABELS[s] ?? s}</li>
-        ))}
-        {agent.approvalActions.map((a) => (
-          <li key={a} className="gate">
-            {actionLabel(a)}: 결재 필요
-          </li>
-        ))}
-        {agent.scopes.length === 0 && agent.approvalActions.length === 0 && <li>권한 없음</li>}
-      </ul>
-      <AgentUsage agent={agent} />
-      <p className="note">
-        <Link href={`/admin/schedules?agent=${agent.id}`}>
-          {agent.schedules > 0 ? `스케줄 ${agent.schedules}개` : '스케줄 없음'}
-        </Link>
-      </p>
-      <div className="row">
-        <button type="button" className="ghost" disabled={busy} onClick={onFlip}>
-          {paused ? '재개' : '중지'}
-        </button>
-        <button type="button" className="ghost" onClick={onEdit}>
-          편집
-        </button>
-        <button type="button" className="ghost" disabled={busy} onClick={() => onRemove(false)}>
-          삭제
-        </button>
-        {members > 0 && (
-          <button type="button" className="ghost" disabled={busy} onClick={() => onRemove(true)}>
-            팀째 삭제
-          </button>
-        )}
-      </div>
-    </article>
-  );
-}
-
-/** 묶인 러너의 이름과 연결 상태. 기기를 끊었으면 그 러너는 일을 빌리지 못해 일이 기다린다 */
-function runnerLabel(runner: RunnerChoice | null): string {
-  if (!runner) return '연결 끊긴 러너 (일이 기다려요)';
-  return runner.runner.online ? runner.device.name : `${runner.device.name} (연결 안 됨)`;
 }

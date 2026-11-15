@@ -171,7 +171,7 @@ export function AskForm({
           />
           페이지로 받기
         </label>
-        <span className="note">발행·전송·삭제는 결재 후 실행</span>
+        <span className="note">발행·전송·삭제는 승인 후 실행</span>
         <span className="spacer" />
         <button
           type="submit"
