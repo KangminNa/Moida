@@ -25,11 +25,14 @@ const events = async (query = '') =>
     events: Json[];
     next: string | null;
   };
-/** 이 시험이 시작한 때. 1분 안의 같은 사건(종류 · 곳 · 내용)은 앞 시험의 줄에 합쳐져 그 줄의 user-agent가 남는다 */
-const started = new Date().toISOString();
-/** 이 시험이 남긴 줄: 이 시험의 user-agent이거나, 시작한 뒤 합쳐진 줄 */
-const mine = (list: Json[]) =>
-  list.filter((e) => e.userAgent === agent || (e.count > 1 && e.lastAt >= started));
+/**
+ * 이 시험만의 곳. 1분 안의 같은 사건(종류 · 곳 · 내용)은 한 줄로 합쳐지므로, 127.0.0.1에서 함께 도는 다른 시험 파일의
+ * 로그인 · 거부와 섞이지 않게 문서용 IPv6(2001:db8::/32)의 /64 하나를 고른다 (서버는 loopback 프록시의 x-forwarded-for를 믿는다)
+ */
+const ip = `2001:db8:${randomUUID().slice(0, 4)}:${randomUUID().slice(0, 4)}::7`;
+const headers = { 'user-agent': agent, 'x-forwarded-for': ip };
+/** 이 시험이 남긴 줄 */
+const mine = (list: Json[]) => list.filter((e) => e.ip === ip);
 
 /** 거부된 접근은 응답을 늦추지 않게 기다리지 않고 남긴다: 나타날 때까지 잠깐 다시 읽는다 */
 async function deniedUntil(found: (list: Json[]) => boolean): Promise<Json[]> {
@@ -42,17 +45,9 @@ async function deniedUntil(found: (list: Json[]) => boolean): Promise<Json[]> {
   return denied;
 }
 
-/** 이 시험의 머리글(user-agent)로 로그인 */
+/** 이 시험의 머리글(user-agent · 곳)로 로그인 */
 const login = (name: string, password: string) =>
-  api.request(
-    'POST',
-    '/api/auth/login',
-    TestUser.visitor,
-    { login: name, password },
-    {
-      'user-agent': agent,
-    },
-  );
+  api.request('POST', '/api/auth/login', TestUser.visitor, { login: name, password }, headers);
 
 before(async () => {
   api = await ApiClient.start();
@@ -90,6 +85,7 @@ describe('보안 기록: 로그인', () => {
     const known = failed.find((e) => e.detail.login === ApiClient.OWNER_LOGIN);
     assert.ok(known, '관리자의 아이디');
     assert.equal(known.count, 2, '두 번이 한 줄');
+    assert.equal(known.userAgent, agent);
     assert.equal(known.detail.method, 'password');
     assert.ok(
       failed.some((e) => e.detail.login === null),
@@ -111,11 +107,7 @@ describe('보안 기록: 로그인', () => {
     const session = new TestUser({ cairn_session: res.cookies().cairn_session ?? '' });
     assert.equal(res.status, 200);
     assert.equal(
-      (
-        await api.request('POST', '/api/auth/logout', session, undefined, {
-          'user-agent': agent,
-        })
-      ).status,
+      (await api.request('POST', '/api/auth/logout', session, undefined, headers)).status,
       200,
     );
     const kinds = mine((await events()).events).map((e) => e.kind);
@@ -136,7 +128,7 @@ describe('보안 기록: 거부된 접근', () => {
       '/mcp',
       TestUser.visitor,
       { jsonrpc: '2.0', id: 1, method: 'tools/list' },
-      { authorization: `Bearer ${bad}`, 'user-agent': agent },
+      { ...headers, authorization: `Bearer ${bad}` },
     );
     assert.equal(res.status, 401);
     assert.match(String(res.header('www-authenticate')), /resource_metadata=/);
@@ -147,11 +139,9 @@ describe('보안 기록: 거부된 접근', () => {
   });
 
   test('아무것도 내밀지 않은 401은 남기지 않고, 관리자 경로의 403은 남긴다', async () => {
-    const me = await api.request('GET', '/api/auth/me', TestUser.visitor, undefined, {
-      'user-agent': agent,
-    });
+    const me = await api.request('GET', '/api/auth/me', TestUser.visitor, undefined, headers);
     assert.equal(me.status, 401);
-    await api.request('GET', '/api/agents', TestUser.visitor, undefined, { 'user-agent': agent });
+    await api.request('GET', '/api/agents', TestUser.visitor, undefined, headers);
     const agents = (e: Json) => e.detail.path === '/api/agents' && e.detail.status === 403;
     const denied = await deniedUntil((list) => list.some(agents));
     assert.ok(!denied.some((e) => e.detail.path === '/api/auth/me'));
