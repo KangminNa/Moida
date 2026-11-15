@@ -1,4 +1,5 @@
 import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-api';
+import { AskTask, DropAsked, GetAsk, ListAgentRepos, StartAsked } from './asks';
 import {
   ArchiveRepo,
   ConfirmMerge,
@@ -35,5 +36,12 @@ export default class CodeGithubPlugin extends BasePlugin {
     );
     cairn.addOperation(new PullOpened());
     cairn.onEvent('task.approval.granted', new ConfirmMerge());
+    // 코드 작업 열기 (2026-11-15 C): 에이전트의 요청 → 결재 code.task.start → 승인되면 코드 작업을 연다
+    cairn.addOperation(new ListAgentRepos());
+    cairn.addOperation(new AskTask());
+    cairn.addOperation(new GetAsk());
+    cairn.onEvent('task.approval.granted', new StartAsked());
+    for (const closed of ['rejected', 'revision_requested', 'cancelled'])
+      cairn.onEvent(`task.approval.${closed}`, new DropAsked());
   }
 }

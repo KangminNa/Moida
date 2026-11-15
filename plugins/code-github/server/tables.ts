@@ -35,3 +35,21 @@ export interface RepoRow {
   archived_at: Date | null;
 }
 export type RepoNew = Partial<RepoRow> & Pick<RepoRow, 'id' | 'space_id' | 'name' | 'url' | 'base'>;
+
+/** code_github.task_asks */
+export interface TaskAskRow {
+  id: string;
+  space_id: string;
+  repo_id: string;
+  request_id: string;
+  paths: readonly string[];
+  instruction: string;
+  agent_id: string | null;
+  asked_by: string;
+  status: string;
+  approval_id: string | null;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+}
+export type TaskAskNew = Partial<TaskAskRow> & Pick<TaskAskRow, 'id' | 'space_id' | 'repo_id' | 'request_id' | 'paths' | 'instruction' | 'asked_by'>;

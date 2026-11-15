@@ -11,6 +11,15 @@ import {
   RuleViolation,
   type Work,
 } from '../../../apps/server/src/plugin-api';
+import {
+  CODE_KIND,
+  CONTROL,
+  checkPaths,
+  codeTaskRequested,
+  PATH_MAX,
+  PATHS_MAX,
+  repoOf,
+} from './code-task';
 import { pulls, repos } from './schema';
 import type { PullRow, RepoRow } from './tables';
 import {
@@ -34,18 +43,13 @@ import {
 export const MERGE_ACTION = 'code.pr.merge';
 /** 결재 대상의 종류 (target_kind) */
 export const PULL_TARGET = 'pull_request';
-const CODE_KIND = 'code';
 const VERSION_MAX = 2_147_483_647;
 /** https://<호스트>/<owner>/<이름>[.git]. 자격(@)이 든 주소는 받지 않는다 (러너의 CodeSpec과 같은 규칙: http는 이 컴퓨터만) */
 const REPO_URL = /^https?:\/\/[^/@\s]+\/[^/\s]+\/[^/\s]+$/;
 const LOCAL_HTTP = /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?\//;
 const BASE = /^[A-Za-z0-9._/-]{1,100}$/;
-const PATHS_MAX = 20;
-const PATH_MAX = 200;
 const CHECKS_MAX = 10;
 const CHECK_MAX = 500;
-// biome-ignore lint/suspicious/noControlCharactersInRegex: 제어 문자를 막는 것이 목적이다
-const CONTROL = /[\u0000-\u001f\u007f]/;
 
 type RepoInput = {
   name: string;
@@ -72,30 +76,6 @@ function checkRepo(repo: RepoInput): RepoInput {
     if (CONTROL.test(command.replace(/\n/g, ' ')))
       throw new RuleViolation('명령에 제어 문자를 쓸 수 없어요');
   return { ...repo, url, name: repo.name.trim() };
-}
-
-/** 고칠 수 있는 곳: 저장소 안의 상대 경로 접두어. "."은 저장소 전체 (러너의 CodeSpec이 다시 본다) */
-function checkPaths(paths: readonly string[]): readonly string[] {
-  const clean = paths.map((p) => p.trim().replace(/\/+$/, '')).filter(Boolean);
-  if (clean.length === 0) throw new RuleViolation('고칠 수 있는 곳(paths)을 하나 이상 적어 주세요');
-  const wrong = clean.filter(
-    (p) =>
-      p.startsWith('/') ||
-      p.split('/').includes('..') ||
-      CONTROL.test(p) ||
-      p.toLowerCase().startsWith('.github/workflows'),
-  );
-  if (wrong.length > 0)
-    throw new RuleViolation(
-      `저장소 안의 상대 경로만 (.. · / 로 시작 · .github/workflows는 안 돼요): ${wrong.join(', ')}`,
-    );
-  return [...new Set(clean)];
-}
-
-async function repoOf(work: Work, spaceId: string, id: string): Promise<RepoRow> {
-  const row = await work.row(repos, { id, space_id: spaceId });
-  if (!row) throw new NotFound('없는 저장소예요');
-  return row;
 }
 
 /** 칸 러너가 지금 쥔 code 작업과 그 저장소. 칸이 아니거나 · 임대가 없거나 · code가 아니면 거절 */
@@ -251,7 +231,6 @@ type CodeInput = {
  * 작업은 코어가 만든다 (task.task.requested, kind code). 그때의 저장소 값(주소 · 기준 · 명령)이 작업에 실린다
  */
 export class RequestCode extends Command<CodeInput> {
-  static readonly TITLE_MAX = 120;
   readonly name = 'requestCode';
   readonly allow = Operation.OWNER;
 
@@ -270,29 +249,16 @@ export class RequestCode extends Command<CodeInput> {
     const space = actor.requireSpace();
     const repo = await repoOf(work, space, input.id);
     if (repo.archived_at) throw new RuleViolation('보관한 저장소에는 일을 맡길 수 없어요');
-    const paths = checkPaths(input.paths);
-    const first =
-      input.instruction
-        .split('\n')
-        .find((l) => l.trim())
-        ?.trim() ?? '';
     const requestId = `code-github:${input.requestId}`;
     work.record(
-      new DomainEvent('task.task.requested', 1, space, {
+      codeTaskRequested(
+        space,
+        repo,
         requestId,
-        kind: CODE_KIND,
-        title: `${repo.name}: ${first}`.slice(0, RequestCode.TITLE_MAX),
-        instruction: input.instruction,
-        agentId: input.agentId,
-        payload: {
-          code: {
-            repo: { id: repo.id, url: repo.url, base: repo.base },
-            paths,
-            setup: repo.setup,
-            checks: repo.checks,
-          },
-        },
-      }),
+        input.instruction,
+        checkPaths(input.paths),
+        input.agentId,
+      ),
     );
     return new AskedView(requestId);
   }

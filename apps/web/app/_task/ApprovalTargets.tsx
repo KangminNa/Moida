@@ -9,7 +9,7 @@ import { ChangeLines } from './ChangeLines';
 import { CHECKPOINTS, GOAL_COMPLETE, GOAL_RUN_STATUS, TARGET_LABELS, tokens } from './labels';
 import { useGoalRun } from './live';
 import { Criteria, RoundReport } from './RoundReport';
-import type { Agent, Approval, CodePull } from './types';
+import type { Agent, Approval, CodeAsk, CodePull } from './types';
 
 // 승인 화면의 "무엇을 승인하는지" 칸 가운데 글 · 한도가 아닌 것. 대상은 서버에서 읽는다 (에이전트의 메모가 아니라).
 
@@ -100,6 +100,38 @@ export function PullTarget({ approval }: { approval: Approval }) {
               ? `${pull.checks.length}개 통과`
               : `실패: ${failed.map((c) => c.command).join(', ')}`}
         </dd>
+      </dl>
+    </section>
+  );
+}
+
+/** 코드 작업 열기 (2026-11-15 C): 승인하면 이 저장소 · 경로 · 지시로 코드 작업이 열린다 */
+export function AskTarget({ approval }: { approval: Approval }) {
+  const { id, version } = approval.target;
+  const { data: ask, error } = useLiveValue(
+    `code-ask:${id}`,
+    () => api<CodeAsk>('GET', `/api/p/code-github/asks/${id}`),
+    [],
+  );
+
+  if (error) return <p className="error">{error}</p>;
+  if (!ask) return <p className="label-mono">요청 불러오는 중…</p>;
+  return (
+    <section className="preview" aria-label="코드 작업 요청">
+      <b>
+        <a href={ask.repo.url} target="_blank" rel="noreferrer">
+          {ask.repo.name}
+        </a>{' '}
+        · {ask.repo.base}
+      </b>
+      {ask.version !== version && (
+        <p className="warn">승인 뒤 요청이 바뀌었어요. 승인해도 열리지 않아요</p>
+      )}
+      <dl className="kv">
+        <dt>고칠 곳</dt>
+        <dd>{ask.paths.join(' · ')}</dd>
+        <dt>지시</dt>
+        <dd className="text">{ask.instruction}</dd>
       </dl>
     </section>
   );

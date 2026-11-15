@@ -1,4 +1,4 @@
-import type { PullRow, RepoRow } from './tables';
+import type { PullRow, RepoRow, TaskAskRow } from './tables';
 
 // 이 패키지가 내보내는 모양. 보는 사람마다 나눈다: 콘솔(주인)은 camelCase, 러너(MCP)는 snake_case.
 
@@ -107,5 +107,53 @@ export class ConfirmedView {
 
   toJSON() {
     return { handled: this.handled };
+  }
+}
+
+/** code_repos의 답 (MCP라 snake_case): 코드 작업을 요청할 수 있는 저장소. 명령(setup · checks)은 싣지 않는다 */
+export class AgentRepoListView {
+  constructor(private readonly rows: readonly RepoRow[]) {}
+
+  toJSON() {
+    return {
+      repos: this.rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        url: r.url,
+        base: r.base,
+      })),
+    };
+  }
+}
+
+/** code_ask_task의 답 (MCP): 이 id · version으로 request_approval(code.task.start, 대상 code_github_ask)을 올린다 */
+export class TaskAskedView {
+  constructor(private readonly row: Readonly<TaskAskRow>) {}
+
+  toJSON() {
+    return { ask_id: this.row.id, version: this.row.version, status: this.row.status };
+  }
+}
+
+/** 코드 작업 요청 하나 (콘솔: 승인 화면 · 결과 카드가 저장소 · 경로 · 지시를 보인다) */
+export class TaskAskView {
+  constructor(
+    private readonly row: Readonly<TaskAskRow>,
+    private readonly repo: Readonly<RepoRow>,
+  ) {}
+
+  toJSON() {
+    const r = this.row;
+    return {
+      id: r.id,
+      repo: { id: this.repo.id, name: this.repo.name, url: this.repo.url, base: this.repo.base },
+      paths: r.paths,
+      instruction: r.instruction,
+      agentId: r.agent_id,
+      askedBy: r.asked_by,
+      status: r.status,
+      version: r.version,
+      createdAt: r.created_at.toISOString(),
+    };
   }
 }

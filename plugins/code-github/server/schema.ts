@@ -38,3 +38,20 @@ export const repos = codeGithubSchema.table('repos', {
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
   archived_at: timestamp('archived_at', { withTimezone: true }),
 });
+
+/** code_github.task_asks */
+export const taskAsks = codeGithubSchema.table('task_asks', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  repo_id: uuid('repo_id').notNull(),
+  request_id: text('request_id').notNull(),
+  paths: text('paths').array().notNull(),
+  instruction: text('instruction').notNull(),
+  agent_id: uuid('agent_id'),
+  asked_by: uuid('asked_by').notNull(),
+  status: text('status').notNull(),
+  approval_id: uuid('approval_id'),
+  version: integer('version').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+});

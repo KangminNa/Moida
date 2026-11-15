@@ -7,7 +7,14 @@ import { api } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
 import { useLiveValue } from '../_lib/use-live';
 import { Stamps } from './ApprovalStamps';
-import { GoalRunTarget, LimitTarget, OtherTarget, PostTarget, PullTarget } from './ApprovalTargets';
+import {
+  AskTarget,
+  GoalRunTarget,
+  LimitTarget,
+  OtherTarget,
+  PostTarget,
+  PullTarget,
+} from './ApprovalTargets';
 import { ClickTarget, LoginDecide, LoginTarget } from './BrowserApproval';
 import {
   APPROVE_LABELS,
@@ -18,6 +25,7 @@ import {
   PUBLISH_POST,
   PUBLISH_SITE,
   RAISE_LIMIT,
+  START_CODE,
   TASK_STATUS,
   when,
 } from './labels';
@@ -132,6 +140,8 @@ function Loaded({
         <LimitTarget approval={a} agent={limitAgent ?? null} />
       ) : a.action === MERGE_PULL ? (
         <PullTarget approval={a} />
+      ) : a.action === START_CODE ? (
+        <AskTarget approval={a} />
       ) : a.action === PUBLISH_SITE ? (
         <ClickTarget approval={a} />
       ) : a.action === LOGIN_SITE ? (

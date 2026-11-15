@@ -457,3 +457,135 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
     assert.deepEqual(leased.map((j) => codeOf(j).repo.url).sort(), [a.url, b.url].sort());
   });
 });
+
+describe('코드 작업 열기 (2026-11-15 C): 에이전트의 요청 → 승인 → 코드 작업', () => {
+  /** 대화 상대(관리자 바로 아래, 코드 권한 없음)의 일을 내 러너가 빌린 작업 토큰 */
+  async function partnerToken(): Promise<{ token: string; taskId: string }> {
+    const lead = ok(
+      await api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: `대화 상대 ${randomUUID().slice(0, 6)}`,
+        tool: 'claude',
+        scopes: ['read_public'],
+      }),
+      201,
+    );
+    const task = ok(
+      await api.request('POST', '/api/tasks', owner, {
+        requestId: randomUUID(),
+        agentId: lead.id,
+        instruction: '로그인 버그 고쳐 줘',
+      }),
+      201,
+    );
+    for (let round = 0; round < 20; round++) {
+      const next = await tool(runner, 'next_jobs', {
+        wait_seconds: 0,
+        limit: 10,
+        tools: ['claude'],
+      });
+      const job = (next.body.jobs as Json[]).find((j) => (j.task as Json).id === task.id);
+      if (job) return { token: String(job.run_token), taskId: String(task.id) };
+    }
+    throw new Error('빌린 일이 없다');
+  }
+
+  async function ask(token: string, repo: Json) {
+    const asked = await tool(token, 'code_ask_task', {
+      request_id: randomUUID(),
+      repo_id: repo.id,
+      paths: ['src/login'],
+      instruction: '로그인 실패 시 다시 시도하게 고쳐요',
+    });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    const approval = await tool(token, 'request_approval', {
+      request_id: randomUUID(),
+      action: 'code.task.start',
+      target_kind: 'code_github_ask',
+      target_id: asked.body.ask_id,
+      target_version: asked.body.version,
+      note: '로그인 버그',
+    });
+    assert.equal(approval.ok, true, JSON.stringify(approval.body));
+    return { askId: String(asked.body.ask_id), approvalId: String(approval.body.approval_id) };
+  }
+
+  async function decide(approvalId: string, decision: string) {
+    const approval = ok(await api.get(`/api/approvals/${approvalId}`, owner));
+    ok(
+      await api.request('POST', `/api/approvals/${approvalId}/decide`, owner, {
+        version: approval.version,
+        decision,
+        ...(decision === 'approve' ? {} : { note: '다르게' }),
+      }),
+    );
+    await drain();
+  }
+
+  test('저장소 목록 → 요청 → 승인하면 그 저장소의 코드 작업이 열리고, 요청한 작업은 이어진다', async () => {
+    const repo = await newRepo();
+    const { token, taskId } = await partnerToken();
+    const listed = await tool(token, 'code_repos');
+    assert.ok((listed.body.repos as Json[]).some((r) => r.id === repo.id));
+    assert.equal('setup' in ((listed.body.repos as Json[])[0] ?? {}), false, '명령은 싣지 않는다');
+    const { askId, approvalId } = await ask(token, repo);
+    const seen = ok(await api.get(`${BASE}/asks/${askId}`, owner));
+    assert.deepEqual([seen.status, seen.paths], ['asked', ['src/login']]);
+
+    await decide(approvalId, 'approve');
+    assert.equal(ok(await api.get(`${BASE}/asks/${askId}`, owner)).status, 'started');
+    const { tasks } = ok(await api.get('/api/tasks?status=queued', owner)) as { tasks: Json[] };
+    assert.ok(
+      tasks.some((t) => t.kind === 'code' && String(t.title).startsWith(`${repo.name}:`)),
+      '코드 작업이 열렸다',
+    );
+    assert.notEqual(ok(await api.get(`/api/tasks/${taskId}`, owner)).status, 'waiting');
+  });
+
+  test('반려하면 요청이 닫히고 코드 작업은 열리지 않는다', async () => {
+    const repo = await newRepo();
+    const { token } = await partnerToken();
+    const { askId, approvalId } = await ask(token, repo);
+    await decide(approvalId, 'reject');
+    assert.equal(ok(await api.get(`${BASE}/asks/${askId}`, owner)).status, 'dropped');
+  });
+
+  test('보관한 저장소 · 틀린 경로는 요청하는 자리에서 막힌다', async () => {
+    const repo = await newRepo();
+    const { token } = await partnerToken();
+    const bad = await tool(token, 'code_ask_task', {
+      request_id: randomUUID(),
+      repo_id: repo.id,
+      paths: ['../etc'],
+      instruction: '고쳐요',
+    });
+    assert.equal(bad.body.code, 'rule_violation');
+    ok(
+      await api.request('POST', `${BASE}/repos/${repo.id}/archive`, owner, {
+        version: repo.version,
+      }),
+    );
+    const archived = await tool(token, 'code_ask_task', {
+      request_id: randomUUID(),
+      repo_id: repo.id,
+      paths: ['src'],
+      instruction: '고쳐요',
+    });
+    assert.equal(archived.body.code, 'rule_violation');
+  });
+
+  test('요청 보기는 주인만 (방문자 · write 기기는 못 본다)', async () => {
+    const repo = await newRepo();
+    const { token } = await partnerToken();
+    const { askId } = await ask(token, repo);
+    assert.notEqual((await api.get(`${BASE}/asks/${askId}`)).status, 200);
+    const asWriter = await api.request(
+      'GET',
+      `${BASE}/asks/${askId}`,
+      undefined,
+      undefined,
+      writer,
+    );
+    assert.equal(asWriter.status, 403);
+  });
+});

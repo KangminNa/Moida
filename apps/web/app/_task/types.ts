@@ -3,7 +3,7 @@ import type {
   ShotImageView,
   ShotListView,
 } from '../../../../plugins/browser-tabs/server/click-views';
-import type { PullView } from '../../../../plugins/code-github/server/views';
+import type { PullView, TaskAskView } from '../../../../plugins/code-github/server/views';
 import type {
   AgentListView,
   AgentTeamListView,
@@ -94,6 +94,8 @@ export type AiTool = AiTools['tools'][number];
 export type AiTest = ReturnType<AiTestView['toJSON']>;
 /** code-github 패키지의 PR (승인 화면의 code.pr.merge 대상). 패키지의 view가 원본이다 */
 export type CodePull = ReturnType<PullView['toJSON']>;
+/** code-github 패키지의 코드 작업 요청 (승인 화면의 code.task.start 대상, 2026-11-15 C) */
+export type CodeAsk = ReturnType<TaskAskView['toJSON']>;
 /** browser-tabs 패키지의 승인된 클릭 하나 (승인 화면이 그린다) */
 export type BrowserClick = ReturnType<ClickDetailView['toJSON']>;
 /** browser-tabs 패키지의 작업 화면 목록 · 하나 */
