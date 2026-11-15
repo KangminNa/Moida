@@ -26,6 +26,7 @@ async function tool(token: string, name: string, args: Json = {}) {
   const res = await api.mcp(token, 'tools/call', { name, arguments: args });
   assert.equal(res.status, 200, res.text);
   const result = res.json().result as Json;
+  assert.ok(result, res.text);
   return result.isError
     ? { ok: false, body: JSON.parse(result.content[0]?.text ?? '{}') as Json }
     : { ok: true, body: (result.structuredContent ?? {}) as Json };
@@ -131,7 +132,7 @@ describe('설정 바꾸기: 읽기와 제안', () => {
       op: 'edit',
       target_id: member.id,
       version: seen.version,
-      fields: { model: 'opus', scopes: ['read_public', 'draft'] },
+      fields: { model: 'opus', scopes: ['read_public', 'write'] },
       note: '글을 쓰게 하려고',
     });
     assert.equal(proposed.status, 'pending');
@@ -139,7 +140,7 @@ describe('설정 바꾸기: 읽기와 제안', () => {
       (proposed.changes as Json[]).map((c) => [c.field, c.before, c.after, c.grant]),
       [
         ['model', 'sonnet', 'opus', false],
-        ['scopes', ['read_public'], ['read_public', 'draft'], true],
+        ['scopes', ['read_public'], ['read_public', 'write'], true],
       ],
     );
     const approval = ok(await api.get(`/api/approvals/${proposed.approval_id}`, owner));
@@ -151,7 +152,7 @@ describe('설정 바꾸기: 읽기와 제안', () => {
     await decide(proposed.approval_id);
     const changed = await current(member.id);
     assert.equal(changed.model, 'opus');
-    assert.deepEqual(changed.scopes, ['read_public', 'draft']);
+    assert.deepEqual(changed.scopes, ['read_public', 'write']);
     assert.equal(ok(await api.get(`/api/tasks/${job.task.id}`, owner)).status, 'running');
   });
 
