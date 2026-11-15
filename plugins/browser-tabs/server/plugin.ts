@@ -46,8 +46,8 @@ import { ManualRun } from './write-runs';
 export default class BrowserTabsPlugin extends BasePlugin {
   register(cairn: PluginContext): void {
     const screen = new BrowserScreenGateway();
-    // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 auto_repair, 기본 켬)
-    const autoRepair = cairn.settings().get('auto_repair') !== 'false';
+    // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 autoRepair, 기본 켬)
+    const autoRepair = cairn.settings().get('autoRepair') !== 'false';
     for (const operation of [
       new ListReads(),
       new RequestRead(),

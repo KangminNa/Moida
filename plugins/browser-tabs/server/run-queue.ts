@@ -9,7 +9,7 @@ import { runDone } from './write-runs';
 
 // 사이트 도구 실행의 러너 쪽 (2026-11-16 MCP 2 · 3단계): 서버 브라우저가 있는 러너가 site_run_next로 하나 꺼내 AI 없이 돌리고
 // site_run_save로 남긴다. 읽기 실행은 러너를 잃으면 한 번 다시 줄을 세우고, 쓰기 실행(결재가 있는 것)은 많아야 한 번이라
-// 다시 하지 않고 unknown(눌렸는지 모름)으로 둔다. 연속 실패면 고장, 자동 고치기(auto_repair)가 켜져 있으면 하루 한 번 다시 굳힌다
+// 다시 하지 않고 unknown(눌렸는지 모름)으로 둔다. 연속 실패면 고장, 자동 고치기(autoRepair)가 켜져 있으면 하루 한 번 다시 굳힌다
 
 const OUTPUT_MAX = 256 * 1024;
 const RUN_TIMEOUT_MS = 60_000;

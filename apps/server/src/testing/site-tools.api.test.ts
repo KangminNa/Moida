@@ -343,7 +343,7 @@ describe('사이트 도구: 실행', () => {
     assert.equal(other.ok, false, '맡긴 에이전트만 결과를 본다');
   });
 
-  test('형식과 다른 답은 shape 실패, 세 번 연속 실패면 고장 → 저절로 다시 굳힌다(auto_repair). 그동안 맡기기는 거절 (대신할 길과 함께)', async () => {
+  test('형식과 다른 답은 shape 실패, 세 번 연속 실패면 고장 → 저절로 다시 굳힌다(autoRepair). 그동안 맡기기는 거절 (대신할 길과 함께)', async () => {
     await liveTool('quote_flaky');
     const outbound = await runTokenOf(await newAgent('시세 담당 2', ['read_public']));
     for (const i of [1, 2, 3]) {
