@@ -7,7 +7,7 @@ export const SECURITY_KINDS: Readonly<Record<string, string>> = {
   'login.succeeded': '로그인',
   'login.failed': '로그인 실패',
   'login.blocked': '로그인 막힘',
-  logout: '로그아웃',
+  'session.logout': '로그아웃',
   'session.ended': '로그인 끝내기',
   'password.changed': '비밀번호 바꿈',
   'install.failed': '설치 코드 틀림',

@@ -11,7 +11,7 @@ export class AccountSecurity implements OnModuleInit {
     Record<string, (data: Record<string, unknown>) => string>
   > = {
     'account.login.succeeded': () => 'login.succeeded',
-    'account.session.ended': (d) => (d.how === 'logout' ? 'logout' : 'session.ended'),
+    'account.session.ended': (d) => (d.how === 'logout' ? 'session.logout' : 'session.ended'),
     'account.password.changed': () => 'password.changed',
     'account.device.connected': () => 'device.connected',
     'account.device.revoked': (d) =>

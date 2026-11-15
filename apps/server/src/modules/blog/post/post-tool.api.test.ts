@@ -233,6 +233,7 @@ describe('blog_save_draft (기기)', () => {
       tags: ['유지'],
       main_wiki_id: null,
       ref_wiki_ids: [],
+      menu_id: null,
     });
     const edited = await draft(writer, {
       post_id: saved.post_id,

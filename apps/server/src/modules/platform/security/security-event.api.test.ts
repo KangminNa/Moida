@@ -105,7 +105,7 @@ describe('보안 기록: 로그인', () => {
     );
     const kinds = mine((await events()).events).map((e) => e.kind);
     assert.ok(kinds.includes('login.succeeded'));
-    assert.ok(kinds.includes('logout'));
+    assert.ok(kinds.includes('session.logout'));
     const succeeded = mine((await events('group=login')).events).find(
       (e) => e.kind === 'login.succeeded',
     );
