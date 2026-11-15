@@ -166,6 +166,11 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     );
   }
 
+  /** 결과 카드면 실린 마지막 회차 (forChat · grew) */
+  get targetVersion(): number {
+    return this.row.target_version;
+  }
+
   get taskId(): string | null {
     return this.row.task_id;
   }

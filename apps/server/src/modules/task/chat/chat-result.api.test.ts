@@ -277,8 +277,13 @@ describe('결과 카드', () => {
     await made(job, 'index.html');
     await done(job);
     await drain();
-    const card = (await detail(next.id)).card;
-    assert.deepEqual([card.deliver, card.passed], ['html', true]);
+    const after = await detail(next.id);
+    assert.deepEqual([after.card.deliver, after.card.passed], ['html', true]);
+    assert.equal(
+      after.chat.turns,
+      1,
+      '카드에 실은 뒤에는 받을 것이 빠졌다고 보지 않는다 (다시 맡기지 않음)',
+    );
   });
 
   test('검토자 짝: 다른 도구의 에이전트만. 회차가 끝나면 검토가 먼저 돌고, 그 의견이 카드에 실린다', async () => {
@@ -305,8 +310,144 @@ describe('결과 카드', () => {
     await done(review, '그대로 승인. 근거가 충분해요');
     await drain();
     const room = await detail(chat.id);
-    assert.equal(room.card.review, '그대로 승인. 근거가 충분해요');
+    assert.deepEqual(
+      [room.card.review.verdict, room.card.review.summary],
+      ['unknown', '그대로 승인. 근거가 충분해요'],
+      'JSON 판정이 아닌 옛 답은 글 그대로',
+    );
     assert.ok(room.news.some((n: Json) => n.kind === 'review'));
+  });
+
+  test('검증 고리: 검토가 고칠 것을 남기면 한 번 다시 맡기고, 다시 검토한 뒤 카드. 고친 결과물만 싣는다', async () => {
+    const lead = await agent('고리 대표');
+    const other = await agent('다른 도구', { tool: 'codex' });
+    ok(
+      await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
+        reviewerId: other.id,
+        version: lead.version,
+      }),
+    );
+    const judged = (verdict: string) =>
+      JSON.stringify({
+        verdict,
+        summary: '출처가 없어요',
+        checklist: [
+          { item: '보고서 파일', ok: true, note: '' },
+          { item: '출처 링크', ok: false, note: '없음' },
+        ],
+        fixes: ['본문 끝에 출처 링크를 단다'],
+        skip: [],
+      });
+    const reviewJob = async () =>
+      (await jobs()).find(
+        (j) => j.task.payload.chat?.chatId === chat.id && j.task.payload.chat?.review === true,
+      ) as Json;
+
+    const chat = await open(lead.id, '보고서 써 줘');
+    const first = await turnJob(chat.id);
+    const old = await made(first, '보고서.html');
+    await done(first, '보고서를 썼어요');
+    await drain();
+    await done(await reviewJob(), judged('fix'));
+    await drain();
+
+    let room = await detail(chat.id);
+    assert.equal(room.card, null, '고치는 동안에는 카드가 없다');
+    assert.deepEqual(
+      room.turns.map((t: Json) => [t.fix, t.fixBy]),
+      [
+        [false, null],
+        [true, 'review'],
+      ],
+    );
+    assert.match(room.turns[1].message, /본문 끝에 출처 링크를 단다/);
+    assert.match(room.turns[1].message, /출처 링크 \(없음\)/, '채우지 못한 완료 조건도 싣는다');
+    assert.ok(room.news.some((n: Json) => n.kind === 'review' && /^고칠 것 있음/.test(n.text)));
+
+    const second = await turnJob(chat.id);
+    const fixed = await made(second, '보고서.html');
+    const bad = await api.mcp(runner, 'tools/call', {
+      name: 'submit_result',
+      arguments: {
+        task_id: second.task.id,
+        request_id: randomUUID(),
+        status: 'done',
+        result: { text: 'x', checks: [{ name: '검사', ok: 'yes' }] },
+      },
+    });
+    assert.equal((bad.json() as Json).result.isError, true, '검사의 모양이 틀리면 받지 않는다');
+    await tool(runner, 'submit_result', {
+      task_id: second.task.id,
+      request_id: randomUUID(),
+      status: 'done',
+      result: {
+        text: '출처를 달았어요',
+        checks: [{ name: 'index.html 있음', ok: true, how: '통과', retried: true }],
+      },
+    });
+    await drain();
+    await done(await reviewJob(), judged('fix'));
+    await drain();
+
+    room = await detail(chat.id);
+    assert.equal(room.chat.turns, 2, '검토 반영은 한 번까지');
+    assert.deepEqual(
+      [room.card.review.verdict, room.card.review.fixes, room.card.fixed],
+      ['fix', ['본문 끝에 출처 링크를 단다'], { deliver: 0, review: 1 }],
+    );
+    assert.deepEqual(
+      room.card.review.checklist.map((c: Json) => c.ok),
+      [true, false],
+    );
+    assert.deepEqual(
+      room.card.items.map((i: Json) => [i.id, i.checks]),
+      [[fixed, [{ name: 'index.html 있음', ok: true, how: '통과', retried: true }]]],
+      '같은 이름의 앞 결과물은 싣지 않는다',
+    );
+    const [gone] = await db.sql`SELECT deleted_at FROM task.outputs WHERE id = ${old}`;
+    assert.ok(gone?.deleted_at, '앞 결과물은 휴지통으로');
+  });
+
+  test('검증 고리: 결재만 기다리는 회차도 카드 전에 검토한다 (고칠 것이 나와도 다시 맡기지 않고 카드에)', async () => {
+    const lead = await agent('결재 고리', { approvalActions: ['qa.post.send'] });
+    const other = await agent('다른 도구', { tool: 'codex' });
+    ok(
+      await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
+        reviewerId: other.id,
+        version: lead.version,
+      }),
+    );
+    const chat = await open(lead.id, '보내 줘');
+    const job = await turnJob(chat.id);
+    await tool(job.run_token, 'request_approval', {
+      request_id: randomUUID(),
+      action: 'qa.post.send',
+      target_kind: 'post',
+      target_id: randomUUID(),
+      target_version: 1,
+      note: '보내도 될까요',
+    });
+    await drain();
+    assert.equal((await detail(chat.id)).card, null, '검토 전에는 카드가 없다');
+    const review = (await jobs()).find(
+      (j) => j.task.payload.chat?.chatId === chat.id && j.task.payload.chat?.review === true,
+    ) as Json;
+    assert.match(review.instruction, /qa\.post\.send/);
+    await done(
+      review,
+      JSON.stringify({
+        verdict: 'fix',
+        summary: '받는 사람이 빠졌어요',
+        fixes: ['받는 사람을 적는다'],
+      }),
+    );
+    await drain();
+    const room = await detail(chat.id);
+    assert.equal(room.chat.turns, 1);
+    assert.deepEqual(
+      [room.card.review.verdict, room.card.fixed, room.card.items.length],
+      ['fix', { deliver: 0, review: 0 }, 1],
+    );
   });
 
   test('멈추기: 도는 일 · 기다리는 결재 · 카드를 모두 취소한다. 낡은 판은 409', async () => {

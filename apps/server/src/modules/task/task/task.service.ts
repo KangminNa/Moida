@@ -34,6 +34,7 @@ import { CodeScope } from './code-scope';
 import type { JobView, ProgressView } from './job.view';
 import { LeasePolicy } from './lease.policy';
 import { RunRecord } from './run-record';
+import { type SubmitResultInput } from './submit-result.input';
 import { Task } from './task';
 import type {
   CreateTaskInput,
@@ -41,7 +42,6 @@ import type {
   NextJobsInput,
   ReleaseJobInput,
   ReportProgressInput,
-  SubmitResultInput,
 } from './task.input';
 import { TaskRepository } from './task.repository';
 

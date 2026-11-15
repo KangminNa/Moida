@@ -1,6 +1,7 @@
 import { RuleViolation, ValueList } from '../../platform';
 import { Task } from '../task/task';
 import type { ChatUpdateKind, ChatUpdateNew, TaskRow } from '../task.tables';
+import { ChatReview } from './chat-review.policy';
 
 /** 끝난 작업과 그 작업이 속한 대화 (ChatRepository.placeOf가 위로 올라가 찾는다) */
 export type ChatPlaceRow = Pick<
@@ -83,7 +84,9 @@ export class ChatUpdates {
     if (place.status === Task.DONE) {
       if (!root) return { kind: 'member_done', text: `${place.title} — ${said || '-'}` };
       if (chat?.reply) return { kind: ChatUpdates.REPLY, text: said || '-' };
-      if (chat?.review) return { kind: ChatUpdates.REVIEW, text: said || '-' };
+      // 검토의 답은 JSON 판정이라 소식에는 판정과 까닭 한 줄로 (검증 고리 V)
+      if (chat?.review)
+        return { kind: ChatUpdates.REVIEW, text: ChatReview.line(ChatReview.parse(said)) };
       const path = `/admin/chats/${place.chat_id}`;
       return { kind: ChatUpdates.FINAL, text: `${ChatUpdates.cut(said || '-', 1700)}\n\n${path}` };
     }

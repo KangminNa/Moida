@@ -3095,6 +3095,31 @@ a.chip {
   color: var(--faint);
 }
 
+.result-review > small + small,
+.result-review > ul + small {
+  display: block;
+  margin-top: 8px;
+}
+
+/* 검증 고리 V: 판정 한 줄과 완료 조건 · 고칠 것 목록. 채우지 못한 조건은 흐리게가 아니라 굵게 */
+.result-verdict {
+  margin: 4px 0 0;
+}
+
+.result-checklist {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.result-checklist .unmet {
+  font-weight: 700;
+}
+
 .result-actions {
   flex-wrap: wrap;
 }

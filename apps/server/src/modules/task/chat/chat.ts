@@ -18,7 +18,7 @@ import { ChatRoute } from './chat-route.policy';
 import { ChatUpdates } from './chat-update.policy';
 
 /** 회차 하나에 더 실을 것 (Chat.send) */
-type ChatTurnExtra = { deviceId?: string | null; fix?: boolean; refs?: TaskRefs };
+type ChatTurnExtra = { deviceId?: string | null; fix?: boolean; fixBy?: string; refs?: TaskRefs };
 
 // 대화 하나 (task.chats, 기획서 결정 2026-11-14). 관리자와 바로 아래 에이전트 하나가 채팅처럼 주고받는다.
 // 서버 본체에는 AI가 없어서 메시지 하나 = 상대에게 맡기는 작업 하나다 (회차, request_id chat:<대화>:<회차>).
@@ -139,8 +139,11 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     message: string,
     previous: readonly ChatTurnRow[],
     now: Date,
-    /** deviceId: 기기가 보냈으면, fix: 받을 것이 없어 서버가 다시 맡기는 회차, refs: 이 회차의 참조 (TaskRefs) */
-    { deviceId = null, fix = false, refs = TaskRefs.of(null) }: ChatTurnExtra = {},
+    /**
+     * deviceId: 기기가 보냈으면, fix: 서버가 다시 맡기는 회차, fixBy: 다시 맡긴 까닭(검토 반영만, 검증 고리 V),
+     * refs: 이 회차의 참조 (TaskRefs)
+     */
+    { deviceId = null, fix = false, fixBy, refs = TaskRefs.of(null) }: ChatTurnExtra = {},
   ): Task {
     if (agent.id !== this.row.agent_id) throw new RuleViolation('이 대화의 상대가 아니에요');
     ChatRoute.assertPartner(agent);
@@ -168,7 +171,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
             requestId,
             history: ChatHistory.of(previous),
             ...(deviceId === null ? {} : { via: 'device', device: deviceId }),
-            ...(fix ? { fix: true } : {}),
+            ...(fix ? { fix: true, ...(fixBy ? { fixBy } : {}) } : {}),
           },
           ...refs.payload,
           ...AgentRuntime.turnPayload(agent.tool, this.row.model, this.row.effort),
@@ -191,11 +194,13 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   }
 
   /**
-   * 받을 것이 결과에 없어 같은 상대에게 다시 맡긴다 (서버가 연다, 2차 2단계). message는 지시문 틀 result-check로 채운 글이고
-   * 관리자의 글이 아니라서 payload.chat.fix로 표시한다 (화면이 "검사"로 보인다)
+   * 같은 상대에게 다시 맡긴다 (서버가 연다). 받을 것이 결과에 없으면(2차 2단계, 틀 result-check) 까닭 없이,
+   * 검토가 고칠 것을 남겼으면(검증 고리 V, 틀 result-fix) fixBy 'review'. message는 그 틀로 채운 글이고
+   * 관리자의 글이 아니라서 payload.chat.fix로 표시한다 (화면이 "검사" · "검토 반영"으로 보인다)
    */
-  fix(agent: Agent, message: string, previous: readonly ChatTurnRow[], now: Date): Task {
-    return this.send(agent, `fix:${this.row.turns + 1}`, message, previous, now, { fix: true });
+  fix(agent: Agent, message: string, previous: readonly ChatTurnRow[], now: Date, by?: string) {
+    const extra = { fix: true, fixBy: by };
+    return this.send(agent, `fix:${this.row.turns + 1}`, message, previous, now, extra);
   }
 
   /**

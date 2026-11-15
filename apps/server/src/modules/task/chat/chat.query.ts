@@ -7,6 +7,7 @@ import type { ChatIdInput } from './chat.input';
 import {
   type ChatApprovalRow,
   type ChatCardOutputRow,
+  type ChatCardTaskRow,
   ChatCardView,
   ChatDetailView,
   ChatListView,
@@ -19,6 +20,7 @@ import {
 } from './chat.view';
 import { ChatRequest } from './chat-request.policy';
 import { ChatResult } from './chat-result.policy';
+import { ChatReview } from './chat-review.policy';
 import { ChatUpdates } from './chat-update.policy';
 import { ChatUpdateQuery } from './chat-update.query';
 
@@ -105,19 +107,41 @@ export class ChatQuery extends BaseQuery {
       SELECT * FROM task.approvals
       WHERE card_id = ${card.id} AND status = ${Approval.PENDING} ORDER BY id`;
     const outputs = await this.sql<ChatCardOutputRow[]>`
-      SELECT id, name, kind, mime FROM task.outputs
+      SELECT id, name, kind, mime, task_id FROM task.outputs
       WHERE card_id = ${card.id} AND deleted_at IS NULL ORDER BY id`;
+    const makers = [
+      ...new Set([...actions.map((a) => a.task_id), ...outputs.map((o) => o.task_id)]),
+    ].filter((id): id is string => id !== null);
+    const tasks = await this.sql<ChatCardTaskRow[]>`
+      SELECT id, result FROM task.tasks WHERE id = ANY(${makers}::uuid[])`;
     const [review] = await this.sql<Pick<TaskRow, 'status' | 'result'>[]>`
       SELECT status, result FROM task.tasks
       WHERE space_id = ${chat.space_id}
         AND request_id = ${ChatRequest.review(chat.id, card.target_version)}`;
+    // 카드의 회차까지 이어진 다시 맡긴 회차 (받을 것 · 검토 반영, 검증 고리 V)
+    const turns = await this.sql<Pick<TaskRow, 'payload'>[]>`
+      SELECT payload FROM task.tasks
+      WHERE space_id = ${chat.space_id}
+        AND request_id = ANY(${ChatRequest.turns(chat.id, card.target_version - ChatResult.FIX_MAX - ChatReview.FIX_MAX, card.target_version)}::text[])
+      ORDER BY created_at, id`;
+    const fixes = ChatResult.fixesIn(turns);
+    const byReview = ChatResult.fixesIn(turns, ChatResult.BY_REVIEW);
     const missing = ChatResult.missing(
       chat.deliver,
       actions.map((a) => a.action),
       outputs.map((o) => o.name),
     );
     const said = review?.status === Task.DONE ? ChatResult.textOf(review.result) : '';
-    return new ChatCardView(card, actions, outputs, chat.deliver, missing === null, said || null);
+    return new ChatCardView(
+      card,
+      actions,
+      outputs,
+      tasks,
+      chat.deliver,
+      missing === null,
+      said ? ChatReview.parse(said) : null,
+      { deliver: fixes - byReview, review: byReview },
+    );
   }
 
   /** 이 대화의 최근 소식 (오래된 것부터). 질문이면 고를 에이전트들 (맡는 일은 역할의 첫 줄) */

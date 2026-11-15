@@ -17,8 +17,18 @@ export type ChatPartnerRow = Pick<AgentRow, 'name' | 'status' | 'reports_to' | '
 export type ChatTurnTaskRow = TaskRow & { last_event: string | null; open_subtasks: number };
 /** 회차(맨 위 작업 root)와 그 아래에서 만든 결과물 */
 export type ChatOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind'> & { root: string };
-/** 결과 카드에 실린 결과물 (2차 2단계) */
-export type ChatCardOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind' | 'mime'>;
+/** 결과 카드에 실린 결과물 (2차 2단계). task_id: 만든 작업 (그 작업의 하네스 검사를 옆에 보인다) */
+export type ChatCardOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind' | 'mime' | 'task_id'>;
+/** 카드 항목을 낸 작업의 결과 (하네스 검사 result.checks, 검증 고리 V) */
+export type ChatCardTaskRow = Pick<TaskRow, 'id' | 'result'>;
+/** 검토자 짝의 판정 (검증 고리 V). 만드는 곳은 ChatReview.parse: 읽지 못한 답은 unknown과 글 그대로 */
+export type ChatReviewVerdict = {
+  verdict: 'pass' | 'fix' | 'reject' | 'unknown';
+  summary: string;
+  checklist: { item: string; ok: boolean; note: string }[];
+  fixes: string[];
+  skip: string[];
+};
 /** 회차(맨 위 작업 root)와 그 아래에서 기다리는 결재 */
 export type ChatApprovalRow = Pick<ApprovalRow, 'id'> & { root: string };
 /** 소식 한 줄과 남긴 에이전트의 이름, 질문이면 고를 에이전트들 (role은 맡는 일: 역할의 첫 줄) */
@@ -109,7 +119,11 @@ export class ChatTurnView {
   toJSON() {
     const t = this.t;
     const result = (t.result ?? {}) as { text?: unknown; error?: unknown };
-    const chat = (t.payload as { chat?: { turn?: unknown; via?: unknown } } | null)?.chat;
+    const chat = (
+      t.payload as {
+        chat?: { turn?: unknown; via?: unknown; fix?: unknown; fixBy?: unknown };
+      } | null
+    )?.chat;
     return {
       turn: Number(chat?.turn ?? 0),
       taskId: t.id,
@@ -127,8 +141,10 @@ export class ChatTurnView {
       openSubtasks: t.open_subtasks,
       /** 이 회차에 넣은 참조 (2026-11-15 B) */
       refs: refsOf((t.payload as { refs?: unknown } | null)?.refs),
-      /** 받을 것이 없어 서버가 다시 맡긴 회차 (메시지는 관리자의 글이 아니라 지시문 틀 result-check) */
-      fix: (t.payload as { chat?: { fix?: unknown } } | null)?.chat?.fix === true,
+      /** 서버가 다시 맡긴 회차 (메시지는 관리자의 글이 아니라 지시문 틀 result-check · result-fix) */
+      fix: chat?.fix === true,
+      /** 다시 맡긴 까닭: review(검토 반영, 검증 고리 V), 받을 것이 빠져서면 null */
+      fixBy: typeof chat?.fixBy === 'string' ? chat.fixBy : null,
       outputs: this.outputs
         .filter((o) => o.root === t.id)
         .map((o) => ({ id: o.id, name: o.name, kind: o.kind })),
@@ -157,6 +173,16 @@ function settingOf(payload: unknown): string | null {
   return typeof setting === 'string' ? setting : null;
 }
 
+/** 작업 결과의 하네스 검사 (러너가 submit_result의 result.checks로 보냈고 서버가 모양을 봤다). 없으면 null */
+function checksOf(result: unknown) {
+  const checks = (result as { checks?: unknown } | null)?.checks;
+  return Array.isArray(checks)
+    ? (checks as { name: string; ok: boolean; how: string; retried: boolean }[]).map(
+        ({ name, ok, how, retried }) => ({ name, ok, how, retried }),
+      )
+    : null;
+}
+
 /**
  * 기다리는 결과 카드 (2차 2단계): 실린 결재(동작)와 결과물, 받을 것의 검사, 검토자 짝의 의견.
  * 항목은 한 모양이다 (kind: action · output). 결정은 POST /api/approvals/:id/decide { version, decision, note?, picked? }
@@ -166,10 +192,18 @@ export class ChatCardView {
     private readonly card: Readonly<ApprovalRow>,
     private readonly actions: readonly ApprovalRow[],
     private readonly outputs: readonly ChatCardOutputRow[],
+    /** 항목을 낸 작업들의 결과 (하네스 검사) */
+    private readonly tasks: readonly ChatCardTaskRow[],
     private readonly deliver: string | null,
     private readonly passed: boolean,
-    private readonly review: string | null,
+    private readonly review: ChatReviewVerdict | null,
+    /** 이 카드까지 서버가 다시 맡긴 회차 수: 받을 것이 빠져서 · 검토 반영 (검증 고리 V) */
+    private readonly fixed: { deliver: number; review: number },
   ) {}
+
+  private checksFor(taskId: string | null) {
+    return checksOf(this.tasks.find((t) => t.id === taskId)?.result ?? null);
+  }
 
   toJSON() {
     const c = this.card;
@@ -190,6 +224,8 @@ export class ChatCardView {
           mime: null as string | null,
           changes: changesOf(a.payload),
           setting: settingOf(a.payload),
+          /** 이 항목을 낸 작업의 하네스 검사 (없으면 null) */
+          checks: this.checksFor(a.task_id),
         })),
         ...this.outputs.map((o) => ({
           kind: 'output',
@@ -202,13 +238,16 @@ export class ChatCardView {
           mime: o.mime as string | null,
           changes: null as ReturnType<typeof changesOf>,
           setting: null as string | null,
+          checks: this.checksFor(o.task_id),
         })),
       ],
       /** 받을 것과 검사 (받을 것을 정하지 않았으면 deliver null, passed true) */
       deliver: this.deliver,
       passed: this.passed,
-      /** 검토자 짝의 의견 (검토하지 않았으면 null) */
+      /** 검토자 짝의 판정 (검토하지 않았으면 null, 검증 고리 V) */
       review: this.review,
+      /** 서버가 다시 맡긴 회차 수 (받을 것 · 검토 반영) */
+      fixed: this.fixed,
     };
   }
 }

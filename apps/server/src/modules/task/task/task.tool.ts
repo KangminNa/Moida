@@ -3,12 +3,8 @@ import { Actor, BaseTool } from '../../platform';
 import { PLAN_USAGE_STATUS } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { type JobStateView, NextJobsView, type ProgressView } from './job.view';
-import {
-  NextJobsInput,
-  ReleaseJobInput,
-  ReportProgressInput,
-  SubmitResultInput,
-} from './task.input';
+import { SubmitResultInput } from './submit-result.input';
+import { NextJobsInput, ReleaseJobInput, ReportProgressInput } from './task.input';
 import { TaskService } from './task.service';
 
 // 러너가 쓰는 MCP 도구 (run 권한). 러너는 일을 빌리고, AI CLI에게는 작업 토큰만 준다.

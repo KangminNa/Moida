@@ -269,33 +269,6 @@ export class ReportProgressInput extends BaseRequest {
   }
 }
 
-/** submit_result. status는 done · failed, 실패면 error에 이유를 적는다 */
-export class SubmitResultInput extends BaseRequest {
-  private constructor(
-    readonly taskId: string,
-    readonly requestId: string,
-    readonly status: string,
-    readonly result: Readonly<Record<string, unknown>>,
-    readonly error: string | null,
-  ) {
-    super();
-  }
-
-  static from(raw: unknown): SubmitResultInput {
-    return BaseRequest.read(
-      raw,
-      (f) =>
-        new SubmitResultInput(
-          f.uuid('task_id'),
-          f.text('request_id', 200),
-          f.text('status', 20),
-          f.optionalRecord('result'),
-          f.optionalText('error', 4000),
-        ),
-    );
-  }
-}
-
 /** release_job. 왜 돌려주는지는 실행 기록에 남는다 */
 export class ReleaseJobInput extends BaseRequest {
   private constructor(

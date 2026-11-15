@@ -160,7 +160,7 @@
       "task_id": "작업 id",
       "request_id": "이 요청의 id. 응답을 받지 못해 다시 보낼 때는 같은 값을 쓴다",
       "status": "어떻게 끝났는가",
-      "result": "결과",
+      "result": "결과. 답 글은 text, 하네스 검사는 checks([{name, ok, how, retried}] 20개까지: 검사 이름 · 통과 · 어떻게 끝났나 · AI에게 한 번 더 고치게 했나). 결과 카드가 checks를 항목 옆에 보인다",
       "error": "실패했을 때의 이유"
     }
   },

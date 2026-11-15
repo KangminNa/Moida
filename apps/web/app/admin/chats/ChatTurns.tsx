@@ -61,7 +61,15 @@ export function ChatTurns({
         return (
           <li key={t.taskId} className="chat-turn">
             <Mine
-              who={t.fix ? '검사 · 받을 것이 없어 다시 맡김' : t.fromDevice ? '기기의 AI 도구' : me}
+              who={
+                t.fixBy === 'review'
+                  ? '검토 반영 · 검토자가 남긴 고칠 것'
+                  : t.fix
+                    ? '검사 · 받을 것이 없어 다시 맡김'
+                    : t.fromDevice
+                      ? '기기의 AI 도구'
+                      : me
+              }
               at={t.createdAt}
               text={t.message}
             />
