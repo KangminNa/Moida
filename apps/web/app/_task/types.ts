@@ -71,6 +71,8 @@ export type SkillSaved = ReturnType<SkillSavedView['toJSON']>;
 export type Runner = ReturnType<RunnerView['toJSON']>;
 export type RunnerList = ReturnType<RunnerListView['toJSON']>;
 export type Approval = ReturnType<ApprovalView['toJSON']>;
+/** 설정 바꾸기의 바뀔 칸 한 줄 (2026-11-15 C) */
+export type SettingChangeLine = NonNullable<Approval['changes']>[number];
 export type ApprovalPage = ReturnType<ApprovalPageView['toJSON']>;
 export type Agent = ReturnType<AgentView['toJSON']>;
 export type AgentList = ReturnType<AgentListView['toJSON']>;

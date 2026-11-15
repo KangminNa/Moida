@@ -23,6 +23,14 @@ export class ExternalToolRepository extends TableRepository<ExternalToolRow, Ext
     }
   }
 
+  /** 이 이름들 가운데 공간에 없는 것 (에이전트의 허락 목록을 저장하기 전에, AgentEdit) */
+  async missing(spaceId: string, names: readonly string[]): Promise<string[]> {
+    const rows = await this.sql<Pick<ExternalToolRow, 'name'>[]>`
+      SELECT name FROM task.external_tools WHERE space_id = ${spaceId} AND name = ANY(${[...names]}::text[])`;
+    const found = new Set(rows.map((r) => r.name));
+    return names.filter((n) => !found.has(n));
+  }
+
   /** 서버 키를 바꾼 뒤 다시 잠글 것 (토큰이 있는 도구 전부) */
   async lockSealed(): Promise<readonly ExternalTool[]> {
     const rows = await this.sql<ExternalToolRow[]>`

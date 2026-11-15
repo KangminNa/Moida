@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { SCOPE_LABELS } from '../../_lib/types';
-import { actionLabel, EFFORT_LABELS, TOOL_LABELS } from '../../_task/labels';
+import {
+  actionLabel,
+  EFFORT_LABELS,
+  PARTNER_ACTIONS,
+  SETTING_CHANGE,
+  TOOL_LABELS,
+} from '../../_task/labels';
 import type { RunnerChoice } from '../../_task/live';
 import { AgentUsage } from '../../_task/parts';
 import type { Agent } from '../../_task/types';
@@ -75,6 +81,18 @@ export function AgentCard({
             {actionLabel(a)} · 승인 필요
           </li>
         ))}
+        {/* 대화 상대(관리자 바로 아래)는 따로 켜지 않아도 제안한다 (2026-11-15 C). 브라우저 · 커넥터면 설정은 못 바꾼다 */}
+        {!agent.reportsTo &&
+          PARTNER_ACTIONS.filter(
+            (a) =>
+              !agent.approvalActions.includes(a) &&
+              (a !== SETTING_CHANGE ||
+                (!agent.scopes.includes('browse') && agent.externalTools.length === 0)),
+          ).map((a) => (
+            <li key={a} className="gate">
+              {actionLabel(a)} · 승인 필요
+            </li>
+          ))}
         {agent.scopes.length === 0 && agent.approvalActions.length === 0 && <li>권한 없음</li>}
       </ul>
       <AgentUsage agent={agent} />

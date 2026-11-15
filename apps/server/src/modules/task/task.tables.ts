@@ -71,6 +71,7 @@ export interface ApprovalRow {
   created_at: Date;
   chat_id: string | null;
   card_id: string | null;
+  payload: unknown;
 }
 export type ApprovalNew = Partial<ApprovalRow> & Pick<ApprovalRow, 'id' | 'space_id' | 'action' | 'target_kind' | 'target_id' | 'target_version'>;
 

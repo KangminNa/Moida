@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { ChangeLines } from '../../_task/ChangeLines';
 import { actionLabel, DELIVER_LABELS } from '../../_task/labels';
 import { OutputOpen } from '../../_task/parts';
 import type { ChatCard } from '../../_task/types';
@@ -67,6 +68,7 @@ export function ChatCardForm({
                     : '결과물 · 고르지 않으면 휴지통'}
                   {item.note ? ` · ${item.note}` : ''}
                 </small>
+                {item.changes && <ChangeLines lines={item.changes} />}
               </span>
             </label>
             {item.kind === 'output' ? (

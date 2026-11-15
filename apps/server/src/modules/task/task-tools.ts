@@ -8,6 +8,7 @@ import { ProposeToolTool } from './external-tool/external-tool.tool';
 import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxTool } from './inbox/inbox.tool';
 import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
+import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
 import { DelegateTaskTool } from './task/delegate.tool';
 import {
   NextJobsTool,
@@ -44,6 +45,8 @@ export class TaskTools {
     agentUpdates: AgentUpdatesTool,
     postUpdate: PostUpdateTool,
     proposeTool: ProposeToolTool,
+    getSettings: GetSettingsTool,
+    proposeSetting: ProposeSettingTool,
   ) {
     this.tools = [
       nextJobs,
@@ -64,6 +67,8 @@ export class TaskTools {
       agentUpdates,
       postUpdate,
       proposeTool,
+      getSettings,
+      proposeSetting,
     ];
   }
 }

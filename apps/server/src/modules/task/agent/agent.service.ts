@@ -9,8 +9,8 @@ import {
   type Sql,
   type VersionInput,
 } from '../../platform';
-import { ExternalToolQuery } from '../external-tool/external-tool.query';
-import { RunnerRepository } from '../runner/runner.repository';
+import { ApprovedSettingInput } from '../setting-change/setting-change.input';
+import { SettingOutcome } from '../setting-change/setting-outcome';
 import { Agent } from './agent';
 import type {
   CreateAgentInput,
@@ -20,6 +20,7 @@ import type {
 } from './agent.input';
 import { AgentQuery } from './agent.query';
 import { AgentRepository } from './agent.repository';
+import { AgentEdit } from './agent-edit';
 import { AgentOrg } from './agent-org.policy';
 import { AgentTeams } from './agent-team.policy';
 
@@ -33,18 +34,8 @@ export class AgentService extends EntityService<Agent> {
   constructor(
     db: Database,
     private readonly agents: AgentQuery,
-    private readonly tools: ExternalToolQuery,
   ) {
     super(db);
-  }
-
-  /** 허락할 외부 도구가 공간에 있는가 (2차 7단계). 없는 이름이 있으면 422 */
-  private async assertKnownTools(
-    actor: Actor,
-    names: readonly string[] | undefined,
-  ): Promise<void> {
-    const missing = names?.length ? await this.tools.missing(actor, names) : [];
-    if (missing.length > 0) throw new RuleViolation(`없는 외부 도구예요: ${missing.join(', ')}`);
   }
 
   protected store(tx: Sql): AgentRepository {
@@ -97,16 +88,12 @@ export class AgentService extends EntityService<Agent> {
   async create(actor: Actor, req: CreateAgentInput): Promise<Agent> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
-    await this.assertKnownTools(actor, req.fields.external_tools);
     return this.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, AgentService.CREATE);
       const before = await once.previous();
       if (before) return agents.load(spaceId, String(before.agentId));
-      const agent = Agent.open(spaceId, req.fields, new Date());
-      if (req.reportsTo !== null) agent.reportTo(req.reportsTo, await agents.lockAll(spaceId));
-      if (req.runnerId !== null)
-        agent.edit({}, await new RunnerRepository(tx).load(spaceId, req.runnerId));
+      const agent = await new AgentEdit(tx, spaceId).open(req, new Date());
       await agents.save(agent);
       await once.remember({ agentId: agent.id });
       return agent;
@@ -157,30 +144,40 @@ export class AgentService extends EntityService<Agent> {
     });
   }
 
-  /** 보고 대상을 바꾸지 않으면 그 에이전트만 잠근다. 러너는 같은 공간의 것만 (없으면 404) */
+  /** 보고 대상 · 러너 · 검토자의 규칙은 AgentEdit (제안 · 승인 뒤 적용과 같은 줄) */
   async update(actor: Actor, req: UpdateAgentInput): Promise<Agent> {
-    await this.assertKnownTools(actor, req.changes.external_tools);
-    const { reportsTo, runnerId, reviewerId } = req;
-    if (reportsTo === undefined && runnerId === undefined && reviewerId === undefined)
-      return this.changeAsOwner(actor, req, (agent) => agent.edit(req.changes));
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     return this.transaction(async (tx) => {
-      const agents = new AgentRepository(tx);
-      const org = reportsTo === undefined ? [] : await agents.lockAll(spaceId);
-      const agent = org.find((a) => a.id === req.id) ?? (await agents.lock(spaceId, req.id));
-      agent.assertVersion(req.version);
-      if (reportsTo !== undefined) agent.reportTo(reportsTo, org);
-      const runner =
-        typeof runnerId === 'string'
-          ? await new RunnerRepository(tx).load(spaceId, runnerId)
-          : runnerId;
-      agent.edit(req.changes, runner);
-      if (reviewerId !== undefined)
-        agent.pairReviewer(reviewerId === null ? null : await agents.load(spaceId, reviewerId));
-      await agents.save(agent);
+      const agent = await new AgentEdit(tx, spaceId).update(req);
+      await new AgentRepository(tx).save(agent);
       return agent;
     });
+  }
+
+  /**
+   * 승인한 설정 바꾸기 (2026-11-15 C, AgentSettingHandler): 관리자의 고치기와 같은 줄(AgentEdit).
+   * 결재마다 한 번만 적용하고 결과(task.setting.changed)를 남긴다. 승인한 뒤 바뀌었으면 실패로 끝난다
+   */
+  async applyApproved(actor: Actor, req: ApprovedSettingInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, req.approvalId);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      spaceId,
+      req.approvalId,
+      async (tx) => {
+        const edit = new AgentEdit(tx, spaceId);
+        const agent = await edit.apply(
+          req.op,
+          req.targetId,
+          req.targetVersion,
+          req.body,
+          req.approvalId,
+          new Date(),
+        );
+        await new AgentRepository(tx).save(agent);
+      },
+    );
   }
 
   pause(actor: Actor, req: VersionInput): Promise<Agent> {

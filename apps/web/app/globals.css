@@ -3174,3 +3174,36 @@ a.chip {
     width: 100%;
   }
 }
+
+/* 설정 바꾸기의 바뀔 칸 (2026-11-15 C): "칸: 전 → 후" 한 줄씩. 권한을 더하는 줄은 굵게 */
+.change-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.change-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.change-lines .change-field {
+  color: var(--muted);
+}
+
+.change-lines .change-before {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.change-lines li.grant .change-after {
+  font-weight: 700;
+}

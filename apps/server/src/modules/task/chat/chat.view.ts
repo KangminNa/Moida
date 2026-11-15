@@ -137,6 +137,14 @@ export class ChatTurnView {
   }
 }
 
+/** 결재에 실린 바뀔 칸 (설정 바꾸기, 2026-11-15 C). approval.view.ts와 같은 모양 (view끼리 가져오지 못한다) */
+function changesOf(payload: unknown) {
+  const lines = (payload as { changes?: unknown } | null)?.changes;
+  return Array.isArray(lines)
+    ? (lines as { field: string; before: unknown; after: unknown; grant: boolean }[])
+    : null;
+}
+
 /**
  * 기다리는 결과 카드 (2차 2단계): 실린 결재(동작)와 결과물, 받을 것의 검사, 검토자 짝의 의견.
  * 항목은 한 모양이다 (kind: action · output). 결정은 POST /api/approvals/:id/decide { version, decision, note?, picked? }
@@ -168,6 +176,7 @@ export class ChatCardView {
           targetId: a.target_id as string | null,
           note: a.note,
           mime: null as string | null,
+          changes: changesOf(a.payload),
         })),
         ...this.outputs.map((o) => ({
           kind: 'output',
@@ -178,6 +187,7 @@ export class ChatCardView {
           targetId: null as string | null,
           note: null as string | null,
           mime: o.mime as string | null,
+          changes: null as ReturnType<typeof changesOf>,
         })),
       ],
       /** 받을 것과 검사 (받을 것을 정하지 않았으면 deliver null, passed true) */

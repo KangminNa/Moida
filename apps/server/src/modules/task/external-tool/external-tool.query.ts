@@ -34,18 +34,6 @@ export class ExternalToolQuery extends BaseQuery {
     );
   }
 
-  /** 공간에 없는 이름 (에이전트에게 허락하기 전에 본다) */
-  async missing(actor: Actor, names: readonly string[]): Promise<readonly string[]> {
-    actor.assertOwner();
-    const rows = await this.rows(
-      externalTools,
-      { space_id: actor.requireSpace(), name: [...names] },
-      { columns: ['name'] },
-    );
-    const found = new Set(rows.map((r) => r.name));
-    return names.filter((n) => !found.has(n));
-  }
-
   /**
    * 일을 빌려 줄 때 그 에이전트에게 붙일 도구 (next_jobs의 tools). 러너만 부른다.
    * 객체설계 4장의 예외: 토큰을 푸는 읽기라 엔티티(`ExternalTool.jobView`)를 거친다 (`AiLoginQuery.token`과 같다)

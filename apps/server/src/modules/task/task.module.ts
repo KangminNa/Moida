@@ -10,6 +10,7 @@ import {
 import { AgentController } from './agent/agent.api';
 import { AgentQuery } from './agent/agent.query';
 import { AgentService } from './agent/agent.service';
+import { AgentSettingHandler } from './agent/agent-setting.handler';
 import { AgentTeamController } from './agent/agent-team.api';
 import { AiLoginController } from './ai/ai-login.api';
 import { AiLoginQuery } from './ai/ai-login.query';
@@ -63,6 +64,10 @@ import { ScheduleJob } from './schedule/schedule.job';
 import { ScheduleQuery } from './schedule/schedule.query';
 import { ScheduleService } from './schedule/schedule.service';
 import { ScheduleFollowHandler } from './schedule/schedule-follow.handler';
+import { ScheduleSettingHandler } from './schedule/schedule-setting.handler';
+import { SettingQuery } from './setting-change/setting-change.query';
+import { SettingChangeService } from './setting-change/setting-change.service';
+import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
 import { RepoSkillGateway } from './skill/repo-skill.gateway';
 import { SkillController } from './skill/skill.api';
 import { SkillQuery } from './skill/skill.query';
@@ -173,6 +178,13 @@ import { WebPageGateway } from './web/web-page.gateway';
     ExternalToolQuery,
     ExternalToolPlugHandler,
     ProposeToolTool,
+    // 설정 바꾸기 제안 (2026-11-15 C): 미리 해 보고 결재로, 승인 뒤 그 설정의 Service가 적용
+    SettingQuery,
+    SettingChangeService,
+    GetSettingsTool,
+    ProposeSettingTool,
+    AgentSettingHandler,
+    ScheduleSettingHandler,
   ],
   controllers: [
     AgentController,
@@ -224,6 +236,8 @@ export class TaskModule implements OnModuleInit {
     private readonly agentQuery: AgentQuery,
     private readonly toolPlugs: ExternalToolPlugHandler,
     private readonly externalTools: ExternalToolService,
+    private readonly agentSettings: AgentSettingHandler,
+    private readonly scheduleSettings: ScheduleSettingHandler,
   ) {}
 
   onModuleInit(): void {
@@ -244,6 +258,9 @@ export class TaskModule implements OnModuleInit {
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
     // 외부 도구 (2차 7단계): 제안의 결재가 정해지면 붙이거나 지우고, 서버 키를 바꾸면 토큰을 다시 잠근다
     for (const topic of ExternalToolPlugHandler.TOPICS) this.workers.on(topic, this.toolPlugs);
+    // 설정 바꾸기 (2026-11-15 C): 승인되면 그 설정을 가진 쪽이 적용하고 결과(task.setting.changed)를 남긴다
+    this.workers.on(AgentSettingHandler.TOPIC, this.agentSettings);
+    this.workers.on(ScheduleSettingHandler.TOPIC, this.scheduleSettings);
     this.rotation.register('task.external_tools', (actor) =>
       this.externalTools.resealSecrets(actor),
     );

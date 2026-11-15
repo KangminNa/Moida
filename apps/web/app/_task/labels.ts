@@ -46,6 +46,12 @@ export const LOGGED_IN_NOTE = '로그인했어요';
 export const MERGE_PULL = 'code.pr.merge';
 /** 외부 도구 꽂기 (2차 7단계): AI가 제안한 도구를 붙이는 승인. 승인하면 켜고 제안한 에이전트에 붙인다 */
 export const PLUG_TOOL = 'task.tool.plug';
+/** 설정 바꾸기 (2026-11-15 C): AI가 propose_setting으로 올린 바꿀 값. 승인하면 서버가 바꾼다 */
+export const SETTING_CHANGE = 'task.setting.change';
+/** 코드 작업 열기 (2026-11-15 C, code-github 패키지): 승인하면 그 저장소에 코드 작업이 시작된다 */
+export const START_CODE = 'code.task.start';
+/** 대화 상대(관리자 바로 아래)가 승인 동작에 넣지 않아도 올리는 것 (서버의 Approval.PARTNER_ACTIONS) */
+export const PARTNER_ACTIONS: readonly string[] = [SETTING_CHANGE, START_CODE];
 
 /** 목표 실행의 승인: 다음 회차로 갈지, 목표 실행을 완료로 닫을지 (서버의 Approval.GOAL_*) */
 export const GOAL_CONTINUE = 'task.goal.continue';
@@ -67,6 +73,8 @@ export const ACTION_LABELS: Record<string, string> = {
   [LOGIN_SITE]: '로그인 필요',
   [MERGE_PULL]: 'PR 머지',
   [PLUG_TOOL]: '커넥터 붙이기',
+  [SETTING_CHANGE]: '설정 바꾸기',
+  [START_CODE]: '코드 작업 열기',
   [RAISE_LIMIT]: '한도 변경',
   [GOAL_CONTINUE]: '목표 실행 중간 승인',
   [GOAL_COMPLETE]: '목표 실행 최종 승인',
@@ -85,6 +93,9 @@ export const TARGET_LABELS: Record<string, string> = {
   pull_request: 'PR',
   [GOAL_RUN]: '목표 실행',
   chat: '대화',
+  schedule: '스케줄',
+  space: '새로 만들기',
+  code_github_ask: '코드 작업 요청',
 };
 
 export const GOAL_RUN_STATUS: Record<string, string> = {

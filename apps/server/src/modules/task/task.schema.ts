@@ -73,6 +73,7 @@ export const approvals = taskSchema.table('approvals', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   chat_id: uuid('chat_id'),
   card_id: uuid('card_id'),
+  payload: jsonb('payload'),
 });
 
 /** task.chat_updates */

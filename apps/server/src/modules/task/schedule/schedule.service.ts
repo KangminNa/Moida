@@ -16,6 +16,8 @@ import { Chat } from '../chat/chat';
 import { ChatRepository } from '../chat/chat.repository';
 import { ChatHistory } from '../chat/chat-history.policy';
 import { GoalRepository } from '../goal/goal.repository';
+import type { ApprovedSettingInput } from '../setting-change/setting-change.input';
+import { SettingOutcome } from '../setting-change/setting-outcome';
 import type { PromptTemplates } from '../skill/prompt-templates';
 import { SkillQuery } from '../skill/skill.query';
 import type { Task } from '../task/task';
@@ -25,6 +27,7 @@ import { TaskNotices } from '../task-notices';
 import { Schedule } from './schedule';
 import type { CreateScheduleInput, UpdateScheduleInput } from './schedule.input';
 import { ScheduleRepository } from './schedule.repository';
+import { ScheduleEdit } from './schedule-edit';
 
 // 스케줄(자동화 레시피) 쓰기: 주인이 만들고 · 고치고 · 지우고 · 지금 한 번 돌리고, 일꾼이 1분마다 때가 된 것을 돌린다.
 // 한 번 돌리기는 어디로에 따라 작업 하나(task) · 페이지 만들기 일 하나(page) · 담당의 대화 회차 하나(chat, 처음이면 대화를 연다).
@@ -57,8 +60,7 @@ export class ScheduleService extends EntityService<Schedule> {
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, ScheduleService.CREATE);
       const before = await once.previous();
       if (before) return schedules.load(spaceId, String(before.scheduleId));
-      await this.assertRefs(tx, spaceId, req.settings);
-      const schedule = Schedule.open(spaceId, req.settings, now);
+      const schedule = await new ScheduleEdit(tx, spaceId).open(req, now);
       await schedules.save(schedule);
       await once.remember({ scheduleId: schedule.id });
       return schedule;
@@ -69,14 +71,35 @@ export class ScheduleService extends EntityService<Schedule> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     return this.transaction(async (tx) => {
-      const schedules = new ScheduleRepository(tx);
-      const schedule = await schedules.lock(spaceId, req.id);
-      schedule.assertVersion(req.version);
-      await this.assertRefs(tx, spaceId, req.settings, schedule.id);
-      schedule.configure(req.settings, new Date());
-      await schedules.save(schedule);
+      const schedule = await new ScheduleEdit(tx, spaceId).update(req, new Date());
+      await new ScheduleRepository(tx).save(schedule);
       return schedule;
     });
+  }
+
+  /**
+   * 승인한 설정 바꾸기 (2026-11-15 C, ScheduleSettingHandler): 관리자의 고치기와 같은 줄(ScheduleEdit).
+   * 결재마다 한 번만 적용하고 결과(task.setting.changed)를 남긴다. 승인한 뒤 바뀌었으면 실패로 끝난다
+   */
+  async applyApproved(actor: Actor, req: ApprovedSettingInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, req.approvalId);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      spaceId,
+      req.approvalId,
+      async (tx) => {
+        const edit = new ScheduleEdit(tx, spaceId);
+        const schedule = await edit.apply(
+          req.op,
+          req.targetId,
+          req.targetVersion,
+          req.body,
+          req.approvalId,
+          new Date(),
+        );
+        await new ScheduleRepository(tx).save(schedule);
+      },
+    );
   }
 
   async remove(actor: Actor, req: VersionInput): Promise<void> {
@@ -260,31 +283,6 @@ export class ScheduleService extends EntityService<Schedule> {
    * 페이지로 보내면 담당이 만들기(make) 권한을 가져야 하고(담당이 없으면 make 에이전트가 자동으로 맡는다),
    * 대화로 보내면 담당이 관리자 바로 아래 에이전트여야 한다. 앞 레시피를 거슬러 올라가 자기가 나오면 고리라 막는다
    */
-  private async assertRefs(
-    tx: Sql,
-    spaceId: string,
-    settings: Partial<ScheduleRow>,
-    self: string | null = null,
-  ) {
-    const agent = settings.agent_id
-      ? await new AgentRepository(tx).load(spaceId, settings.agent_id)
-      : null;
-    if (settings.page_id && agent && !agent.scopes.includes(Actor.MAKE))
-      throw new RuleViolation('페이지의 새 버전은 만들기(make) 권한이 있는 에이전트가 맡아요');
-    if (settings.destination === Schedule.CHAT && agent && !agent.topLevel)
-      throw new RuleViolation(
-        `대화는 관리자 바로 아래 에이전트와만 해요: ${agent.name}은(는) 팀원이에요`,
-      );
-    if (settings.goal_id)
-      (await new GoalRepository(tx).load(spaceId, settings.goal_id)).assertActive();
-    if (settings.after_id) {
-      const schedules = new ScheduleRepository(tx);
-      await schedules.load(spaceId, settings.after_id);
-      if (self !== null && (await schedules.chainOf(spaceId, settings.after_id)).includes(self))
-        throw new RuleViolation('레시피가 서로를 기다리는 고리가 돼요');
-    }
-  }
-
   /** 작업이 향할 목표. 닫혔으면 wake가 목표 없이 만든다 */
   private goalOf(tx: Sql, schedule: Schedule) {
     return schedule.goalId === null
