@@ -3,11 +3,11 @@ import { SCOPE_LABELS } from '../../_lib/types';
 import {
   actionLabel,
   EFFORT_LABELS,
+  engineLabel,
   PARTNER_ACTIONS,
   SETTING_CHANGE,
-  TOOL_LABELS,
 } from '../../_task/labels';
-import type { RunnerChoice } from '../../_task/live';
+import { type RunnerChoice, useEngines } from '../../_task/live';
 import { AgentUsage } from '../../_task/parts';
 import type { Agent } from '../../_task/types';
 import { MenuIcon } from '../menu';
@@ -39,12 +39,13 @@ export function AgentCard({
   onEdit: () => void;
   onRemove: (team: boolean) => void;
 }) {
+  const engines = useEngines();
   const paused = agent.status === 'paused';
   // 상태 점: 채움(일하는 중) · 반(쉬기 한도에 닿음) · 빈 점(멈춤 · 일 없음)
   const state = paused ? '멈춤' : (hold ?? work ?? '쉬는 중');
   const dot = paused || (!hold && !work) ? 'dot off' : hold ? 'dot half' : 'dot run';
   const tuning = [
-    TOOL_LABELS[agent.tool] ?? agent.tool,
+    engineLabel(engines, agent.tool),
     agent.model || null,
     agent.effort ? `생각 ${EFFORT_LABELS[agent.effort] ?? agent.effort}` : null,
     `${boss}에게 보고`,

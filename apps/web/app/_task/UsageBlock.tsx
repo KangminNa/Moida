@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { holdLabel, TOOL_LABELS, tokens, WINDOW_LABELS, when } from './labels';
+import { engineLabel, holdLabel, tokens, WINDOW_LABELS, when } from './labels';
+import { useEngines } from './live';
 import type { Agent, Usage, UsageAgent, UsageWindow } from './types';
 
 /** 값 한 줄과 막대. 글자가 값을 말하므로 막대는 읽어 주지 않는다. percent가 없으면 막대도 없다 */
@@ -78,6 +79,7 @@ export function UsageBlock({
   usage: Usage | null;
   agents: readonly Agent[] | undefined;
 }) {
+  const engines = useEngines();
   const tools = [...new Set(usage?.plan.map((row) => row.tool))];
   const names = new Map(agents?.map((a) => [a.id, a.name]));
   return (
@@ -96,7 +98,7 @@ export function UsageBlock({
             {tools.map((tool) => (
               <div key={tool} className="usage-agent">
                 <div className="usage-head">
-                  <b>{TOOL_LABELS[tool] ?? tool} 구독</b>
+                  <b>{engineLabel(engines, tool)} 구독</b>
                 </div>
                 {usage.plan
                   .filter((row) => row.tool === tool)

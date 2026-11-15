@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseService } from '../../platform';
 import { AiLoginRepository } from '../ai/ai-login.repository';
+import { Engines } from '../ai/engines';
 import type { AgentlessRequestInput } from './agentless.input';
 import { LeasePolicy } from './lease.policy';
 import { Task } from './task';
@@ -18,7 +19,7 @@ export class AgentlessService extends BaseService {
     const now = new Date();
     await this.transaction(async (tx) => {
       const usable = await new AiLoginRepository(tx).usableTools(spaceId, now);
-      const tool = LeasePolicy.serverTool(usable) ?? LeasePolicy.PREFERRED;
+      const tool = LeasePolicy.serverTool(usable) ?? Engines.preferred();
       const task = Task.open(
         spaceId,
         req.requestId,

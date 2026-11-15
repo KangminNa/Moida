@@ -17,15 +17,15 @@ import type {
   AiLoginInput,
   AiLoginRefreshInput,
   AiSigninCodeInput,
-  AiSigninInput,
   AiSigninStepInput,
   AiTokenInput,
+  AiToolInput,
 } from './ai-login.input';
 import { AiLoginQuery } from './ai-login.query';
 import { AiLoginRepository } from './ai-login.repository';
 import type { AiSigninRelayView, AiTokenView } from './ai-login.view';
-import { AiSigninPolicy } from './ai-signin.policy';
 import { AiTasks } from './ai-task';
+import { EngineLogin, Engines } from './engines';
 
 // AI 로그인 쓰기: 토큰 넣기, 연결 확인 맡기기(주인), 서버 키를 바꾼 뒤 다시 잠그기, 러너에게 건네기(ai_login),
 // 웹 로그인(주인이 시작하고 코드를 넣고, 러너가 로그인 명령을 대신 돌려 주소를 알리고 자격을 넘긴다).
@@ -64,17 +64,19 @@ export class AiLoginService extends BaseService {
     return this.logins.token(actor, req);
   }
 
-  /** Claude 토큰을 넣거나 바꾼다 */
+  /** 토큰을 넣거나 바꾼다 (자격이 토큰 한 줄인 엔진만, 엔진 목록) */
   async saveToken(actor: Actor, req: AiTokenInput): Promise<AiLogin> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
+    if (!Engines.of(req.tool).login.takesToken)
+      throw new RuleViolation('직접 넣는 토큰을 받지 않는 도구예요');
     const sealed = this.box.seal(req.token);
     const now = new Date();
     return this.transaction(async (tx) => {
       const logins = new AiLoginRepository(tx);
-      const found = await logins.lockTool(spaceId, AiLogin.CLAUDE);
+      const found = await logins.lockTool(spaceId, req.tool);
       found?.replace(sealed, now);
-      const login = found ?? AiLogin.open(spaceId, AiLogin.CLAUDE, sealed, now);
+      const login = found ?? AiLogin.open(spaceId, req.tool, sealed, now);
       await logins.save(login);
       return login;
     });
@@ -84,13 +86,14 @@ export class AiLoginService extends BaseService {
    * 연결 확인을 맡긴다. 서버 본체에는 AI가 없어 러너가 돈다. 로그인 줄을 잠가서, 여러 번 눌러도 기다리는 확인은 하나다.
    * 작업은 확인할 로그인의 판을 들고 간다: 도는 사이 토큰을 바꾸면 옛 토큰의 결과를 새 토큰에 적지 않는다.
    */
-  async test(actor: Actor): Promise<Task> {
+  async test(actor: Actor, req: AiToolInput): Promise<Task> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
+    AiLogin.assertTool(req.tool);
     const now = new Date();
     return this.transaction(async (tx) => {
-      const login = await new AiLoginRepository(tx).lockTool(spaceId, AiLogin.CLAUDE);
-      if (!login) throw new RuleViolation('토큰을 먼저 넣어 주세요');
+      const login = await new AiLoginRepository(tx).lockTool(spaceId, req.tool);
+      if (!login) throw new RuleViolation('로그인을 먼저 해 주세요');
       login.assertUsable(now);
       const tasks = new TaskRepository(tx);
       const pending = await tasks.findPendingAiTest(spaceId, login.tool);
@@ -102,7 +105,7 @@ export class AiLoginService extends BaseService {
   }
 
   /** 웹 로그인을 시작한다. 도구마다 하나: 진행 중인 로그인이 있으면 그 작업을 돌려준다 */
-  async startSignin(actor: Actor, req: AiSigninInput): Promise<Task> {
+  async startSignin(actor: Actor, req: AiToolInput): Promise<Task> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     AiLogin.assertTool(req.tool);
@@ -117,11 +120,11 @@ export class AiLoginService extends BaseService {
     });
   }
 
-  /** 주인이 브라우저에서 받은 코드 (Claude). 암호화해서 러너가 가져갈 때까지만 둔다 */
+  /** 관리자가 브라우저에서 받은 코드 (코드를 붙여 넣는 엔진). 암호화해서 러너가 가져갈 때까지만 둔다 */
   async submitSigninCode(actor: Actor, req: AiSigninCodeInput): Promise<Task> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
-    AiSigninPolicy.assertBrowserCode(req.code);
+    EngineLogin.assertBrowserCode(req.code);
     const sealed = this.box.pack(
       AiLoginService.CODE_PURPOSE,
       req.code,
@@ -130,7 +133,8 @@ export class AiLoginService extends BaseService {
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, req.taskId);
-      if (task.signinTool !== AiLogin.CLAUDE)
+      const tool = task.signinTool;
+      if (tool === null || tool !== req.tool || !Engines.of(tool).login.pastesCode)
         throw new RuleViolation('코드를 붙여 넣는 로그인이 아니에요');
       task.acceptSigninCode(sealed);
       await tasks.save(task);
@@ -162,12 +166,13 @@ export class AiLoginService extends BaseService {
       if (task.signinDoneBy(runnerId)) return { task, code: null };
       task.assertHeldBy(runnerId, now);
       if (req.url !== null) {
-        AiSigninPolicy.assertUrl(tool, req.url);
-        AiSigninPolicy.assertUserCode(tool, req.userCode);
+        const login = Engines.of(tool).login;
+        login.assertUrl(req.url);
+        login.assertUserCode(req.userCode);
         task.showSignin(req.url, req.userCode);
       }
       if (req.credential !== null) {
-        AiSigninPolicy.assertCredential(tool, req.credential);
+        Engines.of(tool).login.assertCredential(req.credential);
         const logins = new AiLoginRepository(tx);
         const found = await logins.lockTool(spaceId, tool);
         const sealed = this.box.seal(req.credential);
@@ -199,7 +204,7 @@ export class AiLoginService extends BaseService {
     const { spaceId, id: runnerId } = actor;
     if (actor.kind !== 'device' || !spaceId || !runnerId) throw new Forbidden(Actor.RUN);
     AiLogin.assertRotating(req.tool);
-    AiSigninPolicy.assertCredential(req.tool, req.credential);
+    Engines.of(req.tool).login.assertCredential(req.credential);
     const sealed = this.box.seal(req.credential);
     return this.transaction(async (tx) => {
       // 지금 도는 일이 아니어도 된다 (주인이 취소했어도): 이 러너가 맡았던 일이면 받는다

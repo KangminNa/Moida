@@ -52,6 +52,43 @@ export class AiToolView {
   }
 }
 
+/** 일하는 구독 CLI 하나 (엔진 목록 task/engines.json, 리팩토링 E1). 로그인 주소 · 자격의 모양은 싣지 않는다 */
+export class EngineView {
+  constructor(
+    private readonly name: string,
+    private readonly label: string,
+    private readonly efforts: readonly string[],
+    /** 고를 수 있는 모델 [값, 이름] (빈 값은 에이전트의 설정). null이면 직접 적는다 */
+    private readonly models: readonly (readonly [string, string])[] | null,
+    /** 구독 사용률 창 */
+    private readonly windows: readonly string[],
+    /** 웹 로그인 흐름: paste_code(브라우저의 코드를 붙여 넣음) · device_code(주소에서 코드를 입력) */
+    private readonly flow: string,
+    /** 관리자가 토큰을 직접 넣을 수 있는가 */
+    private readonly token: boolean,
+  ) {}
+
+  toJSON() {
+    return {
+      name: this.name,
+      label: this.label,
+      efforts: [...this.efforts],
+      models: this.models?.map(([value, label]) => ({ value, label })) ?? null,
+      windows: [...this.windows],
+      login: { flow: this.flow, token: this.token },
+    };
+  }
+}
+
+/** GET /api/ai/engines: 파일 순서 (첫 줄이 기본) */
+export class EngineListView {
+  constructor(private readonly engines: readonly EngineView[]) {}
+
+  toJSON() {
+    return { engines: this.engines.map((e) => e.toJSON()) };
+  }
+}
+
 /** GET /api/ai */
 export class AiToolListView {
   constructor(private readonly tools: readonly AiToolView[]) {}

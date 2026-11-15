@@ -8,22 +8,13 @@ import {
 } from '../../platform';
 import { AI_LOGIN_TOOL, type AiLoginNew, type AiLoginRow, type AiLoginTool } from '../task.tables';
 import { AiLoginVersionView, AiTokenView, AiToolView } from './ai-login.view';
+import { Engines } from './engines';
 
 // AI 도구의 로그인 하나. 콘솔에서 넣거나 웹 로그인으로 받은 자격을 서버 키로 잠가 두었다가 러너에게 건넨다.
 // 푸는 곳은 tokenView() 하나뿐이고, 화면에는 만료와 연결 확인 결과만 보인다.
-//   Claude: setup-token의 토큰 한 줄. 저장한 날부터 1년
-//   Codex: codex login이 만든 auth.json 내용 (갱신 토큰이 들어 있어 만료를 알 수 없다, expires_at null)
+// 자격의 모양 · 기간 · 갱신 토큰이 바뀌는지는 엔진 목록이 정한다 (task/engines.json, 리팩토링 E1):
+//   Claude는 setup-token의 토큰 한 줄(저장한 날부터 1년), Codex는 auth.json 내용(스스로 갱신해 만료를 알 수 없다, expires_at null)
 export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
-  static readonly CLAUDE = 'claude';
-  static readonly CODEX = 'codex';
-  /**
-   * 쓸 때마다 갱신 토큰이 바뀌는 자격의 도구. 러너가 실행 뒤 바뀐 자격을 되돌려 쓰고(ai_login_refresh),
-   * 서버는 이 도구의 일을 한 번에 하나만 빌려 준다 (LeasePolicy)
-   */
-  static readonly ROTATING: readonly string[] = [AiLogin.CODEX];
-  /** setup-token의 토큰은 1년 간다. CLI가 남은 기간을 알려 주지 않아 저장한 날부터 센다 */
-  private static readonly TERM_YEARS = 1;
-
   static open(spaceId: string, tool: string, sealed: SealedSecret, now: Date): AiLogin {
     AiLogin.assertTool(tool);
     return new AiLogin(
@@ -33,7 +24,7 @@ export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
         tool,
         secret: sealed.ciphertext,
         nonce: sealed.nonce,
-        expires_at: AiLogin.termOf(tool, now),
+        expires_at: Engines.of(tool).login.termFrom(now),
         created_at: now,
       },
       true,
@@ -46,7 +37,7 @@ export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
 
   /** 실행 뒤 바뀐 자격을 되돌려 쓰는 도구인가. 아니면 RuleViolation */
   static assertRotating(tool: string): void {
-    if (!AiLogin.ROTATING.includes(tool))
+    if (!Engines.of(tool).login.rotating)
       throw new RuleViolation(`${tool}의 자격은 실행해도 바뀌지 않아요`);
   }
 
@@ -54,14 +45,6 @@ export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
   static assertTool(tool: string): asserts tool is AiLoginTool {
     if (!ValueList.has(AI_LOGIN_TOOL, tool))
       throw new RuleViolation(`로그인할 수 있는 도구는 ${AI_LOGIN_TOOL.join(' · ')}예요`);
-  }
-
-  /** Claude는 저장한 날부터 1년. Codex는 CLI가 스스로 갱신해 만료를 알 수 없다 */
-  private static termOf(tool: string, now: Date): Date | null {
-    if (tool !== AiLogin.CLAUDE) return null;
-    const end = new Date(now);
-    end.setUTCFullYear(end.getUTCFullYear() + AiLogin.TERM_YEARS);
-    return end;
   }
 
   get tool(): string {
@@ -79,7 +62,7 @@ export class AiLogin extends TableEntity<AiLoginRow, AiLoginNew> {
   /** 새 토큰으로 바꾼다. 앞 토큰의 만료와 확인 결과는 새 토큰의 것이 아니다 */
   replace(sealed: SealedSecret, now: Date): void {
     this.seal(sealed);
-    this.put('expires_at', AiLogin.termOf(this.row.tool, now));
+    this.put('expires_at', Engines.of(this.row.tool).login.termFrom(now));
     this.put('checked_at', null);
     this.put('last_error', null);
   }

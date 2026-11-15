@@ -10,6 +10,8 @@ import type {
   AiTools,
   ApprovalPage,
   ChatList,
+  Engine,
+  EngineList,
   ExternalToolList,
   GoalList,
   GoalRunDetail,
@@ -72,6 +74,13 @@ export function useExternalTools() {
 /** AI 도구마다의 로그인 상태. 연결 확인과 웹 로그인은 작업으로 돌아서 작업이 바뀔 때 다시 읽는다 */
 export function useAiTools() {
   return useLiveValue('ai', () => api<AiTools>('GET', '/api/ai'), TASK_TOPICS);
+}
+
+/** 엔진 목록 (리팩토링 E1). 서버의 파일이라 바뀌지 않아 신호 없이 한 번 읽는다. 읽기 전에는 빈 목록 */
+export function useEngines(): readonly Engine[] {
+  return (
+    useLiveValue('engines', () => api<EngineList>('GET', '/api/ai/engines'), []).data?.engines ?? []
+  );
 }
 
 /** 목표 나무. 목표마다 이어진 작업 수가 있어 작업이 바뀔 때도 다시 읽는다 */

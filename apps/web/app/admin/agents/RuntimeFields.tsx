@@ -1,11 +1,14 @@
-import { EFFORT_LABELS, TOOL_EFFORTS } from '../../_task/labels';
+import { EFFORT_LABELS } from '../../_task/labels';
+import { useEngines } from '../../_task/live';
 
 /** 모델 · 생각 강도 칸의 값 (빈 글이면 CLI의 기본) */
 export type Runtime = { model: string; effort: string };
 
-/** 도구를 바꾸면 그 도구가 받지 않는 강도는 기본으로 되돌린다 (서버 AgentRuntime.assertFits도 막는다) */
-export function runtimeFor(tool: string, runtime: Runtime): Runtime {
-  const efforts = TOOL_EFFORTS[tool] ?? [];
+/**
+ * 도구를 바꾸면 그 도구가 받지 않는 강도는 기본으로 되돌린다 (서버 AgentRuntime.assertFits도 막는다).
+ * efforts: 새 도구가 받는 강도 (엔진 목록)
+ */
+export function runtimeFor(efforts: readonly string[], runtime: Runtime): Runtime {
   return efforts.includes(runtime.effort) ? runtime : { ...runtime, effort: '' };
 }
 
@@ -23,7 +26,7 @@ export function RuntimeFields({
   value: Runtime;
   onChange: (value: Runtime) => void;
 }) {
-  const efforts = TOOL_EFFORTS[tool] ?? [];
+  const efforts = useEngines().find((e) => e.name === tool)?.efforts ?? [];
   return (
     <>
       <div className="field">

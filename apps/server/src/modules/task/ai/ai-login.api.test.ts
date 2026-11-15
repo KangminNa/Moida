@@ -202,6 +202,51 @@ describe('누가 쓸 수 있나', () => {
   });
 });
 
+describe('엔진 목록 (리팩토링 E1)', () => {
+  test('방문자 · 기기는 403, 관리자는 파일 순서로 이름 · 강도 · 모델 · 사용률 창 · 로그인 흐름을 본다', async () => {
+    assert.equal((await api.get('/api/ai/engines')).status, 403);
+    const device = await api.request('GET', '/api/ai/engines', TestUser.visitor, undefined, {
+      authorization: `Bearer ${laptop}`,
+    });
+    assert.equal(device.status, 403);
+    // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 시험 (모양은 assert가 본다)
+    const { engines } = ok(await api.get('/api/ai/engines', owner)) as { engines: any[] };
+    assert.deepEqual(
+      engines.map((e) => [e.name, e.login.flow, e.login.token, e.models === null]),
+      [
+        ['claude', 'paste_code', true, false],
+        ['codex', 'device_code', false, true],
+      ],
+    );
+    assert.deepEqual(engines[1]?.efforts, ['low', 'medium', 'high']);
+    assert.deepEqual(engines[0]?.models[0], { value: '', label: '에이전트 설정' });
+    assert.equal(JSON.stringify(engines).includes('oauth'), false, '로그인 주소는 싣지 않는다');
+  });
+
+  test('토큰을 받지 않는 엔진 · 목록에 없는 엔진은 422, 코드 붙여 넣기도 그 흐름의 엔진만', async () => {
+    const codex = await api.request('PUT', '/api/ai/codex/token', owner, { token: 'abc' });
+    assert.equal(codex.status, 422);
+    assert.match(codex.text, /직접 넣는 토큰을 받지 않는 도구예요/);
+    assert.equal(
+      (await api.request('PUT', '/api/ai/gpt/token', owner, { token: 'abc' })).status,
+      422,
+    );
+    assert.equal((await api.request('POST', '/api/ai/gpt/test', owner)).status, 422);
+    const started = ok(await api.request('POST', '/api/ai/codex/signin', owner));
+    const pasted = await api.request('POST', '/api/ai/codex/signin/code', owner, {
+      taskId: started.taskId,
+      code: 'abcd-efgh',
+    });
+    assert.equal(pasted.status, 422);
+    const crossed = await api.request('POST', '/api/ai/claude/signin/code', owner, {
+      taskId: started.taskId,
+      code: 'abcd-efgh',
+    });
+    assert.equal(crossed.status, 422, '다른 엔진의 로그인 작업에는 붙여 넣지 못한다');
+    await db.sql`UPDATE task.tasks SET status = 'cancelled', lease_until = NULL WHERE id = ${String(started.taskId)}`;
+  });
+});
+
 describe('토큰 넣기', () => {
   test('모양이 틀리면 400이고 문구에 값을 넣지 않는다', async () => {
     const put = (token: unknown) =>

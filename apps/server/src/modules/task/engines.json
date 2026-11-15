@@ -1,0 +1,46 @@
+{
+  "$comment": "엔진 목록 (리팩토링 E1): 일하는 구독 CLI마다 한 줄. 순서가 고르는 순서이고 첫 줄이 기본이다. 이름은 DB 값 목록(agents.tool · ai_logins.tool · plan_usage.tool)과 같아야 한다 (engines.test). 로그인 주소 · 코드 · 자격의 모양은 실제 CLI 화면으로 확인한 값이다 (Paperclip의 setup-token-parse · device-login-parse, MIT). 엔진을 더하면: 이 파일 한 줄 + 값 목록을 넓히는 마이그레이션 + 러너 어댑터",
+  "engines": {
+    "claude": {
+      "label": "Claude Code",
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "models": [["", "에이전트 설정"], ["opus", "Opus"], ["sonnet", "Sonnet"], ["haiku", "Haiku"]],
+      "windows": ["five_hour", "seven_day"],
+      "login": {
+        "flow": "paste_code",
+        "urls": ["https://claude.ai/oauth/authorize", "https://claude.com/cai/oauth/authorize"],
+        "query": true,
+        "userCode": null,
+        "leak": "sk-ant-",
+        "credential": {
+          "kind": "token",
+          "prefix": "sk-ant-oat",
+          "pattern": "^sk-ant-oat01-[A-Za-z0-9_-]{20,}$",
+          "label": "setup-token의 토큰"
+        },
+        "termYears": 1,
+        "rotating": false
+      }
+    },
+    "codex": {
+      "label": "Codex",
+      "efforts": ["low", "medium", "high"],
+      "models": null,
+      "windows": ["five_hour", "seven_day"],
+      "login": {
+        "flow": "device_code",
+        "urls": ["https://auth.openai.com/codex/device"],
+        "query": false,
+        "userCode": "^[A-Za-z0-9]{4}-[A-Za-z0-9]{5}$",
+        "leak": null,
+        "credential": {
+          "kind": "json",
+          "maxBytes": 65536,
+          "label": "auth.json"
+        },
+        "termYears": null,
+        "rotating": true
+      }
+    }
+  }
+}

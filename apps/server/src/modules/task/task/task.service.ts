@@ -287,13 +287,7 @@ export class TaskService extends BaseService {
       // 러너가 할 수 있는 일만: 가진 CLI와 쓸 수 있는 로그인 (LeasePolicy). 빌렸다가 돌려주지 않는다
       const usable = await new AiLoginRepository(tx).usableTools(spaceId, now);
       const running = await tasks.runningAgentTools(spaceId);
-      const workTools = LeasePolicy.workTools(
-        req.tools,
-        req.ownLogins,
-        usable,
-        AiLogin.ROTATING,
-        running,
-      );
+      const workTools = LeasePolicy.workTools(req.tools, req.ownLogins, usable, running);
       // 쉬는지는 작업을 잠그기 전에 따진다: 쉬는 에이전트의 일은 빌렸다가 돌려주지 않고 처음부터 건너뛴다
       const usage = await agents.usage(spaceId, now);
       // 다른 러너에 묶인 에이전트의 일은 이 러너가 빌리지 않는다 (자동 배정도 그 에이전트를 고르지 않는다)
@@ -330,8 +324,7 @@ export class TaskService extends BaseService {
           : ready.find((a) => task.doableWith(a.scopes));
         const agent = task.agentless ? null : worker;
         if (agent === undefined) continue;
-        if (agent && !LeasePolicy.canStart(agent.tool, req.ownLogins, AiLogin.ROTATING, busy))
-          continue;
+        if (agent && !LeasePolicy.canStart(agent.tool, req.ownLogins, busy)) continue;
         if (agent) busy.push(agent.tool);
         if (scope) held.push(scope);
         task.lease(runnerId, agent?.id ?? null, now);

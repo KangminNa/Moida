@@ -4,6 +4,7 @@ import {
   type RequestFields,
   type Unchecked,
 } from '../../platform';
+import { Engines } from '../ai/engines';
 import type { AgentRow } from '../task.tables';
 
 // 에이전트 입력의 모양. 뜻(도구 이름, 권한 목록)은 Agent가 검사한다.
@@ -94,7 +95,7 @@ export class CreateAgentTeamInput extends BaseRequest {
         new CreateAgentTeamInput(
           f.uuid('requestId'),
           f.text('team', 40),
-          f.optionalText('tool', 40) ?? 'claude',
+          f.optionalText('tool', 40) ?? Engines.preferred(),
         ),
     );
   }

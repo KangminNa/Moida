@@ -1,4 +1,4 @@
-import type { UsageAgent } from './types';
+import type { Engine, UsageAgent } from './types';
 
 // 작업·승인·에이전트의 화면 이름과 표시 형식
 
@@ -122,7 +122,10 @@ export const EVENT_KINDS: Record<string, string> = {
   error: '오류',
 };
 
-export const TOOL_LABELS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
+/** 엔진 이름 → 화면 이름 (엔진 목록 GET /api/ai/engines, 읽기 전이거나 목록에 없으면 이름 그대로) */
+export function engineLabel(engines: readonly Engine[], name: string): string {
+  return engines.find((e) => e.name === name)?.label ?? name;
+}
 
 /** 생각 강도 (2차 7단계). 빈 값은 CLI의 기본 */
 export const EFFORT_LABELS: Record<string, string> = {
@@ -142,20 +145,6 @@ export const REF_KINDS: Record<string, string> = {
   output: '결과물',
   link: '스크랩',
   url: '주소',
-};
-
-/** 대화에서 고를 수 있는 모델 (Claude는 별칭, Codex는 직접 적는다. 빈 값은 에이전트의 설정) */
-export const CLAUDE_MODELS: readonly (readonly [string, string])[] = [
-  ['', '에이전트 설정'],
-  ['opus', 'Opus'],
-  ['sonnet', 'Sonnet'],
-  ['haiku', 'Haiku'],
-];
-
-/** 도구마다 받는 생각 강도 (서버 AgentRuntime.EFFORTS와 맞춘다) */
-export const TOOL_EFFORTS: Record<string, readonly string[]> = {
-  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
-  codex: ['low', 'medium', 'high'],
 };
 
 /** 팀 템플릿이 다 돌려면 필요한 것 (서버의 AgentTeamRow.needs) */

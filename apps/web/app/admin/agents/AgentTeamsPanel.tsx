@@ -5,7 +5,8 @@ import { api } from '../../_lib/client-api';
 import { SCOPE_LABELS } from '../../_lib/types';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
-import { NEEDS_LABELS, TOOL_LABELS } from '../../_task/labels';
+import { NEEDS_LABELS } from '../../_task/labels';
+import { useEngines } from '../../_task/live';
 import type { AgentTeam, AgentTeamList, AgentTeamSaved } from '../../_task/types';
 
 // 팀 템플릿: 역할 · 권한 · 조직도가 정해진 팀을 버튼 한 번에 만든다 (서버가 한 번에, 반쪽 팀이 남지 않게).
@@ -26,7 +27,10 @@ export function AgentTeamsPanel({
     [],
   );
   const make = useAction();
-  const [tool, setTool] = useState('claude');
+  // 고르기 전에는 엔진 목록의 첫 줄(기본)
+  const engines = useEngines();
+  const [picked, setTool] = useState<string | null>(null);
+  const tool = picked ?? engines[0]?.name ?? '';
   // 템플릿마다 requestId 하나: 응답을 놓쳐 다시 눌러도 팀은 하나. 만든 뒤에는 새로
   const requestIds = useRef(new Map<string, string>());
 
@@ -62,9 +66,9 @@ export function AgentTeamsPanel({
           value={tool}
           onChange={(e) => setTool(e.target.value)}
         >
-          {Object.entries(TOOL_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
+          {engines.map((e) => (
+            <option key={e.name} value={e.name}>
+              {e.label}
             </option>
           ))}
         </select>

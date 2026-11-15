@@ -1,17 +1,24 @@
 import { BaseRequest } from '../../platform';
+import { Engines } from './engines';
 
 // AI 로그인 입력의 모양. 오류 문구에 토큰 값을 넣지 않는다.
 
-/** PUT /api/ai/claude/token. 터미널에서 줄이 접힌 채 복사하면 토큰이 끊기므로 공백을 따로 알린다 */
+/**
+ * PUT /api/ai/:tool/token. 터미널에서 줄이 접힌 채 복사하면 토큰이 끊기므로 공백을 따로 알린다.
+ * 앞부분은 엔진 목록의 토큰 앞부분 (토큰을 받는 엔진인지는 서비스가 묻는다)
+ */
 export class AiTokenInput extends BaseRequest {
-  private static readonly PREFIX = 'sk-ant-oat';
   private static readonly TOKEN_MAX = 2_000;
 
-  private constructor(readonly token: string) {
+  private constructor(
+    readonly tool: string,
+    readonly token: string,
+  ) {
     super();
   }
 
-  static from(raw: unknown): AiTokenInput {
+  static from(raw: unknown, tool: string): AiTokenInput {
+    const prefix = Engines.find(tool)?.login.tokenPrefix ?? null;
     return BaseRequest.read(raw, (f) => {
       const token = f.text('token', AiTokenInput.TOKEN_MAX);
       if (/\s/.test(token))
@@ -19,9 +26,9 @@ export class AiTokenInput extends BaseRequest {
           'token',
           '공백이나 줄바꿈이 섞인 토큰이에요. 끊긴 곳 없이 한 줄로 붙여 넣어 주세요',
         );
-      else if (token && !token.startsWith(AiTokenInput.PREFIX))
-        f.reject('token', `${AiTokenInput.PREFIX}로 시작하지 않는 토큰이에요`);
-      return new AiTokenInput(token);
+      else if (token && prefix && !token.startsWith(prefix))
+        f.reject('token', `${prefix}로 시작하지 않는 토큰이에요`);
+      return new AiTokenInput(tool, token);
     });
   }
 }
@@ -37,30 +44,31 @@ export class AiLoginInput extends BaseRequest {
   }
 }
 
-/** POST /api/ai/:tool/signin. 도구 이름의 뜻은 AiLogin이 검사한다 */
-export class AiSigninInput extends BaseRequest {
+/** 경로의 도구 하나 (POST /api/ai/:tool/signin · /:tool/test). 도구 이름의 뜻은 엔진 목록이 검사한다 */
+export class AiToolInput extends BaseRequest {
   private constructor(readonly tool: string) {
     super();
   }
 
-  static from(tool: string): AiSigninInput {
-    return BaseRequest.read({ tool }, (f) => new AiSigninInput(f.text('tool', 40)));
+  static from(tool: string): AiToolInput {
+    return BaseRequest.read({ tool }, (f) => new AiToolInput(f.text('tool', 40)));
   }
 }
 
-/** POST /api/ai/claude/signin/code: 주인이 브라우저에서 받은 코드. 오류 문구에 코드를 넣지 않는다 */
+/** POST /api/ai/:tool/signin/code: 관리자가 브라우저에서 받은 코드. 오류 문구에 코드를 넣지 않는다 */
 export class AiSigninCodeInput extends BaseRequest {
   private constructor(
+    readonly tool: string,
     readonly taskId: string,
     readonly code: string,
   ) {
     super();
   }
 
-  static from(raw: unknown): AiSigninCodeInput {
+  static from(raw: unknown, tool: string): AiSigninCodeInput {
     return BaseRequest.read(
       raw,
-      (f) => new AiSigninCodeInput(f.uuid('taskId'), f.text('code', 1024).trim()),
+      (f) => new AiSigninCodeInput(tool, f.uuid('taskId'), f.text('code', 1024).trim()),
     );
   }
 }

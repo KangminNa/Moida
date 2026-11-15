@@ -12,6 +12,7 @@ import {
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
+import { Engines } from '../ai/engines';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
 import { TASK_EVENT_KIND } from '../task.tables';
@@ -299,8 +300,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   /**
-   * 러너가 로그인 주소를 찾았다. Claude는 이제 사람이 브라우저의 코드를 붙여 넣을 차례고,
-   * Codex는 사람이 주소에서 코드를 입력하면 CLI가 스스로 끝난다
+   * 러너가 로그인 주소를 찾았다. 코드를 붙여 넣는 엔진(Claude)은 이제 사람이 브라우저의 코드를 붙여 넣을 차례고,
+   * 기기 코드 엔진(Codex)은 사람이 주소에서 코드를 입력하면 CLI가 스스로 끝난다 (엔진 목록의 login.flow)
    */
   showSignin(url: string, userCode: string | null): void {
     this.assertSigninRunning();
@@ -310,13 +311,10 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
       if (payload.url === url && (payload.userCode ?? null) === userCode) return;
       throw new Conflict('이미 로그인 주소를 알렸어요');
     }
-    const claude = this.signinTool === 'claude';
-    this.put('payload', {
-      ...payload,
-      url,
-      userCode,
-      step: claude ? Task.SIGNIN_WAITING_CODE : Task.SIGNIN_OPEN_URL,
-    });
+    const step = Engines.of(this.signinTool ?? '').login.pastesCode
+      ? Task.SIGNIN_WAITING_CODE
+      : Task.SIGNIN_OPEN_URL;
+    this.put('payload', { ...payload, url, userCode, step });
   }
 
   /** 사람이 붙여 넣은 코드를 받는다 (암호화한 값). 러너가 가져갈 때까지만 둔다 */

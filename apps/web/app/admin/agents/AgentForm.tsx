@@ -1,8 +1,7 @@
 'use client';
 
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { TOOL_LABELS } from '../../_task/labels';
-import type { RunnerChoice } from '../../_task/live';
+import { type RunnerChoice, useEngines } from '../../_task/live';
 import type { Agent, ExternalTool } from '../../_task/types';
 import { type Access, AccessFields } from './AccessFields';
 import { BossField } from './BossField';
@@ -80,8 +79,10 @@ export function AgentForm({
   const id = useId();
   const [name, setName] = useState(agent?.name ?? '');
   const [role, setRole] = useState(agent?.role ?? '');
-  // 칸의 값은 고른 글자 그대로 둔다 (값 목록은 서버가 본다)
-  const [tool, setTool] = useState<string>(agent?.tool ?? 'claude');
+  // 칸의 값은 고른 글자 그대로 둔다 (값 목록은 서버가 본다). 고르기 전에는 엔진 목록의 첫 줄(기본)
+  const engines = useEngines();
+  const [picked, setTool] = useState<string | null>(agent?.tool ?? null);
+  const tool = picked ?? engines[0]?.name ?? '';
   const [runtime, setRuntime] = useState<Runtime>({
     model: agent?.model ?? '',
     effort: agent?.effort ?? '',
@@ -186,13 +187,14 @@ export function AgentForm({
           onChange={(e) =>
             change(() => {
               setTool(e.target.value);
-              setRuntime(runtimeFor(e.target.value, runtime));
+              const next = engines.find((x) => x.name === e.target.value);
+              setRuntime(runtimeFor(next?.efforts ?? [], runtime));
             })
           }
         >
-          {Object.entries(TOOL_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
+          {engines.map((e) => (
+            <option key={e.name} value={e.name}>
+              {e.label}
             </option>
           ))}
         </select>

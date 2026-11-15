@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { CLAUDE_MODELS, EFFORT_LABELS, TOOL_EFFORTS } from '../../_task/labels';
+import { EFFORT_LABELS } from '../../_task/labels';
+import { useEngines } from '../../_task/live';
 
 // 대화의 모델 · 생각 강도 (2026-11-15 B): 맡은 에이전트의 도구가 받는 것만. 비우면 에이전트의 설정.
-// 도구(Claude · Codex)는 대화에서 바꾸지 않는다. Claude는 별칭(opus · sonnet · haiku), Codex는 모델 이름을 적는다
+// 도구는 대화에서 바꾸지 않는다. 고를 모델 목록이 있는 엔진(엔진 목록의 models)은 고르고, 없으면 모델 이름을 적는다
 export function ChatRuntimeForm({
   tool,
   model,
@@ -19,7 +20,8 @@ export function ChatRuntimeForm({
   onSubmit: (body: { model: string | null; effort: string | null }) => void;
 }) {
   const [typed, setTyped] = useState(model ?? '');
-  const efforts = TOOL_EFFORTS[tool] ?? [];
+  const engine = useEngines().find((e) => e.name === tool);
+  const efforts = engine?.efforts ?? [];
   const send = (next: { model?: string | null; effort?: string | null }) =>
     onSubmit({
       model: next.model !== undefined ? next.model || null : model,
@@ -28,7 +30,7 @@ export function ChatRuntimeForm({
 
   return (
     <fieldset className="chat-runtime" aria-label="이 대화의 모델">
-      {tool === 'claude' ? (
+      {engine?.models ? (
         <select
           className="input small"
           aria-label="모델"
@@ -36,9 +38,9 @@ export function ChatRuntimeForm({
           disabled={busy}
           onChange={(e) => send({ model: e.target.value })}
         >
-          {CLAUDE_MODELS.map(([id, label]) => (
-            <option key={id} value={id}>
-              {label}
+          {engine.models.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
             </option>
           ))}
         </select>

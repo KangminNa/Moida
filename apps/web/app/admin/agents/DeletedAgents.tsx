@@ -3,8 +3,8 @@
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
-import { TOOL_LABELS, when } from '../../_task/labels';
-import { AGENT_TOPICS } from '../../_task/live';
+import { engineLabel, when } from '../../_task/labels';
+import { AGENT_TOPICS, useEngines } from '../../_task/live';
 import type { AgentList } from '../../_task/types';
 
 // 삭제한 에이전트 (휴지통). 작업 · 승인 기록은 그대로 남아 있고, 복원하면 다시 일을 받는다.
@@ -23,6 +23,7 @@ export function DeletedAgents({
     AGENT_TOPICS,
   );
   const action = useAction();
+  const engines = useEngines();
   const list = deleted.data?.agents;
 
   return (
@@ -47,7 +48,7 @@ export function DeletedAgents({
               <div className="item-main">
                 <b>{a.name}</b>
                 <small>
-                  {TOOL_LABELS[a.tool] ?? a.tool} · {a.deletedAt ? `삭제 ${when(a.deletedAt)}` : ''}
+                  {engineLabel(engines, a.tool)} · {a.deletedAt ? `삭제 ${when(a.deletedAt)}` : ''}
                 </small>
               </div>
               <button

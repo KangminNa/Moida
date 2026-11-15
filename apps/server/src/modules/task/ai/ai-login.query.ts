@@ -5,7 +5,14 @@ import { aiLogins, tasks } from '../task.schema';
 import { AI_LOGIN_TOOL, type TaskRow } from '../task.tables';
 import type { AiLoginInput } from './ai-login.input';
 import { AiLoginRepository } from './ai-login.repository';
-import { AiSigninView, type AiTokenView, AiToolListView, AiToolView } from './ai-login.view';
+import {
+  AiSigninView,
+  type AiTokenView,
+  AiToolListView,
+  AiToolView,
+  EngineListView,
+} from './ai-login.view';
+import { Engines } from './engines';
 
 // AI 로그인 읽기. 콘솔은 상태만 보고, 토큰은 run 권한을 가진 기기에게만 나간다.
 @Injectable()
@@ -15,6 +22,12 @@ export class AiLoginQuery extends BaseQuery {
     private readonly box: SecretBox,
   ) {
     super(db);
+  }
+
+  /** 엔진 목록 (task/engines.json, 리팩토링 E1). 관리자만 */
+  engines(actor: Actor): EngineListView {
+    actor.assertOwner();
+    return new EngineListView(Engines.list().map((e) => e.view()));
   }
 
   /** 로그인을 받는 도구마다 한 줄. 아직 넣지 않았어도 보낸다. 진행 중인 웹 로그인을 함께 싣는다. 암호문은 읽지도 않는다 */

@@ -10,7 +10,11 @@ import type {
   AgentTeamSavedView,
   AgentView,
 } from '../../../server/src/modules/task/agent/agent.view';
-import type { AiTestView, AiToolListView } from '../../../server/src/modules/task/ai/ai-login.view';
+import type {
+  AiTestView,
+  AiToolListView,
+  EngineListView,
+} from '../../../server/src/modules/task/ai/ai-login.view';
 import type {
   ApprovalPageView,
   ApprovalView,
@@ -90,6 +94,9 @@ export type UsageWindow = Usage['plan'][number];
 /** AI 도구마다의 로그인 상태 (AI 메뉴, 러너 메뉴) */
 export type AiTools = ReturnType<AiToolListView['toJSON']>;
 export type AiTool = AiTools['tools'][number];
+/** 엔진 목록 (task/engines.json, 리팩토링 E1): 도구 이름 · 생각 강도 · 모델 · 로그인 흐름 */
+export type EngineList = ReturnType<EngineListView['toJSON']>;
+export type Engine = EngineList['engines'][number];
 /** 맡긴 연결 확인 · 웹 로그인의 작업 */
 export type AiTest = ReturnType<AiTestView['toJSON']>;
 /** code-github 패키지의 PR (승인 화면의 code.pr.merge 대상). 패키지의 view가 원본이다 */

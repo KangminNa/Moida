@@ -1,4 +1,5 @@
-import { TOOL_LABELS } from '../../_task/labels';
+import { engineLabel } from '../../_task/labels';
+import { useEngines } from '../../_task/live';
 import type { Agent } from '../../_task/types';
 
 // 에이전트 폼의 "검토자" 칸 (검토자 짝, 2차 2단계). 이 에이전트와 나눈 대화의 회차가 끝나면 결과 카드 전에 검토자가 본다.
@@ -19,6 +20,7 @@ export function ReviewerField({
   agents: readonly Agent[];
   onChange: (value: string) => void;
 }) {
+  const engines = useEngines();
   const choices = agents.filter((a) => a.id !== self && a.tool !== tool);
   return (
     <div className="field">
@@ -33,7 +35,7 @@ export function ReviewerField({
         <option value="">없음</option>
         {choices.map((a) => (
           <option key={a.id} value={a.id}>
-            {a.name} · {TOOL_LABELS[a.tool] ?? a.tool}
+            {a.name} · {engineLabel(engines, a.tool)}
           </option>
         ))}
       </select>
