@@ -1,6 +1,6 @@
-// 콘솔 왼쪽 메뉴. 메뉴 하나 = app/admin/<주소>/ 폴더 하나 + 여기 한 줄. 기능이 생길 때 더한다.
-// 대화가 처음 화면이다 (2차 1-5). 왼쪽 아래에는 늘 승인 · 팀 · 보관함 · 설정 네 줄이 있고 (MAIN_MENU),
-// 설정 칸에서는 설정 묶음과 접어 둔 "고급"이 보인다 (MENU, 2026-11-15 화면 정리: 설정은 대화에서 하고 화면은 덜어 둔다).
+// 콘솔 메뉴. 메뉴 하나 = app/admin/<주소>/ 폴더 하나 + 여기 한 줄. 기능이 생길 때 더한다.
+// 왼쪽에 떠 있는 독(DOCK)이 보는 화면 다섯(대화 · 팀 · 오피스 · 승인 · 보관함)이고, 대화가 처음 화면이다 (2026-11-16 떠 있는 화면).
+// 설정에는 바꾸는 것만 둔다: 설정 묶음과 접어 둔 "고급" (MENU, 2026-11-15 화면 정리: 설정은 대화에서 하고 화면은 덜어 둔다).
 // 아이콘은 흑백 이모지다: 이모지 모양을 흑백 글꼴(Noto Emoji)로 그려 흑백 디자인을 지킨다.
 
 /** 아이콘 이름 → 흑백 이모지. 끝의 ︎는 글자 모양으로 그리라는 표시 (색 이모지로 바뀌지 않게) */
@@ -47,19 +47,87 @@ export const LIBRARY_HREF = '/admin/library';
 /** 설정의 첫 화면: AI 계정 */
 export const SETTINGS_HREF = '/admin/ai';
 
-/** 대화 칸 (2차 1-5): 새 대화와 대화 하나 (/admin/chats/<id>). 왼쪽은 대화 목록이라 이 줄들은 메뉴로 그리지 않는다 */
-export const CHAT_MENU = [
-  { href: CHAT_HREF, name: '새 대화', icon: 'new' },
-  { href: CHATS_HREF, name: '대화', icon: 'chat' },
+/** 옆 칸(대화 목록 · 설정 메뉴)을 접어 둔 것을 기억하는 쿠키. 콘솔 틀(layout)이 서버에서 읽어 처음부터 그 모양으로 그린다 */
+export const SIDE_COOKIE = 'cairn_side';
+
+/** 새 대화 (대화 목록 맨 위) */
+export const NEW_CHAT = { href: CHAT_HREF, name: '새 대화', icon: 'new' };
+
+/**
+ * 독 (2026-11-16 떠 있는 화면): 보는 화면 다섯. 이 순서가 화면이 위아래로 넘어가는 방향이다 (page-flip.ts).
+ * pages는 그 화면에 속한 주소들이고, tabs면 카드 위에 탭 줄로 보인다. side면 옆 칸(대화 목록)이 있다.
+ * 설정(SETTINGS_SECTION)은 독의 아래 묶음이고, 그 밖의 콘솔 주소는 모두 설정에 속한다.
+ */
+export const DOCK = [
+  {
+    key: 'chat',
+    href: CHAT_HREF,
+    name: '대화',
+    icon: 'chat',
+    side: true,
+    tabs: false,
+    pages: [NEW_CHAT, { href: CHATS_HREF, name: '대화' }],
+  },
+  {
+    key: 'team',
+    href: TEAM_HREF,
+    name: '팀',
+    icon: 'team',
+    side: false,
+    tabs: true,
+    pages: [
+      { href: TEAM_HREF, name: '팀' },
+      { href: '/admin/tasks', name: '작업 기록' },
+    ],
+  },
+  {
+    key: 'office',
+    href: '/admin/office',
+    name: '오피스',
+    icon: 'office',
+    side: false,
+    tabs: false,
+    pages: [{ href: '/admin/office', name: '오피스' }],
+  },
+  {
+    key: 'approvals',
+    href: APPROVALS_HREF,
+    name: '승인',
+    icon: 'approve',
+    side: false,
+    tabs: false,
+    pages: [{ href: APPROVALS_HREF, name: '승인' }],
+  },
+  {
+    key: 'library',
+    href: LIBRARY_HREF,
+    name: '보관함',
+    icon: 'box',
+    side: false,
+    tabs: true,
+    pages: [
+      { href: LIBRARY_HREF, name: '전체' },
+      { href: `${LIBRARY_HREF}/outputs`, name: '결과물' },
+      { href: `${LIBRARY_HREF}/pages`, name: '페이지' },
+      { href: `${LIBRARY_HREF}/basket`, name: '스크랩' },
+      { href: '/admin/wiki', name: '위키' },
+      { href: '/admin/graph', name: '지식 그래프' },
+      { href: '/admin/sessions', name: '세션' },
+      { href: '/admin/posts', name: '글' },
+    ],
+  },
 ];
 
-/** 늘 보이는 네 줄: 대화 칸에서는 목록 아래, 설정 칸에서는 맨 위 */
-export const MAIN_MENU = [
-  { href: APPROVALS_HREF, name: '승인', icon: 'approve' },
-  { href: TEAM_HREF, name: '팀', icon: 'team' },
-  { href: LIBRARY_HREF, name: '보관함', icon: 'box' },
-  { href: SETTINGS_HREF, name: '설정', icon: 'gear' },
-];
+/** 독 아래 묶음의 설정: 옆 칸이 설정 메뉴(MENU)다 */
+export const SETTINGS_SECTION = {
+  key: 'settings',
+  href: SETTINGS_HREF,
+  name: '설정',
+  icon: 'gear',
+  side: true,
+  tabs: false,
+  pages: [] as { href: string; name: string }[],
+};
 
 /** 설정 칸의 묶음. advanced는 "고급" 안에 접어 둔다 (대화로 하게 될 것 · 직접 손볼 때만 쓰는 것) */
 export const MENU = [
@@ -81,20 +149,13 @@ export const MENU = [
     items: [
       { href: '/admin/goals', name: '목표', icon: 'goal' },
       { href: '/admin/schedules', name: '스케줄', icon: 'clock' },
-      { href: '/admin/tasks', name: '작업 기록', icon: 'task' },
       { href: '/admin/events', name: '처리 실패', icon: 'warn' },
     ],
   },
   {
-    label: '지식 · 블로그',
+    label: '블로그',
     advanced: true,
-    items: [
-      { href: '/admin/sessions', name: '세션', icon: 'session' },
-      { href: '/admin/wiki', name: '위키', icon: 'book' },
-      { href: '/admin/graph', name: '지식 그래프', icon: 'graph' },
-      { href: '/admin/posts', name: '글', icon: 'post' },
-      { href: '/admin/menus', name: '블로그 메뉴', icon: 'compass' },
-    ],
+    items: [{ href: '/admin/menus', name: '블로그 메뉴', icon: 'compass' }],
   },
   {
     label: '연결',
@@ -105,7 +166,6 @@ export const MENU = [
       { href: '/admin/plugins', name: '플러그인', icon: 'brick' },
       { href: '/admin/skills', name: '스킬', icon: 'puzzle' },
       { href: '/admin/tool-texts', name: 'MCP 도구 설명', icon: 'wrench' },
-      { href: '/admin/office', name: '오피스', icon: 'office' },
     ],
   },
 ];
@@ -115,23 +175,29 @@ export const PACKAGE_GROUPS: Readonly<Record<string, string>> = {
   운영: '일',
   자동화: '일',
   일: '일',
-  지식: '지식 · 블로그',
-  블로그: '지식 · 블로그',
+  지식: '블로그',
+  블로그: '블로그',
   연결: '연결',
   설정: '설정',
 };
 
-/** 위쪽 줄의 제목: 지금 주소가 속한 메뉴 (설정 칸은 "설정 › 이름"). 모르면 null */
-export function titleOf(pathname: string | null): { section: string | null; name: string } | null {
-  if (!pathname) return null;
-  if (pathname === CHAT_HREF) return { section: null, name: '새 대화' };
-  if (pathname.startsWith(`${CHATS_HREF}/`)) return { section: null, name: '대화' };
-  const main = MAIN_MENU.find((m) => m.href !== SETTINGS_HREF && pathname.startsWith(m.href));
-  if (main) return { section: null, name: main.name };
-  for (const group of MENU)
-    for (const item of group.items)
-      if (pathname.startsWith(item.href)) return { section: '설정', name: item.name };
-  return null;
+/** 콘솔 주소 → 속한 화면과 그 안의 페이지. 가장 길게 맞는 주소가 이긴다 (보관함 › 결과물). 독에 없으면 설정 */
+export function placeOf(pathname: string | null): {
+  section: (typeof DOCK)[number] | typeof SETTINGS_SECTION;
+  index: number;
+  page: { href: string; name: string } | null;
+} {
+  const path = pathname ?? '';
+  const fits = (href: string) =>
+    path === href || (href !== CHAT_HREF && path.startsWith(`${href}/`));
+  let found: ReturnType<typeof placeOf> | null = null;
+  for (const [index, section] of DOCK.entries())
+    for (const page of section.pages)
+      if (fits(page.href) && page.href.length > (found?.page?.href.length ?? 0))
+        found = { section, index, page };
+  if (found) return found;
+  const item = MENU.flatMap((g) => g.items).find((i) => fits(i.href)) ?? null;
+  return { section: SETTINGS_SECTION, index: DOCK.length, page: item };
 }
 
 export function MenuIcon({ name }: { name: string }) {

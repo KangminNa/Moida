@@ -12,7 +12,7 @@ const TOPICS = ['platform.notification'];
 const when = (iso: string) =>
   new Date(iso).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
 
-// 콘솔 머리줄의 알림: 안 읽은 수와 최근 알림. 누르면 그 주소로 가고 읽음이 된다.
+// 독의 알림: 안 읽은 수와 최근 알림 (목록은 독 옆에 뜬다). 누르면 그 주소로 가고 읽음이 된다.
 // 무엇을 알리는지는 알리는 쪽(승인 요청, 작업 실패, 지울 만한 위키 등)이 정한다. 경로 · 조용한 시간은 설정 › 알림.
 export function NotificationBell() {
   const router = useRouter();
@@ -57,7 +57,7 @@ export function NotificationBell() {
     <div className="bell" ref={box}>
       <button
         type="button"
-        className="icon-button bell-button"
+        className="dock-item bell-button"
         aria-expanded={open}
         aria-label={unread > 0 ? `알림, 안 읽음 ${unread}개` : '알림'}
         onClick={() => setOpen(!open)}
@@ -65,7 +65,14 @@ export function NotificationBell() {
         <span className="menu-ico" aria-hidden="true">
           {'\u{1F514}\uFE0E'}
         </span>
-        {unread > 0 && <span className="bell-count">{unread}</span>}
+        <span className="dock-label" aria-hidden="true">
+          알림
+        </span>
+        {unread > 0 && (
+          <span className="dock-count" aria-hidden="true">
+            {unread}
+          </span>
+        )}
       </button>
       {open && (
         <section className="bell-panel" aria-label="알림 목록">

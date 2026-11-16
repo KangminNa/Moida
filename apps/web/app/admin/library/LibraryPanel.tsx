@@ -105,17 +105,6 @@ export function LibraryPanel() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <nav className="row" aria-label="관리">
-        <Link className="ghost small" href="/admin/library/outputs">
-          결과물 관리
-        </Link>
-        <Link className="ghost small" href="/admin/library/pages">
-          페이지 관리
-        </Link>
-        <Link className="ghost small" href="/admin/library/basket">
-          스크랩 관리
-        </Link>
-      </nav>
       <fieldset className="row" style={{ border: 0, margin: 0, padding: 0 }}>
         <legend className="sr">종류</legend>
         <button
@@ -184,7 +173,7 @@ export function LibraryPanel() {
           </p>
         </div>
       ) : (
-        <ul className="list" aria-label="보관함">
+        <ul className="list library-grid" aria-label="보관함">
           {items.map((i) => (
             <li key={`${i.kind}:${i.id}`} className="list-cell library-row">
               <span className="pill">{KIND_LABELS[i.kind] ?? i.kind}</span>

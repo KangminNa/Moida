@@ -1,9 +1,11 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import type { Owner, SpaceInfo } from '../_account/types';
 import { serverGet } from '../_lib/server-api';
 import type { PluginList } from '../_platform/types';
 import { AdminShell } from './AdminShell';
+import { SIDE_COOKIE } from './menu';
 
 // 콘솔은 주인만. 로그인하지 않았으면 로그인한 뒤 콘솔로 돌아온다.
 export const dynamic = 'force-dynamic';
@@ -19,12 +21,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   ]);
   if (space && !space.installed) redirect('/install');
   if (!owner) redirect('/login?return=/admin');
+  const sideClosed = (await cookies()).get(SIDE_COOKIE)?.value === 'closed';
   return (
     <AdminShell
       ownerName={owner.name}
       siteName={space?.name ?? ''}
       logoUrl={space?.logoUrl ?? null}
       activePlugins={plugins?.plugins.filter((p) => p.active).map((p) => p.name) ?? []}
+      sideClosed={sideClosed}
     >
       {children}
     </AdminShell>

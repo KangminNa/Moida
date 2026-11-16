@@ -1,5 +1,6 @@
 /* Cairn 화면의 바탕. 화이트 또는 블랙 한 벌만 쓴다 (기획서 2026-10-31).
    콘솔과 블로그가 같은 값을 쓰고, 상태는 색 대신 채움·테두리·굵기로 구분한다.
+   콘솔은 바탕(--canvas) 위에 독 · 옆 칸 · 카드가 떠 있다 (2026-11-16): 층은 그림자(--float-*)로, 어두운 화면은 테두리 선으로.
    고르지 않으면 기기 설정을 따르고, 고르면 html의 data-theme이 우선한다. */
 
 :root {
@@ -23,6 +24,17 @@
   --radius-card: 14px;
   --lift: 0 1px 2px rgba(0, 0, 0, 0.04);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* 떠 있는 콘솔: 바탕 · 층 · 독 · 모서리 · 바깥 여백 */
+  --canvas: #ececec;
+  --float-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.07);
+  --float-2: 0 14px 40px rgba(0, 0, 0, 0.22);
+  --dock-bg: #111111;
+  --dock-fg: #ffffff;
+  --dock-dim: rgba(255, 255, 255, 0.72);
+  --dock-line: rgba(255, 255, 255, 0.2);
+  --radius-dock: 22px;
+  --radius-sheet: 24px;
+  --edge: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +51,13 @@
     --muted: #a8a8a8;
     --faint: #8c8c8c;
     --shadow: rgba(0, 0, 0, 0.6);
+    --canvas: #121212;
+    --float-1: 0 0 0 1px var(--line);
+    --float-2: 0 0 0 1px var(--line-strong);
+    --dock-bg: #fafafa;
+    --dock-fg: #0a0a0a;
+    --dock-dim: rgba(0, 0, 0, 0.65);
+    --dock-line: rgba(0, 0, 0, 0.15);
   }
 }
 
@@ -55,6 +74,13 @@
   --muted: #a8a8a8;
   --faint: #8c8c8c;
   --shadow: rgba(0, 0, 0, 0.6);
+  --canvas: #121212;
+  --float-1: 0 0 0 1px var(--line);
+  --float-2: 0 0 0 1px var(--line-strong);
+  --dock-bg: #fafafa;
+  --dock-fg: #0a0a0a;
+  --dock-dim: rgba(0, 0, 0, 0.65);
+  --dock-line: rgba(0, 0, 0, 0.15);
 }
 
 * {
@@ -107,36 +133,170 @@ a {
   white-space: nowrap;
 }
 
-/* 콘솔: 왼쪽 메뉴 + 작업 칸 */
+/* 콘솔 (2026-11-16 떠 있는 화면): 바탕 위에 독 · 옆 칸 · 카드. 바깥 여백은 --edge 하나 */
 .console {
   display: flex;
+  gap: var(--edge);
   height: 100dvh;
+  padding: var(--edge);
+  background: var(--canvas);
 }
 
 .console-scrim {
   display: none;
 }
 
+/* 독: 세로로 떠 있는 검은 알약. 위는 화면 다섯, 아래 묶음은 알림 · 설정 */
+/* z-index: 알림 목록이 독 안에서 떠도 카드 위에 보이게 (독은 화면 전환 이름이 있어 따로 쌓인다) */
+.dock {
+  position: relative;
+  z-index: 20;
+  flex: none;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-dock);
+  background: var(--dock-bg);
+  color: var(--dock-fg);
+  box-shadow: var(--float-2);
+  scrollbar-width: none;
+  view-transition-name: console-dock;
+}
+
+.dock-brand {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 44px;
+  color: var(--dock-fg);
+}
+
+.dock-brand .brand-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.dock-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 52px;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--dock-dim);
+  font-size: 10.5px;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.dock-item .menu-ico {
+  width: auto;
+  font-size: 17px;
+  color: inherit;
+}
+
+.dock-item:hover {
+  color: var(--dock-fg);
+}
+
+.dock-item[aria-current="page"] {
+  background: var(--dock-fg);
+  color: var(--dock-bg);
+  font-weight: 700;
+}
+
+/* 기다리는 승인 · 안 읽은 알림 수 */
+.dock-count {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  min-width: 17px;
+  padding: 0 4px;
+  border: 2px solid var(--dock-bg);
+  border-radius: 999px;
+  background: var(--dock-fg);
+  color: var(--dock-bg);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-item[aria-current="page"] .dock-count {
+  border-color: var(--dock-fg);
+  background: var(--dock-bg);
+  color: var(--dock-fg);
+}
+
+.dock-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--dock-line);
+}
+
+/* 옆 칸: 대화 목록 · 설정 메뉴. 데스크톱에서는 접을 수 있다 (쿠키 cairn_side) */
 .console-side {
-  flex: 0 0 248px;
+  flex: 0 0 240px;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 12px 10px;
+  padding: 10px;
   overflow-y: auto;
-  border-right: 1px solid var(--line);
-  background: var(--side);
+  border-radius: var(--radius-sheet);
+  background: var(--bg);
+  box-shadow: var(--float-1);
+  view-transition-name: console-side;
 }
 
-.console-brand {
+.console[data-side="closed"] .console-side {
+  display: none;
+}
+
+.side-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 4px 10px 10px;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+
+.side-head .chat-new {
+  flex: 1;
+  margin: 0;
+}
+
+.side-title {
+  flex: 1;
+  padding: 0 8px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  text-decoration: none;
+}
+
+/* 접은 옆 칸을 여는 단추: 카드의 왼쪽 위 */
+.side-open {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  left: 12px;
 }
 
 .console-label {
@@ -308,20 +468,119 @@ body:has(.console) > .source {
 }
 
 .console-work {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-sheet);
+  background: var(--bg);
+  box-shadow: var(--float-1);
+  view-transition-name: console-card;
 }
 
+/* 위쪽 줄: 폰에서만 (옆 칸 여는 단추 · 화면 이름, 오른쪽에 알림 · 설정) */
 .console-top {
   flex: none;
-  display: flex;
+  display: none;
   align-items: center;
   gap: 10px;
   min-height: 54px;
   padding: 0 20px;
   border-bottom: 1px solid var(--line);
+}
+
+/* 화면 안의 탭 줄 (팀 · 보관함) */
+.section-tabs {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 14px 18px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.section-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--fg);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.section-tab:hover {
+  background: var(--hover);
+}
+
+.section-tab[aria-current="page"] {
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+/* 독의 화면 사이: 카드가 위아래로 넘어간다 (page-flip.ts가 방향을 정한다). 움직임 줄이기면 끈다 */
+@view-transition {
+  navigation: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}
+
+::view-transition-group(console-card) {
+  overflow: clip;
+  border-radius: var(--radius-sheet);
+  animation-duration: 0.42s;
+  animation-timing-function: var(--ease-out);
+}
+
+html:active-view-transition-type(flip-up)::view-transition-old(console-card) {
+  animation: flip-out-up 0.42s var(--ease-out) both;
+}
+
+html:active-view-transition-type(flip-up)::view-transition-new(console-card) {
+  animation: flip-in-up 0.42s var(--ease-out) both;
+}
+
+html:active-view-transition-type(flip-down)::view-transition-old(console-card) {
+  animation: flip-out-down 0.42s var(--ease-out) both;
+}
+
+html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
+  animation: flip-in-down 0.42s var(--ease-out) both;
+}
+
+@keyframes flip-out-up {
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes flip-in-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes flip-out-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes flip-in-down {
+  from {
+    transform: translateY(-100%);
+  }
 }
 
 /* 머리줄의 제목: 설정 › 이름 */
@@ -342,29 +601,18 @@ body:has(.console) > .source {
   font-weight: 600;
 }
 
-/* 머리줄의 알림: 안 읽은 수와 펼치는 목록 */
+/* 독의 알림: 안 읽은 수와 펼치는 목록 */
 .bell {
   position: relative;
   flex: none;
 }
 
-.bell-count {
-  position: absolute;
-  top: -6px;
-  right: -7px;
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--fg);
-  color: var(--bg);
-  font-size: 10.5px;
-  font-weight: 600;
-  line-height: 18px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
 .bell-panel {
+  /* 독 안에 있어 독의 글자색 · 크기를 물려받지 않게 */
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
   position: absolute;
   z-index: 50;
   top: calc(100% + 6px);
@@ -377,6 +625,17 @@ body:has(.console) > .source {
   border-radius: var(--radius-card);
   background: var(--bg);
   box-shadow: 0 12px 32px var(--shadow);
+}
+
+/* 데스크톱: 목록은 독 오른쪽 아래에 뜬다 (독은 넘치면 스크롤되므로 화면 기준으로) */
+@media (min-width: 761px) {
+  .dock .bell-panel {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: var(--edge);
+    left: calc(var(--edge) * 2 + 64px);
+  }
 }
 
 .bell-head {
@@ -424,7 +683,7 @@ body:has(.console) > .source {
 .console-inner {
   max-width: 880px;
   margin: 0 auto;
-  padding: 32px clamp(16px, 3.5vw, 40px) 72px;
+  padding: 22px clamp(16px, 2.5vw, 28px) 40px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -937,9 +1196,14 @@ textarea.input {
   color: var(--muted);
 }
 
-/* 작업·결재·에이전트 */
+/* 독의 화면(팀 · 작업 기록 · 오피스 · 승인 · 보관함 · 위키): 카드를 가로로 꽉 채운다 (2026-11-16) */
 .console-inner.wide {
-  max-width: 1040px;
+  max-width: none;
+}
+
+/* 탭 줄 아래는 탭이 머리 노릇을 해서 위 여백을 줄인다 */
+.section-tabs + .console-page .console-inner {
+  padding-top: 14px;
 }
 
 .console-inner.medium {
@@ -1714,7 +1978,7 @@ a.chip {
 
 .agents {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 10px;
   align-items: start;
 }
@@ -1999,7 +2263,8 @@ a.chip {
 }
 
 /* 만들기 폼의 고른 재료: 칩마다 빼기 단추 */
-.picked {
+/* ul로 한정: 승인 화면의 .split.picked(고른 승인이 있음)와 이름이 겹친다 */
+ul.picked {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -2008,7 +2273,7 @@ a.chip {
   list-style: none;
 }
 
-.picked > .chip {
+ul.picked > .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2118,6 +2383,32 @@ a.chip {
   align-items: center;
   justify-content: space-between;
   gap: 8px 12px;
+}
+
+/* 보관함 격자 (2026-11-16): 한 칸 = 종류 · 제목과 정보 · 바깥 주소. 칸 수는 카드 폭에 맞춘다 */
+.list.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 10px;
+  overflow: visible;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.list.library-grid > .library-row {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--bg);
+}
+
+.library-grid .library-row .pill {
+  align-self: flex-start;
 }
 
 /* 보관함 한 줄 (2차 5단계): 종류 · 제목과 정보 · 바깥 주소 */
@@ -2517,12 +2808,85 @@ a.chip {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* 폰: 카드가 화면 전체, 독은 아래에 가로로 떠 있고 알림 · 설정은 위쪽 줄 오른쪽 */
+  .console {
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+  }
+
+  .console-work {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .console-menu {
     display: grid;
   }
 
   .console-top {
-    padding: 4px 8px;
+    display: flex;
+    padding: 4px 104px 4px 8px;
+  }
+
+  .console-page {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .side-open {
+    display: none;
+  }
+
+  .dock {
+    position: fixed;
+    z-index: 30;
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    flex-direction: row;
+    justify-content: space-around;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .dock-brand {
+    display: none;
+  }
+
+  .dock > .dock-item {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dock-extra {
+    position: fixed;
+    top: 5px;
+    right: 8px;
+    flex-direction: row;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .dock-extra .dock-item {
+    width: 44px;
+    height: 44px;
+    color: var(--fg);
+  }
+
+  .dock-extra .dock-label {
+    display: none;
+  }
+
+  .dock-extra .dock-item[aria-current="page"] {
+    background: var(--raised);
+    color: var(--fg);
+  }
+
+  .dock-extra .dock-count {
+    border-color: var(--bg);
+    background: var(--fg);
+    color: var(--bg);
   }
 
   /* 좁은 화면에서는 단추가 아니라 화면 기준으로 펼친다 (단추 오른쪽에 다른 단추가 있어 밖으로 나가지 않게) */
@@ -2534,13 +2898,16 @@ a.chip {
     width: auto;
   }
 
-  .console-side {
+  .console-side,
+  .console[data-side="closed"] .console-side {
+    display: flex;
     position: fixed;
     z-index: 40;
     top: 0;
     bottom: 0;
     left: 0;
-    width: 232px;
+    width: 264px;
+    border-radius: 0 var(--radius-sheet) var(--radius-sheet) 0;
     transform: translateX(-105%);
     transition: transform 0.2s ease;
   }
@@ -2713,19 +3080,6 @@ a.chip {
 
 .chat-link .pill {
   flex: none;
-}
-
-.chat-nav-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-
-.chat-back {
-  margin-bottom: 4px;
-  color: var(--muted);
 }
 
 /* 새 대화: 가운데 인사와 큰 입력 칸 */
@@ -3056,6 +3410,21 @@ a.chip {
   flex-direction: column;
   gap: 10px;
   border-color: var(--fg);
+}
+
+/* 결과 카드의 몸통: 넓으면 검토 | 항목 · 메모 · 단추 두 칸, 좁거나 검토가 없으면 한 칸 */
+.result-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.result-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 
 .result-item {

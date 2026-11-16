@@ -3,6 +3,7 @@ import type { SpaceInfo } from './_account/types';
 import { serverGet } from './_lib/server-api';
 import './globals.css';
 import { SOURCE_URL } from './_ui/source';
+import { PAGE_FLIP_SCRIPT } from './admin/page-flip';
 
 /** 사이트 로고를 올렸으면 브라우저 탭 아이콘으로도 쓴다 */
 export async function generateMetadata() {
@@ -26,6 +27,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: 고정된 문자열, 입력값 없음 */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: 메뉴 파일의 주소로만 만든 고정 문자열, 입력값 없음 */}
+        <script dangerouslySetInnerHTML={{ __html: PAGE_FLIP_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

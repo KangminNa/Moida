@@ -50,81 +50,90 @@ export function ChatCardForm({
           {card.passed ? '· 검사 통과' : '· 검사에 떨어짐 (결과에 없음)'}
         </p>
       )}
-      <ChatCardReview card={card} />
-      <ul className="list" aria-label="결과 항목">
-        {card.items.map((item) => (
-          <li key={item.id} className="list-cell result-item">
-            <label className="result-pick">
-              <input
-                type="checkbox"
-                checked={picked.has(item.id)}
-                onChange={() => toggle(item.id)}
-              />
-              <span>
-                <b>{item.kind === 'action' ? actionLabel(item.label) : item.label}</b>
-                <small>
-                  {item.kind === 'action'
-                    ? '동작 · 승인하면 실행'
-                    : '결과물 · 고르지 않으면 휴지통'}
-                  {item.note ? ` · ${item.note}` : ''}
-                </small>
-                {checksLine(item.checks) && <small>{checksLine(item.checks)}</small>}
-                {item.changes && <ChangeLines lines={item.changes} setting={item.setting} />}
-              </span>
-            </label>
-            {item.kind === 'output' ? (
-              <OutputOpen id={item.id} name={item.label} />
-            ) : (
-              // 대상의 실제 내용(글 · 클릭의 페이지 · 버튼 · 화면 · PR)은 승인 화면이 대상 모듈에서 읽어 보인다
-              <Link className="ghost" href={`/admin/approvals/${item.id}`}>
-                자세히
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
-      <label className="field">
-        <span>메모 (수정 요청이면 꼭)</span>
-        <textarea
-          className="input"
-          rows={2}
-          maxLength={4000}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </label>
-      {problem && (
-        <p className="error" role="alert">
-          {problem}
-        </p>
-      )}
-      <div className="row result-actions">
-        <button
-          type="button"
-          className="cta small"
-          disabled={busy}
-          onClick={() =>
-            onDecide({ decision: 'approve', picked: [...picked], ...(note.trim() ? { note } : {}) })
-          }
-        >
-          승인 ({picked.size}/{card.items.length})
-        </button>
-        <button
-          type="button"
-          className="ghost"
-          disabled={busy || !note.trim()}
-          onClick={() => onDecide({ decision: 'revise', note })}
-        >
-          수정 요청
-        </button>
-        <button
-          type="button"
-          className="ghost"
-          disabled={busy}
-          onClick={() => onDecide({ decision: 'reject', ...(note.trim() ? { note } : {}) })}
-        >
-          반려
-        </button>
+      {/* 넓으면 두 칸: 왼쪽 검토 판정, 오른쪽 항목 · 메모 · 단추 (검토가 없으면 한 칸) */}
+      <div className="result-body">
+        <ChatCardReview card={card} />
+        <div className="result-side">
+          <ul className="list" aria-label="결과 항목">
+            {card.items.map((item) => (
+              <li key={item.id} className="list-cell result-item">
+                <label className="result-pick">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(item.id)}
+                    onChange={() => toggle(item.id)}
+                  />
+                  <span>
+                    <b>{item.kind === 'action' ? actionLabel(item.label) : item.label}</b>
+                    <small>
+                      {item.kind === 'action'
+                        ? '동작 · 승인하면 실행'
+                        : '결과물 · 고르지 않으면 휴지통'}
+                      {item.note ? ` · ${item.note}` : ''}
+                    </small>
+                    {checksLine(item.checks) && <small>{checksLine(item.checks)}</small>}
+                    {item.changes && <ChangeLines lines={item.changes} setting={item.setting} />}
+                  </span>
+                </label>
+                {item.kind === 'output' ? (
+                  <OutputOpen id={item.id} name={item.label} />
+                ) : (
+                  // 대상의 실제 내용(글 · 클릭의 페이지 · 버튼 · 화면 · PR)은 승인 화면이 대상 모듈에서 읽어 보인다
+                  <Link className="ghost" href={`/admin/approvals/${item.id}`}>
+                    자세히
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+          <label className="field">
+            <span>메모 (수정 요청이면 꼭)</span>
+            <textarea
+              className="input"
+              rows={2}
+              maxLength={4000}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </label>
+          {problem && (
+            <p className="error" role="alert">
+              {problem}
+            </p>
+          )}
+          <div className="row result-actions">
+            <button
+              type="button"
+              className="cta small"
+              disabled={busy}
+              onClick={() =>
+                onDecide({
+                  decision: 'approve',
+                  picked: [...picked],
+                  ...(note.trim() ? { note } : {}),
+                })
+              }
+            >
+              승인 ({picked.size}/{card.items.length})
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={busy || !note.trim()}
+              onClick={() => onDecide({ decision: 'revise', note })}
+            >
+              수정 요청
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={busy}
+              onClick={() => onDecide({ decision: 'reject', ...(note.trim() ? { note } : {}) })}
+            >
+              반려
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );
