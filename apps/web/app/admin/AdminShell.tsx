@@ -5,12 +5,13 @@ import { type ReactNode, useEffect, useState } from 'react';
 import type { PackageEntry } from '../_plugins/package-types';
 import { useActivePackages } from '../_plugins/packages';
 import { countOf, usePendingApprovals } from '../_task/live';
+import { Icon } from '../_ui/Icon';
 import { NotifyContext } from '../_ui/notify';
 import { useToast } from '../_ui/useToast';
 import { useWaitingChanges } from '../_vault/live';
 import { ChatNav } from './ChatNav';
 import { ConsoleDock } from './ConsoleDock';
-import { MenuIcon, NEW_CHAT, placeOf, SIDE_COOKIE } from './menu';
+import { NEW_CHAT, placeOf, SIDE_COOKIE } from './menu';
 import { SectionTabs } from './SectionTabs';
 import { ConsoleFoot, SettingsNav } from './SettingsNav';
 
@@ -98,7 +99,7 @@ export function AdminShell({
             <div className="side-head">
               {chat ? (
                 <a className="chat-new" href={NEW_CHAT.href}>
-                  <MenuIcon name={NEW_CHAT.icon} />
+                  <Icon name={NEW_CHAT.icon} />
                   {NEW_CHAT.name}
                 </a>
               ) : (
@@ -110,7 +111,7 @@ export function AdminShell({
                 aria-label={chat ? '대화 목록 닫기' : '설정 메뉴 닫기'}
                 onClick={() => showSide(false)}
               >
-                <Chevron />
+                <Icon name="back" />
               </button>
             </div>
             {chat ? (
@@ -129,7 +130,7 @@ export function AdminShell({
               aria-label={chat ? '대화 목록 열기' : '설정 메뉴 열기'}
               onClick={() => showSide(true)}
             >
-              <SideIcon />
+              <Icon name="panel" />
             </button>
           )}
           <header className="console-top">
@@ -140,7 +141,7 @@ export function AdminShell({
                 aria-label={chat ? '대화 목록 열기' : '설정 메뉴 열기'}
                 onClick={() => showSide(true)}
               >
-                <SideIcon />
+                <Icon name="panel" />
               </button>
             )}
             <span className="console-title">
@@ -175,42 +176,4 @@ function titleOf(
   if (place.section.key !== 'settings') return place.section.name;
   const entry = packages.find((p) => pathname?.startsWith(`/admin/p/${p.plugin}`));
   return place.page?.name ?? entry?.name ?? place.section.name;
-}
-
-/** 옆 칸 열기: 칸이 나뉜 네모 */
-function SideIcon() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="2" y="3" width="12" height="10" rx="2" />
-      <path d="M6.5 3v10" />
-    </svg>
-  );
-}
-
-/** 옆 칸 닫기: 왼쪽 꺾쇠 */
-function Chevron() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M10 3.5 5.5 8l4.5 4.5" />
-    </svg>
-  );
 }

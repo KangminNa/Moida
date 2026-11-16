@@ -1,4 +1,5 @@
 import type { ChatCard } from '../../_task/types';
+import { Icon } from '../../_ui/Icon';
 
 // 결과 카드의 검증 (검증 고리 V): 검토자 짝의 판정 · 완료 조건 체크리스트 · 고칠 것, 서버가 다시 맡긴 횟수.
 // 판정을 읽지 못한 답(unknown)은 글 그대로 보인다
@@ -31,7 +32,7 @@ export function ChatCardReview({ card }: { card: ChatCard }) {
         <ul className="result-checklist" aria-label="완료 조건">
           {review.checklist.map((line) => (
             <li key={line.item} className={line.ok ? '' : 'unmet'}>
-              {line.ok ? '✓︎' : '✗︎'} {line.item}
+              <Icon name={line.ok ? 'check' : 'x'} /> {line.item}
               {line.note ? <small> · {line.note}</small> : null}
             </li>
           ))}

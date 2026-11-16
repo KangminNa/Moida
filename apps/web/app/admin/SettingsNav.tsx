@@ -1,8 +1,9 @@
 import { api } from '../_lib/client-api';
 import type { PackageEntry } from '../_plugins/package-types';
+import { Icon } from '../_ui/Icon';
 import { SOURCE_URL } from '../_ui/source';
 import { ThemeToggle } from '../_ui/ThemeToggle';
-import { MENU, MenuIcon, PACKAGE_GROUPS } from './menu';
+import { MENU, PACKAGE_GROUPS } from './menu';
 
 /**
  * 설정 옆 칸의 메뉴: 설정 묶음, 접어 둔 "고급"(지금 화면이 그 안이면 펼친다).
@@ -32,7 +33,7 @@ export function SettingsNav({
           href={item.href}
           aria-current={pathname?.startsWith(item.href) ? 'page' : undefined}
         >
-          <MenuIcon name={item.icon} />
+          <Icon name={item.icon} />
           {item.name}
         </a>
       ))}
@@ -48,7 +49,7 @@ export function SettingsNav({
       {settings.map(group)}
       <details className="console-more" open={inAdvanced || undefined}>
         <summary className="console-link">
-          <MenuIcon name="tools" />
+          <Icon name="tools" />
           고급
         </summary>
         {advanced.map(group)}
@@ -74,7 +75,7 @@ function PackageLink({ entry, pathname }: { entry: PackageEntry; pathname: strin
       href={href}
       aria-current={pathname?.startsWith(href) ? 'page' : undefined}
     >
-      <MenuIcon name={entry.icon} />
+      <Icon name={entry.icon} />
       {entry.name}
     </a>
   );

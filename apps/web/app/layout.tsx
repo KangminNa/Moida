@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { SpaceInfo } from './_account/types';
 import { serverGet } from './_lib/server-api';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './globals.css';
 import { SOURCE_URL } from './_ui/source';
 import { PAGE_FLIP_SCRIPT } from './admin/page-flip';
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Emoji:wght@500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
         />
       </head>
       <body>

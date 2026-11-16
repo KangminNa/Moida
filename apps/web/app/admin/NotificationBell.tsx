@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../_lib/client-api';
 import { useLiveValue } from '../_lib/use-live';
 import type { Notification, NotificationList } from '../_platform/types';
+import { Icon } from '../_ui/Icon';
 
 /** 알림이 남거나 읽히면 오는 변경 신호 */
 const TOPICS = ['platform.notification'];
@@ -62,9 +63,7 @@ export function NotificationBell() {
         aria-label={unread > 0 ? `알림, 안 읽음 ${unread}개` : '알림'}
         onClick={() => setOpen(!open)}
       >
-        <span className="menu-ico" aria-hidden="true">
-          {'\u{1F514}\uFE0E'}
-        </span>
+        <Icon name="bell" />
         <span className="dock-label" aria-hidden="true">
           알림
         </span>

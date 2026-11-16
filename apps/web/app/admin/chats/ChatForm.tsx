@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
+import { Icon } from '../../_ui/Icon';
 import { RefChips, type RefChoice, RefPicker } from './ChatRefs';
 
 /** 메시지 한 개의 길이 (서버 Chat.MESSAGE_MAX) */
@@ -89,25 +90,14 @@ export function ChatForm({
       {refsEnabled && picking && (
         <RefPicker onPick={pick} onUpload={onUpload} onClose={() => setPicking(false)} />
       )}
-      <div className="chat-compose-row">
-        {refsEnabled && (
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="참조 넣기"
-            aria-expanded={picking}
-            disabled={locked}
-            onClick={() => setPicking(!picking)}
-          >
-            +
-          </button>
-        )}
+      {/* 입력 상자: 위는 글, 아래는 도구 줄 (참조 넣기 · 보내기) */}
+      <div className="chat-box">
         <textarea
-          className="input"
+          className="chat-box-input"
           aria-label="메시지"
           placeholder={
             refsEnabled
-              ? '메시지 (+ 단추나 @로 위키 · 파일 · 주소 넣기, Enter로 보내기)'
+              ? '팀에게 맡길 일을 적어요 (+ 단추나 @로 위키 · 파일 · 주소 넣기)'
               : '메시지 (Enter로 보내기, Shift+Enter로 줄 바꿈)'
           }
           rows={rows}
@@ -117,9 +107,28 @@ export function ChatForm({
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={keys}
         />
-        <button type="submit" className="cta small" disabled={locked || !message.trim()}>
-          {busy ? '보내는 중' : '보내기'}
-        </button>
+        <div className="chat-box-tools">
+          {refsEnabled && (
+            <button
+              type="button"
+              className="round-button"
+              aria-label="참조 넣기"
+              aria-expanded={picking}
+              disabled={locked}
+              onClick={() => setPicking(!picking)}
+            >
+              <Icon name="plus" />
+            </button>
+          )}
+          <button
+            type="submit"
+            className="round-button send"
+            aria-label={busy ? '보내는 중' : '보내기'}
+            disabled={locked || !message.trim()}
+          >
+            <Icon name="up" />
+          </button>
+        </div>
       </div>
     </form>
   );

@@ -1,41 +1,7 @@
 // 콘솔 메뉴. 메뉴 하나 = app/admin/<주소>/ 폴더 하나 + 여기 한 줄. 기능이 생길 때 더한다.
 // 왼쪽에 떠 있는 독(DOCK)이 보는 화면 다섯(대화 · 팀 · 오피스 · 승인 · 보관함)이고, 대화가 처음 화면이다 (2026-11-16 떠 있는 화면).
 // 설정에는 바꾸는 것만 둔다: 설정 묶음과 접어 둔 "고급" (MENU, 2026-11-15 화면 정리: 설정은 대화에서 하고 화면은 덜어 둔다).
-// 아이콘은 흑백 이모지다: 이모지 모양을 흑백 글꼴(Noto Emoji)로 그려 흑백 디자인을 지킨다.
-
-/** 아이콘 이름 → 흑백 이모지. 끝의 ︎는 글자 모양으로 그리라는 표시 (색 이모지로 바뀌지 않게) */
-const ICONS: Readonly<Record<string, string>> = {
-  new: '✏︎',
-  chat: '\u{1F4AC}︎',
-  approve: '✅︎',
-  team: '\u{1F465}︎',
-  box: '\u{1F5C2}︎',
-  gear: '⚙︎',
-  key: '\u{1F511}︎',
-  lock: '\u{1F512}\uFE0E',
-  site: '\u{1F310}︎',
-  bell: '\u{1F514}︎',
-  user: '\u{1F464}︎',
-  goal: '\u{1F3AF}︎',
-  clock: '⏰︎',
-  task: '\u{1F4CB}︎',
-  session: '\u{1F5D2}︎',
-  book: '\u{1F4DA}︎',
-  graph: '\u{1F578}︎',
-  post: '\u{1F4DD}︎',
-  compass: '\u{1F9ED}︎',
-  plug: '\u{1F50C}︎',
-  runner: '\u{1F5A5}︎',
-  device: '\u{1F4BB}︎',
-  brick: '\u{1F9F1}︎',
-  puzzle: '\u{1F9E9}︎',
-  wrench: '\u{1F6E0}︎',
-  office: '\u{1F3E2}︎',
-  code: '\u2328\uFE0E',
-  tools: '\u{1F9F0}︎',
-  warn: '\u26A0\uFE0E',
-  back: '←',
-};
+// 아이콘 이름은 _ui/Icon.tsx의 선 아이콘이다 (2026-11-16 테마 B).
 
 export const CHAT_HREF = '/admin';
 export const CHATS_HREF = '/admin/chats';
@@ -198,12 +164,4 @@ export function placeOf(pathname: string | null): {
   if (found) return found;
   const item = MENU.flatMap((g) => g.items).find((i) => fits(i.href)) ?? null;
   return { section: SETTINGS_SECTION, index: DOCK.length, page: item };
-}
-
-export function MenuIcon({ name }: { name: string }) {
-  return (
-    <span className="menu-ico" aria-hidden="true">
-      {ICONS[name] ?? ICONS.tools}
-    </span>
-  );
 }

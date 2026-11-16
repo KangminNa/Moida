@@ -1,39 +1,41 @@
-/* Cairn 화면의 바탕. 화이트 또는 블랙 한 벌만 쓴다 (기획서 2026-10-31).
-   콘솔과 블로그가 같은 값을 쓰고, 상태는 색 대신 채움·테두리·굵기로 구분한다.
-   콘솔은 바탕(--canvas) 위에 독 · 옆 칸 · 카드가 떠 있다 (2026-11-16): 층은 그림자(--float-*)로, 어두운 화면은 테두리 선으로.
+/* Cairn 화면의 바탕 (2026-11-16 테마 B). 중립 회색 단계 + 강조색 하나(남색) + 빨강(배지 · 실패)만.
+   글꼴은 Pretendard(서버에 함께 올림), 아이콘은 선 아이콘(admin/menu.tsx의 MenuIcon).
+   버튼은 테두리 없이 칠한 면으로, 주 동작만 강조색. 카드 · 목록은 옅은 선, 떠 있는 것(독 · 옆 칸 · 카드 · 결과 카드)은 그림자.
+   콘솔은 바탕(--canvas) 위에 떠 있고, 어두운 화면은 그림자 대신 선으로 층을 나눈다.
    고르지 않으면 기기 설정을 따르고, 고르면 html의 data-theme이 우선한다. */
 
 :root {
   --mode: light;
   color-scheme: light;
+  accent-color: var(--accent);
   --bg: #ffffff;
-  --side: #f7f7f7;
-  --raised: #f3f3f3;
-  --hover: #efefef;
-  --line: #e8e8e8;
-  --line-strong: #cfcfcf;
-  --fg: #0a0a0a;
-  --muted: #525252;
-  --faint: #707070;
+  --subtle: #f8f8f9;
+  --raised: #f1f1f3;
+  --hover: #e9e9ec;
+  --line: #e4e4e7;
+  --line-strong: #cdcdd1;
+  --fg: #18181b;
+  --muted: #4b4b52;
+  --faint: #6e6e76;
+  --accent: #4f5bd5;
+  --accent-hover: #4350c4;
+  --accent-soft: #eef0fc;
+  --accent-ink: #3a45b8;
+  --on-accent: #ffffff;
+  --danger: #e5484d;
   --shadow: rgba(0, 0, 0, 0.12);
-  --ui: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --ui: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  /* 흑백 이모지 아이콘 (메뉴 · 머리줄): 색 이모지 대신 Noto Emoji의 흑백 모양 */
-  --icon: "Noto Emoji", var(--ui);
-  --radius: 10px;
-  --radius-card: 14px;
+  --radius: 12px;
+  --radius-card: 16px;
   --lift: 0 1px 2px rgba(0, 0, 0, 0.04);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  /* 떠 있는 콘솔: 바탕 · 층 · 독 · 모서리 · 바깥 여백 */
-  --canvas: #ececec;
-  --float-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.07);
-  --float-2: 0 14px 40px rgba(0, 0, 0, 0.22);
-  --dock-bg: #111111;
-  --dock-fg: #ffffff;
-  --dock-dim: rgba(255, 255, 255, 0.72);
-  --dock-line: rgba(255, 255, 255, 0.2);
-  --radius-dock: 22px;
-  --radius-sheet: 24px;
+  /* 떠 있는 콘솔: 바탕 · 층 · 모서리 · 바깥 여백 */
+  --canvas: #efeff1;
+  --float-1: 0 1px 3px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.06);
+  --float-2: 0 2px 6px rgba(0, 0, 0, 0.05), 0 16px 40px rgba(0, 0, 0, 0.1);
+  --radius-dock: 24px;
+  --radius-sheet: 26px;
   --edge: 16px;
 }
 
@@ -41,46 +43,50 @@
   :root:not([data-theme="light"]) {
     --mode: dark;
     color-scheme: dark;
-    --bg: #000000;
-    --side: #0b0b0b;
-    --raised: #161616;
-    --hover: #1f1f1f;
-    --line: #262626;
-    --line-strong: #3d3d3d;
-    --fg: #fafafa;
-    --muted: #a8a8a8;
-    --faint: #8c8c8c;
+    --bg: #18181b;
+    --subtle: #1e1e22;
+    --raised: #242428;
+    --hover: #2c2c31;
+    --line: #2a2a2f;
+    --line-strong: #3b3b42;
+    --fg: #f4f4f5;
+    --muted: #b4b4bb;
+    --faint: #8e8e96;
+    --accent: #6670e8;
+    --accent-hover: #7880ec;
+    --accent-soft: rgba(102, 112, 232, 0.18);
+    --accent-ink: #a9b0f6;
+    --on-accent: #ffffff;
+    --danger: #f2555a;
     --shadow: rgba(0, 0, 0, 0.6);
-    --canvas: #121212;
+    --canvas: #0e0e10;
     --float-1: 0 0 0 1px var(--line);
     --float-2: 0 0 0 1px var(--line-strong);
-    --dock-bg: #fafafa;
-    --dock-fg: #0a0a0a;
-    --dock-dim: rgba(0, 0, 0, 0.65);
-    --dock-line: rgba(0, 0, 0, 0.15);
   }
 }
 
 :root[data-theme="dark"] {
   --mode: dark;
   color-scheme: dark;
-  --bg: #000000;
-  --side: #0b0b0b;
-  --raised: #161616;
-  --hover: #1f1f1f;
-  --line: #262626;
-  --line-strong: #3d3d3d;
-  --fg: #fafafa;
-  --muted: #a8a8a8;
-  --faint: #8c8c8c;
+  --bg: #18181b;
+  --subtle: #1e1e22;
+  --raised: #242428;
+  --hover: #2c2c31;
+  --line: #2a2a2f;
+  --line-strong: #3b3b42;
+  --fg: #f4f4f5;
+  --muted: #b4b4bb;
+  --faint: #8e8e96;
+  --accent: #6670e8;
+  --accent-hover: #7880ec;
+  --accent-soft: rgba(102, 112, 232, 0.18);
+  --accent-ink: #a9b0f6;
+  --on-accent: #ffffff;
+  --danger: #f2555a;
   --shadow: rgba(0, 0, 0, 0.6);
-  --canvas: #121212;
+  --canvas: #0e0e10;
   --float-1: 0 0 0 1px var(--line);
   --float-2: 0 0 0 1px var(--line-strong);
-  --dock-bg: #fafafa;
-  --dock-fg: #0a0a0a;
-  --dock-dim: rgba(0, 0, 0, 0.65);
-  --dock-line: rgba(0, 0, 0, 0.15);
 }
 
 * {
@@ -97,8 +103,9 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: 14.5px;
   line-height: 1.6;
+  letter-spacing: -0.01em;
   word-break: keep-all;
   -webkit-font-smoothing: antialiased;
 }
@@ -120,7 +127,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--fg);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -146,7 +153,7 @@ a {
   display: none;
 }
 
-/* 독: 세로로 떠 있는 검은 알약. 위는 화면 다섯, 아래 묶음은 알림 · 설정 */
+/* 독: 세로로 떠 있는 흰 알약. 위는 화면 다섯, 아래 묶음은 알림 · 설정. 고른 칸은 회색 면 + 굵게 */
 /* z-index: 알림 목록이 독 안에서 떠도 카드 위에 보이게 (독은 화면 전환 이름이 있어 따로 쌓인다) */
 .dock {
   position: relative;
@@ -156,13 +163,13 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   max-height: 100%;
   overflow-y: auto;
   padding: 6px;
   border-radius: var(--radius-dock);
-  background: var(--dock-bg);
-  color: var(--dock-fg);
+  background: var(--bg);
+  color: var(--faint);
   box-shadow: var(--float-2);
   scrollbar-width: none;
   view-transition-name: console-dock;
@@ -171,15 +178,15 @@ a {
 .dock-brand {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 44px;
-  color: var(--dock-fg);
+  width: 60px;
+  height: 48px;
+  color: var(--fg);
 }
 
 .dock-brand .brand-logo {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   object-fit: cover;
 }
 
@@ -189,69 +196,70 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 52px;
-  height: 50px;
+  gap: 4px;
+  width: 60px;
+  height: 58px;
   padding: 0;
   border: 0;
   border-radius: 16px;
   background: transparent;
-  color: var(--dock-dim);
-  font-size: 10.5px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 500;
   line-height: 1;
+  letter-spacing: -0.02em;
   text-decoration: none;
   transition:
     background 0.15s,
-    color 0.15s;
+    color 0.15s,
+    transform 0.12s;
 }
 
 .dock-item .menu-ico {
-  width: auto;
-  font-size: 17px;
-  color: inherit;
+  width: 22px;
+  height: 22px;
 }
 
 .dock-item:hover {
-  color: var(--dock-fg);
+  color: var(--fg);
+}
+
+.dock-item:active {
+  transform: scale(0.96);
 }
 
 .dock-item[aria-current="page"] {
-  background: var(--dock-fg);
-  color: var(--dock-bg);
+  background: var(--raised);
+  color: var(--fg);
   font-weight: 700;
 }
 
 /* 기다리는 승인 · 안 읽은 알림 수 */
 .dock-count {
   position: absolute;
-  top: 3px;
-  right: 4px;
-  min-width: 17px;
-  padding: 0 4px;
-  border: 2px solid var(--dock-bg);
-  border-radius: 999px;
-  background: var(--dock-fg);
-  color: var(--dock-bg);
-  font-size: 10px;
+  top: 5px;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 13px;
+  line-height: 18px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.dock-item[aria-current="page"] .dock-count {
-  border-color: var(--dock-fg);
-  background: var(--dock-bg);
-  color: var(--dock-fg);
 }
 
 .dock-extra {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--dock-line);
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 /* 옆 칸: 대화 목록 · 설정 메뉴. 데스크톱에서는 접을 수 있다 (쿠키 cairn_side) */
@@ -339,24 +347,16 @@ a {
 }
 
 .console-link[aria-current="page"] {
-  background: var(--bg);
-  box-shadow:
-    0 0 0 1px var(--line),
-    var(--lift);
+  background: var(--raised);
   font-weight: 600;
   opacity: 1;
 }
 
-/* 흑백 이모지 아이콘 */
+/* 선 아이콘 (_ui/Icon.tsx): 글자색을 따른다 */
 .menu-ico {
   flex: none;
-  width: 20px;
-  font-family: var(--icon);
-  font-variant-emoji: text;
-  font-size: 15px;
-  line-height: 1;
-  text-align: center;
-  color: var(--fg);
+  width: 18px;
+  height: 18px;
 }
 
 /* 고급: 접어 둔 메뉴 묶음 */
@@ -449,12 +449,13 @@ body:has(.console) > .source {
   flex: none;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
   transition: background 0.12s;
 }
 
@@ -883,18 +884,27 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 }
 
 .input {
-  height: 38px;
-  padding: 0 11px;
-  border-radius: 6px;
-  border: 1px solid var(--line-strong);
-  background: var(--bg);
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 0;
+  background: var(--raised);
   color: var(--fg);
   outline: none;
-  transition: border-color 0.15s;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+.input::placeholder {
+  color: var(--faint);
 }
 
 .input:focus {
-  border-color: var(--fg);
+  background: var(--bg);
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent),
+    0 0 0 4px var(--accent-soft);
 }
 
 .input.code {
@@ -908,7 +918,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 textarea.input {
   height: auto;
   min-height: 80px;
-  padding: 9px 11px;
+  padding: 11px 14px;
   resize: vertical;
 }
 
@@ -937,20 +947,27 @@ textarea.input {
   gap: 10px;
   flex-shrink: 0;
   white-space: nowrap;
-  height: 40px;
-  padding: 0 16px;
+  height: 44px;
+  padding: 0 18px;
   border-radius: var(--radius);
-  border: 1px solid var(--fg);
-  background: var(--fg);
-  color: var(--bg);
-  font-weight: 500;
-  font-size: 14px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 15px;
   text-decoration: none;
-  transition: opacity 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.12s;
 }
 
 .cta:hover {
-  opacity: 0.85;
+  background: var(--accent-hover);
+}
+
+.cta:active,
+.ghost:active {
+  transform: scale(0.98);
 }
 
 .cta:disabled {
@@ -959,19 +976,21 @@ textarea.input {
 }
 
 .cta.small {
-  height: 34px;
+  height: 36px;
   padding: 0 14px;
-  font-size: 13.5px;
+  border-radius: 10px;
+  font-size: 14px;
 }
 
 .ghost {
-  height: 34px;
-  padding: 0 13px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line-strong);
-  background: var(--bg);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--raised);
   color: var(--fg);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -981,7 +1000,7 @@ textarea.input {
 }
 
 .ghost.wide {
-  height: 40px;
+  height: 44px;
   justify-content: center;
   font-size: 14px;
 }
@@ -996,12 +1015,12 @@ textarea.input {
 }
 
 .ghost.danger:hover {
-  border-color: var(--fg);
+  color: var(--danger);
 }
 
 .error {
   margin: 0;
-  color: var(--fg);
+  color: var(--danger);
   font-size: 13px;
   font-weight: 500;
 }
@@ -1012,9 +1031,9 @@ textarea.input {
 
 .warn {
   margin: 0;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--line-strong);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--raised);
   color: var(--fg);
   font-size: 13px;
 }
@@ -1084,8 +1103,8 @@ textarea.input {
 }
 
 .switch[aria-checked="true"] {
-  background: var(--fg);
-  border-color: var(--fg);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .switch[aria-checked="true"]::after {
@@ -1094,24 +1113,26 @@ textarea.input {
 }
 
 .chip {
-  min-height: 30px;
-  padding: 3px 11px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: transparent;
+  min-height: 32px;
+  padding: 3px 13px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--raised);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 500;
 }
 
 .chip:hover {
   color: var(--fg);
+  background: var(--hover);
 }
 
 .chip[aria-pressed="true"],
 .chip[aria-selected="true"] {
-  color: var(--fg);
-  border-color: var(--line-strong);
-  background: var(--raised);
+  color: var(--bg);
+  background: var(--fg);
+  font-weight: 600;
 }
 
 /* 연결 방법 */
@@ -1329,7 +1350,7 @@ textarea.input {
 }
 
 .ask:focus-within {
-  border-color: var(--fg);
+  border-color: var(--accent);
 }
 
 .ask > label,
@@ -1451,7 +1472,7 @@ textarea.input {
 }
 
 .t-card.wait {
-  border-color: var(--fg);
+  border-color: var(--accent);
 }
 
 .t-card b {
@@ -1513,33 +1534,40 @@ textarea.input {
   gap: 8px;
 }
 
+/* 말: 내 말만 옅은 말풍선(오른쪽), AI의 답은 말풍선 없이 본문으로 (Claude · Codex처럼) */
 .bubble {
   display: flex;
   flex-direction: column;
   gap: 6px;
   max-width: min(720px, 92%);
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
 }
 
 .bubble.mine {
   align-self: flex-end;
+  max-width: min(600px, 86%);
+  padding: 12px 16px;
+  border-radius: 22px 22px 6px 22px;
   background: var(--raised);
-  border-color: var(--raised);
 }
 
 .bubble.theirs {
-  align-self: flex-start;
+  align-self: stretch;
+  max-width: none;
 }
 
 .bubble-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--faint);
+}
+
+.bubble.theirs .bubble-meta {
+  font-weight: 600;
+  color: var(--fg);
 }
 
 .bubble .prose {
   font-size: 15px;
+  line-height: 1.7;
 }
 
 .bubble .prose h1,
@@ -1554,22 +1582,94 @@ textarea.input {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 12px;
-  background: var(--bg);
-  border-top: 1px solid var(--line);
+  padding: 12px 0 16px;
+  background: linear-gradient(transparent, var(--bg) 24px);
 }
 
-.chat-compose-row {
+/* 입력 상자: 둥근 상자 안에 글 칸과 도구 줄 */
+.chat-box {
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 12px 10px 18px;
+  border-radius: 24px;
+  background: var(--bg);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 8px 28px rgba(0, 0, 0, 0.07);
+  transition: box-shadow 0.15s;
 }
 
-.chat-compose-row textarea {
-  flex: 1;
-  min-height: 48px;
+.chat-box:focus-within {
+  box-shadow:
+    0 0 0 1.5px var(--accent),
+    0 8px 28px rgba(0, 0, 0, 0.07);
+}
+
+.chat-box-input {
+  min-height: 26px;
   max-height: 240px;
-  resize: vertical;
+  padding: 0 6px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+.chat-box-input::placeholder {
+  color: var(--faint);
+}
+
+.chat-box-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-box-tools .send {
+  margin-left: auto;
+}
+
+/* 둥근 아이콘 단추 (참조 넣기 · 보내기) */
+.round-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--muted);
+  transition:
+    background 0.15s,
+    transform 0.12s;
+}
+
+.round-button:hover {
+  background: var(--hover);
+}
+
+.round-button:active {
+  transform: scale(0.94);
+}
+
+.round-button.send {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.round-button.send:hover {
+  background: var(--accent-hover);
+}
+
+.round-button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .chips {
@@ -1585,10 +1685,9 @@ a.chip {
 }
 
 .chip[aria-current="true"] {
-  color: var(--fg);
-  border-color: var(--line-strong);
-  background: var(--raised);
-  font-weight: 500;
+  color: var(--bg);
+  background: var(--fg);
+  font-weight: 600;
 }
 
 .item {
@@ -1643,34 +1742,37 @@ a.chip {
   font-size: 13px;
 }
 
+/* 상태 알약: 칠한 면. on = 나에게 온 것(승인 · 질문)은 강조색 */
 .pill {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--raised);
   color: var(--muted);
   font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .pill.on {
-  border-color: var(--fg);
-  background: var(--fg);
-  color: var(--bg);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 
 .pill.off {
-  border-style: dashed;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
   color: var(--faint);
 }
 
 .pill.strong {
-  border-color: var(--fg);
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .dot {
@@ -1678,7 +1780,7 @@ a.chip {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--fg);
+  background: var(--accent);
 }
 
 .dot.run {
@@ -1696,11 +1798,10 @@ a.chip {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 18px 20px;
+  padding: 20px 22px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: 20px;
   background: var(--bg);
-  box-shadow: var(--lift);
 }
 
 .kv {
@@ -2569,16 +2670,6 @@ ul.picked > .chip {
   overflow-wrap: anywhere;
 }
 
-.pill {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--line-strong);
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 /* 세션 노트 */
 .note-title {
   margin: 0;
@@ -2799,8 +2890,8 @@ ul.picked > .chip {
 }
 
 .publish-status button[aria-pressed="true"] {
-  border-color: var(--fg);
-  background: var(--raised);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 @media (max-width: 760px) {
@@ -2830,7 +2921,7 @@ ul.picked > .chip {
   }
 
   .console-page {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
 
   .side-open {
@@ -2840,13 +2931,20 @@ ul.picked > .chip {
   .dock {
     position: fixed;
     z-index: 30;
-    left: 12px;
-    right: 12px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
+    bottom: 0;
     flex-direction: row;
     justify-content: space-around;
     max-height: none;
     overflow: visible;
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+    border-radius: 0;
+    box-shadow: inset 0 1px 0 var(--line);
+  }
+
+  .dock > .dock-item[aria-current="page"] {
+    background: transparent;
   }
 
   .dock-brand {
@@ -2871,7 +2969,7 @@ ul.picked > .chip {
   .dock-extra .dock-item {
     width: 44px;
     height: 44px;
-    color: var(--fg);
+    color: var(--muted);
   }
 
   .dock-extra .dock-label {
@@ -2884,9 +2982,8 @@ ul.picked > .chip {
   }
 
   .dock-extra .dock-count {
-    border-color: var(--bg);
-    background: var(--fg);
-    color: var(--bg);
+    top: 4px;
+    right: 2px;
   }
 
   /* 좁은 화면에서는 단추가 아니라 화면 기준으로 펼친다 (단추 오른쪽에 다른 단추가 있어 밖으로 나가지 않게) */
@@ -3034,14 +3131,11 @@ ul.picked > .chip {
 .chat-new {
   display: flex;
   align-items: center;
-  gap: 11px;
-  min-height: 38px;
-  padding: 0 10px;
-  border-radius: 10px;
-  background: var(--bg);
-  box-shadow:
-    0 0 0 1px var(--line),
-    var(--lift);
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
   font-weight: 600;
   text-decoration: none;
 }
@@ -3061,11 +3155,11 @@ ul.picked > .chip {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 40px;
-  padding: 0 10px;
-  border-radius: 8px;
-  color: var(--fg);
-  font-size: 14px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 14.5px;
   text-decoration: none;
 }
 
@@ -3074,7 +3168,8 @@ ul.picked > .chip {
 }
 
 .chat-link[aria-current="page"] {
-  background: var(--hover);
+  background: var(--raised);
+  color: var(--fg);
   font-weight: 600;
 }
 
@@ -3392,7 +3487,7 @@ ul.picked > .chip {
 }
 
 .choice.first {
-  border-color: var(--fg);
+  border-color: var(--accent);
 }
 
 .choice:hover {
@@ -3405,11 +3500,46 @@ ul.picked > .chip {
 }
 
 /* 결과 카드 (2차 2단계): 항목마다 고르는 칸, 검토 의견, 승인 · 수정 요청 · 반려 */
+/* 결과 카드: 떠 있는 카드 (선 대신 그림자), 승인은 크게 */
 .result-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border-color: var(--fg);
+  gap: 14px;
+  padding: 22px;
+  border: 0;
+  border-radius: 24px;
+  box-shadow: var(--float-2);
+}
+
+.result-card .list {
+  background: var(--subtle);
+  border-color: transparent;
+}
+
+.result-card textarea.input {
+  min-height: 64px;
+}
+
+.result-actions .cta {
+  flex: 1.4;
+  justify-content: center;
+  height: 50px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+
+.result-actions .ghost {
+  flex: 1;
+  justify-content: center;
+  height: 50px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+.result-actions .ghost:last-child {
+  flex: none;
+  background: transparent;
+  color: var(--faint);
 }
 
 /* 결과 카드의 몸통: 넓으면 검토 | 항목 · 메모 · 단추 두 칸, 좁거나 검토가 없으면 한 칸 */
@@ -3455,9 +3585,9 @@ ul.picked > .chip {
 }
 
 .result-review {
-  padding: 10px 12px;
-  border-left: 3px solid var(--fg);
-  background: var(--raised);
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--subtle);
 }
 
 .result-review small {
@@ -3476,17 +3606,36 @@ ul.picked > .chip {
 }
 
 .result-checklist {
-  margin: 6px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.result-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-checklist .menu-ico {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.4;
+  color: var(--accent);
 }
 
 .result-checklist .unmet {
+  color: var(--fg);
   font-weight: 700;
+}
+
+.result-checklist .unmet .menu-ico {
+  color: var(--danger);
 }
 
 .result-actions {
@@ -3505,7 +3654,8 @@ ul.picked > .chip {
 }
 
 .ref-picker .ghost.on {
-  border-color: var(--fg);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 

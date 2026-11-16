@@ -10,7 +10,7 @@ import {
 import { type RunnerChoice, useEngines } from '../../_task/live';
 import { AgentUsage } from '../../_task/parts';
 import type { Agent } from '../../_task/types';
-import { MenuIcon } from '../menu';
+import { Icon } from '../../_ui/Icon';
 
 // 팀 화면의 에이전트 카드 한 장: 이름 · 도구와 모델 · 지금 상태, 역할, 권한 칩, 사용량, 동작
 export function AgentCard({
@@ -73,7 +73,7 @@ export function AgentCard({
         ))}
         {agent.externalTools.map((t) => (
           <li key={t}>
-            <MenuIcon name="plug" />
+            <Icon name="plug" />
             {t}
           </li>
         ))}

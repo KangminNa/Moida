@@ -1,5 +1,6 @@
 import { CairnMark } from '../_ui/CairnMark';
-import { APPROVALS_HREF, CHAT_HREF, DOCK, MenuIcon, SETTINGS_SECTION } from './menu';
+import { Icon } from '../_ui/Icon';
+import { APPROVALS_HREF, CHAT_HREF, DOCK, SETTINGS_SECTION } from './menu';
 import { NotificationBell } from './NotificationBell';
 
 // 독 (2026-11-16 떠 있는 화면): 데스크톱은 왼쪽에 세로로, 폰은 아래에 가로로 떠 있다.
@@ -38,7 +39,7 @@ export function ConsoleDock({
           href={s.href}
           aria-current={here === s.key ? 'page' : undefined}
         >
-          <MenuIcon name={s.icon} />
+          <Icon name={s.icon} />
           <span className="dock-label">{s.name}</span>
           {s.href === APPROVALS_HREF && pendingCount && (
             <span className="dock-count">
@@ -56,7 +57,7 @@ export function ConsoleDock({
           href={SETTINGS_SECTION.href}
           aria-current={here === SETTINGS_SECTION.key ? 'page' : undefined}
         >
-          <MenuIcon name={SETTINGS_SECTION.icon} />
+          <Icon name={SETTINGS_SECTION.icon} />
           <span className="dock-label">{SETTINGS_SECTION.name}</span>
         </a>
       </div>
