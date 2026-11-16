@@ -4,6 +4,7 @@ import { Icon } from '../_ui/Icon';
 import { SOURCE_URL } from '../_ui/source';
 import { ThemeToggle } from '../_ui/ThemeToggle';
 import { MENU, PACKAGE_GROUPS } from './menu';
+import { TextSize } from './TextSize';
 
 /**
  * 설정 옆 칸의 메뉴: 설정 묶음, 접어 둔 "고급"(지금 화면이 그 안이면 펼친다).
@@ -81,7 +82,7 @@ function PackageLink({ entry, pathname }: { entry: PackageEntry; pathname: strin
   );
 }
 
-/** 설정 옆 칸의 아래: 나 · 화면 밝기 · 블로그 열기 · 로그아웃 · 소스 */
+/** 설정 옆 칸의 아래: 나 · 화면 밝기 · 글자 크기 · 블로그 열기 · 로그아웃 · 소스 */
 export function ConsoleFoot({ ownerName }: { ownerName: string }) {
   async function logout() {
     await api('POST', '/api/auth/logout');
@@ -95,6 +96,10 @@ export function ConsoleFoot({ ownerName }: { ownerName: string }) {
         </span>
         <span className="clamp-1">{ownerName}</span>
         <ThemeToggle />
+      </div>
+      <div className="console-me">
+        <span className="console-me-label">글자</span>
+        <TextSize />
       </div>
       <div className="console-foot-links">
         <a href="/">블로그 열기</a>

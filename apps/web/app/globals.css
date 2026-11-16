@@ -98,12 +98,26 @@ body {
   height: 100%;
 }
 
+/* 글자 크기 (2026-11-16): 글자는 rem으로 적고, 여기 한 곳이 단계를 정한다. 간격 · 칸은 px라 배치는 그대로.
+   %라서 브라우저 · 기기의 글자 크기 설정도 함께 따른다. 고른 단계는 html의 data-text (layout.tsx의 첫 그림 전 스크립트) */
+html {
+  font-size: 93.75%;
+}
+
+html[data-text="small"] {
+  font-size: 87.5%;
+}
+
+html[data-text="large"] {
+  font-size: 106.25%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--ui);
-  font-size: 14.5px;
+  font-size: 0.9062rem;
   line-height: 1.6;
   letter-spacing: -0.01em;
   word-break: keep-all;
@@ -204,7 +218,7 @@ a {
   border-radius: 16px;
   background: transparent;
   color: var(--faint);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -246,7 +260,7 @@ a {
   border-radius: 9px;
   background: var(--danger);
   color: #ffffff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   line-height: 18px;
   text-align: center;
@@ -295,7 +309,7 @@ a {
 .side-title {
   flex: 1;
   padding: 0 8px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 
@@ -309,7 +323,7 @@ a {
 
 .console-label {
   padding: 14px 10px 4px;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--faint);
@@ -393,12 +407,47 @@ a {
   align-items: center;
   gap: 10px;
   padding: 0 6px;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 500;
 }
 
 .console-me .icon-button {
   margin-left: auto;
+}
+
+/* 글자 크기 고르기: 세 칸 하나로 붙은 단추 */
+.console-me-label {
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+
+.text-size {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.text-size button {
+  flex: 1;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.text-size button[aria-pressed="true"] {
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 600;
+  box-shadow: var(--lift);
 }
 
 .avatar {
@@ -410,7 +459,7 @@ a {
   border-radius: 50%;
   background: var(--fg);
   color: var(--bg);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 600;
 }
 
@@ -419,7 +468,7 @@ a {
   flex-wrap: wrap;
   gap: 4px 12px;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--faint);
 }
 
@@ -511,7 +560,7 @@ body:has(.console) > .source {
   border-radius: 999px;
   background: var(--raised);
   color: var(--fg);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -591,7 +640,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 
 .console-title .crumb {
@@ -611,7 +660,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 .bell-panel {
   /* 독 안에 있어 독의 글자색 · 크기를 물려받지 않게 */
   color: var(--fg);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 400;
   text-align: left;
   position: absolute;
@@ -704,7 +753,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 
 .page-head h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -712,7 +761,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 /* 날짜 · 개수 같은 작은 글: 본문 글꼴, 숫자 폭은 같게 (고정폭 글꼴은 코드 · id에만) */
 .page-head small,
 .label-mono {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
@@ -757,7 +806,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 
 .empty h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 600;
 }
 
@@ -769,7 +818,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 
 .empty code {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 
@@ -816,7 +865,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 
 .panel-card h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -831,7 +880,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
   gap: 6px;
   align-items: center;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted);
 }
 
@@ -843,7 +892,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
   border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .steps .back:hover {
@@ -874,13 +923,13 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 
 .field > span,
 .field > label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 
 .field small {
   color: var(--faint);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .input {
@@ -909,7 +958,7 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
 
 .input.code {
   font-family: var(--mono);
-  font-size: 20px;
+  font-size: 1.25rem;
   letter-spacing: 0.2em;
   text-align: center;
   text-transform: uppercase;
@@ -931,7 +980,7 @@ textarea.input {
   background: var(--raised);
   border: 1px dashed var(--line-strong);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 
@@ -954,7 +1003,7 @@ textarea.input {
   background: var(--accent);
   color: var(--on-accent);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
   text-decoration: none;
   transition:
     background 0.15s,
@@ -979,7 +1028,7 @@ textarea.input {
   height: 36px;
   padding: 0 14px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .ghost {
@@ -989,7 +1038,7 @@ textarea.input {
   border: 0;
   background: var(--raised);
   color: var(--fg);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
   display: inline-flex;
@@ -1002,7 +1051,7 @@ textarea.input {
 .ghost.wide {
   height: 44px;
   justify-content: center;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .ghost:hover {
@@ -1021,7 +1070,7 @@ textarea.input {
 .error {
   margin: 0;
   color: var(--danger);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 
@@ -1035,7 +1084,7 @@ textarea.input {
   border-radius: var(--radius);
   background: var(--raised);
   color: var(--fg);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* 카드형 묶음 (플러그인, 기기) */
@@ -1064,14 +1113,14 @@ textarea.input {
 }
 
 .plugin-head b {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
 .plugin-head p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .switch {
@@ -1119,7 +1168,7 @@ textarea.input {
   border: 0;
   background: var(--raised);
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 500;
 }
 
@@ -1143,7 +1192,7 @@ textarea.input {
   padding: 14px;
   border-radius: 8px;
   background: var(--raised);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 
@@ -1162,7 +1211,7 @@ textarea.input {
 
 .howto code {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 
@@ -1173,7 +1222,7 @@ textarea.input {
 .howto summary {
   cursor: pointer;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .howto details[open] summary {
@@ -1186,7 +1235,7 @@ textarea.input {
   border-radius: 6px;
   background: var(--raised);
   list-style: none;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   display: flex;
   flex-direction: column;
@@ -1208,7 +1257,7 @@ textarea.input {
   padding: 10px 12px;
   border-radius: 6px;
   background: var(--raised);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .result ul {
@@ -1238,7 +1287,7 @@ textarea.input {
   border-radius: 999px;
   background: var(--fg);
   color: var(--bg);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -1258,7 +1307,7 @@ textarea.input {
 
 .page-title h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   line-height: 1.45;
 }
@@ -1278,13 +1327,13 @@ textarea.input {
 .sec-title h2,
 .panel > h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
 .sec-title a {
   color: var(--faint);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   text-decoration: none;
 }
 
@@ -1295,7 +1344,7 @@ textarea.input {
 .note {
   margin: 0;
   color: var(--faint);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
 }
 
 .note a,
@@ -1336,7 +1385,7 @@ textarea.input {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   line-height: 1.6;
 }
 
@@ -1355,7 +1404,7 @@ textarea.input {
 
 .ask > label,
 .ask-row > label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 
@@ -1367,7 +1416,7 @@ textarea.input {
   outline: none;
   resize: vertical;
   background: transparent;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .ask textarea::placeholder {
@@ -1392,7 +1441,7 @@ textarea.input {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .ask-files li {
@@ -1411,7 +1460,7 @@ textarea.input {
   max-width: 100%;
   height: 34px;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .two {
@@ -1443,7 +1492,7 @@ textarea.input {
   min-height: 44px;
   padding: 0 4px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-variant-numeric: tabular-nums;
   text-decoration: none;
 }
@@ -1484,7 +1533,7 @@ textarea.input {
   display: -webkit-box;
   overflow: hidden;
   color: var(--faint);
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -1495,7 +1544,7 @@ textarea.input {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .split {
@@ -1556,7 +1605,7 @@ textarea.input {
 }
 
 .bubble-meta {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--faint);
 }
 
@@ -1566,7 +1615,7 @@ textarea.input {
 }
 
 .bubble .prose {
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.7;
 }
 
@@ -1613,7 +1662,7 @@ textarea.input {
   border: 0;
   background: transparent;
   color: var(--fg);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.6;
   resize: none;
   outline: none;
@@ -1729,7 +1778,7 @@ a.chip {
 
 .item-main small {
   color: var(--faint);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   overflow-wrap: anywhere;
 }
 
@@ -1739,7 +1788,7 @@ a.chip {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--faint);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* 상태 알약: 칠한 면. on = 나에게 온 것(승인 · 질문)은 강조색 */
@@ -1753,7 +1802,7 @@ a.chip {
   border-radius: 8px;
   background: var(--raised);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1810,7 +1859,7 @@ a.chip {
   align-items: baseline;
   gap: 4px 14px;
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .kv dt {
@@ -1887,7 +1936,7 @@ a.chip {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .signin-steps li {
@@ -1907,7 +1956,7 @@ a.chip {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   font-family: var(--mono);
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   user-select: all;
@@ -1916,7 +1965,7 @@ a.chip {
 .more summary {
   cursor: pointer;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .more[open] summary {
@@ -1940,7 +1989,7 @@ a.chip {
 }
 
 .connector-tools code {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
 }
 
 .log {
@@ -1950,7 +1999,7 @@ a.chip {
   overflow-y: auto;
   list-style: none;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   line-height: 1.6;
 }
 
@@ -2015,7 +2064,7 @@ a.chip {
   border-bottom: 1px solid var(--line-strong);
   background: var(--raised);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   text-align: center;
 }
 
@@ -2026,7 +2075,7 @@ a.chip {
   height: 58px;
   padding: 0 4px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
   text-align: center;
 }
@@ -2039,7 +2088,7 @@ a.chip {
   border: 2px solid var(--fg);
   border-radius: 50%;
   color: var(--fg);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 700;
   transform: rotate(-8deg);
 }
@@ -2059,7 +2108,7 @@ a.chip {
   border-radius: 6px;
   background: var(--raised);
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 
 .preview > b {
@@ -2112,13 +2161,13 @@ a.chip {
   border-radius: 10px;
   background: var(--raised);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .agent-role {
   margin: 0;
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   line-height: 1.55;
 }
 
@@ -2133,7 +2182,7 @@ a.chip {
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   white-space: nowrap;
 }
 
@@ -2171,7 +2220,7 @@ a.chip {
   border-radius: 8px;
   background: none;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-decoration: none;
 }
 
@@ -2192,7 +2241,7 @@ a.chip {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .perm {
@@ -2212,12 +2261,12 @@ a.chip {
   border-radius: 7px;
   background: var(--raised);
   color: var(--fg);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .perm li .menu-ico {
   width: auto;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .perm li.gate {
@@ -2239,7 +2288,7 @@ a.chip {
   justify-content: space-between;
   gap: 2px 12px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
 }
 
 .bar {
@@ -2302,7 +2351,7 @@ a.chip {
   margin-bottom: 4px;
   padding: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .check {
@@ -2310,7 +2359,7 @@ a.chip {
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 
@@ -2430,7 +2479,7 @@ ul.picked > .chip {
   margin: 6px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .page-changes li {
@@ -2445,7 +2494,7 @@ ul.picked > .chip {
 .page-changes del,
 .page-changes ins {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .page-changes del {
@@ -2554,7 +2603,7 @@ ul.picked > .chip {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   object-fit: cover;
   text-transform: uppercase;
 }
@@ -2575,7 +2624,7 @@ ul.picked > .chip {
 
 .output-main small {
   color: var(--faint);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
 }
 
 .output-preview {
@@ -2602,12 +2651,12 @@ ul.picked > .chip {
 }
 
 .list-row b {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
 .list-row small {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--faint);
 }
 
@@ -2664,7 +2713,7 @@ ul.picked > .chip {
 }
 
 .basket-main small {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--faint);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -2673,14 +2722,14 @@ ul.picked > .chip {
 /* 세션 노트 */
 .note-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   line-height: 1.4;
 }
 
 .note-section h4 {
   margin: 0 0 6px;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 500;
   color: var(--faint);
 }
@@ -2697,7 +2746,7 @@ ul.picked > .chip {
   border-left: 2px solid var(--line-strong);
   background: var(--raised);
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
 }
 
 /* 세션의 원문 (수집 훅 · 확장이 올린 대화 글): 길어서 칸 안에서 넘긴다 */
@@ -2707,7 +2756,7 @@ ul.picked > .chip {
   overflow: auto;
   padding: 12px;
   border: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 0.8125rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -2723,7 +2772,7 @@ ul.picked > .chip {
   border-radius: 6px;
   background: var(--fg);
   color: var(--bg);
-  font-size: 13px;
+  font-size: 0.8125rem;
   z-index: 60;
 }
 
@@ -2733,7 +2782,7 @@ ul.picked > .chip {
   right: 16px;
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--faint);
   text-decoration: none;
   z-index: 20;
@@ -2768,7 +2817,7 @@ ul.picked > .chip {
 .editor-state {
   flex: 1;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--faint);
 }
 
@@ -2807,7 +2856,7 @@ ul.picked > .chip {
   border-radius: 4px;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .editor-toolbar button:hover:not(:disabled) {
@@ -2868,7 +2917,7 @@ ul.picked > .chip {
 
 .publish-status legend {
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 
@@ -2886,7 +2935,7 @@ ul.picked > .chip {
 
 .publish-status button small {
   color: var(--faint);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .publish-status button[aria-pressed="true"] {
@@ -3045,8 +3094,10 @@ ul.picked > .chip {
     min-height: 44px;
   }
 
+  /* 글자 크기 단계와 상관없이 16px (더 작으면 iOS가 입력할 때 화면을 확대한다) */
   .console .input,
-  .ask textarea {
+  .ask textarea,
+  .chat-box-input {
     font-size: 16px;
   }
 
@@ -3159,7 +3210,7 @@ ul.picked > .chip {
   padding: 0 12px;
   border-radius: var(--radius);
   color: var(--muted);
-  font-size: 14.5px;
+  font-size: 0.9062rem;
   text-decoration: none;
 }
 
@@ -3194,7 +3245,7 @@ ul.picked > .chip {
 
 .chat-home h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   text-align: center;
 }
@@ -3234,7 +3285,7 @@ ul.picked > .chip {
 .facts li {
   display: flex;
   gap: 12px;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 
 .facts span {
@@ -3256,7 +3307,7 @@ ul.picked > .chip {
 .section-head h2 {
   flex: 1;
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
@@ -3277,12 +3328,12 @@ ul.picked > .chip {
 
 .security-event time {
   flex: none;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .input.small {
   height: 30px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* 대화와 오른쪽 "팀이 동시에 일하는 중" 칸 (2026-11-15 화면 정리). 칸이 없으면 대화가 가운데에 선다 */
@@ -3319,7 +3370,7 @@ ul.picked > .chip {
   flex-direction: column;
   gap: 2px;
   margin: 0 0 12px;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 600;
 }
 
@@ -3347,12 +3398,12 @@ ul.picked > .chip {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .lane p {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .lane-top {
@@ -3396,14 +3447,14 @@ ul.picked > .chip {
 .chat-top h1 {
   flex: 1 1 auto;
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
 }
 
 .chat-event {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* 과정: 접어 둔다 (팀이 무엇을 하는지는 펼쳐야 보인다) */
@@ -3413,7 +3464,7 @@ ul.picked > .chip {
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .chat-process summary {
@@ -3458,7 +3509,7 @@ ul.picked > .chip {
 
 .chat-question > .text {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .choices {
@@ -3496,7 +3547,7 @@ ul.picked > .chip {
 
 .choice small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* 결과 카드 (2차 2단계): 항목마다 고르는 칸, 검토 의견, 승인 · 수정 요청 · 반려 */
@@ -3525,7 +3576,7 @@ ul.picked > .chip {
   justify-content: center;
   height: 50px;
   border-radius: 14px;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .result-actions .ghost {
@@ -3533,7 +3584,7 @@ ul.picked > .chip {
   justify-content: center;
   height: 50px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .result-actions .ghost:last-child {
@@ -3612,7 +3663,7 @@ ul.picked > .chip {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 
@@ -3711,7 +3762,7 @@ ul.picked > .chip {
 
 .chat-turn > .picked .chip {
   max-width: 100%;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 /* 대화 머리의 모델 · 생각 강도 (맡은 에이전트의 값 대신 이 대화만) */
@@ -3749,7 +3800,7 @@ ul.picked > .chip {
   margin: 6px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .change-lines li {

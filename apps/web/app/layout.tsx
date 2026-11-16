@@ -18,9 +18,9 @@ export async function generateMetadata() {
 
 // AGPL-3.0: 서비스를 쓰는 사람도 소스를 받을 수 있게 모든 화면에 링크를 둔다
 
-// 고른 테마를 첫 그림 전에 적용한다 (고르지 않았으면 기기 설정을 따른다)
+// 고른 테마 · 글자 크기를 첫 그림 전에 적용한다 (고르지 않았으면 기기 설정 · 보통)
 const THEME_SCRIPT =
-  "try{var t=localStorage.getItem('cairn-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}";
+  "try{var d=document.documentElement,t=localStorage.getItem('cairn-theme'),x=localStorage.getItem('cairn-text');if(t==='light'||t==='dark')d.dataset.theme=t;if(x==='small'||x==='large')d.dataset.text=x}catch(e){}";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
