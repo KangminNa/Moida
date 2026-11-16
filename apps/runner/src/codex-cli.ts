@@ -4,11 +4,14 @@ import { AiProcess } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
 import { CliRuntime } from './cli-runtime';
+import { CodexSignin } from './codex-signin';
 import { CodexStream } from './codex-stream';
+import type { EngineAdapter } from './engine-adapter';
 import type { ExternalMcp } from './external-mcp';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import type { PromptPack } from './prompt-pack';
+import type { RunnerConfig } from './runner-config';
 import type { SandboxRoom } from './sandbox-room';
 
 // Codex CLI를 부르는 법: 공식 `codex exec --json`을 ChatGPT 구독 로그인(auth.json)으로 그대로 띄운다.
@@ -251,5 +254,24 @@ export class CodexCli implements AiTool {
       found.push(this.authJson);
     }
     return found;
+  }
+}
+
+/** 엔진 codex (engines.json). 실행은 CodexCli, 웹 로그인은 CodexSignin. 로그인은 늘 서버에서 받는다 (auth.json은 쓸 때 바뀐다) */
+export class CodexEngine implements EngineAdapter {
+  readonly name = CodexCli.TOOL;
+  readonly efforts = CodexCli.EFFORTS;
+  readonly bin = { env: 'CAIRN_RUNNER_CODEX_CLI', fallback: 'codex' };
+  readonly ownLogin = null;
+  readonly signin = new CodexSignin();
+
+  tool(credential: string, config: RunnerConfig): AiTool {
+    return new CodexCli(
+      config.binOf(this),
+      credential,
+      config.mcpUrl,
+      config.skillsDir,
+      config.browserUrl,
+    );
   }
 }

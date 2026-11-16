@@ -83,10 +83,10 @@ export class Runner {
   constructor(private readonly config: RunnerConfig) {
     const token = config.deviceToken;
     if (!token) throw new RunnerHalted('기기 토큰 없이 러너를 시작할 수 없어요');
-    this.redactor = new Redactor([token, config.claudeToken]);
+    this.redactor = new Redactor([token, ...Object.values(config.ownLogins)]);
     this.log = new RunLog(this.redactor);
     this.server = new CairnServer(new McpClient(config.mcpUrl, token));
-    this.logins = new AiLogins(this.server, config.claudeToken);
+    this.logins = new AiLogins(this.server, config.ownLogins);
     this.ability = RunnerAbility.detect(config);
     this.pages = config.browserUrl ? new BrowserPages(config.browserUrl) : null;
   }
@@ -123,7 +123,7 @@ export class Runner {
     }
     if (this.ability.tools.length === 0 && this.ability.signinTools.length === 0)
       this.log.info('이 컴퓨터에서 쓸 수 있는 AI CLI가 없어요. 설치한 뒤 러너를 다시 켜 주세요');
-    if (this.config.claudeToken === null)
+    if (Object.keys(this.config.ownLogins).length === 0)
       this.log.info(
         'AI 로그인은 콘솔의 AI 메뉴에서 해요. 로그인이 없는 도구의 일은 서버가 주지 않아요',
       );

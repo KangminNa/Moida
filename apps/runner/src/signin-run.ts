@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChildExit } from './ai-process';
 import { Backoff, pause } from './backoff';
 import type { CairnServer, SigninReply } from './cairn-server';
+import { type EngineAdapter, EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
 import { RunResult } from './progress';
@@ -37,12 +38,11 @@ class SigninEnding {
 }
 
 // 웹 AI 로그인 하나 (작업 종류 ai_signin). 주인이 AI 메뉴에서 누르면 러너가 로그인 명령을 PTY 안에서 대신 돌린다.
-//   claude: setup-token → 주소를 알린다 → 주인이 브라우저에서 받은 코드를 붙여 넣는다 → 러너가 쳐 넣는다 → 1년 토큰
-//   codex:  login --device-auth → 주소와 코드를 알린다 → 주인이 주소에서 코드를 넣는다 → CLI가 auth.json을 쓴다
+// 공통 단계: 주소(와 코드)를 알린다 → 주인이 코드를 붙여 넣으면 쳐 넣는다 → 자격을 받아 서버에 넘긴다.
+// 엔진마다 다른 것(명령 · 설정 폴더 · 화면에서 꺼낼 것 · 자격 · 실패 문구)은 EngineSignin에 묻는다 (claude-signin · codex-signin).
 // 2초마다 서버에 물어 코드와 취소를 받는다. 5분 안에 끝나지 않으면 실패. 서버가 도구마다 하나만 빌려 준다 (폴더는 로그인마다 따로).
 // 격리: 빈 홈·설정 폴더, 다른 인증 환경 변수 없이, 브라우저는 열지 않는다(BROWSER=true). 끝나면 폴더를 지운다.
 // 화면은 비밀이라 로그에도 기록에도 남기지 않는다. 오류도 화면의 글 대신 정해진 문구로 알린다.
-// 나중에 같은 모양이 다시 필요해질 때(Codex 실행) AI CLI 쪽과 공통을 뽑는다 (객체설계 13장).
 export class SigninRun {
   private static readonly POLL_MS = 2_000;
   private static readonly TIMEOUT_MS = 5 * 60_000;
@@ -53,7 +53,6 @@ export class SigninRun {
   private static readonly STALE_MS = 10 * 60_000;
   /** 코드를 넣고 Enter를 따로 친다. 함께 보내면 붙여 넣기로 읽혀 제출되지 않는다 (Paperclip) */
   private static readonly ENTER_DELAY_MS = 150;
-  private static readonly AUTH_JSON_MAX = 64 * 1024;
   private static readonly STOPPING = '러너가 멈춰요';
   /** 셸이 실행 파일을 찾지 못한 종료 코드 */
   private static readonly NOT_FOUND = 127;
@@ -88,16 +87,17 @@ export class SigninRun {
   async perform(): Promise<void> {
     const tool = this.job.tool;
     this.log.info(`${this.job.taskId}: ${tool} 로그인을 시작해요`);
-    const bin = this.binOf(tool);
+    const engine = EngineAdapters.of(tool);
     if (this.stop.aborted) return this.conclude(SigninEnding.release(SigninRun.STOPPING));
-    if (bin === null) return this.conclude(SigninEnding.failed(`${tool} 로그인은 지원하지 않아요`));
+    if (engine === null)
+      return this.conclude(SigninEnding.failed(`${tool} 로그인은 지원하지 않아요`));
     if (!SigninTerminal.supported)
       return this.conclude(
         SigninEnding.failed('이 러너의 운영체제에서는 웹 로그인을 할 수 없어요'),
       );
     const dir = await mkdtemp(join(tmpdir(), SigninRun.DIR_PREFIX));
     try {
-      await this.conclude(await this.drive(tool, bin, dir));
+      await this.conclude(await this.drive(engine, dir));
     } catch (error) {
       if (error instanceof AccessDenied) throw error;
       await this.conclude(SigninEnding.failed(`러너 오류: ${(error as Error).message}`));
@@ -106,29 +106,19 @@ export class SigninRun {
     }
   }
 
-  private binOf(tool: string): string | null {
-    if (tool === 'claude') return this.config.cliPath;
-    if (tool === 'codex') return this.config.codexCliPath;
-    return null;
-  }
-
-  private async drive(tool: string, bin: string, dir: string): Promise<SigninEnding> {
+  private async drive(engine: EngineAdapter, dir: string): Promise<SigninEnding> {
     const home = join(dir, 'home');
     const config = join(dir, 'config');
     await mkdir(home, { mode: 0o700 });
     await mkdir(config, { mode: 0o700 });
-    if (tool === 'codex')
-      // 열쇠고리가 있는 컴퓨터에서도 auth.json으로 남기게 (러너가 읽어 서버에 넘긴다)
-      await writeFile(join(config, 'config.toml'), 'cli_auth_credentials_store = "file"\n', {
-        mode: 0o600,
-      });
-    const screen = new SigninScreen(tool);
+    await engine.signin.prepare(config);
+    const screen = new SigninScreen();
     const ended = new AbortController();
     let exit: ChildExit | null = null;
     const terminal = new SigninTerminal(
-      bin,
-      tool === 'claude' ? ['setup-token'] : ['login', '--device-auth'],
-      this.env(tool, home, config),
+      this.config.binOf(engine),
+      engine.signin.args,
+      this.env(engine, home, config),
       (text) => screen.add(text),
       SigninRun.TIMEOUT_MS / 1000 + SigninRun.LIMIT_SLACK_SECONDS,
     );
@@ -137,7 +127,7 @@ export class SigninRun {
       ended.abort();
     });
     try {
-      return await this.follow(tool, screen, terminal, config, ended.signal, () => exit);
+      return await this.follow(engine, screen, terminal, config, ended.signal, () => exit);
     } finally {
       await terminal.kill();
     }
@@ -145,7 +135,7 @@ export class SigninRun {
 
   /** 화면과 서버의 답을 2초마다 본다. 끝낼 이유가 생기면 돌려준다 */
   private async follow(
-    tool: string,
+    engine: EngineAdapter,
     screen: SigninScreen,
     terminal: SigninTerminal,
     config: string,
@@ -161,7 +151,8 @@ export class SigninRun {
       await pause(SigninRun.POLL_MS, exitOf() === null ? alarm : this.stop);
       if (this.stop.aborted) return SigninEnding.release(SigninRun.STOPPING);
       const exit = exitOf();
-      const credential = await this.credentialOf(tool, screen, config, exit);
+      // 받은 자격 (Claude는 화면의 토큰, Codex는 잘 끝난 뒤의 auth.json). 아직 없으면 null
+      const credential = await engine.signin.credential(screen.text, config, exit?.code === 0);
       if (credential !== null) {
         const saved = await this.relay({ credential });
         if (saved instanceof SigninEnding) return saved;
@@ -172,14 +163,15 @@ export class SigninRun {
           return SigninEnding.failed('서버에 닿지 못해 받은 로그인을 저장하지 못했어요');
         continue;
       }
-      if (exit !== null) return SigninEnding.failed(SigninRun.failureOf(tool, exit, shown, typed));
+      if (exit !== null)
+        return SigninEnding.failed(SigninRun.failureOf(engine, exit, shown, typed));
       if (Date.now() > deadline)
         return SigninEnding.failed('5분 안에 로그인을 마치지 못했어요. 다시 시작해 주세요');
-      const url = shown ? null : screen.url;
-      const reply = await this.relay(url === null ? {} : { url, userCode: screen.userCode });
+      const found = shown ? null : engine.signin.read(screen.text);
+      const reply = await this.relay(found === null ? {} : { ...found });
       if (reply instanceof SigninEnding) return reply;
       if (reply === null) continue;
-      if (url !== null) {
+      if (found !== null) {
         shown = true;
         this.log.info(`${this.job.taskId}: 로그인 주소를 알렸어요`);
       }
@@ -191,23 +183,6 @@ export class SigninRun {
         typed = true;
         this.log.info(`${this.job.taskId}: 붙여 넣은 코드를 넣었어요`);
       }
-    }
-  }
-
-  /** 받은 자격. Claude는 화면의 토큰, Codex는 잘 끝난 뒤의 auth.json. 아직 없으면 null */
-  private async credentialOf(
-    tool: string,
-    screen: SigninScreen,
-    config: string,
-    exit: ChildExit | null,
-  ): Promise<string | null> {
-    if (tool === 'claude') return screen.claudeToken(exit?.code === 0);
-    if (exit?.code !== 0) return null;
-    try {
-      const text = await readFile(join(config, 'auth.json'), 'utf8');
-      return text.length > 0 && text.length <= SigninRun.AUTH_JSON_MAX ? text : null;
-    } catch {
-      return null;
     }
   }
 
@@ -239,7 +214,11 @@ export class SigninRun {
   }
 
   /** 로그인 명령만의 환경. 다른 인증 값(ANTHROPIC_API_KEY, OPENAI_API_KEY 등)과 기기 토큰은 넘기지 않는다 */
-  private env(tool: string, home: string, config: string): Readonly<Record<string, string>> {
+  private env(
+    engine: EngineAdapter,
+    home: string,
+    config: string,
+  ): Readonly<Record<string, string>> {
     const passed = SigninRun.PASSED_ENV.flatMap((name) => {
       const value = process.env[name];
       return value === undefined ? [] : [[name, value] as const];
@@ -249,20 +228,25 @@ export class SigninRun {
       HOME: home,
       TERM: 'xterm-256color',
       BROWSER: 'true',
-      ...(tool === 'claude' ? { CLAUDE_CONFIG_DIR: config } : { CODEX_HOME: config }),
+      ...engine.signin.env(config),
     };
   }
 
   /** 화면의 글은 비밀이 섞일 수 있어 쓰지 않는다. 어느 단계에서 끝났는지로 알린다 */
-  private static failureOf(tool: string, exit: ChildExit, shown: boolean, typed: boolean): string {
+  private static failureOf(
+    engine: EngineAdapter,
+    exit: ChildExit,
+    shown: boolean,
+    typed: boolean,
+  ): string {
     if (exit.spawnError !== null) return `로그인 명령을 실행하지 못했어요: ${exit.spawnError}`;
-    if (exit.code === SigninRun.NOT_FOUND) return `이 러너에 ${tool} CLI가 없어요`;
+    if (exit.code === SigninRun.NOT_FOUND) return `이 러너에 ${engine.name} CLI가 없어요`;
     const how = exit.signal ? `신호 ${exit.signal}` : `코드 ${exit.code}`;
     if (!shown) return `로그인 주소를 받기 전에 로그인 명령이 ${how}로 끝났어요`;
-    if (tool === 'claude' && typed)
-      return `코드가 맞지 않거나 로그인을 마치지 못했어요 (${how}). 다시 시작해 주세요`;
-    if (tool === 'codex' && exit.code === 0) return 'Codex가 auth.json을 남기지 않았어요';
-    return `로그인 명령이 ${how}로 끝났어요. 다시 시작해 주세요`;
+    return (
+      engine.signin.failure(exit, typed, how) ??
+      `로그인 명령이 ${how}로 끝났어요. 다시 시작해 주세요`
+    );
   }
 
   /** 끝을 알린다. 닿지 못하면 몇 번만 다시: 임대가 끝나면 서버가 어차피 대기열로 돌린다 */

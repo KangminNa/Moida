@@ -19,7 +19,13 @@ async function tool(name: string, mode = 0o755): Promise<string> {
 }
 
 const config = (cli: string, codex: string, token: string | null = null) =>
-  new RunnerConfig('http://localhost', 'device', token, cli, '/없는', null, codex);
+  new RunnerConfig(
+    'http://localhost',
+    'device',
+    token === null ? {} : { claude: token },
+    { claude: cli, codex },
+    '/없는',
+  );
 
 before(async () => {
   bin = await mkdtemp(join(tmpdir(), 'ability-'));
@@ -67,11 +73,10 @@ describe('러너가 할 수 있는 것', () => {
     const slot = new RunnerConfig(
       'http://localhost',
       null,
-      null,
-      claude,
+      {},
+      { claude, codex: '/없는/codex' },
       '/없는',
       '/run/cairn-code/pairing',
-      '/없는/codex',
       'http://browser:9222',
       '1',
     );

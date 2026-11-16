@@ -36,17 +36,20 @@ class FakeServer {
   }
 }
 
+/** 러너가 스스로 가진 로그인 (RunnerConfig.ownLogins): 환경 변수의 Claude 토큰 */
+const OWN = { claude: 'env-token' };
+
 describe('AI 토큰 고르기', () => {
   test('환경 변수가 있으면 서버에 묻지 않고 그 값을 쓴다', async () => {
     const server = new FakeServer(() => 'console-token');
-    const login = await new AiLogins(server, 'env-token').forJob(job('general'));
+    const login = await new AiLogins(server, OWN).forJob(job('general'));
     assert.equal(login.token, 'env-token');
     assert.deepEqual(server.asked, []);
   });
 
   test('환경 변수가 없으면 일의 도구로 서버에서 받는다', async () => {
     const server = new FakeServer(() => 'console-token');
-    const login = await new AiLogins(server, null).forJob(job('general'));
+    const login = await new AiLogins(server, {}).forJob(job('general'));
     assert.equal(login.token, 'console-token');
     assert.equal(login.version, 3, '되돌려 쓸 때 보낼 판도 함께');
     assert.deepEqual(server.asked, ['claude']);
@@ -55,14 +58,22 @@ describe('AI 토큰 고르기', () => {
   test('환경 변수의 토큰은 Claude의 것이라 Codex 일에는 서버의 로그인을 받는다', async () => {
     const server = new FakeServer(() => '{"tokens":{}}');
     const codexJob = job('general', { agent: { name: '글쓰기', role: '', tool: 'codex' } });
-    const login = await new AiLogins(server, 'env-token').forJob(codexJob);
+    const login = await new AiLogins(server, OWN).forJob(codexJob);
     assert.equal(login.token, '{"tokens":{}}');
     assert.deepEqual(server.asked, ['codex']);
   });
 
+  test('엔진 이름이 아닌 일의 도구(constructor 등)는 가진 로그인으로 읽지 않는다', async () => {
+    const server = new FakeServer(() => 'console-token');
+    const odd = job('general', { agent: { name: '글쓰기', role: '', tool: 'constructor' } });
+    const login = await new AiLogins(server, OWN).forJob(odd);
+    assert.equal(login.token, 'console-token');
+    assert.deepEqual(server.asked, ['constructor']);
+  });
+
   test('연결 확인은 콘솔의 토큰을 보는 일이라 환경 변수가 있어도 서버에서 받는다', async () => {
     const server = new FakeServer(() => 'console-token');
-    const login = await new AiLogins(server, 'env-token').forJob(aiTest);
+    const login = await new AiLogins(server, OWN).forJob(aiTest);
     assert.equal(login.token, 'console-token');
     assert.deepEqual(server.asked, ['claude']);
   });
@@ -73,7 +84,7 @@ describe('AI 토큰 고르기', () => {
         new FakeServer(() => {
           throw error;
         }),
-        null,
+        {},
       ).forJob(job('general'));
 
     const refused = await failing(new ToolRefused('rule_violation', '토큰을 아직 넣지 않았어요'));
@@ -83,7 +94,7 @@ describe('AI 토큰 고르기', () => {
   });
 
   test('빈 답은 토큰이 아니다', async () => {
-    const login = await new AiLogins(new FakeServer(() => ''), null).forJob(job('general'));
+    const login = await new AiLogins(new FakeServer(() => ''), {}).forJob(job('general'));
     assert.equal(login.token, null);
   });
 
@@ -93,7 +104,7 @@ describe('AI 토큰 고르기', () => {
         new FakeServer(() => {
           throw error;
         }),
-        null,
+        {},
       ).forJob(job('general'));
 
     await assert.rejects(failing(new AccessDenied('기기 토큰이 맞지 않아요')), AccessDenied);

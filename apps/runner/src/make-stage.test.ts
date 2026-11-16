@@ -202,11 +202,10 @@ describe('만들기 작업의 검사 (검증 고리 V)', () => {
     const config = new RunnerConfig(
       'http://cairn',
       'device',
-      null,
-      'claude',
+      {},
+      {},
       '/없는',
       null,
-      'codex',
       null,
       '1',
       AgentUser.parse('self'),

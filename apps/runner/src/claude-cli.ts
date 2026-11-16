@@ -1,15 +1,18 @@
 import { AiProcess } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
+import { ClaudeSignin } from './claude-signin';
 import { ClaudeStream } from './claude-stream';
 import { CliRuntime } from './cli-runtime';
+import type { EngineAdapter } from './engine-adapter';
 import type { ExternalMcp } from './external-mcp';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import type { PromptPack } from './prompt-pack';
+import type { RunnerConfig } from './runner-config';
 import type { SandboxRoom } from './sandbox-room';
 
-// Claude Code를 부르는 법. Codex가 들어올 때 공통 모양을 뽑는다 (객체설계 13장: 추상화는 둘째 구현이 생길 때).
+// Claude Code를 부르는 법. 엔진 어댑터(ClaudeEngine)는 맨 아래에 있다 (리팩토링 E2).
 //
 // 격리: 설정·홈은 빈 임시 폴더, MCP는 --strict-mcp-config로 넘긴 것만 (cairn, 브라우저 작업의 playwright, 허락한 외부 도구 x-*), claude.ai 연결은 끈다.
 // 브라우저 작업(browse)에서만 playwright를 더한다 (BrowserMcp: 서버 브라우저에 CDP로, 사이트의 허용 출처만).
@@ -235,6 +238,25 @@ export class ClaudeCli implements AiTool {
       job.prompt(prompts, workspace.skillReady, null, workspace.outputsDir),
       onLine,
       workspace.user,
+    );
+  }
+}
+
+/** 엔진 claude (engines.json). 실행은 ClaudeCli, 웹 로그인은 ClaudeSignin. 환경 변수의 토큰(setup-token)을 러너가 스스로 가질 수 있다 */
+export class ClaudeEngine implements EngineAdapter {
+  readonly name = ClaudeCli.TOOL;
+  readonly efforts = ClaudeCli.EFFORTS;
+  readonly bin = { env: 'CAIRN_RUNNER_CLI', fallback: 'claude' };
+  readonly ownLogin = 'CLAUDE_CODE_OAUTH_TOKEN';
+  readonly signin = new ClaudeSignin();
+
+  tool(credential: string, config: RunnerConfig): AiTool {
+    return new ClaudeCli(
+      config.binOf(this),
+      credential,
+      config.mcpUrl,
+      config.skillsDir,
+      config.browserUrl,
     );
   }
 }

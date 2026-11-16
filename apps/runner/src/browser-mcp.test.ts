@@ -198,11 +198,10 @@ describe('브라우저 작업의 설정 (러너)', () => {
       new RunnerConfig(
         'http://localhost',
         'device',
-        null,
-        '/없는',
+        {},
+        { claude: '/없는', codex: '/없는' },
         '/없는',
         pairing,
-        '/없는',
         browser,
       );
     const env = { PATH: '' };

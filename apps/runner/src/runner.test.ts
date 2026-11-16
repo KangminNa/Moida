@@ -57,8 +57,14 @@ async function until(what: string, ready: () => boolean): Promise<void> {
   }
 }
 
+/** 설치된 Claude(아무 실행 파일)와 없는 Codex */
+const LOCAL_CLAUDE = { claude: process.execPath, codex: '/없는/codex' };
+
 function runner(claudeToken: string | null = null): Runner {
-  return new Runner(new RunnerConfig(url, 'device-token', claudeToken, '/없는/claude', '/없는'));
+  const own: Record<string, string> = claudeToken === null ? {} : { claude: claudeToken };
+  return new Runner(
+    new RunnerConfig(url, 'device-token', own, { claude: '/없는/claude' }, '/없는'),
+  );
 }
 
 /** 찍힌 로그 줄 */
@@ -101,9 +107,7 @@ beforeEach(() => {
 
 describe('할 수 있는 것을 알리고 빌린다', () => {
   test('빌리기 전에 토큰을 묻지 않고, 가진 CLI와 로그인을 next_jobs에 싣는다', async () => {
-    const loop = new Runner(
-      new RunnerConfig(url, 'device-token', null, process.execPath, '/없는', null, '/없는/codex'),
-    );
+    const loop = new Runner(new RunnerConfig(url, 'device-token', {}, LOCAL_CLAUDE, '/없는'));
     const running = loop.run();
     await until('일을 물음', () => count('next_jobs') >= 1);
     loop.stop();
@@ -122,11 +126,10 @@ describe('할 수 있는 것을 알리고 빌린다', () => {
       new RunnerConfig(
         url,
         'device-token',
-        null,
-        process.execPath,
+        {},
+        LOCAL_CLAUDE,
         '/없는',
         null,
-        '/없는/codex',
         null,
         null,
         null,
@@ -145,7 +148,7 @@ describe('할 수 있는 것을 알리고 빌린다', () => {
 
   test('환경 변수에 토큰이 있으면 이 컴퓨터의 로그인으로 알린다', async () => {
     const loop = new Runner(
-      new RunnerConfig(url, 'device-token', 'env-token', process.execPath, '/없는'),
+      new RunnerConfig(url, 'device-token', { claude: 'env-token' }, LOCAL_CLAUDE, '/없는'),
     );
     const running = loop.run();
     await until('일을 물음', () => count('next_jobs') >= 1);
@@ -207,9 +210,7 @@ describe('코드 작업 (코드 러너 칸)', () => {
   }
 
   test('칸이 아닌 러너: AI를 띄우지 않고 로그인도 묻지 않고 실패로 끝낸다 (돌려주면 끝없이 다시 빌린다)', async () => {
-    const sent = await runOnce(
-      new RunnerConfig(url, 'device-token', null, process.execPath, '/없는', null, '/없는/codex'),
-    );
+    const sent = await runOnce(new RunnerConfig(url, 'device-token', {}, LOCAL_CLAUDE, '/없는'));
     assert.equal(sent?.task_id, '0190f5a2-0000-7000-8000-00000000c0de');
     assert.equal(sent?.status, 'failed');
     assert.match(String(sent?.error), /코드 러너 칸이 아니라서/);
@@ -224,11 +225,10 @@ describe('코드 작업 (코드 러너 칸)', () => {
         new RunnerConfig(
           url,
           'device-token',
-          'env-token',
-          process.execPath,
+          { claude: 'env-token' },
+          LOCAL_CLAUDE,
           '/없는',
           null,
-          '/없는/codex',
           null,
           '1',
           AgentUser.parse('self'),

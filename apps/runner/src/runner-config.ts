@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs';
 import { basename, isAbsolute, resolve, sep } from 'node:path';
 import { AgentUser } from './agent-user';
+import { type EngineAdapter, EngineAdapters } from './engine-adapter';
 import { SharedFolders } from './shared-folders';
 
 /** 설정이 빠졌거나 틀림. 시작하지 않고 이 문구만 보여 준다 */
@@ -8,8 +9,6 @@ export class ConfigProblem extends Error {}
 
 // 러너 설정 (환경 변수). 토큰 값은 오류 문구에 넣지 않는다.
 export class RunnerConfig {
-  private static readonly DEFAULT_CLI = 'claude';
-  private static readonly DEFAULT_CODEX_CLI = 'codex';
   /** apps/runner/src 기준 저장소의 skills/ */
   private static readonly DEFAULT_SKILLS = resolve(__dirname, '../../../skills');
   private static readonly SLOT = /^[1-9][0-9]?$/;
@@ -24,17 +23,19 @@ export class RunnerConfig {
     readonly serverUrl: string,
     /** run 권한을 준 기기의 토큰. AI CLI에게 주지 않는다. 서버 러너는 비워 두고 연결 값으로 받는다 */
     readonly deviceToken: string | null,
-    /** 이 컴퓨터의 AI CLI 로그인. 없으면 콘솔에 넣은 토큰을 일마다 서버에서 받는다 */
-    readonly claudeToken: string | null,
-    readonly cliPath: string,
+    /**
+     * 이 컴퓨터의 AI CLI 로그인 (엔진 이름 → 토큰, EngineAdapter.ownLogin의 환경 변수).
+     * 없는 엔진은 콘솔에 넣은 로그인을 일마다 서버에서 받는다
+     */
+    readonly ownLogins: Readonly<Record<string, string>>,
+    /** 엔진마다 실행 파일 (엔진 이름 → 경로, EngineAdapter.bin의 환경 변수). 없는 엔진은 어댑터의 기본값 (binOf) */
+    readonly bins: Readonly<Record<string, string>>,
     readonly skillsDir: string,
     /**
      * 서버 러너의 연결 값 파일 (서버와 러너만 보는 볼륨). 기기 토큰이 없으면 이 값을 내밀고 토큰을 받는다.
      * 토큰이 있으면 쓰지 않는다
      */
     readonly pairingFile: string | null = null,
-    /** Codex CLI. 지금은 웹 로그인(codex login --device-auth)에만 쓴다 */
-    readonly codexCliPath: string = RunnerConfig.DEFAULT_CODEX_CLI,
     /** 로그인된 브라우저의 CDP 주소 (browser-tabs 패키지). 없으면 브라우저 탭을 읽지 않는다 */
     readonly browserUrl: string | null = null,
     /**
@@ -70,11 +71,10 @@ export class RunnerConfig {
     return new RunnerConfig(
       RunnerConfig.address(env.CAIRN_RUNNER_URL ?? ''),
       token,
-      env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || null,
-      env.CAIRN_RUNNER_CLI?.trim() || RunnerConfig.DEFAULT_CLI,
+      RunnerConfig.ownLoginsOf(env),
+      RunnerConfig.binsOf(env),
       env.CAIRN_SKILLS_DIR?.trim() || RunnerConfig.DEFAULT_SKILLS,
       paired,
-      env.CAIRN_RUNNER_CODEX_CLI?.trim() || RunnerConfig.DEFAULT_CODEX_CLI,
       env.CAIRN_BROWSER_URL?.trim() ? RunnerConfig.browser(env.CAIRN_BROWSER_URL) : null,
       slot,
       slot === null ? null : RunnerConfig.agentOf(env, uid),
@@ -89,11 +89,10 @@ export class RunnerConfig {
     return new RunnerConfig(
       this.serverUrl,
       token,
-      this.claudeToken,
-      this.cliPath,
+      this.ownLogins,
+      this.bins,
       this.skillsDir,
       this.pairingFile,
-      this.codexCliPath,
       this.browserUrl,
       this.slot,
       this.agentUser,
@@ -105,6 +104,32 @@ export class RunnerConfig {
 
   get mcpUrl(): string {
     return `${this.serverUrl}/mcp`;
+  }
+
+  /** 엔진의 실행 파일. 설정에 없으면 어댑터의 기본값 (PATH에서 찾는 이름) */
+  binOf(engine: EngineAdapter): string {
+    return Object.hasOwn(this.bins, engine.name)
+      ? (this.bins[engine.name] as string)
+      : engine.bin.fallback;
+  }
+
+  /** 엔진마다 실행 파일 (CAIRN_RUNNER_CLI · CAIRN_RUNNER_CODEX_CLI). 비었으면 기본값 */
+  private static binsOf(env: Readonly<Record<string, string | undefined>>): Record<string, string> {
+    return Object.fromEntries(
+      EngineAdapters.list().map((e) => [e.name, env[e.bin.env]?.trim() || e.bin.fallback]),
+    );
+  }
+
+  /** 러너가 스스로 가진 로그인 (CLAUDE_CODE_OAUTH_TOKEN). 공백뿐인 값은 없는 것 */
+  private static ownLoginsOf(
+    env: Readonly<Record<string, string | undefined>>,
+  ): Record<string, string> {
+    return Object.fromEntries(
+      EngineAdapters.list().flatMap((e) => {
+        const token = e.ownLogin === null ? '' : (env[e.ownLogin]?.trim() ?? '');
+        return token ? [[e.name, token] as const] : [];
+      }),
+    );
   }
 
   /**

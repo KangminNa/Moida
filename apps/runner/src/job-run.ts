@@ -1,8 +1,9 @@
 import type { AiLogin } from './ai-login';
 import type { AiProcess, ChildExit } from './ai-process';
-import { type AiStream, type AiTool, AiTools } from './ai-tool';
+import type { AiStream, AiTool } from './ai-tool';
 import { Backoff, pause } from './backoff';
 import type { CairnServer } from './cairn-server';
+import { EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
@@ -53,7 +54,7 @@ export class JobRun {
   private loginVersion: number | null;
   /** 마지막으로 되돌려 쓴 자격 */
   private written: string | null = null;
-  /** 일의 도구 어댑터. 토큰이 없거나 모르는 도구면 null (perform이 시작 전에 끝낸다) */
+  /** 일의 엔진으로 만든 실행 어댑터. 토큰이 없거나 모르는 엔진이면 null (perform이 시작 전에 끝낸다) */
   private readonly tool: AiTool | null;
 
   constructor(
@@ -67,7 +68,8 @@ export class JobRun {
     /** 코드 러너 칸에서 하는 일의 앞뒤 (코드 · 만들기). 그 밖의 일은 null */
     private readonly stage: SandboxStage | null = null,
   ) {
-    this.tool = login.token === null ? null : AiTools.for(job.tool, login.token, config);
+    const engine = EngineAdapters.of(job.tool);
+    this.tool = engine && login.token !== null ? engine.tool(login.token, config) : null;
     // 자격 안의 토큰 (Codex auth.json의 access · refresh) · 외부 도구의 머리글 값까지 로그와 기록에서 지운다
     this.redactor = [...(this.tool?.secrets ?? []), ...job.runtime.secrets].reduce(
       (r, secret) => r.with(secret),
@@ -140,7 +142,7 @@ export class JobRun {
   /** 시작도 하지 않고 끝낼 일 */
   private refusal(): RunEnding | null {
     if (this.stop.aborted) return RunEnding.release(JobRun.STOPPING);
-    if (AiTools.SUPPORTED.includes(this.job.tool)) return null;
+    if (EngineAdapters.of(this.job.tool) !== null) return null;
     const error = `${this.job.tool}는 아직 러너가 지원하지 않아요`;
     return RunEnding.submit(error, RunResult.failed(error, this.redactor));
   }
@@ -244,12 +246,8 @@ export class JobRun {
     workspace: JobWorkspace,
     signal: AbortSignal,
   ): Promise<RunEnding | null> {
-    const batch = await OutputBatch.collect(
-      workspace.outputsDir,
-      workspace.outputsStage,
-      workspace.user,
-      signal,
-    );
+    const { outputsDir, outputsStage, user } = workspace;
+    const batch = await OutputBatch.collect(outputsDir, outputsStage, user, signal);
     for (const line of batch.skipped)
       this.note(new RunEvent(RunEvent.ERROR, `결과물에서 뺐어요: ${line}`, 0));
     if (batch.files.length === 0) return null;

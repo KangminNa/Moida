@@ -12,7 +12,7 @@ describe('러너 설정', () => {
   test('주소의 끝 슬래시를 떼고 기본값을 채운다', () => {
     const config = RunnerConfig.fromEnv(env);
     assert.equal(config.mcpUrl, 'https://blog.example/mcp');
-    assert.equal(config.cliPath, 'claude');
+    assert.deepEqual(config.bins, { claude: 'claude', codex: 'codex' });
     assert.ok(config.skillsDir.endsWith('/skills'));
   });
 
@@ -20,9 +20,10 @@ describe('러너 설정', () => {
     const config = RunnerConfig.fromEnv({
       ...env,
       CAIRN_RUNNER_CLI: '/opt/claude',
+      CAIRN_RUNNER_CODEX_CLI: ' /opt/codex ',
       CAIRN_SKILLS_DIR: '/opt/skills',
     });
-    assert.equal(config.cliPath, '/opt/claude');
+    assert.deepEqual(config.bins, { claude: '/opt/claude', codex: '/opt/codex' });
     assert.equal(config.skillsDir, '/opt/skills');
   });
 
@@ -42,12 +43,12 @@ describe('러너 설정', () => {
 
   test('Claude 토큰은 없어도 된다: 콘솔에 넣은 토큰을 서버에서 받는다', () => {
     const { CLAUDE_CODE_OAUTH_TOKEN: _, ...rest } = env;
-    assert.equal(RunnerConfig.fromEnv(rest).claudeToken, null);
-    assert.equal(
-      RunnerConfig.fromEnv({ ...rest, CLAUDE_CODE_OAUTH_TOKEN: '  ' }).claudeToken,
-      null,
+    assert.deepEqual(RunnerConfig.fromEnv(rest).ownLogins, {});
+    assert.deepEqual(
+      RunnerConfig.fromEnv({ ...rest, CLAUDE_CODE_OAUTH_TOKEN: '  ' }).ownLogins,
+      {},
     );
-    assert.equal(RunnerConfig.fromEnv(env).claudeToken, 'claude-secret');
+    assert.deepEqual(RunnerConfig.fromEnv(env).ownLogins, { claude: 'claude-secret' });
   });
 
   test('공백뿐인 값은 없는 것과 같다', () => {

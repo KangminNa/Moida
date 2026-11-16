@@ -1,9 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import { delimiter, join } from 'node:path';
-import { AiTools } from './ai-tool';
-import { ClaudeCli } from './claude-cli';
-import { CodexCli } from './codex-cli';
+import { EngineAdapters } from './engine-adapter';
 import type { RunnerConfig } from './runner-config';
 import { SigninTerminal } from './signin-terminal';
 
@@ -11,7 +9,7 @@ import { SigninTerminal } from './signin-terminal';
 // (서버는 쓸 수 있는 로그인을 알아서, 러너가 미리 토큰을 묻고 빌렸다 돌려줄 필요가 없다).
 //   tools        일할 수 있는 AI CLI: 설치돼 있고 이 러너가 그 도구로 일할 줄 안다
 //   signinTools  웹 로그인을 대신 돌릴 수 있는 CLI: 설치돼 있고 PTY(script)를 만들 수 있다
-//   ownLogins    러너가 스스로 가진 로그인 (환경 변수의 Claude 토큰)
+//   ownLogins    러너가 스스로 가진 로그인 (엔진의 환경 변수 토큰, 지금은 Claude의 CLAUDE_CODE_OAUTH_TOKEN)
 //   browser      서버 브라우저에 붙어 있는가: 서버 러너(연결 값 파일)이고 CAIRN_BROWSER_URL이 있을 때만.
 //                내 컴퓨터 러너의 브라우저는 탭 읽기에만 쓴다 (평소 쓰는 계정에 가까워 AI에게 맡기지 않는다).
 //                사이트 일(대상이 있는 브라우저 작업)이 도는 동안은 알리지 않는다 (withoutBrowser: 한 번에 하나, 둘러보기는 여럿)
@@ -40,27 +38,23 @@ export class RunnerAbility {
     env: Readonly<Record<string, string | undefined>> = process.env,
   ): RunnerAbility {
     const has = (bin: string) => RunnerAbility.installed(bin, env.PATH ?? '');
-    const clis = [
-      [ClaudeCli.TOOL, config.cliPath],
-      [CodexCli.TOOL, config.codexCliPath],
-    ]
-      .filter(([, bin]) => has(bin as string))
-      .map(([tool]) => tool as string);
+    // 러너가 아는 엔진 가운데 설치된 것 (엔진 목록의 순서)
+    const clis = EngineAdapters.list().filter((engine) => has(config.binOf(engine)));
+    const names = clis.map((engine) => engine.name);
     // 리눅스는 러너가 죽어도 로그인 명령이 남지 않게 timeout으로 감싼다 (SigninTerminal)
     const pty =
       SigninTerminal.supported && has('script') && (process.platform !== 'linux' || has('timeout'));
     return new RunnerAbility(
-      clis.filter((tool) => AiTools.SUPPORTED.includes(tool)),
-      pty ? clis : [],
-      config.claudeToken === null ? [] : [ClaudeCli.TOOL],
+      names,
+      pty ? names : [],
+      EngineAdapters.names().filter((name) => Object.hasOwn(config.ownLogins, name)),
       config.browserUrl !== null && config.pairingFile !== null && config.slot === null,
       config.slot,
       env.CAIRN_RUNNER_BUILD?.trim() || RunnerAbility.gitBuild() || 'unknown',
       Object.fromEntries(
-        clis.flatMap((tool) => {
-          const bin = tool === ClaudeCli.TOOL ? config.cliPath : config.codexCliPath;
-          const version = RunnerAbility.versionOf(bin, env);
-          return version === null ? [] : [[tool, version] as const];
+        clis.flatMap((engine) => {
+          const version = RunnerAbility.versionOf(config.binOf(engine), env);
+          return version === null ? [] : [[engine.name, version] as const];
         }),
       ),
     );

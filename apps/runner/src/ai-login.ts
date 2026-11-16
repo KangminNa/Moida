@@ -1,5 +1,4 @@
 import type { CairnServer } from './cairn-server';
-import { ClaudeCli } from './claude-cli';
 import type { Job } from './job';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
 
@@ -30,14 +29,15 @@ export class AiLogins {
 
   constructor(
     private readonly server: Pick<CairnServer, 'aiLogin'>,
-    private readonly envToken: string | null,
+    /** 러너가 스스로 가진 로그인 (엔진 이름 → 토큰, RunnerConfig.ownLogins) */
+    private readonly own: Readonly<Record<string, string>>,
   ) {}
 
   /** 받지 못하면 왜 못 받았는지 담아 돌려준다. 기기 토큰이 틀린 것처럼 사람이 고쳐야 하는 오류만 던진다 */
   async forJob(job: Job): Promise<AiLogin> {
-    // 환경 변수의 토큰은 Claude의 것이다 (CLAUDE_CODE_OAUTH_TOKEN). 다른 도구의 일에는 서버의 로그인을 받는다
-    if (this.envToken !== null && job.tool === ClaudeCli.TOOL && !job.isAiTest)
-      return AiLogin.of(this.envToken);
+    // 환경 변수의 토큰은 그 엔진의 것이다 (Claude의 CLAUDE_CODE_OAUTH_TOKEN). 다른 엔진의 일에는 서버의 로그인을 받는다
+    if (Object.hasOwn(this.own, job.tool) && !job.isAiTest)
+      return AiLogin.of(this.own[job.tool] as string);
     try {
       const { token, version } = await this.server.aiLogin(job.tool);
       return token ? AiLogin.of(token, version) : AiLogin.missing(AiLogins.EMPTY);
