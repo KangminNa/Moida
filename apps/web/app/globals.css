@@ -575,6 +575,27 @@ body:has(.console) > .source {
   font-weight: 600;
 }
 
+/* 승인 카드 안의 서버 브라우저 화면 (로그인 필요, 2026-11-17): 페이지 전체를 카드 폭에 맞춰 보인다.
+   크게 보기는 화면을 가득 채운다. 카드가 독 위로 올라와야 해서 그동안 카드의 쌓임 순서를 올린다 */
+.screen-embed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.screen-embed.large {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow: auto;
+  padding: 16px;
+  background: var(--bg);
+}
+
+.console-work:has(.screen-embed.large) {
+  z-index: 30;
+}
+
 /* 독의 화면 사이: 카드가 위아래로 넘어간다 (page-flip.ts가 방향을 정한다). 움직임 줄이기면 끈다 */
 @view-transition {
   navigation: auto;

@@ -29,7 +29,25 @@ describe('멈춘 자리 (browser-stop.json)', () => {
       ['final_click', 'https://blog.example/write', 'button', '게시', 0, '제목과 본문을 채웠어요'],
     );
     const login = BrowserStop.of({ stop: 'login', page_url: 'https://accounts.example/login' });
-    assert.deepEqual([login.kind, login.button], ['login', null]);
+    assert.deepEqual([login.kind, login.button, login.reason], ['login', null, null]);
+  });
+
+  test('login의 까닭은 한 줄 · 괄호 없이 · 30자까지', () => {
+    const of = (reason: unknown) =>
+      BrowserStop.of({ stop: 'login', page_url: 'https://a.example/x', reason }).reason;
+    assert.equal(of('캡차'), '캡차');
+    assert.equal(of('  본인 인증\n(문자)  '), '본인 인증 문자');
+    assert.equal(of('가'.repeat(50))?.length, 30);
+    assert.equal(of('   '), null);
+    assert.equal(of(3), null);
+    // final_click에는 까닭이 없다
+    const click = BrowserStop.of({
+      stop: 'final_click',
+      page_url: 'https://a.example/x',
+      button: { role: 'button', name: '게시' },
+      reason: '캡차',
+    });
+    assert.equal(click.reason, null);
   });
 
   test('틀린 모양은 붙잡지 않는다', () => {

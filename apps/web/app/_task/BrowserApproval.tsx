@@ -5,14 +5,21 @@ import { useState } from 'react';
 import { api } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
 import { useLiveValue } from '../_lib/use-live';
+import { Screen } from '../_plugins/installed/browser-tabs/Screen';
+import { callFor } from '../_plugins/packages';
 import { LOGGED_IN_NOTE } from './labels';
 import type { Approval, BrowserClick, BrowserShot, BrowserShots } from './types';
 
 // browser-tabs 패키지의 승인 두 가지 (2차 3단계 서버 브라우저 목표). 무엇을 승인하는지는 패키지가 기록한 것을 읽는다 (에이전트의 메모가 아니라).
 //   승인된 클릭(browser.site.publish, 대상 browser_click): 페이지 · 버튼 · 멈춘 화면(버튼 자리에 테두리). 승인하면 러너가 같은 버튼인지 보고 누른다
-//   로그인 필요(browser.site.login, 대상 browser_site): 로그인 화면. 콘솔 화면에서 로그인한 뒤 "로그인했어요"(수정 요청)로 같은 작업을 잇는다
+//   로그인 필요(browser.site.login, 대상 browser_site): 로그인 · 가입 · 본인 인증 · 캡차처럼 사람이 해야 하는 화면.
+//     카드 안에서 서버 브라우저의 그 탭을 열어 바로 하고(2026-11-17, 패키지의 Screen을 pin으로), "로그인했어요"(수정 요청)로 같은 작업을 잇는다
 
 const BROWSER_PAGE = '/admin/p/browser-tabs';
+/** 카드 안 화면이 패키지 API를 부르는 길 (콘솔의 브라우저 화면과 같다, 관리자만) */
+const browserCall = callFor('browser-tabs');
+/** 러너가 승인 메모 앞에 적는 까닭: "확인 필요(캡차): …" (apps/runner browse-stage.ts의 needLogin과 같게) */
+const REASON = /^확인 필요\((.+?)\)/;
 const CLICK_STATUS: Record<string, string> = {
   held: '승인 대기',
   approved: '누를 차례',
@@ -135,16 +142,30 @@ export function LoginTarget({ approval }: { approval: Approval }) {
         : Promise.resolve({ ok: true, data: null } as const),
     [],
   );
+  // 기다리는 동안의 메모는 러너가 남긴 요청 메모다 (정한 뒤에는 결정의 말로 바뀐다)
+  const pending = approval.status === 'pending';
+  const reason = pending ? (REASON.exec(approval.note ?? '')?.[1] ?? null) : null;
   return (
     <section className="preview" aria-label="로그인 필요">
-      <b>로그인이 풀렸어요</b>
+      <b>{reason ? `확인이 필요해요 · ${reason}` : '로그인이 풀렸어요'}</b>
       {login && <p className="label-mono">{login.url}</p>}
-      {shot.data && <MarkedShot image={shot.data.image} box={null} label="로그인 화면" />}
-      <p className="note">
-        <Link href={BROWSER_PAGE}>브라우저 화면</Link>에서 그 사이트에 로그인(2단계 인증 포함)한 뒤
-        “{LOGGED_IN_NOTE}”를 누르면 같은 작업이 처음부터 이어서 해요. 비밀번호는 어디에도 남지
-        않아요
-      </p>
+      {shot.data && <MarkedShot image={shot.data.image} box={null} label="멈춘 화면" />}
+      {pending && login ? (
+        <>
+          <p className="note">
+            아래 화면을 열어 그 사이트에서 직접 로그인 · 인증(2단계 인증 포함)한 뒤 “
+            {LOGGED_IN_NOTE}
+            ”를 누르면 같은 작업이 처음부터 이어서 해요. 비밀번호는 어디에도 남지 않아요
+          </p>
+          <Screen call={browserCall} pin={{ url: login.url }} />
+        </>
+      ) : (
+        <p className="note">
+          <Link href={BROWSER_PAGE}>브라우저 화면</Link>에서 그 사이트에 로그인(2단계 인증 포함)한
+          뒤 “{LOGGED_IN_NOTE}”를 누르면 같은 작업이 처음부터 이어서 해요. 비밀번호는 어디에도 남지
+          않아요
+        </p>
+      )}
     </section>
   );
 }

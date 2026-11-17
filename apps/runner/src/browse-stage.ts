@@ -194,7 +194,9 @@ export class BrowseStage implements SandboxStage {
     }
     const tab = await this.tabOf(stop.pageUrl, signal);
     if (stop.kind === 'login')
-      return (await this.needLogin(site, stop.pageUrl, tab, signal, note, redactor)) ?? done;
+      return (
+        (await this.needLogin(site, stop.pageUrl, tab, signal, note, redactor, stop.reason)) ?? done
+      );
     if (tab === null) return failed('멈춘 페이지의 탭을 찾지 못했어요');
     let held: HeldButton;
     try {
@@ -266,6 +268,8 @@ export class BrowseStage implements SandboxStage {
     signal: AbortSignal,
     note: Note,
     redactor: Redactor,
+    /** 로그인이 아닌 까닭 (가입 · 본인 인증 · 캡차 …). 카드가 메모 앞의 "확인 필요(까닭)"을 읽어 제목으로 쓴다 */
+    reason: string | null = null,
   ): Promise<RunEnding | null> {
     const image = tab ? await this.pages.shot(tab, signal) : null;
     try {
@@ -280,14 +284,22 @@ export class BrowseStage implements SandboxStage {
         targetKind: 'browser_site',
         targetId: target.siteId,
         targetVersion: target.siteVersion,
-        note: `로그인 필요: ${site.name}. 브라우저 화면에서 로그인한 뒤 "로그인했어요"를 눌러 주세요`,
+        note: reason
+          ? `확인 필요(${reason}): ${site.name}. 화면에서 직접 한 뒤 "로그인했어요"를 눌러 주세요`
+          : `로그인 필요: ${site.name}. 화면에서 로그인한 뒤 "로그인했어요"를 눌러 주세요`,
       };
     } catch (error) {
       if (!(error instanceof ToolRefused || error instanceof ServerUnreachable)) throw error;
       const message = `로그인 필요를 남기지 못했어요: ${error.message}`;
       return RunEnding.submit(message, RunResult.failed(message, redactor));
     }
-    note(new RunEvent(RunEvent.WRITE, `로그인이 필요해요: ${site.name}`, 0));
+    note(
+      new RunEvent(
+        RunEvent.WRITE,
+        reason ? `확인이 필요해요(${reason}): ${site.name}` : `로그인이 필요해요: ${site.name}`,
+        0,
+      ),
+    );
     return null;
   }
 
