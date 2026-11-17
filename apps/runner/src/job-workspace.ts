@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import type { AgentUser } from './agent-user';
 import type { Job, SkillPackage } from './job';
+import type { LineagePlace } from './lineage-store';
 import type { PromptPack } from './prompt-pack';
 import type { SandboxRoom } from './sandbox-room';
 import type { SharedCopy, SharedFolders } from './shared-folders';
@@ -14,6 +15,9 @@ import type { SharedCopy, SharedFolders } from './shared-folders';
 //   home/      빈 홈
 //   work/outputs/ AI가 사람에게 줄 파일을 두는 곳. 일이 잘 끝나면 러너가 결과물로 올린다 (OutputBatch)
 //   mcp.json   작업 토큰이 든 MCP 설정 (600). work 밖에 두어 AI가 파일로 읽지 못하게 한다. 연결 확인에는 없다
+//   work/.cairn/memo.md  인수인계 메모 (작업 세션에 기록하는 일, 2026-11-17). 러너가 끝에 읽어 save_run_record로 보낸다.
+//                        칸의 일은 저장소 사본 밖의 memo/memo.md (커밋 · PR에 섞이지 않게)
+// CLI 세션을 남기는 일(LineagePlace)은 임시 자리 대신 세션 키의 고정 자리를 비우고 다시 쓴다: 같은 작업 폴더 경로라야 재개된다.
 // 코드 러너 칸의 일(코드 · 만들기)은 칸의 자리(SandboxRoom) 안에 둔다: work는 그 자리의 work/(코드 작업은 저장소 사본),
 // 홈은 home/, 설정은 ai/, 만들기 작업의 재료는 inputs/.
 // 러너(root)가 써 둔 뒤 agent에게 넘긴다 (handOver). 셸이 있으니 mcp.json의 작업 토큰은 AI가 읽을 수 있다: 그 에이전트의 것이다.
@@ -30,6 +34,10 @@ export class JobWorkspace {
     readonly skillReady: boolean,
     /** 코드 러너 칸의 자리. 있으면 AI는 그 자리의 agent로 돈다 */
     private readonly room: SandboxRoom | null = null,
+    /** 세션 키의 고정 자리. 있으면 지울 때 세션 파일만 남긴다 */
+    private readonly place: LineagePlace | null = null,
+    /** 인수인계 메모 파일을 두었는가 */
+    private readonly memoReady = false,
   ) {}
 
   /** 내 컴퓨터 러너가 나눈 폴더를 복사한 결과 (handOver). 없으면 null */
@@ -47,12 +55,19 @@ export class JobWorkspace {
     room: SandboxRoom | null = null,
     /** 서버가 실어 보낸 스킬. 있으면 디스크의 skills/ 대신 이것을 깐다 */
     skillPackage: SkillPackage | null = null,
+    /** 세션 키의 고정 자리 (CLI 세션을 남기는 일). 있으면 그 자리를 비우고 다시 쓴다 (세션 파일은 남는다) */
+    place: LineagePlace | null = null,
+    /** 인수인계 메모 파일을 둘까 (작업 세션에 기록하는 일) */
+    memo = false,
   ): Promise<JobWorkspace> {
-    const root = room ? room.aiDir : await mkdtemp(join(await realpath(tmpdir()), 'cairn-run-'));
+    await place?.clear();
+    const root = room
+      ? room.aiDir
+      : (place?.root ?? (await mkdtemp(join(await realpath(tmpdir()), 'cairn-run-'))));
     if (room) await mkdir(root, { mode: 0o700 });
     await chmod(root, 0o700);
     for (const dir of room ? ['config'] : ['work', 'config', 'home', join('work', 'outputs')])
-      await mkdir(join(root, dir));
+      await mkdir(join(root, dir), { recursive: true });
     if (mcpConfig !== null) {
       await writeFile(join(root, 'mcp.json'), mcpConfig, { mode: 0o600, flag: 'wx' });
       await chmod(join(root, 'mcp.json'), 0o600);
@@ -62,7 +77,13 @@ export class JobWorkspace {
     const skillReady = skillPackage
       ? JobWorkspace.installPackage(skillPackage, root)
       : skill !== null && JobWorkspace.install(skill, skillsDir, root);
-    return new JobWorkspace(root, mcpConfig !== null, skillReady, room);
+    const workspace = new JobWorkspace(root, mcpConfig !== null, skillReady, room, place, memo);
+    const memoPath = workspace.memoPath;
+    if (memoPath !== null) {
+      await mkdir(dirname(memoPath), { recursive: true });
+      await writeFile(memoPath, '');
+    }
+    return workspace;
   }
 
   /**
@@ -120,9 +141,27 @@ export class JobWorkspace {
     return join(this.root, 'mcp.json');
   }
 
-  /** 코드 러너 칸의 자리는 SandboxRoom이 agent 프로세스를 끈 뒤 지운다 */
+  /** 인수인계 메모 파일. 기록하지 않는 일이면 null */
+  get memoPath(): string | null {
+    if (!this.memoReady) return null;
+    return this.room ? join(this.root, 'memo', 'memo.md') : join(this.workDir, '.cairn', 'memo.md');
+  }
+
+  /** AI가 쓴 인수인계 메모 (앞뒤 공백 없이). 없거나 너무 길면 maxChars까지. 칸이면 agent 권한으로 읽는다 */
+  async readMemo(maxChars: number): Promise<string> {
+    const path = this.memoPath;
+    if (path === null) return '';
+    const bytes = maxChars * 4;
+    const text = this.room
+      ? await this.room.agent.readFile(path, bytes)
+      : await readFile(path, 'utf8').catch(() => null);
+    return (text ?? '').trim().slice(0, maxChars);
+  }
+
+  /** 코드 러너 칸의 자리는 SandboxRoom이 agent 프로세스를 끈 뒤 지운다. 세션 키의 자리는 세션 파일만 남긴다 */
   async remove(): Promise<void> {
     if (this.room) return;
+    if (this.place) return this.place.clear();
     await rm(this.root, { recursive: true, force: true });
   }
 

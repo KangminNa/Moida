@@ -1,11 +1,13 @@
 import { ApprovedClick, BrowseJob } from './browse-job';
 import type { HeldButton } from './browser-page';
 import { Job } from './job';
+import { RunMemo } from './job-lineage';
 import type { Json } from './json';
 import type { McpClient } from './mcp-client';
 import { NoteSource } from './note-source';
 import { PageBase } from './page-base';
 import { type ProgressBatch, ProgressState, type RunResult } from './progress';
+import type { RunRecordBody } from './run-recorder';
 import type { RunnerAbility } from './runner-ability';
 import { SiteToolCalls } from './site-tool-calls';
 
@@ -94,6 +96,9 @@ export class CairnServer {
       ...(batch.requestId === null ? {} : { request_id: batch.requestId }),
       ...(batch.planUsage.length === 0 ? {} : { plan_usage: batch.planUsage }),
       ...(batch.model === null ? {} : { model: batch.model }),
+      ...(batch.session === null
+        ? {}
+        : { cli_session: batch.session.id, resumed: batch.session.resumed }),
     });
     return ProgressState.from(body);
   }
@@ -108,6 +113,17 @@ export class CairnServer {
         : { result: { ...(result.text === null ? {} : { text: result.text }), ...result.extra } }),
       ...(result.error === null ? {} : { error: result.error }),
     });
+  }
+
+  /** 같은 세션 키의 지난 인수인계 메모 (run_memos, 2026-11-17). 오래된 것부터 */
+  async runMemos(taskId: string): Promise<readonly RunMemo[]> {
+    const body = await this.mcp.call('run_memos', { task_id: taskId });
+    return body.list('memos').map((memo) => RunMemo.from(memo));
+  }
+
+  /** 이번 실행의 원문 · 인수인계 메모를 작업 세션에 쌓는다 (save_run_record). 같은 request_id는 한 번만 쌓인다 */
+  async saveRunRecord(taskId: string, record: RunRecordBody): Promise<void> {
+    await this.mcp.call('save_run_record', { task_id: taskId, ...record.toJSON() });
   }
 
   async release(taskId: string, reason: string): Promise<void> {

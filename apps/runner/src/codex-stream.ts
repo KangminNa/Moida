@@ -2,6 +2,7 @@ import type { AiStream } from './ai-tool';
 import { type ConnectorCall, ConnectorCalls } from './connector-calls';
 import { Json } from './json';
 import { type PlanWindow, RunEvent } from './progress';
+import { RunTranscript } from './run-transcript';
 
 // codex exec --json의 줄을 실행 기록으로 바꾼다. 한 줄 = 사건 하나 (Codex 0.164.0으로 확인한 모양).
 //   item.started  mcp_tool_call     →  read · write. 허락하지 않은 서버면 격리가 깨진 것
@@ -49,6 +50,8 @@ export class CodexStream implements AiStream {
   private failureText: string | null = null;
   private lastError: string | null = null;
   private breachText: string | null = null;
+  private thread: string | null = null;
+  readonly transcript = new RunTranscript();
 
   constructor(
     /** 이 실행에서 허락한 MCP 서버. 그 밖의 서버의 도구를 부르면 격리가 깨진 것 */
@@ -79,10 +82,25 @@ export class CodexStream implements AiStream {
     return [];
   }
 
+  /** thread.started의 thread_id. Codex는 늘 새로 시작해(--ephemeral) 재개하지 않고 기록에만 남긴다 */
+  get sessionId(): string | null {
+    return this.thread;
+  }
+
+  /** 한 줄을 읽는다. 만든 기록은 원문에도 남긴다 */
   read(line: string): readonly RunEvent[] {
+    const events = this.parse(line);
+    this.transcript.did(events);
+    return events;
+  }
+
+  private parse(line: string): readonly RunEvent[] {
     const event = Json.parse(line);
     if (event === null) return [];
     switch (event.text('type')) {
+      case 'thread.started':
+        this.thread = event.optionalText('thread_id') ?? this.thread;
+        return [];
       case 'item.started':
         return this.started(event.child('item'));
       case 'item.completed':
@@ -120,6 +138,7 @@ export class CodexStream implements AiStream {
     switch (item.text('type')) {
       case 'agent_message':
         this.lastText = item.text('text') || this.lastText;
+        this.transcript.said(item.text('text'));
         return [];
       case 'mcp_tool_call':
         return this.toolFailed(item);

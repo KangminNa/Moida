@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import { AiProcess } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { BrowserMcp } from './browser-mcp';
@@ -8,6 +9,8 @@ import type { EngineAdapter } from './engine-adapter';
 import type { ExternalMcp } from './external-mcp';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
+import type { LineagePlace } from './lineage-store';
+import { MemoHook } from './memo-hook';
 import type { PromptPack } from './prompt-pack';
 import type { RunnerConfig } from './runner-config';
 import type { SandboxRoom } from './sandbox-room';
@@ -71,6 +74,12 @@ export class ClaudeCli implements AiTool {
   private runtime = CliRuntime.NONE;
   /** 이 일에 붙인 외부 도구 (2차 7단계). MCP가 붙는 일이고 셸이 없을 때만 */
   private tools: readonly ExternalMcp[] = [];
+  /** 세션 파일을 남기는가: 세션 키의 고정 자리에서 도는 일 (2026-11-17) */
+  private keep = false;
+  /** 재개할 CLI 세션. 새로 시작하면 null */
+  private resumeFrom: string | null = null;
+  /** 인수인계 메모를 쓰게 하는가 (작업 세션에 기록하는 일): Stop 훅을 단다 */
+  private memo = false;
   /** --effort가 받는 값 (Claude Code 2.1의 도움말). 모르는 값은 넘기지 않고 CLI의 기본으로 */
   static readonly EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -83,24 +92,38 @@ export class ClaudeCli implements AiTool {
     private readonly browserUrl: string | null = null,
   ) {}
 
-  /** 작업 자리: work 밖의 mcp.json(작업 토큰), 설정 폴더의 권한 설정과 스킬 */
-  open(job: Job, room: SandboxRoom | null = null): Promise<JobWorkspace> {
+  /**
+   * 작업 자리: work 밖의 mcp.json(작업 토큰), 설정 폴더의 권한 설정과 스킬.
+   * place가 있으면 세션 키의 고정 자리에서 세션 파일을 남기고, 러너가 정한 세션(job.lineage.resumeFrom)을 재개한다
+   */
+  async open(
+    job: Job,
+    room: SandboxRoom | null = null,
+    place: LineagePlace | null = null,
+  ): Promise<JobWorkspace> {
     const { runToken } = job;
     this.browser = runToken === null ? null : BrowserMcp.for(job, this.browserUrl);
     this.shell = job.sandboxed && room !== null && runToken !== null;
     this.web = runToken !== null;
     this.runtime = job.runtime;
     this.tools = runToken === null || job.sandboxed ? [] : job.runtime.tools;
-    return JobWorkspace.open(
+    this.memo = runToken !== null && job.lineage !== null;
+    this.keep = place !== null;
+    this.resumeFrom = place === null ? null : (job.lineage?.resumeFrom ?? null);
+    const workspace = await JobWorkspace.open(
       runToken === null
         ? null
         : ClaudeCli.mcpConfig(this.mcpUrl, runToken, this.browser, this.tools),
-      ClaudeCli.settings(process.env.HOME),
+      ClaudeCli.settings(process.env.HOME, this.memo),
       job.skill,
       this.skillsDir,
       room,
       job.skillPackage,
+      place,
+      this.memo,
     );
+    if (this.memo) await MemoHook.install(workspace.configDir);
+    return workspace;
   }
 
   stream(): AiStream {
@@ -152,19 +175,24 @@ export class ClaudeCli implements AiTool {
    * 작업 폴더 밖 읽기는 물어도 답할 사람이 없어 어차피 거절되지만, deny는 묻지도 않고 권한 모드가 바뀌어도 남는다.
    * HOME은 빈 임시 폴더로 바꾸므로 `~`가 아니라 절대 경로로 적는다. 앞의 //가 절대 경로라는 표시다.
    */
-  static settings(ownerHome: string | undefined): string {
+  static settings(ownerHome: string | undefined, memoHook = false): string {
     const home = ownerHome?.replace(/\/+$/, '');
     const deny = home ? ClaudeCli.FILE_TOOLS.map((tool) => `${tool}(/${home}/**)`) : [];
-    return JSON.stringify({ permissions: { deny } });
+    return JSON.stringify({
+      permissions: { deny },
+      ...(memoHook ? { hooks: MemoHook.settings() } : {}),
+    });
   }
 
   args(workspace: JobWorkspace): readonly string[] {
+    // 세션 파일은 세션 키의 고정 자리에서만 남긴다 (재개, 2026-11-17). 그 밖의 일은 남기지 않는다
     const print = [
       '-p',
       '--output-format',
       'stream-json',
       '--verbose',
-      '--no-session-persistence',
+      ...(this.keep ? [] : ['--no-session-persistence']),
+      ...(this.resumeFrom === null ? [] : ['--resume', this.resumeFrom]),
       '--strict-mcp-config',
       ...this.runtimeArgs(),
     ];
@@ -192,6 +220,10 @@ export class ClaudeCli implements AiTool {
       // 코드 러너 칸의 결과물 폴더는 저장소(작업 폴더) 밖이라 따로 열어 준다. 값을 여럿 받는 옵션이라 다음 옵션 앞에 둔다
       ...(workspace.outputsStage === null ? [] : ['--add-dir', workspace.outputsDir]),
       ...(workspace.inputsDir === null ? [] : ['--add-dir', workspace.inputsDir]),
+      // 칸의 일은 인수인계 메모를 저장소 사본 밖에 둔다 (그 밖의 일은 작업 폴더 안이라 따로 열지 않는다)
+      ...(workspace.memoPath === null || workspace.outputsStage === null
+        ? []
+        : ['--add-dir', dirname(workspace.memoPath)]),
       '--permission-mode',
       'acceptEdits',
     ];
@@ -206,10 +238,13 @@ export class ClaudeCli implements AiTool {
     ];
   }
 
+  /** memoReason: 메모가 비었을 때 Stop 훅이 막는 까닭 (지시문 틀 memo-stop). 메모를 쓰지 않는 일은 null */
   env(
     workspace: JobWorkspace,
     parent: Readonly<Record<string, string | undefined>>,
+    memoReason: string | null = null,
   ): Readonly<Record<string, string>> {
+    const memo = workspace.memoPath;
     const passed = ClaudeCli.PASSED_ENV.flatMap((name) => {
       const value = parent[name];
       return value === undefined ? [] : [[name, value] as const];
@@ -221,6 +256,9 @@ export class ClaudeCli implements AiTool {
       ...(workspace.tmpDir === null ? {} : { TMPDIR: workspace.tmpDir }),
       CLAUDE_CONFIG_DIR: workspace.configDir,
       CLAUDE_CODE_OAUTH_TOKEN: this.oauthToken,
+      ...(memo === null || memoReason === null
+        ? {}
+        : { [MemoHook.FILE_ENV]: memo, [MemoHook.REASON_ENV]: memoReason }),
     };
   }
 
@@ -230,12 +268,14 @@ export class ClaudeCli implements AiTool {
     prompts: PromptPack,
     onLine: (line: string) => void,
   ): AiProcess {
+    const memo = workspace.memoPath;
+    const reason = memo === null ? null : prompts.fill('memo-stop', { path: memo });
     return new AiProcess(
       this.bin,
       this.args(workspace),
       workspace.workDir,
-      this.env(workspace, process.env),
-      job.prompt(prompts, workspace.skillReady, null, workspace.outputsDir),
+      this.env(workspace, process.env, reason),
+      job.prompt(prompts, workspace.skillReady, null, workspace.outputsDir, memo),
       onLine,
       workspace.user,
     );
@@ -248,6 +288,7 @@ export class ClaudeEngine implements EngineAdapter {
   readonly efforts = ClaudeCli.EFFORTS;
   readonly bin = { env: 'CAIRN_RUNNER_CLI', fallback: 'claude' };
   readonly ownLogin = 'CLAUDE_CODE_OAUTH_TOKEN';
+  readonly resumes = true;
   readonly signin = new ClaudeSignin();
 
   tool(credential: string, config: RunnerConfig): AiTool {

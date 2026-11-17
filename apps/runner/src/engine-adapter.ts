@@ -44,6 +44,11 @@ export interface EngineAdapter {
   readonly bin: { readonly env: string; readonly fallback: string };
   /** 러너가 스스로 가질 수 있는 로그인의 환경 변수. 없으면 null */
   readonly ownLogin: string | null;
+  /**
+   * CLI 세션을 남기고 재개하며, 인수인계 메모를 Stop 훅으로 챙기는가 (2026-11-17). 아니면 늘 새로 시작하고
+   * 메모는 지시문으로만 부탁한다 (쓰지 않으면 러너가 대신 만든다)
+   */
+  readonly resumes: boolean;
   /** 일의 자격으로 실행 어댑터를 만든다 (일마다 새로) */
   tool(credential: string, config: RunnerConfig): AiTool;
   readonly signin: EngineSignin;

@@ -2,6 +2,7 @@ import type { AiStream } from './ai-tool';
 import { type ConnectorCall, ConnectorCalls } from './connector-calls';
 import { Json } from './json';
 import { PlanWindow, RunEvent } from './progress';
+import { RunTranscript } from './run-transcript';
 
 // claude -p --output-format stream-json의 줄을 실행 기록으로 바꾼다. 한 줄 = JSON 객체 하나.
 //   system(init)  →  붙은 MCP 서버를 본다
@@ -51,6 +52,8 @@ export class ClaudeStream implements AiStream {
   /** 셸을 열지 않은 일에서 셸을 쓴 명령 (설정이 먹지 않은 것) */
   private shellUsed: string | null = null;
   private planWindows: readonly PlanWindow[] = [];
+  private session: string | null = null;
+  readonly transcript = new RunTranscript();
 
   constructor(
     /** 이 실행에서 허락한 MCP 서버. 그 밖의 서버가 보이면 격리가 깨진 것 */
@@ -92,8 +95,19 @@ export class ClaudeStream implements AiStream {
     return windows;
   }
 
-  /** 한 줄을 읽는다. JSON이 아니거나 모르는 줄은 넘어간다 */
+  /** CLI가 처음에 알린 세션 id (system/init). 모르면 null */
+  get sessionId(): string | null {
+    return this.session;
+  }
+
+  /** 한 줄을 읽는다. JSON이 아니거나 모르는 줄은 넘어간다. 만든 기록은 원문에도 남긴다 */
   read(line: string): readonly RunEvent[] {
+    const events = this.parse(line);
+    this.transcript.did(events);
+    return events;
+  }
+
+  private parse(line: string): readonly RunEvent[] {
     const event = Json.parse(line);
     if (event === null) return [];
     switch (event.text('type')) {
@@ -125,6 +139,7 @@ export class ClaudeStream implements AiStream {
     }
     if (subtype !== 'init') return [];
     this.modelName = event.optionalText('model') ?? this.modelName;
+    this.session = event.optionalText('session_id') ?? this.session;
     const servers = event.list('mcp_servers');
     this.strayServers = servers
       .map((server) => server.text('name'))
@@ -142,6 +157,7 @@ export class ClaudeStream implements AiStream {
     for (const block of message.list('content')) {
       if (block.text('type') === 'text') {
         this.lastText = block.text('text') || this.lastText;
+        this.transcript.said(block.text('text'));
       } else if (block.text('type') === 'tool_use') {
         const name = block.text('name');
         this.calls.called(ConnectorCalls.serverOf(name) ?? '', block.text('id'));

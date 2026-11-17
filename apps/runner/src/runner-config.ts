@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs';
-import { basename, isAbsolute, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, isAbsolute, join, resolve, sep } from 'node:path';
 import { AgentUser } from './agent-user';
 import { type EngineAdapter, EngineAdapters } from './engine-adapter';
 import { SharedFolders } from './shared-folders';
@@ -51,6 +52,8 @@ export class RunnerConfig {
     readonly folders: SharedFolders | null = null,
     /** 동시에 하는 일의 수 (CAIRN_RUNNER_CONCURRENCY). 코드 러너 칸은 늘 1 */
     readonly concurrency = 1,
+    /** 세션 키마다 CLI 세션 파일을 24시간 남기는 폴더 (LineageStore, 2026-11-17). 러너 사용자의 홈 아래 */
+    readonly lineagesDir: string = join(homedir(), '.cache', 'cairn-runner', 'lineages'),
   ) {}
 
   /** uid: 이 프로세스의 사용자 (시험이 바꿔 끼운다) */
@@ -99,6 +102,7 @@ export class RunnerConfig {
       this.workDir,
       this.folders,
       this.concurrency,
+      this.lineagesDir,
     );
   }
 

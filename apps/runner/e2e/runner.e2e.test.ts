@@ -578,6 +578,75 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(task.result, null);
   });
 
+  test('끝나면 원문과 AI가 쓴 인수인계 메모를 작업 세션에 쌓는다 (2026-11-17)', async () => {
+    const agent = await newAgent();
+    const created = await newTask(agent, '[fake:memo=한 일: 초안 저장. 남은 일: 사진 고르기]');
+    await taskIn(created.id, 'done');
+    const db = api.service(Database);
+    const [memo] = await db.sql`
+      SELECT memo, written_by, lineage, run_seq FROM vault.run_memos WHERE task_id = ${String(created.id)}`;
+    assert.deepEqual(
+      [memo?.memo, memo?.written_by, memo?.lineage, memo?.run_seq],
+      ['한 일: 초안 저장. 남은 일: 사진 고르기', 'ai', `task:${created.id}`, 1],
+    );
+    const [run] = await db.sql`
+      SELECT cli_session, resumed FROM task.task_runs WHERE task_id = ${String(created.id)}`;
+    assert.ok(run?.cli_session, 'CLI 세션 id를 첫 보고로 남긴다');
+    assert.equal(run?.resumed, false);
+    const [session] = await db.sql`
+      SELECT s.transcript_count, t.text FROM vault.sessions s
+      JOIN vault.session_transcripts t ON t.session_id = s.node_id
+      WHERE s.tool = 'cairn-agent' AND s.source_session_id = ${`task:${created.id}`}`;
+    assert.equal(session?.transcript_count, 1);
+    assert.match(String(session?.text), /- 도구: Read notes\.md/);
+    assert.equal(String(session?.text).includes(OAUTH_TOKEN), false, '토큰은 원문에 남지 않는다');
+  });
+
+  test('메모가 없으면 러너가 대신 남기고, 승인을 기다리다 돌아온 실행은 앞 CLI 세션을 재개한다', async () => {
+    const agent = await newAgent();
+    const spy = new Spy();
+    const created = await newTask(agent, `${spy.mark} [fake:approval]`);
+    const first = await spy.seen();
+    await taskIn(created.id, 'waiting');
+    const db = api.service(Database);
+    const id = String(created.id);
+    const written = await until('러너가 대신 쓴 메모', async () => {
+      const [row] = await db.sql`SELECT written_by FROM vault.run_memos WHERE task_id = ${id}`;
+      return row ? String(row.written_by) : null;
+    });
+    assert.equal(written, 'runner');
+    assert.equal((first.argv as string[]).includes('--no-session-persistence'), false);
+    const firstSession = await until('첫 실행의 CLI 세션', async () => {
+      const [row] = await db.sql`SELECT cli_session FROM task.task_runs WHERE task_id = ${id}`;
+      return row?.cli_session ? String(row.cli_session) : null;
+    });
+    const { approvals } = ok(await api.get('/api/approvals', owner)) as { approvals: Json[] };
+    const approval = approvals.find((a) => a.taskId === created.id) as Json;
+    ok(
+      await api.request('POST', `/api/approvals/${approval.id}/decide`, owner, {
+        version: approval.version,
+        decision: 'revise',
+        note: '제목을 바꿔 주세요',
+      }),
+    );
+    const second = await until('다시 뜬 실행', async () => {
+      const seen = JSON.parse(readFileSync(spy.path, 'utf8')) as Json;
+      return seen.pid === first.pid ? null : seen;
+    });
+    const argv = second.argv as string[];
+    assert.equal(
+      argv[argv.indexOf('--resume') + 1],
+      firstSession,
+      '같은 세션 키 · 같은 러너라 재개한다',
+    );
+    assert.match(String(second.prompt), /^# 이어서 하는 실행/);
+    await until('두 번째 실행의 기록', async () => {
+      const rows =
+        await db.sql`SELECT resumed FROM task.task_runs WHERE task_id = ${id} ORDER BY seq`;
+      return rows.length === 2 && rows[1]?.resumed === true ? rows : null;
+    });
+  });
+
   test('팀장이 팀에게 맡기면 팀원의 일이 돌고, 모두 끝나면 결과를 받아 팀장이 끝낸다', async () => {
     const lead = await newAgent({ name: '팀장' });
     const members = [

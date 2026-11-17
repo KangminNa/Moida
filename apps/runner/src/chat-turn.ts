@@ -41,9 +41,13 @@ export class ChatTurn {
     );
   }
 
-  /** 지시문의 단락 (틀 chat): 앞 대화(있으면)와 대화로 답하는 법 */
-  part(prompts: PromptPack): string {
-    const history = this.lines.map(([from, text]) => {
+  /**
+   * 지시문의 단락 (틀 chat): 앞 대화(있으면)와 대화로 답하는 법.
+   * withHistory: 앞 대화를 싣는가. CLI 세션을 재개한 실행은 앞 대화를 이미 기억해 싣지 않는다
+   */
+  part(prompts: PromptPack, withHistory = true): string {
+    const lines = withHistory ? this.lines : [];
+    const history = lines.map(([from, text]) => {
       const template = ChatTurn.SPEAKERS[from];
       return template ? prompts.fill(template, { text }) : `[${from}] ${text}`;
     });

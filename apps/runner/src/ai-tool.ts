@@ -2,8 +2,10 @@ import type { AiProcess } from './ai-process';
 import type { ConnectorCall } from './connector-calls';
 import type { Job } from './job';
 import type { JobWorkspace } from './job-workspace';
+import type { LineagePlace } from './lineage-store';
 import type { PlanWindow, RunEvent } from './progress';
 import type { PromptPack } from './prompt-pack';
+import type { RunTranscript } from './run-transcript';
 import type { SandboxRoom } from './sandbox-room';
 
 /** AI CLI의 출력을 한 줄씩 실행 기록으로 바꾼다. 실행마다 새로 만든다 */
@@ -23,6 +25,10 @@ export interface AiStream {
   readonly model: string | null;
   /** 이 실행에서 커넥터(x-<이름>)를 부른 수 · 실패 (2026-11-15 MCP 1단계). 서버가 마지막 사용 · 실패를 적는다 */
   readonly connectorCalls: readonly ConnectorCall[];
+  /** CLI가 알린 세션 id (CLI 세션 재개, 2026-11-17). 모르면 null */
+  readonly sessionId: string | null;
+  /** 이번 실행의 원문: AI 말 · 부른 도구와 짧은 입력 · 오류 (작업 세션에 쌓는다) */
+  readonly transcript: RunTranscript;
 }
 
 /**
@@ -36,8 +42,11 @@ export interface AiTool {
   readonly id: string;
   /** 실행 파일 (실행하지 못했을 때 알리려고) */
   readonly bin: string;
-  /** 작업 자리를 만들고 이 도구의 설정을 쓴다. 코드 작업이면 코드 러너 칸의 자리 안에 */
-  open(job: Job, room?: SandboxRoom | null): Promise<JobWorkspace>;
+  /**
+   * 작업 자리를 만들고 이 도구의 설정을 쓴다. 코드 작업이면 코드 러너 칸의 자리 안에.
+   * place: 세션 키의 고정 자리 (CLI 세션을 남기고 재개하는 엔진만, LineageStore). 없으면 일마다 새 임시 자리
+   */
+  open(job: Job, room?: SandboxRoom | null, place?: LineagePlace | null): Promise<JobWorkspace>;
   /** AI CLI를 띄운다. 지시문은 prompts(지시문 틀)로 채운다 */
   start(
     job: Job,

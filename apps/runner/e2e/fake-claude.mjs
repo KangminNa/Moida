@@ -16,6 +16,9 @@
 //   [fake:make]         만들기 작업: "# 재료"의 파일 폴더와 위키(get_wiki)를 읽어 결과물 폴더에 발표.pptx를 둔다
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
+//   [fake:memo=<글>]    인수인계 메모 파일(CAIRN_MEMO_FILE)에 그 글을 쓴다 (작업 세션, 2026-11-17)
+// --no-session-persistence가 없으면 세션 파일을 설정 폴더의 projects/<작업 폴더>/<세션 id>.jsonl에 남기고,
+// --resume <id>면 그 세션 id를 이어 쓴다 (CLI 세션 재개)
 //   [fake:split=<경로>,<경로>…] 코드 작업의 팀장처럼: "내 팀"의 첫 팀원에게 경로마다 code 하위 작업을 맡기고 끝난다
 //                       (하위 작업은 그 경로 아래 x.ts를 고친다). 결과를 받아 깨어난 실행은 맡기지 않고 끝낸다
 // 연결 확인(MCP 설정 없음)은 ok라고 답한다. 토큰에 wrong이 들어 있으면 로그인 실패처럼 끝난다
@@ -102,7 +105,8 @@ const prompt = await new Promise((resolve) => {
 });
 
 const has = (name) => prompt.includes(`[fake:${name}]`);
-const session_id = randomUUID();
+const resumeAt = process.argv.indexOf('--resume');
+const session_id = resumeAt > 0 ? process.argv[resumeAt + 1] : randomUUID();
 const say = (line) => process.stdout.write(`${JSON.stringify({ ...line, session_id })}\n`);
 const assistant = (id, usage, ...content) =>
   say({
@@ -165,6 +169,21 @@ if (spy) {
     }),
   );
 }
+
+if (!process.argv.includes('--no-session-persistence')) {
+  const project = join(
+    process.env.CLAUDE_CONFIG_DIR,
+    'projects',
+    process.cwd().replaceAll('/', '-'),
+  );
+  mkdirSync(project, { recursive: true });
+  appendFileSync(
+    join(project, `${session_id}.jsonl`),
+    `${JSON.stringify({ prompt: prompt.length })}\n`,
+  );
+}
+const memo = /\[fake:memo=([^\]]+)\]/.exec(prompt)?.[1];
+if (memo && process.env.CAIRN_MEMO_FILE) writeFileSync(process.env.CAIRN_MEMO_FILE, memo);
 
 const runs = /\[fake:runs=([^\]]+)\]/.exec(prompt)?.[1];
 if (runs) appendFileSync(runs, `${process.pid}\n`);

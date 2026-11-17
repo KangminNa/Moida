@@ -1,5 +1,11 @@
 import type { CairnServer } from './cairn-server';
-import { type PlanWindow, ProgressBatch, type ProgressState, type RunEvent } from './progress';
+import {
+  type PlanWindow,
+  ProgressBatch,
+  type ProgressState,
+  type RunEvent,
+  RunSession,
+} from './progress';
 import type { Redactor } from './redactor';
 
 // 실행 기록을 모아 report_progress로 보낸다. 한 번에 한 묶음만 보내고,
@@ -15,6 +21,9 @@ export class ProgressReporter {
   /** 아직 보내지 않은 모델 이름. 한 번만 보낸다 */
   private model: string | null = null;
   private modelSent = false;
+  /** 아직 보내지 않은 CLI 세션. 한 번만 보낸다 */
+  private session: RunSession | null = null;
+  private sessionSent = false;
   private unsent: ProgressBatch | null = null;
   private lease: Date | null;
 
@@ -39,6 +48,12 @@ export class ProgressReporter {
   /** AI CLI가 알린 모델. 처음 본 것 하나만 다음 보고에 싣는다 */
   noteModel(model: string | null): void {
     if (model && !this.modelSent && this.model === null) this.model = model;
+  }
+
+  /** AI CLI가 알린 세션 id. 처음 본 것 하나만 재개 여부와 함께 다음 보고에 싣는다 */
+  noteSession(id: string | null, resumed: boolean): void {
+    if (id && !this.sessionSent && this.session === null)
+      this.session = new RunSession(id, resumed);
   }
 
   /** 보낼 것이 남지 않았는가 */
@@ -76,6 +91,11 @@ export class ProgressReporter {
       this.model = null;
       this.modelSent = true;
     }
-    return ProgressBatch.of(this.queue.splice(0, count), plan, model);
+    const session = this.session;
+    if (session !== null) {
+      this.session = null;
+      this.sessionSent = true;
+    }
+    return ProgressBatch.of(this.queue.splice(0, count), plan, model, session);
   }
 }

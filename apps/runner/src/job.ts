@@ -1,9 +1,11 @@
 import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
+import { JobLineage } from './job-lineage';
 import { JobRefs } from './job-refs';
 import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
+import { SubtaskResult } from './subtask-result';
 import { TeamMember } from './team-member';
 
 /** 일의 대상 (글 등) */
@@ -13,47 +15,6 @@ export class JobTarget {
     readonly id: string,
     readonly version: number | null,
   ) {}
-}
-
-/** 맡긴 하위 작업 하나의 결과. 하위 작업이 모두 끝나 깨어난 일에만 온다 */
-export class SubtaskResult {
-  /** 틀(subtask)이 이름을 아는 상태. 그 밖의 상태는 값 그대로 */
-  private static readonly KNOWN: readonly string[] = ['done', 'failed', 'cancelled'];
-
-  constructor(
-    readonly title: string,
-    readonly agent: string,
-    readonly status: string,
-    readonly summary: string | null,
-    readonly error: string | null,
-    /** 그 작업이 만든 결과물 (이름 · id). 보고(report_round)의 근거로 output_id를 건다 */
-    readonly outputs: readonly string[] = [],
-  ) {}
-
-  static from(raw: Json): SubtaskResult {
-    return new SubtaskResult(
-      raw.text('title'),
-      raw.text('agent'),
-      raw.text('status'),
-      raw.optionalText('summary'),
-      raw.optionalText('error'),
-      raw.list('outputs').map((o) => `${o.text('name')} (output_id: ${o.text('id')})`),
-    );
-  }
-
-  /** 지시문의 한 덩이 (틀 subtask) */
-  line(prompts: PromptPack): string {
-    return prompts.fill('subtask', {
-      done: this.status === 'done',
-      failed: this.status === 'failed',
-      cancelled: this.status === 'cancelled',
-      other: SubtaskResult.KNOWN.includes(this.status) ? null : this.status,
-      title: this.title,
-      agent: this.agent,
-      body: this.error ?? this.summary,
-      outputs: this.outputs.join(', '),
-    });
-  }
 }
 
 /**
@@ -180,6 +141,8 @@ export class Job {
     readonly runtime: CliRuntime = CliRuntime.NONE,
     /** 관리자가 대화에 넣은 참조 (payload.refs, 2026-11-15 B) */
     readonly refs: JobRefs = JobRefs.NONE,
+    /** 이번 실행의 세션 키 (next_jobs의 run, 2026-11-17). 작업 세션에 기록하지 않는 일은 null */
+    readonly lineage: JobLineage | null = null,
   ) {}
 
   static from(raw: Json): Job {
@@ -223,6 +186,7 @@ export class Job {
       raw.field('prompt_package') ? SkillPackage.from(raw.child('prompt_package')) : null,
       CliRuntime.from(agent, raw.list('tools')),
       JobRefs.from(task.child('payload')),
+      JobLineage.from(raw.child('run')),
     );
   }
 
@@ -241,7 +205,17 @@ export class Job {
     return this.copy(instruction, this.browse, this.brief);
   }
 
-  private copy(instruction: string, browse: BrowsePlan | null, brief: string | null): Job {
+  /** 러너가 정한 이번 실행(재개할 세션 · 지난 메모)을 실은 같은 일 (RunRecorder) */
+  withLineage(lineage: JobLineage | null): Job {
+    return this.copy(this.instruction, this.browse, this.brief, lineage);
+  }
+
+  private copy(
+    instruction: string,
+    browse: BrowsePlan | null,
+    brief: string | null,
+    lineage = this.lineage,
+  ): Job {
     return new Job(
       this.taskId,
       this.kind,
@@ -270,6 +244,7 @@ export class Job {
       this.promptPackage,
       this.runtime,
       this.refs,
+      lineage,
     );
   }
 
@@ -322,21 +297,24 @@ export class Job {
    * AI CLI에게 줄 글. 글은 지시문 틀(prompts, 러너 스킬 cairn-runner)에서 오고, 여기서는 어느 단락을 어떤 순서로 넣을지만 정한다.
    * skillReady: 스킬을 CLI의 스킬 폴더에 넣어 두었는가 (Claude).
    * skillText: 스킬 폴더를 읽지 못하는 CLI(셸이 없는 Codex)에게 지시문으로 넣을 SKILL.md.
-   * outputsDir: 사람에게 줄 파일을 둘 폴더 (일이 잘 끝나면 러너가 결과물로 올린다)
+   * outputsDir: 사람에게 줄 파일을 둘 폴더 (일이 잘 끝나면 러너가 결과물로 올린다).
+   * memoPath: 인수인계 메모 파일 (작업 세션에 기록하는 일만). 재개한 실행은 머리글을 앞에 두고 이전 대화를 뺀다
    */
   prompt(
     prompts: PromptPack,
     skillReady: boolean,
     skillText: string | null = null,
     outputsDir: string | null = null,
+    memoPath: string | null = null,
   ): string {
     if (this.isAiTest || this.kind === Job.ROUTE) return this.instruction;
     if (this.writesNote) return this.brief ?? '';
     const parts = [
+      this.lineage?.head(prompts) ?? '',
       prompts.fill('intro', { agent: this.agentName, role: this.agentRole }),
       prompts.fill('task', { title: this.title, instruction: this.instruction }),
-    ];
-    if (this.chat) parts.push(this.chat.part(prompts));
+    ].filter(Boolean);
+    if (this.chat) parts.push(this.chat.part(prompts, !this.lineage?.resumed));
     if (this.target) {
       const { kind, id, version } = this.target;
       parts.push(
@@ -374,6 +352,7 @@ export class Job {
         }),
       );
     if (!this.refs.empty) parts.push(this.refs.brief(prompts, this.kind === Job.MAKE));
+    if (this.lineage && memoPath) parts.push(this.lineage.part(prompts, memoPath));
     return parts.join('\n\n');
   }
 }

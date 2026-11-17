@@ -153,7 +153,18 @@ export class CodexCli implements AiTool {
   }
 
   async open(job: Job, room: SandboxRoom | null = null): Promise<JobWorkspace> {
-    const workspace = await JobWorkspace.open(null, null, null, this.skillsDir, room);
+    // 인수인계 메모 파일은 두되 세션은 늘 새로 (--ephemeral, 재개하지 않는다)
+    const memo = job.runToken !== null && job.lineage !== null;
+    const workspace = await JobWorkspace.open(
+      null,
+      null,
+      null,
+      this.skillsDir,
+      room,
+      null,
+      null,
+      memo,
+    );
     const mcp = job.runToken === null ? null : this.mcpUrl;
     this.browser = mcp === null ? null : BrowserMcp.for(job, this.browserUrl);
     this.shell = job.sandboxed && room !== null && mcp !== null;
@@ -218,7 +229,7 @@ export class CodexCli implements AiTool {
       this.args(workspace),
       workspace.workDir,
       this.env(job, workspace, process.env),
-      job.prompt(prompts, false, skill, workspace.outputsDir),
+      job.prompt(prompts, false, skill, workspace.outputsDir, workspace.memoPath),
       onLine,
       workspace.user,
     );
@@ -263,6 +274,7 @@ export class CodexEngine implements EngineAdapter {
   readonly efforts = CodexCli.EFFORTS;
   readonly bin = { env: 'CAIRN_RUNNER_CODEX_CLI', fallback: 'codex' };
   readonly ownLogin = null;
+  readonly resumes = false;
   readonly signin = new CodexSignin();
 
   tool(credential: string, config: RunnerConfig): AiTool {

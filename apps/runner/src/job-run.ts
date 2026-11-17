@@ -3,9 +3,11 @@ import type { AiProcess, ChildExit } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { Backoff, pause } from './backoff';
 import type { CairnServer } from './cairn-server';
+import { CredentialWriteBack } from './credential-write-back';
 import { EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
 import { JobWorkspace } from './job-workspace';
+import { LineageStore } from './lineage-store';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
 import { OutputBatch } from './output-batch';
 import { OutputUploader } from './output-uploader';
@@ -14,6 +16,7 @@ import { ProgressReporter } from './progress-reporter';
 import { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
 import { RunEnding } from './run-ending';
+import { RunRecorder } from './run-recorder';
 import type { RunnerConfig } from './runner-config';
 import type { SandboxStage } from './sandbox-stage';
 import { StageCheck } from './stage-check';
@@ -41,6 +44,7 @@ export class JobRun {
   private static readonly STOP_RETRY_MS = 5_000;
   private static readonly STOPPING = '러너가 멈춰요';
   private static readonly PAUSED = '에이전트가 멈췄어요';
+  private static readonly WAITING = '결재나 하위 작업을 기다려요';
   /** 검사에 떨어졌을 때 AI에게 더 맡기는 횟수 (일 하나에 한 번: 고치지 못하는 일에 구독을 계속 쓰지 않게) */
   private static readonly CHECK_RETRIES = 1;
 
@@ -50,10 +54,10 @@ export class JobRun {
   private sent = 0;
   /** 마지막 검사 (칸의 일). 제출하는 결과에 싣는다 */
   private checks: readonly StageCheck[] = [];
-  /** 서버에 있는 로그인의 판. 바뀐 자격을 되돌려 쓸 때마다 새 판이 된다 (AI를 두 번 띄우면 두 번 쓴다) */
-  private loginVersion: number | null;
-  /** 마지막으로 되돌려 쓴 자격 */
-  private written: string | null = null;
+  /** CLI가 갱신한 자격을 서버에 되돌려 쓴다 */
+  private readonly credentials: CredentialWriteBack;
+  /** 작업 세션의 기록과 CLI 세션 재개 (2026-11-17) */
+  private readonly recorder: RunRecorder;
   /** 일의 엔진으로 만든 실행 어댑터. 토큰이 없거나 모르는 엔진이면 null (perform이 시작 전에 끝낸다) */
   private readonly tool: AiTool | null;
 
@@ -76,7 +80,10 @@ export class JobRun {
       redactor.with(job.runToken).with(login.token),
     );
     this.reporter = new ProgressReporter(server, job.taskId, this.redactor, job.leaseUntil);
-    this.loginVersion = login.version;
+    this.credentials = new CredentialWriteBack(server, job.taskId, log, login.version);
+    const store = new LineageStore(config.lineagesDir);
+    const resumes = engine?.resumes ?? false;
+    this.recorder = new RunRecorder(server, store, resumes, log, this.redactor);
   }
 
   async perform(): Promise<void> {
@@ -95,8 +102,8 @@ export class JobRun {
       }
       const prompts = PromptPack.choose(this.job.promptPackage, this.config.skillsDir, this.log);
       // 단계가 더한 것(브라우저 작업이 도는 곳)이 AI CLI의 설정(mcp.json)에 실린다
-      const job = stage?.aiJob(prompts) ?? this.job;
-      workspace = await this.tool.open(job, stage?.workspaceRoom ?? null);
+      const job = await this.recorder.begin(stage?.aiJob(prompts) ?? this.job);
+      workspace = await this.tool.open(job, stage?.workspaceRoom ?? null, this.recorder.kept);
       await workspace.handOver(this.job.sharedFolders(this.config.folders));
       const { skill, skillPackage: shipped } = this.job;
       if (shipped) this.log.info(`스킬 ${shipped.name}: ${shipped.label}`);
@@ -109,6 +116,7 @@ export class JobRun {
       throw error;
     } finally {
       await workspace?.remove();
+      await this.recorder.close();
       await this.stage?.close();
     }
   }
@@ -152,7 +160,9 @@ export class JobRun {
    * 두 번째 실행도 첫 실행과 같이 지켜본다: 취소 · 멈춤 · 임대 · 격리가 깨지면 끄고 끝낸다
    */
   private async supervise(place: JobWorkspace, tool: AiTool, prompts: PromptPack): Promise<void> {
-    const job = this.stage?.aiJob(prompts) ?? place.withShared(this.job, prompts);
+    const job = this.recorder.onto(
+      this.stage?.aiJob(prompts) ?? place.withShared(this.job, prompts),
+    );
     let run = await this.runAi(job, place, tool, prompts);
     for (let retries = 0; run.ending.succeeded && this.stage !== null; retries++) {
       const stopped = await this.check(this.stage, retries > 0);
@@ -162,7 +172,11 @@ export class JobRun {
       const fix = StageCheck.retryJob(job, prompts, run.stream.finalText, this.checks);
       run = await this.runAi(fix, place, tool, prompts);
     }
-    await this.conclude(run.ending.succeeded ? await this.afterExit(run, place) : run.ending);
+    const ending = run.ending.succeeded ? await this.afterExit(run, place) : run.ending;
+    const save = <T>(send: () => Promise<T>) => this.persist(send);
+    const missed = await this.recorder.save(job, run.stream, place, run.ok, ending.note, save);
+    if (missed) this.log.info(this.redactor.clean(`${this.job.taskId}: ${missed}`));
+    await this.conclude(ending);
   }
 
   /**
@@ -174,13 +188,14 @@ export class JobRun {
     place: JobWorkspace,
     tool: AiTool,
     prompts: PromptPack,
-  ): Promise<{ ending: RunEnding; stream: AiStream }> {
+  ): Promise<{ ending: RunEnding; stream: AiStream; ok: boolean }> {
     const stream = tool.stream();
     const wake = new AbortController();
     const child = tool.start(job, place, prompts, (line) => {
       this.reporter.add(stream.read(line));
       this.reporter.notePlan(stream.takePlanUsage());
       this.reporter.noteModel(stream.model);
+      this.reporter.noteSession(stream.sessionId, job.lineage?.resumed ?? false);
       if (stream.breach !== null) wake.abort();
     });
     void child.exited.then(() => wake.abort());
@@ -192,11 +207,13 @@ export class JobRun {
       await this.conclude(RunEnding.release(`AI CLI를 실행하지 못했어요: ${exit.spawnError}`));
       throw new CliUnavailable(`AI CLI를 실행하지 못했어요 (${tool.bin})`);
     }
-    await this.writeBack(tool, place);
+    await this.credentials.write(tool, place, (send) => this.persist(send));
     const ending = decided
       ? ((await this.flush()) ?? decided)
       : ((await this.flushForSubmit()) ?? this.fromExit(exit, stream, child));
-    return { ending, stream };
+    // 다음 실행이 재개해도 되는 세션: 스스로 잘 끝났거나, 승인 · 위임으로 기다리게 되어 러너가 껐다
+    const ok = ending.note === JobRun.WAITING || (!decided && exit.code === 0 && !stream.failure);
+    return { ending, stream, ok };
   }
 
   /** 칸의 검사를 돌려 기억한다 (retried: AI에게 한 번 더 맡긴 뒤). 그사이 끝낼 이유가 생기면 그 끝 */
@@ -331,29 +348,6 @@ export class JobRun {
     }
   }
 
-  /**
-   * 실행하는 동안 CLI가 갱신한 자격(Codex auth.json)을 서버에 되돌려 쓴다. 끝내는 길(성공 · 실패 · 취소)과 상관없이:
-   * 버리면 다음 실행이 이미 쓴 갱신 토큰을 내밀어 로그인이 깨진다. 이 컴퓨터의 로그인(판 없음)은 서버에 쓰지 않는다.
-   * 판이 다르면(주인이 그사이 다시 로그인) 서버가 거절하고 새 로그인이 이긴다
-   */
-  private async writeBack(tool: AiTool, workspace: JobWorkspace): Promise<void> {
-    const version = this.loginVersion;
-    if (version === null) return;
-    const credential = await tool.changedCredential(workspace);
-    if (credential === null || credential === this.written) return;
-    try {
-      this.loginVersion = await this.persist(() =>
-        this.server.aiLoginRefresh(this.job.taskId, tool.id, version, credential),
-      );
-      this.written = credential;
-      this.log.info(`${this.job.taskId}: 갱신된 ${tool.id} 로그인을 서버에 저장했어요`);
-    } catch (error) {
-      this.log.info(
-        `${this.job.taskId}: 갱신된 로그인을 저장하지 못했어요: ${(error as Error).message}`,
-      );
-    }
-  }
-
   private fromExit(exit: ChildExit, stream: AiStream, child: AiProcess): RunEnding {
     if (exit.code === 0 && stream.failure === null)
       return RunEnding.submit('끝났어요', RunResult.from(stream, this.redactor));
@@ -398,8 +392,7 @@ export class JobRun {
   /** 서버의 답으로 끝낼지 정한다. 계속해도 되면 null */
   private static decide(state: ProgressState): RunEnding | null {
     if (state.cancelled) return RunEnding.quiet('주인이 취소했어요');
-    if (state.status === ProgressState.WAITING)
-      return RunEnding.quiet('결재나 하위 작업을 기다려요');
+    if (state.status === ProgressState.WAITING) return RunEnding.quiet(JobRun.WAITING);
     if (state.status !== ProgressState.RUNNING)
       return RunEnding.quiet(`이미 ${state.status} 상태예요`);
     return state.paused ? RunEnding.release(JobRun.PAUSED) : null;

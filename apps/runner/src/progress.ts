@@ -108,15 +108,27 @@ export class ProgressBatch {
     readonly planUsage: readonly PlanWindow[],
     /** AI CLI가 알린 모델 (실행 기록에 한 번 남긴다). 새로 본 것이 없으면 null */
     readonly model: string | null = null,
+    /** AI CLI의 세션 id와 그 세션을 재개했는지 (CLI 세션 재개, 2026-11-17). 실행 기록에 한 번 남긴다 */
+    readonly session: RunSession | null = null,
   ) {}
 
   static of(
     events: readonly RunEvent[],
     planUsage: readonly PlanWindow[],
     model: string | null = null,
+    session: RunSession | null = null,
   ): ProgressBatch {
-    return new ProgressBatch(events.length === 0 ? null : randomUUID(), events, planUsage, model);
+    const requestId = events.length === 0 ? null : randomUUID();
+    return new ProgressBatch(requestId, events, planUsage, model, session);
   }
+}
+
+/** 이번 실행의 CLI 세션: id와 앞 실행의 세션을 재개했는지 (report_progress의 cli_session · resumed) */
+export class RunSession {
+  constructor(
+    readonly id: string,
+    readonly resumed: boolean,
+  ) {}
 }
 
 /** report_progress의 답 */
