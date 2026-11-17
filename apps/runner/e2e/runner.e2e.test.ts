@@ -419,8 +419,9 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(env.CAIRN_RUNNER_TOKEN, undefined);
     assert.equal(env.DATABASE_URL, undefined);
     assert.notEqual(env.HOME, process.env.HOME);
-    assert.deepEqual(seen.cwdEntries, ['outputs'], '빈 작업 폴더에 결과물 폴더만');
-    assert.deepEqual(seen.configEntries, ['settings.json']);
+    // 빈 작업 폴더에 결과물 폴더와 인수인계 메모 자리(.cairn)만, 설정 폴더에는 권한 설정과 메모 훅만 (2026-11-17)
+    assert.deepEqual([...(seen.cwdEntries as string[])].sort(), ['.cairn', 'outputs']);
+    assert.deepEqual([...(seen.configEntries as string[])].sort(), ['hooks', 'settings.json']);
     assert.equal(seen.mcpConfigMode, 0o600);
     assert.equal(seen.mcpUrl, `${proxyUrl}/mcp`);
     assert.notEqual(seen.runToken, deviceToken);
@@ -431,13 +432,11 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(args[args.indexOf('--output-format') + 1], 'stream-json');
     assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write,Edit,WebSearch');
 
+    // 세션 키의 고정 자리: 작업 폴더 · 홈 · 작업 토큰은 지우고, 설정 폴더에는 CLI의 세션 파일(projects)만 남는다
     await until('자리가 지워짐', () =>
-      [seen.cwd, env.CLAUDE_CONFIG_DIR, env.HOME, seen.mcpConfigPath].some((p) =>
-        existsSync(String(p)),
-      )
-        ? null
-        : true,
+      [seen.cwd, env.HOME, seen.mcpConfigPath].some((p) => existsSync(String(p))) ? null : true,
     );
+    assert.deepEqual(readdirSync(String(env.CLAUDE_CONFIG_DIR)), ['projects']);
   });
 
   test('로그와 기록에 토큰이 남지 않는다', async () => {
