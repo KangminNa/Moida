@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseQuery, SettingActor } from '../../platform';
+import { Session } from '../session/session';
 import { tidySettings } from '../vault.schema';
 import type { TidySettingRow } from '../vault.tables';
 import { TidySettingsView, TidySettingView } from './tidy.view';
@@ -54,14 +55,14 @@ export class TidyQuery extends BaseQuery {
     return rows.map((r) => r.space_id);
   }
 
-  /** 하루 한 번에 맡길 세션: 지난 요청 뒤로 새 판이 쌓인 세션 (대표 wiki가 있어도). 오래된 순으로 한 묶음 */
+  /** 하루 한 번에 맡길 세션: 지난 요청 뒤로 새 판이 쌓인 세션 (대표 wiki가 있어도, 작업 세션은 빼고). 오래된 순으로 한 묶음 */
   async daily(actor: Actor, spaceId: string): Promise<readonly TidySessionRow[]> {
     actor.assertCan(Actor.TIDY);
     return this.sql<TidySessionRow[]>`
       SELECT s.node_id, s.head_title, s.revision_count, s.version
       FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
       WHERE s.space_id = ${spaceId} AND n.deleted_at IS NULL
-        AND s.tidy_requested_seq < s.revision_count
+        AND s.tidy_requested_seq < s.revision_count AND s.tool <> ${Session.AGENT_TOOL}
       ORDER BY s.node_id
       LIMIT ${TidyQuery.DAILY_BATCH}`;
   }
@@ -97,9 +98,12 @@ export class TidyQuery extends BaseQuery {
     return row?.total ?? 0;
   }
 
-  /** 대표 wiki가 없고, 지금 판의 정리를 아직 요청하지 않은 세션. 요청한 뒤에 실패한 세션은 새 판이 쌓여야 돌아온다 */
+  /**
+   * 대표 wiki가 없고, 지금 판의 정리를 아직 요청하지 않은 세션. 요청한 뒤에 실패한 세션은 새 판이 쌓여야 돌아온다.
+   * 작업 세션(에이전트 실행의 기록)은 아직 정리하지 않는다: 끝난 요청만 정리하는 길은 S2 (기획서 결정 2026-11-17)
+   */
   private waiting(actor: Actor) {
     return this.sql`s.space_id = ${actor.spaceId} AND s.wiki_id IS NULL AND n.deleted_at IS NULL
-      AND s.tidy_requested_seq < s.revision_count`;
+      AND s.tidy_requested_seq < s.revision_count AND s.tool <> ${Session.AGENT_TOOL}`;
   }
 }

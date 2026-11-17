@@ -18,9 +18,9 @@ export class SessionTranscript {
     readonly redactions: readonly Redaction[],
   ) {}
 
-  /** 올라온 글에서 민감정보를 지운 원문. 비어 있으면 RuleViolation */
-  static scrubbed(text: string, policy: SensitivePolicy): SessionTranscript {
-    const [clean, found] = policy.scrub(SessionTranscript.SECTION, text.trim());
+  /** 올라온 글에서 민감정보를 지운 원문. personal이면 개인정보도 마스킹한다 (에이전트 기록만). 비어 있으면 RuleViolation */
+  static scrubbed(text: string, policy: SensitivePolicy, personal = false): SessionTranscript {
+    const [clean, found] = policy.scrub(SessionTranscript.SECTION, text.trim(), personal);
     if (!clean.trim()) throw new RuleViolation('원문이 비어 있어요');
     return new SessionTranscript(clean, found);
   }

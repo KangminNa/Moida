@@ -122,6 +122,27 @@ export class JobToolView {
 }
 
 /**
+ * 이번 실행의 세션 키와 CLI 세션 (기획서 결정 2026-11-17, RunLineage). 작업 세션에 기록하지 않는 일에는 없다.
+ * keep: 러너가 CLI 세션 파일을 남겨도 되는지 (브라우저 · 샌드박스 일은 false). resume: 재개할 수 있는 CLI 세션 (서버의 후보,
+ * 러너는 세션 파일이 있고 앞 실행이 잘 끝났을 때만 재개한다)
+ */
+export class JobRunView {
+  constructor(
+    private readonly lineage: string,
+    private readonly keep: boolean,
+    private readonly resume: string | null,
+  ) {}
+
+  toJSON() {
+    return {
+      lineage: this.lineage,
+      keep: this.keep,
+      resume: this.resume === null ? null : { cli_session: this.resume },
+    };
+  }
+}
+
+/**
  * 러너가 빌려 간 일 하나 (next_jobs). MCP 도구의 모양이라 snake_case. run_token은 여기서 한 번만 나간다.
  * 연결 확인(task.kind가 ai_test)에는 에이전트도 run_token도 없다. 어느 도구인지는 task.payload.tool에 있다.
  */
@@ -179,6 +200,14 @@ export class JobView {
     return this;
   }
 
+  /** 이번 실행의 세션 키 · CLI 세션 (2026-11-17). 기록하지 않는 일은 null */
+  private run: JobRunView | null = null;
+
+  withRun(run: JobRunView | null): this {
+    this.run = run;
+    return this;
+  }
+
   toJSON() {
     const r = this.row;
     const a = this.agent;
@@ -225,6 +254,7 @@ export class JobView {
       })),
       rounds_left: this.roundsLeft,
       tools: this.tools.map((t) => t.toJSON()),
+      run: this.run?.toJSON() ?? null,
     };
   }
 }

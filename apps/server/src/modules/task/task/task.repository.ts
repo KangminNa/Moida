@@ -1,8 +1,9 @@
 import { ChangeSignal, Conflict, Database, Rule, TableRepository } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { taskEvents, taskRuns, tasks } from '../task.schema';
-import type { OutputRow, TaskRow } from '../task.tables';
+import type { OutputRow, TaskRow, TaskRunNew, TaskRunRow } from '../task.tables';
 import { Task } from './task';
+import type { ReportProgressInput } from './task.input';
 
 // task.tasks + task_events ↔ Task. 불러오기·잠그기·저장(바뀐 칸만)은 기반이 하고, 여기에는 대기열 SQL과 실행 기록이 있다.
 export class TaskRepository extends TableRepository<TaskRow, Task> {
@@ -330,15 +331,28 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
   }
 
   /**
-   * AI CLI가 알린 모델을 이 러너의 가장 최근 실행에 한 번 남긴다 (이미 있으면 그대로).
-   * 실행 기록은 고치지 않는 표라 트리거가 비어 있는 model을 채우는 것만 허락한다
+   * AI CLI가 알린 모델 · CLI 세션 id · 재개했는지를 이 러너의 가장 최근 실행에 한 번씩 남긴다 (이미 있으면 그대로).
+   * 실행 기록은 고치지 않는 표라 트리거가 비어 있는 이 세 칸을 채우는 것만 허락한다
    */
-  async noteModel(taskId: string, runnerId: string, model: string): Promise<void> {
+  async noteRun(taskId: string, runnerId: string, req: ReportProgressInput): Promise<void> {
+    if (req.model === null && req.cliSession === null && req.resumed === null) return;
     await this.sql`
-      UPDATE task.task_runs SET model = ${model}
-      WHERE model IS NULL AND id = (
+      UPDATE task.task_runs SET model = coalesce(model, ${req.model}),
+        cli_session = coalesce(cli_session, ${req.cliSession}),
+        resumed = coalesce(resumed, ${req.resumed})
+      WHERE (model IS NULL OR cli_session IS NULL OR resumed IS NULL) AND id = (
         SELECT id FROM task.task_runs WHERE task_id = ${taskId} AND runner_id = ${runnerId}
         ORDER BY seq DESC LIMIT 1)`;
+  }
+
+  /** 같은 세션 키의 바로 앞 실행 (CLI 세션 재개 판단, RunLineage). run은 이번에 넣은 실행, 기록하지 않는 일이면 null */
+  async runBefore(run: TaskRunNew | null): Promise<TaskRunRow | null> {
+    if (!run?.lineage) return null;
+    const [row] = await this.sql<TaskRunRow[]>`
+      SELECT * FROM task.task_runs
+      WHERE space_id = ${run.space_id} AND lineage = ${run.lineage} AND id <> ${run.id}
+      ORDER BY started_at DESC, id DESC LIMIT 1`;
+    return row ?? null;
   }
 
   /** 쌓인 실행 기록과, 임대했으면 이번 실행의 규칙 판을 남긴다 (추가만) */

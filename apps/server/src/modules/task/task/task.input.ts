@@ -230,6 +230,7 @@ export class ReportProgressInput extends BaseRequest {
   static readonly EVENTS_MAX = 100;
   static readonly PLAN_USAGE_MAX = 10;
   static readonly MODEL_MAX = 120;
+  static readonly CLI_SESSION_MAX = 120;
 
   private constructor(
     readonly taskId: string,
@@ -238,6 +239,9 @@ export class ReportProgressInput extends BaseRequest {
     readonly planUsage: readonly ReportedPlanUsage[],
     /** AI CLI가 알린 모델. 이 실행의 기록에 한 번 남긴다 */
     readonly model: string | null,
+    /** AI CLI의 세션 id와 그 세션을 재개했는지 (CLI 세션 재개, 2026-11-17). 첫 보고에 한 번, 실행의 기록에 한 번 남긴다 */
+    readonly cliSession: string | null,
+    readonly resumed: boolean | null,
   ) {
     super();
   }
@@ -256,8 +260,15 @@ export class ReportProgressInput extends BaseRequest {
           f.nestedList('events', ReportProgressInput.EVENTS_MAX).map((e) => ReportedEvent.from(e)),
           ReportProgressInput.planUsageOf(raw, f),
           f.optionalText('model', ReportProgressInput.MODEL_MAX),
+          f.optionalText('cli_session', ReportProgressInput.CLI_SESSION_MAX),
+          ReportProgressInput.resumedOf(raw, f),
         ),
     );
+  }
+
+  private static resumedOf(raw: unknown, f: RequestFields): boolean | null {
+    const value = (raw as Record<string, unknown> | null | undefined)?.resumed;
+    return value === undefined || value === null ? null : f.boolean('resumed');
   }
 
   private static planUsageOf(raw: unknown, f: RequestFields): readonly ReportedPlanUsage[] {

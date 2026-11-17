@@ -6,6 +6,8 @@ import KINDS from '../task-kinds.json';
 //   delegable  delegate_task로 맡길 수 있다
 //   sandboxed  셸이 있는 코드 러너 칸에서만 돈다 (칸은 이 일만 받는다)
 //   agentless  에이전트 · 작업 토큰 없이 러너가 바로 돈다 (연결 확인 · 로그인 · 배정 · 세션 노트 · 커넥터 확인)
+//   recorded   false면 에이전트의 일이어도 작업 세션에 원문 · 인수인계 메모를 남기지 않는다 (세션 정리: 정리 일이 또 정리할 세션이 되지 않게,
+//              기획서 결정 2026-11-17). 에이전트 없는 일도 남기지 않는다
 // Task는 여기서 목록을 만든다. 시험이 권한 이름 · 스킬 폴더를 맞춰 보고, 러너 시험이 러너가 아는 종류가 다 있는지 본다.
 // 종류를 더하면: 이 파일 한 줄 + 그 일을 하는 러너 단계 · 스킬 (task/CLAUDE.md)
 
@@ -23,6 +25,7 @@ export class TaskKinds {
         delegable?: boolean;
         sandboxed?: boolean;
         agentless?: boolean;
+        recorded?: boolean;
       }
     >
   >;
@@ -32,6 +35,10 @@ export class TaskKinds {
   );
   static readonly SANDBOXED: readonly string[] = TaskKinds.NAMES.filter(
     (k) => TaskKinds.ALL[k].sandboxed,
+  );
+  /** 작업 세션에 실행을 기록하지 않는 종류: 에이전트 없는 일과 recorded가 false인 일 */
+  static readonly UNRECORDED: readonly string[] = TaskKinds.NAMES.filter(
+    (k) => TaskKinds.ALL[k].agentless || TaskKinds.ALL[k].recorded === false,
   );
   static readonly DELEGABLE: readonly string[] = TaskKinds.NAMES.filter(
     (k) => TaskKinds.ALL[k].delegable,

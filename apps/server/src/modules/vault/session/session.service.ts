@@ -1,19 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseService, Database, Idempotency, Leases, SensitivePolicy } from '../../platform';
 import { ProjectRuleQuery } from '../project/project-rule.query';
-import { Session, SessionReceipt } from './session';
+import { AgentRunRecord } from './agent-run-record';
+import type { SaveRunRecordInput } from './run-record.input';
+import { Session } from './session';
 import type { NoteWorkInput, SaveSessionInput, SaveTranscriptInput } from './session.input';
 import { SessionRepository } from './session.repository';
 import { SessionNote } from './session-note';
+import { SessionReceipt } from './session-receipt';
 import { SessionTranscript } from './session-transcript';
 
-// 세션 쓰기: AI 도구의 저장(save_session), 수집 훅 · 확장의 원문(save_transcript), 서버 러너의 노트(save_note).
+// 세션 쓰기: AI 도구의 저장(save_session), 수집 훅 · 확장의 원문(save_transcript), 서버 러너의 노트(save_note),
+// 에이전트 실행의 기록(save_run_record: 작업 세션의 원문 · 인수인계 메모, 2026-11-17).
 // 관리 화면 편집(사람 판)·휴지통은 뒤 단계에서 여기에 더한다.
 // 세션 저장은 변경 묶음이 아니라 판으로만 남는다 (2026-10-10 결정): 원본이 들어오는 일이라 되돌리기 대상이 아니다.
 @Injectable()
 export class SessionService extends BaseService {
   private static readonly ACTION = 'save_session';
   private static readonly TRANSCRIPT = 'save_transcript';
+  private static readonly RUN_RECORD = 'save_run_record';
 
   constructor(
     db: Database,
@@ -43,6 +48,39 @@ export class SessionService extends BaseService {
       const session =
         found ?? Session.open(actor, req.tool, req.sourceSessionId, req.project, req.startedAt);
       const receipt = session.receiveTranscript(transcript, req.title, actor, new Date());
+      await sessions.save(session);
+      await once.remember(receipt);
+      return receipt;
+    });
+  }
+
+  /**
+   * 에이전트 실행의 기록 받기: 그 일을 쥔 러너인지(platform Leases.forRecord) → 비밀값 지우기 · 개인정보 마스킹(트랜잭션 전) →
+   * 같은 요청인지 → 작업 세션 자리를 잠그고 찾기(없으면 만들기, 비공개) → 원문 · 메모 · 노트 판 → 결과 기록
+   */
+  async saveRun(actor: Actor, req: SaveRunRecordInput): Promise<SessionReceipt> {
+    actor.assertCan(Actor.RUN);
+    const target = await this.leases.forRecord(actor, req.taskId);
+    const [spaceId, runnerId] = Session.uploader(actor);
+    const run = AgentRunRecord.of(
+      target,
+      req.transcript,
+      req.memo,
+      req.memoBy,
+      req.resumed,
+      this.sensitive,
+    );
+    return this.transaction(async (tx) => {
+      const once = new Idempotency(tx, runnerId, req.requestId, SessionService.RUN_RECORD);
+      const before = await once.previous();
+      if (before) return SessionReceipt.replay(before);
+      const sessions = new SessionRepository(tx);
+      const now = new Date();
+      const found = await sessions.lockByFlow(spaceId, target.flow);
+      const session =
+        found ?? Session.open(actor, Session.AGENT_TOOL, target.flow, null, now, true);
+      const memos = found ? await sessions.memos(found.id, AgentRunRecord.NOTE_MEMOS) : [];
+      const receipt = session.receiveRun(run, memos, actor, now);
       await sessions.save(session);
       await once.remember(receipt);
       return receipt;

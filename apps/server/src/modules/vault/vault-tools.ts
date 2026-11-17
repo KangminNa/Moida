@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BaseTool, ToolTextBody } from '../platform';
 import { SubmitChangesTool } from './change/change.tool';
 import { NeighborsTool } from './graph/graph.tool';
+import { RunMemosTool, SaveRunRecordTool } from './session/run-record.tool';
 import {
   CheckSessionTool,
   GetSessionTool,
@@ -31,6 +32,8 @@ export class VaultTools {
     saveTranscript: SaveTranscriptTool,
     readTranscript: ReadTranscriptTool,
     saveNote: SaveNoteTool,
+    runMemos: RunMemosTool,
+    saveRunRecord: SaveRunRecordTool,
   ) {
     this.tools = [
       checkSession,
@@ -44,6 +47,8 @@ export class VaultTools {
       saveTranscript,
       readTranscript,
       saveNote,
+      runMemos,
+      saveRunRecord,
     ];
   }
 }

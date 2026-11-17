@@ -12,6 +12,9 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
   관리 화면 API `api/sessions`(목록·상세·지난 판 · 원문, 비공개까지 볼 수 있는 요청자만)
   원문 (2차 4단계, `SessionTranscript`, `session_transcripts` 추가만): 수집 훅 · 확장이 MCP `save_transcript`(upload, `transcript.tool.ts`)로 올린다. 같은 대화 자리를 잠그고(`lockBySource`), 같은 원문은 쌓지 않고, 새 원문이면 `Session.receiveTranscript`가 원문을 쌓고 세션 노트 일을 요청한다 (`task.agentless.requested`, kind `session_note`, 대상 세션 · 판은 원문 번호, requestId `note:<세션>:<번호>`. 원문은 이벤트에 싣지 않는다). 노트가 아직 없는 세션은 `head_revision_id` NULL이고 보낸 제목을 보인다.
   세션 노트 일을 쥔 러너만(platform `Leases`, `Session.noteWork`) MCP `read_transcript`(run)로 원문을 받고(`forPrompt`: 앞 4만 · 뒤 8만 자), `save_note`(run)로 AI의 답을 보낸다: `SessionNote.fromAnswer`가 JSON을 읽고(글 목록은 줄마다 "- ", 길면 자름) 민감정보를 지운 뒤 `Session.writeNote`가 원본 판(`actor_type` ai)으로 쌓는다. 더 새 원문의 노트가 이미 있으면(`noted_seq`) 쌓지 않는다(skipped)
+  작업 세션 (기획서 결정 2026-11-17 "에이전트 실행의 기록은 작업 세션이다", S1): 에이전트의 요청 하나(대화 · 목표 실행 · 맨 위 작업, task가 정한 작업 세션 키)가 세션 하나다 (도구 `cairn-agent`, 비공개, 러너 기기와 상관없이 하나: 부분 유일 색인 `sessions_agent_flow`, `SessionRepository.lockByFlow`). 기기의 저장(`save_session` · `save_transcript`)은 이 도구 이름을 쓰지 못한다 (`Session.open`).
+  일을 쥔 러너만(platform `Leases.forRecord`) MCP `save_run_record`(run, `run-record.tool.ts`)로 CLI가 끝난 뒤 원문과 인수인계 메모를 보낸다: `AgentRunRecord`가 머리(몇 번째 실행 · 에이전트 · 작업 · 세션 키) + 원문 + 메모를 한 원문으로 묶고 비밀값을 지우고 개인정보를 마스킹한다(`SensitivePolicy`의 personal, 에이전트 기록에만) → `Session.receiveRun`이 원문 한 줄(`actor_type` device) · 메모 한 줄(`run_memos`, 추가만) · 최근 메모 20개를 이어 붙인 노트 판(`actor_type` system, AI 없음)을 쌓는다. 같은 `request_id`는 한 번만(`Idempotency`). 세션 노트 일 · `vault.session.saved`(자동 정리 · 세션 알림)는 부르지 않고, 정리 대상(`TidyQuery`)에서도 뺀다 (끝난 요청의 정리는 S2).
+  MCP `run_memos`(run): 같은 세션 키의 최근 메모 5개를 오래된 것부터 (휴지통 세션의 것은 빼고). 러너가 CLI 세션을 재개하지 않을 때 지시문의 "지난 메모"로 그린다. `run_memos`는 보관 형식에 따로 나가지 않는다: 메모는 원문 안에 있다
 - `project/`: 프로젝트 규칙(`ProjectRule`, `project_rules`, 2차 4단계). 모으기를 끈 프로젝트의 원문은 `save_transcript`가 쌓지 않는다(skipped, 트랜잭션 전에 `ProjectRuleQuery.collects`). `api/project-rules`(주인만: 목록은 세션에 나온 프로젝트와 규칙, `PUT`은 늘 덮어쓴다)
 - `wiki/`: wiki(`Wiki` + 판 `WikiRevision`), 본문(`WikiBody`: md 원문과 `##` 제목 단위의 칸 `WikiSection`, 코드 블록 안의 `##`은 제목이 아니다).
   `api/wikis`(목록 `?q=&category=&cursor=`, 하나, 만들기, 고치기, 휴지통 `trash` · `restore` · 목록 `api/wikis/trash`, 대체 `replaces`), MCP `search_wikis` · `get_wiki`(`read_public`이나 `read_all`. `get_wiki`는 작업 토큰에 봉인된 읽기 허락(`Actor.mayRead`, 만들기 작업의 재료)이 있으면 그 wiki만 읽기 권한 없이도 연다). 읽기는 방문자도 공개 wiki까지, 쓰기는 주인만
@@ -41,12 +44,12 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
 - wiki · 카테고리의 View는 보는 사람마다 둘이다: 비공개까지 보는 요청자는 `WikiPageView` · `WikiDetailView` · `CategoryListView`, 아니면 `Public…` (`WikiQuery` · `CategoryQuery`가 고른다)
 
 ## 소유 데이터
-스키마 `vault`: node_kinds, edge_kinds, nodes, sessions, session_revisions, session_transcripts, categories, wikis, wiki_revisions, wiki_aliases,
+스키마 `vault`: node_kinds, edge_kinds, nodes, sessions, session_revisions, session_transcripts, run_memos, categories, wikis, wiki_revisions, wiki_aliases,
 edges, project_rules, graph_views, node_layout, post_marks,
 change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 
 ## 데이터 묶음
-- 세션: nodes(세션) + sessions + session_revisions + session_transcripts
+- 세션: nodes(세션) + sessions + session_revisions + session_transcripts + run_memos(작업 세션의 인수인계 메모)
 - 프로젝트 규칙: project_rules
 - 카테고리: nodes(카테고리) + categories
 - wiki: nodes(wiki) + wikis + wiki_revisions + wiki_aliases
@@ -91,7 +94,7 @@ platform
 - 판(session_revisions · wiki_revisions)은 추가만 한다. 트리거가 UPDATE·DELETE를 막는다
 - 그래프를 바꾸는 쓰기는 모두 `ChangeService`를 거쳐 변경 묶음으로 남긴다 (관리 화면 편집 포함). 이 Service만 여러 데이터 묶음의 Repository를 쓴다 (객체설계 4장 예외). `TidyService`가 세션 Repository로 부르는 `noteTidyRequested` 하나는 요청 기록이라 그래프를 바꾸지 않는다
 - AI 변경의 바로 합치기·검토·거부는 `ReviewPolicy` 한 곳에서만 판단한다. 규칙을 늘릴 때는 `ReviewRule` 하위 클래스 하나
-- 민감정보는 첫 저장 전에 지운다 (판은 고칠 수 없으므로). 무늬는 platform의 `SensitivePolicy`(blog 초안과 같다). 새 종류는 `SensitivePolicy.RULES`에 한 줄, `session.test.ts`에 한 줄, `skills/cairn-save/scripts/secrets.mjs`도 함께
+- 민감정보는 첫 저장 전에 지운다 (판은 고칠 수 없으므로). 무늬는 platform의 `SensitivePolicy`(blog 초안과 같다). 새 종류는 `SensitivePolicy.RULES`에 한 줄, `session.test.ts`에 한 줄, `skills/cairn-save/scripts/secrets.mjs`도 함께. 개인정보(`SensitivePolicy`의 PERSONAL)는 작업 세션의 원문 · 메모에만 건다 (사람이 올린 세션 · wiki · 글에는 걸지 않는다)
 - 세션 원문(`session_transcripts`)도 추가만 한다 (트리거). 원문을 다른 모듈의 표 · 이벤트에 복사하지 않는다: 세션 노트 일을 쥔 러너만 `read_transcript`로 받는다 (휴지통으로 보내도 사본이 남지 않게). 원문의 민감정보는 쌓기 전에 지운다 (올린 쪽도 지웠다). 보관 형식에는 `vault/transcripts/<세션 id>/<번호>.md`로 쌓인 그대로 나간다 (지운 표시 · 올린 기기는 빼고, 휴지통 세션의 것은 빼고). 복원은 다시 지우지 않는다: 바이트를 지켜야 해시가 같다
 - 세션 저장은 변경 묶음이 아니라 판으로만 남는다. 같은 대화의 저장은 대화 자리를 잠가 하나씩 처리한다 (`SessionRepository.lockBySource`)
 - AI는 공개 여부를 정할 수 없다. 새 세션은 비공개 (프로젝트 규칙은 그 관리 화면이 생길 때 읽는다)

@@ -24,7 +24,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 ## 공개 API (`index.ts`)
 - 기반 클래스: `BaseService` · `EntityService` · `BaseQuery` · `BaseRepository` · `TableRepository` · `BaseEntity` · `TableEntity` · `BaseRequest`(+`RequestFields` · `VersionInput`) · `BaseGateway` · `BaseTool`
 - 코어의 쿼리 도구 (`base/table-query.ts`, 2026-11-08): 조건 규칙(`Rule`)으로 표 하나를 읽고 쓴다. `TableReader`(`rows` · `row` · `exists` · `pageOf`)는 `BaseQuery`가, `TableWriter`(+ `insertRows` · `updateRows` · `deleteRows`)는 `BaseRepository`가 상속한다. 같은 모양은 한 번만 SQL로 만들어 기억한다. 그 기능만의 쿼리는 각 모듈이 `this.sql`로. 모듈은 `drizzle-orm`을 직접 가져오지 않는다
-- 기능 패키지: 동작(`Operation` · `Read` · `Command`, `Work`), 입구(`PackageController` · `PackageService` · `PackageTool`), 패키지의 생성된 표가 쓰는 `TableColumns` (객체설계 12장). 임대 확인 `Leases` · `LeasedWork`(플러그인 API 0.3, 대상 0.4, 지시 0.5): 일을 빌려 주는 모듈이 확인하는 길을 등록하고 패키지는 `work.leased(id)`로 묻는다 (platform은 누가 등록하는지 모른다)
+- 기능 패키지: 동작(`Operation` · `Read` · `Command`, `Work`), 입구(`PackageController` · `PackageService` · `PackageTool`), 패키지의 생성된 표가 쓰는 `TableColumns` (객체설계 12장). 임대 확인 `Leases` · `LeasedWork`(플러그인 API 0.3, 대상 0.4, 지시 0.5): 일을 빌려 주는 모듈이 확인하는 길을 등록하고 패키지는 `work.leased(id)`로 묻는다 (platform은 누가 등록하는지 모른다). 실행 기록의 자리 `Leases.forRecord` · `RunRecordTarget`(2026-11-17): 일을 빌려 주는 모듈(task)이 `registerRecord`로 등록하고, 작업 세션을 쌓는 모듈(vault)이 "이 러너가 기록을 올릴 수 있는 작업인가, 몇 번째 실행 · 세션 키 · 작업 세션 키 · 제목 · 에이전트"를 묻는다 (잡은 러너 · 진행 중이거나 기다리는 중 · 점유 시간이 남음)
 - `Database`, `Sql`·`Row`(라이브러리 타입 별칭), `Actor`와 `OwnerActor`·`DeviceActor`·`AgentActor`·`ApprovedActor`·`SystemActor`·`VisitorActor`.
   권한은 `assertCan(권한)`(기기·에이전트가 받은 권한. `Actor.AGENT_OUT`은 받은 권한이 아니라 `KEEPS_PRIVATE`(전체 읽기 · 초안 · 코드 · 만들기)가 없는 작업 토큰이면 통과, 2026-11-16), 관리 일은 종류로 묻는다: `assertOwner()`(주인만), `assertOwnerOrSystem()`(주인과 명령줄·일꾼: 플러그인, 서버 키 교체, 복원).
   `mayRead(id)` · `hasReadGrants()`: 작업 토큰에 함께 봉인한 id 하나씩의 읽기 허락 (`AgentActor`의 `reads`). 권한이 아니라 id로 하나를 읽을 때만 본다 (무엇의 id인지는 모른다)
@@ -33,7 +33,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - `HttpSetup` · `RequestTrace` (리팩토링 6단계): 서버와 시험이 같은 HTTP 설정(`CairnApp.api`가 건다). 맨 앞에서 요청 번호(UUIDv7, 들어온 `X-Request-Id`는 믿지 않음)를 붙여 응답 머리글로 돌려주고, 응답이 끝나거나 끊길 때 한 줄을 남긴다 (번호 · 메서드 · 쿼리 없는 경로 · 상태 · 걸린 시간 · 요청자 종류 · MCP 도구, 건강 확인의 2xx는 빼고, 5xx는 오류 등급). 알 수 없는 오류는 `DomainErrorFilter`가 `RequestTrace.fail`로 스택을 번호와 함께 남기고 500 `internal` + 번호로 답한다. MCP 입구는 `McpEndpoint.handle`의 `McpTrace`(부른 것 · 알 수 없는 오류)로 같은 로그에 잇는다
 - `ChangeStream`: Postgres LISTEN 연결 하나(`Listener`)로 변경 신호를 나눠 준다. SSE와 긴 폴링이 쓴다. 신호는 깨우기용이고 내용은 늘 테이블에 있다
 - `SecretRotation`: 서버 키 교체. 비밀값을 가진 모듈이 `register`로 다시 잠그는 방법을 등록
-- `SensitivePolicy` · `Redaction`: AI가 보낸 글이 판이 되기 전에 비밀값(토큰 · 키 · 비밀번호 값)을 `[지움: 종류]`로 바꾼다. 모양만 보고, 어느 칸을 지울지는 쓰는 모듈이 정한다 (vault 세션 · wiki, blog 초안)
+- `SensitivePolicy` · `Redaction`: AI가 보낸 글이 판이 되기 전에 비밀값(토큰 · 키 · 비밀번호 값)을 `[지움: 종류]`로 바꾼다. 모양만 보고, 어느 칸을 지울지는 쓰는 모듈이 정한다 (vault 세션 · wiki, blog 초안). `scrub(칸, 글, personal)`의 personal이면 개인정보(전화번호 · 이메일 · Luhn이 맞는 카드 번호 · 주민등록번호)도 마스킹한다: 에이전트 실행의 기록(vault 작업 세션)에만 켠다 (2026-11-17, 사람이 쓴 글의 연락처까지 지우지 않게)
 - `NoticeCatalog` · `NoticeKind`: 알림 종류 등록 (7단계). 등급은 `NoticeKind.IMMEDIATE` · `DIGEST` · `LOG`
 - `CoreWorkers`: 코어 모듈의 이벤트 받기 · 반복 작업 · 마감 작업 등록 (`on`, `every`, `due`, `expect`). 마감 작업은 `BaseDueJob`(다음에 깰 시각을 돌려준다, 리팩토링 2단계): 일꾼은 쉬는 동안 DB를 조회하지 않고 신호와 마감 타이머(`WorkScheduler`)로만 깬다. 들을 때마다(처음 · 끊겼다 다시) outbox와 모든 마감 작업을 한 번씩 돈다
 - `ArchiveQuery`: 보관 형식 파일 묶음. 내용을 가진 모듈이 `onModuleInit`에서 `register`로 자기 파일을, `registerRestore`로 복원을 등록한다

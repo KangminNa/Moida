@@ -312,6 +312,9 @@ export const taskRuns = taskSchema.table('task_runs', {
   prompt_source: text('prompt_source').$type<TaskRunPromptSource>(),
   prompt_revision: integer('prompt_revision'),
   prompt_hash: text('prompt_hash'),
+  lineage: text('lineage'),
+  cli_session: text('cli_session'),
+  resumed: boolean('resumed'),
 });
 
 /** task.tasks */

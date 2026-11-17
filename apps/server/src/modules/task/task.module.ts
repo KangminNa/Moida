@@ -278,6 +278,7 @@ export class TaskModule implements OnModuleInit {
     this.workers.due(this.outputPurge);
     // 기능 패키지의 도구(code-github의 code_credential 등)가 묻는 임대 확인
     this.leaseChecks.register((actor, id) => this.tasks.leasedWork(actor, id));
+    this.leaseChecks.registerRecord((actor, id) => this.tasks.recordTarget(actor, id));
     // 결과물이 가리키는 파일: 쓰는 동안 platform이 지우지 않게
     this.blobs.registerUse(['task.outputs.blob_hash'], (actor, hashes) =>
       this.outputs.usedBlobs(actor, hashes),

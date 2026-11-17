@@ -16,6 +16,7 @@ import { PostWikiQuery } from './post-mark/post-wiki.query';
 import { ProjectRuleController } from './project/project-rule.api';
 import { ProjectRuleQuery } from './project/project-rule.query';
 import { ProjectRuleService } from './project/project-rule.service';
+import { RunMemosTool, SaveRunRecordTool } from './session/run-record.tool';
 import { SessionController } from './session/session.api';
 import { SessionQuery } from './session/session.query';
 import { SessionService } from './session/session.service';
@@ -60,6 +61,8 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
     SaveTranscriptTool,
     ReadTranscriptTool,
     SaveNoteTool,
+    RunMemosTool,
+    SaveRunRecordTool,
     ProjectRuleQuery,
     ProjectRuleService,
     ReviewPolicy,

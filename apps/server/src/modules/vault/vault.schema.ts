@@ -2,7 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { bigint, boolean, integer, jsonb, pgSchema, real, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { CategoryOrigin, ChangeActorType, ChangeDomain, ChangeOp, ChangeOpStatus, ChangeOpTargetKind, ChangeOpVerdict, ChangeSetActorType, ChangeSetKind, ChangeSetStatus, EdgeActorType, EdgeDeletedByType, EdgeOrigin, GraphViewAudience, PostMarkStatus, ProjectRuleDefaultVisibility, ReviewRuleAction, SessionRevisionActorType, SessionRevisionKind, SessionTranscriptActorType, SessionVisibility, TidySettingCadence, WikiOrigin, WikiRevisionActorType, WikiRevisionKind, WikiVisibility } from './vault.tables';
+import type { CategoryOrigin, ChangeActorType, ChangeDomain, ChangeOp, ChangeOpStatus, ChangeOpTargetKind, ChangeOpVerdict, ChangeSetActorType, ChangeSetKind, ChangeSetStatus, EdgeActorType, EdgeDeletedByType, EdgeOrigin, GraphViewAudience, PostMarkStatus, ProjectRuleDefaultVisibility, ReviewRuleAction, RunMemoWrittenBy, SessionRevisionActorType, SessionRevisionKind, SessionTranscriptActorType, SessionVisibility, TidySettingCadence, WikiOrigin, WikiRevisionActorType, WikiRevisionKind, WikiVisibility } from './vault.tables';
 
 const vaultSchema = pgSchema('vault');
 
@@ -167,6 +167,23 @@ export const reviewRules = vaultSchema.table('review_rules', {
   value: integer('value'),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
   updated_by: uuid('updated_by'),
+});
+
+/** vault.run_memos */
+export const runMemos = vaultSchema.table('run_memos', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  session_id: uuid('session_id').notNull(),
+  transcript_seq: integer('transcript_seq').notNull(),
+  lineage: text('lineage').notNull(),
+  task_id: uuid('task_id').notNull(),
+  run_seq: integer('run_seq').notNull(),
+  agent_id: uuid('agent_id'),
+  agent_name: text('agent_name').notNull(),
+  task_title: text('task_title').notNull(),
+  memo: text('memo').notNull(),
+  written_by: text('written_by').$type<RunMemoWrittenBy>().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 /** vault.session_revisions */

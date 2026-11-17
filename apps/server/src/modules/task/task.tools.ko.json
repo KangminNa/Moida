@@ -121,6 +121,8 @@
       "events[].body": "기록 내용",
       "events[].tokens": "이번에 쓴 토큰 수",
       "model": "AI CLI가 알린 모델. 이 실행의 기록에 한 번 남긴다 (이미 있으면 그대로)",
+      "cli_session": "AI CLI의 세션 id. 같은 세션 키의 다음 실행이 재개할 후보가 된다. 이 실행의 기록에 한 번 남긴다",
+      "resumed": "이 실행이 앞 실행의 CLI 세션을 재개했는지. 이 실행의 기록에 한 번 남긴다",
       "plan_usage": "구독 사용률 창들. 없어도 된다. five_hour · seven_day만 저장하고 모르는 창은 넘어간다",
       "plan_usage[].window": "창 이름",
       "plan_usage[].percent": "사용률. 초과 사용이면 100을 넘는다",

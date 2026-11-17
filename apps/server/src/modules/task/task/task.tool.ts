@@ -101,6 +101,8 @@ export class ReportProgressTool extends BaseTool {
         type: 'string',
         maxLength: ReportProgressInput.MODEL_MAX,
       },
+      cli_session: { type: 'string', maxLength: ReportProgressInput.CLI_SESSION_MAX },
+      resumed: { type: 'boolean' },
       plan_usage: {
         type: 'array',
         maxItems: ReportProgressInput.PLAN_USAGE_MAX,

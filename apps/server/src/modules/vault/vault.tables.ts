@@ -229,6 +229,27 @@ export interface ReviewRuleRow {
 }
 export type ReviewRuleNew = Partial<ReviewRuleRow> & Pick<ReviewRuleRow, 'space_id' | 'key' | 'action'>;
 
+/** vault.run_memos.written_by (값 목록 CHECK) */
+export const RUN_MEMO_WRITTEN_BY = ['ai', 'runner'] as const;
+export type RunMemoWrittenBy = (typeof RUN_MEMO_WRITTEN_BY)[number];
+/** vault.run_memos */
+export interface RunMemoRow {
+  id: string;
+  space_id: string;
+  session_id: string;
+  transcript_seq: number;
+  lineage: string;
+  task_id: string;
+  run_seq: number;
+  agent_id: string | null;
+  agent_name: string;
+  task_title: string;
+  memo: string;
+  written_by: RunMemoWrittenBy;
+  created_at: Date;
+}
+export type RunMemoNew = Partial<RunMemoRow> & Pick<RunMemoRow, 'id' | 'space_id' | 'session_id' | 'transcript_seq' | 'lineage' | 'task_id' | 'run_seq' | 'agent_name' | 'task_title' | 'memo' | 'written_by'>;
+
 /** vault.session_revisions.kind (값 목록 CHECK) */
 export const SESSION_REVISION_KIND = ['origin', 'human', 'merge'] as const;
 export type SessionRevisionKind = (typeof SESSION_REVISION_KIND)[number];

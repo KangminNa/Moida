@@ -46,7 +46,7 @@
 도구 모양은 docs/API설계.md 4장이 원본이다. `report_progress`는 기록을 모아 받고, 러너가 쓰므로 바꾸면 `apps/runner`도 함께 고친다.
 
 ## 소유 데이터
-스키마 `task`: agents, agent_revisions(추가만), external_tools, chats, chat_updates(추가만), goals, schedules, tasks, task_events(추가만), task_runs(추가만, model만 한 번), approvals, plan_usage, ai_logins, runners, skills, skill_revisions(추가만), outputs, goal_runs, goal_rounds(추가만)
+스키마 `task`: agents, agent_revisions(추가만), external_tools, chats, chat_updates(추가만), goals, schedules, tasks, task_events(추가만), task_runs(추가만, model · cli_session · resumed만 한 번), approvals, plan_usage, ai_logins, runners, skills, skill_revisions(추가만), outputs, goal_runs, goal_rounds(추가만)
 
 ## 데이터 묶음
 - 에이전트: agents + agent_revisions (조직도는 `reports_to`, 설정 판은 `settings_revision`)
@@ -64,7 +64,7 @@
 - 러너: runners (러너 기기마다 한 줄, 처음 닿을 때 생긴다)
 
 ## 공개 API (`index.ts`)
-`TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상 · 지시)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). 다른 모듈에게는 platform의 `AgentDirectory`에 `AgentQuery.card`(이름 · 권한, 지운 에이전트는 없음)를 등록한다 (2차 6단계, blog 메뉴의 운영 팀)
+`TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상 · 지시)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). 다른 모듈에게는 platform의 `AgentDirectory`에 `AgentQuery.card`(이름 · 권한, 지운 에이전트는 없음)를 등록한다 (2차 6단계, blog 메뉴의 운영 팀). vault에게는 platform `Leases.registerRecord`에 `TaskQuery.recordTarget`을 등록해 실행 기록의 자리(그 러너의 마지막 실행 · 세션 키 · 작업 세션 키와 제목 · 에이전트)를 알려 준다 (2026-11-17, 작업 세션)
 
 ## 내보내는 이벤트
 칸의 원본은 `task.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.
@@ -138,7 +138,9 @@ platform
 - Codex의 자격(`auth.json`)은 갱신 토큰이라 만료가 없다 (`expires_at` null)
 - 연결 확인(`ai_test`)은 에이전트도 작업 토큰도 없다. 일을 받을 에이전트가 없어도 빌려 주고, 기다리는 확인은 도구마다 하나다. 결과는 작업이 끝날 때 같은 트랜잭션에서 로그인에 적는다 (잠그는 순서는 작업 → 로그인). 작업에 적힌 로그인의 판이 다르면 옛 토큰의 결과라 버린다
 
-- 스킬 판 · 에이전트 설정 판 · 실행 기록은 추가만 한다. 스킬 되돌리기는 `active_revision`만 옮기고, 실행 기록은 비어 있는 `model`을 러너의 보고로 한 번 채우는 것 말고 바꾸지 않는다 (DB 트리거). 지시문 글은 실행 기록에 남기지 않는다
+- 스킬 판 · 에이전트 설정 판 · 실행 기록은 추가만 한다. 스킬 되돌리기는 `active_revision`만 옮기고, 실행 기록은 비어 있는 `model` · `cli_session` · `resumed`를 러너의 보고로 한 번씩 채우는 것 말고 바꾸지 않는다 (DB 트리거, `TaskRepository.noteRun`). 지시문 글은 실행 기록에 남기지 않는다
+- 세션 키 · CLI 세션 재개 (기획서 결정 2026-11-17, `task/run-lineage.policy.ts`): 일을 빌려 줄 때 실행 기록에 세션 키(`lineage`)를 적는다. 대화의 일(회차 · 덧붙인 말의 답 · 검토 · 다시 맡김, `payload.chat.chatId`)은 `chat:<대화>:<에이전트>`, 목표 실행의 회차는 `goal-run:<실행>`, 나머지(하위 작업 포함)는 `task:<작업>`. 에이전트 없는 일과 `task-kinds.json`의 `recorded: false`(세션 정리)는 기록하지 않는다(null). 같은 키의 바로 앞 실행이 같은 러너 · 같은 에이전트 · 같은 설정 판이고 CLI 세션 id를 남겼으면 `next_jobs`의 `run.resume`에 싣는다. 브라우저 · 샌드박스 일은 `run.keep: false`라 재개하지 않는다 (개인정보 규칙 ③, 일마다 지우는 칸). 러너는 세션 파일이 있고 앞 실행이 잘 끝났을 때만 실제로 재개한다
+- 작업 점유 시간(lease)은 2분이다 (`Task.LEASE_MS`, 2026-11-17): 러너가 3초마다 `report_progress`로 늘리고, 사라진 러너의 일은 2분 안에 다른 러너가 이어 받는다. 웹 로그인처럼 `report_progress`를 부르지 않는 일은 그 일의 도구(`ai_signin`)가 부를 때마다 늘린다 (`acceptReport`)
 - 콘솔에서 고치는 스킬은 러너 스킬(`cairn-where: runner`)만. 파일 규칙(경로 · 크기 · 앞부분)은 `SkillFiles`가 막고, 러너도 받은 묶음을 다시 거른다(`apps/runner`의 `SkillPackage`)
 
 - 목표 실행: 회차 작업은 `request_id`(`goal-run:<실행>:<회차>`)로 한 번만 만들고, 작업 쪽에 실행을 가리키는 칸을 두지 않는다 (`GoalRun.runIdOf` · `roundOf`가 읽는다). 회차 작업이 끝나면 `closeRound`가 정한다: 다 됐다는 보고 → 최종 결재(`task.goal.complete`), 결재 시점 · 회차 한도 · 진전 없음 · 보고 없음 · 실패 · 취소 → 중간 결재(`task.goal.continue`), 아니면 다음 회차. 완료는 늘 주인의 최종 승인으로만 (팀장의 "다 됐다"는 주장이다). 승인 · 고쳐 달라는 말은 다음 회차(한도면 한 회차 늘림, 50까지), 거절 · 취소는 멈춤. 기다리는 중이 아니면 결재 이벤트를 무시한다 (두 번 와도 같게). 잠그는 순서는 작업 → 그 작업의 결재 → 실행 → 실행의 결재. 멈추기는 도는 회차 작업과 그 하위 작업 · 결재를 함께 취소한다

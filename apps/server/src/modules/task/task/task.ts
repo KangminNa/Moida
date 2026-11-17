@@ -51,8 +51,11 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   static readonly REQUESTED = 'task.task.requested';
   /** 상태가 바뀔 때마다. 러너의 긴 폴링과 콘솔이 이것으로 깨어난다 */
   static readonly CHANGED = 'task.task.changed';
-  /** 임대 15분. report_progress가 늘린다 */
-  static readonly LEASE_MS = 15 * 60_000;
+  /**
+   * 작업 점유 시간(lease) 2분 (기획서 결정 2026-11-17). report_progress(러너는 3초마다)가 늘린다.
+   * 러너가 사라지면 2분 안에 다른 러너가 이어 받는다
+   */
+  static readonly LEASE_MS = 2 * 60_000;
   /** 임대가 이만큼 끝나면 실패로 둔다 */
   static readonly MAX_ATTEMPTS = 3;
   /**
@@ -348,7 +351,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 몇 번째 실행인지는 Repository가 매긴다 (attempts는 고쳐 달라 · 깨우기에서 0으로 돌아간다)
    */
   recordRun(runnerId: string, record: RunRecord, now: Date): void {
-    this.run = record.row(BaseEntity.newId(), this.row.space_id, this.id, runnerId, now);
+    this.run = record.row(BaseEntity.newId(), this.row, runnerId, now);
   }
 
   /** 남길 실행 기록 (Repository가 seq를 매겨 넣는다) */

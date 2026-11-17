@@ -164,7 +164,9 @@ export class AiLoginService extends BaseService {
       if (task.cancelled) return { task, code: null };
       // 자격을 넘긴 응답을 잃고 다시 보냈다: 이미 저장했으니 같은 답을 준다
       if (task.signinDoneBy(runnerId)) return { task, code: null };
-      task.assertHeldBy(runnerId, now);
+      // 임대를 쥔 러너만, 그리고 점유 시간을 늘린다: 로그인하는 동안 러너는 report_progress를 부르지 않고
+      // 사람이 코드를 붙여 넣기를 기다리므로 2분 점유 시간이 끝나 다른 러너에게 넘어가지 않게 (2026-11-17)
+      task.acceptReport(runnerId, now);
       if (req.url !== null) {
         const login = Engines.of(tool).login;
         login.assertUrl(req.url);

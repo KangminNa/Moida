@@ -126,7 +126,7 @@ export class TaskService extends BaseService {
         task.acceptReport(runnerId, now);
         for (const e of req.events) task.log(e.kind, e.body, e.tokens, now);
         await tasks.saveLease(task);
-        if (req.model !== null) await tasks.noteModel(task.id, runnerId, req.model);
+        await tasks.noteRun(task.id, runnerId, req);
         await this.charge(tx, task, req.tokens, now);
         await this.notePlan(tx, task, req, now);
         await once?.remember({ reported: true });
@@ -330,12 +330,12 @@ export class TaskService extends BaseService {
         task.lease(runnerId, agent?.id ?? null, now);
         const skill = task.skill === null ? null : await packageOf(task.skill);
         const prompt = agent || task.writesNote ? prompts : null;
-        const tool = agent?.tool ?? task.payloadTool;
-        const cli = tool === null ? null : (req.cliVersions.get(tool) ?? null);
+        const cli = req.cliVersions.get(agent?.tool ?? task.payloadTool ?? '') ?? null;
         const record = new RunRecord(agent ?? null, skill, prompt, req.runnerBuild, cli);
         task.recordRun(runnerId, record, now);
         await tasks.save(task);
-        jobs.push(await this.jobOf(actor, tx, task, agent, org, skill, prompt));
+        const view = await this.jobOf(actor, tx, task, agent, org, skill, prompt);
+        jobs.push(view.withRun(record.jobView(await tasks.runBefore(task.addedRun))));
       }
       return jobs;
     });

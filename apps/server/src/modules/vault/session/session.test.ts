@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { DeviceActor, OwnerActor, RuleViolation, SensitivePolicy } from '../../platform';
-import { Session, SessionReceipt } from './session';
+import { Session } from './session';
 import { SessionNote } from './session-note';
+import { SessionReceipt } from './session-receipt';
 
 // 세션 노트·민감정보 지우기·판 쌓기 규칙 (DB 없이).
 // 시험용 비밀값은 실행할 때 이어 붙여 만든다: 소스에 그 모양이 그대로 있으면 GitHub의 비밀값 검사가 push를 막는다.
@@ -118,6 +119,34 @@ describe('SensitivePolicy', () => {
     const twice = scrub(once);
     assert.equal(twice.section('did'), once.section('did'));
   });
+
+  test('개인정보는 에이전트 기록(personal)에서만 마스킹: 전화 · 이메일 · 카드(Luhn) · 주민번호', () => {
+    const text = [
+      '연락처 010-1234-5678, +82 10 9876 5432, 02-345-6789',
+      '메일 kim.dev+test@example.co.kr',
+      '카드 4111-1111-1111-1111 과 4111 1111 1111 1112',
+      '주민 900101-1234567',
+      '시각 20261117120000, 작업 0190a1b2-0000-7000-8000-000000000000',
+    ].join('\n');
+    const [kept, none] = policy.scrub('raw', text);
+    assert.equal(kept, text);
+    assert.equal(none.length, 0);
+    const [masked, found] = policy.scrub('raw', text, true);
+    assert.equal(
+      masked,
+      [
+        '연락처 [지움: 전화번호], [지움: 전화번호], [지움: 전화번호]',
+        '메일 [지움: 이메일]',
+        '카드 [지움: 카드 번호] 과 4111 1111 1111 1112',
+        '주민 [지움: 주민등록번호]',
+        '시각 20261117120000, 작업 0190a1b2-0000-7000-8000-000000000000',
+      ].join('\n'),
+    );
+    assert.deepEqual(
+      [...new Set(found.map((r) => r.label))],
+      ['주민등록번호', '카드 번호', '전화번호', '이메일'],
+    );
+  });
 });
 
 describe('Session', () => {
@@ -125,6 +154,15 @@ describe('Session', () => {
     const owner = new OwnerActor(SPACE, '0192d2a0-0000-7000-8000-000000000003');
     assert.throws(() => Session.open(owner, 'claude-code', 'abc', null, null), RuleViolation);
     assert.throws(() => Session.open(device, 'Claude Code', 'abc', null, null), RuleViolation);
+  });
+
+  test('작업 세션의 도구 이름(cairn-agent)은 에이전트 실행의 기록만 쓴다', () => {
+    assert.throws(
+      () => Session.open(device, Session.AGENT_TOOL, 'chat:x', null, null),
+      RuleViolation,
+    );
+    const flow = Session.open(device, Session.AGENT_TOOL, 'chat:x', null, null, true);
+    assert.equal(flow.unsaved.tool, Session.AGENT_TOOL);
   });
 
   test('새 내용이면 판이 쌓이고, 이미 있는 내용이면 판을 만들지 않는다. 새 세션은 늘 비공개', () => {

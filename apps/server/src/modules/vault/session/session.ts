@@ -3,12 +3,13 @@ import {
   BaseEntity,
   DomainEvent,
   type LeasedWork,
-  Redaction,
   RuleViolation,
   ValueList,
 } from '../../platform';
 import { type ChangeWork, type NewNode, TargetEntity } from '../change/change-target';
 import {
+  type RunMemoNew,
+  type RunMemoRow,
   SESSION_TRANSCRIPT_ACTOR_TYPE,
   type SessionNew,
   type SessionRevisionActorType,
@@ -17,73 +18,10 @@ import {
   type SessionTranscriptNew,
   type SessionVisibility,
 } from '../vault.tables';
-import { SessionSavedView, TranscriptSavedView } from './session.view';
+import type { AgentRunRecord } from './agent-run-record';
 import { SessionNote } from './session-note';
+import { SessionReceipt } from './session-receipt';
 import type { SessionTranscript } from './session-transcript';
-
-/**
- * 세션 저장 한 번의 결과. 같은 request_id가 다시 오면 이 기록(platform.idempotency)을 되살려 그대로 돌려준다.
- *   saved      새 판이 쌓였다
- *   unchanged  이미 있는 판과 내용이 같아 판을 만들지 않았다
- *   duplicate  같은 요청이 다시 왔다 (처음 결과 그대로)
- */
-export class SessionReceipt {
-  static readonly SAVED = 'saved';
-  static readonly UNCHANGED = 'unchanged';
-  static readonly DUPLICATE = 'duplicate';
-  /** 쌓지 않았다: 모으지 않는 프로젝트의 원문, 더 새 원문의 노트가 이미 있는 옛 노트 */
-  static readonly SKIPPED = 'skipped';
-
-  private constructor(
-    readonly status: string,
-    /** 쌓지 않은 원문(모으지 않는 프로젝트)은 세션이 없다 */
-    readonly sessionId: string | null,
-    readonly seq: number,
-    readonly warnings: readonly Redaction[],
-  ) {}
-
-  static skipped(sessionId: string | null, seq: number): SessionReceipt {
-    return new SessionReceipt(SessionReceipt.SKIPPED, sessionId, seq, []);
-  }
-
-  static saved(sessionId: string, seq: number, warnings: readonly Redaction[]): SessionReceipt {
-    return new SessionReceipt(SessionReceipt.SAVED, sessionId, seq, warnings);
-  }
-
-  static unchanged(sessionId: string, seq: number, warnings: readonly Redaction[]): SessionReceipt {
-    return new SessionReceipt(SessionReceipt.UNCHANGED, sessionId, seq, warnings);
-  }
-
-  /** 남겨 둔 결과(toJSON)에서. 상태는 duplicate */
-  static replay(stored: Readonly<Record<string, unknown>>): SessionReceipt {
-    const warnings = Array.isArray(stored.warnings) ? stored.warnings : [];
-    return new SessionReceipt(
-      SessionReceipt.DUPLICATE,
-      stored.sessionId === null ? null : String(stored.sessionId),
-      Number(stored.seq),
-      warnings.map((w) => Redaction.restore(w as Record<string, unknown>)),
-    );
-  }
-
-  toJSON(): object {
-    return {
-      status: this.status,
-      sessionId: this.sessionId,
-      seq: this.seq,
-      warnings: this.warnings,
-    };
-  }
-
-  /** save_session의 답 (AI에게). site는 블로그의 사이트 주소 */
-  view(site: string): SessionSavedView {
-    return new SessionSavedView(this.status, this.sessionId ?? '', this.seq, this.warnings, site);
-  }
-
-  /** save_transcript · save_note의 답. seq는 원문의 번호, 노트면 판의 번호 */
-  transcriptView(): TranscriptSavedView {
-    return new TranscriptSavedView(this.status, this.sessionId, this.seq, this.warnings);
-  }
-}
 
 /** sessions 한 줄 + 점의 id. 대표 wiki를 바꿀 때는 휴지통 표시, 대화로 찾을 때는 있는 판의 내용을 함께 읽는다 */
 export interface LoadedSession extends SessionRow {
@@ -102,6 +40,8 @@ export interface LoadedSession extends SessionRow {
 // 판(session_revisions)은 추가만 한다. 원본(origin)은 AI 도구가 올린 노트다. 사람 판·합친 판은 관리 화면 편집 때 생긴다.
 // 원문(session_transcripts, 2차 4단계)도 추가만 한다: 수집 훅 · 확장이 원문을 올리면 노트 없이 세션이 생기고,
 // 서버 러너가 그 원문으로 쓴 노트가 원본 판이 된다 (세션 노트 일, 에이전트 없이 서버의 로그인으로).
+// 작업 세션(도구 cairn-agent, 2026-11-17): 에이전트의 요청 하나가 세션 하나다. 실행마다 원문 한 줄과 인수인계 메모를 쌓고,
+// 노트는 메모를 이어 붙여 시스템이 쓴다. 세션 노트 일 · 자동 정리 · 세션 알림은 부르지 않는다 (정리는 끝난 요청만, S2).
 export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
   static readonly PRIVATE: SessionVisibility = 'private';
   static readonly PUBLIC: SessionVisibility = 'public';
@@ -109,6 +49,8 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
   static readonly WIKI_KEY = '#wiki';
   /** 도구 이름: claude-code, codex … */
   private static readonly TOOL = /^[a-z0-9][a-z0-9-]{0,39}$/;
+  /** 작업 세션의 도구 이름. 기기의 저장(save_session · save_transcript)은 쓰지 못한다 */
+  static readonly AGENT_TOOL = 'cairn-agent';
   /** AI 도구가 올린 판 (session_revisions.kind) */
   private static readonly ORIGIN = 'origin';
   /**
@@ -133,6 +75,7 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
   private readonly transcripts = new Map<string, number>();
   private added: SessionRevisionNew | null = null;
   private addedText: SessionTranscriptNew | null = null;
+  private memo: RunMemoNew | null = null;
 
   /** 세션을 올릴 수 있는 요청자: 연결된 기기만. [공간 id, 기기 id] */
   static uploader(by: Actor): readonly [string, string] {
@@ -141,15 +84,18 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     return [by.spaceId, by.id];
   }
 
-  /** 대화의 첫 저장 */
+  /** 대화의 첫 저장. flow는 작업 세션(에이전트 실행의 기록)을 열 때만 */
   static open(
     by: Actor,
     tool: string,
     sourceSessionId: string,
     project: string | null,
     startedAt: Date | null,
+    flow = false,
   ): Session {
     const [spaceId, deviceId] = Session.uploader(by);
+    if ((tool === Session.AGENT_TOOL) !== flow)
+      throw new RuleViolation(`${Session.AGENT_TOOL}는 에이전트 실행의 기록에만 써요`);
     if (!Session.TOOL.test(tool))
       throw new RuleViolation(
         `도구 이름은 영문 소문자·숫자·-로 써 주세요 (예: claude-code): ${tool}`,
@@ -201,10 +147,16 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     return this.addedText;
   }
 
+  /** 이번에 새로 쌓인 인수인계 메모 (Repository가 저장한다) */
+  get addedMemo(): RunMemoNew | null {
+    return this.memo;
+  }
+
   /** 저장이 끝난 뒤 Repository가 부른다 */
   revisionSaved(): void {
     this.added = null;
     this.addedText = null;
+    this.memo = null;
   }
 
   /** 대표 wiki. 비어 있으면 도착 구역 */
@@ -266,6 +218,44 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
   ): SessionReceipt {
     const same = this.transcripts.get(transcript.hash);
     if (same !== undefined) return SessionReceipt.unchanged(this.id, same, transcript.redactions);
+    const seq = this.appendText(transcript, by, now);
+    if (title && (this.row.revision_count ?? 0) === 0) this.put('head_title', title);
+    const shown = this.row.head_title || title || Session.UNTITLED;
+    this.record(
+      new DomainEvent(Session.NOTE_REQUESTED, 1, this.spaceId, {
+        requestId: `note:${this.id}:${seq}`,
+        kind: Session.NOTE_KIND,
+        title: `${Session.NOTE_TITLE}${shown}`.slice(0, SessionNote.TITLE_MAX),
+        targetKind: this.targetKind,
+        targetId: this.id,
+        baseVersion: seq,
+      }),
+    );
+    return SessionReceipt.saved(this.id, seq, transcript.redactions);
+  }
+
+  /**
+   * 에이전트 실행의 기록 (작업 세션): 원문 한 줄과 인수인계 메모를 쌓고, 최근 메모(memos, 새것부터)에 이번 메모를 더해
+   * 노트 판(system)을 쌓는다. 같은 원문이 다시 오면 쌓지 않는다. 세션 노트 일은 요청하지 않는다
+   */
+  receiveRun(
+    run: AgentRunRecord,
+    memos: readonly RunMemoRow[],
+    by: Actor,
+    now: Date,
+  ): SessionReceipt {
+    const { transcript } = run;
+    const same = this.transcripts.get(transcript.hash);
+    if (same !== undefined) return SessionReceipt.unchanged(this.id, same, transcript.redactions);
+    const seq = this.appendText(transcript, by, now);
+    this.memo = run.memoRow(this.spaceId, this.id, seq, now);
+    const note = run.note([this.memo, ...memos]);
+    if (!this.known.has(note.hash)) this.addRevision(note, 'system', null, now);
+    return SessionReceipt.saved(this.id, seq, transcript.redactions);
+  }
+
+  /** 원문 한 줄을 쌓는다 (올린 쪽은 기기 · 시스템뿐). 원문 번호 */
+  private appendText(transcript: SessionTranscript, by: Actor, now: Date): number {
     const seq = (this.row.transcript_count ?? 0) + 1;
     // 원문을 올린 쪽은 기기 · 시스템뿐이다 (session_transcripts의 값 목록). 그 밖은 예전에도 DB의 CHECK가 막았다
     const actorType = Session.ACTOR_TYPES[by.kind] ?? 'system';
@@ -287,19 +277,7 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     this.transcripts.set(transcript.hash, seq);
     this.put('transcript_count', seq);
     this.put('last_revision_at', now);
-    if (title && (this.row.revision_count ?? 0) === 0) this.put('head_title', title);
-    const shown = this.row.head_title || title || Session.UNTITLED;
-    this.record(
-      new DomainEvent(Session.NOTE_REQUESTED, 1, this.spaceId, {
-        requestId: `note:${this.id}:${seq}`,
-        kind: Session.NOTE_KIND,
-        title: `${Session.NOTE_TITLE}${shown}`.slice(0, SessionNote.TITLE_MAX),
-        targetKind: this.targetKind,
-        targetId: this.id,
-        baseVersion: seq,
-      }),
-    );
-    return SessionReceipt.saved(this.id, seq, transcript.redactions);
+    return seq;
   }
 
   /**
@@ -349,16 +327,18 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     this.put('head_text', revision.body_md);
     this.put('revision_count', revision.seq);
     this.put('last_revision_at', now);
-    this.record(
-      new DomainEvent('vault.session.saved', 1, this.spaceId, {
-        sessionId: this.id,
-        revisionId: revision.id,
-        seq: revision.seq,
-        deviceId: this.row.device_id,
-        project: this.row.project,
-        created: revision.seq === 1,
-      }),
-    );
+    // 작업 세션의 판은 알리지 않는다: 자동 정리 · 세션 알림은 사람의 AI 도구 세션만 (작업 세션 정리는 S2)
+    if (this.row.tool !== Session.AGENT_TOOL)
+      this.record(
+        new DomainEvent('vault.session.saved', 1, this.spaceId, {
+          sessionId: this.id,
+          revisionId: revision.id,
+          seq: revision.seq,
+          deviceId: this.row.device_id,
+          project: this.row.project,
+          created: revision.seq === 1,
+        }),
+      );
     return revision;
   }
 }

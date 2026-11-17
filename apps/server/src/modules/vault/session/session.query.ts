@@ -12,7 +12,10 @@ import {
   SensitivePolicy,
 } from '../../platform';
 import { sessionRevisions, sessionTranscripts } from '../vault.schema';
-import type { SessionRevisionRow, SessionRow } from '../vault.tables';
+import type { RunMemoRow, SessionRevisionRow, SessionRow } from '../vault.tables';
+import { AgentRunRecord } from './agent-run-record';
+import type { RunMemosInput } from './run-record.input';
+import { RunMemosView } from './run-record.view';
 import { Session } from './session';
 import {
   type CheckSessionInput,
@@ -157,6 +160,24 @@ export class SessionQuery extends BaseQuery {
       WHERE s.node_id = ${sessionId} AND s.space_id = ${actor.requireSpace()} AND t.seq = ${seq}`;
     if (!row) throw new NotFound('원문을 찾을 수 없어요');
     return new TranscriptJobView(row, SessionTranscript.restore(row.text).forPrompt());
+  }
+
+  /**
+   * 같은 세션 키의 지난 인수인계 메모 (run_memos, 2026-11-17): 그 일을 쥔 러너만(platform Leases.forRecord).
+   * 최근 것 몇 개를 오래된 것부터. 휴지통의 작업 세션에 쌓인 메모는 주지 않는다
+   */
+  async runMemos(actor: Actor, req: RunMemosInput): Promise<RunMemosView> {
+    actor.assertCan(Actor.RUN);
+    const target = await this.leases.forRecord(actor, req.taskId);
+    const spaceId = actor.requireSpace();
+    const [flow] = await this.sql<Pick<SessionRow, 'node_id'>[]>`
+      SELECT node_id FROM vault.sessions
+      WHERE space_id = ${spaceId} AND tool = ${Session.AGENT_TOOL} AND source_session_id = ${target.flow}`;
+    const memos = await this.sql<RunMemoRow[]>`
+      SELECT m.* FROM vault.run_memos m JOIN vault.nodes n ON n.id = m.session_id
+      WHERE m.space_id = ${spaceId} AND m.lineage = ${target.lineage} AND n.deleted_at IS NULL
+      ORDER BY m.created_at DESC, m.id DESC LIMIT ${AgentRunRecord.LINEAGE_MEMOS}`;
+    return new RunMemosView(flow?.node_id ?? null, memos.reverse());
   }
 
   /** 판 하나 (지난 판 보기) */

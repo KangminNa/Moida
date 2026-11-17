@@ -120,7 +120,12 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
 
   /** 회차 작업이면 그 실행의 id (작업의 request_id goal-run:<실행>:<회차>에서). 아니면 null */
   static runIdOf(task: Task): string | null {
-    return GoalRun.parse(task.requestId)?.[1] ?? null;
+    return GoalRun.runIdOfRequest(task.requestId);
+  }
+
+  /** request_id에서 실행의 id (작업 엔티티 없이: 실행 기록의 세션 키, RunLineage) */
+  static runIdOfRequest(requestId: string | null): string | null {
+    return GoalRun.parse(requestId)?.[1] ?? null;
   }
 
   /** 회차 작업의 회차 (아니면 0) */

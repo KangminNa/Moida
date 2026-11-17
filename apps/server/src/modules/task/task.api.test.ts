@@ -665,10 +665,11 @@ describe('취소와 임대', () => {
   test('진행 보고가 임대를 늘린다', async () => {
     const task = await newTask(await newAgent());
     await take();
-    await db.sql`UPDATE task.tasks SET lease_until = now() + interval '1 minute' WHERE id = ${String(task.id)}`;
+    // 작업 점유 시간은 2분 (2026-11-17): 끝나 가는 임대를 보고가 다시 2분으로 늘린다
+    await db.sql`UPDATE task.tasks SET lease_until = now() + interval '10 seconds' WHERE id = ${String(task.id)}`;
     const before = Date.parse(String((await getTask(task.id)).leaseUntil));
     const { body } = await tool(runner, 'report_progress', { task_id: task.id, events: [] });
-    assert.equal(Date.parse(String(body.lease_until)) > before + 10 * 60_000, true);
+    assert.equal(Date.parse(String(body.lease_until)) > before + 60_000, true);
   });
 
   test('실행 기록은 고치거나 지울 수 없다', async () => {

@@ -395,6 +395,9 @@ export interface TaskRunRow {
   prompt_source: TaskRunPromptSource | null;
   prompt_revision: number | null;
   prompt_hash: string | null;
+  lineage: string | null;
+  cli_session: string | null;
+  resumed: boolean | null;
 }
 export type TaskRunNew = Partial<TaskRunRow> & Pick<TaskRunRow, 'id' | 'space_id' | 'task_id' | 'seq' | 'runner_id'>;
 

@@ -7,9 +7,11 @@ import {
   LeasedWork,
   NotFound,
   RuleViolation,
+  RunRecordTarget,
 } from '../../platform';
 import { taskRuns, tasks } from '../task.schema';
 import type { GoalRow, OutputRow, TaskEventRow, TaskRow, TaskRunRow } from '../task.tables';
+import { RunLineage } from './run-lineage.policy';
 import { Task } from './task';
 import type { ListTasksInput, TaskIdInput } from './task.input';
 import {
@@ -21,6 +23,14 @@ import {
   TaskRunView,
   TaskView,
 } from './task.view';
+
+/** 실행 기록의 자리: 맨 위 작업의 줄에 대화 · 목표 실행의 제목과 일한 에이전트를 더한 모양 */
+type RecordRootRow = TaskRow & {
+  chat_title: string | null;
+  run_title: string | null;
+  agent_name: string | null;
+  agent_tool: string | null;
+};
 
 // 작업 읽기. 목록과 상세는 주인만. mcp 모듈은 작업 토큰이 아직 살아 있는지 여기에 묻는다.
 @Injectable()
@@ -139,6 +149,49 @@ export class TaskQuery extends BaseQuery {
       row.target_id,
       row.base_version,
       row.instruction,
+    );
+  }
+
+  /**
+   * 실행의 기록이 들어갈 자리 (platform Leases.registerRecord에 등록, vault가 원문 · 인수인계 메모를 쌓을 때 묻는다, 2026-11-17).
+   * 그 러너가 잡았고 진행 중이거나 기다리는 중이며 점유 시간이 남은 작업의, 그 러너의 마지막 실행. 기록하지 않는 일은 RuleViolation.
+   * 작업 세션은 맨 위 작업의 대화 · 목표 실행 · 그 작업이고, 제목은 대화 · 목표 실행 · 맨 위 작업의 제목
+   */
+  async recordTarget(actor: Actor, taskId: string): Promise<RunRecordTarget> {
+    actor.assertCan(Actor.RUN);
+    if (!actor.id || !actor.spaceId) throw new Forbidden(Actor.RUN);
+    const task = await this.row(tasks, { space_id: actor.spaceId, id: taskId });
+    if (!task) throw new NotFound('작업을 찾을 수 없어요');
+    RunLineage.assertRecordable(task, actor.id, new Date());
+    const run = await this.runOf(actor, taskId);
+    if (run.lineage === null) throw new RuleViolation('작업 세션에 기록하지 않는 일이에요');
+    const [root] = await this.sql<RecordRootRow[]>`
+      WITH RECURSIVE up AS (
+        SELECT id, parent_id, 0 AS step FROM task.tasks WHERE id = ${taskId}
+        UNION ALL
+        SELECT t.id, t.parent_id, up.step + 1 FROM task.tasks t JOIN up ON t.id = up.parent_id
+        WHERE up.step < 10
+      )
+      SELECT root.*, c.title AS chat_title, g.title AS run_title,
+        a.name AS agent_name, a.tool AS agent_tool
+      FROM (SELECT id FROM up ORDER BY step DESC LIMIT 1) top
+      JOIN task.tasks root ON root.id = top.id
+      LEFT JOIN task.chats c
+        ON c.space_id = root.space_id AND c.id::text = root.payload->'chat'->>'chatId'
+      LEFT JOIN task.goal_runs g
+        ON g.space_id = root.space_id AND root.request_id LIKE 'goal-run:' || g.id || ':%'
+      LEFT JOIN task.agents a ON a.id = ${run.agent_id}`;
+    if (!root) throw new NotFound('작업을 찾을 수 없어요');
+    return new RunRecordTarget(
+      task.id,
+      run.seq,
+      run.lineage,
+      RunLineage.flowOf(root),
+      root.chat_title ?? root.run_title ?? root.title,
+      task.title,
+      run.agent_id,
+      root.agent_name ?? '에이전트',
+      root.agent_tool ?? '',
     );
   }
 

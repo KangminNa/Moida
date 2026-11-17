@@ -1,5 +1,6 @@
 import { NodeRepository } from '../change/change-target.repository';
 import { sessions } from '../vault.schema';
+import type { RunMemoRow } from '../vault.tables';
 import { type LoadedSession, Session } from './session';
 
 // vault.nodes(세션) + sessions + session_revisions ↔ Session. 저장은 기반이 하고(바뀐 칸만, version으로 늦은 쓰기를 막는다),
@@ -56,6 +57,30 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
   }
 
   /**
+   * 작업 세션(에이전트 요청 하나, 도구 cairn-agent)을 찾아 잠근다. 없으면 null.
+   * 러너 기기와 상관없이 하나라서(sessions_agent_flow) 기기 없이 자리를 잠근다 (lockBySource와 같은 까닭)
+   */
+  async lockByFlow(spaceId: string, flow: string): Promise<Session | null> {
+    const place = `vault.agent-flow:${spaceId}:${flow}`;
+    await this.sql`SELECT pg_advisory_xact_lock(hashtextextended(${place}, 0))`;
+    return this.maybeOne(
+      await this.sql`
+        SELECT s.*, s.node_id AS id, ${this.hashes()}
+        FROM vault.sessions s
+        WHERE s.space_id = ${spaceId} AND s.tool = ${Session.AGENT_TOOL}
+          AND s.source_session_id = ${flow}
+        FOR UPDATE OF s`,
+    );
+  }
+
+  /** 작업 세션의 최근 인수인계 메모, 새것부터 (노트를 이어 붙인다) */
+  memos(sessionId: string, limit: number): Promise<RunMemoRow[]> {
+    return this.sql<RunMemoRow[]>`
+      SELECT * FROM vault.run_memos WHERE session_id = ${sessionId}
+      ORDER BY transcript_seq DESC LIMIT ${limit}`;
+  }
+
+  /**
    * 이 판까지 정리를 요청했다고 적는다. 이미 이 판이나 더 뒤의 판을 요청했으면 false.
    * 세션의 내용이 아니라 요청 기록이라 version을 올리지 않는다: 올리면 정리 일이 들고 간 baseVersion이
    * 어긋나 `session.assign`이 검토로 빠진다.
@@ -67,13 +92,14 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
     return update.count > 0;
   }
 
-  /** 새 판 · 원문 (둘 다 추가만) */
+  /** 새 판 · 원문 · 인수인계 메모 (모두 추가만) */
   protected override async saveParts(session: Session): Promise<void> {
-    const { addedRevision: revision, addedTranscript: transcript } = session;
+    const { addedRevision: revision, addedTranscript: transcript, addedMemo: memo } = session;
     if (transcript)
       await this.sql`INSERT INTO vault.session_transcripts ${this.sql(transcript as never)}`;
     if (revision)
       await this.sql`INSERT INTO vault.session_revisions ${this.sql(revision as never)}`;
+    if (memo) await this.sql`INSERT INTO vault.run_memos ${this.sql(memo as never)}`;
     session.revisionSaved();
   }
 }
