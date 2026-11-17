@@ -11,6 +11,12 @@ function runtimeOf(r: Readonly<TaskRow>): { model?: string; effort?: string } | 
   return (r.payload as { runtime?: { model?: string; effort?: string } } | null)?.runtime ?? null;
 }
 
+/** 위 작업이 정한 결과 형식 (payload.deliver, delegate_task의 deliver, D1). 맡긴 일이 아니거나 없으면 null */
+function deliverOf(r: Readonly<TaskRow>): string | null {
+  const deliver = (r.payload as { deliver?: unknown } | null)?.deliver;
+  return typeof deliver === 'string' && deliver !== '' ? deliver : null;
+}
+
 /** 작업의 대상. 없으면 null (task.view.ts와 같은 모양) */
 function targetOf(r: Readonly<TaskRow>) {
   return r.target_kind === null
@@ -18,16 +24,43 @@ function targetOf(r: Readonly<TaskRow>) {
     : { kind: r.target_kind, id: r.target_id, version: r.base_version };
 }
 
-/** next_jobs의 팀원 한 명: 이 에이전트가 일을 맡길 수 있는 바로 아래 팀원 */
+/** 팀원 한 명의 일 수 (AgentRepository.roster가 읽는 줄): 쥔 일, 최근 7일의 끝냄 · 실패 · 고쳐 달라 · 반려, 허락받았고 켜진 커넥터 */
+export interface TeamStatRow {
+  agent_id: string;
+  open: number;
+  done: number;
+  failed: number;
+  revised: number;
+  connectors: readonly string[];
+}
+
+/** 팀원 바로 아래 팀의 요약 (이름 없이): 사람 수, 맡길 수 있는 일마다 몇 명 */
+export interface SubTeamRow {
+  members: number;
+  kinds: Readonly<Record<string, number>>;
+}
+
+/** next_jobs의 팀원 한 명: 이 에이전트가 일을 맡길 수 있는 바로 아래 팀원 (팀원 정보 D1, TeamRoster) */
 export class JobTeamMemberView {
+  private stat: Readonly<TeamStatRow> | null = null;
+  private team: Readonly<SubTeamRow> | null = null;
+
   constructor(
     private readonly row: Readonly<AgentRow>,
     /** 이 팀원에게 맡길 수 있는 일의 종류 */
     private readonly kinds: readonly string[],
   ) {}
 
+  /** 일 수 · 커넥터 · 바로 아래 팀 요약 (팀원 정보, 2026-11-17) */
+  withStats(stat: Readonly<TeamStatRow> | null, team: Readonly<SubTeamRow> | null): this {
+    this.stat = stat;
+    this.team = team;
+    return this;
+  }
+
   toJSON() {
     const r = this.row;
+    const s = this.stat;
     // bound: 정해진 러너에서만 일한다 (관리자의 컴퓨터일 수 있어 그 컴퓨터의 폴더를 읽는 일은 이 팀원에게)
     const bound = Boolean(r.runner_id);
     return {
@@ -37,6 +70,11 @@ export class JobTeamMemberView {
       status: r.status,
       kinds: this.kinds,
       bound,
+      tool: r.tool,
+      open: s?.open ?? 0,
+      recent: { done: s?.done ?? 0, failed: s?.failed ?? 0, revised: s?.revised ?? 0 },
+      connectors: s?.connectors ?? [],
+      team: this.team,
     };
   }
 }
@@ -68,6 +106,7 @@ export class JobSubtaskResultView {
       status: r.status,
       summary: this.summary?.slice(0, JobSubtaskResultView.SUMMARY_MAX) ?? null,
       error: this.error,
+      deliver: deliverOf(r),
     };
   }
 }
@@ -220,6 +259,7 @@ export class JobView {
         lease_until: r.lease_until?.toISOString() ?? null,
       },
       instruction: r.instruction,
+      deliver: deliverOf(r),
       target: targetOf(r),
       skill: this.skill,
       skill_package: this.skillPackage?.toJSON() ?? null,

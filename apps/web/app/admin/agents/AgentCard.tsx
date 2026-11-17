@@ -12,6 +12,9 @@ import { AgentUsage } from '../../_task/parts';
 import type { Agent } from '../../_task/types';
 import { Icon } from '../../_ui/Icon';
 
+/** 바로 아래가 이보다 많으면 중간 팀장을 두라고 안내한다 (위임 계약 D1: 팀장은 한 층만 보고 고른다) */
+const WIDE_TEAM = 7;
+
 // 팀 화면의 에이전트 카드 한 장: 이름 · 도구와 모델 · 지금 상태, 역할, 권한 칩, 사용량, 동작
 export function AgentCard({
   agent,
@@ -97,6 +100,9 @@ export function AgentCard({
         {agent.scopes.length === 0 && agent.approvalActions.length === 0 && <li>권한 없음</li>}
       </ul>
       <AgentUsage agent={agent} />
+      {members > WIDE_TEAM && (
+        <p className="note">바로 아래가 {members}명이에요. 중간 팀장을 두면 맡기기가 정확해져요</p>
+      )}
       <div className="agent-acts">
         <button type="button" className="text-button" onClick={onEdit}>
           편집

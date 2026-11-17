@@ -304,6 +304,7 @@ export class SubtaskOrder extends BaseRequest {
   private static readonly PATH_SHAPE = 1_000;
   private static readonly REFS_SHAPE = 10;
   private static readonly REF_SHAPE = 2_000;
+  static readonly DELIVER_MAX = 300;
 
   private constructor(
     readonly requestId: string,
@@ -314,6 +315,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly paths: readonly string[] | null,
     /** 넘길 참조: 위 작업의 참조 가운데 id나 주소 (TaskRefs.handOn이 고른다) */
     readonly refs: readonly string[] | null,
+    /** 받을 것: 하위 작업이 돌려줄 결과의 형식 (D1, 2026-11-17). 하위 작업의 deliver, 위 작업의 subtask_results[].deliver */
+    readonly deliver: string | null,
   ) {
     super();
   }
@@ -334,6 +337,7 @@ export class SubtaskOrder extends BaseRequest {
       },
       f.optionalTextList('paths', SubtaskOrder.PATHS_SHAPE, SubtaskOrder.PATH_SHAPE),
       f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
+      f.optionalText('deliver', SubtaskOrder.DELIVER_MAX),
     );
   }
 }

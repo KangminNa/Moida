@@ -1,5 +1,6 @@
 import { Actor, Forbidden, RuleViolation } from '../../platform';
 import type { Agent } from '../agent/agent';
+import { TaskKinds } from './task-kinds';
 
 // 위임 하나의 판단 (Task.subtask가 부른다). 받는 쪽 · 종류 · 권한은 코드가 막고 LLM에게 맡기지 않는다.
 // 브라우저 일(browse, 2차 3단계 2026-11-14)은 맡기는 쪽도 비공개(전체 읽기 · 초안 작성)를 읽지 못해야 한다:
@@ -9,6 +10,13 @@ import type { Agent } from '../agent/agent';
 export class DelegationPolicy {
   /** 브라우저 일을 맡기는 쪽에게 없어야 하는 권한 (browse와 함께 줄 수 없는 권한과 같다) */
   private static readonly NOT_WITH_BROWSE: readonly string[] = [Actor.READ_ALL, Actor.WRITE];
+
+  /** 이 권한을 가진 에이전트에게 맡길 수 있는 일의 종류 (팀원 정보의 kinds) */
+  static kindsFor(scopes: readonly string[]): readonly string[] {
+    return TaskKinds.DELEGABLE.filter((kind) =>
+      (TaskKinds.SCOPES[kind] ?? []).every((scope) => scopes.includes(scope)),
+    );
+  }
 
   /**
    * 받는 쪽은 manager의 바로 아래 팀원, 종류는 위임할 수 있는 것(delegable), 받는 쪽은 그 일에 필요한 권한(needs)을 가졌는가.

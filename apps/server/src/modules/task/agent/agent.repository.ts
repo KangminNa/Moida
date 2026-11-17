@@ -1,4 +1,6 @@
 import { NotFound, TableRepository } from '../../platform';
+import type { TeamStatRow } from '../task/job.view';
+import { TeamRoster } from '../task/team-roster';
 import { agentRevisions, agents } from '../task.schema';
 import type { AgentRow } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
@@ -22,6 +24,43 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
 
   override async lock(spaceId: string, id: string): Promise<Agent> {
     return AgentRepository.alive(await super.lock(spaceId, id));
+  }
+
+  /**
+   * 팀원 정보 (D1, 2026-11-17): 공간의 에이전트(usage)에 에이전트마다 쥔 일(대기 · 실행 · 기다림), 최근 기간의 끝냄 · 실패 ·
+   * 결재에서 고쳐 달라 · 반려된 수, 허락받았고 켜진 커넥터를 붙인다. 일을 빌려 줄 때 한 번 읽는다
+   */
+  async roster(spaceId: string, usage: readonly AgentUsage[], now: Date): Promise<TeamRoster> {
+    const since = TeamRoster.since(now);
+    const stats = await this.sql<TeamStatRow[]>`
+      WITH work AS (
+        SELECT agent_id,
+          count(*) FILTER (WHERE status IN ('queued', 'running', 'waiting'))::int AS open,
+          count(*) FILTER (WHERE status = 'done' AND finished_at >= ${since})::int AS done,
+          count(*) FILTER (WHERE status = 'failed' AND finished_at >= ${since})::int AS failed
+        FROM task.tasks
+        WHERE space_id = ${spaceId} AND agent_id IS NOT NULL
+          AND (status IN ('queued', 'running', 'waiting') OR finished_at >= ${since})
+        GROUP BY agent_id
+      ), sent_back AS (
+        SELECT agent_id, count(*)::int AS revised FROM task.approvals
+        WHERE space_id = ${spaceId} AND status IN ('revision_requested', 'rejected')
+          AND decided_at >= ${since} AND agent_id IS NOT NULL
+        GROUP BY agent_id
+      )
+      SELECT a.id AS agent_id, coalesce(w.open, 0) AS open, coalesce(w.done, 0) AS done,
+        coalesce(w.failed, 0) AS failed, coalesce(b.revised, 0) AS revised,
+        ARRAY(SELECT e.name FROM task.external_tools e
+              WHERE e.space_id = a.space_id AND e.status = 'active' AND e.name = ANY(a.external_tools)
+              ORDER BY e.name) AS connectors
+      FROM task.agents a
+      LEFT JOIN work w ON w.agent_id = a.id
+      LEFT JOIN sent_back b ON b.agent_id = a.id
+      WHERE a.space_id = ${spaceId} AND a.deleted_at IS NULL`;
+    return new TeamRoster(
+      usage.map((u) => u.agent),
+      stats,
+    );
   }
 
   private static alive(agent: Agent): Agent {

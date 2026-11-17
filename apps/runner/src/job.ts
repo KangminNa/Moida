@@ -143,6 +143,8 @@ export class Job {
     readonly refs: JobRefs = JobRefs.NONE,
     /** 이번 실행의 세션 키 (next_jobs의 run, 2026-11-17). 작업 세션에 기록하지 않는 일은 null */
     readonly lineage: JobLineage | null = null,
+    /** 맡긴 팀장이 정한 결과 형식 (위임 계약 D1). 맡긴 일이 아니거나 정하지 않았으면 null */
+    readonly deliver: string | null = null,
   ) {}
 
   static from(raw: Json): Job {
@@ -187,6 +189,7 @@ export class Job {
       CliRuntime.from(agent, raw.list('tools')),
       JobRefs.from(task.child('payload')),
       JobLineage.from(raw.child('run')),
+      raw.optionalText('deliver'),
     );
   }
 
@@ -245,6 +248,7 @@ export class Job {
       this.runtime,
       this.refs,
       lineage,
+      this.deliver,
     );
   }
 
@@ -313,6 +317,7 @@ export class Job {
       this.lineage?.head(prompts) ?? '',
       prompts.fill('intro', { agent: this.agentName, role: this.agentRole }),
       prompts.fill('task', { title: this.title, instruction: this.instruction }),
+      this.deliver ? prompts.fill('deliver', { deliver: this.deliver }) : '',
     ].filter(Boolean);
     if (this.chat) parts.push(this.chat.part(prompts, !this.lineage?.resumed));
     if (this.target) {

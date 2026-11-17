@@ -44,6 +44,7 @@ import type {
   ReportProgressInput,
 } from './task.input';
 import { TaskRepository } from './task.repository';
+import type { TeamRoster } from './team-roster';
 
 // 작업 쓰기: 만들기와 취소(주인), 일 요청(이벤트), 빌리기·진행·끝내기·돌려주기(러너), 끝난 임대 되돌리기(일꾼),
 // 위임(에이전트가 작업 토큰으로)과 하위 작업이 끝났을 때 위 작업 깨우기(일꾼).
@@ -245,8 +246,7 @@ export class TaskService extends BaseService {
     await this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const parentId = await tasks.parentOf(taskId);
-      if (parentId === null) return;
-      const parent = await tasks.lockById(parentId);
+      const parent = parentId === null ? null : await tasks.lockById(parentId);
       if (!parent?.waitingForSubtasks) return;
       if ((await tasks.openChildren(parent.id)) > 0) return;
       parent.wakeAfterSubtasks(new Date());
@@ -295,7 +295,7 @@ export class TaskService extends BaseService {
         .filter((u) => u.ready && u.agent.runsOn(runner.id))
         .filter((u) => workTools === null || workTools.includes(u.agent.tool))
         .map((u) => u.agent);
-      const org = usage.map((u) => u.agent);
+      const roster = await agents.roster(spaceId, usage, now);
       const jobs: JobView[] = [];
       // 칸: 공간을 잠그고(두 칸이 동시에 겹치는 일을 받지 않게) 저장소를 쥔 code 작업과 겹치는 일은 건너뛴다.
       // 건너뛸 수 있으니 후보를 넉넉히 잠근다
@@ -334,7 +334,7 @@ export class TaskService extends BaseService {
         const record = new RunRecord(agent ?? null, skill, prompt, req.runnerBuild, cli);
         task.recordRun(runnerId, record, now);
         await tasks.save(task);
-        const view = await this.jobOf(actor, tx, task, agent, org, skill, prompt);
+        const view = await this.jobOf(actor, tx, task, agent, roster, skill, prompt);
         jobs.push(view.withRun(record.jobView(await tasks.runBefore(task.addedRun))));
       }
       return jobs;
@@ -342,14 +342,14 @@ export class TaskService extends BaseService {
   }
 
   /**
-   * 빌려 준 일 하나. 목표 사슬, 바로 아래 팀, 깨어난 일이면 하위 작업의 결과와 그 결과물, 스킬의 지금 판을 함께 싣는다
+   * 빌려 준 일 하나. 목표 사슬, 바로 아래 팀(팀원 정보), 깨어난 일이면 하위 작업의 결과와 그 결과물, 스킬의 지금 판을 함께 싣는다
    */
   private async jobOf(
     actor: Actor,
     tx: Sql,
     task: Task,
     agent: Agent | null,
-    org: readonly Agent[],
+    roster: TeamRoster,
     skill: SkillPackage | null,
     prompt: SkillPackage | null,
   ): Promise<JobView> {
@@ -357,7 +357,7 @@ export class TaskService extends BaseService {
     const children = await new TaskRepository(tx).children(task.id);
     const ids = children.map((c) => c.id);
     const made = await this.outputs.madeBy(actor, ids);
-    const view = task.jobView(agent, this.box, goals, org, children, skill?.jobView() ?? null);
+    const view = task.jobView(agent, this.box, goals, roster, children, skill?.jobView() ?? null);
     view.withOutputs(made).withChat(await this.chats.forJob(actor, task.id));
     // 외부 도구 (2차 7단계): 이 에이전트에게 허락한 것만, 토큰은 여기서 풀려 이 일과 함께만 나간다
     const tools = await this.tools.forJob(actor, agent, task.checkedToolId);

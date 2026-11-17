@@ -5,14 +5,17 @@ import { AgentActor, Conflict, Forbidden, RuleViolation, SecretBox } from '../..
 import { Agent } from '../agent/agent';
 import type { TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
+import { DelegationPolicy } from './delegation.policy';
 import { Task } from './task';
 import type { SubtaskOrder } from './task.input';
+import { TeamRoster } from './team-roster';
 
 /** 위임 입력 하나 (delegate_task의 subtasks 한 줄). 참조는 넘기지 않는다 */
 function subtaskOrder(
   fields: SubtaskOrder['fields'],
   paths: string[] | null,
   refs: string[] | null = null,
+  deliver: string | null = null,
 ) {
   return {
     requestId: randomUUID(),
@@ -20,6 +23,7 @@ function subtaskOrder(
     fields,
     paths,
     refs,
+    deliver,
   } as unknown as SubtaskOrder;
 }
 
@@ -41,7 +45,8 @@ function queued(): Task {
 }
 
 /** 러너가 받는 일의 모양 */
-const job = (task: Task) => task.jobView(null, SecretBox.fromEnv({}), [], [], []).toJSON();
+const job = (task: Task) =>
+  task.jobView(null, SecretBox.fromEnv({}), [], new TeamRoster([], []), []).toJSON();
 
 function running(): Task {
   const task = queued();
@@ -311,6 +316,24 @@ describe('위임', () => {
     assert.throws(() => parent.resume(), RuleViolation, '결재 승인으로 깨울 수 없다');
   });
 
+  test('받을 것(결과 형식)은 하위 작업의 지시문으로 가고, 없으면 칸도 없다', () => {
+    const { lead, writer } = org();
+    const parent = leadTask(lead);
+    const fields = {
+      kind: 'general',
+      title: '조사',
+      instruction: '자료를 모아 주세요',
+      target_kind: null,
+      target_id: null,
+      base_version: null,
+    };
+    const shaped = parent.subtask(lead, writer, subtaskOrder(fields, null, null, '표 하나'), NOW);
+    assert.equal(job(shaped).deliver, '표 하나');
+    const plain = parent.subtask(lead, writer, subtaskOrder(fields, null), NOW);
+    assert.equal(job(plain).deliver, null);
+    assert.equal((plain.unsaved.payload as Record<string, unknown> | null)?.deliver, undefined);
+  });
+
   test('팀이 아니거나 없는 에이전트, 권한으로 못 하는 일, 맡길 수 없는 종류는 막는다', () => {
     const { lead, writer, tidier, outsider } = org();
     const parent = leadTask(lead);
@@ -320,7 +343,7 @@ describe('위임', () => {
     assert.throws(() => order(parent, lead, writer, 'tidy_session'), RuleViolation);
     assert.throws(() => order(parent, lead, writer, 'ai_test'), RuleViolation);
     assert.equal(order(parent, lead, tidier, 'tidy_session').unsaved.kind, 'tidy_session');
-    assert.deepEqual(Task.delegableWith(writer.scopes), ['general', 'draft_post']);
+    assert.deepEqual(DelegationPolicy.kindsFor(writer.scopes), ['general', 'draft_post']);
   });
 
   test('한도: 한 번에 5개, 작업 하나에 10개, 깊이 3, 라운드 3. 실행 중이 아니면 conflict', () => {

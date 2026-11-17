@@ -14,6 +14,8 @@ export class SubtaskResult {
     readonly error: string | null,
     /** 그 작업이 만든 결과물 (이름 · id). 보고(report_round)의 근거로 output_id를 건다 */
     readonly outputs: readonly string[] = [],
+    /** 맡길 때 정한 결과 형식 (delegate_task의 deliver). 받은 결과를 이것과 견준다 */
+    readonly deliver: string | null = null,
   ) {}
 
   static from(raw: Json): SubtaskResult {
@@ -24,6 +26,7 @@ export class SubtaskResult {
       raw.optionalText('summary'),
       raw.optionalText('error'),
       raw.list('outputs').map((o) => `${o.text('name')} (output_id: ${o.text('id')})`),
+      raw.optionalText('deliver'),
     );
   }
 
@@ -38,6 +41,7 @@ export class SubtaskResult {
       agent: this.agent,
       body: this.error ?? this.summary,
       outputs: this.outputs.join(', '),
+      deliver: this.deliver,
     });
   }
 }

@@ -3,7 +3,7 @@ import { Actor, BaseTool } from '../../platform';
 import { CodeScope } from './code-scope';
 import type { DelegatedView } from './job.view';
 import { Task } from './task';
-import { DelegateTaskInput } from './task.input';
+import { DelegateTaskInput, SubtaskOrder } from './task.input';
 import { TaskService } from './task.service';
 import { TaskRefs } from './task-refs.policy';
 
@@ -53,6 +53,7 @@ export class DelegateTaskTool extends BaseTool {
               maxItems: TaskRefs.MAX,
               items: { type: 'string', maxLength: 2000 },
             },
+            deliver: { type: 'string', maxLength: SubtaskOrder.DELIVER_MAX },
           },
           required: ['request_id', 'to_agent_id', 'title', 'instruction'],
         },

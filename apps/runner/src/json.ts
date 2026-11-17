@@ -68,6 +68,11 @@ export class Json {
     return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
   }
 
+  /** 객체의 키들 (키가 정해지지 않은 표, 예: 일의 종류마다 수) */
+  keys(): readonly string[] {
+    return Object.keys(this.value);
+  }
+
   /** 객체의 값들 (키가 정해지지 않은 표, 예: 모델별 사용량) */
   values(): readonly Json[] {
     return Object.values(this.value).map((item) => Json.of(item));

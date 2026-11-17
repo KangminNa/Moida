@@ -296,6 +296,46 @@ describe('지시문', () => {
     assert.ok(prompt.includes('## [실패] 정리 (정리 팀원)\n세션이 없어요'));
   });
 
+  test('팀원 정보(일 수 · 최근 결과 · 도구 · 커넥터 · 아래 팀)와 나누는 법, 결과 형식을 담는다', () => {
+    const prompt = job({
+      team: [
+        {
+          agent_id: 'm1',
+          name: '조사 팀장',
+          role: '',
+          status: 'active',
+          kinds: ['general'],
+          tool: 'codex',
+          open: 2,
+          recent: { done: 5, failed: 1, revised: 0 },
+          connectors: ['notion', 'linear'],
+          team: { members: 2, kinds: { general: 2, browse: 1 } },
+        },
+        { agent_id: 'w1', name: '글쓰기', role: '', status: 'active', kinds: ['general'] },
+      ],
+      subtask_results: [
+        { title: '조사', agent: '조사 팀장', status: 'done', summary: '표', deliver: '표 하나' },
+      ],
+      rounds_left: 1,
+    }).prompt(REPO_PROMPTS, false);
+    assert.ok(
+      prompt.includes(
+        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 커넥터: notion, linear · 아래 팀: 2명 (general 2, browse 1)',
+      ),
+    );
+    // 옛 서버(팀원 정보 없음)면 0으로, 아래 팀 · 커넥터 칸은 없다
+    assert.ok(prompt.includes('글쓰기 (agent_id: w1) · 맡길 수 있는 일: general · 쥔 일 0개'));
+    assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|아래 팀)/.test(prompt), false);
+    assert.ok(prompt.includes('## 나누는 법'));
+    assert.ok(prompt.includes('propose_setting'), '맞는 담당이 없으면 팀 바꾸기를 제안한다');
+    assert.ok(prompt.includes('## [완료] 조사 (조사 팀장)\n요청한 형식: 표 하나\n표'));
+
+    const child = job({ deliver: '후보 3개를 표로' }).prompt(REPO_PROMPTS, false);
+    assert.ok(child.includes('# 돌려줄 결과의 형식'));
+    assert.ok(child.includes('후보 3개를 표로'));
+    assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('돌려줄 결과의 형식'), false);
+  });
+
   test('묶인 팀원은 정해진 컴퓨터에서 일한다고 팀장에게 알린다', () => {
     const prompt = job({
       team: [

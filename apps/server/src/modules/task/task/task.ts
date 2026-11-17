@@ -33,6 +33,7 @@ import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
 import { type TaskKind, TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
+import type { TeamRoster } from './team-roster';
 
 // 작업 하나. 러너가 임대로 빌려 가고, 에이전트가 결재를 올리고, 결재 뒤 실행 결과로 끝난다.
 //   queued → running → waiting → running → done, 그리고 failed · cancelled
@@ -182,13 +183,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     if (kind !== Task.AI_SIGNIN || typeof payload !== 'object' || payload === null) return payload;
     const { code: _sealed, ...rest } = payload as Record<string, unknown>;
     return rest;
-  }
-
-  /** 이 권한을 가진 에이전트에게 위임할 수 있는 일의 종류 */
-  static delegableWith(scopes: readonly string[]): readonly string[] {
-    return Task.DELEGABLE.filter((kind) =>
-      (Task.SCOPES[kind] ?? []).every((scope) => scopes.includes(scope)),
-    );
   }
 
   /** delegate_task의 답: 맡긴 하위 작업들. 위 작업은 하위 작업을 기다린다 */
@@ -458,6 +452,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
           delegatedBy: this.id,
           ...CodeScope.forSubtask(kind, paths, this.codeScope),
           ...TaskRefs.of(r.payload).handOn(refs, worker).payload,
+          ...(order.deliver ? { deliver: order.deliver } : {}),
         },
         priority: r.priority,
         goal_id: r.goal_id,
@@ -613,19 +608,18 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /**
    * 빌려 준 일 하나. 맡은 에이전트의 작업 토큰을 여기서 만든다.
-   * 목표 사슬(goals), 바로 아래 팀(org에서), 깨어난 일이면 하위 작업(children)의 결과를 함께 싣는다
+   * 목표 사슬(goals), 바로 아래 팀(roster: 팀원 정보, D1), 깨어난 일이면 하위 작업(children)의 결과를 함께 싣는다
    */
   jobView(
     agent: Agent | null,
     box: SecretBox,
     goals: readonly Goal[],
-    org: readonly Agent[],
+    roster: TeamRoster,
     children: readonly Task[],
     skill: JobSkillView | null = null,
   ): JobView {
     const runToken =
       agent && this.actorFor(agent.id, agent.scopes).seal(box, Task.RUN_TOKEN_SECONDS);
-    const team = agent ? org.filter((a) => agent.manages(a)) : [];
     return new JobView(
       this.row,
       this.skill,
@@ -633,8 +627,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
       agent,
       runToken,
       goals.map((g) => g.title),
-      team.map((a) => a.memberView(Task.delegableWith(a.scopes))),
-      children.map((c) => c.resultView(org.find((a) => a.id === c.row.agent_id)?.name ?? null)),
+      roster.members(agent),
+      children.map((c) => c.resultView(roster.nameOf(c.row.agent_id))),
       Math.max(0, Task.ROUNDS_MAX - this.row.rounds),
       skill,
     );

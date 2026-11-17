@@ -1145,11 +1145,19 @@ describe('위임', () => {
         ['정리 팀원', ['general', 'draft_post', 'tidy_session']],
       ],
     );
+    // 팀원 정보 (D1): 아직 맡은 일이 없으면 0, 아래 팀이 없으면 null
+    assert.deepEqual(
+      (job.team as Json[]).map((m) => [m.tool, m.open, m.recent, m.connectors, m.team]),
+      [
+        ['claude', 0, { done: 0, failed: 0, revised: 0 }, [], null],
+        ['claude', 0, { done: 0, failed: 0, revised: 0 }, [], null],
+      ],
+    );
     assert.deepEqual(job.subtask_results, []);
     assert.equal(job.rounds_left, 3);
 
     const subtasks = [
-      order('draft', writer, { kind: 'draft_post' }),
+      order('draft', writer, { kind: 'draft_post', deliver: '초안 한 편과 제목 후보 3개' }),
       order('tidy', tidier, { kind: 'tidy_session' }),
     ];
     const delegated = await tool(job.run_token, 'delegate_task', { subtasks });
@@ -1186,6 +1194,11 @@ describe('위임', () => {
     const first = (await take()) as Awaited<ReturnType<typeof take>> & Json;
     assert.deepEqual(first.goal_chain, job.goal_chain);
     assert.deepEqual(first.team, [], '팀원에게는 팀이 없다');
+    assert.equal(
+      first.deliver,
+      first.agent.name === '글쓰기 팀원' ? '초안 한 편과 제목 후보 3개' : null,
+      '받을 것은 정한 하위 작업에만 간다',
+    );
     const finish = (child: Awaited<ReturnType<typeof take>>) =>
       child.agent.name === '글쓰기 팀원'
         ? tool(runner, 'submit_result', {
@@ -1220,11 +1233,26 @@ describe('위임', () => {
     assert.equal(back.agent.name, '팀장');
     assert.deepEqual(
       (back.subtask_results as Json[])
-        .map((r) => [r.title, r.agent, r.status, r.summary, r.error])
+        .map((r) => [r.title, r.agent, r.status, r.summary, r.error, r.deliver])
         .sort(),
       [
-        ['글쓰기 팀원의 일', '글쓰기 팀원', 'done', '초안을 썼어요', null],
-        ['정리 팀원의 일', '정리 팀원', 'failed', null, '세션이 없어요'],
+        [
+          '글쓰기 팀원의 일',
+          '글쓰기 팀원',
+          'done',
+          '초안을 썼어요',
+          null,
+          '초안 한 편과 제목 후보 3개',
+        ],
+        ['정리 팀원의 일', '정리 팀원', 'failed', null, '세션이 없어요', null],
+      ],
+    );
+    // 최근 7일의 결과가 팀원 정보에 쌓인다 (쥔 일은 이제 없다)
+    assert.deepEqual(
+      (back.team as Json[]).map((m) => [m.name, m.open, m.recent]),
+      [
+        ['글쓰기 팀원', 0, { done: 1, failed: 0, revised: 0 }],
+        ['정리 팀원', 0, { done: 0, failed: 1, revised: 0 }],
       ],
     );
     assert.equal(back.rounds_left, 2);
@@ -1256,6 +1284,10 @@ describe('위임', () => {
       subtasks: ['1', '2', '3', '4', '5', '6'].map((id) => order(id, writer)),
     });
     assert.equal(tooMany.body.code, 'rule_violation', '한 번에 5개까지');
+    const longShape = await tool(job.run_token, 'delegate_task', {
+      subtasks: [order('v', writer, { deliver: '가'.repeat(301) })],
+    });
+    assert.equal(longShape.body.code, 'invalid_request', '받을 것은 300자까지');
 
     const once = await tool(job.run_token, 'delegate_task', { subtasks: [order('z', writer)] });
     assert.equal(once.ok, true, JSON.stringify(once.body));

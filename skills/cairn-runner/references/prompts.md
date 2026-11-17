@@ -1,7 +1,7 @@
 # 지시문 틀
 
 AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도 자기가 만드는 지시(goal-round · goal-report · read-url-note)를 채운다. 표시 줄부터 다음 표시 줄 전까지가 틀 하나이고, 이 설명은 첫 표시 앞이라 쓰지 않는다.
-문법은 SKILL.md의 "고칠 때". 지시문은 대개 (resumed) · intro · task · (chat) · (target) · (goal) · (revision) · (subtasks) · (site) · (단락들) · (team) · (skill) · work · (tools) · (refs) · (memos) · (memo) 순이다.
+문법은 SKILL.md의 "고칠 때". 지시문은 대개 (resumed) · intro · task · (deliver) · (chat) · (target) · (goal) · (revision) · (subtasks) · (site) · (단락들) · (team) · (skill) · work · (tools) · (refs) · (memos) · (memo) 순이다.
 
 <!-- intro -->
 당신은 Cairn의 에이전트 "{{agent}}"입니다.
@@ -12,6 +12,11 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 <!-- task -->
 # 할 일: {{title}}
 {{instruction}}
+
+<!-- deliver -->
+# 돌려줄 결과의 형식
+맡긴 팀장이 정한 형식입니다. 마지막 답을 이 형식으로 씁니다. 팀장은 이 답을 다른 팀원의 결과와 나란히 놓고 모읍니다.
+{{deliver}}
 
 <!-- chat -->
 {{#history}}
@@ -72,6 +77,9 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 
 <!-- subtask -->
 ## [{{#done}}완료{{/done}}{{#failed}}실패{{/failed}}{{#cancelled}}취소{{/cancelled}}{{#other}}{{other}}{{/other}}] {{title}} ({{#agent}}{{agent}}{{/agent}}{{^agent}}담당 없음{{/agent}})
+{{#deliver}}
+요청한 형식: {{deliver}}
+{{/deliver}}
 {{#body}}
 {{body}}
 {{/body}}
@@ -134,19 +142,24 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 
 <!-- team -->
 # 내 팀 (바로 아래)
+팀원마다 맡길 수 있는 일 · AI 도구 · 지금 쥔 일 · 최근 7일 결과(끝냄 · 실패 · 고쳐 달라거나 반려된 수) · 쓸 수 있는 커넥터 · 그 아래 팀의 크기입니다. 그 아래 팀은 팀원이 알아서 나눕니다.
 {{members}}
 
 {{#rounds}}
-나눠 맡기는 편이 나을 때만 delegate_task로 한 번에 맡기고, 이 실행은 바로 끝냅니다.
-팀원은 내가 쓴 지시와 목표만 보고 일하므로 지시에 필요한 것을 모두 적습니다.
-하위 작업이 모두 끝나면 결과와 함께 이 일이 다시 옵니다. 남은 위임 횟수: {{rounds}}.
+## 나누는 법
+- 나눠 맡기는 편이 나을 때만 맡깁니다: 서로 기다리지 않는 일이고, 필요한 능력(일의 종류 · 커넥터)이 다를 때. 작은 일은 직접 합니다.
+- 하위 작업 하나에 결과 하나. 같은 질문을 두 팀원에게 맡기지 않습니다.
+- 팀원은 내가 쓴 지시와 목표만 봅니다. 지시만 읽고 할 수 있게 필요한 것(대상 · 기준 · 범위 · 출처)을 모두 적고, deliver에 돌려받을 결과의 형식을 적습니다.
+- 같은 일을 할 수 있는 팀원이 여럿이면 쥔 일이 적고 최근 실패 · 고쳐 달라가 적은 쪽에 맡깁니다.
+- 맡길 팀원이 없으면(필요한 일의 종류 · 커넥터가 팀에 없음) 맡기지 않습니다. 할 수 있는 만큼 직접 하고, 무엇이 없어서 못 했는지와 필요한 능력을 답에 적어 위로 올립니다. 내가 관리자와 대화하는 담당이면 propose_setting으로 팀 바꾸기(에이전트 더하기 · 권한 · 커넥터)를 제안할 수 있습니다. 관리자가 승인해야 바뀝니다.
+- delegate_task로 한 번에 맡기고 이 실행은 바로 끝냅니다. 하위 작업이 모두 끝나면 결과와 함께 이 일이 다시 옵니다. 남은 위임 횟수: {{rounds}}.
 {{/rounds}}
 {{^rounds}}
 더 맡길 수 없습니다. 직접 마무리합니다.
 {{/rounds}}
 
 <!-- member -->
-- {{name}} (agent_id: {{id}}){{#role}}: {{role}}{{/role}} · 맡길 수 있는 일: {{kinds}}{{#paused}} (중지됨: 맡겨도 재개될 때까지 기다림){{/paused}}{{#bound}} · 정해진 컴퓨터에서 일함 (그 컴퓨터의 폴더를 읽는 일은 이 팀원에게){{/bound}}
+- {{name}} (agent_id: {{id}}){{#role}}: {{role}}{{/role}} · 맡길 수 있는 일: {{kinds}}{{#tool}} · AI 도구: {{tool}}{{/tool}} · 쥔 일 {{open}}개 · 최근 7일 끝냄 {{done}} · 실패 {{failed}} · 고쳐 달라 · 반려 {{revised}}{{#connectors}} · 커넥터: {{connectors}}{{/connectors}}{{#team}} · 아래 팀: {{team}}{{/team}}{{#paused}} (중지됨: 맡겨도 재개될 때까지 기다림){{/paused}}{{#bound}} · 정해진 컴퓨터에서 일함 (그 컴퓨터의 폴더를 읽는 일은 이 팀원에게){{/bound}}
 
 <!-- skill -->
 {{#text}}

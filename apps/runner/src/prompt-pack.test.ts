@@ -126,6 +126,7 @@ describe('PromptPack', () => {
     for (const name of [
       'intro',
       'task',
+      'deliver',
       'chat',
       'chat-owner',
       'chat-agent',
