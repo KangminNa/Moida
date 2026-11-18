@@ -117,6 +117,7 @@ async function publishPost(main: unknown, more: Json = {}): Promise<Json> {
     slug: named('글').replace(' ', '-'),
     title: named('글'),
     status: 'published',
+    appId: null,
     postVersion: 1,
     mainWikiId: main,
     refWikiIds: [],
