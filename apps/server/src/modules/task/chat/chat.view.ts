@@ -105,6 +105,8 @@ export class ChatView {
       project: r.project ?? null,
       /** 받을 것 (html · blog · browser · code). null이면 대화 답 */
       deliver: r.deliver ?? null,
+      /** 앱 관리에서 연 대화의 앱 (blog 앱 id, 스토어 2단계). 화면이 앱 목록으로 이름을 붙인다 */
+      appId: r.app_id ?? null,
       /** 대화의 모델 · 생각 강도 (2026-11-15 B). null이면 상대 에이전트의 설정 */
       model: r.model ?? null,
       effort: r.effort ?? null,

@@ -112,6 +112,7 @@ export const chats = taskSchema.table('chats', {
   model: text('model'),
   effort: text('effort').$type<ChatEffort>(),
   pending_refs: jsonb('pending_refs'),
+  app_id: uuid('app_id'),
 });
 
 /** task.external_tools */

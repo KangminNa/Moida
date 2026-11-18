@@ -80,7 +80,7 @@
 `task.app_code.built` (taskId, runId, appId, note, files): 앱 코드의 새 버전 (스토어 1-6). 두 번 받아도 버전은 하나다 (`UNIQUE(app_id, run_id)`와 `AppCodeRepository.hasRun`). 그사이 다른 버전이 생겼으면 409로 다시 받는다
 
 ## 써도 되는 모듈
-platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄)
+platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄). 거꾸로 앱 이름은 `Lookups`의 `app`으로 준다 (스토어 2단계, `AppQuery.names`: 관리자는 공간의 앱, 그 밖은 공개 앱. task가 대화의 앱을 확인한다)
 
 ## 지켜야 할 것
 - 글 → wiki 연결은 blog가 값으로 갖는다 (외래키 없음): 대표 `posts.main_wiki_id`, 참고 `post_wiki_refs`. 발행·수정 때 이벤트로 vault에 알린다

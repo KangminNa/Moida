@@ -89,10 +89,15 @@ export class ChatUpdateQuery extends BaseQuery {
     return view.empty ? null : view;
   }
 
-  /** 관리자의 상태판 (대화 목록 · 상세): 공간의 대화 limit개, chatId를 주면 그 대화 하나 */
-  ownerBoard(actor: Actor, chatId: string | null, limit = ChatUpdateQuery.BOARD) {
+  /** 관리자의 상태판 (대화 목록 · 상세): 공간의 대화 limit개, chatId를 주면 그 대화 하나, appId를 주면 그 앱의 대화만 (스토어 2단계) */
+  ownerBoard(
+    actor: Actor,
+    chatId: string | null,
+    limit = ChatUpdateQuery.BOARD,
+    appId: string | null = null,
+  ) {
     actor.assertOwner();
-    return this.board(actor.requireSpace(), null, chatId, null, limit);
+    return this.board(actor.requireSpace(), null, chatId, null, limit, appId);
   }
 
   private async lastNumber(spaceId: string): Promise<number> {
@@ -137,6 +142,7 @@ export class ChatUpdateQuery extends BaseQuery {
     chatId: string | null,
     project: string | null,
     limit = ChatUpdateQuery.BOARD,
+    appId: string | null = null,
   ): Promise<ChatBoardRow[]> {
     const sql = this.sql;
     const prefix = ChatRequest.TURN_PREFIX;
@@ -166,6 +172,7 @@ export class ChatUpdateQuery extends BaseQuery {
         ${device === null ? sql`` : sql`AND c.device_id = ${device}`}
         ${chatId === null ? sql`` : sql`AND c.id = ${chatId}`}
         ${project === null ? sql`` : sql`AND c.project = ${project}`}
+        ${appId === null ? sql`` : sql`AND c.app_id = ${appId}`}
       ORDER BY c.updated_at DESC, c.id DESC LIMIT ${limit}`;
   }
 }

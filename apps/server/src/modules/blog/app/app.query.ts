@@ -79,6 +79,20 @@ export class AppQuery extends BaseQuery {
     return new AppIconFile(blob, await this.blobs.open(hash));
   }
 
+  /**
+   * 다른 모듈이 platform Lookups 'app'으로 묻는 앱 이름 (스토어 2단계: 대화의 앱). 관리자는 공간의 앱, 그 밖은 공개 앱만.
+   * 볼 수 없거나 없는 앱은 빠진다
+   */
+  async names(actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const where =
+      actor.kind === 'owner'
+        ? this.sql`AND space_id = ${actor.requireSpace()}`
+        : this.sql`AND visibility = ${App.PUBLIC}`;
+    const rows = await this.sql<Pick<AppRow, 'id' | 'name'>[]>`
+      SELECT id, name FROM blog.apps WHERE id = ANY(${ids as string[]}::uuid[]) ${where}`;
+    return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
   /** 대화로 바꾸는 앱 (get_settings apps). 확인을 거친 제안자만 */
   async settings(actor: Actor): Promise<AppSettingsView> {
     const spaceId = SettingActor.spaceOf(actor);

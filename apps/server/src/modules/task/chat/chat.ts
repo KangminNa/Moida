@@ -54,14 +54,17 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   /**
    * 새 대화: 상대 없이 열고 첫 메시지를 pending에 둔다. 같은 트랜잭션에서 대표가 맡는다 (assign, O-2).
    * opening: device_id(기기 MCP ask_agent가 연 대화면 그 기기), goal(목표 한 줄), project(맞춘 git 주소, ChatProject),
-   * deliver(받을 것, ChatResult.deliverOf), pending_refs(첫 메시지의 참조, 2026-11-15 B)
+   * deliver(받을 것, ChatResult.deliverOf), pending_refs(첫 메시지의 참조, 2026-11-15 B), app_id(앱 관리에서 연 대화의 앱, 스토어 2단계)
    */
   static open(
     spaceId: string,
     requestId: string,
     message: string,
     now: Date,
-    opening: Pick<ChatNew, 'device_id' | 'goal' | 'project' | 'deliver' | 'pending_refs'> = {},
+    opening: Pick<
+      ChatNew,
+      'device_id' | 'goal' | 'project' | 'deliver' | 'pending_refs' | 'app_id'
+    > = {},
   ): Chat {
     const text = message.trim();
     if (!text) throw new RuleViolation('메시지를 적어요');
@@ -188,6 +191,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
             ...(fix ? { fix: true, ...(fixBy ? { fixBy } : {}) } : {}),
             ...(note ? { note } : {}),
             ...(deliver ? { deliver } : {}),
+            ...(this.row.app_id ? { appId: this.row.app_id } : {}),
           },
           ...refs.payload,
           ...AgentRuntime.turnPayload(agent.tool, this.row.model, this.row.effort),

@@ -6,6 +6,7 @@ import {
   Forbidden,
   Idempotency,
   LibraryQuery,
+  Lookups,
   RuleViolation,
   type Sql,
   SystemActor,
@@ -44,6 +45,7 @@ export class ChatService extends BaseService {
     db: Database,
     private readonly skills: SkillQuery,
     private readonly library: LibraryQuery,
+    private readonly lookups: Lookups,
   ) {
     super(db);
   }
@@ -53,6 +55,9 @@ export class ChatService extends BaseService {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     const refs = await this.refsOf(actor, req.refs);
+    // 대화의 앱 (스토어 2단계): blog의 앱인지 platform Lookups로 (task는 blog를 모른다)
+    if (req.appId !== null)
+      await this.lookups.assertVisible('app', actor, [req.appId], '앱을 찾을 수 없어요');
     const now = new Date();
     return this.transaction(async (tx) => {
       const before = await new ChatRepository(tx).findByRequest(spaceId, req.requestId);
@@ -62,6 +67,7 @@ export class ChatService extends BaseService {
         project: ChatProject.of(req.project),
         deliver: ChatResult.deliverOf(req.deliver),
         pending_refs: refs.empty ? null : refs.lines,
+        app_id: req.appId,
       });
       await this.start(tx, chat, await new AgentEdit(tx, spaceId).lead(now), now);
       return chat;

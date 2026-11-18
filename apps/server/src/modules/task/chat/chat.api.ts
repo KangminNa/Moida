@@ -1,6 +1,12 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { type Actor, CurrentActor, VersionInput } from '../../platform';
-import { ChatIdInput, CreateChatInput, SendChatInput, TuneChatInput } from './chat.input';
+import {
+  ChatIdInput,
+  CreateChatInput,
+  ListChatsInput,
+  SendChatInput,
+  TuneChatInput,
+} from './chat.input';
 import { ChatQuery } from './chat.query';
 import { ChatService } from './chat.service';
 import type { ChatDetailView, ChatListView, ChatView } from './chat.view';
@@ -15,8 +21,8 @@ export class ChatController {
   ) {}
 
   @Get()
-  list(@CurrentActor() actor: Actor): Promise<ChatListView> {
-    return this.query.list(actor);
+  list(@CurrentActor() actor: Actor, @Query() query: unknown): Promise<ChatListView> {
+    return this.query.list(actor, ListChatsInput.from(query));
   }
 
   @Get(':id')

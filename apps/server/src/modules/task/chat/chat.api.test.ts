@@ -390,6 +390,71 @@ describe('대화', () => {
   });
 });
 
+describe('대화의 앱 (스토어 2단계)', () => {
+  const newApp = async () =>
+    ok(
+      await api.request('POST', '/api/apps', owner, {
+        requestId: randomUUID(),
+        kind: 'blog',
+        name: '대화 앱',
+        slug: `chat-${randomUUID().slice(0, 6)}`,
+      }),
+      201,
+    );
+  const openIn = (appId: unknown, message: string) =>
+    api.request('POST', '/api/chats', owner, { requestId: randomUUID(), message, appId });
+
+  test('앱 관리에서 연 대화는 앱을 들고, 대표의 회차가 payload.chat.appId로 싣는다. ?app=으로 거른다', async () => {
+    const app = await newApp();
+    const made = ok(await openIn(app.id, '이 앱에 글 하나'), 201);
+    assert.equal(made.appId, app.id);
+    const { chat, turns } = await detail(made.id);
+    assert.equal(chat.appId, app.id);
+    assert.equal((await task(turns[0].taskId)).payload.chat.appId, app.id);
+
+    const plain = ok(await open('앱 없는 대화'), 201);
+    assert.equal(plain.appId, null);
+    const plainTurn = (await detail(plain.id)).turns[0];
+    assert.equal('appId' in (await task(plainTurn.taskId)).payload.chat, false);
+
+    const listed = ok(await api.get(`/api/chats?app=${app.id}`, owner)).chats as Json[];
+    assert.deepEqual(
+      listed.map((c) => [c.id, c.appId]),
+      [[made.id, app.id]],
+    );
+    const all = ok(await api.get('/api/chats', owner)).chats as Json[];
+    assert.ok(all.some((c) => c.id === plain.id));
+    assert.equal((await api.get('/api/chats?app=nope', owner)).status, 400);
+  });
+
+  test('다음 회차도 앱을 싣고, 덧붙인 말의 답에는 싣지 않는다 (대표의 회차만 앱을 본다)', async () => {
+    const app = await newApp();
+    const made = ok(await openIn(app.id, '첫 글'), 201);
+    const first = await take();
+    ok(await send(made, '제목은 짧게'), 201);
+    const reply = (await jobs()).find(
+      (j) => j.task.payload?.chat?.chatId === made.id && j.task.payload.chat.reply,
+    ) as Json;
+    assert.ok(reply, '도는 회차에 덧붙인 말은 답하는 작업이 된다');
+    assert.equal('appId' in reply.task.payload.chat, false);
+    await tool(runner, 'submit_result', {
+      task_id: first.task.id,
+      request_id: randomUUID(),
+      status: 'done',
+      result: { text: '초안을 썼어요' },
+    });
+    const now = (await detail(made.id)).chat;
+    ok(await send(now, '하나 더'), 201);
+    const second = (await detail(made.id)).turns.at(-1);
+    assert.equal((await task(second.taskId)).payload.chat.appId, app.id);
+  });
+
+  test('없는 앱 · 모양이 틀린 앱은 대화를 열지 않는다 (404 · 400)', async () => {
+    assert.equal((await openIn(randomUUID(), '없는 앱')).status, 404);
+    assert.equal((await openIn('nope', '모양')).status, 400);
+  });
+});
+
 describe('대화 입력창 (2026-11-15 B): 참조 · 모델', () => {
   test('주소 참조는 회차 작업의 payload.refs와 회차에 실린다. 모양이 틀리면 400, 없는 참조는 422', async () => {
     const refs = [{ kind: 'url', url: 'https://example.com/a', browser: false }];

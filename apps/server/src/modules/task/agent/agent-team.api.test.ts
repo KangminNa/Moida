@@ -53,7 +53,18 @@ describe('에이전트 팀 템플릿', () => {
     const { teams } = ok(await api.get('/api/agent-teams', owner)) as { teams: Json[] };
     assert.deepEqual(
       teams.map((t) => t.key),
-      ['contest', 'briefing', 'planning', 'output', 'data', 'blog', 'code', 'tidy', 'maintainer'],
+      [
+        'contest',
+        'briefing',
+        'planning',
+        'output',
+        'data',
+        'code',
+        'tidy',
+        'maintainer',
+        'blog',
+        'app',
+      ],
     );
     const contest = teams[0] as { needs: string[]; members: Json[] };
     assert.deepEqual(contest.needs, ['code-runner', 'browser']);
@@ -108,6 +119,33 @@ describe('에이전트 팀 템플릿', () => {
       first.map((a) => a.id),
     );
     assert.equal(await count(), before, '다시 보내도 팀은 하나');
+  });
+
+  test('앱 운영 팀 (스토어 2단계): 편집장이 맨 위라 앱의 운영 팀장이 되고, 비공개를 읽는 구성원이 없다', async () => {
+    const made = ok(await make('app'), 201).agents as Json[];
+    const [editor] = made as [Json];
+    assert.deepEqual(
+      made.map((a) => [a.name, a.scopes, a.reportsTo]),
+      [
+        ['편집장', ['read_public', 'write'], null],
+        ['작가', ['read_public', 'write'], editor.id],
+        ['자료 조사', ['read_public'], editor.id],
+        ['앱 디자이너', ['make'], editor.id],
+      ],
+    );
+    assert.ok(made.every((a) => !(a.scopes as string[]).includes('read_all')));
+    const slug = `ops-${randomUUID().slice(0, 6)}`;
+    const app = ok(
+      await api.request('POST', '/api/apps', owner, {
+        requestId: randomUUID(),
+        kind: 'blog',
+        name: '운영 팀 앱',
+        slug,
+        agentId: editor.id,
+      }),
+      201,
+    );
+    assert.equal(app.agentId, editor.id);
   });
 
   test('모든 템플릿이 에이전트 규칙(권한 조합 · 조직도)을 지나 만들어진다. 도구를 고를 수 있다', async () => {
