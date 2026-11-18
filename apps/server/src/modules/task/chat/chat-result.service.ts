@@ -5,6 +5,7 @@ import {
   BaseService,
   Database,
   Forbidden,
+  Idempotency,
   SystemActor,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
@@ -14,6 +15,7 @@ import { OutputRepository } from '../output/output.repository';
 import { SkillQuery } from '../skill/skill.query';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
+import type { AppCodeAddedInput } from './chat.input';
 import { ChatRepository } from './chat.repository';
 import { ChatResult } from './chat-result.policy';
 import { ChatReview } from './chat-review.policy';
@@ -28,6 +30,8 @@ import { ChatReview } from './chat-review.policy';
 // 카드의 결정(고른 것만 남기기)은 ApprovalService.decide, 수정 요청 · 반려 뒤의 정리는 ChatService.closeByCard
 @Injectable()
 export class ChatResultService extends BaseService {
+  private static readonly APP_CODE = 'app_code_card';
+
   constructor(
     db: Database,
     private readonly skills: SkillQuery,
@@ -126,6 +130,33 @@ export class ChatResultService extends BaseService {
           await outputs.save(output);
         }
       }
+    });
+  }
+
+  /**
+   * 대화의 만들기 일이 낸 앱 코드가 확인 대기 버전이 됐다 (blog.app_code.added, 스토어 1-6b): 그 대화의 결과 카드에
+   * 공개 승인(Approval.forAppCode)을 싣는다. 결재 요청이 다시 settle을 불러 카드에 실린다. 대화의 일이 아니거나
+   * 바로 보인 버전(비공개 앱)이면 아무것도 하지 않는다 (알림과 코드 탭이 맡는다). 같은 버전이 두 번 와도 결재는 하나
+   */
+  async offerAppCode(actor: Actor, spaceId: string, req: AppCodeAddedInput): Promise<void> {
+    if (!(actor instanceof SystemActor)) throw new Forbidden('system');
+    if (!req.offered || req.taskId === null) return;
+    const taskId = req.taskId;
+    const now = new Date();
+    await this.transaction(async (tx) => {
+      const chatId = await new TaskRepository(tx).chatOf(taskId);
+      if (chatId === null) return;
+      const chat = await new ChatRepository(tx).lock(spaceId, chatId);
+      const once = new Idempotency(
+        tx,
+        spaceId,
+        `${req.appId}:${req.seq}`,
+        ChatResultService.APP_CODE,
+      );
+      if (await once.previous()) return;
+      const approval = Approval.forAppCode(spaceId, chat.id, chat.partnerId, req, now);
+      await new ApprovalRepository(tx).save(approval);
+      await once.remember({ approvalId: approval.id });
     });
   }
 }

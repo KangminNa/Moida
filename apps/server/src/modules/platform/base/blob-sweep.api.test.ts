@@ -49,7 +49,7 @@ describe('쓰지 않는 파일 지우기', () => {
        WHERE column_name LIKE '%blob_hash' AND table_schema NOT IN ('pg_catalog', 'information_schema')
        ORDER BY 1`;
     // 해시를 jsonb 목록 안에 두는 칸(이름이 blob_hash로 끝나지 않는다)은 이 물음에 나오지 않아 따로 적는다
-    const inJson = ['blog.page_revisions.files'];
+    const inJson = ['blog.page_revisions.files', 'blog.app_code_versions.files'];
     assert.deepEqual(
       [...rows.map((row) => String(row.name)), ...inJson].sort(),
       [...store.usedColumns].sort(),
@@ -59,6 +59,7 @@ describe('쓰지 않는 파일 지우기', () => {
 
   test('아무도 가리키지 않는 오래된 파일만 지운다. 글의 사진과 새 파일은 남는다', async () => {
     const created = await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `사진 글 ${randomUUID()}`,
     });

@@ -1,3 +1,19 @@
+import type {
+  AppListView,
+  AppView,
+  PublicAppListView,
+  PublicAppView,
+} from '../../../server/src/modules/blog/app/app.view';
+import type {
+  AppCodeChangesView,
+  AppCodePreviewView,
+  AppCodeStateView,
+  AppCodeView,
+} from '../../../server/src/modules/blog/app-code/app-code.view';
+import type {
+  AppScreenRedirectView,
+  AppScreenView,
+} from '../../../server/src/modules/blog/app-code/app-screen.view';
 import type { AssetView } from '../../../server/src/modules/blog/asset/asset.view';
 import type {
   BasketItemView,
@@ -6,8 +22,6 @@ import type {
 import type {
   IssueDetailView,
   IssueListView,
-  PublicIssueListView,
-  PublicIssueView,
 } from '../../../server/src/modules/blog/issue/issue.view';
 import type {
   MenuListView,
@@ -70,11 +84,26 @@ export type PageChanges = ReturnType<PageChangesView['toJSON']>;
 export type MenuList = ReturnType<MenuListView['toJSON']>;
 export type Menu = MenuList['menus'][number];
 export type PublicMenuList = ReturnType<PublicMenuListView['toJSON']>;
-export type PublicMenu = PublicMenuList['menus'][number];
 
-/** 매거진 호 (2차 6단계): 관리자의 목록 · 호 하나(글까지), 방문자의 발행한 호 목록 · 호 하나 */
+/** 매거진 호 (2차 6단계): 관리자의 목록 · 호 하나(글까지) */
 export type IssueList = ReturnType<IssueListView['toJSON']>;
 export type Issue = IssueList['issues'][number];
 export type IssueDetail = ReturnType<IssueDetailView['toJSON']>;
-export type PublicIssueList = ReturnType<PublicIssueListView['toJSON']>;
-export type PublicIssue = ReturnType<PublicIssueView['toJSON']>;
+
+/** 스토어의 앱 (방문자, 스토어 1단계): 종류 · 이름 · 주소 · 설명 · 아이콘 주소. 목록은 공개 앱만 순서대로 */
+export type PublicApp = ReturnType<PublicAppView['toJSON']>;
+export type PublicAppList = ReturnType<PublicAppListView['toJSON']>;
+/** 앱 (관리자): 칸 전부 · 든 것의 수(목록) · version. 만들거나 고친 결과는 counts가 null */
+export type AdminApp = ReturnType<AppView['toJSON']>;
+export type AdminAppList = ReturnType<AppListView['toJSON']>;
+
+/** 앱 화면 하나 (스토어 1-6, 방문자): 템플릿 · 바깥 주소 · 데이터. 다른 주소로 보낼 때는 redirect만 */
+export type AppScreen = ReturnType<AppScreenView['toJSON']>;
+export type AppScreenRedirect = ReturnType<AppScreenRedirectView['toJSON']>;
+export type AppScreenData = AppScreen['data'];
+/** 앱 코드 (스토어 1-6, 관리자): 코드 탭 · 버전 한 줄 · 바뀐 점 · 미리 보기 주소 · 쓰기 결과 */
+export type AppCode = ReturnType<AppCodeView['toJSON']>;
+export type AppCodeVersion = AppCode['versions'][number];
+export type AppCodeChanges = ReturnType<AppCodeChangesView['toJSON']>;
+export type AppCodePreview = ReturnType<AppCodePreviewView['toJSON']>;
+export type AppCodeState = ReturnType<AppCodeStateView['toJSON']>;

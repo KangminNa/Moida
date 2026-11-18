@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+<head>
+{{> head}}
+{{^post.listed}}<meta name="robots" content="noindex">{{/post.listed}}
+</head>
+<body>
+{{> header}}
+<main class="blog-main">
+  <article class="post">
+    {{^post.listed}}<p class="post-note">링크 공개 글 · 목록과 검색에 안 보임</p>{{/post.listed}}
+    <header class="post-head">
+      <h1>{{post.title}}</h1>
+      <div class="post-meta"><time datetime="{{post.date}}">{{post.dateText}}</time>{{#post.tags}}<span>#{{.}}</span>{{/post.tags}}</div>
+    </header>
+    <div class="prose{{#post.center}} center{{/post.center}}">{{{post.html}}}</div>
+    <footer class="post-foot"><a href="{{post.back}}">← 글 목록</a></footer>
+  </article>
+</main>
+{{> footer}}
+</body>
+</html>

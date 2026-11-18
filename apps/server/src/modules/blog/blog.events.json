@@ -6,6 +6,7 @@
         "slug",
         "title",
         "status",
+        "appId",
         "postVersion",
         "mainWikiId",
         "refWikiIds",
@@ -14,13 +15,40 @@
       ]
     },
     "blog.post.updated": {
-      "fields": ["postId", "slug", "title", "status", "postVersion", "mainWikiId", "refWikiIds"]
+      "fields": [
+        "postId",
+        "slug",
+        "title",
+        "status",
+        "appId",
+        "postVersion",
+        "mainWikiId",
+        "refWikiIds"
+      ]
     },
     "blog.post.unpublished": {
-      "fields": ["postId", "slug", "title", "status", "postVersion", "mainWikiId", "refWikiIds"]
+      "fields": [
+        "postId",
+        "slug",
+        "title",
+        "status",
+        "appId",
+        "postVersion",
+        "mainWikiId",
+        "refWikiIds"
+      ]
     },
     "blog.post.deleted": {
-      "fields": ["postId", "slug", "title", "status", "postVersion", "mainWikiId", "refWikiIds"]
+      "fields": [
+        "postId",
+        "slug",
+        "title",
+        "status",
+        "appId",
+        "postVersion",
+        "mainWikiId",
+        "refWikiIds"
+      ]
     },
     "blog.post.publish_failed": {
       "fields": ["postId", "approvalId", "outcome", "error"]
@@ -42,6 +70,18 @@
     },
     "blog.setting.changed": {
       "fields": ["approvalId", "outcome", "error?"]
+    },
+    "blog.app.changed": {
+      "fields": ["appId", "visibility", "appVersion", "deleted"]
+    },
+    "blog.app_code.added": {
+      "fields": ["appId", "name", "seq", "source", "pending", "taskId"]
+    },
+    "blog.app_code.shown": {
+      "fields": ["appId", "seq", "settled"]
+    },
+    "blog.app_code.refused": {
+      "fields": ["appId", "name", "taskId", "error"]
     }
   }
 }

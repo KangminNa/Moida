@@ -118,6 +118,9 @@
     "task.page.built": {
       "fields": ["taskId", "runId", "pageId", "title", "note", "files"]
     },
+    "task.app_code.built": {
+      "fields": ["taskId", "runId", "appId", "note", "files"]
+    },
     "task.external_tool.noted": {
       "fields": ["toolId?", "names?"]
     },

@@ -1,15 +1,33 @@
 import { type Actor, ApprovedActor, DomainEvent, Forbidden } from '../../platform';
+import type { PostRow } from '../blog.tables';
 
 // 결재한 공개의 요청자와 결과 이벤트 (Post.publishApproved와 PostService.publishApproved가 쓴다).
 // 결과를 기록하지 않고 돌려주므로, 같은 결재가 다시 오면 앞서 남긴 결과를 그대로 다시 낸다 (sameResult).
 // 이 결과는 공개 · 블로그 메뉴의 호 발행(2차 6단계)이 함께 쓴다.
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 결재 결과 규칙 한 곳
 export class PostPublish {
-  /** 결재로 맡기는 공개 (task.approvals.action). Post.PUBLISH_ACTION과 같은 값 */
+  /** 결재로 맡기는 공개 (task.approvals.action) */
   static readonly ACTION = 'blog.post.publish';
   /** 대상이 없어 결재한 공개를 하지 못했을 때의 이유 */
   static readonly NO_POST = '없는 글이라 공개하지 않았어요';
   private static readonly FAILED = 'blog.post.publish_failed';
+
+  /**
+   * 결재한 대로 공개할 수 없는 이유 (없으면 null). 공개 범위를 바꿔도 버전이 오르므로 사람이 먼저 공개했으면 바뀐 글이다.
+   * 앱에 넣지 않은 글은 공개하지 않는다 (스토어 1단계)
+   */
+  static problemOf(
+    post: Readonly<Pick<PostRow, 'deleted_at' | 'status' | 'app_id'>>,
+    version: number,
+    targetVersion: number,
+  ): string | null {
+    if (post.deleted_at) return '휴지통에 있는 글이라 공개하지 않았어요';
+    if (version !== targetVersion)
+      return `승인 요청 뒤 바뀐 글이라 공개하지 않았어요 (요청 때 버전 ${targetVersion}, 지금 ${version})`;
+    if (post.status === 'published') return '이미 공개된 글이에요';
+    if (post.app_id === null) return '앱에 넣지 않은 글이라 공개하지 않았어요';
+    return null;
+  }
 
   /** 결재로 공개하는 요청자의 결재 id. 그 밖의 요청자(주인도)와 다른 동작의 결재는 이 길로 오지 못한다 */
   static approvalOf(by: Actor, action = PostPublish.ACTION): string {

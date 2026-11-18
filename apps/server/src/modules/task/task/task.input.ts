@@ -61,7 +61,7 @@ export class CreateTaskInput extends BaseRequest {
   private static payloadOf(f: RequestFields, raw: unknown): Record<string, unknown> {
     const payload = f.optionalRecord('payload');
     const given = (raw as Record<string, unknown> | null | undefined)?.materials;
-    const page = CreateTaskInput.pageOf(f, raw);
+    const page = { ...CreateTaskInput.pageOf(f, raw), ...CreateTaskInput.appCodeOf(f, raw) };
     if (given === undefined || given === null) return { ...payload, ...page };
     const m = f.nested('materials');
     const outputs = m.optionalTextList('outputIds', MakeMaterials.MAX, 36) ?? [];
@@ -77,6 +77,13 @@ export class CreateTaskInput extends BaseRequest {
     return {
       page: { title: p.optionalText('title', 120), pageId: p.optionalText('pageId', 36) },
     };
+  }
+
+  /** 결과를 앱 코드의 새 버전으로 내라는 주문(appCode: { appId })을 payload.appCode로 (스토어 1-6). 적지 않았으면 빈 객체 */
+  private static appCodeOf(f: RequestFields, raw: unknown): Record<string, unknown> {
+    const given = (raw as Record<string, unknown> | null | undefined)?.appCode;
+    if (given === undefined || given === null) return {};
+    return { appCode: { appId: f.nested('appCode').uuid('appId') } };
   }
 
   private static optionalUuid(f: RequestFields, raw: unknown, name: string): string | null {
@@ -317,6 +324,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly refs: readonly string[] | null,
     /** 받을 것: 하위 작업이 돌려줄 결과의 형식 (D1, 2026-11-17). 하위 작업의 deliver, 위 작업의 subtask_results[].deliver */
     readonly deliver: string | null,
+    /** make 일의 결과를 이 앱 코드의 새 버전으로 (payload.appCode, 스토어 1-6b). 다른 일에는 없다 */
+    readonly appId: string | null,
   ) {
     super();
   }
@@ -338,6 +347,7 @@ export class SubtaskOrder extends BaseRequest {
       f.optionalTextList('paths', SubtaskOrder.PATHS_SHAPE, SubtaskOrder.PATH_SHAPE),
       f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
       f.optionalText('deliver', SubtaskOrder.DELIVER_MAX),
+      f.optionalText('app_id', 36) === null ? null : f.uuid('app_id'),
     );
   }
 }

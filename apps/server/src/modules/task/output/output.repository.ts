@@ -40,17 +40,21 @@ export class OutputRepository extends TableRepository<OutputRow, Output> {
     return [Number(row?.files ?? 0), Number(row?.bytes ?? 0)];
   }
 
-  /** 대화의 일(회차 · 덧붙인 말의 답 · 검토와 그 아래 작업)이 만든, 아직 카드에 실리지 않은 결과물 (휴지통 제외) */
+  /**
+   * 대화의 일(회차 · 덧붙인 말의 답 · 검토와 그 아래 작업)이 만든, 아직 카드에 실리지 않은 결과물 (휴지통 제외).
+   * 앱 코드를 고친 만들기 일(payload.appCode)의 결과물은 뺀다: 결과는 앱 코드의 버전이고, 카드에는 그 공개 승인이 실린다 (스토어 1-6b)
+   */
   async uncardedInChat(spaceId: string, chatId: string): Promise<readonly Output[]> {
     const rows = await this.sql<OutputRow[]>`
       WITH RECURSIVE tree AS (
-        SELECT id FROM task.tasks
+        SELECT id, payload FROM task.tasks
         WHERE space_id = ${spaceId} AND request_id LIKE ${`chat:${chatId}:%`}
         UNION ALL
-        SELECT t.id FROM task.tasks t JOIN tree ON t.parent_id = tree.id
+        SELECT t.id, t.payload FROM task.tasks t JOIN tree ON t.parent_id = tree.id
       )
       SELECT * FROM task.outputs
-      WHERE task_id IN (SELECT id FROM tree) AND card_id IS NULL AND deleted_at IS NULL
+      WHERE task_id IN (SELECT id FROM tree WHERE NOT coalesce(payload ? 'appCode', false))
+        AND card_id IS NULL AND deleted_at IS NULL
       ORDER BY id FOR UPDATE`;
     return rows.map((r) => this.toEntity(r));
   }

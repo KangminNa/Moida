@@ -1169,6 +1169,80 @@ describe('코드 작업 (작업 공간)', () => {
       await roomsLeft();
     });
 
+    // 스토어 1-6c: 앱 코드를 고치는 만들기 일. 러너가 지금 코드(app_code_base)를 inputs/app/에 두고, AI가 낸 파일을
+    // 그 위에 얹어 묶음 · 템플릿을 검사한다. 끝나면 서버가 같은 코드 위에 얹은 새 버전을 만든다 (task.app_code.built)
+    const newApp = async (slug: string) =>
+      ok(
+        await api.request('POST', '/api/apps', owner, {
+          requestId: randomUUID(),
+          kind: 'blog',
+          name: `앱 ${slug}`,
+          slug,
+        }),
+        201,
+      );
+    const appTask = (marks: string, app: Json) =>
+      newTask(maker, marks, { kind: 'make', appCode: { appId: app.id } });
+    const codeOf = async (app: Json) => {
+      while ((await api.service(OutboxWorker).tick()) > 0);
+      return ok(await api.get(`/api/apps/${app.id}/code`, owner));
+    };
+
+    test('앱 코드: 바꾼 파일만 낸 결과가 시작 코드 위에 얹힌 새 버전이 된다', async () => {
+      const app = await newApp(`e2e-app-${randomUUID().slice(0, 6)}`);
+      const created = await appTask('[fake:app]', app);
+      const task = await taskIn(created.id, 'done');
+      const checks = resultOf(task).checks as Json[];
+      assert.deepEqual(
+        checks.map((c) => [c.name, c.ok, c.retried]),
+        ['결과물 파일', '앱 코드 묶음', '템플릿 문법', '데이터 이름'].map((n) => [n, true, false]),
+      );
+      const bodies = events(task).map((e) => String(e.body));
+      assert.ok(bodies.includes('고칠 앱 코드(시작 코드)를 받았어요'), bodies.join(' | '));
+
+      const code = await codeOf(app);
+      assert.equal(code.current, 1, '비공개 앱의 새 버전은 바로 보인다');
+      assert.equal((code.versions as Json[])[0]?.source, 'task');
+      const files = (code.files as Json[]).map((f) => f.name);
+      assert.ok(
+        files.includes('header.html') && files.includes('style.css'),
+        '내지 않은 시작 코드는 남는다',
+      );
+      const { url } = ok(await api.request('POST', `/api/apps/${app.id}/code/preview`, owner, {}));
+      const ticket = String(url).split('~')[1];
+      const screen = ok(await api.get(`/api/apps/site/${app.slug}/screen?path=&ticket=${ticket}`));
+      assert.match(String((screen.templates as Json)['index.html']), /fake-made/);
+      await roomsLeft();
+    });
+
+    test('앱 코드: 템플릿 문법이 틀리면 한 번 더 맡기고, 고치면 버전이 되고 그래도 틀리면 버전 없이 실패한다', async () => {
+      const fixedApp = await newApp(`e2e-fix-${randomUUID().slice(0, 6)}`);
+      const fixRuns = new Runs();
+      const fixed = await appTask(`[fake:app-broken] [fake:app-fix] ${fixRuns.mark}`, fixedApp);
+      const done = await taskIn(fixed.id, 'done');
+      assert.equal(fixRuns.count(), 2);
+      const syntax = (resultOf(done).checks as Json[]).find((c) => c.name === '템플릿 문법');
+      assert.deepEqual([syntax?.ok, syntax?.retried], [true, true]);
+      assert.equal((await codeOf(fixedApp)).current, 1);
+
+      const brokenApp = await newApp(`e2e-broken-${randomUUID().slice(0, 6)}`);
+      const runs = new Runs();
+      const broken = await appTask(`[fake:app-broken] ${runs.mark}`, brokenApp);
+      const failed = await taskIn(broken.id, 'failed');
+      assert.equal(runs.count(), 2);
+      assert.match(
+        String(resultOf(failed).error),
+        /템플릿 문법 검사에 떨어져 새 버전을 만들지 않았어요/,
+      );
+      const code = await codeOf(brokenApp);
+      assert.deepEqual(
+        [code.current, code.versions],
+        [null, []],
+        '틀린 템플릿은 버전이 되지 않는다',
+      );
+      await roomsLeft();
+    });
+
     test('만든 파일이 없으면 한 번 더 맡기고, 그래도 없으면 실패로 끝낸다', async () => {
       const runs = new Runs();
       const task = await taskIn((await makeTask(runs.mark)).id, 'failed');

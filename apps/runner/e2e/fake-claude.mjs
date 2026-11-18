@@ -14,6 +14,8 @@
 //   [fake:runs=<파일>]  뜰 때마다 그 파일에 한 줄을 더한다 (일 하나에 몇 번 떴는지)
 //   [fake:fix-hang]     검사에 떨어져 다시 맡긴 실행에서만 끝나지 않는다
 //   [fake:make]         만들기 작업: "# 재료"의 파일 폴더와 위키(get_wiki)를 읽어 결과물 폴더에 발표.pptx를 둔다
+//   [fake:app]          앱 코드 일: "# 고칠 앱"의 폴더에서 index.html을 읽어 한 줄을 더해 결과물 폴더에 낸다 (바뀐 파일만)
+//   [fake:app-broken]   앱 코드 일: 닫지 않은 섹션이 든 list.html도 낸다. [fake:app-fix]가 있으면 다시 맡긴 실행에서 고쳐 낸다
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
 //   [fake:memo=<글>]    인수인계 메모 파일(CAIRN_MEMO_FILE)에 그 글을 쓴다 (작업 세션, 2026-11-17)
@@ -444,6 +446,24 @@ if (has('make')) {
       ...pages,
     ].join('\n'),
   );
+}
+
+// 앱 코드 일 (스토어 1-6c): 받은 코드에서 시작해 바뀐 파일만 결과물 폴더에 낸다
+if (has('app') || has('app-broken')) {
+  const outputs = /만들면 (\S+) 바로 아래에 둡니다/.exec(prompt)?.[1];
+  const code = /글 파일은 (\S+)에 있어요/.exec(prompt)?.[1];
+  if (has('app')) {
+    const index = readFileSync(join(code, 'index.html'), 'utf8');
+    writeFileSync(
+      join(outputs, 'index.html'),
+      index.replace('</main>', '  <p class="fake-made">{{app.name}} 고침</p>\n</main>'),
+    );
+  }
+  if (has('app-broken')) {
+    const fixed = fixing && has('app-fix');
+    const list = `{{> head}}{{#posts}}<a href="{{url}}">{{title}}</a>${fixed ? '{{/posts}}' : ''}`;
+    writeFileSync(join(outputs, 'list.html'), list);
+  }
 }
 
 const text = '초안을 저장했어요';

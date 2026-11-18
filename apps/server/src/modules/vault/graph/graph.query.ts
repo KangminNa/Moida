@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { Actor, BaseQuery, NotFound, Rule } from '../../platform';
-import { edges, postMarks } from '../vault.schema';
+import { Actor, BaseQuery, NotFound } from '../../platform';
+import { edges } from '../vault.schema';
 import type { CategoryRow, PostMarkRow, SessionRow, WikiRow } from '../vault.tables';
 import type { NeighborsInput } from './graph.input';
 import { GraphEdgeView, GraphNodeView, GraphView, NeighborsView, NeighborView } from './graph.view';
@@ -113,21 +113,16 @@ export class GraphQuery extends BaseQuery {
 
   /**
    * 대표 wiki가 있는 글 자리 사본, 글 id 순서. 대표 wiki가 없는 글은 그래프에 나오지 않는다.
-   * 방문자에게는 공개한 글만 (링크만 공개는 목록에 나오지 않는다). 공간이 없는 요청자는 공간으로 거르지 않는다
+   * 방문자에게는 공개 앱의 공개한 글만 (링크만 공개는 목록에 나오지 않는다, 앱의 사본이 없거나 비공개면 숨긴다: 스토어 1-2).
+   * 공간이 없는 요청자는 공간으로 거르지 않는다
    */
   private posts(actor: Actor, full: boolean) {
-    return this.rows(
-      postMarks,
-      {
-        space_id: Rule.maybe(actor.spaceId),
-        main_wiki_id: Rule.set,
-        status: Rule.maybe(full ? null : GraphQuery.PUBLISHED),
-      },
-      {
-        columns: ['post_id', 'title', 'slug', 'status', 'main_wiki_id', 'ref_wiki_ids'],
-        order: ['post_id'],
-      },
-    );
+    return this.sql<GraphPostRow[]>`
+      SELECT p.post_id, p.title, p.slug, p.status, p.main_wiki_id, p.ref_wiki_ids
+      FROM vault.post_marks p LEFT JOIN vault.app_marks a ON a.app_id = p.app_id
+      WHERE ${this.inSpace(actor, 'p.space_id')} AND p.main_wiki_id IS NOT NULL
+        ${full ? this.sql`` : this.sql`AND p.status = ${GraphQuery.PUBLISHED} AND a.public`}
+      ORDER BY p.post_id`;
   }
 
   /** 글이 가리키는 비공개 wiki (진짜 id → 자리 id). 주인에게는 다 보이므로 없다 */

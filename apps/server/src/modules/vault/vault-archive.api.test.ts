@@ -136,6 +136,7 @@ before(async () => {
   });
   post = ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `보관 글 ${randomUUID()}`,
       body: '글 본문',
@@ -167,7 +168,7 @@ describe('보관 형식 내보내기', () => {
     for (const path of files.keys())
       assert.match(
         path,
-        /^(cairn\.json|vault\/categories\.yml|vault\/graph\.json|vault\/wikis\/[^/]+\.md|vault\/sessions\/[^/]+\/\d{4}-\d{2}-\d{2}-[^/]+\.md|vault\/transcripts\/[0-9a-f-]{36}\/[1-9]\d*\.md|blog\/posts\/\d{4}\/[^/]+\.md)$/,
+        /^(cairn\.json|vault\/categories\.yml|vault\/graph\.json|vault\/wikis\/[^/]+\.md|vault\/sessions\/[^/]+\/\d{4}-\d{2}-\d{2}-[^/]+\.md|vault\/transcripts\/[0-9a-f-]{36}\/[1-9]\d*\.md|blog\/apps\/[a-z0-9-]+\.yml|blog\/posts\/\d{4}\/[^/]+\.md|assets\/[0-9a-f]{64}\.[a-z0-9]+)$/,
         path,
       );
     assert.ok(files.has('vault/categories.yml'));

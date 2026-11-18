@@ -11,7 +11,7 @@ import { MENU_KIND, type MenuNew, type MenuRow } from '../blog.tables';
 import { SlugPolicy } from '../post/slug.policy';
 import { MenuView } from './menu.view';
 
-// 메뉴 하나 (blog.menus, 2차 6단계). 공개 블로그 위쪽 메뉴 줄의 한 칸이고 주소는 /m/<주소>다.
+// 메뉴 하나 (blog.menus, 2차 6단계). 앱 첫 화면 위쪽 메뉴 줄의 한 칸이고 주소는 /<앱>/m/<주소>다 (스토어 1단계: 메뉴는 앱 하나에 든다).
 // 종류는 만들 때만 정한다: posts(글 목록) · issues(호 목록, 매거진) · pages(페이지 모음) · page(페이지 하나).
 // 편집 방침(policy)은 이 메뉴에 쓰는 AI가 읽고, 운영 팀(agent_id)은 이 메뉴에 쓰는 에이전트 하나다
 // (task의 값이라 외래키 없음. 비공개를 읽지 않는 에이전트인지는 Service가 platform AgentDirectory로 본다).
@@ -54,8 +54,14 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
     rss: (value) => value,
   };
 
-  /** 새 메뉴. 주소를 정하지 않으면 이름에서 만든다 (겹치면 409, Service) */
-  static open(spaceId: string, kind: string, fields: Partial<MenuRow>, now: Date): Menu {
+  /** 새 메뉴. 앱 하나에 든다 (스토어 1단계, 옮기지 않는다). 주소를 정하지 않으면 이름에서 만든다 (앱 안에서 겹치면 422) */
+  static open(
+    spaceId: string,
+    appId: string,
+    kind: string,
+    fields: Partial<MenuRow>,
+    now: Date,
+  ): Menu {
     if (!ValueList.has(MENU_KIND, kind))
       throw new RuleViolation(`메뉴 종류는 ${MENU_KIND.join(' · ')} 중 하나예요`);
     const name = fields.name ?? '';
@@ -64,6 +70,7 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
       {
         id: BaseEntity.newId(),
         space_id: spaceId,
+        app_id: appId,
         name,
         slug,
         kind,
@@ -89,6 +96,11 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
 
   get kind(): string {
     return this.row.kind;
+  }
+
+  /** 든 앱 (스토어 1단계). 메뉴에 올린 글 · 페이지도 이 앱에 든다 */
+  get appId(): string {
+    return this.row.app_id;
   }
 
   /** 운영 팀 (에이전트 id). 없으면 null */

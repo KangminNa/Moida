@@ -27,7 +27,7 @@ import {
   ProgressView,
 } from './job.view';
 import { MakeMaterials } from './make-materials';
-import { PageOrder } from './page-order';
+import { MakeOrder } from './make-order';
 import type { RunRecord } from './run-record';
 import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
@@ -149,8 +149,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     if (fields.kind === Task.MAKE) MakeMaterials.of(fields.payload);
     else if (MakeMaterials.given(fields.payload))
       throw new RuleViolation('재료(make)는 만들기 일에만 적어요');
-    if (PageOrder.of(fields.payload) !== null && fields.kind !== Task.MAKE)
-      throw new RuleViolation('페이지(page)는 만들기 일에만 적어요');
+    MakeOrder.check(fields.kind, Task.MAKE, fields.payload);
     const task = new Task(
       {
         agent_id: null,
@@ -453,6 +452,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
           ...CodeScope.forSubtask(kind, paths, this.codeScope),
           ...TaskRefs.of(r.payload).handOn(refs, worker).payload,
           ...(order.deliver ? { deliver: order.deliver } : {}),
+          // 앱 코드를 고치는 make 일 (스토어 1-6b): 어느 앱인지만 물려준다. make 일이 아니면 MakeOrder가 막는다
+          ...(order.appId ? { appCode: { appId: order.appId } } : {}),
         },
         priority: r.priority,
         goal_id: r.goal_id,
@@ -512,11 +513,11 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     result: Readonly<Record<string, unknown>>,
     error: string | null,
     now: Date,
-    /** 결과를 페이지로 내보내는 일이면 이번 실행의 결과물 (PageOrder) */
+    /** 결과를 페이지 · 앱 코드로 내보내는 일이면 이번 실행의 결과물 (MakeOrder) */
     made: readonly OutputRow[] | null = null,
   ): void {
     this.assertHeldBy(runnerId, now);
-    const page = status === Task.DONE && made !== null ? PageOrder.of(this.row.payload) : null;
+    const page = status === Task.DONE && made !== null ? MakeOrder.of(this.row.payload) : null;
     const refusal = page === null || made === null ? null : page.refusal(made);
     if (refusal !== null) {
       this.fail(refusal, now);

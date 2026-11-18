@@ -71,8 +71,21 @@ async function grant(name: string, scopes: readonly string[]): Promise<void> {
 }
 
 /** 주인이 공개 범위를 바꾼다 */
+/** 공개하려면 앱에 든 글이어야 한다 (스토어 1단계): AI의 초안은 앱 밖이라 관리자가 먼저 앱에 넣는다 */
 async function setStatus(id: unknown, version: unknown, status: string): Promise<Json> {
-  return ok(await api.request('POST', `/api/posts/${id}/status`, owner, { version, status }));
+  const placed = ok(
+    await api.request('POST', `/api/posts/${id}/menu`, owner, {
+      version,
+      menuId: null,
+      appId: await api.blogApp(owner),
+    }),
+  );
+  return ok(
+    await api.request('POST', `/api/posts/${id}/status`, owner, {
+      version: placed.version,
+      status,
+    }),
+  );
 }
 
 async function revisions(postId: unknown) {
@@ -190,6 +203,7 @@ describe('blog_save_draft (기기)', () => {
     const github = `gh${'p'}_${'b'.repeat(36)}`;
     const created = ok(
       await api.request('POST', '/api/posts', owner, {
+        appId: await api.blogApp(owner),
         requestId: randomUUID(),
         title: '주인의 메모',
         body: `예시 토큰 ${github}`,

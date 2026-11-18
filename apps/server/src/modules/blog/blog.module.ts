@@ -1,5 +1,17 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { ActionChecks, BlobStore, CoreWorkers, EventCatalog, LibraryQuery } from '../platform';
+import { AppController } from './app/app.api';
+import { AppQuery } from './app/app.query';
+import { AppService } from './app/app.service';
+import { AppCodeController, AppSiteController } from './app-code/app-code.api';
+import { AppCodeQuery } from './app-code/app-code.query';
+import { AppCodeService } from './app-code/app-code.service';
+import { AppCodeBaseTool } from './app-code/app-code.tool';
+import { AppCodeBuiltHandler } from './app-code/app-code-built.handler';
+import { AppCodeShowHandler } from './app-code/app-code-show.handler';
+import { AppScreenQuery } from './app-code/app-screen.query';
+import { AppSiteQuery } from './app-code/app-site.query';
+import { AppStarterGateway } from './app-code/app-starter.gateway';
 import { AssetController, FileController } from './asset/asset.api';
 import { AssetQuery } from './asset/asset.query';
 import { AssetService } from './asset/asset.service';
@@ -25,15 +37,15 @@ import { PageQuery } from './page/page.query';
 import { PageService } from './page/page.service';
 import { PageBaseTool } from './page/page.tool';
 import { PageBuiltHandler } from './page/page-built.handler';
-import { Post } from './post/post';
 import { PostController } from './post/post.api';
 import { PostQuery } from './post/post.query';
 import { PostService } from './post/post.service';
 import { BlogGetPostTool, BlogSaveDraftTool } from './post/post.tool';
 import { PostArchiveQuery } from './post/post-archive.query';
+import { PostPublish } from './post/post-publish.policy';
 import { PublishApprovedHandler } from './post/publish-approved.handler';
 
-// 방문자가 읽는 블로그와 글을 쓰는 재료: 글(쓰기·고치기·공개 범위·휴지통), 사진, 소재, AI 도구의 초안.
+// 방문자가 읽는 스토어의 앱(블로그 · 매거진 · 페이지 앱)과 글을 쓰는 재료: 앱, 글(쓰기·고치기·공개 범위·휴지통), 사진, 소재, AI 도구의 초안.
 // vault는 소재의 세션을 확인할 때 Query로만 읽는다. 주인이 결재한 공개는 이벤트로 받아 실행한다 (task를 부르지 않는다).
 @Module({
   providers: [
@@ -63,6 +75,18 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     IssueService,
     IssueQuery,
     IssuePublishHandler,
+    // 스토어의 앱 (스토어 1단계)
+    AppService,
+    AppQuery,
+    // 앱 코드 (스토어 1-6)
+    AppCodeService,
+    AppCodeQuery,
+    AppSiteQuery,
+    AppScreenQuery,
+    AppCodeBaseTool,
+    AppCodeBuiltHandler,
+    AppCodeShowHandler,
+    { provide: AppStarterGateway, useFactory: () => AppStarterGateway.fromEnv() },
   ],
   controllers: [
     PostController,
@@ -72,6 +96,9 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     PageController,
     MenuController,
     IssueController,
+    AppController,
+    AppCodeController,
+    AppSiteController,
   ],
   exports: [BlogTools],
 })
@@ -89,6 +116,10 @@ export class BlogModule implements OnModuleInit {
     private readonly checks: ActionChecks,
     private readonly issuePublish: IssuePublishHandler,
     private readonly issues: IssueQuery,
+    private readonly apps: AppQuery,
+    private readonly appCodeBuilt: AppCodeBuiltHandler,
+    private readonly appCodeShow: AppCodeShowHandler,
+    private readonly appCode: AppCodeQuery,
   ) {}
 
   onModuleInit(): void {
@@ -98,12 +129,15 @@ export class BlogModule implements OnModuleInit {
     this.workers.expect(PublishApprovedHandler.TOPIC);
     // 만들기 작업이 끝나며 알린 페이지 (task가 보낸다)
     this.workers.on(PageBuiltHandler.TOPIC, this.built);
+    // 앱 코드를 고친 만들기 작업 (스토어 1-6, task가 보낸다)
+    this.workers.on(AppCodeBuiltHandler.TOPIC, this.appCodeBuilt);
+    this.workers.on(AppCodeShowHandler.TOPIC, this.appCodeShow);
     // 보관함 (2차 5단계): 페이지 · 글 · 읽은 글(소재의 링크)
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
     this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
     // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
-    this.checks.register(Post.PUBLISH_ACTION, (a, id) => this.posts.publishProblem(a, id));
+    this.checks.register(PostPublish.ACTION, (a, id) => this.posts.publishProblem(a, id));
     this.checks.register(Issue.ACTION, (a, id) => this.issues.publishProblem(a, id));
     // 파일을 가리키는 칸: 쓰는 동안 platform이 파일을 지우지 않게
     this.blobs.registerUse(
@@ -113,9 +147,16 @@ export class BlogModule implements OnModuleInit {
     this.blobs.registerUse(['work.basket_items.blob_hash'], (actor, hashes) =>
       this.basket.usedBlobs(actor, hashes),
     );
+    this.blobs.registerUse(['blog.apps.icon_blob_hash'], (actor, hashes) =>
+      this.apps.usedBlobs(actor, hashes),
+    );
     // 페이지 판의 파일은 files(jsonb) 안에 있다
     this.blobs.registerUse(['blog.page_revisions.files'], (actor, hashes) =>
       this.pages.usedBlobs(actor, hashes),
+    );
+    // 앱 코드 버전의 파일도 files(jsonb) 안에 있다 (스토어 1-6)
+    this.blobs.registerUse(['blog.app_code_versions.files'], (actor, hashes) =>
+      this.appCode.usedBlobs(actor, hashes),
     );
   }
 }

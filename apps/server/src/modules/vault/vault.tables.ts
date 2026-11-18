@@ -2,6 +2,16 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** vault.app_marks */
+export interface AppMarkRow {
+  app_id: string;
+  space_id: string;
+  public: boolean;
+  app_version: number;
+  updated_at: Date;
+}
+export type AppMarkNew = Partial<AppMarkRow> & Pick<AppMarkRow, 'app_id' | 'space_id' | 'public' | 'app_version'>;
+
 /** vault.categories.origin (값 목록 CHECK) */
 export const CATEGORY_ORIGIN = ['ai', 'human'] as const;
 export type CategoryOrigin = (typeof CATEGORY_ORIGIN)[number];
@@ -199,6 +209,7 @@ export interface PostMarkRow {
   ref_wiki_ids: readonly string[];
   post_version: number;
   updated_at: Date;
+  app_id: string | null;
 }
 export type PostMarkNew = Partial<PostMarkRow> & Pick<PostMarkRow, 'post_id' | 'space_id' | 'title' | 'slug' | 'status' | 'post_version'>;
 

@@ -37,6 +37,7 @@ const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).dig
 async function newPost(): Promise<Json> {
   return ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `사진 보관 ${randomUUID()}`,
     }),

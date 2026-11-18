@@ -30,10 +30,11 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
   `TidyRequestHandler`(`vault.session.saved`)가 켜져 있으면 `task.task.requested`를 outbox로 남긴다. task를 import하지 않는다.
   요청한 판은 같은 트랜잭션에서 `sessions.tidy_requested_seq`에 적는다
   언제(`cadence`, 2차 7단계): save면 저장마다, daily(기본)면 `TidyRequestHandler`는 요청하지 않고 `TidyDailyJob`(마감 작업: 가장 이른 다음 차례에 깨고, 정리 설정을 저장하면 `TidySettingsRepository.save`가 깨운다)이 차례가 된 공간(`daily_at`에서 23시간)의 새 판이 쌓인 세션을 50개까지 요청하고 `daily_at`을 적는다 (`TidyService.daily`, 설정을 잠근 뒤 다시 본다)
-- `post-mark/`: 글 자리 사본(`PostMark`). `PostMarkHandler`(`blog.post.*`)만 쓴다. `PostWikiQuery`: 글이 가리킬 wiki를 볼 수 있는지 blog가 묻는 읽기 (Lookups의 `wiki`로)
+- `post-mark/`: 글 자리 사본(`PostMark`, 글이 든 앱 `app_id`까지). `PostMarkHandler`(`blog.post.*`)만 쓴다. `PostWikiQuery`: 글이 가리킬 wiki를 볼 수 있는지 blog가 묻는 읽기 (Lookups의 `wiki`로)
+- `app-mark/`: 앱 공개 여부 사본(`AppMark`, 스토어 1-2). `AppMarkHandler`(`blog.app.changed`) → `AppMarkService.keep`(`Actor.TIDY`). `appVersion`이 더 큰 것만, 지운 앱은 비공개로 남긴다. 같은 앱은 advisory 잠금(`vault.app_mark:<id>`)으로 하나씩
 - `graph/`: 그래프 읽기(`GraphQuery`). `api/graph`(주인), `api/graph/public`(방문자), MCP `neighbors`(`read_public`이나 `read_all`)
 - `vault-archive.query.ts`: 보관 형식 파일 (`ArchiveQuery.register`로 등록). 노트가 없는 세션도, 세션 원문도 나간다. `vault-archive.api.ts`: `api/archive.zip`(주인만). platform은 모듈 파일을 모르고, 이 경로의 자리가 다른 곳에 없어 여기 둔다
-- `restore/`: 복원의 vault 몫(`VaultRestore`, `ArchiveQuery.registerRestore`로 등록). 파일을 읽는 `RestoredCategory` · `RestoredWiki` · `RestoredSession`(노트 없는 세션 `cairn_note: false`는 판 없이) · `RestoredTranscript`(세션 원문, 모르는 앞부분 키는 보관할 칸이 없어 거절) · `RestoredEdge` · `RestoredPin` · `RestoredPostMark`, 새 행만 넣는 `VaultRestoreRepository`. 원문은 들어오는 세션을 가리키고 세션 안에서 번호가 1부터 이어지고 내용이 겹치지 않아야 한다 (`VaultRestore.transcriptsOf`). 세션의 `transcript_count`는 원문 수, `noted_seq`는 `cairn_noted_seq`
+- `restore/`: 복원의 vault 몫(`VaultRestore`, `ArchiveQuery.registerRestore`로 등록). 파일을 읽는 `RestoredCategory` · `RestoredWiki` · `RestoredSession`(노트 없는 세션 `cairn_note: false`는 판 없이) · `RestoredTranscript`(세션 원문, 모르는 앞부분 키는 보관할 칸이 없어 거절) · `RestoredEdge` · `RestoredPin` · `RestoredPostMark` · `RestoredAppMark`(앱 파일 `blog/apps/<주소>.yml`에서 id와 공개 여부만), 새 행만 넣는 `VaultRestoreRepository`. 앱 파일이 없는데 공개 · 링크 공개 글이 있으면 앱이 생기기 전의 백업이라, blog와 같은 형식 규칙으로 기본 앱(id = 공간 id, 공개) 사본 하나를 만들고 글 자리를 모두 그 앱에 둔다. 원문은 들어오는 세션을 가리키고 세션 안에서 번호가 1부터 이어지고 내용이 겹치지 않아야 한다 (`VaultRestore.transcriptsOf`). 세션의 `transcript_count`는 원문 수, `noted_seq`는 `cairn_noted_seq`
 
 엔티티는 `TableEntity`(platform)로 표 한 줄을 들고, Repository(`TableRepository`)는 바뀐 칸만 저장한다 (객체설계 6장). 칼럼을 아는 곳은 `vault.tables.ts`, Entity의 `RULES`, Input의 `COLUMNS`, View의 `toJSON`, 그리고 칸을 다른 형식으로 옮기는 `ChangeOp`의 payload · `snapshot` · 보관 · 복원이다.
 - 변경 대상(세션 · wiki · 카테고리 · 선)은 `TargetEntity`, 휴지통으로 가는 점(wiki · 카테고리)은 `GraphNode`다 (`change/change-target.ts`). 변경과 묶음은 `ChangeTarget` 약속으로만 대상을 다룬다
@@ -45,7 +46,7 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
 
 ## 소유 데이터
 스키마 `vault`: node_kinds, edge_kinds, nodes, sessions, session_revisions, session_transcripts, run_memos, categories, wikis, wiki_revisions, wiki_aliases,
-edges, project_rules, graph_views, node_layout, post_marks,
+edges, project_rules, graph_views, node_layout, post_marks, app_marks,
 change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 
 ## 데이터 묶음
@@ -58,6 +59,7 @@ change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 - 검토 규칙: review_rules
 - 그래프 보기: graph_views + node_layout
 - 글 자리 사본: post_marks (blog 이벤트를 받는 Handler와 복원만 쓴다)
+- 앱 공개 여부 사본: app_marks (`blog.app.changed`를 받는 Handler와 복원만 쓴다)
 - 정리 설정: tidy_settings
 - 지울 만한 wiki 알림 기록: stale_wikis (wiki 점수)
 
@@ -84,7 +86,7 @@ change_sets, change_ops, review_rules, changes, tidy_settings, stale_wikis
 알리는 것 (`VaultNotices`, 7단계. platform `NoticeCatalog`에 등록, 이벤트와 같은 트랜잭션에서 생긴다):
 `vault.change.review` 검토할 제안 (묶음, `vault.change.submitted`의 status가 review일 때, 묶음 키 하나), `vault.session.saved` 세션 들어옴 (묶음, 새 세션만), `vault.wiki.stale` 지울 만한 위키 (묶음, 이벤트 없이 `WikiScoreService.notice`가 남긴다)
 
-받는 이벤트: `vault.session.saved` (자동 정리. 꺼져 있으면 아무 일 없이 처리됨), `blog.post.*` (글 자리 사본. `postVersion`이 없는 이벤트는 건너뛴다. 글 이벤트에는 `mainWikiId`, `refWikiIds`가 실려 온다)
+받는 이벤트: `vault.session.saved` (자동 정리. 꺼져 있으면 아무 일 없이 처리됨), `blog.post.*` (글 자리 사본. `postVersion`이 없는 이벤트는 건너뛴다. 글 이벤트에는 `mainWikiId`, `refWikiIds`, `appId`가 실려 온다), `blog.app.changed` (앱 공개 여부 사본. `appId`, `visibility`, `appVersion`, `deleted`)
 
 ## 써도 되는 모듈
 platform
@@ -122,7 +124,8 @@ platform
 - `space_id`, `device_id`, `blob_hash`는 다른 모듈을 가리키는 값이다 (외래키 없음)
 - 복원은 변경 묶음을 거치지 않고 이벤트도 남기지 않는 유일한 쓰기다 (빈 곳에 id를 지켜 넣는 일이라 되돌릴 대상이 없고, 정리 요청이 생기면 안 된다). 칸·해시·찾기용 글은 `SessionNote`·`WikiBody`로 다시 만든다
 - 복원한 세션의 `device_id`는 고정 값(`RestoredSession.NO_DEVICE`), `source_session_id`는 세션 id다. 기기가 복원 뒤 저장하는 세션은 새 세션이 되고, 복원 전의 대화를 다시 저장해도 새 세션이 된다 (보관 파일에 기기와 대화 id가 없다)
-- 복원은 `post_marks`를 보관 형식의 글 파일 앞부분에서 바로 채운다: blog를 읽지 않고, 이벤트를 남기지 않는다
+- 복원은 `post_marks`를 보관 형식의 글 파일 앞부분에서, `app_marks`를 앱 파일에서 바로 채운다: blog를 읽지 않고, 이벤트를 남기지 않는다. 지운 앱의 사본은 남으므로 같은 id가 다시 들어오면 덮는다 (복원한 앱은 버전 1부터)
+- 방문자 그래프의 글은 앱도 공개여야 나온다: `post_marks`와 `app_marks`를 이어 SQL에서 거른다. 앱 사본이 없거나 앱 밖의 글은 숨긴다 (모르면 숨긴다)
 - 사람이 정한 표시도 보관 파일에 있다: wiki의 `cairn_origin`·`cairn_pinned`, 세션의 `cairn_pinned`, 카테고리의 `origin`·`pinned`. 없는 옛 백업은 사람의 것으로 본다
 
 ## 하지 말 것

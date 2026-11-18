@@ -1,5 +1,5 @@
 // 콘솔 메뉴. 메뉴 하나 = app/admin/<주소>/ 폴더 하나 + 여기 한 줄. 기능이 생길 때 더한다.
-// 왼쪽에 떠 있는 독(DOCK)이 보는 화면 다섯(대화 · 팀 · 오피스 · 승인 · 보관함)이고, 대화가 처음 화면이다 (2026-11-16 떠 있는 화면).
+// 왼쪽에 떠 있는 독(DOCK)이 보는 화면 여섯(대화 · 팀 · 스토어 · 오피스 · 승인 · 보관함)이고, 대화가 처음 화면이다 (2026-11-16 떠 있는 화면, 스토어 1-5).
 // 설정에는 바꾸는 것만 둔다: 설정 묶음과 접어 둔 "고급" (MENU, 2026-11-15 화면 정리: 설정은 대화에서 하고 화면은 덜어 둔다).
 // 아이콘 이름은 _ui/Icon.tsx의 선 아이콘이다 (2026-11-16 테마 B).
 
@@ -8,6 +8,8 @@ export const CHATS_HREF = '/admin/chats';
 export const APPROVALS_HREF = '/admin/approvals';
 /** 팀: 에이전트 · 조직도 · 팀 템플릿. 이 제품의 핵심 설정 */
 export const TEAM_HREF = '/admin/agents';
+/** 스토어 (스토어 1-5): 내 앱 · 앱 종류 고르기 · 앱 관리(/admin/store/<앱 id>) */
+export const STORE_HREF = '/admin/store';
 /** 보관함 (2차 5단계): 결과물 · 페이지 · 읽은 글 · 세션 · 위키 · 글을 한 목록으로. 결과물 · 페이지 · 스크랩 관리는 그 아래 */
 export const LIBRARY_HREF = '/admin/library';
 /** 설정의 첫 화면: AI 계정 */
@@ -20,7 +22,7 @@ export const SIDE_COOKIE = 'cairn_side';
 export const NEW_CHAT = { href: CHAT_HREF, name: '새 대화', icon: 'new' };
 
 /**
- * 독 (2026-11-16 떠 있는 화면): 보는 화면 다섯. 이 순서가 화면이 위아래로 넘어가는 방향이다 (page-flip.ts).
+ * 독 (2026-11-16 떠 있는 화면): 보는 화면 여섯. 이 순서가 화면이 위아래로 넘어가는 방향이다 (page-flip.ts).
  * pages는 그 화면에 속한 주소들이고, tabs면 카드 위에 탭 줄로 보인다. side면 옆 칸(대화 목록)이 있다.
  * 설정(SETTINGS_SECTION)은 독의 아래 묶음이고, 그 밖의 콘솔 주소는 모두 설정에 속한다.
  */
@@ -44,6 +46,18 @@ export const DOCK = [
     pages: [
       { href: TEAM_HREF, name: '팀' },
       { href: '/admin/tasks', name: '작업 기록' },
+    ],
+  },
+  {
+    key: 'store',
+    href: STORE_HREF,
+    name: '스토어',
+    icon: 'store',
+    side: false,
+    tabs: true,
+    pages: [
+      { href: STORE_HREF, name: '내 앱' },
+      { href: `${STORE_HREF}/new`, name: '스토어' },
     ],
   },
   {
@@ -119,11 +133,6 @@ export const MENU = [
     ],
   },
   {
-    label: '블로그',
-    advanced: true,
-    items: [{ href: '/admin/menus', name: '블로그 메뉴', icon: 'compass' }],
-  },
-  {
     label: '연결',
     advanced: true,
     items: [
@@ -141,8 +150,6 @@ export const PACKAGE_GROUPS: Readonly<Record<string, string>> = {
   운영: '일',
   자동화: '일',
   일: '일',
-  지식: '블로그',
-  블로그: '블로그',
   연결: '연결',
   설정: '설정',
 };

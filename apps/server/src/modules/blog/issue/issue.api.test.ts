@@ -24,6 +24,7 @@ function ok(res: ApiResult, status = 200): Json {
 const newPost = async (title: string) =>
   ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title,
       body: '본문',
@@ -47,6 +48,7 @@ before(async () => {
   writer = { authorization: `Bearer ${await api.writeDevice(owner, `issue-writer-${mark}`)}` };
   menu = ok(
     await api.request('POST', '/api/menus', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       kind: 'issues',
       name: `매거진 ${mark}`,
@@ -64,6 +66,7 @@ describe('매거진 호 (/api/issues)', () => {
     assert.deepEqual([first.number, second.number, first.status], [1, 2, 'draft']);
     const posts = ok(
       await api.request('POST', '/api/menus', owner, {
+        appId: await api.blogApp(owner),
         requestId: randomUUID(),
         kind: 'posts',
         name: `글들 ${mark}`,
@@ -106,7 +109,7 @@ describe('매거진 호 (/api/issues)', () => {
         [a.id, 2, 'draft'],
       ],
     );
-    const hidden = await api.get(`/api/issues/by-number/mag-${mark}/${issue.number}`);
+    const hidden = await api.get(`/api/issues/by-number/blog/mag-${mark}/${issue.number}`);
     assert.equal(hidden.status, 404, '발행 전에는 방문자에게 없다');
 
     const published = ok(
@@ -115,7 +118,7 @@ describe('매거진 호 (/api/issues)', () => {
       }),
     );
     assert.equal(published.status, 'published');
-    const seen = ok(await api.get(`/api/issues/by-number/mag-${mark}/${issue.number}`));
+    const seen = ok(await api.get(`/api/issues/by-number/blog/mag-${mark}/${issue.number}`));
     assert.deepEqual(
       (seen.posts as Json[]).map((p) => p.slug),
       [b.slug, a.slug],

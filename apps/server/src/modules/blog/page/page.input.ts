@@ -4,12 +4,19 @@ import { PageTicket } from './page-ticket';
 
 /** GET /api/pages?menu=: 이 메뉴(주소)에 올린 페이지만 (2차 6단계, 공개 블로그의 /m/<주소>) */
 export class ListPagesInput extends BaseRequest {
-  private constructor(readonly menu: string | null) {
+  private constructor(
+    readonly menu: string | null,
+    /** 이 앱(주소)에 든 페이지만 (스토어 1단계: 페이지 앱의 첫 화면, 메뉴 주소는 앱 안에서 하나) */
+    readonly app: string | null,
+  ) {
     super();
   }
 
   static from(query: unknown): ListPagesInput {
-    return BaseRequest.read(query ?? {}, (f) => new ListPagesInput(f.optionalText('menu', 200)));
+    return BaseRequest.read(
+      query ?? {},
+      (f) => new ListPagesInput(f.optionalText('menu', 200), f.optionalText('app', 200)),
+    );
   }
 }
 
@@ -35,12 +42,14 @@ export class EditPageInput extends BaseRequest {
     readonly direction: string | null,
     /** 올릴 메뉴 (2차 6단계). 보내지 않으면 그대로, null은 메뉴에서 빼기 */
     readonly menuId: string | null | undefined,
+    /** 넣을 앱 (스토어 1단계). 보내지 않으면 그대로, null은 앱에서 빼기 */
+    readonly appId: string | null | undefined,
   ) {
     super();
   }
 
   static from(id: string, raw: unknown): EditPageInput {
-    const body = (raw ?? {}) as { direction?: unknown; menuId?: unknown };
+    const body = (raw ?? {}) as { direction?: unknown; menuId?: unknown; appId?: unknown };
     return BaseRequest.read(
       { ...(raw as object), id },
       (f) =>
@@ -51,6 +60,7 @@ export class EditPageInput extends BaseRequest {
           f.optionalText('visibility', 20),
           body.direction === '' ? '' : f.optionalText('direction', Page.DIRECTION_MAX),
           !('menuId' in body) ? undefined : body.menuId === null ? null : f.uuid('menuId'),
+          !('appId' in body) ? undefined : body.appId === null ? null : f.uuid('appId'),
         ),
     );
   }

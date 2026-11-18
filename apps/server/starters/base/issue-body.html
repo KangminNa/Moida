@@ -1,0 +1,15 @@
+{{#issue}}
+<h1 class="blog-menu-title">{{number}}호 · {{title}}</h1>
+<p class="post-meta"><time datetime="{{date}}">{{dateText}}</time></p>
+{{#intro}}<p class="blog-intro">{{intro}}</p>{{/intro}}
+<ol class="post-list">
+  {{#posts}}
+  <li>
+    <a href="{{url}}">
+      <h2>{{title}}</h2>
+      {{#excerpt}}<p>{{excerpt}}</p>{{/excerpt}}
+    </a>
+  </li>
+  {{/posts}}
+</ol>
+{{/issue}}

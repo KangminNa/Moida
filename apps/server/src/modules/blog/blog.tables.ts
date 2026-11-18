@@ -2,6 +2,50 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** blog.app_code_versions.source (값 목록 CHECK) */
+export const APP_CODE_VERSION_SOURCE = ['starter', 'upload', 'task', 'restore'] as const;
+export type AppCodeVersionSource = (typeof APP_CODE_VERSION_SOURCE)[number];
+/** blog.app_code_versions */
+export interface AppCodeVersionRow {
+  id: string;
+  app_id: string;
+  space_id: string;
+  seq: number;
+  files: unknown;
+  source: AppCodeVersionSource;
+  task_id: string | null;
+  run_id: string | null;
+  note: string;
+  created_at: Date;
+}
+export type AppCodeVersionNew = Partial<AppCodeVersionRow> & Pick<AppCodeVersionRow, 'id' | 'app_id' | 'space_id' | 'seq' | 'files' | 'source'>;
+
+/** blog.apps.kind (값 목록 CHECK) */
+export const APP_KIND = ['blog', 'magazine', 'page'] as const;
+export type AppKind = (typeof APP_KIND)[number];
+/** blog.apps.visibility (값 목록 CHECK) */
+export const APP_VISIBILITY = ['private', 'public'] as const;
+export type AppVisibility = (typeof APP_VISIBILITY)[number];
+/** blog.apps */
+export interface AppRow {
+  id: string;
+  space_id: string;
+  kind: AppKind;
+  name: string;
+  slug: string;
+  description: string;
+  visibility: AppVisibility;
+  sort: number;
+  icon_blob_hash: string | null;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+  code_seq: number | null;
+  code_pending_seq: number | null;
+  code_versions: number;
+}
+export type AppNew = Partial<AppRow> & Pick<AppRow, 'id' | 'space_id' | 'kind' | 'name' | 'slug'>;
+
 /** blog.assets */
 export interface AssetRow {
   post_id: string;
@@ -47,8 +91,9 @@ export interface MenuRow {
   rss: boolean;
   created_at: Date;
   updated_at: Date;
+  app_id: string;
 }
-export type MenuNew = Partial<MenuRow> & Pick<MenuRow, 'id' | 'space_id' | 'name' | 'slug'>;
+export type MenuNew = Partial<MenuRow> & Pick<MenuRow, 'id' | 'space_id' | 'name' | 'slug' | 'app_id'>;
 
 /** blog.page_revisions */
 export interface PageRevisionRow {
@@ -81,6 +126,7 @@ export interface PageRow {
   direction: string;
   pending_seq: number | null;
   menu_id: string | null;
+  app_id: string | null;
 }
 export type PageNew = Partial<PageRow> & Pick<PageRow, 'id' | 'space_id' | 'name' | 'title' | 'current_seq' | 'revisions'>;
 
@@ -139,6 +185,7 @@ export interface PostRow {
   purge_after: Date | null;
   meta: unknown;
   main_wiki_id: string | null;
+  app_id: string | null;
 }
 export type PostNew = Partial<PostRow> & Pick<PostRow, 'id' | 'space_id' | 'slug'>;
 

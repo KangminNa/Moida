@@ -637,6 +637,7 @@ describe('러너 추가', () => {
       'run_memos',
       'save_run_record',
       'page_base',
+      'app_code_base',
       'next_jobs',
       'report_progress',
       'submit_result',

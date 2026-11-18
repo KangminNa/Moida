@@ -36,6 +36,7 @@ function stored(fields: Partial<LoadedPost>): Post {
     excerpt: '본문',
     head_text: '첫 글\n본문',
     head_revision_id: 'r1',
+    app_id: 'app-1',
     menu_id: null,
     issue_id: null,
     issue_order: null,
@@ -56,14 +57,17 @@ function stored(fields: Partial<LoadedPost>): Post {
   });
 }
 
+/** 새 글을 앱 하나에 넣어 둔다 (스토어 1단계: 앱에 든 글만 공개할 수 있다) */
 function draft(by: Actor = owner): Post {
-  return Post.open(
+  const post = Post.open(
     by,
     PostContent.write('첫 글', '본문'),
     { slug: 'first', tags: ['mcp'], align: 'left' },
     '0192d2a0-0000-7000-8000-0000000000aa',
     now,
   );
+  post.placeIn('app-1', null, by, now);
+  return post;
 }
 
 /** 주인이 보는 글의 모양 (쓰기 결과): 공개 범위, 판 수, 태그, 정렬, 발행일, wiki 연결 */
@@ -183,6 +187,25 @@ describe('Post', () => {
     );
     assert.throws(() => post.changeStatus('secret', owner, now), RuleViolation);
     assert.throws(() => draft(writer).changeStatus(Post.PUBLISHED, writer, now), Forbidden);
+  });
+
+  test('앱에 없는 글은 공개 · 링크만으로 바꾸지 못하고, 공개한 글은 앱에서 빼지 못한다 (스토어 1단계)', () => {
+    const loose = Post.open(owner, PostContent.write('앱 밖', '본문'), { slug: 'loose' }, 'r', now);
+    assert.throws(() => loose.changeStatus(Post.PUBLISHED, owner, now), /앱에 넣은 뒤/);
+    assert.throws(() => loose.changeStatus(Post.UNLISTED, owner, now), /앱에 넣은 뒤/);
+    const post = draft();
+    post.changeStatus(Post.PUBLISHED, owner, now);
+    const [published] = post.pullEvents();
+    assert.equal(published?.data.appId, 'app-1', '공개 이벤트는 든 앱을 싣는다');
+    assert.throws(() => post.placeIn(null, null, owner, now), /앱에서 뺄 수 없어요/);
+    post.placeIn('app-2', null, owner, now);
+    assert.equal(post.appId, 'app-2', '공개한 글도 관리자는 다른 앱으로 옮긴다');
+    const moved = post.pullEvents();
+    assert.deepEqual(
+      moved.map((e) => [e.name, e.data.appId]),
+      [['blog.post.updated', 'app-2']],
+      '그래프 사본이 새 앱을 알게',
+    );
   });
 
   test('AI 도구(글쓰기 권한)는 임시 글만 고친다. 공개된 글·휴지통은 주인만', () => {
@@ -344,14 +367,14 @@ describe('글 → wiki 연결', () => {
   });
 
   test('결재로 움직이는 요청자는 연결을 바꾸지 못한다', () => {
-    const approved = new ApprovedActor(SPACE, String(owner.id), 'approval', Post.PUBLISH_ACTION);
+    const approved = new ApprovedActor(SPACE, String(owner.id), 'approval', PostPublish.ACTION);
     assert.throws(() => linked(Post.DRAFT).linkWikis(B, [], approved, now), Forbidden);
   });
 });
 
 describe('결재한 공개', () => {
   const APPROVAL = '0192d2a0-0000-7000-8000-0000000000b1';
-  const approved = new ApprovedActor(SPACE, String(owner.id), APPROVAL, Post.PUBLISH_ACTION);
+  const approved = new ApprovedActor(SPACE, String(owner.id), APPROVAL, PostPublish.ACTION);
   const later = new Date('2026-10-30T00:00:00Z');
   const saved = (
     status: PostStatus,
@@ -372,6 +395,7 @@ describe('결재한 공개', () => {
       slug: 'first',
       title: '첫 글',
       status: Post.PUBLISHED,
+      appId: 'app-1',
       postVersion: 4,
       mainWikiId: null,
       refWikiIds: [],
@@ -452,6 +476,7 @@ describe('결재한 공개', () => {
       'slug',
       'title',
       'status',
+      'appId',
       'postVersion',
       'mainWikiId',
       'refWikiIds',

@@ -6,6 +6,15 @@ import type { CategoryOrigin, ChangeActorType, ChangeDomain, ChangeOp, ChangeOpS
 
 const vaultSchema = pgSchema('vault');
 
+/** vault.app_marks */
+export const appMarks = vaultSchema.table('app_marks', {
+  app_id: uuid('app_id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  public: boolean('public').notNull(),
+  app_version: integer('app_version').notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
 /** vault.categories */
 export const categories = vaultSchema.table('categories', {
   node_id: uuid('node_id').notNull(),
@@ -148,6 +157,7 @@ export const postMarks = vaultSchema.table('post_marks', {
   ref_wiki_ids: uuid('ref_wiki_ids').array().notNull(),
   post_version: integer('post_version').notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  app_id: uuid('app_id'),
 });
 
 /** vault.project_rules */

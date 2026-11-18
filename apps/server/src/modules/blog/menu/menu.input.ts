@@ -22,10 +22,11 @@ function fieldsOf(f: RequestFields, body: Record<string, unknown>): Partial<Menu
   };
 }
 
-/** POST /api/menus. 같은 requestId는 처음 만든 메뉴를 돌려준다 */
+/** POST /api/menus. 같은 requestId는 처음 만든 메뉴를 돌려준다. 메뉴는 앱 하나에 든다 (appId, 스토어 1단계) */
 export class CreateMenuInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
+    readonly appId: string,
     readonly kind: string,
     readonly fields: Partial<MenuRow>,
   ) {
@@ -37,7 +38,7 @@ export class CreateMenuInput extends BaseRequest {
     return BaseRequest.read(
       body,
       (f) =>
-        new CreateMenuInput(f.uuid('requestId'), f.text('kind', 20), {
+        new CreateMenuInput(f.uuid('requestId'), f.uuid('appId'), f.text('kind', 20), {
           ...fieldsOf(f, body),
           name: f.text('name', Menu.NAME_MAX * 2),
         }),
@@ -61,5 +62,16 @@ export class UpdateMenuInput extends BaseRequest {
       body,
       (f) => new UpdateMenuInput(f.uuid('id'), f.version(), fieldsOf(f, body)),
     );
+  }
+}
+
+/** GET /api/menus?app=<앱 주소>: 한 앱의 메뉴만. 없으면 모든 앱 (방문자는 공개 앱만) */
+export class ListMenusInput extends BaseRequest {
+  private constructor(readonly app: string | null) {
+    super();
+  }
+
+  static from(query: unknown): ListMenusInput {
+    return BaseRequest.read(query ?? {}, (f) => new ListMenusInput(f.optionalText('app', 200)));
   }
 }

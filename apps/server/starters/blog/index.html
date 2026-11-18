@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ko">
+<head>
+{{> head}}
+</head>
+<body>
+{{> header}}
+<main class="blog-main">
+  {{#app.description}}<p class="blog-intro">{{app.description}}</p>{{/app.description}}
+  {{> post-list}}
+</main>
+{{> footer}}
+</body>
+</html>

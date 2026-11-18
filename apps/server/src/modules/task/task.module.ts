@@ -21,6 +21,7 @@ import { ApprovalQuery } from './approval/approval.query';
 import { ApprovalService } from './approval/approval.service';
 import { RequestApprovalTool } from './approval/approval.tool';
 import { ApprovalResultHandler } from './approval/approval-result.handler';
+import { AppCodeCardHandler } from './chat/app-code-card.handler';
 import { ChatController } from './chat/chat.api';
 import { ChatQuery } from './chat/chat.query';
 import { ChatService } from './chat/chat.service';
@@ -164,6 +165,8 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatResultService,
     ChatResultHandler,
     ChatCardHandler,
+    // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
+    AppCodeCardHandler,
     ChatRouteService,
     ChatRouteHandler,
     ChatRouteJob,
@@ -234,6 +237,7 @@ export class TaskModule implements OnModuleInit {
     private readonly goalRuns: GoalRunHandler,
     private readonly chatResults: ChatResultHandler,
     private readonly chatCards: ChatCardHandler,
+    private readonly appCodeCards: AppCodeCardHandler,
     private readonly chatRoutes: ChatRouteHandler,
     private readonly chatRouteJob: ChatRouteJob,
     private readonly agentless: AgentlessRequestHandler,
@@ -258,6 +262,7 @@ export class TaskModule implements OnModuleInit {
     for (const topic of GoalRunHandler.DECIDED) this.workers.on(topic, this.goalRuns);
     for (const topic of ChatResultHandler.TOPICS) this.workers.on(topic, this.chatResults);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
+    this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
     this.workers.on(Task.CHANGED, this.chatRoutes);
     this.workers.on(Task.CHANGED, this.follows);
     this.workers.due(this.chatRouteJob, Task.CHANGED);

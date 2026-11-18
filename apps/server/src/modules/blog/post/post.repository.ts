@@ -66,17 +66,20 @@ export class PostRepository extends TableRepository<PostRow, Post> {
   }
 
   /**
-   * 초안을 넣을 호 (blog_save_draft의 issue_id): 호의 메뉴 · 상태와 맨 뒤 순서. 넣는 동안 호가 지워지지 않게 공유 잠금.
+   * 초안을 넣을 호 (blog_save_draft의 issue_id): 호의 메뉴 · 앱 · 상태와 맨 뒤 순서. 넣는 동안 호가 지워지지 않게 공유 잠금.
    * 없으면 NotFound
    */
   async issueSlot(
     spaceId: string,
     issueId: string,
-  ): Promise<{ id: string; menu_id: string; status: string; next: number }> {
-    const [row] = await this.sql<{ id: string; menu_id: string; status: string; next: number }[]>`
-      SELECT i.id, i.menu_id, i.status,
+  ): Promise<{ id: string; menu_id: string; app_id: string; status: string; next: number }> {
+    const [row] = await this.sql<
+      { id: string; menu_id: string; app_id: string; status: string; next: number }[]
+    >`
+      SELECT i.id, i.menu_id, m.app_id, i.status,
         (SELECT coalesce(max(p.issue_order), 0)::int + 1 FROM blog.posts p WHERE p.issue_id = i.id) AS next
-      FROM blog.issues i WHERE i.space_id = ${spaceId} AND i.id = ${issueId} FOR SHARE OF i`;
+      FROM blog.issues i JOIN blog.menus m ON m.id = i.menu_id
+      WHERE i.space_id = ${spaceId} AND i.id = ${issueId} FOR SHARE OF i`;
     if (!row) throw new NotFound('호를 찾을 수 없어요');
     return row;
   }

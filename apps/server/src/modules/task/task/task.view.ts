@@ -16,6 +16,12 @@ function pageOf(r: Readonly<TaskRow>) {
   return page ? { pageId: page.pageId ?? null } : null;
 }
 
+/** 결과를 앱 코드의 새 버전으로 내는 일(payload.appCode, 스토어 1-6)이면 고칠 앱 */
+function appCodeOf(r: Readonly<TaskRow>) {
+  const order = (r.payload as { appCode?: { appId?: string } } | null)?.appCode;
+  return order?.appId ? { appId: order.appId } : null;
+}
+
 /** 작업 목록의 한 줄 */
 export class TaskView {
   constructor(
@@ -48,6 +54,8 @@ export class TaskView {
       waitReason: r.wait_reason,
       /** 결과를 페이지로 내보내는 일이면 고칠 페이지 (새 페이지면 pageId가 null). 아니면 null */
       page: pageOf(r),
+      /** 결과를 앱 코드의 새 버전으로 내는 일이면 고칠 앱. 아니면 null */
+      appCode: appCodeOf(r),
     };
   }
 }

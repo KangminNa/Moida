@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, Post, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, StreamableFile } from '@nestjs/common';
 import { type Actor, CurrentActor, type HttpResponse } from '../../platform';
-import { UploadAssetInput } from './asset.input';
+import { ReadFileInput, UploadAssetInput } from './asset.input';
 import { AssetQuery } from './asset.query';
 import { AssetService } from './asset.service';
 import { AssetView } from './asset.view';
@@ -31,9 +31,10 @@ export class FileController {
   async read(
     @CurrentActor() actor: Actor,
     @Param('hash') hash: string,
+    @Query() query: unknown,
     @Res({ passthrough: true }) res: HttpResponse,
   ): Promise<StreamableFile> {
-    const file = await this.assets.file(actor, hash);
+    const file = await this.assets.file(actor, ReadFileInput.from(hash, query), new Date());
     res.setHeader('Cache-Control', file.cacheControl);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(file.stream, {

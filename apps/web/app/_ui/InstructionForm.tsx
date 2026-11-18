@@ -1,0 +1,64 @@
+'use client';
+
+import { type FormEvent, useId, useRef, useState } from 'react';
+
+// AI에게 맡기는 지시 입력 (페이지 만들기 · 고치기, 앱 코드 고치기). 칸만 들고, 보내기는 패널이 한다.
+export function InstructionForm({
+  label,
+  placeholder,
+  submit,
+  hint,
+  busy,
+  problem,
+  onSubmit,
+  onEdit,
+}: {
+  label: string;
+  placeholder: string;
+  /** 단추의 글 */
+  submit: string;
+  /** 단추 옆 안내: 끝나면 어떻게 보이는지 */
+  hint: string;
+  busy: boolean;
+  problem: string | null;
+  /** 보냈으면 true: 칸을 비운다. requestId는 내용을 고치기 전까지 같다 (다시 눌러도 작업은 하나) */
+  onSubmit: (instruction: string, requestId: string) => Promise<boolean>;
+  onEdit: () => void;
+}) {
+  const id = useId();
+  const [instruction, setInstruction] = useState('');
+  const requestId = useRef<string | null>(null);
+
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    requestId.current ??= crypto.randomUUID();
+    if (!(await onSubmit(instruction.trim(), requestId.current))) return;
+    requestId.current = null;
+    setInstruction('');
+  }
+
+  return (
+    <form className="ask" onSubmit={send}>
+      <label htmlFor={`${id}-text`}>{label}</label>
+      <textarea
+        id={`${id}-text`}
+        rows={2}
+        value={instruction}
+        placeholder={placeholder}
+        onChange={(e) => {
+          requestId.current = null;
+          onEdit();
+          setInstruction(e.target.value);
+        }}
+      />
+      <div className="ask-row">
+        <span className="note">{hint}</span>
+        <span className="spacer" />
+        <button type="submit" className="cta small" disabled={busy || !instruction.trim()}>
+          {submit}
+        </button>
+      </div>
+      {problem && <p className="error">{problem}</p>}
+    </form>
+  );
+}

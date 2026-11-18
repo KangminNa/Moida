@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { useApps } from '../../_blog/live';
 import type { EditablePost, MenuList, PageDetail } from '../../_blog/types';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
@@ -76,6 +77,9 @@ export function LibraryPanel() {
     NO_TOPICS,
   );
   const menus = useLiveValue('menus', () => api<MenuList>('GET', '/api/menus'), NO_TOPICS);
+  /** 메뉴 이름 앞에 붙일 앱 이름 (스토어 1-5: 메뉴 주소는 앱 안에서 하나라 이름이 겹칠 수 있다) */
+  const apps = useApps();
+  const appName = (id: string) => apps.data?.apps.find((a) => a.id === id)?.name ?? '';
   const place = useAction();
   const items = list.data?.items ?? null;
 
@@ -200,7 +204,7 @@ export function LibraryPanel() {
                     .filter((m) => MENU_KINDS[i.kind]?.includes(m.kind))
                     .map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {appName(m.appId)} › {m.name}
                       </option>
                     ))}
                 </select>

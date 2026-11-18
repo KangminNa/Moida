@@ -11,6 +11,7 @@ import {
   type Sql,
   type VersionTarget,
 } from '../../platform';
+import { AppRepository } from '../app/app.repository';
 import { MenuRepository } from '../menu/menu.repository';
 import { Post } from './post';
 import type {
@@ -69,13 +70,18 @@ export class PostService extends EntityService<Post> {
       const now = new Date();
       const post = Post.open(actor, content, { ...req.fields, slug }, req.requestId, now);
       post.linkWikis(req.mainWikiId, req.refWikiIds, actor, now);
+      if (req.appId !== null)
+        post.placeIn(await this.appOf(tx, spaceId, req.appId), null, actor, now);
       await posts.save(post);
       await once.remember({ postId: post.id });
       return post;
     });
   }
 
-  /** 메뉴에 올리기 · 빼기 (2차 6단계, 관리자). 메뉴가 받는 종류인지는 Post · Menu가 본다 */
+  /**
+   * 앱 · 메뉴에 올리기 · 빼기 (2차 6단계 · 스토어 1단계, 관리자). 메뉴를 주면 그 메뉴의 앱, 메뉴 없이 appId를 주면 그 앱
+   * (null은 앱에서 빼기, 보내지 않으면 지금 앱 그대로). 메뉴가 받는 종류인지는 Post · Menu가 본다
+   */
   async placeInMenu(actor: Actor, req: PostMenuInput): Promise<Post> {
     actor.assertOwner();
     const spaceId = Post.spaceOf(actor);
@@ -83,7 +89,8 @@ export class PostService extends EntityService<Post> {
       const posts = new PostRepository(tx);
       const post = await posts.lock(spaceId, req.id);
       post.assertVersion(req.version);
-      post.placeIn(await this.menuOf(tx, spaceId, req.menuId), actor, new Date());
+      const app = req.appId === undefined ? post.appId : await this.appOf(tx, spaceId, req.appId);
+      post.placeIn(app, await this.menuOf(tx, spaceId, req.menuId), actor, new Date());
       await posts.save(post);
       return post;
     });
@@ -101,16 +108,21 @@ export class PostService extends EntityService<Post> {
     actor: Actor,
     now: Date,
   ): Promise<void> {
-    if (issueId === null) return post.joinIssue(null, 0, actor, now);
+    if (issueId === null) return post.joinIssue(null, null, 0, actor, now);
     const slot = await new PostRepository(tx).issueSlot(spaceId, issueId);
     if (slot.status !== 'draft') throw new RuleViolation('이미 발행한 호예요');
     (await new MenuRepository(tx).holder(spaceId, slot.menu_id)).assertWriter(actor);
-    if (post.issueId !== slot.id) post.joinIssue(slot.id, slot.next, actor, now);
+    if (post.issueId !== slot.id) post.joinIssue(slot.id, slot.app_id, slot.next, actor, now);
   }
 
   /** 올릴 메뉴 (공유 잠금: 올리는 동안 지워지지 않게). null은 빼기 */
   private menuOf(tx: Sql, spaceId: string, menuId: string | null) {
     return menuId === null ? Promise.resolve(null) : new MenuRepository(tx).holder(spaceId, menuId);
+  }
+
+  /** 넣을 앱 (공유 잠금: 넣는 동안 지워지지 않게, 이 공간의 앱만). null은 빼기 */
+  private async appOf(tx: Sql, spaceId: string, appId: string | null): Promise<string | null> {
+    return appId === null ? null : (await new AppRepository(tx).holder(spaceId, appId)).id;
   }
 
   /** 고쳐 쓰기: 제목·본문이 바뀌었으면 새 판. 주소·wiki 연결을 보내지 않으면 지금 그대로 */
@@ -164,7 +176,7 @@ export class PostService extends EntityService<Post> {
       }
       post.linkWikis(req.mainWikiId, req.refWikiIds, actor, now);
       if (req.menuId !== undefined)
-        post.placeIn(await this.menuOf(tx, spaceId, req.menuId), actor, now);
+        post.placeIn(post.appId, await this.menuOf(tx, spaceId, req.menuId), actor, now);
       if (req.issueId !== undefined)
         await this.intoIssue(tx, spaceId, post, req.issueId, actor, now);
       await posts.save(post);

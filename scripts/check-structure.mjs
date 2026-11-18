@@ -6,6 +6,8 @@
 //   3. 콘솔 메뉴(app/admin/menu.tsx의 href)와 app/admin/<주소>/page.tsx가 하나씩 맞는다
 //   4. 웹은 서버 응답 모양을 손으로 적지 않는다: app/_lib/types.ts에는 HAND_WRITTEN_TYPES(오류 모양)만.
 //      응답 타입은 서버 view에서 import type으로 만든다 (ReturnType<XxxView['toJSON']>, app/_<모듈>/types.ts)
+//   5. 웹의 최상위 경로(app/의 폴더 · (묶음) 안의 폴더, next.config의 rewrites)는 앱 주소로 못 쓰는 이름(App.RESERVED)이다:
+//      빠지면 그 이름의 앱 주소(/<앱>)가 웹의 화면에 가려진다 (docs/스토어.md 8.7)
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const modulesDir = join(root, 'apps/server/src/modules');
 const adminDir = join(root, 'apps/web/app/admin');
+const webAppDir = join(root, 'apps/web/app');
 
 /** 옆이 아닌 곳에서 시험하는 REST 진입 → 그 테스트 파일 (modules/ 아래). 흐름 하나를 여러 진입이 함께 이룰 때 */
 const TESTED_ELSEWHERE = {
@@ -31,6 +34,8 @@ const TESTED_ELSEWHERE = {
   'platform/notice/notification.api.ts': 'vault/wiki-score/wiki-score.api.test.ts',
   // 페이지는 만들기 작업(task) → 이벤트 → blog를 잇는 흐름이라 모듈을 가로지르는 시험 폴더에서
   'blog/page/page.api.ts': '../testing/page.api.test.ts',
+  // 앱 코드 (스토어 1-6): AI 작업(task) → 이벤트 → 버전 흐름을 함께 시험해 모듈 밖에 둔다
+  'blog/app-code/app-code.api.ts': '../testing/app-code.api.test.ts',
 };
 
 /** app/_lib/types.ts에 손으로 적어도 되는 타입: 오류 모양(DomainError.toJSON)은 view가 아니라 모든 실패 응답의 모양이다 */
@@ -115,11 +120,69 @@ function checkWebTypes() {
       );
 }
 
+/** 앱 주소의 모양 (App.SLUG와 같다): 점 · 밑줄이 든 이름(_next · sw.js · rss.xml)은 앱 주소가 될 수 없어 보지 않는다 */
+const APP_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** 웹의 최상위 경로 이름: app/의 폴더와 (묶음) 안의 폴더 ([동적]과 _비공개 폴더는 빼고), 파일 경로 · rewrites의 첫 칸 */
+function topRoutes() {
+  const names = new Set();
+  const visit = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (!statSync(path).isDirectory()) continue;
+      if (/^\(.+\)$/.test(name)) visit(path);
+      else if (!name.startsWith('_') && !name.startsWith('[')) names.add(name);
+    }
+  };
+  visit(webAppDir);
+  const config = readFileSync(join(root, 'apps/web/next.config.ts'), 'utf8');
+  for (const [, first] of config.matchAll(/source:\s*'\/([^/:'(]+)/g)) names.add(first);
+  return [...names].filter((n) => APP_SLUG.test(n));
+}
+
+function checkReserved() {
+  const file = join(modulesDir, 'blog/app/app.ts');
+  const block = /static readonly RESERVED[^=]*=\s*\[([^\]]*)\]/.exec(
+    readFileSync(file, 'utf8'),
+  )?.[1];
+  if (!block) {
+    problems.push(`${at(file)} App.RESERVED를 찾지 못했어요`);
+    return;
+  }
+  const reserved = new Set([...block.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  for (const name of topRoutes())
+    if (!reserved.has(name))
+      problems.push(
+        `웹의 최상위 경로 /${name}이(가) App.RESERVED에 없어요 (${at(file)}): 그 이름의 앱 주소가 화면에 가려진다`,
+      );
+}
+
+/**
+ * next.config의 WEB_ROUTES(화면 머리글을 붙이는 웹의 최상위 경로, 스토어 1-6)가 웹의 최상위 경로를 모두 담는가.
+ * 빠지면 그 화면에 frame-ancestors 'none' · X-Frame-Options가 붙지 않는다 (앱 화면으로 여겨진다). /pages는 따로 적는다
+ */
+function checkWebRoutes() {
+  const file = join(root, 'apps/web/next.config.ts');
+  const block = /const WEB_ROUTES = \[([^\]]*)\]/.exec(readFileSync(file, 'utf8'))?.[1];
+  if (!block) {
+    problems.push(`${at(file)} WEB_ROUTES를 찾지 못했어요`);
+    return;
+  }
+  const listed = new Set([...block.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  for (const name of topRoutes())
+    if (name !== 'pages' && !listed.has(name))
+      problems.push(
+        `웹의 최상위 경로 /${name}이(가) ${at(file)}의 WEB_ROUTES에 없어요: 화면 머리글이 붙지 않는다`,
+      );
+}
+
 const files = walk(modulesDir).filter((f) => f.endsWith('.ts'));
 checkNames(files);
 checkTests(files);
 checkMenu();
 checkWebTypes();
+checkReserved();
+checkWebRoutes();
 
 if (problems.length > 0) {
   console.error(`구조 검사 위반 ${problems.length}건\n`);

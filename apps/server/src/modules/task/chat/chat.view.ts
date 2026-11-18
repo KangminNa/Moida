@@ -220,6 +220,8 @@ export class ChatCardView {
           action: a.action as string | null,
           targetKind: a.target_kind as string | null,
           targetId: a.target_id as string | null,
+          /** 대상의 판 (앱 코드 공개면 버전 번호: 미리 보기 주소) */
+          targetVersion: a.target_version as number | null,
           note: a.note,
           mime: null as string | null,
           changes: changesOf(a.payload),
@@ -234,6 +236,7 @@ export class ChatCardView {
           action: null as string | null,
           targetKind: null as string | null,
           targetId: null as string | null,
+          targetVersion: null as number | null,
           note: null as string | null,
           mime: o.mime as string | null,
           changes: null as ReturnType<typeof changesOf>,

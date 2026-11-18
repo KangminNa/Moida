@@ -120,7 +120,23 @@ export class Page extends TableEntity<PageRow, PageNew> {
     if (menu?.kind === Menu.PAGE && others > 0)
       throw new RuleViolation('페이지 하나 메뉴에는 페이지가 하나만 들어가요');
     if ((menu?.id ?? null) === this.row.menu_id) return;
+    // 메뉴에 올린 페이지는 그 메뉴의 앱에 든다 (스토어 1단계). 메뉴에서 빼도 앱에는 그대로 있다
+    if (menu) this.put('app_id', menu.appId);
     this.put('menu_id', menu?.id ?? null);
+    this.put('updated_at', now);
+    this.announce();
+  }
+
+  /** 든 앱 (스토어 1단계). null이면 앱 밖의 페이지 (/pages/<이름>/) */
+  get appId(): string | null {
+    return this.row.app_id;
+  }
+
+  /** 앱에 넣기 · 빼기 (스토어 1단계, 관리자 · 앱 만들기). 다른 앱으로 가면 메뉴에서는 빠진다 */
+  moveToApp(appId: string | null, now: Date): void {
+    if (appId === this.row.app_id) return;
+    this.put('app_id', appId);
+    this.put('menu_id', null);
     this.put('updated_at', now);
     this.announce();
   }

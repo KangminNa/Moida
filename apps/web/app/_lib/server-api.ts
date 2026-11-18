@@ -37,3 +37,12 @@ export async function serverGet<T>(path: string, asVisitor = false): Promise<T |
   const reply = await serverFetch<T>(path, asVisitor);
   return reply.status >= 200 && reply.status < 300 ? reply.data : null;
 }
+
+/** 서버의 답을 그대로 (파일을 흘려보낼 때). 방문자로 묻는다. 연결 실패면 null */
+export async function serverRaw(path: string): Promise<Response | null> {
+  try {
+    return await fetch(`${BASE}${path}`, { cache: 'no-store' });
+  } catch {
+    return null;
+  }
+}

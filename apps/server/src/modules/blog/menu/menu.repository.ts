@@ -17,8 +17,8 @@ export class MenuRepository extends TableRepository<MenuRow, Menu> {
     try {
       await super.save(menu);
     } catch (error) {
-      if (Database.isUniqueViolation(error, 'menus_space_id_slug_key'))
-        throw new RuleViolation('이미 쓰는 메뉴 주소예요');
+      if (Database.isUniqueViolation(error, 'menus_app_id_slug_key'))
+        throw new RuleViolation('앱 안에서 이미 쓰는 메뉴 주소예요');
       throw error;
     }
   }
@@ -42,6 +42,11 @@ export class MenuRepository extends TableRepository<MenuRow, Menu> {
         + (SELECT count(*) FROM blog.pages WHERE menu_id = ${menuId})::int
         + (SELECT count(*) FROM blog.issues WHERE menu_id = ${menuId})::int AS items`;
     return row?.items ?? 0;
+  }
+
+  /** 앱의 메뉴를 모두 지운다 (앱 지우기: AppService가 앱에 글 · 페이지 · 호가 없는 것을 먼저 본다) */
+  async removeAllIn(appId: string): Promise<void> {
+    await this.deleteRows(menus, { app_id: appId });
   }
 
   /** 지운다 (설정이라 판을 남기지 않는다) */

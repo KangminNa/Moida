@@ -2,6 +2,7 @@ import { ArchiveFile, type ArchiveRecord, BaseEntity } from '../../platform';
 import { ChangeWork } from '../change/change-target';
 import { SlugPolicy } from '../slug.policy';
 import {
+  type AppMarkNew,
   CATEGORY_ORIGIN,
   type CategoryNew,
   EDGE_DELETED_BY_TYPE,
@@ -213,30 +214,67 @@ export class RestoredPostMark extends BaseEntity {
   private static readonly DRAFT: PostMarkStatus = 'draft';
 
   private constructor(
-    private readonly fields: Omit<PostMarkNew, 'space_id' | 'main_wiki_id'>,
+    private readonly fields: Omit<PostMarkNew, 'space_id' | 'main_wiki_id' | 'app_id'>,
     /** 글 파일이 가리키는 대표 wiki. 그 wiki가 복원되지 않으면 비운다 (외래키) */
     readonly mainWikiId: string | null,
+    /** 든 앱 (cairn_app). 앱 밖의 글이나 앱이 생기기 전의 백업은 null */
+    readonly appId: string | null,
+    /** 방문자에게 보이는 상태인가 (공개 · 링크 공개). 옛 백업을 알아보는 데 쓴다 */
+    readonly shown: boolean,
   ) {
     super(fields.post_id, 1);
   }
 
   static read(record: ArchiveRecord): RestoredPostMark {
-    const published = record.text('status') === RestoredPostMark.PUBLISHED;
+    const status = record.text('status');
+    const published = status === RestoredPostMark.PUBLISHED;
     const fields = {
       post_id: record.id(),
       title: record.text('title'),
       slug: record.text('slug'),
       status: published ? RestoredPostMark.PUBLISHED : RestoredPostMark.DRAFT,
+      ref_wiki_ids: record.ids('cairn_ref_wikis'),
+      post_version: 1,
     };
-    const mainWikiId = record.optionalId('cairn_main_wiki');
     return new RestoredPostMark(
-      { ...fields, ref_wiki_ids: record.ids('cairn_ref_wikis'), post_version: 1 },
-      mainWikiId,
+      fields,
+      record.optionalId('cairn_main_wiki'),
+      record.optionalId('cairn_app'),
+      status !== RestoredPostMark.DRAFT,
     );
   }
 
-  /** 이 공간에 넣을 사본 행. mainWikiId: 복원되는 wiki일 때만 */
-  rowIn(spaceId: string, mainWikiId: string | null): PostMarkNew {
-    return { ...this.fields, space_id: spaceId, main_wiki_id: mainWikiId };
+  /** 이 공간에 넣을 사본 행. mainWikiId: 복원되는 wiki일 때만. appId: 든 앱 (옛 백업은 기본 앱) */
+  rowIn(spaceId: string, mainWikiId: string | null, appId: string | null): PostMarkNew {
+    return { ...this.fields, space_id: spaceId, main_wiki_id: mainWikiId, app_id: appId };
+  }
+}
+
+/**
+ * blog/apps/<주소>.yml에서 읽는 앱 공개 여부 사본 (스토어 1-3). 앱의 칸은 blog의 복원이 보고, vault는 id와 공개 여부만 읽는다.
+ * 복원한 앱의 버전은 1부터 다시라 사본의 버전도 1이다
+ */
+export class RestoredAppMark extends BaseEntity {
+  private static readonly PUBLIC = 'public';
+
+  private constructor(
+    id: string,
+    private readonly isPublic: boolean,
+  ) {
+    super(id, 1);
+  }
+
+  static read(record: ArchiveRecord): RestoredAppMark {
+    return new RestoredAppMark(record.id(), record.text('visibility') === RestoredAppMark.PUBLIC);
+  }
+
+  /** 앱이 생기기 전의 백업의 기본 앱: id는 공간 id이고 공개다 (blog의 복원과 같은 규칙, docs/보관형식.md) */
+  static former(spaceId: string): RestoredAppMark {
+    return new RestoredAppMark(spaceId, true);
+  }
+
+  /** 이 공간에 넣을 사본 행 */
+  rowIn(spaceId: string): AppMarkNew {
+    return { app_id: this.id, space_id: spaceId, public: this.isPublic, app_version: 1 };
   }
 }

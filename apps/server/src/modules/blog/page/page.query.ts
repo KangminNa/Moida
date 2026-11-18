@@ -11,6 +11,7 @@ import {
   NotFound,
   SecretBox,
 } from '../../platform';
+import { App } from '../app/app';
 import type { PageRevisionRow, PageRow } from '../blog.tables';
 import { Page } from './page';
 import type {
@@ -97,9 +98,10 @@ export class PageQuery extends BaseQuery {
     const rows = await this.sql<(PageRow & { last_task_id: string | null })[]>`
       SELECT p.*, (SELECT r.task_id FROM blog.page_revisions r
                    WHERE r.page_id = p.id AND r.seq = p.revisions) AS last_task_id
-      FROM blog.pages p
-      WHERE ${this.inSpace(actor)} ${all ? this.sql`` : this.sql`AND p.visibility = ${Page.PUBLIC}`}
-        ${req.menu === null ? this.sql`` : this.sql`AND p.menu_id IN (SELECT m.id FROM blog.menus m WHERE m.slug = ${req.menu} AND m.space_id = p.space_id)`}
+      FROM blog.pages p LEFT JOIN blog.apps a ON a.id = p.app_id
+      WHERE ${this.inSpace(actor)} ${all ? this.sql`` : this.sql`AND p.visibility = ${Page.PUBLIC} AND (p.app_id IS NULL OR a.visibility = ${App.PUBLIC})`}
+        ${req.app === null ? this.sql`` : this.sql`AND a.slug = ${req.app}`}
+        ${req.menu === null ? this.sql`` : this.sql`AND p.menu_id IN (SELECT m.id FROM blog.menus m WHERE m.slug = ${req.menu} AND m.app_id = p.app_id)`}
       ORDER BY p.updated_at DESC, p.id DESC`;
     return all
       ? new PageListView(rows.map((r) => new PageView(r, r.last_task_id)))
@@ -134,11 +136,16 @@ export class PageQuery extends BaseQuery {
   async site(actor: Actor, req: PageSiteInput, now: Date): Promise<PageSiteAnswer> {
     const ticket = req.ticket === null ? null : PageTicket.open(this.box, req.ticket, now);
     const ticketPage = ticket?.pageId ?? null;
-    const [page] = await this.sql<PageRow[]>`
-      SELECT p.* FROM blog.pages p WHERE ${this.inSpace(actor)} AND p.name = ${req.name}
+    const [page] = await this.sql<(PageRow & { app_visibility: string | null })[]>`
+      SELECT p.*, a.visibility AS app_visibility
+      FROM blog.pages p LEFT JOIN blog.apps a ON a.id = p.app_id
+      WHERE ${this.inSpace(actor)} AND p.name = ${req.name}
         ${ticketPage === null ? this.sql`` : this.sql`AND p.id = ${ticketPage}`}`;
     if (!page) throw new NotFound(PageQuery.MISSING);
-    const isPublic = page.visibility === Page.PUBLIC;
+    // 방문자에게 보이는 페이지 = 공개 페이지이고 앱 밖이거나 공개 앱에 든 것 (스토어 1단계)
+    const isPublic =
+      page.visibility === Page.PUBLIC &&
+      (page.app_id === null || page.app_visibility === App.PUBLIC);
     const name = encodeURIComponent(page.name);
     if (ticketPage === null && !isPublic) {
       if (actor.kind !== 'owner') throw new NotFound(PageQuery.MISSING);

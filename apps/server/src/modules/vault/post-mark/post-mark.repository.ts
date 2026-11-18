@@ -31,6 +31,7 @@ export class PostMarkRepository extends BaseRepository<PostMark> {
       ON CONFLICT (post_id) DO UPDATE SET
         title = EXCLUDED.title, slug = EXCLUDED.slug, status = EXCLUDED.status,
         main_wiki_id = EXCLUDED.main_wiki_id, ref_wiki_ids = EXCLUDED.ref_wiki_ids,
-        post_version = EXCLUDED.post_version, updated_at = EXCLUDED.updated_at`;
+        post_version = EXCLUDED.post_version, app_id = EXCLUDED.app_id,
+        updated_at = EXCLUDED.updated_at`;
   }
 }

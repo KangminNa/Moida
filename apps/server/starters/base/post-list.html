@@ -1,0 +1,15 @@
+{{#posts.length}}
+<ol class="post-list">
+  {{#posts}}
+  <li>
+    <a href="{{url}}">
+      <h2>{{title}}</h2>
+      {{#excerpt}}<p>{{excerpt}}</p>{{/excerpt}}
+      <div class="post-meta"><time datetime="{{date}}">{{dateText}}</time>{{#tags}}<span>#{{.}}</span>{{/tags}}</div>
+    </a>
+  </li>
+  {{/posts}}
+</ol>
+{{/posts.length}}
+{{^posts.length}}<p class="blog-empty">공개한 글 없음</p>{{/posts.length}}
+{{#more}}<a class="blog-more" href="{{more.url}}">이전 글 더 보기</a>{{/more}}

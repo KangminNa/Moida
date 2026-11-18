@@ -1,0 +1,268 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { describe, test } from 'node:test';
+import { AgentUser } from './agent-user';
+import { AppCodeBase } from './app-code-base';
+import { AppCodeCheck, AppCodeEntry } from './app-code-check';
+import type { CairnServer } from './cairn-server';
+import { Job } from './job';
+import { Json } from './json';
+import { MakeStage } from './make-stage';
+import { PromptPack } from './prompt-pack';
+import { Redactor, RunLog } from './redactor';
+import { RunnerConfig } from './runner-config';
+import type { StageCheck } from './stage-check';
+
+// 앱 코드를 고치는 만들기 일 (스토어 1-6c): 지금 코드 받기(app_code_base) · 지시 단락 · 묶음과 템플릿 검사.
+
+const id = (n: number) => `00000000-0000-7000-8000-${String(n).padStart(12, '0')}`;
+const STARTERS = resolve(__dirname, '../../server/starters');
+const scan = (text: string, partials: readonly string[] = []) =>
+  AppCodeCheck.scan(text, (name) => partials.includes(name));
+const codeOf = (files: object[], hosts: string[] = []) =>
+  AppCodeBase.from(
+    Json.of({
+      app_id: id(1),
+      name: '개발 블로그',
+      kind: 'blog',
+      slug: 'dev',
+      seq: 0,
+      files,
+      hosts,
+    }),
+  ) as AppCodeBase;
+const short = (checks: readonly StageCheck[]) => checks.map((c) => [c.name, c.ok, c.how]);
+
+describe('템플릿 훑기 (AppCodeCheck.scan)', () => {
+  test('시작 코드 셋의 템플릿은 문제도 모르는 이름도 없다', async () => {
+    for (const kind of ['blog', 'magazine', 'page']) {
+      const names = new Map<string, string>();
+      for (const dir of ['base', kind])
+        for (const file of await readdir(join(STARTERS, dir)))
+          names.set(file, await readFile(join(STARTERS, dir, file), 'utf8'));
+      const partials = [...names.keys()].map((n) => n.replace(/\.html$/, ''));
+      for (const [file, text] of names) {
+        if (!AppCodeCheck.isTemplate(file)) continue;
+        const found = scan(text, partials);
+        assert.deepEqual(found.problems, [], `${kind}/${file}`);
+        const unknown = [...found.names].filter((n) => !AppCodeCheck.NAMES.includes(n));
+        assert.deepEqual(unknown, [], `${kind}/${file}`);
+      }
+    }
+  });
+
+  test('여닫는 짝 · 없는 조각 · {{{ }}}는 html에만 · 구분자 바꾸기 · 닫히지 않은 태그를 줄과 함께 알린다', () => {
+    const text = [
+      '<h1>{{app.name}}</h1>',
+      '{{#posts}}<a href="{{url}}">{{title}}</a>{{/menus}}',
+      '{{> header}}{{> nope}}',
+      '{{{post.title}}} {{&app.description}} {{{post.html}}} {{#post}}{{{html}}}{{/post}}',
+      '{{=<% %>=}} {{! 설명 {{ 은 괜찮다 }}',
+      '{{#more}}다음',
+      '{{/issues}} {{titel}} {{post.titel}} {{.}}',
+      '{{ app.url',
+    ].join('\n');
+    const found = scan(text, ['header']);
+    assert.deepEqual(found.problems, [
+      '2: 2줄의 {{#posts}}을 {{/menus}}로 닫았어요',
+      '3: 없는 조각 {{> nope}} (nope.html이 없어요)',
+      '4: {{{post.title}}}는 글자를 그대로 넣어요. html 값(post.html)에만 쓰고 나머지는 {{post.title}}로',
+      '4: {{{app.description}}}는 글자를 그대로 넣어요. html 값(post.html)에만 쓰고 나머지는 {{app.description}}로',
+      '5: 구분자 바꾸기({{= =}})는 쓰지 않아요',
+      '7: 6줄의 {{#more}}을 {{/issues}}로 닫았어요',
+      '8: 닫히지 않은 {{',
+    ]);
+    assert.deepEqual(
+      [...found.names].filter((n) => !AppCodeCheck.NAMES.includes(n)),
+      ['titel'],
+      '점 앞의 첫 마디만 본다 (post.titel은 post로)',
+    );
+    assert.deepEqual(scan('{{#posts}}{{title}}').problems, [
+      '1: {{#posts}}을 닫지 않았어요 ({{/posts}})',
+    ]);
+    assert.deepEqual(scan('{{/posts}}').problems, ['1: 열지 않은 {{/posts}}']);
+    assert.deepEqual(scan('{{ }}').problems, ['1: 이름이 빈 태그']);
+  });
+});
+
+describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
+  const starter = codeOf([
+    { name: 'index.html', size: 300, text: '{{> header}}{{#posts}}{{title}}{{/posts}}' },
+    { name: 'header.html', size: 100, text: '<a href="{{base}}">{{app.name}}</a>' },
+    { name: 'style.css', size: 2000, text: 'body{}' },
+    { name: 'logo.png', size: 5000, text: null },
+  ]);
+
+  test('받은 코드 위에 낸 파일을 얹어 본다: 낸 템플릿만 훑고, 조각은 받은 코드에서도 찾는다', () => {
+    const made = [
+      new AppCodeEntry('post.html', 120, '{{> header}}<h1>{{post.title}}</h1>{{{post.html}}}'),
+      new AppCodeEntry('style.css', 2400, null),
+    ];
+    assert.deepEqual(short(AppCodeCheck.checks(starter, made)), [
+      [AppCodeCheck.BUNDLE, true, '5개 · 8KB'],
+      [AppCodeCheck.SYNTAX, true, '1개'],
+      [AppCodeCheck.DATA, true, '모두 약속에 있음'],
+    ]);
+    assert.deepEqual(
+      AppCodeCheck.checks(starter, []),
+      [],
+      '낸 것이 없으면 결과물 파일 검사만 떨어진다',
+    );
+    assert.deepEqual(
+      short(AppCodeCheck.checks(starter, [new AppCodeEntry('app.js', 10, null)])),
+      [[AppCodeCheck.BUNDLE, true, '5개 · 7KB']],
+      '템플릿을 내지 않으면 문법 · 이름 검사는 없다',
+    );
+  });
+
+  test('묶음 규칙: index.html · 개수 · 크기 · cairn.json. 묶음과 문법만 일을 실패로 끝낸다', () => {
+    const empty = codeOf([]);
+    const noEntry = AppCodeCheck.checks(empty, [new AppCodeEntry('style.css', 10, null)]);
+    assert.deepEqual(short(noEntry), [[AppCodeCheck.BUNDLE, false, '문제 1개']]);
+    assert.match(noEntry[0]?.tail ?? '', /index\.html가 없어요/);
+
+    const many = Array.from({ length: 101 }, (_, i) => new AppCodeEntry(`f${i}.css`, 1, null));
+    const big = new AppCodeEntry('index.html', 2 * 1024 * 1024, null);
+    const tail = AppCodeCheck.checks(empty, [...many, big])[0]?.tail ?? '';
+    assert.match(tail, /100개까지예요 \(얹으면 102개\)/);
+    assert.match(tail, /템플릿\(\.html\)은 합쳐 1MB까지/);
+
+    const manifest = (text: string | null) =>
+      AppCodeCheck.checks(starter, [new AppCodeEntry('cairn.json', 40, text)])[0]?.tail ?? '';
+    assert.equal(manifest('{"cairn":1,"hosts":["fonts.example.com"]}'), '');
+    assert.match(
+      manifest('{"cairn":1,"hosts":["*.example.com","10.0.0.1","a.com:443"]}'),
+      /와일드카드/,
+    );
+    assert.equal(
+      manifest('{"cairn":1,"hosts":["*.example.com","10.0.0.1"]}').split('\n').length,
+      2,
+    );
+    assert.match(manifest('{"cairn":2}'), /데이터 약속\(cairn\)은 1/);
+    assert.match(manifest('nope'), /JSON이 아니에요/);
+    assert.match(manifest(null), /읽지 못했어요/);
+
+    const typo = AppCodeCheck.checks(starter, [new AppCodeEntry('list.html', 20, '{{titel}}')]);
+    assert.deepEqual(short(typo).at(-1), [AppCodeCheck.DATA, false, '문제 1개']);
+    assert.match(typo.at(-1)?.tail ?? '', /- list\.html: titel/);
+    assert.equal(AppCodeCheck.fatal(typo), null, '모르는 이름은 알리기만 한다');
+    const broken = AppCodeCheck.checks(starter, [new AppCodeEntry('list.html', 20, '{{#posts}}')]);
+    assert.equal(AppCodeCheck.fatal(broken)?.name, AppCodeCheck.SYNTAX);
+    assert.equal(AppCodeCheck.fatal(noEntry)?.name, AppCodeCheck.BUNDLE);
+  });
+});
+
+describe('앱 코드 일 (MakeStage)', () => {
+  const job = (payload: object) =>
+    Job.from(
+      Json.of({
+        task: { id: id(70), kind: 'make', title: '블로그 꾸미기', payload },
+        agent: { name: '만들기', role: '', tool: 'claude' },
+        instruction: '글 목록을 카드로',
+        run_token: 'cairn_run_x',
+      }),
+    );
+
+  test('payload.appCode가 있는 make 일만 앱 코드 일이다', () => {
+    assert.equal(job({ appCode: { appId: id(1) } }).appCode, true);
+    assert.equal(job({ make: { outputs: [] } }).appCode, false);
+    assert.equal(job({ appCode: { appId: id(1) } }).withBrief('# 고칠 앱').appCode, true);
+  });
+
+  test('지금 코드를 inputs/app/에 두고 지시 단락을 채우고, 검사가 그래도 틀리면 실패로 끝낸다', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'cairn-app-code-'));
+    const code = codeOf(
+      [
+        { name: 'index.html', size: 40, text: '{{> header}}{{#posts}}{{title}}{{/posts}}' },
+        { name: 'header.html', size: 30, text: '<a href="{{base}}">{{app.name}}</a>' },
+        { name: 'icon.svg', size: 300, text: '<svg/>' },
+        { name: 'photo.jpg', size: 9000, text: null },
+      ],
+      ['fonts.example.com'],
+    );
+    const config = new RunnerConfig(
+      'http://cairn',
+      'device',
+      {},
+      {},
+      '/없는',
+      null,
+      null,
+      '1',
+      AgentUser.parse('self'),
+      work,
+    );
+    const server = { appCodeBase: async () => code } as unknown as CairnServer;
+    const redactor = new Redactor([]);
+    const agent = AgentUser.parse('self') as AgentUser;
+    const stage = new MakeStage(
+      job({ appCode: { appId: id(1) } }),
+      config,
+      agent,
+      new RunLog(redactor),
+      server,
+    );
+    const notes: string[] = [];
+    try {
+      const ending = await stage.prepare(
+        new AbortController().signal,
+        (e) => notes.push(e.body),
+        redactor,
+      );
+      assert.equal(ending, null);
+      assert.deepEqual(notes, ['고칠 앱 코드(시작 코드)를 받았어요']);
+      const room = stage.workspaceRoom;
+      assert.ok(room);
+      const dir = join(room.inputsDir, 'app');
+      assert.deepEqual((await readdir(dir)).sort(), ['header.html', 'icon.svg', 'index.html']);
+
+      const pack = PromptPack.read(resolve(__dirname, '../../../skills'));
+      const prompt = stage.aiJob(pack).brief ?? '';
+      assert.match(prompt, /# 고칠 앱: 개발 블로그 \(blog · 지금 시작 코드\)/);
+      assert.match(
+        prompt,
+        new RegExp(`글 파일은 ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}에 있어요`),
+      );
+      assert.match(prompt, /- photo\.jpg \(그대로 남아요/);
+      assert.match(prompt, /\(지금: fonts\.example\.com\)/);
+      assert.doesNotMatch(prompt, /# 재료/);
+
+      await writeFile(join(room.outputsDir, 'list.html'), '{{#posts}}<b>{{title}}</b>');
+      const checks = await stage.check();
+      assert.deepEqual(short(checks), [
+        ['결과물 파일', true, '1개'],
+        [AppCodeCheck.BUNDLE, true, '5개 · 9KB'],
+        [AppCodeCheck.SYNTAX, false, '문제 1개'],
+        [AppCodeCheck.DATA, true, '모두 약속에 있음'],
+      ]);
+      const failed = await stage.finish(
+        '고쳤어요',
+        checks,
+        new AbortController().signal,
+        () => {},
+        redactor,
+      );
+      assert.match(failed.note, /템플릿 문법 검사에 떨어져 새 버전을 만들지 않았어요/);
+
+      await writeFile(join(room.outputsDir, 'list.html'), '{{#posts}}<b>{{title}}</b>{{/posts}}');
+      const fixed = await stage.check();
+      assert.equal(
+        fixed.every((c) => c.ok),
+        true,
+      );
+      const done = await stage.finish(
+        '고쳤어요',
+        fixed,
+        new AbortController().signal,
+        () => {},
+        redactor,
+      );
+      assert.equal(done.note, '만들었어요');
+    } finally {
+      await stage.close();
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});

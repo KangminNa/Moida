@@ -1,5 +1,7 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { CoreWorkers, EventCatalog, LibraryQuery, Lookups } from '../platform';
+import { AppMarkHandler } from './app-mark/app-mark.handler';
+import { AppMarkService } from './app-mark/app-mark.service';
 import { CategoryController } from './category/category.api';
 import { CategoryQuery } from './category/category.query';
 import { ChangeController } from './change/change.api';
@@ -82,6 +84,8 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
     TidyDailyJob,
     PostMarkService,
     PostMarkHandler,
+    AppMarkHandler,
+    AppMarkService,
     PostWikiQuery,
     GraphQuery,
     NeighborsTool,
@@ -107,6 +111,7 @@ export class VaultModule implements OnModuleInit {
     private readonly tidy: TidyRequestHandler,
     private readonly tidyDaily: TidyDailyJob,
     private readonly postMarks: PostMarkHandler,
+    private readonly appMarks: AppMarkHandler,
     private readonly stale: WikiStaleJob,
     private readonly library: LibraryQuery,
     private readonly sessions: SessionQuery,
@@ -125,6 +130,8 @@ export class VaultModule implements OnModuleInit {
     this.library.register([SessionQuery.LIBRARY_KIND], (a, f) => this.sessions.library(a, f));
     this.library.register([WikiQuery.LIBRARY_KIND], (a, f) => this.wikis.library(a, f));
     this.workers.on('blog.post.*', this.postMarks);
+    // 앱 공개 여부 사본 (스토어 1-2): 방문자 그래프는 앱도 공개인 글만
+    this.workers.on(AppMarkHandler.TOPIC, this.appMarks);
     this.workers.every(this.stale, WikiStaleJob.EVERY_MS);
     // 세션 정리를 하루 한 번 몰아서 (2차 7단계)
     this.workers.due(this.tidyDaily);

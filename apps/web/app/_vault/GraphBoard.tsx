@@ -59,7 +59,7 @@ function neighborsOf(graph: Graph, id: string): readonly GraphNode[] {
 /** 고른 점을 여는 주소. 방문자는 공개 글만 열 수 있다 */
 function linkOf(n: GraphNode, admin: boolean): readonly [string, string] | null {
   if (n.kind === 'post' && admin) return [`/admin/posts/${n.id}`, '글 열기'];
-  if (n.kind === 'post' && n.slug) return [postPath(n.slug), '글 읽기'];
+  if (n.kind === 'post' && n.slug) return [postPath(n.slug, null), '글 읽기'];
   if (n.kind === 'wiki' && admin) return [`/admin/wiki?wiki=${n.id}`, '위키 열기'];
   if (n.kind === 'session' && admin) return [`/admin/sessions?session=${n.id}`, '세션 열기'];
   return null;

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head>
+{{> head}}
+</head>
+<body>
+{{> header}}
+<main class="blog-main">
+  {{#app.description}}<p class="blog-intro">{{app.description}}</p>{{/app.description}}
+  {{> issue-body}}
+  {{^issue}}<p class="blog-empty">발행한 호 없음</p>{{/issue}}
+  {{#menu}}<a class="blog-more" href="{{menu.url}}">지난 호 모두 보기</a>{{/menu}}
+</main>
+{{> footer}}
+</body>
+</html>

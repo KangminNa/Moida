@@ -20,6 +20,8 @@ let laptop: string;
 /** read_all · tidy */
 let tidier: string;
 
+/** 글을 넣는 공개 앱 (스토어 1-2: 방문자 그래프는 앱도 공개인 글만, blog.app.changed로 사본을 둔다) */
+const APP = randomUUID();
 /** 앞 테스트의 것과 섞이지 않는 이름 */
 const named = (label: string) => `${label} ${randomUUID().slice(0, 8)}`;
 
@@ -117,6 +119,7 @@ async function publishPost(main: unknown, more: Json = {}): Promise<Json> {
     slug: named('글').replace(' ', '-'),
     title: named('글'),
     status: 'published',
+    appId: APP,
     postVersion: 1,
     mainWikiId: main,
     refWikiIds: [],
@@ -157,6 +160,12 @@ before(async () => {
   const { id } = await newWiki(false);
   const [wiki] = await db.sql`SELECT space_id FROM vault.wikis WHERE node_id = ${String(id)}`;
   spaceId = String(wiki?.space_id);
+  await postEvent('blog.app.changed', {
+    appId: APP,
+    visibility: 'public',
+    appVersion: 1,
+    deleted: false,
+  });
 });
 
 after(() => api.close());
@@ -409,6 +418,41 @@ describe('글 자리 사본', () => {
     const post = await publishPost(randomUUID());
     assert.equal((await mark(post.postId))?.main_wiki_id, null);
     assert.equal(await api.unprocessed('blog.post.published'), 0);
+  });
+
+  test('비공개 앱 · 모르는 앱 · 앱 밖의 글은 방문자 그래프에 없다. 앱을 공개하면 돌아온다 (스토어 1-2)', async () => {
+    const wiki = await newWiki(true);
+    const app = randomUUID();
+    const inApp = await publishPost(wiki.id, { appId: app });
+    const loose = await publishPost(wiki.id, { appId: null });
+    const seen = async () => {
+      const graph = await publicGraph();
+      return [nodeOf(graph, inApp.postId) !== undefined, nodeOf(graph, loose.postId) !== undefined];
+    };
+    assert.deepEqual(await seen(), [false, false], '앱의 사본이 없으면 숨긴다');
+    assert.notEqual(nodeOf(await ownerGraph(), inApp.postId), undefined, '주인에게는 보인다');
+
+    const app1 = { appId: app, visibility: 'public', appVersion: 2, deleted: false };
+    await postEvent('blog.app.changed', app1);
+    assert.deepEqual(await seen(), [true, false]);
+    await postEvent('blog.app.changed', { ...app1, visibility: 'private', appVersion: 3 });
+    assert.deepEqual(await seen(), [false, false], '앱을 내리면 행 하나로 숨는다');
+    await postEvent('blog.app.changed', { ...app1, appVersion: 2 });
+    assert.deepEqual(await seen(), [false, false], '늦게 온 옛 버전은 버린다');
+    await postEvent('blog.app.changed', { ...app1, appVersion: 5, deleted: true });
+    await postEvent('blog.app.changed', { ...app1, appVersion: 4 });
+    assert.deepEqual(await seen(), [false, false], '지운 앱은 되살아나지 않는다');
+  });
+
+  test('글이 다른 앱으로 가면 그 앱의 공개 여부를 따른다', async () => {
+    const wiki = await newWiki(true);
+    const post = await publishPost(wiki.id);
+    assert.notEqual(nodeOf(await publicGraph(), post.postId), undefined);
+    await postEvent('blog.post.updated', { ...post, appId: randomUUID(), postVersion: 2 });
+    assert.equal(nodeOf(await publicGraph(), post.postId), undefined);
+    const { appId: _gone, ...old } = post;
+    await postEvent('blog.post.updated', { ...old, appId: APP, postVersion: 3 });
+    assert.notEqual(nodeOf(await publicGraph(), post.postId), undefined);
   });
 });
 

@@ -458,7 +458,13 @@ describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
     const made = await propose(token, {
       setting: 'menu',
       op: 'create',
-      fields: { name, kind: 'posts', slug: `m-${randomUUID().slice(0, 6)}`, policy: '짧게' },
+      fields: {
+        app_id: await api.blogApp(owner),
+        name,
+        kind: 'posts',
+        slug: `m-${randomUUID().slice(0, 6)}`,
+        policy: '짧게',
+      },
     });
     await decide(made.approval_id);
     const { token: next } = await partner();
@@ -475,6 +481,52 @@ describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
       note: '왜',
     });
     assert.equal(kind.body.code, 'rule_violation');
+  });
+});
+
+describe('설정 바꾸기: 스토어의 앱 (스토어 1단계)', () => {
+  const propose = (token: string, fields: Json) =>
+    call(token, 'propose_setting', { request_id: randomUUID(), note: '왜', ...fields });
+
+  test('만들기는 승인 뒤에 비공개로 생기고 시작 메뉴도 함께. 공개 여부는 제안하지 못한다', async () => {
+    const { token } = await partner();
+    const slug = `ai-${randomUUID().slice(0, 6)}`;
+    const made = await propose(token, {
+      setting: 'app',
+      op: 'create',
+      fields: { name: '요리 블로그', slug, kind: 'blog', menus: ['레시피', '맛집'] },
+    });
+    assert.equal((await api.get(`/api/apps/by-slug/${slug}`, owner)).status, 404, '승인 전');
+    await decide(made.approval_id);
+    const { token: next } = await partner();
+    const { apps } = await call(next, 'get_settings', { kind: 'apps' });
+    const app = (apps as Json[]).find((a) => a.slug === slug) as Json;
+    assert.deepEqual([app.name, app.kind, app.visibility], ['요리 블로그', 'blog', 'private']);
+    const menus = ok(await api.get(`/api/menus?app=${slug}`, owner)).menus as Json[];
+    assert.deepEqual(
+      menus.map((m) => m.name),
+      ['레시피', '맛집'],
+    );
+    const open = await tool(next, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'app',
+      op: 'edit',
+      target_id: app.id,
+      version: app.version,
+      fields: { visibility: 'public' },
+      note: '공개해 주세요',
+    });
+    assert.equal(open.body.code, 'invalid_request', '공개는 관리자가 앱 관리에서');
+    const kind = await tool(next, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'app',
+      op: 'edit',
+      target_id: app.id,
+      version: app.version,
+      fields: { kind: 'magazine' },
+      note: '왜',
+    });
+    assert.equal(kind.body.code, 'rule_violation', '종류는 만들 때만');
   });
 });
 

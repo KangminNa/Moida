@@ -47,8 +47,6 @@ export class Post extends TableEntity<PostRow, PostNew> {
   static readonly REFS_MAX = 20;
   /** 휴지통에 둔 글을 영구히 지우기까지 (영구 삭제 일꾼은 뒤 단계) */
   static readonly TRASH_DAYS = 30;
-  /** 결재로 맡기는 공개 (task.approvals.action) */
-  static readonly PUBLISH_ACTION = PostPublish.ACTION;
 
   /** 글을 쓰는 쪽이 정하는 칸과 그 규칙 */
   private static readonly RULES: ColumnRules<PostRow> = {
@@ -114,6 +112,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
         space_id: Post.spaceOf(by),
         slug: fields.slug,
         status: Post.DRAFT,
+        app_id: null,
         main_wiki_id: null,
         published_at: null,
       },
@@ -140,6 +139,11 @@ export class Post extends TableEntity<PostRow, PostNew> {
   /** 지금 주소 (고쳐 쓸 때 주소를 보내지 않으면 이 주소의 겹침을 다시 본다) */
   get slug(): string {
     return this.row.slug;
+  }
+
+  /** 든 앱 (스토어 1단계). 아직 앱에 없는 글은 null이고 공개할 수 없다 */
+  get appId(): string | null {
+    return this.row.app_id;
   }
 
   /** 든 호 (2차 6단계). 없으면 null */
@@ -200,26 +204,40 @@ export class Post extends TableEntity<PostRow, PostNew> {
   }
 
   /**
-   * 메뉴에 올리기 (2차 6단계): 올린 글은 공개 대기이고, 공개는 공개 범위로 정한다. null은 메뉴에서 빼기.
+   * 앱 · 메뉴에 놓기 (2차 6단계, 스토어 1단계): 메뉴를 주면 앱은 그 메뉴의 앱, 메뉴가 null이면 메뉴에서 빼고 appId의 앱에
+   * (null이면 앱에서도 뺀다. 공개된 글은 앱에서 뺄 수 없다). 올린 글은 공개 대기이고, 공개는 공개 범위로 정한다.
    * 공개된 글은 관리자만 옮긴다. 메뉴가 받는 종류인지 · 이 요청자가 올릴 수 있는지는 메뉴가 본다. 호에서는 빠진다
    */
-  placeIn(menu: Menu | null, by: Actor, now: Date): void {
+  placeIn(appId: string | null, menu: Menu | null, by: Actor, now: Date): void {
     this.assertLive();
     if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
     menu?.assertHolds('post');
     menu?.assertWriter(by);
-    if ((menu?.id ?? null) === this.row.menu_id) return;
+    const app = menu?.appId ?? appId;
+    if (app === null && this.row.status !== Post.DRAFT)
+      throw new RuleViolation('공개된 글은 앱에서 뺄 수 없어요');
+    const was = this.row.app_id;
+    if ((menu?.id ?? null) === this.row.menu_id && app === was) return;
+    this.put('app_id', app);
     this.put('menu_id', menu?.id ?? null);
     this.put('issue_id', null);
     this.put('issue_order', null);
     this.touch(now);
+    // 공개 글이 다른 앱으로 가면 그래프 사본도 알아야 한다 (보이는지가 앱의 공개 여부를 따른다)
+    if (app !== was && this.row.status === Post.PUBLISHED) this.announceUpdate();
   }
 
   /**
-   * 호에 넣기 · 빼기 (2차 6단계): 순서(order)와 함께. 호에 든 글은 메뉴에서 빠진다 (글 목록 메뉴와 호 중 하나).
-   * 발행한 호의 글은 Issue가 막고, 공개된 글은 관리자만 옮긴다
+   * 호에 넣기 · 빼기 (2차 6단계): 순서(order)와 함께. 호에 든 글은 메뉴에서 빠지고 호의 앱(appId)에 든다 (글 목록 메뉴와 호 중 하나).
+   * 빼면 앱에는 그대로 있다. 발행한 호의 글은 Issue가 막고, 공개된 글은 관리자만 옮긴다
    */
-  joinIssue(issueId: string | null, order: number, by: Actor, now: Date): void {
+  joinIssue(
+    issueId: string | null,
+    appId: string | null,
+    order: number,
+    by: Actor,
+    now: Date,
+  ): void {
     this.assertLive();
     if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
     if (issueId === this.row.issue_id && (issueId === null || order === this.row.issue_order))
@@ -227,6 +245,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
     this.put('issue_id', issueId);
     this.put('issue_order', issueId === null ? null : order);
     if (issueId !== null) this.put('menu_id', null);
+    if (issueId !== null) this.put('app_id', appId);
     this.touch(now);
   }
 
@@ -249,6 +268,8 @@ export class Post extends TableEntity<PostRow, PostNew> {
       throw new RuleViolation(`공개 범위는 ${POST_STATUS.join(' · ')} 중 하나예요`);
     const was = this.row.status;
     if (status === was) return;
+    if (status !== Post.DRAFT && this.row.app_id === null)
+      throw new RuleViolation('앱에 넣은 뒤 공개해요');
     this.put('status', status);
     if (status !== Post.DRAFT && !this.row.published_at) this.put('published_at', now);
     this.touch(now);
@@ -262,7 +283,7 @@ export class Post extends TableEntity<PostRow, PostNew> {
    */
   publishApproved(by: Actor, targetVersion: number, now: Date): DomainEvent {
     const approvalId = PostPublish.approvalOf(by);
-    const problem = this.publishProblem(targetVersion);
+    const problem = PostPublish.problemOf(this.row, this.version, targetVersion);
     if (problem) return PostPublish.failed(this.row.space_id, this.id, approvalId, problem);
     this.put('status', Post.PUBLISHED);
     if (!this.row.published_at) this.put('published_at', now);
@@ -354,20 +375,12 @@ export class Post extends TableEntity<PostRow, PostNew> {
       slug: this.row.slug,
       title: this.head.title,
       status: this.row.status,
+      appId: this.row.app_id,
       postVersion: this.isNew ? 1 : this.version + 1,
       mainWikiId: this.row.main_wiki_id,
       refWikiIds: this.refWikis,
       ...more,
     });
-  }
-
-  /** 결재한 대로 공개할 수 없는 이유. 공개 범위를 바꿔도 버전이 오르므로 사람이 먼저 공개했으면 바뀐 글이다 */
-  private publishProblem(targetVersion: number): string | null {
-    if (this.row.deleted_at) return '휴지통에 있는 글이라 공개하지 않았어요';
-    if (this.version !== targetVersion)
-      return `승인 요청 뒤 바뀐 글이라 공개하지 않았어요 (요청 때 버전 ${targetVersion}, 지금 ${this.version})`;
-    if (this.row.status === Post.PUBLISHED) return '이미 공개된 글이에요';
-    return null;
   }
 
   private assertLive(): void {

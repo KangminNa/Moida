@@ -41,7 +41,7 @@ COPY plugins plugins
 RUN pnpm --filter @cairn/server build \
     && pnpm --filter @cairn/server --prod deploy --legacy /deploy
 
-# 운영 서버·일꾼: 저장소와 같은 모양으로 둔다 (/app/apps/server · /app/plugins · /app/skills).
+# 운영 서버·일꾼: 저장소와 같은 모양으로 둔다 (/app/apps/server · /app/plugins · /app/skills · 시작 코드 /app/apps/server/starters).
 # 플러그인은 목록 파일이 가리키는 .ts 옆에 컴파일한 .js를 얹는다. 실행 중에 TS를 읽지 않는다
 # 코드는 root 소유로 두고, 쓸 수 있는 곳은 사진 볼륨(/data/blobs)과 러너 연결 값 볼륨뿐이다.
 # 코드 러너 칸의 연결 값 폴더(/run/cairn-code)는 node와 node 그룹만 연다: 칸의 러너는 그 그룹에 들고, 칸 안의 AI(agent)는 읽지 못한다
@@ -51,6 +51,8 @@ WORKDIR /app/apps/server
 COPY --from=server-build /deploy/node_modules /app/node_modules
 COPY plugins /app/plugins
 COPY skills /app/skills
+# 앱 종류의 시작 코드 (스토어 1-6): 서버가 apps/server/starters를 읽는다 (서버는 /app/apps/server에서 돈다)
+COPY apps/server/starters /app/apps/server/starters
 COPY --from=server-build /repo/apps/server/dist /app
 RUN printf '#!/bin/sh\nexec node /app/apps/server/src/main.cli.js "$@"\n' > /usr/local/bin/cairn-admin \
     && chmod +x /usr/local/bin/cairn-admin \

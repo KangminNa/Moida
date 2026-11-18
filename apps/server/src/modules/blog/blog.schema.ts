@@ -2,10 +2,43 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { BasketItemActorType, BasketItemKind, IssueStatus, MenuKind, PageVisibility, PostAlign, PostRevisionActorType, PostStatus } from './blog.tables';
+import type { AppCodeVersionSource, AppKind, AppVisibility, BasketItemActorType, BasketItemKind, IssueStatus, MenuKind, PageVisibility, PostAlign, PostRevisionActorType, PostStatus } from './blog.tables';
 
 const blogSchema = pgSchema('blog');
 const workSchema = pgSchema('work');
+
+/** blog.app_code_versions */
+export const appCodeVersions = blogSchema.table('app_code_versions', {
+  id: uuid('id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  seq: integer('seq').notNull(),
+  files: jsonb('files').notNull(),
+  source: text('source').$type<AppCodeVersionSource>().notNull(),
+  task_id: uuid('task_id'),
+  run_id: uuid('run_id'),
+  note: text('note').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+/** blog.apps */
+export const apps = blogSchema.table('apps', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  kind: text('kind').$type<AppKind>().notNull(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  description: text('description').notNull(),
+  visibility: text('visibility').$type<AppVisibility>().notNull(),
+  sort: integer('sort').notNull(),
+  icon_blob_hash: text('icon_blob_hash'),
+  version: integer('version').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  code_seq: integer('code_seq'),
+  code_pending_seq: integer('code_pending_seq'),
+  code_versions: integer('code_versions').notNull(),
+});
 
 /** blog.assets */
 export const assets = blogSchema.table('assets', {
@@ -44,6 +77,7 @@ export const menus = blogSchema.table('menus', {
   rss: boolean('rss').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  app_id: uuid('app_id').notNull(),
 });
 
 /** blog.page_revisions */
@@ -73,6 +107,7 @@ export const pages = blogSchema.table('pages', {
   direction: text('direction').notNull(),
   pending_seq: integer('pending_seq'),
   menu_id: uuid('menu_id'),
+  app_id: uuid('app_id'),
 });
 
 /** blog.post_revisions */
@@ -119,6 +154,7 @@ export const posts = blogSchema.table('posts', {
   purge_after: timestamp('purge_after', { withTimezone: true }),
   meta: jsonb('meta').notNull(),
   main_wiki_id: uuid('main_wiki_id'),
+  app_id: uuid('app_id'),
 });
 
 /** work.basket_items */
