@@ -172,6 +172,17 @@ class Cairn {
     );
   }
 
+  /** 앱 아이콘 올리기: 본문이 그림 파일 그대로라 fetch로 직접 보낸다 */
+  async icon(appId: string, bytes: Buffer): Promise<void> {
+    const [app] = await this.sql`SELECT version FROM blog.apps WHERE id = ${appId}`;
+    const res = await fetch(`${this.api.baseUrl}/api/apps/${appId}/icon?version=${app?.version}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png', cookie: this.owner.header },
+      body: new Uint8Array(bytes),
+    });
+    assert.equal(res.status, 200, await res.text());
+  }
+
   async upload(postId: unknown, bytes: Buffer): Promise<void> {
     const res = await fetch(`${this.api.baseUrl}/api/posts/${postId}/assets`, {
       method: 'POST',
@@ -196,6 +207,12 @@ class Seed {
   deletedEdge: [string, string] = ['', ''];
   published = '';
   unlisted = '';
+  /** 공개 앱 (주소 blog, 아이콘 있음) */
+  blogApp = '';
+  /** 비공개 앱과 그 안의 공개 글 */
+  hiddenApp = '';
+  hidden = '';
+  iconPhoto: Buffer = Buffer.alloc(0);
   draftPhoto: Buffer = Buffer.alloc(0);
   openPhoto: Buffer = Buffer.alloc(0);
   loosePhoto: Buffer = Buffer.alloc(0);
@@ -203,7 +220,7 @@ class Seed {
 
 const seed = new Seed();
 
-/** 공개·비공개 wiki, 세션, 지운 선, 임시·공개·링크만 글, 사진까지 진짜 길로 채운다 */
+/** 공개·비공개 wiki, 세션, 지운 선, 공개 · 비공개 앱, 임시·공개·링크만 글, 사진까지 진짜 길로 채운다 */
 async function fill(c: Cairn): Promise<void> {
   const { api, owner } = c;
   const device = await api.connectDevice(owner, 'source-laptop');
@@ -336,6 +353,26 @@ async function fill(c: Cairn): Promise<void> {
   seed.openPhoto = photo();
   seed.draftPhoto = photo();
   seed.loosePhoto = photo();
+  seed.iconPhoto = photo();
+  // 앱 (스토어 1-3): 글이 드는 공개 앱에 아이콘을 달고, 공개 글이 든 비공개 앱을 하나 더
+  seed.blogApp = await api.blogApp(owner);
+  await c.icon(seed.blogApp, seed.iconPhoto);
+  const hidden = ok(
+    await api.request('POST', '/api/apps', owner, {
+      requestId: randomUUID(),
+      kind: 'magazine',
+      name: '비공개 잡지',
+      slug: 'hidden',
+      description: '아직 열지 않음',
+      sort: 5,
+    }),
+    201,
+  );
+  seed.hiddenApp = String(hidden.id);
+  const inside = await c.post('비공개 앱의 글', '앱이 닫혀 있다', 'published', {
+    appId: seed.hiddenApp,
+  });
+  seed.hidden = String(inside.id);
   const published = await c.post(
     '공개 글',
     `첫 줄\n\n![사진](/api/files/${sha256(seed.openPhoto)})\n\n::: center\n가운데\n:::\n`,
@@ -344,7 +381,8 @@ async function fill(c: Cairn): Promise<void> {
   );
   seed.published = String(published.id);
   await c.upload(published.id, seed.openPhoto);
-  await c.sql`UPDATE blog.posts SET main_wiki_id = ${seed.openWiki} WHERE id = ${seed.published}`;
+  await c.sql`UPDATE blog.posts SET main_wiki_id = ${seed.openWiki}
+    WHERE id IN ${c.sql([seed.published, seed.hidden])}`;
   for (const wiki of [seed.aiWiki, seed.privateWiki])
     await c.sql`INSERT INTO blog.post_wiki_refs (post_id, wiki_id) VALUES (${seed.published}, ${wiki})`;
 
@@ -452,11 +490,12 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
         ['세션', 7],
         ['원문', 3],
         ['선', 3],
-        ['글', 4],
-        ['사진', 3],
+        ['앱', 2],
+        ['글', 5],
+        ['사진', 4],
       ],
     );
-    assert.match(report.summary, /세션 7개 · 원문 3개 · 선 3개 · 글 4개 · 사진 3개/);
+    assert.match(report.summary, /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 글 5개 · 사진 4개/);
     assert.equal(await target.rows(), 0);
     const [row] = await target.sql`SELECT count(*)::int AS n FROM platform.blobs`;
     assert.equal(row?.n, 0);
@@ -529,6 +568,26 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     await refuses(
       [...swap(exported, 'vault/categories.yml', () => '[]\n')],
       /없는 카테고리를 가리켜요/,
+    );
+    await refuses(
+      exported.filter((f) => f.path !== 'blog/apps/hidden.yml'),
+      /글 [^:]+: 없는 앱을 가리켜요/,
+    );
+    await refuses(
+      swap(exported, pathOf(exported, '앱이 닫혀 있다'), (t) => t.replace(/^cairn_app: .*\n/m, '')),
+      /앱 밖의 글은 공개할 수 없어요/,
+    );
+    await refuses(
+      swap(exported, 'blog/apps/hidden.yml', (t) => `${t}  theme: dark\n`),
+      /blog\/apps\/hidden\.yml: 앱 파일에는 모르는 키를 둘 수 없어요: theme/,
+    );
+    await refuses(
+      swap(exported, 'blog/apps/hidden.yml', (t) => t.replace('slug: hidden', 'slug: admin')),
+      /admin는 앱 주소로 쓸 수 없어요/,
+    );
+    await refuses(
+      swap(exported, 'blog/apps/hidden.yml', (t) => t.replace('kind: magazine', 'kind: shop')),
+      /kind은\(는\) blog · magazine · page 중 하나/,
     );
   });
 
@@ -633,7 +692,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
       exported.find((f) => f.path === 'vault/graph.json')?.asText() ?? '{}',
     ) as { edges: Json[] };
     assert.equal(graph.edges.length, 3);
-    assert.equal(exported.filter((f) => f.path.startsWith('assets/')).length, 3);
+    assert.equal(exported.filter((f) => f.path.startsWith('assets/')).length, 4, '아이콘 포함');
     const dangling = exported.find((f) => f.asText().includes('지운 wiki의 세션'))?.asText();
     assert.ok(dangling);
     assert.equal(dangling.includes('cairn_wiki'), false);
@@ -642,8 +701,8 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
   test('결과를 알린다', () => {
     assert.equal(report.counts.get('세션'), 7);
     assert.equal(report.counts.get('원문'), 3);
-    // 앱을 싣지 않은 백업: 글은 기본 앱 하나에 (스토어 1단계, 마이그레이션과 같은 규칙)
-    assert.deepEqual(report.notes, ['글 4개를 블로그 앱(/blog)에 넣었어요']);
+    assert.equal(report.counts.get('앱'), 2);
+    assert.deepEqual(report.notes, []);
   });
 
   test('id·종류가 그대로이고 판은 첫 판 하나다', async () => {
@@ -675,7 +734,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     for (const w of wikis) assert.equal(w.head_revision_id, w.id);
     const posts = await target.sql`
       SELECT p.head_revision_id, r.id, r.seq FROM blog.posts p JOIN blog.post_revisions r ON r.post_id = p.id`;
-    assert.equal(posts.length, 4);
+    assert.equal(posts.length, 5);
     for (const p of posts) assert.deepEqual([p.seq, p.head_revision_id], [1, p.id]);
   });
 
@@ -793,6 +852,56 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     assert.equal(events?.n, 0);
     const res = await target.api.get('/api/graph/public');
     assert.ok(res.text.includes('공개 글'), '방문자 그래프에 글이 나온다');
+    assert.equal(res.text.includes('비공개 앱의 글'), false, '비공개 앱의 글은 숨는다');
+    const full = await target.api.get('/api/graph', target.owner);
+    assert.ok(full.text.includes('비공개 앱의 글'), '관리자 그래프에는 있다');
+  });
+
+  test('앱이 id · 종류 · 공개 여부 · 아이콘째 돌아오고, 글이 든 앱과 그래프 사본이 맞는다', async () => {
+    const apps = await target.sql`
+      SELECT id, kind, name, slug, description, visibility, sort, icon_blob_hash, version
+      FROM blog.apps ORDER BY sort`;
+    assert.deepEqual(
+      apps.map((a) => ({ ...a })),
+      [
+        {
+          id: seed.blogApp,
+          kind: 'blog',
+          name: '블로그',
+          slug: 'blog',
+          description: '',
+          visibility: 'public',
+          sort: 0,
+          icon_blob_hash: sha256(seed.iconPhoto),
+          version: 1,
+        },
+        {
+          id: seed.hiddenApp,
+          kind: 'magazine',
+          name: '비공개 잡지',
+          slug: 'hidden',
+          description: '아직 열지 않음',
+          visibility: 'private',
+          sort: 5,
+          icon_blob_hash: null,
+          version: 1,
+        },
+      ],
+    );
+    const posts = await target.sql`
+      SELECT p.id, p.app_id, m.app_id AS mark_app FROM blog.posts p
+      JOIN vault.post_marks m ON m.post_id = p.id WHERE p.id IN ${target.sql([seed.published, seed.hidden])}`;
+    const byId = new Map(posts.map((p) => [p.id, [p.app_id, p.mark_app]]));
+    assert.deepEqual(byId.get(seed.published), [seed.blogApp, seed.blogApp]);
+    assert.deepEqual(byId.get(seed.hidden), [seed.hiddenApp, seed.hiddenApp]);
+    const marks = await target.sql`SELECT app_id, public, app_version FROM vault.app_marks`;
+    assert.deepEqual(
+      new Map(marks.map((m) => [m.app_id, [m.public, m.app_version]])),
+      new Map([
+        [seed.blogApp, [true, 1]],
+        [seed.hiddenApp, [false, 1]],
+      ]),
+    );
   });
 
   test('방문자는 공개된 글·wiki·사진만 본다', async () => {
@@ -805,6 +914,9 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     assert.ok(list.text.includes('공개 글'));
     assert.equal(list.text.includes('임시 글'), false);
     assert.equal(list.text.includes('링크만 글'), false);
+    assert.equal(list.text.includes('비공개 앱의 글'), false);
+    assert.equal((await api.get('/api/apps/by-slug/blog/icon')).status, 200, '공개 앱의 아이콘');
+    assert.equal((await api.get('/api/apps/by-slug/hidden')).status, 404, '비공개 앱');
     const [file] =
       await target.sql`SELECT mime FROM platform.blobs WHERE hash = ${sha256(seed.openPhoto)}`;
     assert.equal(file?.mime, 'image/png');
@@ -814,7 +926,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     const before = await target.rows();
     await assert.rejects(
       target.restores.preview(system, exported),
-      /빈 Cairn에만 복원할 수 있어요. 지금 카테고리 2개 · wiki 4개 · 세션 7개 · 글 4개가 있어요/,
+      /빈 Cairn에만 복원할 수 있어요. 지금 카테고리 2개 · wiki 4개 · 세션 7개 · 앱 2개 · 글 5개가 있어요/,
     );
     await assert.rejects(target.restore(exported), /빈 Cairn에만/);
     assert.equal(await target.rows(), before);
@@ -983,7 +1095,13 @@ describe('다른 묶음', () => {
     const report = await cairn.restore(open);
     assert.ok(report.notes.some((n) => /vault 파일이 없어요/.test(n)));
     assert.equal(report.counts.get('세션'), undefined);
+    assert.equal(report.counts.get('앱'), 1, '공개 앱만');
     assert.equal(report.counts.get('글'), 1);
+    assert.equal(report.counts.get('사진'), 2, '공개 글의 사진과 공개 앱의 아이콘');
+    assert.equal(
+      open.some((f) => f.path === 'blog/apps/hidden.yml' || f.asText().includes('비공개 앱의 글')),
+      false,
+    );
     const [post] =
       await cairn.sql`SELECT main_wiki_id FROM blog.posts WHERE id = ${seed.published}`;
     assert.equal(post?.main_wiki_id, seed.openWiki);
@@ -994,6 +1112,62 @@ describe('다른 묶음', () => {
     const wanted = new Map(open.map((f) => [f.path, f.asText()]));
     for (const file of after.filter((f) => !f.isPrivateArea() && f.path.startsWith('blog/')))
       assert.equal(file.asText(), wanted.get(file.path));
+  });
+
+  /** 앱이 생기기 전의 묶음: 앱 파일과 글의 cairn_app이 없다 */
+  const beforeApps = (files: readonly ArchiveFile[]): readonly ArchiveFile[] =>
+    files
+      .filter((f) => !f.path.startsWith('blog/apps/'))
+      .map((f) =>
+        f.path.startsWith('blog/posts/')
+          ? ArchiveFile.text(f.path, f.asText().replace(/^cairn_app: .*\n/m, ''))
+          : f,
+      );
+
+  test('앱이 생기기 전의 백업: 글은 모두 기본 앱(id = 공간 id, /blog, 공개)에 들고 방문자 그래프에도 나온다', async () => {
+    const cairn = await boot('before_apps');
+    const report = await cairn.restore(beforeApps(exported));
+    assert.equal(report.counts.get('앱'), 1);
+    assert.ok(
+      report.notes.includes('앱이 생기기 전의 백업이라 글 5개를 블로그 앱(/blog)에 넣었어요'),
+      report.notes.join(),
+    );
+    const spaceId = await cairn.spaceId;
+    const apps = await cairn.sql`SELECT id, kind, name, slug, visibility FROM blog.apps`;
+    assert.deepEqual(
+      apps.map((a) => ({ ...a })),
+      [{ id: spaceId, kind: 'blog', name: '블로그', slug: 'blog', visibility: 'public' }],
+    );
+    const [posts] = await cairn.sql`
+      SELECT array_agg(DISTINCT p.app_id) AS apps, array_agg(DISTINCT m.app_id) AS marks
+      FROM blog.posts p JOIN vault.post_marks m ON m.post_id = p.id`;
+    assert.deepEqual([posts?.apps, posts?.marks], [[spaceId], [spaceId]]);
+    const marks = await cairn.sql`SELECT app_id, public, app_version FROM vault.app_marks`;
+    assert.deepEqual(
+      marks.map((m) => ({ ...m })),
+      [{ app_id: spaceId, public: true, app_version: 1 }],
+    );
+    assert.ok((await cairn.api.get('/api/graph/public')).text.includes('공개 글'));
+    assert.ok((await cairn.api.get('/api/posts')).text.includes('공개 글'));
+  });
+
+  test('앱 파일도 공개 · 링크 공개 글도 없는 묶음: 임시 글은 앱 밖에 들고 기본 앱을 만들지 않는다', async () => {
+    const cairn = await boot('drafts_only');
+    const drafts = beforeApps(exported).filter(
+      (f) => !f.path.startsWith('blog/posts/') || /^status: draft$/m.test(f.asText()),
+    );
+    const report = await cairn.restore(drafts);
+    assert.equal(report.counts.get('앱'), undefined);
+    assert.equal(report.counts.get('글'), 2);
+    assert.equal(
+      report.notes.some((n) => /블로그 앱/.test(n)),
+      false,
+    );
+    const [counts] = await cairn.sql`
+      SELECT (SELECT count(*)::int FROM blog.apps) AS apps, (SELECT count(*)::int FROM vault.app_marks) AS marks,
+             (SELECT count(*)::int FROM blog.posts WHERE app_id IS NOT NULL)
+           + (SELECT count(*)::int FROM vault.post_marks WHERE app_id IS NOT NULL) AS placed`;
+    assert.deepEqual({ ...counts }, { apps: 0, marks: 0, placed: 0 });
   });
 
   test('없는 것을 가리키는 값은 빼고 알려 주고, 고정한 점 위치는 보기가 있을 때만 돌아온다', async () => {
@@ -1055,7 +1229,10 @@ describe('cairn-admin restore (표준 입력의 zip)', () => {
     const zip = zipOf(exported);
     const preview = admin(cairn, [], zip);
     assert.equal(preview.status, 0, preview.stderr);
-    assert.match(preview.stdout, /들어올 내용: .*세션 7개 · 원문 3개 · 선 3개 · 글 4개 · 사진 3개/);
+    assert.match(
+      preview.stdout,
+      /들어올 내용: .*세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 글 5개 · 사진 4개/,
+    );
     assert.match(preview.stdout, /--apply/);
     assert.equal(await cairn.rows(), 0);
 
@@ -1127,7 +1304,10 @@ describe('sync-github: 저장소에서 복원', () => {
 
     const preview = ok(await run(cairn, 'restore-preview'));
     assert.equal(preview.ok, true, preview.message as string);
-    assert.match(String(preview.message), /세션 7개 · 원문 3개 · 선 3개 · 글 4개 · 사진 3개/);
+    assert.match(
+      String(preview.message),
+      /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 글 5개 · 사진 4개/,
+    );
     assert.equal(await cairn.rows(), 0);
 
     const restored = ok(await run(cairn, 'restore'));

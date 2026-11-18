@@ -7,6 +7,7 @@ import {
   type Sql,
 } from '../../platform';
 import {
+  RestoredAppMark,
   RestoredCategory,
   RestoredEdge,
   RestoredPin,
@@ -17,9 +18,10 @@ import { RestoredSession } from './restored-session';
 import { RestoredTranscript } from './restored-transcript';
 import { VaultRestoreRepository } from './vault-restore.repository';
 
-// 복원에서 vault의 몫: 카테고리, wiki, 세션과 그 원문, 선, 고정한 점 위치, 글 자리 사본.
+// 복원에서 vault의 몫: 카테고리, wiki, 세션과 그 원문, 선, 고정한 점 위치, 글 자리 사본과 앱 공개 여부 사본.
 // 이벤트를 남기지 않는다: 정리 요청과 일 요청이 생기지 않고, 일꾼이 할 일도 없다.
-// 공개 저장소에서 받은 묶음에는 vault 파일이 없다. 그때는 빈 채로 넘어가고 글 자리만 채운다.
+// 공개 저장소에서 받은 묶음에는 vault 파일이 없다. 그때는 빈 채로 넘어가고 글 자리와 앱만 채운다.
+// 앱 파일이 없는데 공개 · 링크 공개 글이 있으면 앱이 생기기 전의 백업이다: blog와 같은 규칙으로 기본 앱(id = 공간 id, 공개)에 넣는다.
 export class VaultRestore extends ArchivePart {
   private static readonly CATEGORIES = 'vault/categories.yml';
   private static readonly GRAPH = 'vault/graph.json';
@@ -27,6 +29,7 @@ export class VaultRestore extends ArchivePart {
   private static readonly SESSION = /^vault\/sessions\/.+\.md$/;
   private static readonly TRANSCRIPT = /^vault\/transcripts\/.+\.md$/;
   private static readonly POST = /^blog\/posts\/.+\.md$/;
+  private static readonly APP = /^blog\/apps\/[^/]+\.yml$/;
 
   private constructor(
     private readonly categories: readonly RestoredCategory[],
@@ -37,6 +40,8 @@ export class VaultRestore extends ArchivePart {
     private readonly edges: readonly RestoredEdge[],
     private readonly pins: readonly RestoredPin[],
     private readonly marks: readonly RestoredPostMark[],
+    /** 앱 공개 여부 사본. 앱이 생기기 전의 백업이면 null (기본 앱 하나) */
+    private readonly apps: readonly RestoredAppMark[] | null,
     private readonly findings: readonly string[],
   ) {
     super();
@@ -48,10 +53,15 @@ export class VaultRestore extends ArchivePart {
     const sessions: RestoredSession[] = [];
     const transcripts: RestoredTranscript[] = [];
     const marks: RestoredPostMark[] = [];
+    const apps: RestoredAppMark[] = [];
     let graph: ArchiveFile | null = null;
     for (const file of files) {
       if (VaultRestore.POST.test(file.path)) {
         marks.push(RestoredPostMark.read(VaultRestore.document(file, 'post', ArchiveQuery.FORMAT)));
+      } else if (VaultRestore.APP.test(file.path)) {
+        const text = VaultRestore.textOf(file);
+        for (const record of ArchiveRecord.listOfYaml(file.path, text))
+          apps.push(RestoredAppMark.read(record));
       } else if (file.path === VaultRestore.CATEGORIES) {
         const text = VaultRestore.textOf(file);
         for (const record of ArchiveRecord.listOfYaml(file.path, text))
@@ -72,7 +82,11 @@ export class VaultRestore extends ArchivePart {
         throw new RuleViolation(`모르는 파일이에요: ${file.path}`);
       }
     }
-    return VaultRestore.checked(categories, wikis, sessions, transcripts, graph, marks);
+    const former = apps.length === 0 && marks.some((m) => m.shown);
+    return VaultRestore.checked(categories, wikis, sessions, transcripts, graph, [
+      marks,
+      former ? null : apps,
+    ]);
   }
 
   /** 서로 가리키는 것을 맞춰 본다. 휴지통의 wiki·점을 가리키는 값은 옛 백업에 남아 있을 수 있어 멈추지 않고 뺀다 */
@@ -82,7 +96,7 @@ export class VaultRestore extends ArchivePart {
     sessions: readonly RestoredSession[],
     transcripts: readonly RestoredTranscript[],
     graph: ArchiveFile | null,
-    marks: readonly RestoredPostMark[],
+    [marks, apps]: readonly [readonly RestoredPostMark[], readonly RestoredAppMark[] | null],
   ): VaultRestore {
     const nodes = [...categories, ...wikis, ...sessions].map((n) => n.id);
     VaultRestore.assertUnique(nodes, 'id');
@@ -120,7 +134,17 @@ export class VaultRestore extends ArchivePart {
         : []),
     ];
     const bySession = VaultRestore.transcriptsOf(sessions, transcripts);
-    return new VaultRestore(categories, wikis, sessions, bySession, edges, pins, marks, findings);
+    return new VaultRestore(
+      categories,
+      wikis,
+      sessions,
+      bySession,
+      edges,
+      pins,
+      marks,
+      apps,
+      findings,
+    );
   }
 
   /**
@@ -214,9 +238,12 @@ export class VaultRestore extends ArchivePart {
       await repository.saveSession(spaceId, session, live ? session.wikiId : null, transcripts);
     }
     for (const edge of this.edges) await repository.saveEdge(spaceId, edge);
+    for (const app of this.apps ?? [RestoredAppMark.former(spaceId)])
+      await repository.saveAppMark(spaceId, app);
     for (const mark of this.marks) {
       const live = mark.mainWikiId !== null && wikiIds.has(mark.mainWikiId);
-      await repository.savePostMark(spaceId, mark, live ? mark.mainWikiId : null);
+      const app = this.apps === null ? spaceId : mark.appId;
+      await repository.savePostMark(spaceId, mark, live ? mark.mainWikiId : null, app);
     }
     const placed = await repository.savePins(spaceId, this.pins);
     return placed < this.pins.length

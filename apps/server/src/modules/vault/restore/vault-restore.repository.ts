@@ -1,6 +1,7 @@
 import type { Sql } from '../../platform';
 import type { GraphViewRow, NodeLayoutNew, NodeRow } from '../vault.tables';
 import type {
+  RestoredAppMark,
   RestoredCategory,
   RestoredEdge,
   RestoredPin,
@@ -55,13 +56,28 @@ export class VaultRestoreRepository {
     await this.tx`INSERT INTO vault.edges ${this.tx(e.rowIn(spaceId) as never)}`;
   }
 
-  /** mainWikiId: 복원되는 wiki일 때만. 외래키가 있어 없는 wiki를 가리킬 수 없다 */
+  /** mainWikiId: 복원되는 wiki일 때만. 외래키가 있어 없는 wiki를 가리킬 수 없다. appId: 든 앱 */
   async savePostMark(
     spaceId: string,
     m: RestoredPostMark,
     mainWikiId: string | null,
+    appId: string | null,
   ): Promise<void> {
-    await this.tx`INSERT INTO vault.post_marks ${this.tx(m.rowIn(spaceId, mainWikiId) as never)}`;
+    const row = m.rowIn(spaceId, mainWikiId, appId);
+    await this.tx`INSERT INTO vault.post_marks ${this.tx(row as never)}`;
+  }
+
+  /**
+   * 앱 공개 여부 사본. 지운 앱의 사본은 남으므로(늦은 이벤트가 되살리지 못하게) 같은 백업을 다시 복원하면 id가 겹친다:
+   * 복원한 앱은 버전 1부터 다시라 사본도 그 값으로 덮는다
+   */
+  async saveAppMark(spaceId: string, a: RestoredAppMark): Promise<void> {
+    const row = a.rowIn(spaceId);
+    await this.tx`
+      INSERT INTO vault.app_marks ${this.tx(row as never)}
+      ON CONFLICT (app_id) DO UPDATE
+      SET space_id = EXCLUDED.space_id, public = EXCLUDED.public,
+          app_version = EXCLUDED.app_version, updated_at = now()`;
   }
 
   /** 이름이 같은 그래프 보기가 있는 위치만 넣는다. 넣은 수를 돌려준다. 보기는 보관 파일에 없다 */

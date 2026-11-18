@@ -13,8 +13,8 @@
   글 → wiki 연결은 `Post.linkWikis`: 새 글·고쳐 쓰기·초안 저장의 `mainWikiId`·`refWikiIds` (`blog_save_draft`는 `main_wiki_id`·`ref_wiki_ids`). 보내지 않으면 그대로, 대표 null과 참고 []는 비우기.
   MCP 도구 `blog_get_post`(휴지통 글은 없는 글과 같다. 작업 토큰에 봉인된 읽기 허락(`Actor.mayRead`, 대화의 참조 2026-11-15 B)이 있는 글은 쓰기 권한 없이도 그 작업에서 읽힌다)와 `blog_save_draft`(`PostService.saveDraft`, 주소·정렬은 건드리지 않고, 고칠 때는 `base_version`이 꼭 있어야 한다).
   결재한 공개는 `PublishApprovedHandler` → `PostService.publishApproved` → `Post.publishApproved`.
-  보관 파일은 `PostArchiveQuery`: 글과, 남은 글이 쓰는 사진 `assets/<해시>.<확장자>`(휴지통 글에만 붙은 사진은 뺀다. 디스크에 없는 파일은 로그만 남기고 뺀다). 글마다 붙은 사진은 앞부분 `cairn_assets`에 적는다.
-  복원의 blog 몫은 `PostRestore`(`RestoredPost`, 새 행만 넣는 `PostRestoreRepository`): 사진은 이름의 해시와 파일의 앞부분을 확인하고, `cairn_assets`가 없는 옛 백업은 본문의 `/api/files/<해시>`로 사진 행을 만든다
+  보관 파일은 `PostArchiveQuery`: 앱 `blog/apps/<주소>.yml`(앱 하나에 파일 하나, 스토어 1-3), 글과, 남은 글이 쓰는 사진 · 앱 아이콘 `assets/<해시>.<확장자>`(휴지통 글에만 붙은 사진은 뺀다. 디스크에 없는 파일은 로그만 남기고 뺀다). 글마다 붙은 사진은 앞부분 `cairn_assets`에, 든 앱은 `cairn_app`에 적는다. 공개 저장소로는 공개 앱과, 공개 앱에 든 공개 글 · 그 사진 · 공개 앱의 아이콘만 나간다.
+  복원의 blog 몫은 `PostRestore`(`RestoredApp` · `RestoredPost`, 새 행만 넣는 `PostRestoreRepository`): 앱은 id · 종류 · 공개 여부 · 아이콘 그대로(칸은 `App.checked` · `App.checkSlug`, 버전은 1부터), 글이 없는 앱을 가리키거나 공개 · 링크 공개 글이 앱 밖이면 멈춘다. 사진은 이름의 해시와 파일의 앞부분을 확인하고, `cairn_assets`가 없는 옛 백업은 본문의 `/api/files/<해시>`로 사진 행을 만든다. 앱 파일이 없는데 공개 · 링크 공개 글이 있으면 앱이 생기기 전의 백업이라 모든 글을 기본 앱(`RestoredApp.former`: 블로그, `/blog`, 공개, id = 공간 id. vault도 같은 규칙)에 넣는다
 - `asset/`: 사진(`Asset`, 글 ↔ 파일 한 행), 형식 판단(`ImagePolicy`: 파일의 앞부분으로, PNG · JPEG · WebP · GIF만).
   `POST api/posts/:id/assets`(주인만, 본문이 파일 그대로), `GET api/files/:hash`. 파일은 platform의 `BlobStore`에 있다
 - `basket/`: 소재(`BasketItem`, 공간마다 기본 상자 하나를 처음 담을 때 만든다). `api/basket/items`(주인만), MCP 도구 `basket_get`(write 권한).

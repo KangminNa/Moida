@@ -90,6 +90,15 @@ export class App extends TableEntity<AppRow, AppNew> {
     return slug;
   }
 
+  /** 칸 하나를 관리자가 고칠 때와 같은 규칙으로 본다 (복원: RestoredApp) */
+  static checked<K extends 'name' | 'description' | 'sort'>(
+    column: K,
+    value: Unchecked<AppRow>[K],
+  ): AppRow[K] {
+    const rule = App.RULES[column] as (value: Unchecked<AppRow>[K]) => AppRow[K];
+    return rule(value);
+  }
+
   /** 새 앱: 늘 비공개로 만든다 (공개는 관리자가 앱 관리에서) */
   static open(spaceId: string, kind: string, fields: Partial<Unchecked<AppRow>>, now: Date): App {
     if (!ValueList.has(APP_KIND, kind))
