@@ -1,9 +1,9 @@
 'use client';
 
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { MENU_KIND_LABELS } from '../../_blog/labels';
-import type { Menu } from '../../_blog/types';
-import type { Agent } from '../../_task/types';
+import { MENU_KIND_LABELS } from '../../../_blog/labels';
+import type { Menu } from '../../../_blog/types';
+import type { Agent } from '../../../_task/types';
 
 /** 칸의 길이 (서버 Menu의 값과 같다) */
 const NAME_MAX = 40;

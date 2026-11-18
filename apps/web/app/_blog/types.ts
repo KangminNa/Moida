@@ -1,4 +1,6 @@
 import type {
+  AppListView,
+  AppView,
   PublicAppListView,
   PublicAppView,
 } from '../../../server/src/modules/blog/app/app.view';
@@ -86,3 +88,6 @@ export type PublicIssue = ReturnType<PublicIssueView['toJSON']>;
 /** 스토어의 앱 (방문자, 스토어 1단계): 종류 · 이름 · 주소 · 설명 · 아이콘 주소. 목록은 공개 앱만 순서대로 */
 export type PublicApp = ReturnType<PublicAppView['toJSON']>;
 export type PublicAppList = ReturnType<PublicAppListView['toJSON']>;
+/** 앱 (관리자): 칸 전부 · 든 것의 수(목록) · version. 만들거나 고친 결과는 counts가 null */
+export type AdminApp = ReturnType<AppView['toJSON']>;
+export type AdminAppList = ReturnType<AppListView['toJSON']>;

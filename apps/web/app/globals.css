@@ -3850,3 +3850,142 @@ ul.picked > .chip {
 .change-lines li.grant .change-after {
   font-weight: 700;
 }
+
+/* 스토어 (스토어 1-5): 앱 아이콘(공개 화면과 콘솔이 함께 쓴다) · 내 앱 · 스토어 · 앱 관리 */
+
+/* 앱 아이콘: 올린 그림, 없으면 종류의 선 아이콘 (_blog/AppIcon.tsx) */
+.app-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: var(--float-1);
+}
+
+.app-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.app-icon.small {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.app-icon.tile {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  transition: box-shadow 0.2s var(--ease-out);
+}
+
+.app-icon.tile .menu-ico {
+  width: 38px;
+  height: 38px;
+}
+
+/* 내 앱의 한 줄: 아이콘 · 이름 · 버튼 */
+.list-cell.app-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-row .item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 앱 관리 머리: 아이콘 · 이름 · 공개 전환 */
+.page-head.app-head {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.app-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 스토어: 앱 종류 카드 */
+.store-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.store-kind p {
+  flex: 1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.store-kind small {
+  color: var(--faint);
+}
+
+.store-kind[aria-disabled="true"] {
+  opacity: 0.6;
+}
+
+.store-kind-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+/* 앱 관리 › 개요: 든 것의 수 */
+.app-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-counts li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-counts b {
+  font-size: 1.4rem;
+}
+
+.app-counts small {
+  color: var(--muted);
+}
+
+/* 만들기 시트의 주소 칸: 사이트 주소 + 앱 주소 */
+.slug-row {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.slug-row .input {
+  flex: 1;
+}

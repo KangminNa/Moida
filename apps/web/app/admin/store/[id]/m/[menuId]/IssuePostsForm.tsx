@@ -1,7 +1,7 @@
 'use client';
 
 import { type FormEvent, useState } from 'react';
-import type { AdminPostSummary } from '../../../_blog/types';
+import type { AdminPostSummary } from '../../../../../_blog/types';
 
 // 호에 든 글 고르기: 고른 순서가 호의 순서다. 임시 글과 이 호에 든 글만 보인다 (다른 호에 든 글은 빼고).
 export function IssuePostsForm({

@@ -2,22 +2,23 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { menuPath } from '../../_blog/format';
-import { MENU_KIND_LABELS } from '../../_blog/labels';
-import type { Menu, MenuList } from '../../_blog/types';
-import { api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
-import { useLiveValue } from '../../_lib/use-live';
-import { useAgents } from '../../_task/live';
+import { menuPath } from '../../../_blog/format';
+import { MENU_KIND_LABELS } from '../../../_blog/labels';
+import { useMenus } from '../../../_blog/live';
+import type { AdminApp, Menu } from '../../../_blog/types';
+import { api } from '../../../_lib/client-api';
+import { useAction } from '../../../_lib/use-action';
+import { useAgents } from '../../../_task/live';
+import { STORE_HREF } from '../../menu';
 import { type MenuBody, MenuForm } from './MenuForm';
 
 const NEW = 'new';
 const CONFLICT = '이미 바뀐 메뉴예요. 최신 내용을 다시 읽었어요';
 
-// 블로그 메뉴 (2차 6단계): 공개 블로그 위쪽 메뉴 줄의 순서대로. 추가 · 편집 · 삭제(빈 메뉴만).
-// 글 · 페이지는 보관함에서 "메뉴에 올리기"로 담는다.
-export function MenusPanel() {
-  const menus = useLiveValue('menus', () => api<MenuList>('GET', '/api/menus'), []);
+// 앱의 메뉴 (2차 6단계 블로그 메뉴를 스토어 1-5에서 앱 관리로 옮김): 앱 머리의 메뉴 줄 순서대로. 추가 · 편집 · 삭제(빈 메뉴만).
+// 메뉴는 이 앱에 만들어진다 (appId). 글 · 페이지는 보관함에서 "메뉴에 올리기"로 담는다.
+export function AppMenus({ app }: { app: AdminApp }) {
+  const menus = useMenus(app.slug);
   const agents = useAgents();
   const action = useAction();
   const save = useAction();
@@ -37,7 +38,7 @@ export function MenusPanel() {
       () =>
         target
           ? api('PATCH', `/api/menus/${target.id}`, { ...body, version: target.version })
-          : api('POST', '/api/menus', { ...body, requestId }),
+          : api('POST', '/api/menus', { ...body, appId: app.id, requestId }),
       { done: `${body.name} 저장됨`, reload: menus.reload, conflict: CONFLICT },
     );
     if (reply?.ok) setOpen(null);
@@ -70,8 +71,8 @@ export function MenusPanel() {
     <>
       <header className="page-head">
         <div>
-          <h1>블로그 메뉴</h1>
-          <p>공개 블로그 위쪽 메뉴 줄. 글 · 페이지는 보관함에서 메뉴에 올림</p>
+          <h2>메뉴</h2>
+          <p>앱 머리의 메뉴 줄. 글 · 페이지는 보관함에서 메뉴에 올림</p>
         </div>
         {open !== NEW && (
           <button type="button" className="cta small" onClick={() => setOpen(NEW)}>
@@ -99,8 +100,8 @@ export function MenusPanel() {
                     {m.name} <span className="pill">{MENU_KIND_LABELS[m.kind] ?? m.kind}</span>
                   </b>
                   <small>
-                    <a href={menuPath(m.slug, null)} target="_blank" rel="noreferrer">
-                      {menuPath(m.slug, null)}
+                    <a href={menuPath(m.slug, app.slug)} target="_blank" rel="noreferrer">
+                      /{app.slug}/m/{m.slug}
                     </a>{' '}
                     · {m.items ?? 0}개 · 운영 팀{' '}
                     {agentList.find((a) => a.id === m.agentId)?.name ?? '없음'}
@@ -110,7 +111,7 @@ export function MenusPanel() {
                 </div>
                 <div className="row">
                   {m.kind === 'issues' && (
-                    <Link className="ghost" href={`/admin/menus/${m.id}`}>
+                    <Link className="ghost" href={`${STORE_HREF}/${app.id}/m/${m.id}`}>
                       호 관리
                     </Link>
                   )}

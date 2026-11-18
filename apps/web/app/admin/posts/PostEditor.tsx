@@ -8,25 +8,15 @@ import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { postPath } from '../../_blog/format';
 import { POST_STATUS_LABELS } from '../../_blog/labels';
-import type { Asset, EditablePost, PostStatus, SavedPost } from '../../_blog/types';
+import type { Asset, PostStatus, SavedPost } from '../../_blog/types';
 import { type ApiReply, api, describe, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useToast } from '../../_ui/useToast';
 import { BigQuote } from './editor/big-quote';
 import { docToMarkdown, markdownToEditorHtml } from './editor/markdown-doc';
+import { PostAppField } from './PostAppField';
+import { type LinkedPost, sameIds, settingsOf, tagsOf } from './post-settings';
 import { WikiPicker } from './WikiPicker';
-
-/** 편집기가 다루는 글: 불러온 글이거나 방금 쓴 결과 (둘 다 편집기가 쓰는 칸을 모두 가진다) */
-export type LinkedPost = EditablePost | SavedPost;
-
-/** 글 설정 (발행 창에서 고르는 것) */
-type Settings = {
-  tags: string;
-  slug: string;
-  align: 'left' | 'center';
-  mainWikiId: string | null;
-  refWikiIds: readonly string[];
-};
 
 /** 서버의 이미지 본문 한도와 같다 (HttpSetup.IMAGE_LIMIT) */
 const PHOTO_MAX = 10 * 1024 * 1024;
@@ -61,30 +51,6 @@ const EXTENSIONS = [
   BigQuote,
 ];
 
-function settingsOf(post: LinkedPost | null): Settings {
-  return post
-    ? {
-        tags: post.tags.join(', '),
-        slug: post.slug,
-        align: post.align,
-        mainWikiId: post.mainWikiId,
-        refWikiIds: post.refWikiIds,
-      }
-    : { tags: '', slug: '', align: 'left', mainWikiId: null, refWikiIds: [] };
-}
-
-/** 고른 순서는 뜻이 없어서 순서 없이 견준다 */
-function sameIds(a: readonly string[], b: readonly string[]): boolean {
-  return [...a].sort().join('\n') === [...b].sort().join('\n');
-}
-
-function tagsOf(text: string): string[] {
-  return text
-    .split(',')
-    .map((t) => t.trim().replace(/^#+/, '').trim())
-    .filter((t) => t.length > 0);
-}
-
 /** 도구 막대가 보여줄 지금 상태 (커서가 있는 곳의 모양) */
 function toolState({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
@@ -111,8 +77,10 @@ function toolState({ editor }: { editor: Editor | null }) {
 // 공개 범위·태그·주소·위키·전체 가운데 정렬은 "발행" 창에서 고른다. 주소는 비우면 제목에서 만든다.
 // 위키는 바뀐 칸만 보낸다: 그사이 지워진 wiki가 이어져 있어도 나머지를 고쳐 저장할 수 있게.
 // 다른 탭에서 먼저 고쳤으면 서버가 409로 막고, 덮어쓰지 않고 다시 불러오라고 알린다.
-export function PostEditor({ initial }: { initial: LinkedPost | null }) {
+/** app: 새 글을 넣을 앱 (앱 관리 › 글의 "새 글", /admin/posts/new?app=<id>) */
+export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: string | null }) {
   const [post, setPost] = useState(initial);
+  const [appId, setAppId] = useState(app);
   const [title, setTitle] = useState(initial?.title ?? '');
   const [settings, setSettings] = useState(() => settingsOf(initial));
   const [body, setBody] = useState(initial?.body ?? '');
@@ -200,6 +168,7 @@ export function PostEditor({ initial }: { initial: LinkedPost | null }) {
           })
         : api<SavedPost>('POST', '/api/posts', {
             ...fields,
+            ...(appId ? { appId } : {}),
             requestId: requestId.current,
             slug: settings.slug.trim() || null,
           }),
@@ -394,6 +363,7 @@ export function PostEditor({ initial }: { initial: LinkedPost | null }) {
               </button>
             ))}
           </fieldset>
+          <PostAppField post={post} pending={appId} onPick={setAppId} onMoved={setPost} />
           <label className="field">
             <span>태그</span>
             <input

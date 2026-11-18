@@ -2,10 +2,17 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import type { AdminPostList, Issue, IssueDetail, IssueList, MenuList } from '../../../_blog/types';
-import { api } from '../../../_lib/client-api';
-import { useAction } from '../../../_lib/use-action';
-import { useLiveValue } from '../../../_lib/use-live';
+import type {
+  AdminPostList,
+  Issue,
+  IssueDetail,
+  IssueList,
+  MenuList,
+} from '../../../../../_blog/types';
+import { api } from '../../../../../_lib/client-api';
+import { useAction } from '../../../../../_lib/use-action';
+import { useLiveValue } from '../../../../../_lib/use-live';
+import { STORE_HREF } from '../../../../menu';
 import { IssueForm } from './IssueForm';
 import { IssuePostsForm } from './IssuePostsForm';
 
@@ -15,7 +22,7 @@ const STATUS: Record<string, string> = { draft: '만드는 중', published: '발
 
 // 매거진 호 (2차 6단계): 호 목록 메뉴 하나의 호를 새 번호부터. 추가 · 글 고르기 · 발행 · 삭제(발행 전만).
 // 발행은 호와 그 글을 한 번에 공개한다. AI 팀이 만든 호는 결과 카드의 승인(blog.issue.publish)로도 나간다.
-export function MenuIssuesPanel({ menuId }: { menuId: string }) {
+export function MenuIssuesPanel({ appId, menuId }: { appId: string; menuId: string }) {
   const menus = useLiveValue('menus', () => api<MenuList>('GET', '/api/menus'), NO_TOPICS);
   const issues = useLiveValue('issues', () => api<IssueList>('GET', '/api/issues'), NO_TOPICS);
   const posts = useLiveValue(
@@ -85,7 +92,8 @@ export function MenuIssuesPanel({ menuId }: { menuId: string }) {
         <div>
           <h1>{menu ? `${menu.name} 호` : '호'}</h1>
           <p>
-            <Link href="/admin/menus">메뉴</Link> · 발행은 호와 그 글을 한 번에 공개
+            <Link href={`${STORE_HREF}/${appId}?tab=menus`}>앱의 메뉴</Link> · 발행은 호와 그 글을
+            한 번에 공개
           </p>
         </div>
       </header>
