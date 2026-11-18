@@ -82,6 +82,15 @@ services:
       - ./skills:/repo/skills   # 앱에 올릴 스킬 묶음(관리 화면 → 기기 → 스킬 받기)을 여기서 만든다
       - blob-data:/data/blobs
       - runner-pairing:/run/cairn-runner   # 서버와 러너만 붙는다
+    # 운영 구성과 같은 상태 확인. 코드 러너(docker-compose.code.yml)는 서버가 healthy가 된 뒤에 뜬다:
+    # 이것이 없으면 개발 구성에 코드 러너를 더했을 때 코드 러너 컨테이너가 만들어지기만 하고 시작하지 않는다.
+    # 개발 서버는 처음 컴파일이 길어 시작 여유를 크게 둔다
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     depends_on:
       migrate:
         condition: service_completed_successfully
