@@ -54,6 +54,7 @@ export class DelegateTaskTool extends BaseTool {
               items: { type: 'string', maxLength: 2000 },
             },
             deliver: { type: 'string', maxLength: SubtaskOrder.DELIVER_MAX },
+            app_id: { type: 'string', format: 'uuid' },
           },
           required: ['request_id', 'to_agent_id', 'title', 'instruction'],
         },

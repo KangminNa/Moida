@@ -313,7 +313,7 @@ export class ApprovedPublishInput extends BaseRequest {
     readonly approvalId: string,
     readonly action: string,
     readonly decidedBy: string,
-    /** 결재의 대상 (글 · 호) */
+    /** 결재의 대상 (글 · 호 · 앱 코드의 앱, 스토어 1-6b) */
     readonly targetId: string,
     readonly targetVersion: number,
   ) {

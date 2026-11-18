@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { ChangeLines } from '../../_task/ChangeLines';
-import { actionLabel, DELIVER_LABELS } from '../../_task/labels';
+import { actionLabel, DELIVER_LABELS, SHOW_APP_CODE } from '../../_task/labels';
 import { OutputOpen } from '../../_task/parts';
 import type { ChatCard } from '../../_task/types';
+import { STORE_HREF } from '../menu';
 import { ChatCardReview, checksLine } from './ChatCardReview';
 
 // 결과 카드 (2차 2단계): 항목(결과물 · 동작)마다 고르고, 승인(고른 개수) · 수정 요청 · 반려.
@@ -77,6 +78,14 @@ export function ChatCardForm({
                 </label>
                 {item.kind === 'output' ? (
                   <OutputOpen id={item.id} name={item.label} />
+                ) : item.action === SHOW_APP_CODE ? (
+                  // 앱 코드 공개: 그 버전을 격리된 미리 보기로 (스토어 1-6b)
+                  <Link
+                    className="ghost"
+                    href={`${STORE_HREF}/${item.targetId}/code/${item.targetVersion}`}
+                  >
+                    미리 보기
+                  </Link>
                 ) : (
                   // 대상의 실제 내용(글 · 클릭의 페이지 · 버튼 · 화면 · PR)은 승인 화면이 대상 모듈에서 읽어 보인다
                   <Link className="ghost" href={`/admin/approvals/${item.id}`}>

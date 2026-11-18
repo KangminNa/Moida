@@ -8,6 +8,7 @@ import { AppCodeQuery } from './app-code/app-code.query';
 import { AppCodeService } from './app-code/app-code.service';
 import { AppCodeBaseTool } from './app-code/app-code.tool';
 import { AppCodeBuiltHandler } from './app-code/app-code-built.handler';
+import { AppCodeShowHandler } from './app-code/app-code-show.handler';
 import { AppScreenQuery } from './app-code/app-screen.query';
 import { AppSiteQuery } from './app-code/app-site.query';
 import { AppStarterGateway } from './app-code/app-starter.gateway';
@@ -84,6 +85,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     AppScreenQuery,
     AppCodeBaseTool,
     AppCodeBuiltHandler,
+    AppCodeShowHandler,
     { provide: AppStarterGateway, useFactory: () => AppStarterGateway.fromEnv() },
   ],
   controllers: [
@@ -116,6 +118,7 @@ export class BlogModule implements OnModuleInit {
     private readonly issues: IssueQuery,
     private readonly apps: AppQuery,
     private readonly appCodeBuilt: AppCodeBuiltHandler,
+    private readonly appCodeShow: AppCodeShowHandler,
     private readonly appCode: AppCodeQuery,
   ) {}
 
@@ -128,6 +131,7 @@ export class BlogModule implements OnModuleInit {
     this.workers.on(PageBuiltHandler.TOPIC, this.built);
     // 앱 코드를 고친 만들기 작업 (스토어 1-6, task가 보낸다)
     this.workers.on(AppCodeBuiltHandler.TOPIC, this.appCodeBuilt);
+    this.workers.on(AppCodeShowHandler.TOPIC, this.appCodeShow);
     // 보관함 (2차 5단계): 페이지 · 글 · 읽은 글(소재의 링크)
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));

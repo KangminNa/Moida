@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   type Actor,
+  ApprovedActor,
   BlobStore,
   Conflict,
   Database,
   EntityService,
+  Forbidden,
   NotFound,
   RuleViolation,
   type Sql,
@@ -16,7 +18,7 @@ import {
 } from '../../platform';
 import type { AppCodeVersionSource } from '../blog.tables';
 import { type PageFileEntry, PageFiles } from '../page/page-files';
-import type { AppCode } from './app-code';
+import { AppCode } from './app-code';
 import type { AppCodeBuiltInput, ShowCodeInput, UploadCodeInput } from './app-code.input';
 import { AppCodeQuery } from './app-code.query';
 import { AppCodeRepository } from './app-code.repository';
@@ -97,6 +99,23 @@ export class AppCodeService extends EntityService<AppCode> {
     const starter = await this.code.filesOf(actor, app, 0);
     const bundle = await this.bundleOf(starter.files, starter);
     return this.add(actor, req, bundle, 'starter', '시작 코드');
+  }
+
+  /**
+   * 대화의 결과 카드에서 승인한 공개 (task.approval.granted, 동작 blog.app_code.show, 스토어 1-6b). 승인한 결재만
+   * (ApprovedActor). 지운 앱이면 아무것도 하지 않는다. 두 번 받아도 같다 (이미 보이면 그대로)
+   */
+  async showApproved(actor: Actor, appId: string, seq: number): Promise<void> {
+    if (!(actor instanceof ApprovedActor) || actor.action !== AppCode.SHOW_ACTION)
+      throw new Forbidden('approved', '승인한 공개만 할 수 있어요');
+    const spaceId = actor.requireSpace();
+    await this.transaction(async (tx) => {
+      const codes = this.store(tx);
+      const code = await codes.lockOrNull(spaceId, appId);
+      if (code === null) return;
+      code.showApproved(seq, new Date());
+      await codes.save(code);
+    });
   }
 
   /** 이 버전 공개 (확인 대기 버전 · 앞 버전으로 되돌리기). 관리자만 */

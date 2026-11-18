@@ -75,7 +75,7 @@
       "fields": ["appId", "visibility", "appVersion", "deleted"]
     },
     "blog.app_code.added": {
-      "fields": ["appId", "name", "seq", "source", "pending"]
+      "fields": ["appId", "name", "seq", "source", "pending", "taskId"]
     },
     "blog.app_code.shown": {
       "fields": ["appId", "seq", "settled"]

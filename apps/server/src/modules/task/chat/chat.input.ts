@@ -167,3 +167,39 @@ export class AskAgentInput extends BaseRequest {
     );
   }
 }
+
+/**
+ * blog.app_code.added (스토어 1-6b): 앱 코드에 새 버전이 쌓였다. AI 작업(taskId)이 만든 확인 대기(pending) 버전만
+ * 결과 카드에 공개 승인으로 싣는다 (ChatResultService.offerAppCode가 대화의 일인지 본다)
+ */
+export class AppCodeAddedInput extends BaseRequest {
+  private constructor(
+    readonly appId: string,
+    readonly name: string,
+    readonly seq: number,
+    readonly pending: boolean,
+    readonly taskId: string | null,
+  ) {
+    super();
+  }
+
+  static from(data: unknown): AppCodeAddedInput {
+    const raw = (data ?? {}) as { taskId?: unknown; pending?: unknown };
+    return BaseRequest.read(
+      data,
+      (f) =>
+        new AppCodeAddedInput(
+          f.uuid('appId'),
+          f.text('name', 200),
+          f.integer('seq', 1, 2_147_483_647),
+          raw.pending === true,
+          typeof raw.taskId === 'string' ? f.uuid('taskId') : null,
+        ),
+    );
+  }
+
+  /** 카드에 실을 버전인가: AI 작업이 만든 확인 대기 버전 */
+  get offered(): boolean {
+    return this.pending && this.taskId !== null;
+  }
+}

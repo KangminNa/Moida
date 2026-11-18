@@ -50,6 +50,8 @@ export const PLUG_TOOL = 'task.tool.plug';
 export const SETTING_CHANGE = 'task.setting.change';
 /** 코드 작업 열기 (2026-11-15 C, code-github 패키지): 승인하면 그 저장소에 코드 작업이 시작된다 */
 export const START_CODE = 'code.task.start';
+/** 앱 코드 공개 (스토어 1-6b): 대화의 만들기 일이 낸 확인 대기 버전. 대상은 앱, 판은 버전 번호 (서버의 Approval.APP_CODE_SHOW) */
+export const SHOW_APP_CODE = 'blog.app_code.show';
 /** 대화 상대(관리자 바로 아래)가 승인 동작에 넣지 않아도 올리는 것 (서버의 Approval.PARTNER_ACTIONS) */
 export const PARTNER_ACTIONS: readonly string[] = [SETTING_CHANGE, START_CODE];
 
@@ -75,6 +77,7 @@ export const ACTION_LABELS: Record<string, string> = {
   [PLUG_TOOL]: '커넥터 붙이기',
   [SETTING_CHANGE]: '설정 바꾸기',
   [START_CODE]: '코드 작업 열기',
+  [SHOW_APP_CODE]: '앱 코드 공개',
   [RAISE_LIMIT]: '한도 변경',
   [GOAL_CONTINUE]: '목표 실행 중간 승인',
   [GOAL_COMPLETE]: '목표 실행 최종 승인',
@@ -96,6 +99,7 @@ export const TARGET_LABELS: Record<string, string> = {
   schedule: '스케줄',
   goal: '목표',
   menu: '블로그 메뉴',
+  app: '앱',
   /** 새로 만들기, 또는 공간에 하나인 설정(알림 · 사이트 · 세션 정리 …)의 바꾸기 (2026-11-15 D) */
   space: '공간',
   code_github_ask: '코드 작업 요청',

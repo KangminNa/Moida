@@ -9,6 +9,7 @@
 
 - `app-code/`: 앱 코드 (스토어 1-6, [docs/스토어.md](../../../../../docs/스토어.md) 9장). 앱마다 자기 코드 묶음(HTML · CSS · JS · 그림)을 버전으로 쌓는다(`AppCode`: `apps`의 코드 칸 + 추가만 하는 `app_code_versions`). 묶음 규칙은 `AppCodeBundle`(파일 규칙은 `PageFiles` 그대로 + 크기 · `cairn.json`의 바깥 주소), 코드가 없는 앱은 종류의 시작 코드(`AppStarterGateway`: 저장소 `apps/server/starters/base` 위에 종류 폴더, `AppCodeFiles.starter`).
   공개 앱의 새 버전은 확인 대기(`code_pending_seq`, `blog.app_code.added`의 `pending` → 즉시 알림), 관리자가 `show`로 공개하면 풀린다(`blog.app_code.shown`의 `settled`). 비공개 앱의 새 버전은 바로 보인다.
+  대화의 make 일이 만든 확인 대기 버전은 task가 결과 카드에 공개 승인(`blog.app_code.show`, 대상 앱 · 판 = 버전)으로 싣고, 승인하면 `AppCodeShowHandler` → `AppCodeService.showApproved`(그 동작의 `ApprovedActor`만) → `AppCode.showApproved`: 아직 보이지 않을 때만 보인다 (더 새 버전이 보이면 되돌리지 않는다, 스토어 1-6b).
   관리자 `api/apps/:id/code`(코드 · 바뀐 점 · zip 받기 · zip 올리기 · 공개 · 시작 코드로 · 미리 보기 주소). AI는 만들기 작업의 `payload.appCode`로만 버전을 만든다: `task.app_code.built` → `AppCodeBuiltHandler` → `AppCodeService.built`(가장 새 버전 · 시작 코드 위에 얹기, 실행마다 버전 하나, 규칙에 맞지 않으면 `blog.app_code.refused` → 알림). MCP `app_code_base`(run, 쥔 일만): 고칠 앱의 지금 코드.
   방문자 화면은 `api/apps/site/:slug/screen`(`AppSiteQuery`: 앱 · 토큰 · 버전을 정하고 템플릿을 고른다, `AppScreenQuery`: 그 앱 안의 방문자 데이터) · `files/:name`. 볼 수 있는 앱 = 공개 앱, 또는 미리 보기 토큰(`AppTicket`, 30분, 앱 하나 · 버전 하나)의 그 앱. 그리기(Mustache)와 화면의 격리 머리글은 웹이 한다. 앱 코드는 서버에서 실행되지 않는다
 - `post/`: 글(`Post` + 판 `PostRevision`), 내용(`PostContent`: 제목·본문 md, 앞부분·찾기용 글자), 주소 규칙(`SlugPolicy`).
@@ -70,9 +71,9 @@
 `blog.issue.published` (v1: issueId, menuId, number, title, 결재한 발행이면 approvalId · outcome done) · `blog.issue.publish_failed` (issueId, approvalId, outcome failed, error). 결재 결과는 task가 받아 작업을 끝낸다. 호와 함께 공개된 글마다 `blog.post.published`도 난다 (approvalId 없이)
 `blog.setting.changed` (v1: approvalId, outcome, error?. 승인한 블로그 메뉴 설정 바꾸기의 결과, 2026-11-15 D: `MenuEdit` · `BlogSettings`, 관리자의 만들기 · 고치기와 같은 줄. 종류는 만들 때만)
 `blog.page.pending` (v1: pageId, title, seq. 공개 페이지에 확인 대기 판이 생김) · `blog.page.shown` (v1: pageId, seq. 대기 판을 보임). 받는 모듈은 없고 알림(`BlogNotices`)만 만든다
-`blog.app_code.added` (v1: appId, name, seq, source, pending. 앱 코드의 새 버전, 공개 앱이면 pending → 확인 알림) · `blog.app_code.shown` (v1: appId, seq, settled. 보이는 버전이 바뀜, settled면 확인 알림 읽음) · `blog.app_code.refused` (v1: appId, name, taskId, error. AI 작업의 결과로 버전을 만들지 못함 → 알림). 받는 모듈은 없다
+`blog.app_code.added` (v1: appId, name, seq, source, pending, taskId. 앱 코드의 새 버전, 공개 앱이면 pending → 확인 알림. AI 작업이 만든 버전이면 taskId: task가 대화의 일이면 결과 카드에 공개 승인을 싣는다) · `blog.app_code.shown` (v1: appId, seq, settled. 보이는 버전이 바뀜, settled면 확인 알림 읽음) · `blog.app_code.refused` (v1: appId, name, taskId, error. AI 작업의 결과로 버전을 만들지 못함 → 알림). `added`는 task가 받는다 (결과 카드), 나머지는 받는 모듈이 없다
 
-받는 이벤트: `task.approval.granted` 중 `action`이 `blog.post.publish` · `blog.issue.publish`인 것만 (`CoreWorkers.expect`도 여기서 적는다).
+받는 이벤트: `task.approval.granted` 중 `action`이 `blog.post.publish` · `blog.issue.publish` · `blog.app_code.show`(스토어 1-6b, 결과를 task에 돌려주지 않는다)인 것만 (`CoreWorkers.expect`도 여기서 적는다).
 `task.page.built` (taskId, runId, pageId, title, note, files): 페이지의 새 판. 두 번 받아도 판은 하나다 (`page_revisions`의 `UNIQUE(page_id, run_id)`와 `PageRepository.hasRun`)
 `task.app_code.built` (taskId, runId, appId, note, files): 앱 코드의 새 버전 (스토어 1-6). 두 번 받아도 버전은 하나다 (`UNIQUE(app_id, run_id)`와 `AppCodeRepository.hasRun`). 그사이 다른 버전이 생겼으면 409로 다시 받는다
 

@@ -324,6 +324,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly refs: readonly string[] | null,
     /** 받을 것: 하위 작업이 돌려줄 결과의 형식 (D1, 2026-11-17). 하위 작업의 deliver, 위 작업의 subtask_results[].deliver */
     readonly deliver: string | null,
+    /** make 일의 결과를 이 앱 코드의 새 버전으로 (payload.appCode, 스토어 1-6b). 다른 일에는 없다 */
+    readonly appId: string | null,
   ) {
     super();
   }
@@ -345,6 +347,7 @@ export class SubtaskOrder extends BaseRequest {
       f.optionalTextList('paths', SubtaskOrder.PATHS_SHAPE, SubtaskOrder.PATH_SHAPE),
       f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
       f.optionalText('deliver', SubtaskOrder.DELIVER_MAX),
+      f.optionalText('app_id', 36) === null ? null : f.uuid('app_id'),
     );
   }
 }

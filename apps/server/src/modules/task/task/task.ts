@@ -452,6 +452,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
           ...CodeScope.forSubtask(kind, paths, this.codeScope),
           ...TaskRefs.of(r.payload).handOn(refs, worker).payload,
           ...(order.deliver ? { deliver: order.deliver } : {}),
+          // 앱 코드를 고치는 make 일 (스토어 1-6b): 어느 앱인지만 물려준다. make 일이 아니면 MakeOrder가 막는다
+          ...(order.appId ? { appCode: { appId: order.appId } } : {}),
         },
         priority: r.priority,
         goal_id: r.goal_id,

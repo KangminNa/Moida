@@ -33,6 +33,8 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   /** 서버가 올리는 동작: 대화 한 회차의 결과 카드 (대상은 대화, 판은 회차) */
   static readonly CARD = 'task.chat.result';
   static readonly CHAT = 'chat';
+  /** 앱 코드의 확인 대기 버전 공개 (스토어 1-6b): 실행은 blog가 한다 (AppCodeShowHandler) */
+  static readonly APP_CODE_SHOW = 'blog.app_code.show';
   /** 설정 바꾸기 (2026-11-15 C · D): 바뀔 값은 payload에 (propose_setting이 미리 적용해 보고 올린다). 이름은 platform이 갖는다 */
   static readonly SETTING_CHANGE = SettingKinds.ACTION;
   /**
@@ -146,6 +148,35 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     );
     card.announce('task.approval.requested');
     return card;
+  }
+
+  /**
+   * 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 (서버가 올린다, 스토어 1-6b): 그 대화의 결과 카드에 실려
+   * 고르면 그 버전이 공개된다. 작업은 이미 끝나 작업에 묶이지 않는다. 대상은 앱, 판은 버전 번호
+   */
+  static forAppCode(
+    spaceId: string,
+    chatId: string,
+    agentId: string,
+    target: { appId: string; name: string; seq: number },
+    now: Date,
+  ): Approval {
+    const approval = Approval.pending(
+      {
+        space_id: spaceId,
+        task_id: null,
+        agent_id: agentId,
+        action: Approval.APP_CODE_SHOW,
+        target_kind: 'app',
+        target_id: target.appId,
+        target_version: target.seq,
+        note: Approval.cleanNote(`${target.name} 버전 ${target.seq}`),
+        chat_id: chatId,
+      },
+      now,
+    );
+    approval.announce('task.approval.requested');
+    return approval;
   }
 
   static restore(row: ApprovalRow): Approval {

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { ServerRunnerPolicy } from '../modules/account';
-import { OutboxWorker, ZipFile, ZipReader } from '../modules/platform';
+import { Database, OutboxWorker, ZipFile, ZipReader } from '../modules/platform';
 import { ApiClient, ApiResult, TestUser } from './api-client';
 
 // 앱 코드 (스토어 1-6, docs/스토어.md 9장): 앱마다 자기 코드 묶음을 버전으로 쌓고, 방문자 화면은 그 코드의 템플릿과 데이터로 그린다.
@@ -21,6 +21,8 @@ let worker: OutboxWorker;
 let dir: string;
 let slot: string;
 let maker: Json;
+/** 칸이 아닌 러너 (대화의 회차 같은 general 일) */
+let runner: string;
 const mark = randomUUID().slice(0, 6);
 
 const ok = (res: { status: number; text: string; json(): unknown }, status = 200): Json => {
@@ -127,6 +129,35 @@ async function lease(taskId: string): Promise<void> {
   assert.fail('작업을 빌리지 못했어요');
 }
 
+/** 빌린 만들기 일이 바꾼 파일을 올리고 끝낸다 (러너가 하는 것: begin_upload → PUT → submit_result) */
+async function deliver(taskId: string, files: Readonly<Record<string, string>>): Promise<void> {
+  for (const [name, text] of Object.entries(files)) {
+    const bytes = Buffer.from(text);
+    const ticket = await mcp(slot, 'begin_upload', {
+      task_id: taskId,
+      name,
+      size: bytes.length,
+      sha256: sha(bytes),
+    });
+    const res = await fetch(`${api.baseUrl}${ticket.upload_path}`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-cairn-upload': String(ticket.token),
+      },
+      body: bytes,
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+  }
+  await mcp(slot, 'submit_result', {
+    task_id: taskId,
+    request_id: randomUUID(),
+    status: 'done',
+    result: { text: '고쳤어요' },
+  });
+  while ((await worker.tick()) > 0);
+}
+
 /** 앱 코드를 고치는 만들기 작업 하나: 맡기기 → 빌리기 → app_code_base → 바꾼 파일 올리기 → 끝내기 → 일꾼 */
 async function build(
   app: Json,
@@ -144,31 +175,7 @@ async function build(
   );
   await lease(String(task.id));
   const base = await mcp(slot, 'app_code_base', { task_id: task.id });
-  for (const [name, text] of Object.entries(files)) {
-    const bytes = Buffer.from(text);
-    const ticket = await mcp(slot, 'begin_upload', {
-      task_id: task.id,
-      name,
-      size: bytes.length,
-      sha256: sha(bytes),
-    });
-    const res = await fetch(`${api.baseUrl}${ticket.upload_path}`, {
-      method: 'PUT',
-      headers: {
-        'content-type': 'application/octet-stream',
-        'x-cairn-upload': String(ticket.token),
-      },
-      body: bytes,
-    });
-    assert.equal(res.status, 200, await res.clone().text());
-  }
-  await mcp(slot, 'submit_result', {
-    task_id: task.id,
-    request_id: randomUUID(),
-    status: 'done',
-    result: { text: '고쳤어요' },
-  });
-  while ((await worker.tick()) > 0);
+  await deliver(String(task.id), files);
   return { taskId: String(task.id), base };
 }
 
@@ -187,6 +194,15 @@ before(async () => {
   ok(
     await api.request('PUT', '/api/ai/claude/token', owner, {
       token: `sk-ant-oat01-${randomUUID()}`,
+    }),
+  );
+  runner = await api.connectDevice(owner, `app-code-runner-${mark}`);
+  const { devices } = ok(await api.get('/api/devices', owner)) as { devices: Json[] };
+  const device = devices.find((d) => d.name === `app-code-runner-${mark}`) as Json;
+  ok(
+    await api.request('PATCH', `/api/devices/${device.id}`, owner, {
+      scopes: [...(device.scopes as string[]), 'run'],
+      version: device.version,
     }),
   );
   maker = ok(
@@ -481,5 +497,162 @@ describe('AI로 고치기 (payload.appCode → task.app_code.built)', () => {
       });
     ok(await make(randomUUID()), 201);
     assert.equal((await make(randomUUID())).status, 409);
+  });
+});
+
+describe('대화에서 맡기기 (스토어 1-6b)', () => {
+  /** 칸이 아닌 러너가 이 대화의 회차를 빌린다 */
+  async function turnOf(chatId: unknown): Promise<Json> {
+    const { jobs } = (await mcp(runner, 'next_jobs', { limit: 5, tools: ['claude'] })) as {
+      jobs: Json[];
+    };
+    const job = jobs.find(
+      (j) =>
+        ((j.task as Json).payload as Json | null)?.chat !== undefined &&
+        (((j.task as Json).payload as Json).chat as Json).chatId === chatId,
+    );
+    assert.ok(job, '대화의 회차를 빌리지 못했어요');
+    return job;
+  }
+  const finish = (job: Json) =>
+    mcp(runner, 'submit_result', {
+      task_id: (job.task as Json).id,
+      request_id: randomUUID(),
+      status: 'done',
+      result: { text: '맡긴 일이 끝났어요' },
+    });
+  const drain = async () => {
+    for (let i = 0; i < 200 && (await worker.tick()) > 0; i++);
+  };
+
+  test('대표가 make 팀원에게 app_id로 맡기면 새 버전이 되고, 공개 앱이면 결과 카드에서 공개를 고른다', async () => {
+    const app = await publish(await newApp(`code-chat-${mark}`));
+    const partner = ok(
+      await api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: `앱 대표 ${mark}`,
+        tool: 'claude',
+        scopes: ['read_public'],
+      }),
+      201,
+    );
+    const member = ok(
+      await api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: `앱 꾸미기 ${mark}`,
+        tool: 'claude',
+        scopes: ['make'],
+        reportsTo: partner.id,
+      }),
+      201,
+    );
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        agentId: partner.id,
+        message: '글 목록을 카드로 바꿔 줘',
+      }),
+      201,
+    );
+    await drain();
+    const turn = await turnOf(chat.id);
+    // make가 아닌 일에는 app_id를 적지 못한다
+    const wrong = await api.mcp(String(turn.run_token), 'tools/call', {
+      name: 'delegate_task',
+      arguments: {
+        subtasks: [
+          {
+            request_id: randomUUID(),
+            to_agent_id: member.id,
+            kind: 'general',
+            title: '카드',
+            instruction: '카드로',
+            app_id: app.id,
+          },
+        ],
+      },
+    });
+    assert.equal((wrong.json().result as Json).isError, true, wrong.text);
+    const delegated = await mcp(String(turn.run_token), 'delegate_task', {
+      subtasks: [
+        {
+          request_id: randomUUID(),
+          to_agent_id: member.id,
+          kind: 'make',
+          title: '글 목록 카드',
+          instruction: '글 목록을 카드 두 줄로',
+          app_id: app.id,
+        },
+      ],
+    });
+    const subtaskId = String(((delegated.subtasks as Json[])[0] as Json).task_id);
+    const sub = ok(await api.get(`/api/tasks/${subtaskId}`, owner));
+    assert.deepEqual(sub.appCode, { appId: app.id });
+
+    await lease(subtaskId);
+    const base = await mcp(slot, 'app_code_base', { task_id: subtaskId });
+    assert.equal(base.app_id, app.id);
+    await deliver(subtaskId, {
+      'post-list.html': '<ul>{{#posts}}<li>{{title}}</li>{{/posts}}</ul>',
+    });
+    assert.deepEqual([(await code(app)).current, (await code(app)).pending], [null, 1]);
+
+    await finish(await turnOf(chat.id));
+    await drain();
+    const card = (ok(await api.get(`/api/chats/${chat.id}`, owner)).card ?? null) as Json | null;
+    assert.ok(card, '결과 카드가 없어요');
+    const items = card.items as Json[];
+    assert.deepEqual(
+      items.map((i) => [i.kind, i.action, i.targetId, i.targetVersion, i.note]),
+      [['action', 'blog.app_code.show', app.id, 1, `${app.name} 버전 1`]],
+      '앱 코드 일의 결과물(파일)은 카드에 싣지 않고 공개 승인 하나만',
+    );
+    // 같은 이벤트가 다시 와도 결재는 하나
+    assert.equal(await api.unprocessed('blog.app_code.added'), 0);
+
+    ok(
+      await api.request('POST', `/api/approvals/${card.id}/decide`, owner, {
+        version: card.version,
+        decision: 'approve',
+        picked: [items[0]?.id],
+      }),
+    );
+    await drain();
+    assert.deepEqual([(await code(app)).current, (await code(app)).pending], [1, null]);
+  });
+
+  test('결과 카드의 공개 승인은 그사이 더 새 버전이 보이면 앞 버전으로 되돌리지 않는다', async () => {
+    const app = await publish(await newApp(`code-chat2-${mark}`));
+    for (const n of ['1', '2']) {
+      assert.equal((await upload(app, zipOf({ 'index.html': `<p>${n}</p>` }))).status, 201);
+      ok(
+        await api.request('POST', `/api/apps/${app.id}/code/current`, owner, {
+          version: (await appOf(app.id)).version,
+          seq: Number(n),
+        }),
+      );
+    }
+    // 결과 카드에서 버전 1의 공개를 승인한 것과 같은 이벤트 (작업에 묶이지 않은 결재)
+    const db = api.service(Database);
+    const [row] = await db.sql`SELECT space_id FROM blog.apps WHERE id = ${String(app.id)}`;
+    const granted = (action: string) => db.sql`
+      INSERT INTO platform.outbox (space_id, topic, payload)
+      VALUES (${String(row?.space_id)}, 'task.approval.granted', ${db.sql.json({
+        v: 1,
+        approvalId: randomUUID(),
+        taskId: null,
+        agentId: randomUUID(),
+        action,
+        targetKind: 'app',
+        targetId: String(app.id),
+        targetVersion: 1,
+        decidedBy: randomUUID(),
+        note: null,
+        chatId: randomUUID(),
+        payload: null,
+      })})`;
+    await granted('blog.app_code.show');
+    while ((await worker.tick()) > 0);
+    assert.equal((await code(app)).current, 2, '앞 버전으로 되돌리지 않는다');
   });
 });

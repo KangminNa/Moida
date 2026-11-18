@@ -20,6 +20,8 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
   static readonly SHOWN = 'blog.app_code.shown';
   /** AI 작업의 결과로 버전을 만들지 못했다 (묶음 규칙) */
   static readonly REFUSED = 'blog.app_code.refused';
+  /** 결과 카드에서 고른 확인 대기 버전의 공개 (task의 결재 동작, 스토어 1-6b) */
+  static readonly SHOW_ACTION = 'blog.app_code.show';
   static readonly NOTE_MAX = 2000;
   private static readonly PUBLIC = 'public';
   /** 이번에 쌓을 버전 (saveParts가 넣는다) */
@@ -80,6 +82,8 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
         seq,
         source,
         pending: held,
+        // AI 작업이 만든 버전이면 그 작업 (task가 대화의 일이면 결과 카드에 공개 승인을 싣는다, 스토어 1-6b)
+        taskId,
       }),
     );
     if (!held) this.announceShown(seq, true);
@@ -98,6 +102,17 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
     if (settles) this.put('code_pending_seq', null);
     this.put('updated_at', now);
     this.announceShown(seq, settles);
+  }
+
+  /**
+   * 대화의 결과 카드에서 승인한 공개 (스토어 1-6b). 그 버전이 아직 보이지 않을 때만 보인다: 그사이 관리자가 같은 버전이나
+   * 더 새 버전을 공개했으면 되돌리지 않는다. 없는 버전이면 아무것도 하지 않는다 (승인은 이미 끝났다)
+   */
+  showApproved(seq: number, now: Date): void {
+    if (seq < 1 || seq > this.row.code_versions) return;
+    const current = this.row.code_seq;
+    if (current !== null && current >= seq) return;
+    this.show(seq, now);
   }
 
   /**
