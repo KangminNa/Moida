@@ -132,7 +132,7 @@ export class ChatUpdateQuery extends BaseQuery {
 
   /**
    * 대화마다 상태와 지금 도는 작업 수 (마지막 회차 · 그 덧붙인 말의 답 아래 전부).
-   * 상태: 맡기 전이면 배정 일이 돌 때 routing, 아니면 asking (2차 1-5). 맡은 뒤에는 마지막 회차로:
+   * 상태: 맡기 전(O-2 전에 배정을 기다리던 대화, 다음 말에서 대표가 맡는다)이면 asking. 맡은 뒤에는 마지막 회차로:
    * 결재를 기다리면 waiting_approval, 끝나지 않았으면 working, 실패 · 취소면 failed, 아니면 done
    */
   private async board(
@@ -148,10 +148,7 @@ export class ChatUpdateQuery extends BaseQuery {
     return await sql<ChatBoardRow[]>`
       SELECT c.*, a.name AS partner,
         CASE
-          WHEN c.agent_id IS NULL THEN
-            CASE WHEN EXISTS (SELECT 1 FROM task.tasks r WHERE r.space_id = c.space_id
-              AND r.request_id LIKE ${ChatRequest.ROUTE_PREFIX} || c.id || ':%'
-              AND r.status = ANY(${[Task.QUEUED, Task.RUNNING]}::text[])) THEN 'routing' ELSE 'asking' END
+          WHEN c.agent_id IS NULL THEN 'asking'
           WHEN EXISTS (SELECT 1 FROM task.approvals card WHERE card.action = ${Approval.CARD}
             AND card.target_id = c.id AND card.status = ${Approval.PENDING}) THEN 'waiting_approval'
           WHEN last.status = ${Task.WAITING} AND last.wait_reason = ${Task.WAIT_APPROVAL} THEN 'waiting_approval'

@@ -37,6 +37,12 @@ export class ChatHistory {
     return chat?.requestId === requestId;
   }
 
+  /** 대화의 일이 몇 회차의 것인가 (payload.chat.turn: 회차 · 덧붙인 말의 답 · 검토). 없으면 0 */
+  static turnOf(task: Pick<TaskRow, 'payload'>): number {
+    const turn = (task.payload as { chat?: { turn?: unknown } } | null)?.chat?.turn;
+    return typeof turn === 'number' ? turn : 0;
+  }
+
   /** 앞 회차가 아직 끝나지 않았는가 (답을 기다리는 중) */
   static waiting(turn: ChatTurnRow | undefined): boolean {
     return turn !== undefined && [Task.QUEUED, Task.RUNNING, Task.WAITING].includes(turn.status);

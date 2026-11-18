@@ -38,7 +38,7 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
    * 빌려 줄 작업을 잠근다. 다른 러너가 잡은 행은 건너뛰고, 담당이 없거나 일을 받을 수 있는 에이전트(ready)의 일만,
    * 우선순위 → 오래된 순. 멈췄거나 쉬는 에이전트의 일과 맡을 권한이 없는 일은 대기열에 남아 뒤의 일을 막지 않는다.
    * 연결 확인과 웹 로그인은 에이전트가 필요 없어 일을 받을 에이전트가 없어도 빌려 준다.
-   * 그 둘은 도구로 거른다 (null이면 거르지 않는다): 연결 확인 · 대화의 배정 · 세션 노트는 testTools(서버의 로그인이 쓸 수 있는 도구),
+   * 그 둘은 도구로 거른다 (null이면 거르지 않는다): 연결 확인 · 세션 노트는 testTools(서버의 로그인이 쓸 수 있는 도구),
    * 웹 로그인은 signinTools의 도구만.
    * 브라우저 작업(browse)은 브라우저에 붙어 있다고 알린 러너(browser)에게만, 커넥터 확인(tool_check)은 할 수 있다고 알린 러너에게만
    */
@@ -62,10 +62,9 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       WHERE space_id = ${spaceId} AND status = ${Task.QUEUED}
         AND (kind = ANY(${Task.AGENTLESS as string[]}::text[])
           OR agent_id = ANY(${agentIds}::uuid[])
-          OR (agent_id IS NULL AND ${agentIds.length > 0}))
+          OR (agent_id IS NULL AND ${ready.some((a) => !a.lead)}))
         ${this.scoped(ready)}
         ${this.byTool(Task.AI_TEST, tools.testTools)}
-        ${this.byTool(Task.ROUTE, tools.testTools)}
         ${this.byTool(Task.SESSION_NOTE, tools.testTools)}
         ${this.byTool(Task.AI_SIGNIN, tools.signinTools)}
         ${tools.browser ? this.sql`` : this.sql`AND kind <> ${Task.BROWSE}`}
@@ -162,26 +161,6 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     return this.findOne({ space_id: spaceId, id });
   }
 
-  /** request_id가 prefix로 시작하는, 대기 · 실행 중인 작업을 잠근다 (대화의 배정 일) */
-  lockOpenRequests(spaceId: string, prefix: string): Promise<readonly Task[]> {
-    return this.find(
-      {
-        space_id: spaceId,
-        request_id: Rule.like(`${prefix}%`),
-        status: [Task.QUEUED, Task.RUNNING],
-      },
-      { lock: true },
-    );
-  }
-
-  /** before보다 먼저 만들어 아직 아무도 빌려 가지 않은 그 종류의 작업 (잠그지 않는다: 부르는 쪽이 대화부터 잠근다) */
-  staleQueued(kind: string, before: Date, limit: number): Promise<readonly Task[]> {
-    return this.find(
-      { kind, status: Task.QUEUED, created_at: Rule.before(before) },
-      { order: ['created_at'], limit },
-    );
-  }
-
   /** 이 작업을 맡긴 위 작업의 id. 없으면 null */
   async parentOf(id: string): Promise<string | null> {
     return (await this.row(tasks, { id }, { columns: ['parent_id'] }))?.parent_id ?? null;
@@ -224,16 +203,48 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
    * 결재가 결과 카드에 실릴지 정할 때 (2차 2단계)
    */
   async chatOf(taskId: string): Promise<string | null> {
-    const [row] = await this.sql<{ chat_id: string | null }[]>`
+    return (await this.rootOf(taskId))?.chat_id ?? null;
+  }
+
+  /**
+   * 브라우저 일을 맡겨도 되는가를 보는 "비공개를 읽었는가" (O-2, DelegationPolicy): 대화의 일이면 그 대화의 모든 회차 ·
+   * 덧붙인 말의 답 · 검토와 그 아래 전부, 대화가 아니면(목표 실행의 회차 · REST로 연 일) 맨 위 작업과 그 아래.
+   * 그 안에 비공개를 읽는 에이전트(전체 읽기 · 초안 작성, 지금 권한)의 작업이 하나라도 있거나 비공개 참조(payload.refs)가 있으면 참
+   */
+  async privateTouched(spaceId: string, taskId: string): Promise<boolean> {
+    const root = await this.rootOf(taskId);
+    if (!root) return false;
+    const seed =
+      root.chat_id === null
+        ? this.sql`id = ${root.id}`
+        : this.sql`request_id LIKE ${`chat:${root.chat_id}:%`}`;
+    const [row] = await this.sql<{ touched: boolean }[]>`
+      WITH RECURSIVE tree AS (
+        SELECT id FROM task.tasks WHERE space_id = ${spaceId} AND ${seed}
+        UNION ALL
+        SELECT t.id FROM task.tasks t JOIN tree ON t.parent_id = tree.id
+      )
+      SELECT EXISTS (
+        SELECT 1 FROM tree JOIN task.tasks t ON t.id = tree.id
+        LEFT JOIN task.agents a ON a.id = t.agent_id
+        WHERE a.scopes && ARRAY['read_all', 'write']::text[]
+           OR t.payload->'refs' @> '[{"private": true}]'::jsonb
+      ) AS touched`;
+    return row?.touched === true;
+  }
+
+  /** 맨 위 작업 (위 작업을 따라 10단계까지)과 그 대화 */
+  private async rootOf(taskId: string): Promise<{ id: string; chat_id: string | null } | null> {
+    const [row] = await this.sql<{ id: string; chat_id: string | null }[]>`
       WITH RECURSIVE up AS (
         SELECT id, parent_id, 0 AS step FROM task.tasks WHERE id = ${taskId}
         UNION ALL
         SELECT t.id, t.parent_id, up.step + 1 FROM task.tasks t JOIN up ON t.id = up.parent_id
         WHERE up.step < 10
       )
-      SELECT root.payload->'chat'->>'chatId' AS chat_id FROM task.tasks root
+      SELECT root.id, root.payload->'chat'->>'chatId' AS chat_id FROM task.tasks root
       WHERE root.id = (SELECT id FROM up ORDER BY step DESC LIMIT 1)`;
-    return row?.chat_id ?? null;
+    return row ?? null;
   }
 
   /**

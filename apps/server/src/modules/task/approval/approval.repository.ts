@@ -30,6 +30,15 @@ export class ApprovalRepository extends TableRepository<ApprovalRow, Approval> {
     return this.findOne({ task_id: taskId, status: Approval.PENDING }, { lock: true });
   }
 
+  /** 작업이 올려 승인받은 설정 바꾸기 중 이어서 하기로 한 마지막 것 (O-2, 승인 뒤 이어서). 없으면 null */
+  async continuedBy(taskId: string): Promise<Approval | null> {
+    const approved = await this.find(
+      { task_id: taskId, action: Approval.SETTING_CHANGE, status: Approval.APPROVED },
+      { order: ['id desc'] },
+    );
+    return approved.find((a) => a.continues) ?? null;
+  }
+
   /** 대화의 기다리는 결과 카드 (대화마다 하나) */
   lockOpenCard(chatId: string): Promise<Approval | null> {
     return this.findOne(

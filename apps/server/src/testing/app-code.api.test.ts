@@ -527,29 +527,19 @@ describe('대화에서 맡기기 (스토어 1-6b)', () => {
 
   test('대표가 make 팀원에게 app_id로 맡기면 새 버전이 되고, 공개 앱이면 결과 카드에서 공개를 고른다', async () => {
     const app = await publish(await newApp(`code-chat-${mark}`));
-    const partner = ok(
-      await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: `앱 대표 ${mark}`,
-        tool: 'claude',
-        scopes: ['read_public'],
-      }),
-      201,
-    );
+    // 대화는 대표가 맡고(O-2), 대표는 맨 위의 make 팀장에게 맡긴다
     const member = ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
         name: `앱 꾸미기 ${mark}`,
         tool: 'claude',
         scopes: ['make'],
-        reportsTo: partner.id,
       }),
       201,
     );
     const chat = ok(
       await api.request('POST', '/api/chats', owner, {
         requestId: randomUUID(),
-        agentId: partner.id,
         message: '글 목록을 카드로 바꿔 줘',
       }),
       201,

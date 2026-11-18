@@ -103,12 +103,6 @@
     "task.chat.changed": {
       "fields": ["chatId", "title", "turns"]
     },
-    "task.chat.asked": {
-      "fields": ["chatId", "title", "question"]
-    },
-    "task.chat.routed": {
-      "fields": ["chatId", "title", "agent"]
-    },
     "task.chat.answered": {
       "fields": ["chatId", "title", "text"]
     },

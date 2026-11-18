@@ -4,8 +4,11 @@ import {
   type SettingShape,
   type Sql,
 } from '../../platform';
+import { AiLoginRepository } from '../ai/ai-login.repository';
+import { Engines } from '../ai/engines';
 import { ExternalToolRepository } from '../external-tool/external-tool.repository';
 import { RunnerRepository } from '../runner/runner.repository';
+import { LeasePolicy } from '../task/lease.policy';
 import { Agent } from './agent';
 import { CreateAgentInput, UpdateAgentInput } from './agent.input';
 import { AgentRepository } from './agent.repository';
@@ -57,6 +60,22 @@ export class AgentEdit {
     return agent;
   }
 
+  /**
+   * 공간의 대표 (O-2). 없으면 만들어 저장한다 (마이그레이션은 에이전트가 있던 공간에만 만들었다: 새 공간은 첫 대화에서).
+   * 도구는 서버의 로그인 순서(LeasePolicy.serverTool), 로그인이 없으면 엔진 목록의 첫 줄. 관리자가 설정 › AI에서 바꾼다
+   */
+  async lead(now: Date): Promise<Agent> {
+    const agents = new AgentRepository(this.tx);
+    const found =
+      (await agents.findLead(this.spaceId)) ?? (await agents.lockLeadSlot(this.spaceId));
+    if (found) return found;
+    const usable = await new AiLoginRepository(this.tx).usableTools(this.spaceId, now);
+    const tool = LeasePolicy.serverTool(usable) ?? Engines.preferred();
+    const lead = Agent.openLead(this.spaceId, tool, now);
+    await agents.save(lead);
+    return lead;
+  }
+
   /** 보고 대상을 바꾸지 않으면 그 에이전트만 잠근다. 러너 · 검토자는 같은 공간의 것만 (없으면 404) */
   async update(req: UpdateAgentInput): Promise<Agent> {
     await this.assertKnownTools(req.changes.external_tools);
@@ -76,13 +95,17 @@ export class AgentEdit {
    * 설정 바꾸기 하나 (2026-11-15 C): 제안의 미리 해 보기와 승인 뒤 적용이 같은 줄.
    * body는 관리자 REST(POST · PATCH api/agents)와 같은 본문, key는 만들기의 requestId (결재 id)
    */
-  apply(change: SettingChangeInput, now: Date): Promise<Agent> {
+  async apply(change: SettingChangeInput, now: Date): Promise<Agent> {
     const { op, body, version } = change;
     const id = String(change.targetId);
     if (op === 'create')
       return this.open(CreateAgentInput.from({ ...body, requestId: change.key }), now);
-    if (op === 'edit') return this.update(UpdateAgentInput.from(id, { ...body, version }));
-    return this.toggle(id, version, op === 'pause');
+    const agent =
+      op === 'edit'
+        ? await this.update(UpdateAgentInput.from(id, { ...body, version }))
+        : await this.toggle(id, version, op === 'pause');
+    if (agent.lead) throw new RuleViolation('대표는 관리자가 설정 › AI에서 바꿔요');
+    return agent;
   }
 
   private async toggle(id: string, version: number, pause: boolean): Promise<Agent> {

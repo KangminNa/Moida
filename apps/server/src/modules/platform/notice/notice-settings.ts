@@ -91,7 +91,12 @@ export class NoticeSettings extends TableEntity<
    */
   adjust(changes: Partial<Unchecked<NoticeSettingRow>>, known: readonly string[], now: Date): void {
     const r = this.row;
-    const routes = (r.routes ?? {}) as Record<string, unknown>;
+    // 지금 없는 종류(지운 알림 · 끈 플러그인)의 경로는 버린다: 남기면 규칙(등록한 종류만)에 걸려 저장이 막힌다
+    const routes = Object.fromEntries(
+      Object.entries((r.routes ?? {}) as Record<string, unknown>).filter(([k]) =>
+        known.includes(k),
+      ),
+    );
     this.configure(
       {
         digest: r.digest,

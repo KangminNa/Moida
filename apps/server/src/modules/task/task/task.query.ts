@@ -41,15 +41,6 @@ export class TaskQuery extends BaseQuery {
   /** 목록 카드에 보이는 마지막 기록의 길이 */
   private static readonly LAST_EVENT = 200;
 
-  /** 이 종류의 기다리는(queued) 작업 가운데 가장 오래된 것이 만들어진 때. 없으면 null (대화 배정의 마감) */
-  async oldestQueued(actor: Actor, kind: string): Promise<Date | null> {
-    actor.assertOwnerOrSystem();
-    const [row] = await this.sql<Pick<TaskRow, 'created_at'>[]>`
-      SELECT min(created_at) AS created_at FROM task.tasks
-      WHERE kind = ${kind} AND status = ${Task.QUEUED}`;
-    return row?.created_at ?? null;
-  }
-
   /** 진행 중 작업의 임대가 가장 먼저 끝나는 때. 없으면 null (일꾼의 LeaseJob이 그때 깬다) */
   async nextLeaseEnd(actor: Actor): Promise<Date | null> {
     actor.assertOwnerOrSystem();

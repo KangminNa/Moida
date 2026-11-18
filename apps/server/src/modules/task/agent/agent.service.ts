@@ -57,7 +57,7 @@ export class AgentService extends EntityService<Agent> {
       const agent = org.find((a) => a.id === req.id && !a.deleted);
       if (!agent) throw new NotFound('에이전트를 찾을 수 없어요');
       agent.assertVersion(req.version);
-      const gone = req.team ? AgentOrg.teamUnder(agent, org) : [agent];
+      const gone = AgentOrg.toDelete(agent, org, req.team);
       const why = await this.agents.blockers(
         actor,
         gone.map((a) => a.id),

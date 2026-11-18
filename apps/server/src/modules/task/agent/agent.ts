@@ -12,6 +12,7 @@ import { JobTeamMemberView } from '../task/job.view';
 import { AGENT_TOOL, type AgentNew, type AgentRevisionNew, type AgentRow } from '../task.tables';
 import { AgentUsageView } from '../usage/usage.view';
 import { AgentSavedView } from './agent.view';
+import { AgentLead } from './agent-lead.policy';
 import { AgentOrg } from './agent-org.policy';
 import { AgentRuntime } from './agent-runtime.policy';
 import { AgentScopes } from './agent-scopes.policy';
@@ -20,6 +21,7 @@ import { AgentScopes } from './agent-scopes.policy';
 // 주인이 정하는 칸은 RULES를 지나서만 바뀌고, 멈춤·다시 시작은 메서드로만 바뀐다.
 // 한 달 한도는 넘기면 멈추고 결재를 받는다. 5시간 한도와 구독 사용률은 닿으면 새 일만 쉬고 시간이 지나면 저절로 돌아온다 (holds).
 // 조직도: 보고 대상(reports_to)이 없으면 주인에게 보고한다. 보고 대상은 reportTo로만 바꾼다 (순환 · 깊이 검사).
+// 대표(lead, O-2): 공간마다 숨은 하나. 모든 대화를 받아 맨 위 에이전트 누구에게나 맡긴다 (AgentLead)
 export class Agent extends TableEntity<AgentRow, AgentNew> {
   /** 이번 저장에서 쌓을 설정 판 */
   private pendingRevision: AgentRevisionNew | null = null;
@@ -46,8 +48,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   private static readonly NAME_MAX = 60;
   private static readonly ROLE_MAX = 2000;
   private static readonly PLAN_PERCENT_MAX = 100;
-  /** 조직도의 깊이 한도. 주인 바로 아래가 1단계 */
-  static readonly ORG_DEPTH_MAX = 4;
   private static readonly ACTION = /^[a-z]+\.[a-z_]+\.[a-z_]+$/;
   /** 이 동작은 서버가 한도를 넘었을 때만 올린다 */
   private static readonly SERVER_ACTION = 'task.agent.raise_limit';
@@ -126,8 +126,20 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return agent;
   }
 
+  /** 공간의 대표 (O-2). tool: 서버의 로그인으로 고른 AI 도구 */
+  static openLead(spaceId: string, tool: string, now: Date): Agent {
+    const lead = Agent.open(spaceId, { ...AgentLead.FIELDS, tool }, now);
+    lead.put('lead', true);
+    return lead;
+  }
+
   static restore(row: AgentRow): Agent {
     return new Agent(row);
+  }
+
+  /** 대표인가 (O-2). 새로 연 줄(저장 전)과 시험의 줄에는 칸이 없을 수 있다 */
+  get lead(): boolean {
+    return this.row.lead === true;
   }
 
   get spaceId(): string {
@@ -216,6 +228,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
    * 진행 중인 작업 · 스케줄 · 목표 실행은 Service가 먼저 본다
    */
   delete(org: readonly Agent[], now: Date): readonly Agent[] {
+    if (this.lead) throw new RuleViolation('대표는 지울 수 없어요');
     if (this.deleted) throw new RuleViolation('이미 삭제한 에이전트예요');
     const team = org.filter((a) => this.manages(a));
     for (const member of team) member.reportTo(this.row.reports_to, org);
@@ -240,6 +253,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
    */
   edit(changes: Partial<Unchecked<AgentRow>>, runner?: Runner | null): void {
     const before = this.settingsSnapshot();
+    if (this.lead) AgentLead.assertEdit(changes, runner !== undefined);
     if (runner?.sandbox) throw new RuleViolation('샌드박스에는 묶을 수 없어요');
     if (runner !== undefined) this.put('runner_id', runner?.id ?? null);
     this.accept(changes, Agent.RULES);
@@ -308,30 +322,18 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     this.pendingRevision = { id: BaseEntity.newId(), agent_id: this.id, revision, settings: after };
   }
 
-  /**
-   * 보고 대상을 바꾼다. null이면 주인에게 보고한다. org는 공간의 모든 에이전트다 (바꾸는 쪽이 모두 잠근 것).
-   * 자기 자신이나 자기 아래 팀원에게 보고하면 순환이라 막고, 바꾼 뒤 가장 깊은 팀원이 ORG_DEPTH_MAX를 넘으면 막는다.
-   */
+  /** 보고 대상을 바꾼다. null이면 주인에게 보고한다. 조직도의 규칙(순환 · 깊이 · 대표)은 AgentOrg.assertPlace */
   reportTo(managerId: string | null, org: readonly Agent[]): void {
-    let level = 1;
-    if (managerId !== null) {
-      const manager = org.find((a) => a.id === managerId);
-      if (!manager || manager.deleted) throw new RuleViolation('보고 대상 에이전트가 없어요');
-      const above = AgentOrg.chainUp(manager, org);
-      if (above.some((a) => a.id === this.id))
-        throw new RuleViolation('자기 자신이나 자기 팀원에게는 보고할 수 없어요');
-      level = above.length + 1;
-    }
-    if (level + AgentOrg.heightOf(this.id, org) - 1 > Agent.ORG_DEPTH_MAX)
-      throw new RuleViolation(`조직도는 ${Agent.ORG_DEPTH_MAX}단계까지예요`);
+    AgentOrg.assertPlace(this, managerId, org);
     if (managerId === this.row.reports_to) return;
     const before = this.settingsSnapshot();
     this.put('reports_to', managerId);
     this.noteSettings(before);
   }
 
-  /** 이 에이전트의 바로 아래 팀원인가 (위임은 바로 아래에게만). 삭제한 에이전트는 팀원이 아니다 */
+  /** 이 에이전트의 바로 아래 팀원인가 (위임은 바로 아래에게만). 삭제한 에이전트는 팀원이 아니다. 대표는 맨 위 에이전트 전부 */
   manages(other: Agent): boolean {
+    if (this.lead) return AgentLead.leads(other);
     return other.row.reports_to === this.id && !other.deleted;
   }
 

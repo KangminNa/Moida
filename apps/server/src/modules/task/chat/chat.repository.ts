@@ -111,22 +111,6 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
     );
   }
 
-  /** 맡기 전에 글로 한 답들 (오래된 것부터): 덧붙인 말 중 회차 작업이 없는 것 */
-  async answersBefore(chatId: string): Promise<string[]> {
-    const rows = await this.sql<{ text: string }[]>`
-      SELECT text FROM task.chat_updates
-      WHERE chat_id = ${chatId} AND kind = ${ChatUpdates.APPENDED} AND task_id IS NULL ORDER BY n`;
-    return rows.map((r) => r.text);
-  }
-
-  /** 마지막 질문이 고르라고 준 에이전트들. 질문이 없으면 빈 목록 */
-  async lastChoices(chatId: string): Promise<string[]> {
-    const [row] = await this.sql<{ choices: string[] | null }[]>`
-      SELECT choices FROM task.chat_updates
-      WHERE chat_id = ${chatId} AND kind = ${ChatUpdates.QUESTION} ORDER BY n DESC LIMIT 1`;
-    return row?.choices ?? [];
-  }
-
   /** 쌓은 소식의 번호 (커서). 저장한 뒤에 읽는다 */
   async numberOf(updateId: string): Promise<number> {
     const [row] = await this.sql<{ n: string }[]>`

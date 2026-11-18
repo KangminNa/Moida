@@ -179,14 +179,12 @@ export class TaskService extends BaseService {
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, req.id);
       task.assertVersion(req.version);
-      // 잠그는 순서는 위 작업 → 아래 작업 → 결재
+      // 잠그는 순서는 위 작업 → 아래 작업 → 결재 (작업은 모두 먼저 잠갔다)
       const below = await tasks.lockOpenDescendants(task.id);
+      const approvals = new ApprovalRepository(tx);
       for (const one of [task, ...below]) {
         one.cancel(now);
         await tasks.save(one);
-      }
-      const approvals = new ApprovalRepository(tx);
-      for (const one of [task, ...below]) {
         const pending = await approvals.lockPending(one.id);
         if (!pending) continue;
         pending.cancel();
@@ -221,8 +219,9 @@ export class TaskService extends BaseService {
       const org = await new AgentRepository(tx).all(spaceId);
       const manager = org.find((a) => a.id === agentId);
       if (!manager) throw new Forbidden(Actor.AGENT);
+      const tainted = await tasks.privateTouched(spaceId, parent.id);
       const made = req.subtasks.map((s) =>
-        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now),
+        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now, tainted),
       );
       // 코드 하위 작업끼리(아직 안 끝난 형제 포함) 고칠 곳이 겹치면 PR이 부딪친다
       CodeScope.assertApart(
@@ -318,10 +317,11 @@ export class TaskService extends BaseService {
         if (jobs.length >= req.limit) break;
         const scope = task.codeScope;
         if (scope && held.some((h) => h.overlaps(scope))) continue;
-        // 담당을 정하지 않은 일은 그 일의 권한이 있는 에이전트 중 가장 먼저 만든, 일을 받을 수 있는 에이전트가 맡는다
+        // 담당을 정하지 않은 일은 그 일의 권한이 있는 에이전트 중 가장 먼저 만든, 일을 받을 수 있는 에이전트가 맡는다.
+        // 대표(O-2)는 대화만 맡는다: 담당 없는 일을 집어 가지 않는다
         const worker = task.agentId
           ? ready.find((a) => a.id === task.agentId)
-          : ready.find((a) => task.doableWith(a.scopes));
+          : ready.find((a) => !a.lead && task.doableWith(a.scopes));
         const agent = task.agentless ? null : worker;
         if (agent === undefined) continue;
         if (agent && !LeasePolicy.canStart(agent.tool, req.ownLogins, busy)) continue;

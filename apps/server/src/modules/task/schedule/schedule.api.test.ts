@@ -306,12 +306,11 @@ describe('스케줄 (/api/schedules)', () => {
       ok(await api.request('POST', `/api/tasks/${id}/cancel`, owner, { version }));
     };
 
-    test('대화로 보내면 처음엔 대화를 열고, 다음 차례부터 같은 대화의 회차. 지킬 것은 지시 뒤에, 받을 것은 대화의 받을 것', async () => {
-      const agent = await newAgent({ name: `레시피 담당 ${randomUUID().slice(0, 6)}` });
+    test('대화로 보내면 대표가 처음엔 대화를 열고(없으면 대표를 만든다), 다음 차례부터 같은 대화의 회차. 지킬 것은 지시 뒤에, 받을 것은 대화의 받을 것', async () => {
       const recipe = {
         ...DAILY,
         title: '주간 보고',
-        agentId: agent.id,
+        agentId: null,
         destination: 'chat',
         instruction: '이번 주 글 진행을 정리해 줘',
         rules: '표 하나로, 다섯 줄 넘지 않게',
@@ -333,7 +332,8 @@ describe('스케줄 (/api/schedules)', () => {
       const [opened] = (await list()).filter((s) => s.id === schedule.id);
       assert.ok(opened?.chatId, '연 대화를 기억한다');
       const { chat } = ok(await api.get(`/api/chats/${opened?.chatId}`, owner)) as { chat: Json };
-      assert.deepEqual([chat.agentId, chat.turns, chat.deliver], [agent.id, 1, 'html']);
+      const { lead } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
+      assert.deepEqual([chat.agentId, chat.turns, chat.deliver], [lead.id, 1, 'html']);
 
       await makeDue(schedule, 2);
       await job.run();
@@ -347,16 +347,14 @@ describe('스케줄 (/api/schedules)', () => {
       assert.equal(again.chat.turns, 2, '같은 대화의 다음 회차');
     });
 
-    test('대화는 관리자 바로 아래 에이전트와만, 받을 것은 대화에만 (422)', async () => {
-      const lead = await newAgent({ name: `팀장 ${randomUUID().slice(0, 6)}` });
-      const member = await newAgent({
-        name: `팀원 ${randomUUID().slice(0, 6)}`,
-        reportsTo: lead.id,
-      });
+    test('대화로 보내는 레시피는 대표가 맡아 담당을 비운다 (O-2), 받을 것은 대화에만 (422)', async () => {
+      const head = await newAgent({ name: `팀장 ${randomUUID().slice(0, 6)}` });
       const chatTo = (agentId: unknown, more: Json = {}) =>
         create({ ...DAILY, agentId, destination: 'chat', instruction: '정리', ...more });
-      assert.equal((await chatTo(member.id)).status, 422);
-      assert.equal((await chatTo(null)).status, 422, '담당이 있어야 한다');
+      const refused = await chatTo(head.id);
+      assert.equal(refused.status, 422, refused.text);
+      assert.match(refused.text, /대표가 맡아요/);
+      assert.equal((await chatTo(null, { instruction: '' })).status, 422, '지시가 있어야 한다');
       assert.equal((await create({ ...DAILY, instruction: '요약', deliver: 'html' })).status, 422);
     });
 

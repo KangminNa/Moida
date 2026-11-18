@@ -47,6 +47,7 @@ export interface AgentRow {
   model: string;
   effort: AgentEffort;
   external_tools: readonly string[];
+  lead: boolean;
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 

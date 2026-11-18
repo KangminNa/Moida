@@ -4,14 +4,13 @@ import { NoticeCatalog, NoticeKind } from '../platform';
 // task가 알리는 것 (7단계). 무엇을 알릴지는 알리는 모듈이 정하고 platform의 NoticeCatalog에 등록한다.
 //   결재 요청(즉시): 결재가 끝나면(승인 · 거절 · 고쳐 달라 · 취소) 그 알림을 읽음으로
 //   작업 실패(즉시)
-//   대화 (2차 1-5, 즉시): 맡을 에이전트를 묻는 질문(맡으면 읽음으로) · 회차의 답 (웹 푸시까지)
+//   대화 (2차 1-5, 즉시): 회차의 답 (웹 푸시까지). 맡을 에이전트를 묻는 질문은 O-2에서 없앴다 (상대는 늘 대표)
 //   스케줄 한도(기록만): ScheduleService가 하루 한도로 건너뛸 때 바로 남긴다
 @Injectable()
 export class TaskNotices implements OnModuleInit {
   static readonly APPROVAL = 'task.approval.requested';
   static readonly FAILED = 'task.task.failed';
   static readonly SCHEDULE_SKIPPED = 'task.schedule.skipped';
-  static readonly CHAT_ASKED = 'task.chat.asked';
   static readonly CHAT_ANSWERED = 'task.chat.answered';
   private static readonly APPROVAL_ENDED = [
     'task.approval.granted',
@@ -63,17 +62,6 @@ export class TaskNotices implements OnModuleInit {
                 data: { taskId: e.data.taskId },
               },
       ),
-    );
-    this.catalog.define(
-      new NoticeKind(TaskNotices.CHAT_ASKED, '대화의 질문', NoticeKind.IMMEDIATE)
-        .from([TaskNotices.CHAT_ASKED], (e) => ({
-          title: `질문 · ${String(e.data.title ?? '')}`.slice(0, 200),
-          body: String(e.data.question ?? '').slice(0, TaskNotices.BODY_MAX),
-          link: `/admin/chats/${e.data.chatId}`,
-          group_key: `chat-question:${e.data.chatId}`,
-          data: { chatId: e.data.chatId },
-        }))
-        .settledOn(['task.chat.routed'], (e) => `chat-question:${e.data.chatId}`),
     );
     this.catalog.define(
       new NoticeKind(TaskNotices.CHAT_ANSWERED, '대화의 답', NoticeKind.IMMEDIATE).from(

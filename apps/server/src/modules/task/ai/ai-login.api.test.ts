@@ -144,7 +144,7 @@ beforeEach(async () => {
   await db.sql`
     UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
-  await db.sql`UPDATE task.agents SET status = 'paused'`;
+  await db.sql`UPDATE task.agents SET status = 'paused' WHERE NOT lead`; // 대표(O-2)는 뒤 파일의 대화가 쓴다
 });
 
 after(async () => {

@@ -83,7 +83,7 @@ describe('RunLineage', () => {
   });
 
   test('기록하지 않는 일: 에이전트 없는 일 · 세션 정리', () => {
-    for (const kind of ['ai_test', 'ai_signin', 'chat_route', 'session_note', 'tool_check'])
+    for (const kind of ['ai_test', 'ai_signin', 'session_note', 'tool_check'])
       assert.equal(RunLineage.of(task({ kind, agent_id: null })), null, kind);
     assert.equal(RunLineage.of(task({ kind: 'tidy_session' })), null);
   });

@@ -40,6 +40,7 @@ export const agents = taskSchema.table('agents', {
   model: text('model').notNull(),
   effort: text('effort').$type<AgentEffort>().notNull(),
   external_tools: text('external_tools').array().notNull(),
+  lead: boolean('lead').notNull(),
 });
 
 /** task.ai_logins */

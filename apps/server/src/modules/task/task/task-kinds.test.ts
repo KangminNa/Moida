@@ -27,7 +27,7 @@ describe('작업 종류 목록', () => {
   test('옮기기 전과 같은 목록', () => {
     assert.deepEqual(
       sorted(Task.AGENTLESS),
-      sorted(['ai_test', 'ai_signin', 'chat_route', 'session_note', 'tool_check']),
+      sorted(['ai_test', 'ai_signin', 'session_note', 'tool_check']),
     );
     assert.deepEqual(sorted(Task.SANDBOXED), ['code', 'make']);
     assert.deepEqual(

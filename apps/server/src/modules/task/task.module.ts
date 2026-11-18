@@ -27,11 +27,9 @@ import { ChatQuery } from './chat/chat.query';
 import { ChatService } from './chat/chat.service';
 import { AskAgentTool } from './chat/chat.tool';
 import { ChatCardHandler } from './chat/chat-card.handler';
+import { ChatContinueHandler } from './chat/chat-continue.handler';
 import { ChatResultHandler } from './chat/chat-result.handler';
 import { ChatResultService } from './chat/chat-result.service';
-import { ChatRouteHandler } from './chat/chat-route.handler';
-import { ChatRouteJob } from './chat/chat-route.job';
-import { ChatRouteService } from './chat/chat-route.service';
 import { ChatUpdateHandler } from './chat/chat-update.handler';
 import { ChatUpdateQuery } from './chat/chat-update.query';
 import { ChatUpdateService } from './chat/chat-update.service';
@@ -167,9 +165,8 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatCardHandler,
     // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
     AppCodeCardHandler,
-    ChatRouteService,
-    ChatRouteHandler,
-    ChatRouteJob,
+    // 승인 뒤 이어서 (O-2): 대표가 continue로 올린 설정 바꾸기가 적용되어 끝난 회차 → 같은 대화의 다음 회차
+    ChatContinueHandler,
     AgentUpdatesTool,
     PostUpdateTool,
     GoalRunHandler,
@@ -238,8 +235,7 @@ export class TaskModule implements OnModuleInit {
     private readonly chatResults: ChatResultHandler,
     private readonly chatCards: ChatCardHandler,
     private readonly appCodeCards: AppCodeCardHandler,
-    private readonly chatRoutes: ChatRouteHandler,
-    private readonly chatRouteJob: ChatRouteJob,
+    private readonly chatContinues: ChatContinueHandler,
     private readonly agentless: AgentlessRequestHandler,
     private readonly library: LibraryQuery,
     private readonly follows: ScheduleFollowHandler,
@@ -263,9 +259,8 @@ export class TaskModule implements OnModuleInit {
     for (const topic of ChatResultHandler.TOPICS) this.workers.on(topic, this.chatResults);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
     this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
-    this.workers.on(Task.CHANGED, this.chatRoutes);
+    this.workers.on(Task.CHANGED, this.chatContinues);
     this.workers.on(Task.CHANGED, this.follows);
-    this.workers.due(this.chatRouteJob, Task.CHANGED);
     this.workers.on('*', this.results);
     this.workers.due(this.leases, Task.CHANGED);
     this.workers.due(this.schedules);

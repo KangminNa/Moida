@@ -75,7 +75,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 대화의 배정 (2차 1-5): 새 대화를 어느 에이전트가 맡을지 AI가 한 번 고른다. 연결 확인처럼 에이전트 없이 지시문 하나를 돌리고,
    * 답(JSON 한 줄)은 서버가 읽는다 (ChatRoute). payload: { tool, route: { chatId } }
    */
-  static readonly ROUTE: TaskKind = 'chat_route';
   /**
    * 세션 노트 (2차 4단계): vault가 원문을 받으면 요청한다 (task.agentless.requested). 에이전트 없이 서버의 로그인으로,
    * 러너가 vault에서 원문을 받아(read_transcript) 지시문 틀 session-note로 쓰고 답을 vault에 보낸다(save_note).
@@ -434,12 +433,13 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 하위 작업 하나를 만든다. 받는 쪽은 manager의 바로 아래 팀원이어야 하고, 그 에이전트의 권한으로 할 수 있는 종류여야 한다 (DelegationPolicy).
    * 하위 작업은 이 작업의 목표와 우선순위를 물려받고, 담당은 worker로 정해진다.
    * code는 code 작업에서만 맡긴다: 이 작업의 저장소 · 명령을 물려받고 경로(paths)는 이 작업의 경로 안으로 좁힌다 (CodeScope).
-   * 참조(refs)는 이 작업의 참조 가운데 고른 것만 넘긴다 (TaskRefs.handOn)
+   * 참조(refs)는 이 작업의 참조 가운데 고른 것만 넘긴다 (TaskRefs.handOn). tainted: 이 일의 대화가 비공개를 읽었다 (브라우저 일 막기)
    */
-  subtask(manager: Agent, worker: Agent | null, order: SubtaskOrder, now: Date): Task {
+  subtask(manager: Agent, worker: Agent | null, order: SubtaskOrder, now: Date, tainted = false) {
     const { fields, paths, refs } = order;
     const { kind } = fields;
-    DelegationPolicy.assert(manager, worker, kind, Task.DELEGABLE, Task.SCOPES[kind] ?? []);
+    const needs = Task.SCOPES[kind] ?? [];
+    DelegationPolicy.assert(manager, worker, kind, Task.DELEGABLE, needs, tainted);
     const r = this.row;
     return Task.open(
       r.space_id,

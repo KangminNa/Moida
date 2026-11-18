@@ -459,17 +459,20 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
 });
 
 describe('코드 작업 열기 (2026-11-15 C): 에이전트의 요청 → 승인 → 코드 작업', () => {
-  /** 대화 상대(관리자 바로 아래, 코드 권한 없음)의 일을 내 러너가 빌린 작업 토큰 */
+  /** 대표(O-2, 코드 권한 없음, 승인 동작 없이도 코드 작업 열기를 올린다)의 일을 내 러너가 빌린 작업 토큰 */
   async function partnerToken(): Promise<{ token: string; taskId: string }> {
-    const lead = ok(
-      await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: `대화 상대 ${randomUUID().slice(0, 6)}`,
-        tool: 'claude',
-        scopes: ['read_public'],
-      }),
-      201,
-    );
+    let lead = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+    if (!lead) {
+      // 대표는 첫 대화에서 생긴다
+      ok(
+        await api.request('POST', '/api/chats', owner, {
+          requestId: randomUUID(),
+          message: '대표를 만드는 첫 대화',
+        }),
+        201,
+      );
+      lead = ok(await api.get('/api/agents/lead', owner)).lead as Json;
+    }
     const task = ok(
       await api.request('POST', '/api/tasks', owner, {
         requestId: randomUUID(),

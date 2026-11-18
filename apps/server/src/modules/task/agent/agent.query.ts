@@ -10,10 +10,17 @@ import {
 import { agentRevisions, agents } from '../task.schema';
 import type { AgentRow } from '../task.tables';
 import type { ListAgentsInput } from './agent.input';
-import { AgentListView, AgentRevisionListView, AgentTeamListView, AgentView } from './agent.view';
+import {
+  AgentLeadView,
+  AgentListView,
+  AgentRevisionListView,
+  AgentTeamListView,
+  AgentView,
+} from './agent.view';
 import { AgentTeams } from './agent-team.policy';
 
 // 에이전트 읽기. 주인만. 이번 달 사용량은 실행 기록에서 더하고, 하트비트를 함께 싣는다.
+// 대표(O-2)는 목록 · 다른 모듈의 카드에 보이지 않고 lead로만 읽는다
 @Injectable()
 export class AgentQuery extends BaseQuery {
   /** 설정 판 목록 (새 판부터). 실행 기록의 agentRevision을 이 판과 맞춰 본다 */
@@ -31,7 +38,7 @@ export class AgentQuery extends BaseQuery {
     // 관리자, 또는 관리자가 확인한 길로 오는 설정 바꾸기 (제안의 미리 해 보기 · 승인 뒤 적용, 2026-11-15 D: 메뉴의 운영 팀)
     if (!(actor instanceof SettingActor || actor instanceof ApprovedActor)) actor.assertOwner();
     const row = await this.row(agents, { space_id: actor.requireSpace(), id, deleted_at: null });
-    return row ? new AgentCard(row.id, row.name, row.scopes) : null;
+    return row && !row.lead ? new AgentCard(row.id, row.name, row.scopes) : null;
   }
 
   /** 팀 템플릿 목록 (코드에 둔 것, AgentTeams) */
@@ -71,7 +78,22 @@ export class AgentQuery extends BaseQuery {
       (SELECT count(*)::int FROM task.schedules s WHERE s.agent_id = a.id) AS schedules
       FROM task.agents a
       WHERE a.space_id = ${actor.spaceId} AND (a.deleted_at IS NOT NULL) = ${req.deleted}
+        AND NOT a.lead
       ORDER BY a.id`;
     return new AgentListView(rows.map((r) => new AgentView(r, r.used, r.schedules)));
+  }
+
+  /** 대표 (O-2): 설정 › AI의 대표 칸. 이번 달에 쓴 토큰까지. 첫 대화 전이라 아직 없으면 null */
+  async lead(actor: Actor): Promise<AgentLeadView> {
+    actor.assertOwner();
+    const [row] = await this.sql<(AgentRow & { used: number })[]>`
+      SELECT a.*, (
+        SELECT coalesce(sum(e.tokens), 0)::bigint
+        FROM task.task_events e JOIN task.tasks t ON t.id = e.task_id
+        WHERE t.agent_id = a.id AND e.at >= date_trunc('month', now())
+      ) AS used
+      FROM task.agents a
+      WHERE a.space_id = ${actor.requireSpace()} AND a.lead AND a.deleted_at IS NULL`;
+    return new AgentLeadView(row ? new AgentView(row, row.used, 0) : null);
   }
 }

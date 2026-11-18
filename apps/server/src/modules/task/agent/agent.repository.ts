@@ -63,6 +63,21 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
     );
   }
 
+  /** 공간의 대표 (O-2). 아직 없으면 null */
+  async findLead(spaceId: string): Promise<Agent | null> {
+    return this.findOne({ space_id: spaceId, lead: true, deleted_at: null });
+  }
+
+  /**
+   * 대표를 만들기 전에: 공간마다 advisory 잠금을 걸고 다시 찾는다 (처음 여는 대화 둘이 대표를 하나씩 만들지 않게.
+   * 부분 유일 색인 agents_one_lead가 마지막 방어). 줄이 없을 수 있어 행 대신 advisory 잠금
+   */
+  async lockLeadSlot(spaceId: string): Promise<Agent | null> {
+    await this
+      .sql`SELECT pg_advisory_xact_lock(hashtextextended(${`task.agent-lead:${spaceId}`}, 0))`;
+    return this.findLead(spaceId);
+  }
+
   private static alive(agent: Agent): Agent {
     if (agent.deleted) throw new NotFound('에이전트를 찾을 수 없어요');
     return agent;

@@ -96,6 +96,15 @@ export class AgentView extends AgentSavedView {
   }
 }
 
+/** 대표 (O-2, GET api/agents/lead): 설정 › AI의 대표 칸. 첫 대화 전이라 아직 없으면 null */
+export class AgentLeadView {
+  constructor(private readonly lead: AgentView | null) {}
+
+  toJSON() {
+    return { lead: this.lead?.toJSON() ?? null };
+  }
+}
+
 /** 에이전트 목록. 몇 개뿐이라 한 쪽에 다 보낸다 */
 export class AgentListView {
   constructor(private readonly agents: readonly AgentView[]) {}

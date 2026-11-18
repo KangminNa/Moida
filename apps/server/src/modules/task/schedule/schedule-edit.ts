@@ -87,10 +87,6 @@ export class ScheduleEdit {
       : null;
     if (settings.page_id && agent && !agent.scopes.includes(Actor.MAKE))
       throw new RuleViolation('페이지의 새 버전은 만들기(make) 권한이 있는 에이전트가 맡아요');
-    if (settings.destination === Schedule.CHAT && agent && !agent.topLevel)
-      throw new RuleViolation(
-        `대화는 관리자 바로 아래 에이전트와만 해요: ${agent.name}은(는) 팀원이에요`,
-      );
     if (settings.goal_id)
       (await new GoalRepository(this.tx).load(this.spaceId, settings.goal_id)).assertActive();
     if (settings.after_id) {

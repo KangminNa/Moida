@@ -8,7 +8,12 @@ import {
 } from './agent.input';
 import { AgentQuery } from './agent.query';
 import { AgentService } from './agent.service';
-import type { AgentListView, AgentRevisionListView, AgentSavedView } from './agent.view';
+import type {
+  AgentLeadView,
+  AgentListView,
+  AgentRevisionListView,
+  AgentSavedView,
+} from './agent.view';
 
 // 에이전트 메뉴. 주인만 (Service·Query 첫 줄에서 확인).
 // 바꾼 뒤에는 에이전트 하나를 돌려주고, 화면은 그 version으로 다음 변경을 보낸다.
@@ -18,6 +23,12 @@ export class AgentController {
     private readonly agents: AgentQuery,
     private readonly service: AgentService,
   ) {}
+
+  /** 대표 (O-2): 설정 › AI의 대표 칸. 고치기는 PATCH api/agents/:id (AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만) */
+  @Get('lead')
+  lead(@CurrentActor() actor: Actor): Promise<AgentLeadView> {
+    return this.agents.lead(actor);
+  }
 
   /** 설정 판 목록 (새 판부터) */
   @Get(':id/revisions')

@@ -199,24 +199,29 @@ describe('Schedule', () => {
     assert.deepEqual((row.payload as { schedule: { at: string } }).schedule.at, slot.toISOString());
   });
 
-  test('레시피: 어디로 ↔ 페이지 · 담당 · 지시, 받을 것은 대화에만, 계기 ↔ 앞 레시피', () => {
+  test('레시피: 어디로 ↔ 페이지 · 담당 · 지시, 받을 것은 대화에만, 계기 ↔ 앞 레시피, 대화는 대표가 (O-2)', () => {
     const page = daily({ page_id: 'page-1' });
     assert.equal(page.destination, Schedule.PAGE, '페이지가 있으면 기본은 페이지로');
     const bad = [
       { destination: 'mail' },
       { destination: 'page' },
       { destination: 'task', page_id: 'page-1' },
-      { destination: 'chat', instruction: '' },
-      { destination: 'chat', agent_id: null, instruction: '요약' },
+      { destination: 'chat', agent_id: null, instruction: '' },
+      { destination: 'chat', instruction: '요약' }, // 담당이 있으면: 대화는 대표가 맡는다
       { deliver: 'html' },
-      { destination: 'chat', instruction: '요약', deliver: 'pdf' },
+      { destination: 'chat', agent_id: null, instruction: '요약', deliver: 'pdf' },
       { rules: 'x'.repeat(Schedule.RULES_MAX + 1) },
       { trigger: 'github' },
       { trigger: 'after' },
       { after_id: 'other' },
     ];
     for (const more of bad) assert.throws(() => daily(more), RuleViolation, JSON.stringify(more));
-    const chat = daily({ destination: 'chat', instruction: '주간 보고', deliver: 'html' });
+    const chat = daily({
+      destination: 'chat',
+      agent_id: null,
+      instruction: '주간 보고',
+      deliver: 'html',
+    });
     assert.deepEqual([chat.destination, chat.deliver], [Schedule.CHAT, 'html']);
     assert.throws(
       () => chat.configure(settings({ trigger: 'after', after_id: chat.id }), NOW),
@@ -236,8 +241,8 @@ describe('Schedule', () => {
     assert.equal(daily({ trigger: 'after', after_id: 'other', enabled: false }).follow(NOW), null);
   });
 
-  test('대화 레시피: 연 대화를 기억하고, 담당 · 받을 것 · 어디로가 바뀌면 다음 차례에 새 대화', () => {
-    const recipe = settings({ destination: 'chat', instruction: '주간 보고' });
+  test('대화 레시피: 연 대화를 기억하고, 받을 것 · 어디로가 바뀌면 다음 차례에 새 대화', () => {
+    const recipe = settings({ destination: 'chat', agent_id: null, instruction: '주간 보고' });
     const chat = daily(recipe);
     chat.openedChat('chat-1');
     chat.configure({ ...recipe, title: '이름만 바꿈' }, NOW);

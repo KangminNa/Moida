@@ -22,7 +22,6 @@ import {
 import { ChatRequest } from './chat-request.policy';
 import { ChatResult } from './chat-result.policy';
 import { ChatReview } from './chat-review.policy';
-import { ChatUpdates } from './chat-update.policy';
 import { ChatUpdateQuery } from './chat-update.query';
 
 // 대화 읽기 (관리자만). 회차는 작업이라 그 대화의 회차 request_id로 작업을 찾는다.
@@ -68,15 +67,14 @@ export class ChatQuery extends BaseQuery {
     const ids = ChatRequest.turns(chat.id, chat.turns - ChatQuery.TURNS + 1, chat.turns);
     const turns = await this.turns(spaceId, ids);
     const [board] = await this.updates.ownerBoard(actor, chat.id);
-    const news = await this.news(chat.id);
-    const asked = news.filter((n) => n.kind === ChatUpdates.QUESTION).at(-1) ?? null;
+    // 맡을 에이전트를 묻는 질문은 O-2에서 없앴다 (상대는 늘 대표). 칸은 O-3에서 지운다
     return new ChatDetailView(
       chat,
       partner ?? null,
       await this.views(turns),
       board ?? null,
-      news,
-      chat.agent_id === null ? asked : null,
+      await this.news(chat.id),
+      null,
       await this.card(chat),
       await this.team(spaceId, chat.id),
       await this.tokens(spaceId, chat.id),
@@ -84,7 +82,7 @@ export class ChatQuery extends BaseQuery {
   }
 
   /**
-   * 이 대화의 일이 쓴 토큰 (O-1): 회차 · 덧붙인 말의 답 · 검토(request_id `chat:<대화>:<회차>…`) · 배정(`chat-route:<대화>:`)과
+   * 이 대화의 일이 쓴 토큰 (O-1): 회차 · 덧붙인 말의 답 · 검토(request_id `chat:<대화>:<회차>…`) · O-2 전의 배정(`chat-route:<대화>:`)과
    * 그 아래 하위 작업 전부의 실행 기록. 회차는 맨 위 작업의 request_id 세 번째 칸 (배정은 null)
    */
   private tokens(spaceId: string, chatId: string): Promise<ChatTokenRow[]> {

@@ -12,7 +12,6 @@
   "make": { "skill": "cairn-make", "scopes": ["make"], "delegable": true, "sandboxed": true },
   "ai_test": { "agentless": true },
   "ai_signin": { "agentless": true },
-  "chat_route": { "agentless": true },
   "session_note": { "agentless": true },
   "tool_check": { "agentless": true }
 }
