@@ -67,6 +67,13 @@ export class ApiClient {
   static readonly OWNER_LOGIN = 'owner';
   static readonly OWNER_PASSWORD = 'test-password-123';
 
+  /**
+   * 키를 주지 않았을 때 모든 시험 프로세스가 함께 쓰는 서버 키 (시험 DB 전용).
+   * 시험 파일마다 프로세스가 따로지만 시험 DB는 하나다: 프로세스마다 무작위 키를 쓰면 앞 파일이 잠근 값을
+   * 뒤 파일의 키 교체(SecretRotation)가 풀지 못한다 (CI에서만 드러났다. 로컬은 .env의 키 하나로 돌았다)
+   */
+  private static readonly TEST_KEY = createHash('sha256').update('cairn-test-db').digest('base64');
+
   private constructor(
     private readonly app: INestApplication,
     readonly baseUrl: string,
@@ -75,7 +82,7 @@ export class ApiClient {
   /** 운영과 같은 길(CairnApp.api)로 서버를 띄운다. log: 요청 로그를 모아 볼 때 */
   static async start(options: { log?: RequestLogSink } = {}): Promise<ApiClient> {
     // compose는 값이 없으면 빈 문자열로 넘긴다
-    process.env.CAIRN_SECRET_KEY ||= SecretBox.newKey();
+    process.env.CAIRN_SECRET_KEY ||= ApiClient.TEST_KEY;
     const app = await CairnApp.api({
       port: 0,
       host: '127.0.0.1',

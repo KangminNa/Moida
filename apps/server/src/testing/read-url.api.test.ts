@@ -8,7 +8,8 @@ import { ApiClient, type TestUser } from './api-client';
 
 // MCP read_url: 작업 토큰을 쥔 AI만, 이 일이 비공개를 볼 수 있으면 주인의 지시에 적힌 사이트만 연다.
 // 바깥 사이트 대신 127.0.0.1의 가짜 사이트를 쓴다 (시험에서만 루프백을 연다). 그래서 "다른 사이트"는 이름이 다른 같은 서버다:
-// 127.0.0.1(지시에 적음)과 localhost(지시에 없음)
+// 127.0.0.1(지시에 적음)과 localhost(지시에 없음). localhost는 막히는 경우에만 쓴다: 접속하기 전에 끊기므로 풀리는 주소와
+// 상관없다. 실제로 여는 주소는 늘 127.0.0.1이다 (CI처럼 localhost가 ::1로 먼저 풀리면 127.0.0.1에서만 받는 가짜 사이트에 닿지 않는다)
 
 type Json = Record<string, unknown>;
 /** WebPageGateway.TEST_LOOPBACK_ENV (모듈 안을 가져오지 않으려고 이름만) */
@@ -116,7 +117,7 @@ describe('read_url', () => {
   test('비공개를 볼 수 없는 일은 지시에 없는 주소도 연다. 받은 글은 자료라는 표시와 함께', async () => {
     const token = await runToken(['read_public'], '서울 맛집을 찾아 정리해 줘');
     const { ok: done, body } = await tool(token, 'read_url', {
-      url: `http://localhost:${port}/news`,
+      url: `http://127.0.0.1:${port}/news`,
     });
     assert.equal(done, true, JSON.stringify(body));
     assert.equal(body.title, '가짜 기사');
