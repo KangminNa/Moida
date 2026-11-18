@@ -19,6 +19,8 @@
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
 //   [fake:memo=<글>]    인수인계 메모 파일(CAIRN_MEMO_FILE)에 그 글을 쓴다 (작업 세션, 2026-11-17)
+//   [fake:deliver=<값>] 대표의 회차(O-3): 지시문이 받을 것을 정하라고 하면 set_deliver로 그 값을 정한다 (정해진 회차면 부르지 않는다)
+//   [fake:automate=<제목>] 대표의 회차(O-3): 받을 것을 setting으로 정하고 이 대화로 보내는 매일 08:00 자동화를 제안한다
 // --no-session-persistence가 없으면 세션 파일을 설정 폴더의 projects/<작업 폴더>/<세션 id>.jsonl에 남기고,
 // --resume <id>면 그 세션 id를 이어 쓴다 (CLI 세션 재개)
 //   [fake:split=<경로>,<경로>…] 코드 작업의 팀장처럼: "내 팀"의 첫 팀원에게 경로마다 code 하위 작업을 맡기고 끝난다
@@ -311,6 +313,32 @@ if (split && !prompt.includes('# 맡긴 하위 작업의 결과')) {
       instruction: `${path} 아래를 고쳐 주세요 [fake:edit=${path}/x.ts]`,
       paths: [path],
     })),
+  });
+}
+
+// 대표의 회차 (O-3): 받을 것 정하기 · 대화로 자동화 제안 (제안하면 회차는 승인을 기다린다)
+const deliver = /\[fake:deliver=([a-z_]+)\]/.exec(prompt)?.[1];
+const choosing = prompt.includes('set_deliver로 이번 회차의 받을 것을 정합니다');
+if (deliver && choosing) await callTool('set_deliver', { deliver, note: '테스트용 CLI가 정함' });
+const automate = /\[fake:automate=([^\]]+)\]/.exec(prompt)?.[1];
+if (automate && choosing) {
+  await callTool('set_deliver', { deliver: 'setting' });
+  await callTool('propose_setting', {
+    request_id: randomUUID(),
+    setting: 'schedule',
+    op: 'create',
+    fields: {
+      title: automate,
+      enabled: true,
+      mode: 'daily',
+      at_time: '08:00',
+      time_zone: 'Asia/Seoul',
+      instruction: '오늘의 소식을 짧게 정리한다',
+      destination: 'chat',
+      deliver: 'answer',
+      daily_max: 1,
+    },
+    note: '매일 아침 정리하려고',
   });
 }
 

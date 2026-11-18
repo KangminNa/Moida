@@ -11,6 +11,8 @@ export class ChatTurn {
   };
 
   private constructor(
+    /** 대화 id (대표가 이 대화의 자동화를 찾는다, O-3) */
+    readonly chatId: string,
     readonly turn: number,
     /** [말한 쪽, 글] (오래된 것부터, 서버가 최근 것만 잘라 보낸다) */
     private readonly lines: readonly (readonly [string, string])[],
@@ -20,6 +22,8 @@ export class ChatTurn {
     private readonly appended: readonly string[] = [],
     /** 팀원이 남긴 소식 [종류, 팀원, 글] (chat_updates.team, 오래된 것부터) */
     private readonly team: readonly (readonly [string, string, string])[] = [],
+    /** 이미 정해진 이번 회차의 받을 것 (레시피 · 다시 맡긴 회차, payload.chat.deliver). 없으면 대표가 정한다 (O-3) */
+    readonly deliver: string | null = null,
   ) {}
 
   /** 대화의 회차가 아니면 null. updates: next_jobs의 chat_updates (없을 수 있다) */
@@ -31,6 +35,7 @@ export class ChatTurn {
       .filter((line) => line.text('text') !== '')
       .map((line) => [line.text('from'), line.text('text')] as const);
     return new ChatTurn(
+      chat.text('chatId'),
       chat.number('turn'),
       lines,
       chat.flag('reply'),
@@ -38,6 +43,7 @@ export class ChatTurn {
       (updates?.list('team') ?? []).map(
         (u) => [u.text('kind'), u.text('agent'), u.text('text')] as const,
       ),
+      chat.text('deliver') || null,
     );
   }
 

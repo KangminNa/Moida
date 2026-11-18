@@ -358,6 +358,30 @@ describe('지시문', () => {
     assert.equal(head.includes('대표로 일하는 법'), false, '팀장의 일에는 없다');
   });
 
+  test('대표의 대화 회차 (O-3): 받을 것을 set_deliver로 정하고, 자동화는 이 대화 id로 찾는다. 정해진 받을 것이면 그것을 낸다', () => {
+    const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
+    const turn = (chat: object) =>
+      job({
+        agent: lead,
+        task: {
+          id: 't',
+          title: '대화 · 브리핑',
+          payload: { chat: { turn: 1, history: [], ...chat } },
+        },
+      }).prompt(REPO_PROMPTS, false);
+    const free = turn({ chatId: 'chat-7' });
+    assert.ok(free.includes('set_deliver로 이번 회차의 받을 것을 정합니다'));
+    assert.ok(free.includes('chat_id가 이 대화(chat-7)인 것'));
+    assert.ok(
+      free.includes('propose_setting setting: schedule'),
+      '되풀이할 일은 자동화를 제안한다',
+    );
+    assert.ok(free.includes('답 글은 두세 줄로'));
+    const fixed = turn({ chatId: 'chat-8', deliver: 'blog' });
+    assert.ok(fixed.includes('이번 회차의 받을 것은 이미 정해져 있습니다: blog'));
+    assert.equal(fixed.includes('set_deliver로 이번 회차의'), false);
+  });
+
   test('묶인 팀원은 정해진 컴퓨터에서 일한다고 팀장에게 알린다', () => {
     const prompt = job({
       team: [

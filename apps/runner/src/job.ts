@@ -348,7 +348,14 @@ export class Job {
           rounds: this.roundsLeft,
         }),
       );
-    if (this.lead) parts.push(prompts.fill('lead', {}));
+    // 대표 (O-2 · O-3): 이 대화의 id(자동화 찾기)와 이미 정해진 받을 것
+    if (this.lead)
+      parts.push(
+        prompts.fill('lead', {
+          chat: this.chat?.chatId ?? null,
+          deliver: this.chat?.deliver ?? null,
+        }),
+      );
     if (this.skill && skillReady) parts.push(prompts.fill('skill', { name: this.skill }));
     else if (this.skill && skillText)
       parts.push(prompts.fill('skill', { name: this.skill, text: skillText.trim() }));
