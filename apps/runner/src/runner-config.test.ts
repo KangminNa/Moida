@@ -27,6 +27,21 @@ describe('러너 설정', () => {
     assert.equal(config.skillsDir, '/opt/skills');
   });
 
+  test('세션 키 폴더: 기본은 홈 아래, CAIRN_RUNNER_LINEAGES_DIR로 바꾸고 상대 경로 · /는 막는다', () => {
+    assert.ok(RunnerConfig.fromEnv(env).lineagesDir.endsWith('/.cache/cairn-runner/lineages'));
+    const moved = { ...env, CAIRN_RUNNER_LINEAGES_DIR: ' /tmp/cairn-runner/lineages/ ' };
+    assert.equal(RunnerConfig.fromEnv(moved).lineagesDir, '/tmp/cairn-runner/lineages');
+    assert.equal(
+      RunnerConfig.fromEnv(moved).withToken('t').lineagesDir,
+      '/tmp/cairn-runner/lineages',
+    );
+    for (const bad of ['lineages', '/'])
+      assert.throws(
+        () => RunnerConfig.fromEnv({ ...env, CAIRN_RUNNER_LINEAGES_DIR: bad }),
+        ConfigProblem,
+      );
+  });
+
   test('빠진 설정의 이름을 모두 알리고 값은 드러내지 않는다', () => {
     assert.throws(
       () => RunnerConfig.fromEnv({ CAIRN_RUNNER_TOKEN: 'device-secret' }),

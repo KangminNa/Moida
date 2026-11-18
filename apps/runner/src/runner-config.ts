@@ -14,6 +14,12 @@ export class RunnerConfig {
   private static readonly DEFAULT_SKILLS = resolve(__dirname, '../../../skills');
   private static readonly SLOT = /^[1-9][0-9]?$/;
   private static readonly DEFAULT_WORK_DIR = '/work';
+  private static readonly DEFAULT_LINEAGES_DIR = join(
+    homedir(),
+    '.cache',
+    'cairn-runner',
+    'lineages',
+  );
   /** 동시에 하는 일의 수 (CAIRN_RUNNER_CONCURRENCY). 서버의 next_jobs는 한 번에 10개까지 빌려 준다 */
   private static readonly CONCURRENCY_MAX = 8;
   /** 서버 러너(연결 값 파일로 스스로 붙는 러너)의 기본값. 내 컴퓨터 러너는 1 */
@@ -52,8 +58,11 @@ export class RunnerConfig {
     readonly folders: SharedFolders | null = null,
     /** 동시에 하는 일의 수 (CAIRN_RUNNER_CONCURRENCY). 코드 러너 칸은 늘 1 */
     readonly concurrency = 1,
-    /** 세션 키마다 CLI 세션 파일을 24시간 남기는 폴더 (LineageStore, 2026-11-17). 러너 사용자의 홈 아래 */
-    readonly lineagesDir: string = join(homedir(), '.cache', 'cairn-runner', 'lineages'),
+    /**
+     * 세션 키마다 CLI 세션 파일을 24시간 남기는 폴더 (LineageStore, 2026-11-17). 실행 중에는 작업 폴더도 여기 생긴다.
+     * CAIRN_RUNNER_LINEAGES_DIR, 기본은 러너 사용자의 홈 아래. 서버 러너는 홈이 작은 메모리 폴더라 compose가 /tmp 아래로 정한다
+     */
+    readonly lineagesDir: string = RunnerConfig.DEFAULT_LINEAGES_DIR,
   ) {}
 
   /** uid: 이 프로세스의 사용자 (시험이 바꿔 끼운다) */
@@ -84,6 +93,7 @@ export class RunnerConfig {
       RunnerConfig.workDirOf(env),
       RunnerConfig.foldersOf(env),
       slot === null ? RunnerConfig.concurrencyOf(env, paired !== null) : 1,
+      RunnerConfig.lineagesDirOf(env),
     );
   }
 
@@ -240,6 +250,13 @@ export class RunnerConfig {
     const dir = env.CAIRN_WORK_DIR?.trim() || RunnerConfig.DEFAULT_WORK_DIR;
     if (!isAbsolute(dir) || dir === '/')
       throw new ConfigProblem(`CAIRN_WORK_DIR은 / 밖의 절대 경로여야 해요: ${dir}`);
+    return dir.replace(/\/+$/, '');
+  }
+
+  private static lineagesDirOf(env: Readonly<Record<string, string | undefined>>): string {
+    const dir = env.CAIRN_RUNNER_LINEAGES_DIR?.trim() || RunnerConfig.DEFAULT_LINEAGES_DIR;
+    if (!isAbsolute(dir) || dir === '/')
+      throw new ConfigProblem(`CAIRN_RUNNER_LINEAGES_DIR은 / 밖의 절대 경로여야 해요: ${dir}`);
     return dir.replace(/\/+$/, '');
   }
 
