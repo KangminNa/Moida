@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import { RuleViolation } from '../../platform';
 import type { AgentRow } from '../task.tables';
 import { Agent } from './agent';
+import { AgentOrg } from './agent-org.policy';
 import { AgentUsage } from './agent-usage';
 
 // 에이전트가 쉬는 규칙. DB 없이 돈다.
@@ -233,7 +234,7 @@ describe('조직도 (Agent.reportTo)', () => {
     assert.throws(() => a.reportTo('no-such', [a]), RuleViolation);
   });
 
-  test(`깊이는 ${Agent.ORG_DEPTH_MAX}단계까지: 아래 팀째로 옮겨도 가장 깊은 팀원을 센다`, () => {
+  test(`깊이는 ${AgentOrg.DEPTH_MAX}단계까지: 아래 팀째로 옮겨도 가장 깊은 팀원을 센다`, () => {
     const [a, b, c, d, e] = ['1', '2', '3', '4', '5'].map(named) as [
       Agent,
       Agent,

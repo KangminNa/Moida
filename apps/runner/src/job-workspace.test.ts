@@ -309,7 +309,7 @@ describe('지시문', () => {
           open: 2,
           recent: { done: 5, failed: 1, revised: 0 },
           connectors: ['notion', 'linear'],
-          team: { members: 2, kinds: { general: 2, browse: 1 } },
+          team: { members: 2, kinds: { general: 2, browse: 1 }, connectors: { notion: 1 } },
         },
         { agent_id: 'w1', name: '글쓰기', role: '', status: 'active', kinds: ['general'] },
       ],
@@ -320,7 +320,7 @@ describe('지시문', () => {
     }).prompt(REPO_PROMPTS, false);
     assert.ok(
       prompt.includes(
-        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 커넥터: notion, linear · 아래 팀: 2명 (general 2, browse 1)',
+        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 커넥터: notion, linear · 아래 팀: 2명 (general 2, browse 1 · 커넥터 notion 1)',
       ),
     );
     // 옛 서버(팀원 정보 없음)면 0으로, 아래 팀 · 커넥터 칸은 없다
@@ -334,6 +334,52 @@ describe('지시문', () => {
     assert.ok(child.includes('# 돌려줄 결과의 형식'));
     assert.ok(child.includes('후보 3개를 표로'));
     assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('돌려줄 결과의 형식'), false);
+  });
+
+  test('대표의 일(agent.lead, O-2)에는 lead 단락을 넣는다: 나눠 맡기기 · continue로 팀 바꾸기 제안 · 결과 중심', () => {
+    const team = [
+      { agent_id: 'h1', name: '조사 팀장', role: '', status: 'active', kinds: ['general'] },
+    ];
+    const lead = job({
+      agent: {
+        id: 'l',
+        name: '대표',
+        role: '대화를 받아 팀에 나눠 맡긴다',
+        tool: 'claude',
+        lead: true,
+      },
+      team,
+      rounds_left: 2,
+    }).prompt(REPO_PROMPTS, false);
+    assert.ok(lead.includes('# 대표로 일하는 법'));
+    assert.ok(lead.includes('continue: true'));
+    assert.ok(lead.indexOf('# 내 팀') < lead.indexOf('# 대표로 일하는 법'), '팀 목록 뒤에');
+    const head = job({ team, rounds_left: 2 }).prompt(REPO_PROMPTS, false);
+    assert.equal(head.includes('대표로 일하는 법'), false, '팀장의 일에는 없다');
+  });
+
+  test('대표의 대화 회차 (O-3): 받을 것을 set_deliver로 정하고, 자동화는 이 대화 id로 찾는다. 정해진 받을 것이면 그것을 낸다', () => {
+    const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
+    const turn = (chat: object) =>
+      job({
+        agent: lead,
+        task: {
+          id: 't',
+          title: '대화 · 브리핑',
+          payload: { chat: { turn: 1, history: [], ...chat } },
+        },
+      }).prompt(REPO_PROMPTS, false);
+    const free = turn({ chatId: 'chat-7' });
+    assert.ok(free.includes('set_deliver로 이번 회차의 받을 것을 정합니다'));
+    assert.ok(free.includes('chat_id가 이 대화(chat-7)인 것'));
+    assert.ok(
+      free.includes('propose_setting setting: schedule'),
+      '되풀이할 일은 자동화를 제안한다',
+    );
+    assert.ok(free.includes('답 글은 두세 줄로'));
+    const fixed = turn({ chatId: 'chat-8', deliver: 'blog' });
+    assert.ok(fixed.includes('이번 회차의 받을 것은 이미 정해져 있습니다: blog'));
+    assert.equal(fixed.includes('set_deliver로 이번 회차의'), false);
   });
 
   test('묶인 팀원은 정해진 컴퓨터에서 일한다고 팀장에게 알린다', () => {

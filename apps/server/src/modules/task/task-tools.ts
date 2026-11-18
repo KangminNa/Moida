@@ -3,7 +3,7 @@ import type { BaseTool, ToolTextBody } from '../platform';
 import { AiLoginRefreshTool, AiLoginTool, AiSigninTool } from './ai/ai-login.tool';
 import { RequestApprovalTool } from './approval/approval.tool';
 import { AskAgentTool } from './chat/chat.tool';
-import { AgentUpdatesTool, PostUpdateTool } from './chat/chat-update.tool';
+import { AgentUpdatesTool, PostUpdateTool, SetDeliverTool } from './chat/chat-update.tool';
 import { ProposeToolTool } from './external-tool/external-tool.tool';
 import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxTool } from './inbox/inbox.tool';
@@ -44,6 +44,7 @@ export class TaskTools {
     inbox: InboxTool,
     agentUpdates: AgentUpdatesTool,
     postUpdate: PostUpdateTool,
+    setDeliver: SetDeliverTool,
     proposeTool: ProposeToolTool,
     getSettings: GetSettingsTool,
     proposeSetting: ProposeSettingTool,
@@ -66,6 +67,7 @@ export class TaskTools {
       inbox,
       agentUpdates,
       postUpdate,
+      setDeliver,
       proposeTool,
       getSettings,
       proposeSetting,

@@ -1,9 +1,12 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { ApprovalDetail } from '../../_task/ApprovalDetail';
-import { clock, NEWS_KINDS, OUTPUT_KINDS } from '../../_task/labels';
+import { clock, DELIVER_LABELS, NEWS_KINDS, OUTPUT_KINDS, tokens } from '../../_task/labels';
 import { MarkdownText } from '../../_task/MarkdownText';
 import { OutputOpen } from '../../_task/parts';
-import type { ChatNews, ChatTurn } from '../../_task/types';
+import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
 import { RefChips } from './ChatRefs';
 
 /** 일하는 중인 회차의 상태 */
@@ -17,19 +20,24 @@ const isBefore = (n: ChatNews) =>
   BEFORE.includes(n.kind) || (n.kind === 'appended' && n.taskId === null);
 
 // 대화의 주고받음 (2차 1-5, ChatGPT · Claude 같은 모양): 관리자의 말풍선(오른쪽)과 답(왼쪽).
-// 맡기 전에는 첫 메시지(pending)와 질문 · 답, 맡은 뒤에는 회차마다 메시지 → 덧붙인 말 · 짧은 답 → 과정(접힘) → 답.
-// 팀이 무엇을 하는지는 과정을 펼쳐야 보인다. 결과 카드에 싣지 않는 승인(사이트 로그인 등)만 답 아래에 둔다
+// 맡기 전에는 첫 메시지(pending)와 질문 · 답, 맡은 뒤에는 회차마다 메시지 → 덧붙인 말 · 짧은 답 → 받을 것 · 과정(접힘) → 답.
+// 팀이 무엇을 하는지는 과정을 펼쳐야 보인다. 결과 카드에 싣지 않는 승인(사이트 로그인 등)만 답 아래에 둔다.
+// 결과물 중심 (O-3): 서버가 연 회차는 지시문 원문 대신 한 줄(note), 결과물을 내는 회차의 긴 답은 세 줄까지 접는다
 export function ChatTurns({
   turns,
+  usage,
   news,
   pending,
   pendingRefs,
   me,
   partner,
+  deliver,
   busy,
   onCancel,
 }: {
   turns: readonly ChatTurn[];
+  /** 회차마다 쓴 토큰 (O-1). 없는 회차는 아직 실행 기록이 없다 */
+  usage: readonly ChatTurnUsage[];
   news: readonly ChatNews[];
   /** 맡기 전의 첫 메시지 (맡았으면 null) */
   pending: string | null;
@@ -38,6 +46,8 @@ export function ChatTurns({
   me: string;
   /** 맡은 에이전트 (맡기 전이면 null) */
   partner: string | null;
+  /** 대화에 정한 받을 것 (관리자 · 레시피). 회차에 정한 값이 먼저다 (O-3) */
+  deliver: string | null;
   /** 지금 취소하는 회차의 작업 id */
   busy: string | null;
   onCancel: (taskId: string, version: number) => void;
@@ -58,20 +68,24 @@ export function ChatTurns({
           (n) =>
             !isBefore(n) && n.createdAt >= t.createdAt && (next === null || n.createdAt < next),
         );
+        const want = t.deliver ?? deliver;
         return (
           <li key={t.taskId} className="chat-turn">
             <Mine
               who={
+                // 서버가 연 회차는 까닭 한 줄(note)이 말풍선에 있어 머리는 짧게 (O-3)
                 t.fixBy === 'review'
-                  ? '검토 반영 · 검토자가 남긴 고칠 것'
-                  : t.fix
-                    ? '검사 · 받을 것이 없어 다시 맡김'
-                    : t.fromDevice
-                      ? '기기의 AI 도구'
-                      : me
+                  ? '검토 반영'
+                  : t.fixBy === 'setting'
+                    ? '승인 뒤 이어서'
+                    : t.fix
+                      ? '검사'
+                      : t.fromDevice
+                        ? '기기의 AI 도구'
+                        : me
               }
               at={t.createdAt}
-              text={t.message}
+              text={t.fix ? (t.note ?? fixLine(t.message)) : t.message}
             />
             <RefChips refs={t.refs} />
             {i === 0 && <Before items={before} me={me} />}
@@ -89,13 +103,22 @@ export function ChatTurns({
                   </div>
                 ),
               )}
-            <Process turn={t} items={within.filter((n) => PROCESS.includes(n.kind))} />
+            {want && (
+              <p className="chat-event" title={t.deliverNote ?? undefined}>
+                받을 것 · {DELIVER_LABELS[want] ?? want}
+              </p>
+            )}
+            <Process
+              turn={t}
+              items={within.filter((n) => PROCESS.includes(n.kind))}
+              usage={usage.find((u) => u.turn === t.turn) ?? null}
+            />
             <div className="bubble theirs" aria-live={t.finishedAt ? undefined : 'polite'}>
               <span className="bubble-meta">
                 {partner ?? '에이전트'}
                 {t.finishedAt ? ` · ${clock(t.finishedAt)}` : ''}
               </span>
-              <Reply turn={t} />
+              <Reply turn={t} fold={(want !== null && want !== 'answer') || t.outputs.length > 0} />
               {t.outputs.length > 0 && (
                 <ul className="list" aria-label="결과물">
                   {t.outputs.map((o) => (
@@ -146,7 +169,7 @@ function Mine({ who, at, text }: { who: string; at?: string; text: string }) {
   );
 }
 
-/** 맡기 전의 주고받음: 질문(지금 질문의 고를 것은 아래 ChatQuestion) · 글로 한 답 · 맡음 */
+/** 맡기 전의 주고받음 (O-2 전 대화의 기록): 질문 · 글로 한 답 · 맡음 */
 function Before({ items, me }: { items: readonly ChatNews[]; me: string }) {
   return items.map((n) =>
     n.kind === 'appended' ? (
@@ -165,10 +188,21 @@ function Before({ items, me }: { items: readonly ChatNews[]; me: string }) {
   );
 }
 
-/** 회차의 과정: 접어 둔다. 돌면 "일하는 중", 끝나면 "과정". 펼치면 팀이 남긴 소식과 작업 */
-function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[] }) {
+/**
+ * 회차의 과정: 접어 둔다. 돌면 "일하는 중", 끝나면 "과정". 펼치면 팀이 남긴 소식과 작업.
+ * 이 회차가 쓴 토큰(O-1)은 머리에 합계, 펼치면 에이전트별 (일하는 동안 늘어난다)
+ */
+function Process({
+  turn: t,
+  items,
+  usage,
+}: {
+  turn: ChatTurn;
+  items: readonly ChatNews[];
+  usage: ChatTurnUsage | null;
+}) {
   const open = OPEN.includes(t.status);
-  if (!open && items.length === 0) return null;
+  if (!open && items.length === 0 && usage === null) return null;
   // 지금 하는 일 한 줄은 도는 동안만 (승인을 기다리는 동안의 기록은 승인 요청이라 카드가 대신 보인다)
   const doing =
     t.status === 'running'
@@ -180,7 +214,13 @@ function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[
         {open ? '일하는 중' : '과정'}
         {items.length > 0 ? ` · 소식 ${items.length}개` : ''}
         {doing ? ` · ${doing}` : ''}
+        {usage ? ` · ${tokens(usage.tokens)} 토큰` : ''}
       </summary>
+      {usage && (
+        <p className="chat-event">
+          {usage.agents.map((a) => `${a.name ?? '배정'} ${tokens(a.tokens)}`).join(' · ')}
+        </p>
+      )}
       <ol>
         {items.map((n) => (
           <li key={n.n}>
@@ -199,11 +239,16 @@ function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[
   );
 }
 
-/** 답: 끝났으면 글, 아니면 지금 상태 한 줄 */
-function Reply({ turn: t }: { turn: ChatTurn }) {
+/** 서버가 연 회차의 한 줄 (O-3 전 회차는 note가 없어 지시문 틀의 첫 줄에서 머리 표시를 뗀다) */
+function fixLine(message: string): string {
+  return (message.trim().split('\n')[0] ?? '').replace(/^#+\s*/, '');
+}
+
+/** 답: 끝났으면 글, 아니면 지금 상태 한 줄. fold: 결과물을 내는 회차라 긴 답은 세 줄까지 접는다 (O-3) */
+function Reply({ turn: t, fold }: { turn: ChatTurn; fold: boolean }) {
   if (t.status === 'done')
     // 승인한 일을 서버가 실행해 끝난 회차에는 글 답이 없다
-    return t.reply?.trim() ? <MarkdownText text={t.reply} /> : <p className="note">완료</p>;
+    return t.reply?.trim() ? <Answer text={t.reply} fold={fold} /> : <p className="note">완료</p>;
   if (t.status === 'failed') return <p className="error">{t.error ?? '실패'}</p>;
   if (t.status === 'cancelled') return <p className="note">멈춤</p>;
   const doing =
@@ -213,4 +258,23 @@ function Reply({ turn: t }: { turn: ChatTurn }) {
         ? '승인을 기다려요 · 아래 결과 카드에서 정하면 이어서 해요'
         : '일하는 중…';
   return <p className="note">{doing}</p>;
+}
+
+/** 결과물 중심 (O-3): 결과는 카드에 있으니 긴 답은 접고 펼칠 수 있게 (서버는 자르지 않는다) */
+function Answer({ text, fold }: { text: string; fold: boolean }) {
+  const [open, setOpen] = useState(false);
+  const long = text.trim().split('\n').length > 3 || text.length > 240;
+  if (!fold || !long || open) return <MarkdownText text={text} />;
+  return (
+    <>
+      <div className="answer-fold">
+        <MarkdownText text={text} />
+      </div>
+      <div className="row">
+        <button type="button" className="ghost small" onClick={() => setOpen(true)}>
+          펼치기
+        </button>
+      </div>
+    </>
+  );
 }

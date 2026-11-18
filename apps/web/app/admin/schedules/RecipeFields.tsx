@@ -167,7 +167,7 @@ export function RecipeFields({
             value={value.deliver}
             onChange={(e) => set({ deliver: e.target.value })}
           >
-            <option value="">대화 답</option>
+            <option value="">대표가 정함</option>
             {Object.entries(DELIVER_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}

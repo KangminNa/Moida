@@ -876,6 +876,7 @@ describe('작업 토큰', () => {
       'read_url',
       'report_round',
       'post_update',
+      'set_deliver',
       'propose_tool',
       'get_settings',
       'propose_setting',
@@ -898,6 +899,7 @@ describe('작업 토큰', () => {
       'request_approval',
       'save_session',
       'save_transcript',
+      'set_deliver',
     ]);
   });
 

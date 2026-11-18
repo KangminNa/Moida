@@ -74,6 +74,7 @@ export class ProposeSettingTool extends BaseTool {
       version: { type: 'integer', minimum: 0 },
       fields: { type: 'object' },
       note: { type: 'string', maxLength: 4000 },
+      continue: { type: 'boolean' },
     },
     required: ['request_id', 'setting', 'op', 'note'],
   };

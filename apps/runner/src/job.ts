@@ -67,12 +67,10 @@ export class SkillPackage {
 }
 
 // next_jobs가 빌려 준 일 하나. run_token은 AI CLI의 MCP 설정에만 쓴다.
-// 연결 확인(ai_test) · 웹 로그인(ai_signin) · 대화의 배정(chat_route) · 세션 노트(session_note)에는 에이전트도 run_token도 없다.
+// 연결 확인(ai_test) · 웹 로그인(ai_signin) · 세션 노트(session_note)에는 에이전트도 run_token도 없다.
 // 도구는 작업의 payload에 있고, MCP 없이 지시만 돌린다.
 export class Job {
   private static readonly AI_TEST = 'ai_test';
-  /** 대화의 배정 (2차 1-5): 서버가 채운 지시(지시문 틀 chat-route) 하나를 그대로 돌리고 답(JSON 한 줄)을 낸다 */
-  private static readonly ROUTE = 'chat_route';
   /** 세션 노트 (2차 4단계): NoteStage가 원문으로 채운 지시문 틀(session-note) 하나를 돌리고 답(JSON)을 vault에 보낸다 */
   private static readonly SESSION_NOTE = 'session_note';
   /** 웹 AI 로그인: 러너가 로그인 명령을 대신 돌린다 (SigninRun) */
@@ -88,7 +86,6 @@ export class Job {
   /** 러너가 이름으로 알아보는 종류. 서버의 작업 종류 목록(task-kinds.json)에 다 있어야 한다 (job.test) */
   static readonly KINDS: readonly string[] = [
     Job.AI_TEST,
-    Job.ROUTE,
     Job.SESSION_NOTE,
     Job.AI_SIGNIN,
     Job.TOOL_CHECK,
@@ -147,6 +144,8 @@ export class Job {
     readonly deliver: string | null = null,
     /** 결과를 앱 코드의 새 버전으로 내는 만들기 작업인가 (payload.appCode, 스토어 1-6). 받은 코드 위에 바뀐 파일만 낸다 */
     readonly appCode = false,
+    /** 공간의 대표의 일 (agent.lead, O-2): 지시문 틀의 lead 단락(나눠 맡기기 · 설정 제안 · 결과 중심)을 넣는다 */
+    readonly lead = false,
   ) {}
 
   static from(raw: Json): Job {
@@ -193,6 +192,7 @@ export class Job {
       JobLineage.from(raw.child('run')),
       raw.optionalText('deliver'),
       task.text('kind') === Job.MAKE && Boolean(task.child('payload').field('appCode')),
+      agent.flag('lead'),
     );
   }
 
@@ -253,6 +253,7 @@ export class Job {
       lineage,
       this.deliver,
       this.appCode,
+      this.lead,
     );
   }
 
@@ -315,7 +316,7 @@ export class Job {
     outputsDir: string | null = null,
     memoPath: string | null = null,
   ): string {
-    if (this.isAiTest || this.kind === Job.ROUTE) return this.instruction;
+    if (this.isAiTest) return this.instruction;
     if (this.writesNote) return this.brief ?? '';
     const parts = [
       this.lineage?.head(prompts) ?? '',
@@ -345,6 +346,14 @@ export class Job {
         prompts.fill('team', {
           members: this.team.map((m) => m.line(prompts)).join('\n'),
           rounds: this.roundsLeft,
+        }),
+      );
+    // 대표 (O-2 · O-3): 이 대화의 id(자동화 찾기)와 이미 정해진 받을 것
+    if (this.lead)
+      parts.push(
+        prompts.fill('lead', {
+          chat: this.chat?.chatId ?? null,
+          deliver: this.chat?.deliver ?? null,
         }),
       );
     if (this.skill && skillReady) parts.push(prompts.fill('skill', { name: this.skill }));

@@ -20,7 +20,7 @@ import { GetSettingsInput, ProposeSettingInput } from './setting-change.input';
 import { SettingChanges } from './setting-change.policy';
 
 // 설정 바꾸기 제안 (2026-11-15 C · D): 바뀐 점 · 굵은 줄 · 펼친 줄 · 입력 모양 · 결재 칸 · 승인 뒤 값 비교 ·
-// 대화 상대의 기본 동작. 등록부에는 가짜 읽기 · 적용을 단다. DB 없이 돈다.
+// 대화 상대(대표, O-2)의 기본 동작. 등록부에는 가짜 읽기 · 적용을 단다. DB 없이 돈다.
 
 const NOW = new Date('2026-11-15T00:00:00Z');
 const SPACE = '00000000-0000-7000-8000-00000000000a';
@@ -61,8 +61,9 @@ for (const shape of [AgentEdit.SETTING, ScheduleEdit.SETTING, GoalEdit.SETTING, 
 const propose = (raw: Record<string, unknown>) =>
   ProposeSettingInput.from({ request_id: REQUEST, note: '왜', ...raw }, kinds);
 
-function agent(reportsTo: string | null, actions: readonly string[] = []): Agent {
+function agent(reportsTo: string | null, actions: readonly string[] = [], lead = false): Agent {
   return Agent.restore({
+    lead,
     id: 'agent-1',
     space_id: 'space',
     version: 1,
@@ -405,11 +406,16 @@ describe('대화 상대의 기본 동작', () => {
   };
   const payload = { setting: 'agent', op: 'edit', body: {}, changes: [] };
 
-  test('관리자 바로 아래는 승인 동작에 넣지 않아도 올리고, 팀원은 넣어 준 경우만', () => {
-    const partner = agent(null);
+  test('대표(O-2)는 승인 동작에 넣지 않아도 올리고, 팀장 · 팀원은 넣어 준 경우만', () => {
+    const partner = agent(null, [], true);
     assert.equal(
       Approval.request(running(partner), partner, fields, NOW, null, payload).unsaved.status,
       'pending',
+    );
+    const head = agent(null);
+    assert.throws(
+      () => Approval.request(running(head), head, fields, NOW, null, payload),
+      Forbidden,
     );
     const member = agent(TARGET);
     assert.throws(
@@ -431,7 +437,7 @@ describe('대화 상대의 기본 동작', () => {
   });
 
   test('승인 이벤트에 바뀔 값이 실린다 (다른 모듈 · 패키지가 읽는다)', () => {
-    const partner = agent(null);
+    const partner = agent(null, [], true);
     const approval = Approval.request(running(partner), partner, fields, NOW, null, payload);
     const event = approval.pullEvents().at(-1);
     assert.deepEqual(event?.data.payload, payload);

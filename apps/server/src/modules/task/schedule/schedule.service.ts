@@ -14,7 +14,9 @@ import {
   type VersionInput,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
+import { AgentEdit } from '../agent/agent-edit';
 import type { AgentUsage } from '../agent/agent-usage';
+import { ApprovalRepository } from '../approval/approval.repository';
 import { Chat } from '../chat/chat';
 import { ChatRepository } from '../chat/chat.repository';
 import { ChatHistory } from '../chat/chat-history.policy';
@@ -32,7 +34,7 @@ import { ScheduleRepository } from './schedule.repository';
 import { ScheduleEdit } from './schedule-edit';
 
 // 스케줄(자동화 레시피) 쓰기: 주인이 만들고 · 고치고 · 지우고 · 지금 한 번 돌리고, 일꾼이 1분마다 때가 된 것을 돌린다.
-// 한 번 돌리기는 어디로에 따라 작업 하나(task) · 페이지 만들기 일 하나(page) · 담당의 대화 회차 하나(chat, 처음이면 대화를 연다).
+// 한 번 돌리기는 어디로에 따라 작업 하나(task) · 페이지 만들기 일 하나(page) · 대표의 대화 회차 하나(chat, 처음이면 대화를 연다, O-2).
 // 작업은 request_id(schedule:<스케줄>:<시각>)로, 회차는 그 요청(payload.chat.requestId)으로 한 번만 생긴다.
 // 지시와 지킬 것은 지시문 틀 recipe로 묶는다. 앞 레시피의 일이 끝나면 그 뒤의 레시피가 돈다 (follow, ScheduleFollowHandler).
 @Injectable()
@@ -100,6 +102,9 @@ export class ScheduleService extends EntityService<Schedule> {
       change.key,
       async (tx) => {
         const schedule = await new ScheduleEdit(tx, spaceId).apply(change, new Date());
+        // 대화에서 올라온 결재로 만든 대화 레시피는 그 대화에 묶는다 (O-3, change.key는 결재 id)
+        if (change.op === 'create')
+          schedule.bindChat((await new ApprovalRepository(tx).load(spaceId, change.key)).chatId);
         await new ScheduleRepository(tx).save(schedule);
       },
     );
@@ -203,8 +208,9 @@ export class ScheduleService extends EntityService<Schedule> {
   }
 
   /**
-   * 레시피 한 번: 어디로에 따라 작업 하나(task · page)나 담당의 대화 회차 하나(chat). 처음 도는 대화 레시피는 대화를 열고
-   * 기억한다 (그 대화의 받을 것이 레시피의 받을 것). 만든 작업, 같은 차례의 일이 이미 있으면 null
+   * 레시피 한 번: 어디로에 따라 작업 하나(task · page)나 대표의 대화 회차 하나(chat). 처음 도는 대화 레시피는 대화를 열고
+   * 기억한다. 받을 것은 회차마다 싣는다 (O-3 · O-4: 대표가 바꾸지 못하고, 레시피를 고쳐도 같은 대화에 이어 쌓인다).
+   * 만든 작업, 같은 차례의 일이 이미 있으면 null
    */
   private async start(
     tx: Sql,
@@ -223,12 +229,13 @@ export class ScheduleService extends EntityService<Schedule> {
       return (await tasks.insertOnce(task)) ? task : null;
     }
     const { spaceId, chatId } = schedule;
-    const agent = await new AgentRepository(tx).load(spaceId, schedule.agentId as string);
+    const lead = await new AgentEdit(tx, spaceId).lead(now);
     const chats = new ChatRepository(tx);
     const requestId = schedule.requestIdFor(slot);
     if (chatId === null) {
-      const chat = Chat.open(spaceId, requestId, instruction, now, { deliver: schedule.deliver });
-      const turn = chat.assign(agent, now);
+      // 받을 것은 대화가 아니라 회차마다 싣는다 (O-4): 레시피의 받을 것이 바뀌어도 같은 대화에 이어 쌓인다
+      const chat = Chat.open(spaceId, requestId, instruction, now);
+      const turn = chat.assign(lead, now, schedule.deliver);
       await chats.save(chat);
       schedule.openedChat(chat.id);
       await new ScheduleRepository(tx).save(schedule);
@@ -237,12 +244,18 @@ export class ScheduleService extends EntityService<Schedule> {
     const chat = await chats.lock(spaceId, chatId);
     const previous = await chats.previousTurns(chat, spaceId);
     if (ChatHistory.sentAs(previous.at(-1), requestId)) return null;
-    const turn = chat.send(agent, requestId, instruction, previous, now);
+    // 대화에 묶인 레시피(O-3)는 그 회차의 받을 것으로 레시피의 받을 것을 싣는다 (대표가 다른 값을 정하지 못한다)
+    const turn = chat.send(lead, requestId, instruction, previous, now, {
+      deliver: schedule.deliver,
+    });
     await chats.save(chat);
     return (await tasks.insertOnce(turn)) ? turn : null;
   }
 
-  /** 담당이 일을 받을 수 있는가 (멈춤 · 한도로 쉼이면 아니다). 담당이 없으면 늘 그렇다 (빌릴 때 자동 배정) */
+  /**
+   * 담당이 일을 받을 수 있는가 (멈춤 · 한도로 쉼이면 아니다). 담당이 없으면 늘 그렇다 (빌릴 때 자동 배정).
+   * 대화로 보내는 레시피는 대표가 맡는다 (O-2): 대표가 아직 없으면 처음 열 때 만든다
+   */
   private async ready(
     tx: Sql,
     schedule: Schedule,
@@ -250,9 +263,11 @@ export class ScheduleService extends EntityService<Schedule> {
     now: Date,
   ): Promise<boolean> {
     const { agentId, spaceId } = schedule;
-    if (agentId === null) return true;
+    const chat = schedule.destination === Schedule.CHAT;
+    if (agentId === null && !chat) return true;
     if (!usage.has(spaceId)) usage.set(spaceId, await new AgentRepository(tx).usage(spaceId, now));
-    return usage.get(spaceId)?.find((u) => u.agent.id === agentId)?.ready === true;
+    const who = usage.get(spaceId)?.find((u) => (chat ? u.agent.lead : u.agent.id === agentId));
+    return chat && !who ? true : who?.ready === true;
   }
 
   /** 앞 일이 아직 끝나지 않았는가: 이 레시피의 작업 · 가리키는 페이지를 고치는 일 · 대화의 마지막 회차 */

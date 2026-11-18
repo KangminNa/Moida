@@ -3,11 +3,12 @@ import { Actor, BaseQuery, ChangeStream, Database, Forbidden, RuleViolation } fr
 import { Approval } from '../approval/approval';
 import { JobChatView } from '../task/job.view';
 import { Task } from '../task/task';
-import { AgentUpdatesView, type ChatBoardRow, type ChatUpdateLine } from './chat.view';
+import type { ChatBoardRow, ChatUpdateLine } from './chat.view';
 import { ChatProject } from './chat-project.policy';
 import { ChatRequest } from './chat-request.policy';
 import type { AgentUpdatesInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
+import { AgentUpdatesView } from './chat-update.view';
 
 // 대화의 소식 읽기 (MCP agent_updates, 2차 1-1). 기기의 권한으로 범위를 정한다:
 //   delegate → 그 기기가 연 대화만, news(소식 기기, 훅 · 상태 줄) → 공간의 모든 대화 (읽기만)
@@ -67,7 +68,7 @@ export class ChatUpdateQuery extends BaseQuery {
     const sql = this.sql;
     // 첫 회차는 맡기 전에 글로 한 답(회차 작업이 없는 덧붙인 말)도 함께 받는다 (2차 1-5)
     const appended = await sql<ChatUpdateLine[]>`
-      SELECT u.*, NULL AS agent, NULL AS choice_list FROM task.chat_updates u
+      SELECT u.*, NULL AS agent FROM task.chat_updates u
       WHERE u.kind = ${ChatUpdates.APPENDED}
         AND (u.task_id = ${taskId} OR (u.task_id IS NULL AND u.chat_id = (
           SELECT (t.payload->'chat'->>'chatId')::uuid FROM task.tasks t WHERE t.id = ${taskId}
@@ -79,7 +80,7 @@ export class ChatUpdateQuery extends BaseQuery {
         UNION ALL
         SELECT t.id FROM task.tasks t JOIN tree ON t.parent_id = tree.id
       )
-      SELECT u.*, a.name AS agent, NULL AS choice_list FROM task.chat_updates u
+      SELECT u.*, a.name AS agent FROM task.chat_updates u
       LEFT JOIN task.agents a ON a.id = u.agent_id
       WHERE u.task_id IN (SELECT id FROM tree)
         AND u.kind = ANY(${ChatUpdates.POSTED as string[]}::text[])
@@ -110,11 +111,7 @@ export class ChatUpdateQuery extends BaseQuery {
   ): Promise<ChatUpdateLine[]> {
     const sql = this.sql;
     const rows = await sql<ChatUpdateLine[]>`
-      SELECT u.*, a.name AS agent,
-        (SELECT json_agg(json_build_object('id', x.id, 'name', x.name,
-            'role', split_part(x.role, E'\n', 1)) ORDER BY o.ord)
-          FROM unnest(u.choices) WITH ORDINALITY AS o(id, ord)
-          JOIN task.agents x ON x.id = o.id) AS choice_list
+      SELECT u.*, a.name AS agent
       FROM task.chat_updates u
       JOIN task.chats c ON c.id = u.chat_id
       LEFT JOIN task.agents a ON a.id = u.agent_id
@@ -131,7 +128,7 @@ export class ChatUpdateQuery extends BaseQuery {
 
   /**
    * 대화마다 상태와 지금 도는 작업 수 (마지막 회차 · 그 덧붙인 말의 답 아래 전부).
-   * 상태: 맡기 전이면 배정 일이 돌 때 routing, 아니면 asking (2차 1-5). 맡은 뒤에는 마지막 회차로:
+   * 상태: 맡기 전(O-2 전에 배정을 기다리던 대화, 다음 말에서 대표가 맡는다)이면 asking. 맡은 뒤에는 마지막 회차로:
    * 결재를 기다리면 waiting_approval, 끝나지 않았으면 working, 실패 · 취소면 failed, 아니면 done
    */
   private async board(
@@ -147,10 +144,7 @@ export class ChatUpdateQuery extends BaseQuery {
     return await sql<ChatBoardRow[]>`
       SELECT c.*, a.name AS partner,
         CASE
-          WHEN c.agent_id IS NULL THEN
-            CASE WHEN EXISTS (SELECT 1 FROM task.tasks r WHERE r.space_id = c.space_id
-              AND r.request_id LIKE ${ChatRequest.ROUTE_PREFIX} || c.id || ':%'
-              AND r.status = ANY(${[Task.QUEUED, Task.RUNNING]}::text[])) THEN 'routing' ELSE 'asking' END
+          WHEN c.agent_id IS NULL THEN 'asking'
           WHEN EXISTS (SELECT 1 FROM task.approvals card WHERE card.action = ${Approval.CARD}
             AND card.target_id = c.id AND card.status = ${Approval.PENDING}) THEN 'waiting_approval'
           WHEN last.status = ${Task.WAITING} AND last.wait_reason = ${Task.WAIT_APPROVAL} THEN 'waiting_approval'

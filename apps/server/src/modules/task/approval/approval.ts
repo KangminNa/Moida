@@ -38,8 +38,8 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   /** 설정 바꾸기 (2026-11-15 C · D): 바뀔 값은 payload에 (propose_setting이 미리 적용해 보고 올린다). 이름은 platform이 갖는다 */
   static readonly SETTING_CHANGE = SettingKinds.ACTION;
   /**
-   * 대화 상대(관리자 바로 아래)가 승인 동작에 넣지 않아도 올리는 동작 (2026-11-15 C): 설정 바꾸기 · 코드 작업 열기.
-   * 대화가 곧 설정 창구라서다. 모두 승인 뒤에만 실행되고, 팀원은 승인 동작에 넣어 준 경우만
+   * 대표(O-2, 대화 상대)가 승인 동작에 넣지 않아도 올리는 동작 (2026-11-15 C): 설정 바꾸기 · 코드 작업 열기.
+   * 대화가 곧 설정 창구라서다. 모두 승인 뒤에만 실행되고, 팀장 · 팀원은 승인 동작에 넣어 준 경우만
    */
   static readonly PARTNER_ACTIONS: readonly string[] = [Approval.SETTING_CHANGE, 'code.task.start'];
   /** 대화의 일이어도 카드에 싣지 않고 바로 알리는 동작: 사람이 해야 일이 이어진다 (한도 · 사이트 로그인) */
@@ -63,8 +63,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       throw new RuleViolation(
         '설정 바꾸기는 propose_setting으로 올려요 (바뀔 값을 서버가 미리 해 봐요)',
       );
-    if (!(agent.topLevel && Approval.PARTNER_ACTIONS.includes(action)))
-      agent.assertMayRequest(action);
+    if (!(agent.lead && Approval.PARTNER_ACTIONS.includes(action))) agent.assertMayRequest(action);
     const approval = Approval.pending(
       {
         ...fields,
@@ -206,6 +205,11 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     return this.row.task_id;
   }
 
+  /** 대화의 일에서 올라온 결재면 그 대화 (O-3: 대화에서 올린 자동화가 그 대화에 묶인다) */
+  get chatId(): string | null {
+    return this.row.chat_id;
+  }
+
   get targetId(): string {
     return this.row.target_id;
   }
@@ -260,6 +264,25 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   get approved(): boolean {
     return this.row.status === Approval.APPROVED;
+  }
+
+  /** 승인한 설정 바꾸기이고, 적용되면 대표가 이어서 하기로 한 것인가 (O-2, propose_setting의 continue) */
+  get continues(): boolean {
+    const payload = this.row.payload as { continue?: unknown } | null;
+    return (
+      this.approved && this.row.action === Approval.SETTING_CHANGE && payload?.continue === true
+    );
+  }
+
+  /** 설정 바꾸기 한 줄 (승인 뒤 이어서의 지시문 틀 setting-continue): 설정 · 동작 · 대상 이름 · 관리자에게 보인 까닭 */
+  get settingLine(): string {
+    const p = (this.row.payload ?? {}) as {
+      setting?: unknown;
+      op?: unknown;
+      target_name?: unknown;
+    };
+    const head = [p.setting, p.op, p.target_name].filter((v) => typeof v === 'string').join(' ');
+    return this.row.note ? `${head}: ${this.row.note}` : head;
   }
 
   /** 승인한 한도 올리기인가 (task 모듈 안의 일이라 이벤트를 기다리지 않고 같은 트랜잭션에서 한다) */

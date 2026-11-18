@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseTool } from '../../platform';
-import { type AgentUpdatesView, PostedUpdateView } from './chat.view';
-import { AgentUpdatesInput, PostUpdateInput } from './chat-update.input';
+import { CHAT_DELIVER } from '../task.tables';
+import { AgentUpdatesInput, PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
 import { ChatUpdateQuery } from './chat-update.query';
 import { ChatUpdateService } from './chat-update.service';
+import { type AgentUpdatesView, type DeliverSetView, PostedUpdateView } from './chat-update.view';
+import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화의 소식 MCP 도구 (2차 1-1, docs/API설계.md 4장). 글은 task.tools.ko.json에.
 
@@ -53,5 +55,29 @@ export class PostUpdateTool extends BaseTool {
 
   async handle(actor: Actor, raw: unknown): Promise<PostedUpdateView> {
     return new PostedUpdateView(await this.updates.post(actor, PostUpdateInput.from(raw)));
+  }
+}
+
+/** 이번 회차의 받을 것 (O-3): 대표가 첫 실행에서 정하면 서버가 결과 카드에서 본다 */
+@Injectable()
+export class SetDeliverTool extends BaseTool {
+  readonly name = 'set_deliver';
+  readonly scope = Actor.AGENT;
+  readonly readOnly = false;
+  override readonly idempotent = true;
+  readonly inputSchema = {
+    properties: {
+      deliver: { type: 'string', enum: [...CHAT_DELIVER] },
+      note: { type: 'string', maxLength: TurnDeliver.NOTE_MAX },
+    },
+    required: ['deliver'],
+  };
+
+  constructor(private readonly updates: ChatUpdateService) {
+    super();
+  }
+
+  handle(actor: Actor, raw: unknown): Promise<DeliverSetView> {
+    return this.updates.setDeliver(actor, SetDeliverInput.from(raw));
   }
 }

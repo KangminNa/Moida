@@ -91,11 +91,11 @@ export class TaskService extends BaseService {
    */
   async next(actor: Actor, req: NextJobsInput): Promise<readonly JobView[]> {
     actor.assertCan(Actor.RUN);
-    const [spaceId, runnerId] = TaskService.runnerAt(actor);
+    const [spaceId, runnerId, sandbox] = TaskService.runnerAt(actor);
     const deadline = Date.now() + req.waitSeconds * 1000;
     for (;;) {
       const runner = await this.transaction((tx) =>
-        new RunnerRepository(tx).seen(spaceId, runnerId, new Date(), actor.inSandbox()),
+        new RunnerRepository(tx).seen(spaceId, runnerId, new Date(), sandbox, req.browser),
       );
       const jobs = runner.accepting ? await this.lease(actor, runner, req) : [];
       const left = deadline - Date.now();
@@ -179,14 +179,12 @@ export class TaskService extends BaseService {
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, req.id);
       task.assertVersion(req.version);
-      // 잠그는 순서는 위 작업 → 아래 작업 → 결재
+      // 잠그는 순서는 위 작업 → 아래 작업 → 결재 (작업은 모두 먼저 잠갔다)
       const below = await tasks.lockOpenDescendants(task.id);
+      const approvals = new ApprovalRepository(tx);
       for (const one of [task, ...below]) {
         one.cancel(now);
         await tasks.save(one);
-      }
-      const approvals = new ApprovalRepository(tx);
-      for (const one of [task, ...below]) {
         const pending = await approvals.lockPending(one.id);
         if (!pending) continue;
         pending.cancel();
@@ -221,8 +219,9 @@ export class TaskService extends BaseService {
       const org = await new AgentRepository(tx).all(spaceId);
       const manager = org.find((a) => a.id === agentId);
       if (!manager) throw new Forbidden(Actor.AGENT);
+      const tainted = await tasks.privateTouched(spaceId, parent.id);
       const made = req.subtasks.map((s) =>
-        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now),
+        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now, tainted),
       );
       // 코드 하위 작업끼리(아직 안 끝난 형제 포함) 고칠 곳이 겹치면 PR이 부딪친다
       CodeScope.assertApart(
@@ -318,10 +317,11 @@ export class TaskService extends BaseService {
         if (jobs.length >= req.limit) break;
         const scope = task.codeScope;
         if (scope && held.some((h) => h.overlaps(scope))) continue;
-        // 담당을 정하지 않은 일은 그 일의 권한이 있는 에이전트 중 가장 먼저 만든, 일을 받을 수 있는 에이전트가 맡는다
+        // 담당을 정하지 않은 일은 그 일의 권한이 있는 에이전트 중 가장 먼저 만든, 일을 받을 수 있는 에이전트가 맡는다.
+        // 대표(O-2)는 대화만 맡는다: 담당 없는 일을 집어 가지 않는다
         const worker = task.agentId
           ? ready.find((a) => a.id === task.agentId)
-          : ready.find((a) => task.doableWith(a.scopes));
+          : ready.find((a) => !a.lead && task.doableWith(a.scopes));
         const agent = task.agentless ? null : worker;
         if (agent === undefined) continue;
         if (agent && !LeasePolicy.canStart(agent.tool, req.ownLogins, busy)) continue;
@@ -380,7 +380,7 @@ export class TaskService extends BaseService {
    * 작업에 적힌 판이 아니면 그사이 토큰을 바꾼 것이다: 옛 토큰의 결과를 새 토큰에 적지 않는다.
    */
   private async noteAiTest(tx: Sql, task: Task, now: Date): Promise<void> {
-    if (!task.isAiTest || !task.ended) return;
+    if (!task.is(Task.AI_TEST) || !task.ended) return;
     const logins = new AiLoginRepository(tx);
     const login = await logins.lockTool(task.spaceId, task.payloadTool ?? '');
     if (login === null || !task.tests(login.version)) return;
@@ -421,9 +421,9 @@ export class TaskService extends BaseService {
     return actor.spaceId;
   }
 
-  /** 러너의 공간과 기기 id (run 권한 기기만 닿는다) */
-  private static runnerAt(actor: Actor): readonly [string, string] {
+  /** 러너의 공간과 기기 id, 코드 러너 칸인지 (run 권한 기기만 닿는다) */
+  private static runnerAt(actor: Actor): readonly [string, string, boolean] {
     if (!actor.spaceId || !actor.id) throw new Forbidden(Actor.RUN);
-    return [actor.spaceId, actor.id];
+    return [actor.spaceId, actor.id, actor.inSandbox()];
   }
 }

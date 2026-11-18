@@ -24,7 +24,8 @@ import {
 } from './setting-change.view';
 
 // 설정 바꾸기 (2026-11-15 C · D)의 읽기: MCP get_settings와 제안의 지금 값.
-// 읽는 에이전트: 대화 상대(관리자 바로 아래)나 승인 동작에 task.setting.change를 넣어 준 에이전트, 바깥길(브라우저 · 커넥터)이 없는 것만.
+// 읽는 에이전트: 대표(O-2, 대화 상대)나 승인 동작에 task.setting.change를 넣어 준 에이전트, 바깥길(브라우저 · 커넥터)이 없는 것만.
+// 팀 목록(team)에 대표는 보이지 않는다 (대표는 관리자가 설정 › AI에서 바꾼다)
 // 확인을 거치면 SettingActor로 그 설정을 가진 모듈에 묻는다 (platform SettingKinds). 에이전트 · 스케줄의 읽기는 여기 있다
 @Injectable()
 export class SettingQuery extends BaseQuery {
@@ -48,10 +49,10 @@ export class SettingQuery extends BaseQuery {
     const me = await this.row(agents, { space_id: actor.spaceId, id: actor.agentId });
     if (!me) throw new Forbidden(Actor.AGENT);
     SettingChanges.assertInside(me.scopes, me.external_tools);
-    if (me.reports_to !== null && !me.approval_actions.includes(Approval.SETTING_CHANGE))
+    if (!me.lead && !me.approval_actions.includes(Approval.SETTING_CHANGE))
       throw new Forbidden(
         Approval.SETTING_CHANGE,
-        '설정은 대화 상대나 승인 동작에 설정 바꾸기를 넣어 준 에이전트만 봐요',
+        '설정은 대표나 승인 동작에 설정 바꾸기를 넣어 준 에이전트만 봐요',
       );
     return new SettingActor(actor.spaceId, actor.agentId);
   }
@@ -60,7 +61,11 @@ export class SettingQuery extends BaseQuery {
   async team(actor: Actor): Promise<TeamSettingsView> {
     const spaceId = SettingActor.spaceOf(actor);
     return new TeamSettingsView(
-      await this.rows(agents, { space_id: spaceId, deleted_at: null }, { order: ['id'] }),
+      await this.rows(
+        agents,
+        { space_id: spaceId, deleted_at: null, lead: false },
+        { order: ['id'] },
+      ),
     );
   }
 

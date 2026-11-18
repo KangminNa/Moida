@@ -10,7 +10,7 @@ import { ChatForm, type ChatMessageBody } from './ChatForm';
 import type { RefChoice } from './ChatRefs';
 
 // 새 대화 (2차 1-5, 처음 화면): 인사와 입력 하나. 상대 · 프로젝트 · 받을 것은 고르지 않는다:
-// 맞는 에이전트가 맡고(배정), 애매하면 대화에서 묻는다. 보내면 그 대화로 간다
+// 대표가 받아 팀에 나눠 맡긴다 (O-2). 보내면 그 대화로 간다
 export function ChatNewPanel() {
   const me = useMe();
   const action = useAction();
@@ -57,8 +57,8 @@ export function ChatNewPanel() {
         onSubmit={start}
       />
       <p className="note">
-        맞는 에이전트가 알아서 맡아요. 애매하면 대화로 물어봐요. + 단추나 @로 위키 · 파일 · 주소를
-        함께 넣어요
+        대표가 받아 팀에 나눠 맡기고 결과를 모아 답해요. + 단추나 @로 위키 · 파일 · 주소를 함께
+        넣어요
       </p>
     </section>
   );

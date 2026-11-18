@@ -4,10 +4,12 @@ import type {
   ChatRow,
   ChatUpdateRow,
   OutputRow,
+  ScheduleRow,
   TaskRow,
 } from '../task.tables';
 
 // 대화 묶음의 응답 모양. 웹이 `import type`으로 가져온다. view끼리는 서로 가져오지 못해서(경계 검사) 대화 · 소식을 한 파일에 둔다.
+// MCP agent_updates · post_update의 모양은 chat-update.view.ts (O-1에서 나눔: 화면이 쓰지 않는다).
 // REST(관리자만)는 camelCase, MCP 도구(agent_updates · post_update, docs/API설계.md 4장)는 snake_case.
 // 회차 하나 = 관리자의 메시지(작업의 지시)와 상대의 답(작업의 결과). 결과물 · 기다리는 결재는 그 회차의 작업과 하위 작업의 것.
 
@@ -31,11 +33,8 @@ export type ChatReviewVerdict = {
 };
 /** 회차(맨 위 작업 root)와 그 아래에서 기다리는 결재 */
 export type ChatApprovalRow = Pick<ApprovalRow, 'id'> & { root: string };
-/** 소식 한 줄과 남긴 에이전트의 이름, 질문이면 고를 에이전트들 (role은 맡는 일: 역할의 첫 줄) */
-export type ChatUpdateLine = ChatUpdateRow & {
-  agent: string | null;
-  choice_list: Pick<AgentRow, 'id' | 'name' | 'role'>[] | null;
-};
+/** 소식 한 줄과 남긴 에이전트의 이름 */
+export type ChatUpdateLine = ChatUpdateRow & { agent: string | null };
 /**
  * 상태판의 대화 한 줄: 상대 이름(맡기 전이면 null), 상태(SQL이 정한다: 맡기 전 routing · asking, 맡은 뒤 마지막 회차로
  * working · waiting_approval · done · failed), 지금 도는 작업 수 (마지막 회차와 그 덧붙인 말의 답 아래 전부)
@@ -57,6 +56,32 @@ function refsOf(raw: unknown) {
     url: typeof r.url === 'string' ? r.url : null,
     browser: r.browser === true,
   }));
+}
+
+/**
+ * 대화의 토큰 한 묶음 (O-1): 회차(배정은 null) · 일한 에이전트(에이전트 없는 일은 null)마다의 합.
+ * 수는 러너가 보고한 실행 기록의 tokens (입력 + 캐시 쓰기 + 출력, 설정 › AI 한도와 같은 수)
+ */
+export type ChatTokenRow = {
+  turn: number | null;
+  agent_id: string | null;
+  agent: string | null;
+  tokens: number | string;
+};
+
+/** 합계와 에이전트별 몫 (많은 순) */
+function tokensOf(rows: readonly ChatTokenRow[]) {
+  const agents = new Map<
+    string | null,
+    { agentId: string | null; name: string | null; tokens: number }
+  >();
+  for (const r of rows) {
+    const one = agents.get(r.agent_id) ?? { agentId: r.agent_id, name: r.agent, tokens: 0 };
+    one.tokens += Number(r.tokens);
+    agents.set(r.agent_id, one);
+  }
+  const list = [...agents.values()].sort((a, b) => b.tokens - a.tokens);
+  return { tokens: list.reduce((sum, a) => sum + a.tokens, 0), agents: list };
 }
 
 /** 대화 하나 (만들기 · 보내기의 응답, 목록 · 상세의 머리) */
@@ -94,7 +119,11 @@ export class ChatView {
 
 /** 대화 목록 (최근에 보낸 것부터): 맡은 에이전트의 이름과 상태 (routing · asking · working · waiting_approval · done · failed) */
 export class ChatListView {
-  constructor(private readonly rows: readonly ChatBoardRow[]) {}
+  constructor(
+    private readonly rows: readonly ChatBoardRow[],
+    /** 대화마다 쓴 토큰 (O-1). 없으면 0 */
+    private readonly tokens: ReadonlyMap<string, number> = new Map(),
+  ) {}
 
   toJSON() {
     return {
@@ -103,6 +132,7 @@ export class ChatListView {
         agentName: r.partner,
         state: r.state,
         active: Number(r.active),
+        tokens: this.tokens.get(r.id) ?? 0,
       })),
     };
   }
@@ -121,7 +151,15 @@ export class ChatTurnView {
     const result = (t.result ?? {}) as { text?: unknown; error?: unknown };
     const chat = (
       t.payload as {
-        chat?: { turn?: unknown; via?: unknown; fix?: unknown; fixBy?: unknown };
+        chat?: {
+          turn?: unknown;
+          via?: unknown;
+          fix?: unknown;
+          fixBy?: unknown;
+          note?: unknown;
+          deliver?: unknown;
+          deliverNote?: unknown;
+        };
       } | null
     )?.chat;
     return {
@@ -143,8 +181,13 @@ export class ChatTurnView {
       refs: refsOf((t.payload as { refs?: unknown } | null)?.refs),
       /** 서버가 다시 맡긴 회차 (메시지는 관리자의 글이 아니라 지시문 틀 result-check · result-fix) */
       fix: chat?.fix === true,
-      /** 다시 맡긴 까닭: review(검토 반영, 검증 고리 V), 받을 것이 빠져서면 null */
+      /** 다시 맡긴 까닭: review(검토 반영, 검증 고리 V) · setting(승인 뒤 이어서, O-2), 받을 것이 빠져서면 null */
       fixBy: typeof chat?.fixBy === 'string' ? chat.fixBy : null,
+      /** 서버가 연 회차의 화면용 한 줄 (O-3). 관리자의 말이거나 O-3 전 회차면 null */
+      note: typeof chat?.note === 'string' ? chat.note : null,
+      /** 이번 회차의 받을 것 (대표가 set_deliver로 정함 · 레시피, O-3)과 까닭. 정하지 않았으면 null (대화의 받을 것을 본다) */
+      deliver: typeof chat?.deliver === 'string' ? chat.deliver : null,
+      deliverNote: typeof chat?.deliverNote === 'string' ? chat.deliverNote : null,
       outputs: this.outputs
         .filter((o) => o.root === t.id)
         .map((o) => ({ id: o.id, name: o.name, kind: o.kind })),
@@ -255,9 +298,15 @@ export class ChatCardView {
   }
 }
 
+/** 이 대화에 회차를 쌓는 자동화 (O-3, 대화 레시피의 chat_id). 매일이면 시각 "HH:MM" (at_time) */
+export type ChatAutomationRow = Pick<
+  ScheduleRow,
+  'id' | 'title' | 'enabled' | 'trigger' | 'mode' | 'weekdays' | 'every_hours' | 'next_run_at'
+> & { at_time: string | null };
+
 /**
  * 대화 하나와 회차들 (오래된 것부터, 최근 ChatQuery.TURNS개), 상태 · 최근 소식(과정), 결과 카드 (2차 2단계),
- * 맡기 전이면 지금 질문 (2차 1-5)
+ * 이 대화의 자동화 (O-3)
  */
 export class ChatDetailView {
   constructor(
@@ -266,15 +315,16 @@ export class ChatDetailView {
     private readonly turns: readonly ChatTurnView[],
     private readonly board: Readonly<ChatBoardRow> | null,
     private readonly news: readonly ChatUpdateLine[],
-    private readonly question: Readonly<ChatUpdateLine> | null,
+    private readonly automations: readonly ChatAutomationRow[],
     private readonly card: ChatCardView | null,
     /** 이 대화에서 시작해 아직 끝나지 않은 작업 (오래된 것부터) */
     private readonly team: readonly ChatTeamRow[] = [],
+    /** 이 대화의 일이 쓴 토큰 (O-1) */
+    private readonly tokens: readonly ChatTokenRow[] = [],
   ) {}
 
   toJSON() {
     const p = this.partner;
-    const q = this.question;
     return {
       chat: new ChatView(this.chat).toJSON(),
       /** 맡은 에이전트 (맡기 전이면 null) */
@@ -290,7 +340,7 @@ export class ChatDetailView {
       /** routing · asking · working · waiting_approval · done · failed, 지금 도는 작업 수 */
       state: this.board?.state ?? 'done',
       active: Number(this.board?.active ?? 0),
-      /** 최근 소식 (오래된 것부터): 과정 · 맡기 전의 질문 · 답 · 맡음 */
+      /** 최근 소식 (오래된 것부터): 과정 · 덧붙인 말 · O-2 전 대화의 질문 · 맡음 (기록) */
       news: this.news.map((r) => ({
         n: Number(r.n),
         kind: r.kind,
@@ -299,10 +349,27 @@ export class ChatDetailView {
         taskId: r.task_id,
         createdAt: r.created_at.toISOString(),
       })),
-      /** 맡기 전의 지금 질문과 고를 에이전트 (choice로 답한다). 묻지 않았거나 맡았으면 null */
-      question: q ? { text: q.text, choices: q.choice_list ?? [] } : null,
+      /** 이 대화에 회차를 쌓는 자동화 (O-3): 매일 시각(atTime "HH:MM") · 요일(월 1 ~ 일 7) 또는 N시간마다 */
+      automations: this.automations.map((a) => ({
+        id: a.id,
+        title: a.title,
+        enabled: a.enabled,
+        trigger: a.trigger,
+        mode: a.mode,
+        atTime: a.at_time,
+        weekdays: a.weekdays,
+        everyHours: a.every_hours,
+        nextRunAt: a.next_run_at?.toISOString() ?? null,
+      })),
       /** 기다리는 결과 카드 (없으면 null) */
       card: this.card?.toJSON() ?? null,
+      /** 쓴 토큰 (O-1): 대화 전체 · 에이전트별, 회차마다 (배정은 대화 합계에만) */
+      usage: {
+        ...tokensOf(this.tokens),
+        turns: [...new Set(this.tokens.flatMap((r) => (r.turn === null ? [] : [r.turn])))]
+          .sort((a, b) => a - b)
+          .map((turn) => ({ turn, ...tokensOf(this.tokens.filter((r) => r.turn === turn)) })),
+      },
       /** 팀이 동시에 일하는 칸 (2026-11-15): 회차 · 덧붙인 말의 답 · 검토와 그 아래에서 끝나지 않은 작업. parentId로 맡긴 사슬 */
       team: this.team.map((t) => ({
         taskId: t.id,
@@ -316,72 +383,5 @@ export class ChatDetailView {
         lastEvent: t.last_event,
       })),
     };
-  }
-}
-
-// MCP agent_updates · post_update의 모양 (snake_case)
-
-export class ChatUpdateView {
-  constructor(private readonly row: Readonly<ChatUpdateLine>) {}
-
-  toJSON() {
-    const r = this.row;
-    return {
-      n: Number(r.n),
-      chat_id: r.chat_id,
-      kind: r.kind,
-      text: r.text,
-      agent: r.agent,
-      task_id: r.task_id,
-      /** question이면 고를 에이전트들 (ask_agent의 choice로 답한다). 아니면 null */
-      choices: r.choice_list,
-      created_at: r.created_at.toISOString(),
-    };
-  }
-}
-
-export class ChatBoardView {
-  constructor(private readonly row: Readonly<ChatBoardRow>) {}
-
-  toJSON() {
-    const r = this.row;
-    return {
-      chat_id: r.id,
-      title: r.title,
-      goal: r.goal,
-      project: r.project,
-      /** 맡은 에이전트 (맡기 전이면 null, state는 routing · asking) */
-      partner: r.partner,
-      state: r.state,
-      active: Number(r.active),
-      turns: r.turns,
-      updated_at: r.updated_at.toISOString(),
-    };
-  }
-}
-
-/** agent_updates의 답: 새 소식(n 오름차순), 다음에 보낼 커서, 대화마다의 상태판 */
-export class AgentUpdatesView {
-  constructor(
-    private readonly news: readonly ChatUpdateLine[],
-    private readonly cursor: number,
-    private readonly board: readonly ChatBoardRow[],
-  ) {}
-
-  toJSON() {
-    return {
-      news: this.news.map((r) => new ChatUpdateView(r).toJSON()),
-      cursor: this.cursor,
-      board: this.board.map((r) => new ChatBoardView(r).toJSON()),
-    };
-  }
-}
-
-/** post_update의 답 */
-export class PostedUpdateView {
-  constructor(private readonly n: number) {}
-
-  toJSON() {
-    return { n: this.n };
   }
 }

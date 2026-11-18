@@ -94,7 +94,7 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
   async turnState(chat: Chat): Promise<ChatTurnStateRow> {
     const turn = ChatRequest.turn(chat.id, chat.turns);
     const [row] = await this.sql<ChatTurnStateRow[]>`
-      SELECT root.status, root.instruction, root.result,
+      SELECT root.status, root.payload, root.instruction, root.result,
         review.status AS review_status, review.result AS review_result
       FROM (SELECT 1) one
       LEFT JOIN task.tasks root ON root.space_id = ${chat.spaceId} AND root.request_id = ${turn}
@@ -103,28 +103,13 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
     return (
       row ?? {
         status: null,
+        payload: null,
         instruction: null,
         result: null,
         review_status: null,
         review_result: null,
       }
     );
-  }
-
-  /** 맡기 전에 글로 한 답들 (오래된 것부터): 덧붙인 말 중 회차 작업이 없는 것 */
-  async answersBefore(chatId: string): Promise<string[]> {
-    const rows = await this.sql<{ text: string }[]>`
-      SELECT text FROM task.chat_updates
-      WHERE chat_id = ${chatId} AND kind = ${ChatUpdates.APPENDED} AND task_id IS NULL ORDER BY n`;
-    return rows.map((r) => r.text);
-  }
-
-  /** 마지막 질문이 고르라고 준 에이전트들. 질문이 없으면 빈 목록 */
-  async lastChoices(chatId: string): Promise<string[]> {
-    const [row] = await this.sql<{ choices: string[] | null }[]>`
-      SELECT choices FROM task.chat_updates
-      WHERE chat_id = ${chatId} AND kind = ${ChatUpdates.QUESTION} ORDER BY n DESC LIMIT 1`;
-    return row?.choices ?? [];
   }
 
   /** 쌓은 소식의 번호 (커서). 저장한 뒤에 읽는다 */
@@ -137,9 +122,10 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
   protected override async saveParts(chat: Chat): Promise<void> {
     const rows = chat.addedUpdates;
     if (rows.length === 0) return;
+    // choices(질문의 고를 에이전트)는 O-2 전 대화의 기록에만 있다: 새 줄에는 적지 않는다
     await this.insertRows(
       chatUpdates,
-      rows.map((r) => ({ ...r, choices: r.choices ? [...r.choices] : null })),
+      rows.map(({ choices: _none, ...row }) => row),
     );
     await ChangeSignal.send(this.sql, [new ChangeSignal(chat.spaceId, ChatUpdates.TOPIC, chat.id)]);
   }

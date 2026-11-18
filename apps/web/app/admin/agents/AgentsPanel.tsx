@@ -114,7 +114,8 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
         <div>
           <h1>팀</h1>
           <p>
-            일을 맡는 AI 에이전트. 역할 · 모델 · 권한 · 한도를 정하고, 대화에서 맡기면 동시에 일해요
+            일을 맡는 AI 에이전트. 역할 · 모델 · 권한 · 한도를 정해요. 대화는 대표가 받아 맨 위
+            팀장들에게 나눠 맡겨요 (대표는 설정 › AI)
           </p>
         </div>
         {list && list.length > 0 && open !== NEW && (

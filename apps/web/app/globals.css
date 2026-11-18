@@ -3256,6 +3256,15 @@ ul.picked > .chip {
   flex: none;
 }
 
+/* 대화가 쓴 토큰 (O-1): 목록 줄 끝과 대화 머리에 작게 */
+.chat-link small,
+.chat-tokens {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 새 대화: 가운데 인사와 큰 입력 칸 */
 .chat-home {
   display: flex;
@@ -3485,6 +3494,13 @@ ul.picked > .chip {
   font-size: 0.8125rem;
 }
 
+/* 결과물을 내는 회차의 긴 답 (O-3): 세 줄쯤 보이고 아래로 흐려진다. "펼치기"로 전부 */
+.answer-fold {
+  max-height: 5.4em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+
 /* 과정: 접어 둔다 (팀이 무엇을 하는지는 펼쳐야 보인다) */
 .chat-process {
   align-self: flex-start;
@@ -3526,56 +3542,6 @@ ul.picked > .chip {
 .chat-process > .note {
   display: inline-block;
   margin-bottom: 10px;
-}
-
-/* 맡기 전의 질문: 고를 것마다 이름과 맡는 일 */
-.chat-question {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chat-question > .text {
-  margin: 0;
-  font-size: 0.9375rem;
-}
-
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 520px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.choice {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  min-height: 56px;
-  padding: 10px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--bg);
-  color: var(--fg);
-  text-align: left;
-}
-
-.choice.first {
-  border-color: var(--accent);
-}
-
-.choice:hover {
-  background: var(--hover);
-}
-
-.choice small {
-  color: var(--muted);
-  font-size: 0.8125rem;
 }
 
 /* 결과 카드 (2차 2단계): 항목마다 고르는 칸, 검토 의견, 승인 · 수정 요청 · 반려 */

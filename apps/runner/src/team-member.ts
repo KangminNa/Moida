@@ -46,16 +46,23 @@ export class TeamMember {
     );
   }
 
-  /** 아래 팀 요약: 사람 수와 일의 종류마다 맡을 수 있는 사람 수. 사람이 없으면 null */
+  /**
+   * 아래 팀 전체의 요약: 사람 수, 일의 종류마다 · 켜진 커넥터마다 쓸 수 있는 사람 수 (O-2: 손자 팀까지, 이름 없이).
+   * 사람이 없으면 null
+   */
   private static teamLine(team: Json): string | null {
     const members = team.number('members');
     if (members === 0) return null;
-    const kinds = team.child('kinds');
-    const counts = kinds
-      .keys()
-      .map((kind) => `${kind} ${kinds.number(kind)}`)
-      .join(', ');
-    return counts ? `${members}명 (${counts})` : `${members}명`;
+    const countsOf = (field: Json) =>
+      field
+        .keys()
+        .map((key) => `${key} ${field.number(key)}`)
+        .join(', ');
+    const connectors = countsOf(team.child('connectors'));
+    const parts = [countsOf(team.child('kinds')), connectors ? `커넥터 ${connectors}` : '']
+      .filter(Boolean)
+      .join(' · ');
+    return parts ? `${members}명 (${parts})` : `${members}명`;
   }
 
   /** 지시문의 한 줄 (틀 member). 역할은 첫 줄만 */

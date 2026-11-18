@@ -34,10 +34,11 @@ export interface TeamStatRow {
   connectors: readonly string[];
 }
 
-/** 팀원 바로 아래 팀의 요약 (이름 없이): 사람 수, 맡길 수 있는 일마다 몇 명 */
+/** 팀원 아래 팀 전체의 요약 (이름 없이, O-2): 사람 수, 맡길 수 있는 일마다 · 켜진 커넥터마다 몇 명 */
 export interface SubTeamRow {
   members: number;
   kinds: Readonly<Record<string, number>>;
+  connectors: Readonly<Record<string, number>>;
 }
 
 /** next_jobs의 팀원 한 명: 이 에이전트가 일을 맡길 수 있는 바로 아래 팀원 (팀원 정보 D1, TeamRoster) */
@@ -190,9 +191,12 @@ export class JobView {
     private readonly row: Readonly<TaskRow>,
     private readonly skill: string | null,
     private readonly revisionNote: string | null,
-    /** bound: 정해진 러너에 묶였다 (Agent.bound) */
+    /** bound: 정해진 러너에 묶였다 (Agent.bound), lead: 공간의 대표 (Agent.lead, O-2) */
     private readonly agent: Readonly<
-      Pick<AgentRow, 'id' | 'name' | 'role' | 'tool' | 'model' | 'effort'> & { bound: boolean }
+      Pick<AgentRow, 'id' | 'name' | 'role' | 'tool' | 'model' | 'effort'> & {
+        bound: boolean;
+        lead: boolean;
+      }
     > | null,
     private readonly runToken: string | null,
     /** 회사 목표부터 이 작업의 목표까지 (제목) */
@@ -268,7 +272,8 @@ export class JobView {
       revision_note: this.revisionNote,
       // bound: 이 러너에 묶인 에이전트 (묶인 일은 그 러너만 빌린다). 러너는 이때만 나눈 폴더를 연다
       // model · effort: AI CLI에 넘길 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계).
-      // 대화가 정해 둔 것(payload.runtime, 2026-11-15 B)이 있으면 그 회차에는 그것을 쓴다 (팀원의 일에는 없다)
+      // 대화가 정해 둔 것(payload.runtime, 2026-11-15 B)이 있으면 그 회차에는 그것을 쓴다 (팀원의 일에는 없다).
+      // lead: 대표의 일 (O-2). 러너가 지시문 틀의 lead 단락을 넣는다 (나눠 맡기기 · 설정 제안 · 결과 중심)
       agent:
         a === null
           ? null
@@ -280,6 +285,7 @@ export class JobView {
               model: runtimeOf(r)?.model || a.model,
               effort: runtimeOf(r)?.effort || a.effort,
               bound: a.bound,
+              lead: a.lead,
             },
       run_token: this.runToken,
       goal_chain: this.goalChain.map((title) => ({ title })),

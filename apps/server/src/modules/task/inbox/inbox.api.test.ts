@@ -58,7 +58,7 @@ describe('inbox', () => {
     assert.equal((await inbox(plain)).ok, false);
   });
 
-  test('기다리는 결재(대화의 결재는 빼고)와 맡을 에이전트를 묻는 질문의 수 · 최근 것 · 콘솔 주소', async () => {
+  test('기다리는 결재(대화의 결재는 빼고)의 수 · 최근 것 · 콘솔 주소. 질문은 늘 비어 있다 (O-2, 상대는 늘 대표)', async () => {
     const spaceId = String(
       (await db.sql<{ id: string }[]>`SELECT id FROM account.spaces LIMIT 1`)[0]?.id,
     );
@@ -79,18 +79,17 @@ describe('inbox', () => {
 
     const got = await inbox(reader);
     assert.equal(got.approvals.count, before.approvals.count + 1, '대화의 결재는 세지 않는다');
-    assert.equal(got.questions.count, before.questions.count + 1);
-    assert.equal(got.total, got.approvals.count + got.questions.count);
+    assert.deepEqual(
+      got.questions,
+      { count: 0, items: [] },
+      '맡기 전 대화의 옛 질문도 세지 않는다',
+    );
+    assert.equal(got.total, got.approvals.count);
     const approval = (got.approvals.items as Json[]).find((a) => a.id === approvalId);
     assert.deepEqual(
       [approval?.title, approval?.link],
       ['공개해도 될까요', `/admin/approvals/${approvalId}`],
     );
     assert.ok(!(got.approvals.items as Json[]).some((a) => a.id === inChat));
-    const question = (got.questions.items as Json[]).find((q) => q.chat_id === chatId);
-    assert.deepEqual(
-      [question?.question, question?.link],
-      ['어느 에이전트에게 맡길까요?', `/admin/chats/${chatId}`],
-    );
   });
 });

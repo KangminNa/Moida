@@ -314,15 +314,15 @@ export function bytes(n: number): string {
 
 /** 대화의 상태 (상태판의 state: 마지막 회차로 정한다) */
 export const CHAT_STATE: Record<string, string> = {
-  routing: '맡길 곳 찾는 중',
-  asking: '질문',
+  // 맡기 전 (O-2 전에 배정을 기다리던 대화): 다음 말을 보내면 대표가 맡는다
+  asking: '맡기 전',
   working: '일하는 중',
   waiting_approval: '승인',
   done: '끝남',
   failed: '실패',
 };
 
-/** 나에게 온 것: 목록에서 채운 표시로 (질문 · 승인). 나머지는 테두리 */
+/** 나에게 온 것: 목록에서 채운 표시로 (맡기 전 · 승인). 나머지는 테두리 */
 export const CHAT_NEEDS_ME: readonly string[] = ['asking', 'waiting_approval'];
 
 /** 대화의 소식 종류 (task.chat_updates.kind) */
@@ -355,10 +355,14 @@ export const TRIGGER_LABELS: Record<string, string> = {
   after: '다른 레시피가 끝난 뒤',
 };
 
-/** 대화의 받을 것 (chats.deliver). 비우면 대화 답 */
+/** 받을 것 (대화 · 회차 · 레시피, O-3). 비우면 대표가 회차마다 정한다 */
 export const DELIVER_LABELS: Record<string, string> = {
-  html: 'HTML 페이지',
+  answer: '짧은 답',
+  file: '파일',
+  html: '페이지 (HTML)',
+  app_code: '앱 코드',
   blog: '블로그 글',
   browser: '브라우저 동작',
   code: '코드 (PR)',
+  setting: '설정 · 자동화',
 };

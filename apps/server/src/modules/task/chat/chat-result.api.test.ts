@@ -7,6 +7,7 @@ import { Database, OutboxWorker } from '../../platform';
 // 결과 결재 (2차 2단계): 대화 한 회차의 결재는 결과 카드 하나로. 도중 결재는 따로 정하지 못하고 카드에 실린다.
 // 승인은 고른 것만 남기고(고른 결재는 승인, 고르지 않은 결재는 반려, 고르지 않은 결과물은 휴지통), 수정 요청은 다음 회차,
 // 반려는 결과물을 휴지통으로. 받을 것이 없으면 두 번까지 다시 맡기고, 검토자 짝이 있으면 카드 전에 검토한다. 멈추기는 모두 취소.
+// 상대는 늘 대표 (O-2): 결재는 대표가 맡긴 팀장이 올리고, 검토자 짝은 대표에게 붙였다가 테스트 끝에 뗀다.
 
 // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 시험 (모양은 assert가 본다)
 type Json = Record<string, any>;
@@ -46,16 +47,21 @@ const agent = async (name: string, more: Json = {}) =>
     }),
     201,
   );
-const open = async (agentId: string, message: string, more: Json = {}) =>
+const open = async (message: string, more: Json = {}) =>
   ok(
-    await api.request('POST', '/api/chats', owner, {
-      requestId: randomUUID(),
-      agentId,
-      message,
-      ...more,
-    }),
+    await api.request('POST', '/api/chats', owner, { requestId: randomUUID(), message, ...more }),
     201,
   );
+/** 공간의 대표 (O-2). before에서 첫 대화를 열어 만들어 둔다 */
+const lead = async (): Promise<Json> => ok(await api.get('/api/agents/lead', owner)).lead;
+/** 대표의 검토자 짝 (null이면 뗀다) */
+const pair = async (reviewerId: string | null) => {
+  const boss = await lead();
+  return api.request('PATCH', `/api/agents/${boss.id}`, owner, {
+    reviewerId,
+    version: boss.version,
+  });
+};
 const detail = async (id: string) => ok(await api.get(`/api/chats/${id}`, owner));
 const decide = (card: Json, decision: string, more: Json = {}) =>
   api.request('POST', `/api/approvals/${card.id}/decide`, owner, {
@@ -73,6 +79,17 @@ async function jobs(): Promise<Json[]> {
 async function turnJob(chatId: string): Promise<Json> {
   const job = (await jobs()).find((j) => j.task.payload.chat?.chatId === chatId);
   assert.ok(job, '대화의 일이 빌려지지 않았다');
+  return job;
+}
+
+/** 대표의 회차가 팀장(member)에게 맡긴 일을 빌린다: 결재는 팀이 올린다 (대표는 승인 동작이 없다) */
+async function teamJob(chatId: string, member: Json, title = '팀의 일'): Promise<Json> {
+  const turn = await turnJob(chatId);
+  await tool(turn.run_token, 'delegate_task', {
+    subtasks: [{ request_id: randomUUID(), to_agent_id: member.id, title, instruction: title }],
+  });
+  const job = (await jobs()).find((j) => j.task.title === title);
+  assert.ok(job, '팀장의 일이 빌려지지 않았다');
   return job;
 }
 
@@ -111,6 +128,7 @@ before(async () => {
       version: device.version,
     }),
   );
+  await open('대표를 만드는 첫 대화');
 });
 // 이 파일이 만든 결과물(시험의 해시)과 다른 도구 에이전트는 치운다: 같은 공간을 쓰는 뒤 파일(결과물 목록 · 사용량)이 보지 않게
 after(async () => {
@@ -129,8 +147,7 @@ beforeEach(async () => {
 
 describe('결과 카드', () => {
   test('회차가 끝나면 결과물이 카드 하나에 실리고, 승인하면 고른 것만 남는다. 방문자는 정하지 못한다', async () => {
-    const partner = await agent('카드 대표');
-    const chat = await open(partner.id, '자료 두 개 만들어 줘');
+    const chat = await open('자료 두 개 만들어 줘');
     const job = await turnJob(chat.id);
     const keep = await made(job, '남길 것.html');
     const drop = await made(job, '버릴 것.html');
@@ -175,9 +192,9 @@ describe('결과 카드', () => {
   });
 
   test('대화의 일에서 올린 결재는 따로 정하지 못하고 카드에 실린다. 고르지 않은 결재는 반려된다', async () => {
-    const partner = await agent('결재 대표', { approvalActions: ['qa.post.send'] });
-    const chat = await open(partner.id, '보내 줘');
-    const job = await turnJob(chat.id);
+    const sender = await agent('결재 팀장', { approvalActions: ['qa.post.send'] });
+    const chat = await open('보내 줘');
+    const job = await teamJob(chat.id, sender);
     const output = await made(job, '보낼 글.html');
     const asked = await tool(job.run_token, 'request_approval', {
       request_id: randomUUID(),
@@ -218,8 +235,7 @@ describe('결과 카드', () => {
   });
 
   test('수정 요청은 메모를 다음 회차로 보내고 결과물은 남긴다. 반려는 결과물을 휴지통으로', async () => {
-    const partner = await agent('수정 대표');
-    const chat = await open(partner.id, '초안 써 줘');
+    const chat = await open('초안 써 줘');
     const job = await turnJob(chat.id);
     const draft = await made(job, '초안.html');
     await done(job);
@@ -246,19 +262,17 @@ describe('결과 카드', () => {
   });
 
   test('받을 것이 없으면 두 번까지 다시 맡기고, 그다음은 떨어진 채로 끝난다. 있으면 검사를 통과한 카드', async () => {
-    const partner = await agent('검사 대표');
     assert.equal(
       (
         await api.request('POST', '/api/chats', owner, {
           requestId: randomUUID(),
-          agentId: partner.id,
           message: 'x',
           deliver: 'pdf',
         })
       ).status,
       422,
     );
-    const chat = await open(partner.id, '발표 자료 만들어 줘', { deliver: 'html' });
+    const chat = await open('발표 자료 만들어 줘', { deliver: 'html' });
     for (const turn of [1, 2, 3]) {
       await done(await turnJob(chat.id), `${turn}번째 답`);
       await drain();
@@ -272,7 +286,7 @@ describe('결과 카드', () => {
     assert.equal(room.chat.turns, 3, '두 번 다시 맡긴 뒤에는 멈춘다');
     assert.equal(room.card, null, '실을 것이 없으면 카드도 없다');
 
-    const next = await open(partner.id, '페이지 만들어 줘', { deliver: 'html' });
+    const next = await open('페이지 만들어 줘', { deliver: 'html' });
     const job = await turnJob(next.id);
     await made(job, 'index.html');
     await done(job);
@@ -287,17 +301,15 @@ describe('결과 카드', () => {
   });
 
   test('검토자 짝: 다른 도구의 에이전트만. 회차가 끝나면 검토가 먼저 돌고, 그 의견이 카드에 실린다', async () => {
-    const lead = await agent('검토받는 대표');
+    const boss = await lead();
     const same = await agent('같은 도구');
     const other = await agent('다른 도구', { tool: 'codex' });
-    const pair = (reviewerId: string | null, version: number) =>
-      api.request('PATCH', `/api/agents/${lead.id}`, owner, { reviewerId, version });
-    assert.equal((await pair(same.id, lead.version)).status, 422);
-    assert.equal((await pair(lead.id, lead.version)).status, 422);
-    const paired = ok(await pair(other.id, lead.version));
+    assert.equal((await pair(same.id)).status, 422);
+    assert.equal((await pair(boss.id)).status, 422);
+    const paired = ok(await pair(other.id));
     assert.equal(paired.reviewerId, other.id);
 
-    const chat = await open(lead.id, '보고서 써 줘');
+    const chat = await open('보고서 써 줘');
     const job = await turnJob(chat.id);
     await made(job, '보고서.html');
     await done(job, '보고서를 썼어요');
@@ -316,17 +328,12 @@ describe('결과 카드', () => {
       'JSON 판정이 아닌 옛 답은 글 그대로',
     );
     assert.ok(room.news.some((n: Json) => n.kind === 'review'));
+    ok(await pair(null));
   });
 
   test('검증 고리: 검토가 고칠 것을 남기면 한 번 다시 맡기고, 다시 검토한 뒤 카드. 고친 결과물만 싣는다', async () => {
-    const lead = await agent('고리 대표');
     const other = await agent('다른 도구', { tool: 'codex' });
-    ok(
-      await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
-        reviewerId: other.id,
-        version: lead.version,
-      }),
-    );
+    ok(await pair(other.id));
     const judged = (verdict: string) =>
       JSON.stringify({
         verdict,
@@ -343,7 +350,7 @@ describe('결과 카드', () => {
         (j) => j.task.payload.chat?.chatId === chat.id && j.task.payload.chat?.review === true,
       ) as Json;
 
-    const chat = await open(lead.id, '보고서 써 줘');
+    const chat = await open('보고서 써 줘');
     const first = await turnJob(chat.id);
     const old = await made(first, '보고서.html');
     await done(first, '보고서를 썼어요');
@@ -406,19 +413,15 @@ describe('결과 카드', () => {
     );
     const [gone] = await db.sql`SELECT deleted_at FROM task.outputs WHERE id = ${old}`;
     assert.ok(gone?.deleted_at, '앞 결과물은 휴지통으로');
+    ok(await pair(null));
   });
 
   test('검증 고리: 결재만 기다리는 회차도 카드 전에 검토한다 (고칠 것이 나와도 다시 맡기지 않고 카드에)', async () => {
-    const lead = await agent('결재 고리', { approvalActions: ['qa.post.send'] });
+    const sender = await agent('결재 고리', { approvalActions: ['qa.post.send'] });
     const other = await agent('다른 도구', { tool: 'codex' });
-    ok(
-      await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
-        reviewerId: other.id,
-        version: lead.version,
-      }),
-    );
-    const chat = await open(lead.id, '보내 줘');
-    const job = await turnJob(chat.id);
+    ok(await pair(other.id));
+    const chat = await open('보내 줘');
+    const job = await teamJob(chat.id, sender);
     await tool(job.run_token, 'request_approval', {
       request_id: randomUUID(),
       action: 'qa.post.send',
@@ -448,12 +451,13 @@ describe('결과 카드', () => {
       [room.card.review.verdict, room.card.fixed, room.card.items.length],
       ['fix', { deliver: 0, review: 0 }, 1],
     );
+    ok(await pair(null));
   });
 
   test('멈추기: 도는 일 · 기다리는 결재 · 카드를 모두 취소한다. 낡은 판은 409', async () => {
-    const partner = await agent('멈출 대표', { approvalActions: ['qa.post.send'] });
-    const chat = await open(partner.id, '길게 일해 줘');
-    const job = await turnJob(chat.id);
+    const sender = await agent('멈출 팀장', { approvalActions: ['qa.post.send'] });
+    const chat = await open('길게 일해 줘');
+    const job = await teamJob(chat.id, sender);
     const asked = await tool(job.run_token, 'request_approval', {
       request_id: randomUUID(),
       action: 'qa.post.send',

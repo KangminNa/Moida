@@ -52,6 +52,8 @@ export class ProposeSettingInput extends BaseRequest {
     /** 바꿀 칸 (get_settings와 같은 이름, 보낸 칸만) */
     readonly fields: Readonly<Record<string, unknown>>,
     readonly note: string | null,
+    /** 승인되어 적용되면 대표가 그 대화에서 이어서 한다 (O-2, 대표의 제안만: SettingChangeService.payloadOf) */
+    readonly continues: boolean,
   ) {
     super();
   }
@@ -83,6 +85,7 @@ export class ProposeSettingInput extends BaseRequest {
         shape?.versioned && !creating ? f.integer('version', 0, VERSION_MAX) : 0,
         fieldsOf(f, body.fields, shape?.fields ?? null, op),
         f.optionalText('note', 4000),
+        body.continue === undefined || body.continue === null ? false : f.boolean('continue'),
       );
     });
   }

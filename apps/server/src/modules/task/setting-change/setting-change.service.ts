@@ -73,7 +73,8 @@ export class SettingChangeService extends BaseService {
         req.approvalFields(spaceId),
         at,
         await tasks.chatOf(taskId),
-        change.payload(),
+        // 이어서 하기(O-2)는 대표의 제안만: 팀장 · 팀원이 보내면 무시한다
+        { ...change.payload(), ...(req.continues && proposer.lead ? { continue: true } : {}) },
       );
       await tasks.save(task);
       await approvals.save(approval);

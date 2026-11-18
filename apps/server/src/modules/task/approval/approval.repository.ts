@@ -30,12 +30,34 @@ export class ApprovalRepository extends TableRepository<ApprovalRow, Approval> {
     return this.findOne({ task_id: taskId, status: Approval.PENDING }, { lock: true });
   }
 
+  /** 작업이 올려 승인받은 설정 바꾸기 중 이어서 하기로 한 마지막 것 (O-2, 승인 뒤 이어서). 없으면 null */
+  async continuedBy(taskId: string): Promise<Approval | null> {
+    const approved = await this.find(
+      { task_id: taskId, action: Approval.SETTING_CHANGE, status: Approval.APPROVED },
+      { order: ['id desc'] },
+    );
+    return approved.find((a) => a.continues) ?? null;
+  }
+
   /** 대화의 기다리는 결과 카드 (대화마다 하나) */
   lockOpenCard(chatId: string): Promise<Approval | null> {
     return this.findOne(
       { action: Approval.CARD, target_id: chatId, status: Approval.PENDING },
       { lock: true },
     );
+  }
+
+  /**
+   * 이 회차가 실린 결과 카드를 관리자가 이미 정했는가 (O-3). 정한 뒤 회차가 끝나도(카드에서 승인한 결재를 기다리던 회차)
+   * 실을 것이 0이라 받을 것이 빠져 보이므로 다시 맡기지 않는다
+   */
+  async cardDecided(chatId: string, turn: number): Promise<boolean> {
+    const [row] = await this.sql`
+      SELECT 1 FROM task.approvals
+      WHERE action = ${Approval.CARD} AND target_id = ${chatId} AND target_version = ${turn}
+        AND status <> ${Approval.PENDING}
+      LIMIT 1`;
+    return row !== undefined;
   }
 
   /** 대화의 일에서 올라와 아직 카드에 실리지 않은 결재 (기다리는 것만, id 순서로 잠근다) */

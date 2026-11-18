@@ -6,6 +6,7 @@ import { Database, OutboxWorker } from '../../platform';
 
 // 설정 바꾸기 제안 (2026-11-15 C · D): get_settings → propose_setting(미리 해 보기 + 결재 task.setting.change) → 승인 → 적용.
 // 러너는 MCP로, 관리자는 REST로 들어오고 승인 뒤 적용은 outbox와 일꾼을 실제로 거친다. AI는 띄우지 않는다.
+// 제안하는 쪽은 대표(O-2)이거나 승인 동작에 설정 바꾸기를 넣어 준 에이전트. 대표의 continue는 적용 뒤 같은 대화의 회차를 연다.
 
 // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 시험 (모양은 assert가 본다)
 type Json = Record<string, any>;
@@ -75,12 +76,16 @@ async function drain(): Promise<void> {
   for (let i = 0; i < 200 && (await worker.tick()) > 0; i++);
 }
 
-/** 대화 상대(관리자 바로 아래) 하나와 그 팀원 하나. 대화 상대의 일을 러너가 빌린 토큰 */
+/** 공간의 대표 (O-2). before에서 첫 대화를 열어 만들어 둔다 */
+const lead = async (): Promise<Json> => ok(await api.get('/api/agents/lead', owner)).lead;
+
+/** 대표와 팀장 아래 팀원 하나. 대표의 일을 러너가 빌린 토큰 */
 async function partner() {
-  const lead = await agent();
-  const member = await agent({ reportsTo: lead.id, model: 'sonnet' });
-  const job = await take(lead.id);
-  return { lead, member, job, token: String(job.run_token) };
+  const boss = await lead();
+  const head = await agent();
+  const member = await agent({ reportsTo: head.id, model: 'sonnet' });
+  const job = await take(boss.id);
+  return { lead: boss, head, member, job, token: String(job.run_token) };
 }
 
 async function decide(approvalId: unknown, decision = 'approve') {
@@ -108,24 +113,49 @@ before(async () => {
       version: device.version,
     }),
   );
+  ok(
+    await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      message: '대표를 만드는 첫 대화',
+    }),
+    201,
+  );
+  await db.sql`
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
+    WHERE status IN ('queued', 'running', 'waiting')`;
 });
 
 after(async () => {
   await db.sql`
     UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
-  await db.sql`UPDATE task.agents SET status = 'paused'`;
+  await db.sql`UPDATE task.agents SET status = 'paused' WHERE NOT lead`; // 대표(O-2)는 뒤 파일의 대화가 쓴다
   await drain();
   await api.close();
 });
 
 describe('설정 바꾸기: 읽기와 제안', () => {
-  test('대화 상대는 팀을 읽고, 바꿀 값을 제안하면 결재가 바뀔 칸과 함께 올라온다. 승인 전에는 바뀌지 않는다', async () => {
-    const { member, job, token } = await partner();
+  test('대표는 팀을 읽고, 바꿀 값을 제안하면 결재가 바뀔 칸과 함께 올라온다. 승인 전에는 바뀌지 않는다', async () => {
+    const { lead: boss, member, job, token } = await partner();
     const team = await call(token, 'get_settings', { kind: 'team' });
     const seen = (team.agents as Json[]).find((a) => a.id === member.id) as Json;
     assert.equal(seen.model, 'sonnet');
     assert.equal(seen.reports_to !== null, true);
+    assert.ok(!(team.agents as Json[]).some((a) => a.id === boss.id), '팀 목록에 대표는 없다');
+    const self = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'agent',
+      op: 'edit',
+      target_id: boss.id,
+      version: boss.version,
+      fields: { model: 'opus' },
+      note: '나를 바꾸기',
+    });
+    assert.deepEqual(
+      [self.ok, self.body.code],
+      [false, 'rule_violation'],
+      '대표는 관리자가 바꾼다',
+    );
     const proposed = await call(token, 'propose_setting', {
       request_id: randomUUID(),
       setting: 'agent',
@@ -587,17 +617,21 @@ describe('설정 바꾸기: 플러그인 설정 (D)', () => {
 });
 
 describe('설정 바꾸기: 막는 것', () => {
-  test('팀원은 승인 동작에 넣어 주지 않으면 읽지도 제안하지도 못한다', async () => {
-    const lead = await agent();
-    const member = await agent({ reportsTo: lead.id });
-    const job = await take(member.id);
-    const res = await tool(String(job.run_token), 'get_settings', { kind: 'team' });
-    assert.equal(res.ok, false);
-    assert.equal(res.body.code, 'forbidden');
+  test('팀장 · 팀원은 승인 동작에 넣어 주지 않으면 읽지도 제안하지도 못한다 (기본으로는 대표만, O-2)', async () => {
+    const head = await agent();
+    const member = await agent({ reportsTo: head.id });
+    for (const who of [head, member]) {
+      const job = await take(who.id);
+      const res = await tool(String(job.run_token), 'get_settings', { kind: 'team' });
+      assert.deepEqual([res.ok, res.body.code], [false, 'forbidden']);
+    }
+    const allowed = await agent({ approvalActions: ['task.setting.change'] });
+    const job = await take(allowed.id);
+    assert.equal((await tool(String(job.run_token), 'get_settings', { kind: 'team' })).ok, true);
   });
 
-  test('브라우저 에이전트는 대화 상대여도 읽지 못한다', async () => {
-    const browser = await agent({ scopes: ['browse'] });
+  test('브라우저 에이전트는 승인 동작에 넣어 줘도 읽지 못한다', async () => {
+    const browser = await agent({ scopes: ['browse'], approvalActions: ['task.setting.change'] });
     const job = await take(browser.id);
     const res = await tool(String(job.run_token), 'get_settings', { kind: 'schedules' });
     assert.equal(res.body.code, 'forbidden');
@@ -621,5 +655,100 @@ describe('설정 바꾸기: 막는 것', () => {
       arguments: { kind: 'team' },
     });
     assert.equal(visitor.status, 401);
+  });
+});
+
+describe('승인 뒤 이어서 (O-2): 대표의 propose_setting continue', () => {
+  /** 대화를 열고 대표의 회차를 러너가 빌린다 */
+  async function chatTurn(message: string): Promise<{ chat: Json; job: Json }> {
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, { requestId: randomUUID(), message }),
+      201,
+    );
+    for (let i = 0; i < 50; i++) {
+      const { jobs } = (await call(runner, 'next_jobs', { limit: 5 })) as { jobs: Json[] };
+      const job = jobs.find((j) => j.task.payload?.chat?.chatId === chat.id);
+      if (job) return { chat, job };
+      if (jobs.length === 0) break;
+    }
+    throw new Error('대화의 회차를 빌리지 못했어요');
+  }
+  const room = async (chatId: unknown) => ok(await api.get(`/api/chats/${chatId}`, owner));
+  const proposeModel = (token: string, member: Json, more: Json = {}) =>
+    call(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'agent',
+      op: 'edit',
+      target_id: member.id,
+      version: member.version,
+      fields: { model: 'opus' },
+      note: '조사에 더 강한 모델이 필요해요',
+      ...more,
+    });
+  /** 결과 카드에서 그 결재를 골라 승인한다 */
+  async function approveInCard(chatId: unknown, approvalId: unknown): Promise<void> {
+    await drain();
+    const { card } = await room(chatId);
+    assert.ok(card, '설정 바꾸기가 결과 카드에 실린다');
+    ok(
+      await api.request('POST', `/api/approvals/${card.id}/decide`, owner, {
+        version: card.version,
+        decision: 'approve',
+        picked: [approvalId],
+      }),
+    );
+    await drain();
+  }
+
+  test('적용되면 같은 대화에 회차가 하나 열린다 (승인 뒤 이어서, 결재마다 한 번)', async () => {
+    const member = await agent({ model: 'sonnet' });
+    const { chat, job } = await chatTurn('조사 팀을 강하게 해서 시장 조사해 줘');
+    const proposed = await proposeModel(String(job.run_token), member, { continue: true });
+    const [row] = await db.sql`
+      SELECT payload->>'continue' AS go FROM task.approvals WHERE id = ${proposed.approval_id}`;
+    assert.equal(row?.go, 'true');
+    await approveInCard(chat.id, proposed.approval_id);
+    assert.equal((await current(member.id)).model, 'opus');
+    const after = await room(chat.id);
+    assert.deepEqual(
+      after.turns.map((t: Json) => [t.turn, t.status, t.fix, t.fixBy]),
+      [
+        [1, 'done', false, null],
+        [2, 'queued', true, 'setting'],
+      ],
+    );
+    assert.match(after.turns[1].message, /승인한 설정이 적용됐어요/);
+    assert.match(after.turns[1].message, /agent edit/);
+    await drain();
+    assert.equal((await room(chat.id)).chat.turns, 2, '두 번 열지 않는다');
+  });
+
+  test('적용이 실패하면 열지 않는다. 대표가 아닌 에이전트의 continue는 읽지 않는다', async () => {
+    const member = await agent({ model: 'sonnet' });
+    const { chat, job } = await chatTurn('모델을 바꿔서 다시 해 줘');
+    const proposed = await proposeModel(String(job.run_token), member, { continue: true });
+    // 승인 전에 관리자가 바꾸면 적용은 낡은 버전이라 실패한다
+    ok(
+      await api.request('PATCH', `/api/agents/${member.id}`, owner, {
+        version: member.version,
+        role: '바뀐 역할',
+      }),
+    );
+    await approveInCard(chat.id, proposed.approval_id);
+    const after = await room(chat.id);
+    assert.deepEqual(
+      [after.chat.turns, after.turns[0].status],
+      [1, 'failed'],
+      '실패한 회차 뒤에는 이어서 하지 않는다',
+    );
+
+    const helper = await agent({ approvalActions: ['task.setting.change'] });
+    const other = await take(helper.id);
+    const theirs = await proposeModel(String(other.run_token), await current(member.id), {
+      continue: true,
+    });
+    const [row] = await db.sql`
+      SELECT payload ? 'continue' AS has FROM task.approvals WHERE id = ${theirs.approval_id}`;
+    assert.equal(row?.has, false);
   });
 });

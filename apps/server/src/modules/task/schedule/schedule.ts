@@ -189,13 +189,9 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('time_zone', timeZone);
     this.put('instruction', instruction);
     this.put('goal_id', goalId);
-    // 대화의 상대 · 받을 것은 대화를 열 때 정해진다: 바뀌면 다음 차례에 새 대화를 연다
-    const before = this.row;
-    const reopen =
-      before.agent_id !== agentId ||
-      before.deliver !== recipe.deliver ||
-      recipe.destination !== Schedule.CHAT;
-    if (reopen) this.put('chat_id', null);
+    // 회차를 쌓는 대화는 대화로 보내는 동안 그대로 둔다 (O-4: 상대는 늘 대표, 받을 것은 회차마다 싣는다).
+    // 대화가 아닌 곳으로 보내게 바뀌면 놓는다 (다시 대화로 보내면 다음 차례에 새 대화를 연다)
+    if (recipe.destination !== Schedule.CHAT) this.put('chat_id', null);
     this.put('page_id', pageId);
     this.put('destination', recipe.destination);
     this.put('deliver', recipe.deliver);
@@ -225,8 +221,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
       throw new RuleViolation(`어디로는 ${SCHEDULE_DESTINATION.join(' · ')} 중 하나예요`);
     if ((destination === Schedule.PAGE) !== (pageId !== null))
       throw new RuleViolation('페이지로 보내면 페이지를 골라요 (다른 곳이면 비워요)');
-    if (destination === Schedule.CHAT && (agentId === null || instruction.trim() === ''))
-      throw new RuleViolation('대화로 보내면 담당과 지시가 있어야 해요');
+    // 대화로 보내는 레시피는 대표가 맡는다 (O-2): 담당은 비운다
+    if (destination === Schedule.CHAT && agentId !== null)
+      throw new RuleViolation('대화로 보내는 스케줄은 대표가 맡아요 (담당을 비워요)');
+    if (destination === Schedule.CHAT && instruction.trim() === '')
+      throw new RuleViolation('대화로 보내면 지시가 있어야 해요');
     if (deliver !== null && destination !== Schedule.CHAT)
       throw new RuleViolation('받을 것은 대화로 보낼 때만 정해요');
     const checked = ChatResult.deliverOf(deliver);
@@ -285,6 +284,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   /** 대화로 보내는 레시피가 처음 연 대화를 기억한다 (다음 차례부터 그 대화의 회차) */
   openedChat(chatId: string): void {
     this.put('chat_id', chatId);
+  }
+
+  /** 대화에서 승인한 대화 레시피는 그 대화에 회차를 쌓는다 (O-3, 대화로 자동화). 다른 곳으로 보내는 레시피는 그대로 */
+  bindChat(chatId: string | null): void {
+    if (chatId !== null && this.row.destination === Schedule.CHAT) this.openedChat(chatId);
   }
 
   /** 주인이 누른 "지금 한 번". 하루 한도에 함께 센다. 닿았으면 RuleViolation */

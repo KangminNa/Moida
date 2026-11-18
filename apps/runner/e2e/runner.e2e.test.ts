@@ -675,6 +675,99 @@ describe('러너가 일을 처리한다', () => {
     assert.ok(String(prompt).includes('남은 위임 횟수: 2'));
   });
 
+  test('대화는 대표가 맡고(O-2), 대표의 지시문에는 lead 단락과 맨 위 팀장 목록이 들어간다', async () => {
+    const head = await newAgent({ name: '대표 아래 팀장' });
+    const spy = new Spy();
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        // 표시는 둘째 줄에: 첫 줄은 회차 작업의 제목(60자로 자름)이 되어 가짜 CLI가 잘린 표시를 읽는다
+        message: `이번 주 글감을 정리해 줘\n${spy.mark}`,
+      }),
+      201,
+    );
+    const { lead } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
+    assert.equal(chat.agentId, lead.id);
+    const { prompt } = await spy.seen();
+    assert.ok(String(prompt).includes('# 대표로 일하는 법'));
+    assert.ok(String(prompt).includes('continue: true'));
+    assert.ok(String(prompt).includes(`대표 아래 팀장 (agent_id: ${head.id})`));
+    await until('대표의 회차가 끝남', async () => {
+      const room = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { turns: Json[] };
+      return room.turns[0]?.status === 'done' ? room : null;
+    });
+  });
+
+  /** 일꾼(outbox)의 일을 다 한다: 결과 카드 · 다시 맡기기 · 설정 적용 (e2e는 일꾼을 따로 돌리지 않는다) */
+  const settle = async (): Promise<void> => {
+    while ((await api.service(OutboxWorker).tick()) > 0);
+  };
+
+  test('대표가 set_deliver로 받을 것을 정하고, 결과에 없으면 서버가 같은 대화에 다시 맡긴다 (O-3)', async () => {
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '보고서를 파일로 줘\n[fake:deliver=file]',
+      }),
+      201,
+    );
+    const room = await until('다시 맡긴 회차', async () => {
+      await settle();
+      const now = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { turns: Json[] };
+      return now.turns.length >= 2 ? now : null;
+    });
+    const [first, again] = room.turns as Json[];
+    assert.deepEqual([first?.deliver, first?.deliverNote], ['file', '테스트용 CLI가 정함']);
+    assert.deepEqual(
+      [again?.fix, again?.note, again?.deliver],
+      [true, '받을 것(파일)이 없어 다시 맡김', 'file'],
+    );
+    // 뒤 테스트에 일이 남지 않게 멈춘다
+    const now = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { chat: Json };
+    const stopped = await api.request('POST', `/api/chats/${chat.id}/stop`, owner, {
+      version: now.chat.version,
+    });
+    assert.ok([200, 204].includes(stopped.status), stopped.text);
+  });
+
+  test('대표가 대화에서 자동화를 제안하고, 승인하면 그 대화에 묶인다 (O-3 대화로 자동화)', async () => {
+    const title = `아침 정리 ${randomUUID().slice(0, 6)}`;
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: `매일 아침 소식 정리해 줘\n[fake:automate=${title}]`,
+      }),
+      201,
+    );
+    const card = await until('자동화 제안이 결과 카드에', async () => {
+      await settle();
+      const now = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { card: Json | null };
+      return (now.card?.items as Json[] | undefined)?.length ? now.card : null;
+    });
+    assert.deepEqual([card.deliver, card.passed], ['setting', true]);
+    const decided = await api.request('POST', `/api/approvals/${card.id}/decide`, owner, {
+      version: card.version,
+      decision: 'approve',
+    });
+    assert.ok([200, 204].includes(decided.status), decided.text);
+    const room = await until('대화에 묶인 자동화', async () => {
+      await settle();
+      const now = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { automations: Json[] };
+      return now.automations.length > 0 ? now : null;
+    });
+    assert.deepEqual(
+      room.automations.map((a: Json) => [a.title, a.mode, a.atTime, a.enabled]),
+      [[title, 'daily', '08:00', true]],
+    );
+    const { schedules } = ok(await api.get('/api/schedules', owner)) as { schedules: Json[] };
+    // 뒤 테스트에 돌지 않게 지운다
+    const made = schedules.find((s) => s.title === title) as Json;
+    const removed = await api.request('POST', `/api/schedules/${made.id}/delete`, owner, {
+      version: made.version,
+    });
+    assert.equal(removed.status, 204, removed.text);
+  });
+
   test('에이전트가 멈추면 AI CLI를 끄고 일을 돌려준다', async () => {
     const agent = await newAgent();
     const spy = new Spy();

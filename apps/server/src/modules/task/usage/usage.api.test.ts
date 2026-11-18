@@ -120,7 +120,7 @@ beforeEach(async () => {
   await db.sql`
     UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
-  await db.sql`UPDATE task.agents SET status = 'paused' WHERE status = 'active'`;
+  await db.sql`UPDATE task.agents SET status = 'paused' WHERE status = 'active' AND NOT lead`;
   await db.sql`DELETE FROM task.plan_usage`;
 });
 

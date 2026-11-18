@@ -1,11 +1,11 @@
 // 대화의 일을 찾는 request_id (작업 쪽에 대화를 가리키는 칸을 두지 않아서 이름으로 찾는다. 목표 실행과 같다):
-//   회차 chat:<대화>:<회차>, 그 덧붙인 말의 답 …:reply:<n>, 검토 …:review, 배정 chat-route:<대화>:<id> (2차 1-5).
-// 배정 일은 chat: 로 시작하지 않는다: 대화의 일 · 결과 카드 · 소식 규칙(chat:<대화>:%)에 섞이지 않게
+//   회차 chat:<대화>:<회차>, 그 덧붙인 말의 답 …:reply:<n>, 검토 …:review.
+// O-2 전의 배정 일은 chat-route:<대화>:<id>였다 (대화의 토큰 합계에만 남는다). chat: 로 시작하지 않아 대화의 일 규칙에 섞이지 않는다
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 이름 규칙 한 곳. Chat · Repository · Query가 함께 쓴다
 export class ChatRequest {
   /** 회차 작업의 맨 앞 (SQL이 대화 id · 회차를 이어 붙인다) */
   static readonly TURN_PREFIX = 'chat:';
-  /** 배정 일의 맨 앞 (SQL이 대화 id를 이어 붙인다) */
+  /** O-2 전 배정 일의 맨 앞 (대화의 토큰 합계에만, SQL이 대화 id를 이어 붙인다) */
   static readonly ROUTE_PREFIX = 'chat-route:';
 
   /** 회차 작업 */
@@ -25,14 +25,8 @@ export class ChatRequest {
     return ids;
   }
 
-  /** 이 대화의 배정 일들의 앞부분 */
+  /** 이 대화의 O-2 전 배정 일들의 앞부분 (토큰 합계) */
   static route(chatId: string): string {
     return `${ChatRequest.ROUTE_PREFIX}${chatId}:`;
-  }
-
-  /** 배정 일이 고르는 대화 (request_id chat-route:<대화>:<id>). 배정 일이 아니면 null */
-  static routedChat(requestId: string | null): string | null {
-    if (!requestId?.startsWith(ChatRequest.ROUTE_PREFIX)) return null;
-    return requestId.slice(ChatRequest.ROUTE_PREFIX.length).split(':')[0] || null;
   }
 }

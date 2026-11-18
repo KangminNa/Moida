@@ -40,6 +40,7 @@ export const agents = taskSchema.table('agents', {
   model: text('model').notNull(),
   effort: text('effort').$type<AgentEffort>().notNull(),
   external_tools: text('external_tools').array().notNull(),
+  lead: boolean('lead').notNull(),
 });
 
 /** task.ai_logins */
@@ -226,6 +227,7 @@ export const runners = taskSchema.table('runners', {
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   sandbox: boolean('sandbox').notNull(),
+  browser: boolean('browser').notNull(),
 });
 
 /** task.schedules */

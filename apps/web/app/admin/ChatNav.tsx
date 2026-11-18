@@ -1,15 +1,15 @@
 'use client';
 
-import { CHAT_NEEDS_ME, CHAT_STATE } from '../_task/labels';
+import { CHAT_NEEDS_ME, CHAT_STATE, tokens } from '../_task/labels';
 import { useChats } from '../_task/live';
 import type { ChatSummary } from '../_task/types';
 import { CHATS_HREF } from './menu';
 
 /** 목록에 표시를 다는 상태 (끝난 대화는 표시 없이) */
-const MARKED = ['routing', 'asking', 'working', 'waiting_approval', 'failed'];
+const MARKED = ['asking', 'working', 'waiting_approval', 'failed'];
 
 // 대화 옆 칸의 목록 (2차 1-5, ChatGPT · Claude 같은 모양): 날짜별 대화. 위의 새 대화 · 접기 단추는 콘솔 틀이 그린다.
-// 나에게 온 것(질문 · 승인)은 채운 표시, 일하는 중 · 실패는 테두리 표시. 누가 맡았는지는 대화 안에서만 보인다
+// 나에게 온 것(승인 · O-2 전에 맡기 전으로 남은 대화)은 채운 표시, 일하는 중 · 실패는 테두리 표시. 누가 맡았는지는 대화 안에서만 보인다
 export function ChatNav({ pathname }: { pathname: string | null }) {
   const list = useChats();
   const chats = list.data?.chats ?? null;
@@ -35,6 +35,7 @@ export function ChatNav({ pathname }: { pathname: string | null }) {
                   title={c.title}
                 >
                   <span className="clamp-1">{c.title}</span>
+                  {c.tokens > 0 && <small title="이 대화가 쓴 토큰">{tokens(c.tokens)}</small>}
                   {MARKED.includes(c.state) && (
                     <span className={CHAT_NEEDS_ME.includes(c.state) ? 'pill on' : 'pill'}>
                       {CHAT_STATE[c.state] ?? c.state}
