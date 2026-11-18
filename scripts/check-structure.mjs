@@ -157,12 +157,32 @@ function checkReserved() {
       );
 }
 
+/**
+ * next.config의 WEB_ROUTES(화면 머리글을 붙이는 웹의 최상위 경로, 스토어 1-6)가 웹의 최상위 경로를 모두 담는가.
+ * 빠지면 그 화면에 frame-ancestors 'none' · X-Frame-Options가 붙지 않는다 (앱 화면으로 여겨진다). /pages는 따로 적는다
+ */
+function checkWebRoutes() {
+  const file = join(root, 'apps/web/next.config.ts');
+  const block = /const WEB_ROUTES = \[([^\]]*)\]/.exec(readFileSync(file, 'utf8'))?.[1];
+  if (!block) {
+    problems.push(`${at(file)} WEB_ROUTES를 찾지 못했어요`);
+    return;
+  }
+  const listed = new Set([...block.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  for (const name of topRoutes())
+    if (name !== 'pages' && !listed.has(name))
+      problems.push(
+        `웹의 최상위 경로 /${name}이(가) ${at(file)}의 WEB_ROUTES에 없어요: 화면 머리글이 붙지 않는다`,
+      );
+}
+
 const files = walk(modulesDir).filter((f) => f.endsWith('.ts'));
 checkNames(files);
 checkTests(files);
 checkMenu();
 checkWebTypes();
 checkReserved();
+checkWebRoutes();
 
 if (problems.length > 0) {
   console.error(`구조 검사 위반 ${problems.length}건\n`);

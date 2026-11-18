@@ -9,23 +9,25 @@ import type { AdminApp } from '../../../_blog/types';
 import { api } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
 import { STORE_HREF } from '../../menu';
+import { AppCodeTab } from './AppCodeTab';
 import { AppMenus } from './AppMenus';
 import { AppOverview } from './AppOverview';
 import { AppPosts } from './AppPosts';
 import { AppSettings } from './AppSettings';
 
-export type AppTab = 'overview' | 'menus' | 'posts' | 'settings';
+export type AppTab = 'overview' | 'menus' | 'posts' | 'code' | 'settings';
 
 const TAB_NAMES: Record<AppTab, string> = {
   overview: '개요',
   menus: '메뉴',
   posts: '글',
+  code: '코드',
   settings: '설정',
 };
 
 const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어요';
 
-// 앱 관리 (스토어 1-5): 머리(아이콘 · 이름 · 종류 · 주소 · 공개 전환)와 탭(개요 · 메뉴 · 글 · 설정).
+// 앱 관리 (스토어 1-5): 머리(아이콘 · 이름 · 종류 · 주소 · 공개 전환)와 탭(개요 · 메뉴 · 글 · 코드 · 설정, 코드는 스토어 1-6).
 // 공개는 관리자만 이 전환 하나로 한다 (AI · 대화는 공개를 제안하지 못한다). 운영 팀 탭은 2단계.
 export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
   const apps = useApps();
@@ -112,6 +114,7 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
           <AppMenus app={app} />
         ))}
       {tab === 'posts' && <AppPosts app={app} />}
+      {tab === 'code' && <AppCodeTab app={app} />}
       {tab === 'settings' && <AppSettings app={app} onChanged={apps.reload} />}
     </>
   );

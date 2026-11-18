@@ -10,6 +10,7 @@
 //   6. AI가 읽는 글은 코드에 두지 않는다 (2차 1-0): MCP 도구(*.tool.ts)의 설명 · 칸 설명은 <모듈>.tools.ko.json에
 //   7. 지시문의 글도 코드에 두지 않는다 (2차 1-0): 러너와 task 모듈의 코드에 마크다운 제목('# …')으로 시작하는 글자를 쓰지 않는다.
 //      글은 러너 스킬 cairn-runner의 틀(skills/cairn-runner/references/prompts.md)에
+//   8. 웹이 들인 라이브러리는 정해 둔 한 파일에서만 가져온다 (객체설계 10장 "고치는 범위"): mustache → _blog/app-screen.ts
 //
 // 예외 목록(scripts/ratchet.json)은 줄어들기만 한다: 새 항목을 더하지 않고, 고친 파일은 목록에서 지운다.
 // 목록의 why에는 아직 남은 화면마다 까닭을 적어 둔다 (검사는 보지 않는다).
@@ -154,6 +155,16 @@ for (const [file, allowed] of Object.entries(ratchet.longFiles)) {
     );
 }
 if (update) ratchet.longFiles = Object.fromEntries(Object.entries(longFiles).sort());
+
+// --- 한 파일에서만 쓰는 웹 라이브러리 ---
+// 들일 때 정한 자리 밖에서 가져오면 빼거나 바꿀 때 고칠 곳이 늘어난다 (docs/스토어.md 9.10)
+const ONE_PLACE = { mustache: 'apps/web/app/_blog/app-screen.ts' };
+for (const file of webFiles) {
+  const text = readFileSync(file, 'utf8');
+  for (const [, , , from] of text.matchAll(IMPORT))
+    if (from in ONE_PLACE && at(file) !== ONE_PLACE[from])
+      problems.push(`${at(file)}: ${from}은(는) ${ONE_PLACE[from]}에서만 가져와요`);
+}
 
 // --- 패턴 목록의 본보기 ---
 const doc = readFileSync(patternDoc, 'utf8');

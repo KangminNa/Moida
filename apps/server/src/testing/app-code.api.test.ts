@@ -268,6 +268,49 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
     assert.equal((await screen(String(app.slug), '', { ticket: 'x' })).status, 404);
   });
 
+  test('비공개 앱 미리 보기의 글 사진은 토큰으로 연다: 그 앱의 공개 · 링크 공개 글의 사진만', async () => {
+    const app = await newApp(`code-photo-${mark}`);
+    const shown = await publicPost(app.id, `사진 글 ${mark}`);
+    const draft = ok(
+      await api.request('POST', '/api/posts', owner, {
+        requestId: randomUUID(),
+        title: `초안 ${mark}`,
+        appId: app.id,
+      }),
+      201,
+    );
+    const photo = async (postId: unknown) => {
+      const png = Buffer.concat([
+        Buffer.from('89504e470d0a1a0a', 'hex'),
+        Buffer.from(randomUUID()),
+      ]);
+      const res = await fetch(`${api.baseUrl}/api/posts/${postId}/assets`, {
+        method: 'POST',
+        headers: { 'content-type': 'image/png', cookie: owner.header ?? '' },
+        body: png,
+      });
+      assert.equal(res.status, 201);
+      return String(((await res.json()) as Json).url);
+    };
+    const [inShown, inDraft] = [await photo(shown.id), await photo(draft.id)];
+    const token = async (id: unknown) =>
+      String(ok(await api.request('POST', `/api/apps/${id}/code/preview`, owner, {})).url).split(
+        '~',
+      )[1];
+    const ticket = await token(app.id);
+
+    assert.equal((await api.get(inShown)).status, 404);
+    const seen = await api.get(`${inShown}?ticket=${ticket}`);
+    assert.equal(seen.status, 200, seen.text);
+    assert.equal(seen.header('cache-control'), 'no-store');
+    assert.equal((await api.get(`${inShown}?ticket=~${ticket}`)).status, 200);
+    // 초안의 사진 · 다른 앱의 토큰 · 틀린 토큰은 없는 파일과 같다
+    assert.equal((await api.get(`${inDraft}?ticket=${ticket}`)).status, 404);
+    const other = await token((await newApp(`code-photo2-${mark}`)).id);
+    assert.equal((await api.get(`${inShown}?ticket=${other}`)).status, 404);
+    assert.equal((await api.get(`${inShown}?ticket=x`)).status, 404);
+  });
+
   test('다른 공개 앱에 든 글은 그 앱의 주소로 보낸다', async () => {
     const a = await publish(await newApp(`code-d-${mark}`));
     const b = await publish(await newApp(`code-e-${mark}`));

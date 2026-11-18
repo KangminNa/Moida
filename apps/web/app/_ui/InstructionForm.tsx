@@ -2,8 +2,8 @@
 
 import { type FormEvent, useId, useRef, useState } from 'react';
 
-// 페이지를 만들어 달라 · 고쳐 달라는 입력. 칸만 들고, 보내기는 패널이 한다.
-export function PageAskForm({
+// AI에게 맡기는 지시 입력 (페이지 만들기 · 고치기, 앱 코드 고치기). 칸만 들고, 보내기는 패널이 한다.
+export function InstructionForm({
   label,
   placeholder,
   submit,

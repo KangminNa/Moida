@@ -11,7 +11,7 @@ import { when } from '../../../_task/labels';
 import { usePageTasks } from '../../../_task/live';
 import { TaskPill } from '../../../_task/parts';
 import type { Task } from '../../../_task/types';
-import { PageAskForm } from './PageAskForm';
+import { InstructionForm } from '../../../_ui/InstructionForm';
 import { PageChangesPanel } from './PageChangesPanel';
 import { PageEditForm } from './PageEditForm';
 
@@ -167,7 +167,7 @@ export function PageDetailPanel({ id }: { id: string }) {
           sandbox={FRAME_SANDBOX}
         />
         <div className="stack">
-          <PageAskForm
+          <InstructionForm
             label="고칠 내용"
             placeholder="예: 둘째 날은 실내 코스로 바꿔 줘"
             submit="저장"

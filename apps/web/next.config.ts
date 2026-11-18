@@ -57,6 +57,24 @@ const PAGE_FRAME_HEADERS = new Set([
 ]);
 const pageHeaders = securityHeaders.filter((h) => !PAGE_FRAME_HEADERS.has(h.key));
 
+// 웹이 그리는 화면의 최상위 경로 (서버로 넘기는 경로 포함). 화면 머리글은 이 경로와 첫 화면(/)에만 붙인다.
+// 그 밖의 /<이름>/…은 앱 화면(스토어 1-6)이라 route handler가 앱마다 격리 머리글을 붙인다: 화면의 frame-ancestors 'none' ·
+// X-Frame-Options가 함께 붙으면 콘솔의 미리 보기가 막히고 CSP 둘이 겹친다. 구조 검사가 app/ 폴더 · App.RESERVED와 맞춰 본다
+const WEB_ROUTES = [
+  'admin',
+  'api',
+  'connect',
+  'graph',
+  'install',
+  'login',
+  'm',
+  'mcp',
+  'oauth',
+  'posts',
+];
+/** 웹이 내는 파일 (route handler · Next가 만드는 것) */
+const WEB_FILES = ['rss.xml', 'sw.js', 'manifest.webmanifest', 'favicon.ico'];
+
 const config: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
@@ -66,9 +84,19 @@ const config: NextConfig = {
     return localHostRedirect();
   },
   async headers() {
+    const routes = WEB_ROUTES.join('|');
     return [
+      { source: '/', headers: securityHeaders },
+      { source: `/:route(${routes})`, headers: securityHeaders },
+      { source: `/:route(${routes})/:rest*`, headers: securityHeaders },
+      {
+        source: `/:file(${WEB_FILES.map((f) => f.replace('.', '\\.')).join('|')})`,
+        headers: securityHeaders,
+      },
+      { source: '/_next/:rest*', headers: securityHeaders },
+      { source: '/.well-known/:rest*', headers: securityHeaders },
       // 공개 페이지 목록(/pages)은 화면이라 화면의 머리글을 받는다
-      { source: '/((?!pages/).*)', headers: securityHeaders },
+      { source: '/pages', headers: securityHeaders },
       { source: '/pages/:path+', headers: pageHeaders },
     ];
   },

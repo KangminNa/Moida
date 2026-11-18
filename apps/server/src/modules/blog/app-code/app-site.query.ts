@@ -59,7 +59,7 @@ export class AppSiteQuery extends BaseQuery {
     const found = await this.visible(actor, req.slug, req.ticket, now);
     if (found instanceof AppScreenRedirectView) {
       const rest = req.path.map(encodeURIComponent).join('/');
-      return new AppScreenRedirectView(`${found.url}${rest}`);
+      return new AppScreenRedirectView(rest === '' ? found.url : `${found.url}/${rest}`);
     }
     const { app, ticket } = found;
     const base = ticket === null ? `/${app.slug}` : `/${app.slug}/${AppTicket.MARK}${req.ticket}`;
@@ -100,7 +100,7 @@ export class AppSiteQuery extends BaseQuery {
     );
   }
 
-  /** 볼 수 있는 앱과 토큰. 관리자가 토큰 없이 연 비공개 앱은 토큰 주소(끝에 /)로 보낸다 */
+  /** 볼 수 있는 앱과 토큰. 관리자가 토큰 없이 연 비공개 앱은 토큰 주소로 보낸다 */
   private async visible(
     actor: Actor,
     slug: string,
@@ -120,7 +120,7 @@ export class AppSiteQuery extends BaseQuery {
     if (actor.kind !== 'owner' || actor.spaceId !== app.space_id)
       throw new NotFound(AppSiteQuery.MISSING);
     const sealed = new AppTicket(app.id).seal(this.box, now);
-    return new AppScreenRedirectView(`/${app.slug}/${AppTicket.MARK}${sealed}/`);
+    return new AppScreenRedirectView(`/${app.slug}/${AppTicket.MARK}${sealed}`);
   }
 
   /** 템플릿(.html) 전부: 이름 → 글. 저장할 때 크기를 검사했다 */

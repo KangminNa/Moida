@@ -32,6 +32,11 @@ export function AppOverview({ app }: { app: AdminApp }) {
 
   return (
     <>
+      <p className="row">
+        <Link className="ghost small" href={`${STORE_HREF}/${app.id}/code/live`}>
+          {app.visibility === 'public' ? '미리 보기' : '미리 보기 (비공개 앱)'}
+        </Link>
+      </p>
       <ul className="app-counts" aria-label="든 것의 수">
         {counts.map(([label, n]) => (
           <li key={label} className="panel">

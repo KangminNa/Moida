@@ -87,13 +87,13 @@ export class AppCodeQuery extends BaseQuery {
     );
   }
 
-  /** 미리 보기 주소 (토큰이 든 /<앱>/~<토큰>/, 30분). seq가 없으면 보이는 버전, 0이면 시작 코드. 관리자만 */
+  /** 미리 보기 주소 (토큰이 든 /<앱>/~<토큰>, 30분). seq가 없으면 보이는 버전, 0이면 시작 코드. 관리자만 */
   async preview(actor: Actor, req: PreviewCodeInput, now: Date): Promise<AppCodePreviewView> {
     const app = await this.owned(actor, req.id);
     if (req.seq !== null && req.seq > app.code_versions)
       throw new NotFound(`없는 버전이에요: ${req.seq}`);
     const token = new AppTicket(app.id, req.seq).seal(this.box, now);
-    return new AppCodePreviewView(`/${app.slug}/${AppTicket.MARK}${token}/`);
+    return new AppCodePreviewView(`/${app.slug}/${AppTicket.MARK}${token}`);
   }
 
   /** 버전 하나(0이면 시작 코드)의 zip. 파일 이름은 <앱 주소>-v<번호>.zip. 관리자만 */

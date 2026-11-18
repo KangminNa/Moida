@@ -2,7 +2,7 @@
 
 import { api } from '../_lib/client-api';
 import { useLiveValue } from '../_lib/use-live';
-import type { AdminAppList, MenuList, PageDetail, PageList } from './types';
+import type { AdminAppList, AppCode, MenuList, PageDetail, PageList } from './types';
 
 // 여러 화면이 함께 쓰는 읽기.
 
@@ -30,4 +30,16 @@ export function useApps() {
 export function useMenus(app: string | null) {
   const path = app === null ? '/api/menus' : `/api/menus?app=${encodeURIComponent(app)}`;
   return useLiveValue(`menus:${app ?? ''}`, () => api<MenuList>('GET', path), []);
+}
+
+/** 앱 코드의 버전이 쌓이거나 보이는 버전이 바뀌면 온다 (스토어 1-6) */
+const APP_CODE_TOPICS = ['blog.app_code.*'];
+
+/** 앱 코드 (관리자): 지금 상태 · 버전 목록 · 보이는 코드의 파일 · 바깥 주소 */
+export function useAppCode(appId: string) {
+  return useLiveValue(
+    `app-code:${appId}`,
+    () => api<AppCode>('GET', `/api/apps/${appId}/code`),
+    APP_CODE_TOPICS,
+  );
 }

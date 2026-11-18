@@ -2,9 +2,9 @@ import { AppPanel, type AppTab } from './AppPanel';
 
 export const metadata = { title: '앱 관리 · Cairn', robots: { index: false } };
 
-const TABS: readonly AppTab[] = ['overview', 'menus', 'posts', 'settings'];
+const TABS: readonly AppTab[] = ['overview', 'menus', 'posts', 'code', 'settings'];
 
-// 앱 관리 (스토어 1-5, 시안 4번): /admin/store/<앱 id>?tab=개요 · 메뉴 · 글 · 설정. 읽기 · 쓰기는 패널이 한다.
+// 앱 관리 (스토어 1-5, 시안 4번): /admin/store/<앱 id>?tab=개요 · 메뉴 · 글 · 코드(스토어 1-6) · 설정. 읽기 · 쓰기는 패널이 한다.
 export default async function AppManagePage({
   params,
   searchParams,

@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AppGrid } from '../_blog/AppGrid';
-import { AppHome } from '../_blog/AppHome';
-import { AppShell } from '../_blog/AppShell';
+import { appPath } from '../_blog/format';
 import { SiteFooter } from '../_blog/SiteFooter';
 import { SiteHeader } from '../_blog/SiteHeader';
 import { siteNow } from '../_blog/site';
 
 // 첫 화면 (스토어 1-4, 시안 6 · 7 · 8번): 공개 앱이 0개면 사이트 이름 · 소개 · "공개한 앱 없음",
-// 1개면 그 앱의 첫 화면 그대로, 2개 이상이면 앱 아이콘 목록. 관리자가 열어도 방문자가 보는 그대로다.
+// 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다), 2개 이상이면 앱 아이콘 목록. 관리자가 열어도 방문자가 보는 그대로다.
 export const dynamic = 'force-dynamic';
 
 /** 예전 관리 시트 주소 (?sheet=이름). 이미 저장된 링크가 있어서 콘솔 주소로 넘긴다 */
@@ -21,7 +20,7 @@ const OLD_SHEETS: Record<string, string> = {
   account: '/admin/account',
 };
 
-type Search = { cursor?: string; sheet?: string; session?: string; error?: string };
+type Search = { sheet?: string; session?: string; error?: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await siteNow();
@@ -49,13 +48,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       </main>
     );
   if (!site.space.installed) redirect('/install');
+  // 공개 앱이 하나면 그 앱의 주소로 (307): 앱 화면은 앱 코드가 그린다 (스토어 1-6)
   const [only] = site.apps;
-  if (only && site.apps.length === 1)
-    return (
-      <AppShell site={site} app={only}>
-        <AppHome app={only} cursor={search.cursor ?? null} />
-      </AppShell>
-    );
+  if (only && site.apps.length === 1) redirect(appPath(only.slug));
   const { space } = site;
   return (
     <>

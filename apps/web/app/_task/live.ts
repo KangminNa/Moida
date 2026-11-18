@@ -137,15 +137,26 @@ export function useTasksIn(status: string) {
 }
 
 /** 결과를 페이지로 내보내는 일 가운데 아직 끝나지 않은 것 (페이지 메뉴의 "만드는 중"). 대기와 실행의 첫 쪽에서 고른다 */
-export function usePageTasks() {
+/** 대기 · 실행 중인 작업 (한 작업은 한 번만) */
+function useOpenTasks() {
   const running = useTasksIn('running');
   const queued = useTasksIn('queued');
   // 두 목록은 따로 읽는다: 대기에서 실행으로 넘어가는 순간에는 같은 작업이 양쪽에 있을 수 있어 하나만 남긴다
   const byId = new Map(
     [...(queued.data?.tasks ?? []), ...(running.data?.tasks ?? [])].map((t) => [t.id, t]),
   );
-  const tasks = [...byId.values()].filter((t) => t.page !== null);
-  return { tasks, error: running.error ?? queued.error };
+  return { tasks: [...byId.values()], error: running.error ?? queued.error };
+}
+
+export function usePageTasks() {
+  const open = useOpenTasks();
+  return { tasks: open.tasks.filter((t) => t.page !== null), error: open.error };
+}
+
+/** 이 앱의 코드를 고치는 중인 작업 (스토어 1-6, payload.appCode) */
+export function useAppCodeTasks(appId: string) {
+  const open = useOpenTasks();
+  return { tasks: open.tasks.filter((t) => t.appCode?.appId === appId), error: open.error };
 }
 
 export function usePendingApprovals() {

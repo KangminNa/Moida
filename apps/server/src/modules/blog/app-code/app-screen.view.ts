@@ -60,7 +60,7 @@ export class AppScreenDataView {
   }
 
   withArticle(row: ScreenArticleRow): this {
-    const back = row.menu_slug === null ? `${this.base}/` : this.menuUrl(row.menu_slug);
+    const back = row.menu_slug === null ? this.base : this.menuUrl(row.menu_slug);
     this.article = { row, back };
     return this;
   }
@@ -88,7 +88,7 @@ export class AppScreenDataView {
   toJSON() {
     const app = this.app;
     const here = this.menu?.slug ?? null;
-    const appUrl = (r: Readonly<AppRow>) => `/${r.slug}/`;
+    const appUrl = (r: Readonly<AppRow>) => `/${r.slug}`;
     const apps = this.apps.map((r) => ({
       name: r.name,
       url: appUrl(r),
@@ -145,7 +145,7 @@ export class AppScreenDataView {
   }
 
   private here(): string {
-    return this.screen === 'menu' && this.menu ? this.menuUrl(this.menu.slug) : `${this.base}/`;
+    return this.screen === 'menu' && this.menu ? this.menuUrl(this.menu.slug) : this.base;
   }
 
   private menuUrl(slug: string): string {
