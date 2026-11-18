@@ -99,8 +99,8 @@ export function MenusPanel() {
                     {m.name} <span className="pill">{MENU_KIND_LABELS[m.kind] ?? m.kind}</span>
                   </b>
                   <small>
-                    <a href={menuPath(m.slug)} target="_blank" rel="noreferrer">
-                      {menuPath(m.slug)}
+                    <a href={menuPath(m.slug, null)} target="_blank" rel="noreferrer">
+                      {menuPath(m.slug, null)}
                     </a>{' '}
                     · {m.items ?? 0}개 · 운영 팀{' '}
                     {agentList.find((a) => a.id === m.agentId)?.name ?? '없음'}

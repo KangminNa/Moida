@@ -1,4 +1,4 @@
-import type { PostStatus } from './types';
+import type { PostStatus, PublicApp } from './types';
 
 // 글의 화면 이름
 
@@ -14,4 +14,11 @@ export const MENU_KIND_LABELS: Record<string, string> = {
   issues: '호 목록',
   pages: '페이지 모음',
   page: '페이지 하나',
+};
+
+/** 앱 종류 (서버 blog.tables의 APP_KIND) */
+export const APP_KIND_LABELS: Record<PublicApp['kind'], string> = {
+  blog: '블로그',
+  magazine: '매거진',
+  page: '페이지 앱',
 };

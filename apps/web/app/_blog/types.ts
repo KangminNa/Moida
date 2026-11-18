@@ -1,3 +1,7 @@
+import type {
+  PublicAppListView,
+  PublicAppView,
+} from '../../../server/src/modules/blog/app/app.view';
 import type { AssetView } from '../../../server/src/modules/blog/asset/asset.view';
 import type {
   BasketItemView,
@@ -78,3 +82,7 @@ export type Issue = IssueList['issues'][number];
 export type IssueDetail = ReturnType<IssueDetailView['toJSON']>;
 export type PublicIssueList = ReturnType<PublicIssueListView['toJSON']>;
 export type PublicIssue = ReturnType<PublicIssueView['toJSON']>;
+
+/** 스토어의 앱 (방문자, 스토어 1단계): 종류 · 이름 · 주소 · 설명 · 아이콘 주소. 목록은 공개 앱만 순서대로 */
+export type PublicApp = ReturnType<PublicAppView['toJSON']>;
+export type PublicAppList = ReturnType<PublicAppListView['toJSON']>;

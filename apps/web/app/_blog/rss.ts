@@ -1,7 +1,7 @@
 import { postPath } from './format';
 import type { PostSummary } from './types';
 
-// RSS 2.0 한 벌 (블로그 전체 /rss.xml, 메뉴 /m/<주소>/rss.xml). 글은 발행한 순서로 서버의 목록 한 쪽(20개)이다.
+// RSS 2.0 한 벌 (사이트 전체 /rss.xml, 앱 /<앱>/rss.xml, 메뉴 /<앱>/m/<주소>/rss.xml). 글은 발행한 순서로 서버의 목록 한 쪽(20개)이다.
 
 /** XML 1.0에 넣을 수 없는 제어 문자 */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: 바로 이 글자들을 지우려는 식이다
@@ -20,7 +20,7 @@ function xml(text: string): string {
 }
 
 function item(post: PostSummary, site: string): string {
-  const link = xml(`${site}${postPath(post.slug)}`);
+  const link = xml(`${site}${postPath(post.slug, post.app?.slug ?? null)}`);
   return [
     '    <item>',
     `      <title>${xml(post.title)}</title>`,
@@ -35,7 +35,7 @@ function item(post: PostSummary, site: string): string {
     .join('\n');
 }
 
-/** 피드 응답. site: 블로그 주소(끝 / 없이), page: 이 피드가 가리키는 화면(/ · /m/<주소>), self: 피드 자신의 경로 */
+/** 피드 응답. site: 사이트 주소(끝 / 없이), page: 이 피드가 가리키는 화면(/ · /<앱> · /<앱>/m/<주소>), self: 피드 자신의 경로 */
 export function rssResponse(feed: {
   site: string;
   title: string;

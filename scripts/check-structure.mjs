@@ -6,6 +6,8 @@
 //   3. 콘솔 메뉴(app/admin/menu.tsx의 href)와 app/admin/<주소>/page.tsx가 하나씩 맞는다
 //   4. 웹은 서버 응답 모양을 손으로 적지 않는다: app/_lib/types.ts에는 HAND_WRITTEN_TYPES(오류 모양)만.
 //      응답 타입은 서버 view에서 import type으로 만든다 (ReturnType<XxxView['toJSON']>, app/_<모듈>/types.ts)
+//   5. 웹의 최상위 경로(app/의 폴더 · (묶음) 안의 폴더, next.config의 rewrites)는 앱 주소로 못 쓰는 이름(App.RESERVED)이다:
+//      빠지면 그 이름의 앱 주소(/<앱>)가 웹의 화면에 가려진다 (docs/스토어.md 8.7)
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const modulesDir = join(root, 'apps/server/src/modules');
 const adminDir = join(root, 'apps/web/app/admin');
+const webAppDir = join(root, 'apps/web/app');
 
 /** 옆이 아닌 곳에서 시험하는 REST 진입 → 그 테스트 파일 (modules/ 아래). 흐름 하나를 여러 진입이 함께 이룰 때 */
 const TESTED_ELSEWHERE = {
@@ -115,11 +118,49 @@ function checkWebTypes() {
       );
 }
 
+/** 앱 주소의 모양 (App.SLUG와 같다): 점 · 밑줄이 든 이름(_next · sw.js · rss.xml)은 앱 주소가 될 수 없어 보지 않는다 */
+const APP_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** 웹의 최상위 경로 이름: app/의 폴더와 (묶음) 안의 폴더 ([동적]과 _비공개 폴더는 빼고), 파일 경로 · rewrites의 첫 칸 */
+function topRoutes() {
+  const names = new Set();
+  const visit = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (!statSync(path).isDirectory()) continue;
+      if (/^\(.+\)$/.test(name)) visit(path);
+      else if (!name.startsWith('_') && !name.startsWith('[')) names.add(name);
+    }
+  };
+  visit(webAppDir);
+  const config = readFileSync(join(root, 'apps/web/next.config.ts'), 'utf8');
+  for (const [, first] of config.matchAll(/source:\s*'\/([^/:'(]+)/g)) names.add(first);
+  return [...names].filter((n) => APP_SLUG.test(n));
+}
+
+function checkReserved() {
+  const file = join(modulesDir, 'blog/app/app.ts');
+  const block = /static readonly RESERVED[^=]*=\s*\[([^\]]*)\]/.exec(
+    readFileSync(file, 'utf8'),
+  )?.[1];
+  if (!block) {
+    problems.push(`${at(file)} App.RESERVED를 찾지 못했어요`);
+    return;
+  }
+  const reserved = new Set([...block.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  for (const name of topRoutes())
+    if (!reserved.has(name))
+      problems.push(
+        `웹의 최상위 경로 /${name}이(가) App.RESERVED에 없어요 (${at(file)}): 그 이름의 앱 주소가 화면에 가려진다`,
+      );
+}
+
 const files = walk(modulesDir).filter((f) => f.endsWith('.ts'));
 checkNames(files);
 checkTests(files);
 checkMenu();
 checkWebTypes();
+checkReserved();
 
 if (problems.length > 0) {
   console.error(`구조 검사 위반 ${problems.length}건\n`);

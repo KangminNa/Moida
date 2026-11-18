@@ -568,7 +568,7 @@ export function PostEditor({ initial }: { initial: LinkedPost | null }) {
 
       <footer className="editor-foot">
         {post && post.status !== 'draft' && !trashed ? (
-          <a className="ghost" href={postPath(post.slug)} target="_blank" rel="noopener">
+          <a className="ghost" href={postPath(post.slug, null)} target="_blank" rel="noopener">
             글 보기 ↗
           </a>
         ) : (
