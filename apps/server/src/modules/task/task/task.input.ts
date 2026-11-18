@@ -61,7 +61,7 @@ export class CreateTaskInput extends BaseRequest {
   private static payloadOf(f: RequestFields, raw: unknown): Record<string, unknown> {
     const payload = f.optionalRecord('payload');
     const given = (raw as Record<string, unknown> | null | undefined)?.materials;
-    const page = CreateTaskInput.pageOf(f, raw);
+    const page = { ...CreateTaskInput.pageOf(f, raw), ...CreateTaskInput.appCodeOf(f, raw) };
     if (given === undefined || given === null) return { ...payload, ...page };
     const m = f.nested('materials');
     const outputs = m.optionalTextList('outputIds', MakeMaterials.MAX, 36) ?? [];
@@ -77,6 +77,13 @@ export class CreateTaskInput extends BaseRequest {
     return {
       page: { title: p.optionalText('title', 120), pageId: p.optionalText('pageId', 36) },
     };
+  }
+
+  /** 결과를 앱 코드의 새 버전으로 내라는 주문(appCode: { appId })을 payload.appCode로 (스토어 1-6). 적지 않았으면 빈 객체 */
+  private static appCodeOf(f: RequestFields, raw: unknown): Record<string, unknown> {
+    const given = (raw as Record<string, unknown> | null | undefined)?.appCode;
+    if (given === undefined || given === null) return {};
+    return { appCode: { appId: f.nested('appCode').uuid('appId') } };
   }
 
   private static optionalUuid(f: RequestFields, raw: unknown, name: string): string | null {

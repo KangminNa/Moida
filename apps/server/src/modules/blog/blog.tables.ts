@@ -2,6 +2,24 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** blog.app_code_versions.source (값 목록 CHECK) */
+export const APP_CODE_VERSION_SOURCE = ['starter', 'upload', 'task', 'restore'] as const;
+export type AppCodeVersionSource = (typeof APP_CODE_VERSION_SOURCE)[number];
+/** blog.app_code_versions */
+export interface AppCodeVersionRow {
+  id: string;
+  app_id: string;
+  space_id: string;
+  seq: number;
+  files: unknown;
+  source: AppCodeVersionSource;
+  task_id: string | null;
+  run_id: string | null;
+  note: string;
+  created_at: Date;
+}
+export type AppCodeVersionNew = Partial<AppCodeVersionRow> & Pick<AppCodeVersionRow, 'id' | 'app_id' | 'space_id' | 'seq' | 'files' | 'source'>;
+
 /** blog.apps.kind (값 목록 CHECK) */
 export const APP_KIND = ['blog', 'magazine', 'page'] as const;
 export type AppKind = (typeof APP_KIND)[number];
@@ -22,6 +40,9 @@ export interface AppRow {
   version: number;
   created_at: Date;
   updated_at: Date;
+  code_seq: number | null;
+  code_pending_seq: number | null;
+  code_versions: number;
 }
 export type AppNew = Partial<AppRow> & Pick<AppRow, 'id' | 'space_id' | 'kind' | 'name' | 'slug'>;
 

@@ -73,6 +73,15 @@
     },
     "blog.app.changed": {
       "fields": ["appId", "visibility", "appVersion", "deleted"]
+    },
+    "blog.app_code.added": {
+      "fields": ["appId", "name", "seq", "source", "pending"]
+    },
+    "blog.app_code.shown": {
+      "fields": ["appId", "seq", "settled"]
+    },
+    "blog.app_code.refused": {
+      "fields": ["appId", "name", "taskId", "error"]
     }
   }
 }

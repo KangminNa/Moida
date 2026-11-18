@@ -1,0 +1,215 @@
+import { Readable } from 'node:stream';
+import { Injectable } from '@nestjs/common';
+import {
+  Actor,
+  BaseQuery,
+  BlobStore,
+  Database,
+  Leases,
+  NotFound,
+  SecretBox,
+  ZipFile,
+} from '../../platform';
+import { appCodeVersions, apps } from '../blog.schema';
+import type { AppCodeVersionRow, AppRow } from '../blog.tables';
+import { PageFiles } from '../page/page-files';
+import type {
+  AppCodeBaseInput,
+  AppCodeIdInput,
+  CodeVersionInput,
+  PreviewCodeInput,
+} from './app-code.input';
+import {
+  type AppCodeBaseFile,
+  AppCodeBaseView,
+  AppCodeChangesView,
+  AppCodePreviewView,
+  AppCodeVersionView,
+  AppCodeView,
+} from './app-code.view';
+import { AppCodeBundle } from './app-code-bundle';
+import { AppCodeFiles } from './app-code-files';
+import { AppStarterGateway } from './app-starter.gateway';
+import { AppTicket } from './app-ticket';
+
+/** 버전 하나를 묶은 zip (관리자의 내려받기) */
+export class AppCodeArchive {
+  constructor(
+    readonly fileName: string,
+    readonly bytes: Buffer,
+  ) {}
+}
+
+// 앱 코드 읽기 (스토어 1-6). 관리자의 코드 탭 · 바뀐 점 · 미리 보기 주소 · zip 받기, 러너의 app_code_base.
+// 버전의 파일 읽기(filesOf · textOf · hostsOf · open)는 방문자 화면(AppSiteQuery)과 쓰기(AppCodeService)도 함께 쓴다:
+// 그 앱을 볼 수 있는지는 부르는 쪽이 이미 정했다.
+@Injectable()
+export class AppCodeQuery extends BaseQuery {
+  private static readonly MISSING = '앱을 찾을 수 없어요';
+  /** app_code_base가 내용까지 주는 글 파일과 그 크기의 합 (페이지의 page_base와 같다) */
+  private static readonly TEXT = /\.(html?|css|m?js|json|md|txt|csv|svg|xml)$/i;
+  private static readonly BASE_TEXT_MAX = 300 * 1024;
+
+  constructor(
+    db: Database,
+    private readonly blobs: BlobStore,
+    private readonly box: SecretBox,
+    private readonly leases: Leases,
+    private readonly starters: AppStarterGateway,
+  ) {
+    super(db);
+  }
+
+  /** 코드 탭: 지금 상태 · 버전 목록(새 버전부터) · 보이는 코드의 파일 · 바깥 주소. 관리자만 */
+  async code(actor: Actor, req: AppCodeIdInput): Promise<AppCodeView> {
+    const app = await this.owned(actor, req.id);
+    const rows = await this.rows(appCodeVersions, { app_id: app.id }, { order: ['seq desc'] });
+    const shown = await this.filesOf(actor, app, null);
+    return new AppCodeView(
+      app,
+      rows.map((r) => new AppCodeVersionView(r, PageFiles.of(r.files).toJSON())),
+      shown.files.toJSON(),
+      await this.hostsOf(actor, shown),
+    );
+  }
+
+  /** 버전 하나의 바뀐 점: 앞 버전(버전 1이면 시작 코드)과 파일 · 바깥 주소 비교. 관리자만 */
+  async changes(actor: Actor, req: CodeVersionInput): Promise<AppCodeChangesView> {
+    const app = await this.owned(actor, req.id);
+    if (req.seq < 1) throw new NotFound(`없는 버전이에요: ${req.seq}`);
+    const after = await this.filesOf(actor, app, req.seq);
+    const before = await this.filesOf(actor, app, req.seq - 1);
+    return new AppCodeChangesView(
+      req.seq,
+      AppCodeBundle.diff(before.files, after.files),
+      { before: await this.hostsOf(actor, before), after: await this.hostsOf(actor, after) },
+      after.files.toJSON().reduce((sum, f) => sum + f.sizeBytes, 0),
+    );
+  }
+
+  /** 미리 보기 주소 (토큰이 든 /<앱>/~<토큰>/, 30분). seq가 없으면 보이는 버전, 0이면 시작 코드. 관리자만 */
+  async preview(actor: Actor, req: PreviewCodeInput, now: Date): Promise<AppCodePreviewView> {
+    const app = await this.owned(actor, req.id);
+    if (req.seq !== null && req.seq > app.code_versions)
+      throw new NotFound(`없는 버전이에요: ${req.seq}`);
+    const token = new AppTicket(app.id, req.seq).seal(this.box, now);
+    return new AppCodePreviewView(`/${app.slug}/${AppTicket.MARK}${token}/`);
+  }
+
+  /** 버전 하나(0이면 시작 코드)의 zip. 파일 이름은 <앱 주소>-v<번호>.zip. 관리자만 */
+  async zip(actor: Actor, req: CodeVersionInput): Promise<AppCodeArchive> {
+    const app = await this.owned(actor, req.id);
+    const code = await this.filesOf(actor, app, req.seq);
+    const zip = new ZipFile();
+    for (const f of code.files.toJSON()) zip.add(f.name, await this.bytesOf(actor, code, f.name));
+    return new AppCodeArchive(`${app.slug}-v${req.seq}.zip`, zip.toBuffer());
+  }
+
+  /**
+   * 러너가 쥔 만들기 일이 고칠 앱 (MCP app_code_base): 가장 새 버전(확인 대기 포함, 없으면 시작 코드)의 파일과 바깥 주소.
+   * 글 파일은 내용까지(모두 BASE_TEXT_MAX바이트까지), 그 밖은 이름 · 크기만. 앱 코드 주문이 없는 일이면 app_id null
+   */
+  async base(actor: Actor, req: AppCodeBaseInput): Promise<AppCodeBaseView> {
+    actor.assertCan(Actor.RUN);
+    const work = await this.leases.of(actor, req.taskId);
+    const appId = (work.payload as { appCode?: { appId?: unknown } } | null)?.appCode?.appId;
+    if (work.kind !== 'make' || typeof appId !== 'string')
+      return new AppCodeBaseView(null, 0, [], []);
+    const app = await this.row(apps, { space_id: actor.requireSpace(), id: appId });
+    if (!app) return new AppCodeBaseView(null, 0, [], []);
+    const code = await this.filesOf(actor, app, app.code_versions);
+    let budget = AppCodeQuery.BASE_TEXT_MAX;
+    const files: AppCodeBaseFile[] = [];
+    for (const f of code.files.toJSON()) {
+      const readable = AppCodeQuery.TEXT.test(f.name) && f.sizeBytes <= budget;
+      const text = readable ? await this.textOf(actor, code, f.name, budget) : null;
+      if (text !== null) budget -= f.sizeBytes;
+      files.push({ name: f.name, size: f.sizeBytes, text });
+    }
+    return new AppCodeBaseView(app, code.seq, files, await this.hostsOf(actor, code));
+  }
+
+  /** 앱 한 줄 (쓰기 전에 읽기: 일꾼 · 관리자). 없거나 다른 공간이면 null */
+  async appOf(actor: Actor, spaceId: string, id: string): Promise<AppRow | null> {
+    actor.assertOwnerOrSystem();
+    return this.row(apps, { space_id: spaceId, id });
+  }
+
+  /**
+   * 앱의 코드 한 벌. seq: null이면 방문자에게 보이는 버전(없으면 시작 코드), 0이면 시작 코드, 그 밖은 그 버전.
+   * 없는 버전이면 NotFound
+   */
+  async filesOf(_actor: Actor, app: Readonly<AppRow>, seq: number | null): Promise<AppCodeFiles> {
+    const wanted = seq ?? app.code_seq ?? AppCodeFiles.STARTER;
+    if (wanted === AppCodeFiles.STARTER) return AppCodeFiles.starter(this.starters.files(app.kind));
+    const row: Pick<AppCodeVersionRow, 'files'> | null = await this.row(
+      appCodeVersions,
+      { app_id: app.id, seq: wanted },
+      { columns: ['files'] },
+    );
+    if (!row) throw new NotFound(`없는 버전이에요: ${wanted}`);
+    return AppCodeFiles.stored(wanted, PageFiles.of(row.files));
+  }
+
+  /** 글 파일 하나의 내용. 없거나 max바이트를 넘으면 null */
+  async textOf(
+    _actor: Actor,
+    code: AppCodeFiles,
+    name: string,
+    max: number,
+  ): Promise<string | null> {
+    const file = code.files.find(name);
+    if (!file || file.sizeBytes > max) return null;
+    const starter = code.starterBytes(name);
+    return starter ? starter.toString('utf8') : this.blobs.text(file.blobHash, max);
+  }
+
+  /** 이 코드의 바깥 주소 (cairn.json의 hosts). 저장할 때 검사한 값이라 읽을 수 없으면 비운다 */
+  async hostsOf(actor: Actor, code: AppCodeFiles): Promise<readonly string[]> {
+    const text = await this.textOf(
+      actor,
+      code,
+      AppCodeBundle.MANIFEST,
+      AppCodeBundle.MANIFEST_BYTES_MAX,
+    );
+    if (text === null) return [];
+    try {
+      return AppCodeBundle.hostsOf(text);
+    } catch {
+      return [];
+    }
+  }
+
+  /** 파일 하나를 흘려보낸다. 없으면 NotFound */
+  async open(_actor: Actor, code: AppCodeFiles, name: string): Promise<Readable> {
+    if (!code.files.find(name)) throw new NotFound('없는 파일이에요');
+    const starter = code.starterBytes(name);
+    return starter
+      ? Readable.from(starter)
+      : this.blobs.open(code.files.find(name)?.blobHash ?? '');
+  }
+
+  /** hashes 가운데 버전이 가리키는 파일 (BlobStore.registerUse: 쓰는 동안 platform이 파일을 지우지 않게) */
+  async usedBlobs(actor: Actor, hashes: readonly string[]): Promise<string[]> {
+    actor.assertOwnerOrSystem();
+    const rows = await this.sql<{ hash: string }[]>`
+      SELECT DISTINCT f->>'blobHash' AS hash
+      FROM blog.app_code_versions v, jsonb_array_elements(v.files) f
+      WHERE f->>'blobHash' = ANY(${hashes as string[]}::text[])`;
+    return rows.map((row) => row.hash);
+  }
+
+  /** 관리자의 앱 (같은 공간). 없으면 NotFound */
+  private async owned(actor: Actor, id: string): Promise<AppRow> {
+    actor.assertOwner();
+    const app = await this.row(apps, { space_id: actor.requireSpace(), id });
+    if (!app) throw new NotFound(AppCodeQuery.MISSING);
+    return app;
+  }
+
+  private async bytesOf(actor: Actor, code: AppCodeFiles, name: string): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of await this.open(actor, code, name)) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks);
+  }
+}

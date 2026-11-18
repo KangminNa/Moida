@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+{{> head}}
+{{#menu.rssUrl}}<link rel="alternate" type="application/rss+xml" title="{{menu.name}}" href="{{menu.rssUrl}}">{{/menu.rssUrl}}
+</head>
+<body>
+{{> header}}
+<main class="blog-main">
+  <h1 class="blog-menu-title">{{menu.name}}</h1>
+  {{#menu.isPosts}}{{> post-list}}{{/menu.isPosts}}
+  {{#menu.isIssues}}
+  {{#issues.length}}
+  <ol class="post-list">
+    {{#issues}}
+    <li>
+      <a href="{{url}}">
+        <h2>{{number}}호 · {{title}}</h2>
+        {{#intro}}<p>{{intro}}</p>{{/intro}}
+        <div class="post-meta"><time datetime="{{date}}">{{dateText}}</time></div>
+      </a>
+    </li>
+    {{/issues}}
+  </ol>
+  {{/issues.length}}
+  {{^issues.length}}<p class="blog-empty">발행한 호 없음</p>{{/issues.length}}
+  {{/menu.isIssues}}
+  {{#menu.isPages}}{{> page-list}}{{/menu.isPages}}
+  {{#menu.isPage}}{{> page-list}}{{/menu.isPage}}
+</main>
+{{> footer}}
+</body>
+</html>

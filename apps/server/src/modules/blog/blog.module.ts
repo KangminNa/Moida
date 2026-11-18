@@ -3,6 +3,14 @@ import { ActionChecks, BlobStore, CoreWorkers, EventCatalog, LibraryQuery } from
 import { AppController } from './app/app.api';
 import { AppQuery } from './app/app.query';
 import { AppService } from './app/app.service';
+import { AppCodeController, AppSiteController } from './app-code/app-code.api';
+import { AppCodeQuery } from './app-code/app-code.query';
+import { AppCodeService } from './app-code/app-code.service';
+import { AppCodeBaseTool } from './app-code/app-code.tool';
+import { AppCodeBuiltHandler } from './app-code/app-code-built.handler';
+import { AppScreenQuery } from './app-code/app-screen.query';
+import { AppSiteQuery } from './app-code/app-site.query';
+import { AppStarterGateway } from './app-code/app-starter.gateway';
 import { AssetController, FileController } from './asset/asset.api';
 import { AssetQuery } from './asset/asset.query';
 import { AssetService } from './asset/asset.service';
@@ -69,6 +77,14 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     // 스토어의 앱 (스토어 1단계)
     AppService,
     AppQuery,
+    // 앱 코드 (스토어 1-6)
+    AppCodeService,
+    AppCodeQuery,
+    AppSiteQuery,
+    AppScreenQuery,
+    AppCodeBaseTool,
+    AppCodeBuiltHandler,
+    { provide: AppStarterGateway, useFactory: () => AppStarterGateway.fromEnv() },
   ],
   controllers: [
     PostController,
@@ -79,6 +95,8 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     MenuController,
     IssueController,
     AppController,
+    AppCodeController,
+    AppSiteController,
   ],
   exports: [BlogTools],
 })
@@ -97,6 +115,8 @@ export class BlogModule implements OnModuleInit {
     private readonly issuePublish: IssuePublishHandler,
     private readonly issues: IssueQuery,
     private readonly apps: AppQuery,
+    private readonly appCodeBuilt: AppCodeBuiltHandler,
+    private readonly appCode: AppCodeQuery,
   ) {}
 
   onModuleInit(): void {
@@ -106,6 +126,8 @@ export class BlogModule implements OnModuleInit {
     this.workers.expect(PublishApprovedHandler.TOPIC);
     // 만들기 작업이 끝나며 알린 페이지 (task가 보낸다)
     this.workers.on(PageBuiltHandler.TOPIC, this.built);
+    // 앱 코드를 고친 만들기 작업 (스토어 1-6, task가 보낸다)
+    this.workers.on(AppCodeBuiltHandler.TOPIC, this.appCodeBuilt);
     // 보관함 (2차 5단계): 페이지 · 글 · 읽은 글(소재의 링크)
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
@@ -127,6 +149,10 @@ export class BlogModule implements OnModuleInit {
     // 페이지 판의 파일은 files(jsonb) 안에 있다
     this.blobs.registerUse(['blog.page_revisions.files'], (actor, hashes) =>
       this.pages.usedBlobs(actor, hashes),
+    );
+    // 앱 코드 버전의 파일도 files(jsonb) 안에 있다 (스토어 1-6)
+    this.blobs.registerUse(['blog.app_code_versions.files'], (actor, hashes) =>
+      this.appCode.usedBlobs(actor, hashes),
     );
   }
 }

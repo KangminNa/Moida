@@ -9,6 +9,7 @@ import type { ReportProgressInput } from './task.input';
 export class TaskRepository extends TableRepository<TaskRow, Task> {
   /** 한 페이지에 대기 · 실행 · 기다림 중인 일은 하나 (DB의 부분 유일 인덱스) */
   private static readonly ONE_OPEN_PAGE = 'tasks_one_open_page';
+  private static readonly ONE_OPEN_APP_CODE = 'tasks_one_open_app_code';
 
   /** 실행 기록이 쌓였다는 신호 (콘솔의 실행 기록 화면이 다시 읽는다) */
   static readonly LOGGED = 'task.event.added';
@@ -315,6 +316,11 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       // 한 페이지를 고치는 일은 한 번에 하나 (자라는 페이지, 2차 5단계)
       if (Database.isUniqueViolation(error, TaskRepository.ONE_OPEN_PAGE))
         throw new Conflict('이 페이지를 고치는 일이 이미 돌고 있어요. 끝난 뒤에 다시 맡겨 주세요');
+      // 한 앱의 코드를 고치는 일도 한 번에 하나 (스토어 1-6)
+      if (Database.isUniqueViolation(error, TaskRepository.ONE_OPEN_APP_CODE))
+        throw new Conflict(
+          '이 앱의 코드를 고치는 일이 이미 돌고 있어요. 끝난 뒤에 다시 맡겨 주세요',
+        );
       throw error;
     });
     if (!row) return false;

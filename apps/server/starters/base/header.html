@@ -1,0 +1,12 @@
+<header class="blog-top">
+  <div class="app-brand">
+    {{#others.length}}<a class="app-all" href="{{site.home}}" aria-label="모든 앱" title="모든 앱"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></a>{{/others.length}}
+    <span class="app-icon small" aria-hidden="true">{{#app.iconUrl}}<img src="{{app.iconUrl}}" alt="">{{/app.iconUrl}}{{^app.iconUrl}}<img src="{{files}}/icon.svg" alt="">{{/app.iconUrl}}</span>
+    <a class="blog-brand" href="{{base}}/">{{app.name}}</a>
+  </div>
+  <nav aria-label="{{app.name}} 메뉴">
+    {{#menus}}<a href="{{url}}"{{#active}} aria-current="page"{{/active}}>{{name}}</a>{{/menus}}
+    {{#site.graphUrl}}<a href="{{site.graphUrl}}">그래프</a>{{/site.graphUrl}}
+    <a href="{{site.loginUrl}}">로그인</a>
+  </nav>
+</header>
