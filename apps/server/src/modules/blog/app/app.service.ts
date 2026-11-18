@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
   type Actor,
+  AgentDirectory,
   BlobStore,
   Conflict,
   Database,
   EntityService,
   Idempotency,
+  NotFound,
   SettingActor,
   type SettingChangeInput,
   SettingOutcome,
@@ -15,13 +17,15 @@ import {
 import { MenuRepository } from '../menu/menu.repository';
 import { PageRepository } from '../page/page.repository';
 import type { App } from './app';
-import type { CreateAppInput, UpdateAppInput, UploadIconInput } from './app.input';
+import type { CreateAppInput, HomeAppInput, UpdateAppInput, UploadIconInput } from './app.input';
 import { AppRepository } from './app.repository';
 import { AppEdit } from './app-edit';
+import { AppTeam } from './app-team.policy';
 
 // 앱 쓰기 (스토어 1단계, 관리자만: 화면에서 바로, 또는 대화에서 AI가 제안한 것을 승인해서 — AppEdit, 메뉴와 같은 줄).
 // 공개 여부는 관리자의 고치기에서만 바뀐다 (대화의 제안에는 없다). 지우기는 글 · 페이지 · 호가 없을 때만, 빈 메뉴는 함께 지운다.
-// 앱과 메뉴 · 페이지를 한 번에 바꾸는 이 Service만 메뉴 · 페이지의 Repository를 함께 쓴다 (IssueService와 같은 예외)
+// 앱과 메뉴 · 페이지를 한 번에 바꾸는 이 Service만 메뉴 · 페이지의 Repository를 함께 쓴다 (IssueService와 같은 예외).
+// 운영 팀장(스토어 2단계)은 트랜잭션 전에 platform AgentDirectory로 확인한다: 맨 위의, 비공개를 읽지 않는 에이전트만 (AppTeam)
 @Injectable()
 export class AppService extends EntityService<App> {
   private static readonly CREATE = 'create_app';
@@ -29,6 +33,7 @@ export class AppService extends EntityService<App> {
   constructor(
     db: Database,
     private readonly blobs: BlobStore,
+    private readonly agents: AgentDirectory,
   ) {
     super(db);
   }
@@ -41,6 +46,7 @@ export class AppService extends EntityService<App> {
   async create(actor: Actor, req: CreateAppInput): Promise<App> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
+    await this.assertLeader(actor, req.fields.agent_id);
     return this.transaction(async (tx) => {
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, AppService.CREATE);
       const before = await once.previous();
@@ -57,6 +63,7 @@ export class AppService extends EntityService<App> {
   async update(actor: Actor, req: UpdateAppInput): Promise<App> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
+    await this.assertLeader(actor, req.changes.agent_id);
     return this.transaction(async (tx) => {
       const edit = new AppEdit(tx, spaceId);
       const app = await edit.update(req, new Date());
@@ -68,6 +75,7 @@ export class AppService extends EntityService<App> {
   /** 설정 바꾸기 제안의 미리 해 보기: 같은 줄(AppEdit)을 지나고 저장하지 않는다 */
   async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
     const spaceId = SettingActor.spaceOf(actor);
+    await this.assertLeader(actor, change.body.agent_id);
     await this.transaction(async (tx) => {
       await new AppEdit(tx, spaceId).apply(change, new Date());
     });
@@ -82,11 +90,33 @@ export class AppService extends EntityService<App> {
       spaceId,
       change.key,
       async (tx) => {
+        await this.assertLeader(actor, change.body.agent_id);
         const edit = new AppEdit(tx, spaceId);
         await edit.apply(change, new Date());
         await edit.save();
       },
     );
+  }
+
+  /**
+   * 방문자 첫 화면(/)으로 고정할 앱 (스토어 2단계). 공간의 앱을 모두 잠그고(둘이 동시에 고정해도 하나만 남게)
+   * 다른 앱의 고정을 푼 뒤 이 앱을 고정한다. null은 모두 풀기 (자동). 비공개 앱이면 422. 같은 값이면 그대로
+   */
+  async pinHome(actor: Actor, req: HomeAppInput): Promise<void> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    await this.transaction(async (tx) => {
+      const apps = this.store(tx);
+      const all = await apps.lockAll(spaceId);
+      if (req.appId !== null && !all.some((app) => app.id === req.appId))
+        throw new NotFound('앱을 찾을 수 없어요');
+      const now = new Date();
+      // 푸는 것을 먼저 저장한다: 고정은 공간마다 하나(apps_one_home)라 거는 쪽이 먼저면 겹친다
+      for (const app of all) app.pinHome(app.id === req.appId, now);
+      const pinned = all.filter((app) => app.id === req.appId);
+      for (const app of [...all.filter((app) => app.id !== req.appId), ...pinned])
+        await apps.save(app);
+    });
   }
 
   /** 지운다. 페이지 앱의 페이지는 앱 밖으로 풀고, 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다) */
@@ -126,5 +156,11 @@ export class AppService extends EntityService<App> {
 
   removeIcon(actor: Actor, req: VersionInput): Promise<App> {
     return this.changeAsOwner(actor, req, (app) => app.setIcon(null, new Date()));
+  }
+
+  /** 운영 팀장으로 고른 에이전트 (트랜잭션 전에, AppTeam.assertLeader). 글자가 아니면(비우기 · 보내지 않음) 보지 않는다 */
+  private async assertLeader(actor: Actor, agentId: unknown): Promise<void> {
+    if (typeof agentId !== 'string') return;
+    AppTeam.assertLeader(await this.agents.find(actor, agentId), true);
   }
 }

@@ -28,6 +28,8 @@ export class App extends TableEntity<AppRow, AppNew> {
   static readonly SLUG_MAX = 30;
   static readonly DESCRIPTION_MAX = 200;
   static readonly SORT_MAX = 1000;
+  /** 편집 방침 (메뉴의 방침과 같은 한도, DB CHECK) */
+  static readonly POLICY_MAX = 4000;
   /**
    * 앱 주소로 못 쓰는 이름: 웹의 최상위 경로 · 서버로 넘기는 경로와 겹치거나 겹칠 이름.
    * 점 · 밑줄이 든 이름(_next · .well-known · sw.js)은 주소 모양에서 이미 막힌다
@@ -77,6 +79,13 @@ export class App extends TableEntity<AppRow, AppNew> {
         throw new RuleViolation(`공개 여부는 ${APP_VISIBILITY.join(' · ')} 중 하나예요`);
       return value;
     },
+    policy: (value) => {
+      if (value.length > App.POLICY_MAX)
+        throw new RuleViolation(`편집 방침은 ${App.POLICY_MAX}자까지예요`);
+      return value;
+    },
+    // 운영 팀장이 맨 위의, 비공개를 읽지 않는 에이전트인지는 Service가 트랜잭션 전에 본다 (AppTeam.assertLeader)
+    agent_id: (value) => value,
   };
 
   /** 주소 규칙: 영어 소문자 · 숫자 · 하이픈, 못 쓰는 이름 제외 (겹침은 DB의 UNIQUE가 본다) */
@@ -137,13 +146,35 @@ export class App extends TableEntity<AppRow, AppNew> {
     return this.row.slug;
   }
 
-  /** 관리자가 고친 칸을 적는다. 종류는 바꾸지 않는다. 공개 여부가 바뀌면 알린다 */
+  /** 운영 팀장 (task의 에이전트 id). 없으면 null */
+  get agentId(): string | null {
+    return this.row.agent_id;
+  }
+
+  get name(): string {
+    return this.row.name;
+  }
+
+  /**
+   * 관리자가 고친 칸을 적는다. 종류는 바꾸지 않는다. 공개 여부가 바뀌면 알리고,
+   * 비공개가 되면 첫 화면 고정도 푼다 (방문자에게 없는 앱이 첫 화면일 수 없다, DB CHECK)
+   */
   edit(changes: Partial<Unchecked<AppRow>>, now: Date): void {
     const before = this.row;
     this.accept(changes, App.RULES);
     if (this.row === before) return;
+    if (this.row.visibility !== App.PUBLIC) this.put('home', false);
     this.put('updated_at', now);
     if (this.row.visibility !== before.visibility) this.record(this.changed(false));
+  }
+
+  /** 방문자 첫 화면(/)으로 고정하거나 푼다 (스토어 2단계). 공개 앱만. 공간에 하나인지는 AppService가 다른 앱을 풀어 지킨다 */
+  pinHome(on: boolean, now: Date): void {
+    if (on && this.row.visibility !== App.PUBLIC)
+      throw new RuleViolation('공개 앱만 첫 화면으로 고정할 수 있어요');
+    if (on === this.row.home) return;
+    this.put('home', on);
+    this.put('updated_at', now);
   }
 
   /** 아이콘 (platform BlobStore의 해시). null은 지우기 */

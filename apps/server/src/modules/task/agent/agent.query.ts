@@ -33,12 +33,31 @@ export class AgentQuery extends BaseQuery {
     );
   }
 
-  /** 다른 모듈이 platform AgentDirectory로 묻는 에이전트 하나 (예: blog 메뉴의 운영 팀). 지운 에이전트는 없다 */
+  /**
+   * 다른 모듈이 platform AgentDirectory로 묻는 에이전트 하나와 그 위 보고 대상 (예: blog 앱 · 메뉴의 운영 팀). 지운 에이전트 · 대표는 없다.
+   * 관리자, 관리자가 확인한 길로 오는 설정 바꾸기(제안의 미리 해 보기 · 승인 뒤 적용, 2026-11-15 D),
+   * 에이전트 자신(글을 놓을 때 자기가 운영 팀 안인지, 스토어 2단계)이 읽는다
+   */
   async card(actor: Actor, id: string): Promise<AgentCard | null> {
-    // 관리자, 또는 관리자가 확인한 길로 오는 설정 바꾸기 (제안의 미리 해 보기 · 승인 뒤 적용, 2026-11-15 D: 메뉴의 운영 팀)
-    if (!(actor instanceof SettingActor || actor instanceof ApprovedActor)) actor.assertOwner();
-    const row = await this.row(agents, { space_id: actor.requireSpace(), id, deleted_at: null });
-    return row && !row.lead ? new AgentCard(row.id, row.name, row.scopes) : null;
+    const self = actor.kind === 'agent' && actor.id === id;
+    if (!(self || actor instanceof SettingActor || actor instanceof ApprovedActor))
+      actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    const [row] = await this.sql<
+      (Pick<AgentRow, 'id' | 'name' | 'scopes'> & { chain: string[] })[]
+    >`
+      WITH RECURSIVE up AS (
+        SELECT reports_to AS id, 1 AS depth FROM task.agents
+        WHERE space_id = ${spaceId} AND id = ${id} AND deleted_at IS NULL AND NOT lead
+        UNION ALL
+        SELECT a.reports_to, up.depth + 1 FROM up JOIN task.agents a ON a.id = up.id
+        WHERE up.depth < 10
+      )
+      SELECT a.id, a.name, a.scopes,
+        coalesce((SELECT array_agg(up.id::text ORDER BY up.depth) FROM up WHERE up.id IS NOT NULL), '{}') AS chain
+      FROM task.agents a
+      WHERE a.space_id = ${spaceId} AND a.id = ${id} AND a.deleted_at IS NULL AND NOT a.lead`;
+    return row ? new AgentCard(row.id, row.name, row.scopes, row.chain) : null;
   }
 
   /** 팀 템플릿 목록 (코드에 둔 것, AgentTeams) */

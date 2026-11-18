@@ -177,6 +177,8 @@ export class PostRestore extends ArchivePart {
       apps.map((a) => a.slug),
       '앱 주소',
     );
+    if (apps.filter((a) => a.home).length > 1)
+      throw new RuleViolation('첫 화면으로 고정한 앱이 둘 이상이에요');
     PostRestore.assertUnique(
       posts.map((p) => p.id),
       '글 id',

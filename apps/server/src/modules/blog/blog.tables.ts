@@ -43,6 +43,9 @@ export interface AppRow {
   code_seq: number | null;
   code_pending_seq: number | null;
   code_versions: number;
+  agent_id: string | null;
+  policy: string;
+  home: boolean;
 }
 export type AppNew = Partial<AppRow> & Pick<AppRow, 'id' | 'space_id' | 'kind' | 'name' | 'slug'>;
 

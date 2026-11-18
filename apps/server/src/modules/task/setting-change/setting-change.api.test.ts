@@ -558,6 +558,41 @@ describe('설정 바꾸기: 스토어의 앱 (스토어 1단계)', () => {
     });
     assert.equal(kind.body.code, 'rule_violation', '종류는 만들 때만');
   });
+
+  test('운영 팀장 · 편집 방침도 제안 → 승인 (스토어 2단계). 팀장은 맨 위 에이전트만, 첫 화면 고정은 제안하지 못한다', async () => {
+    const { token, head, member } = await partner();
+    const slug = `team-${randomUUID().slice(0, 6)}`;
+    const made = ok(
+      await api.request('POST', '/api/apps', owner, {
+        requestId: randomUUID(),
+        kind: 'blog',
+        name: '운영 팀 앱',
+        slug,
+      }),
+      201,
+    );
+    const edit = (fields: Json) =>
+      tool(token, 'propose_setting', {
+        request_id: randomUUID(),
+        setting: 'app',
+        op: 'edit',
+        target_id: made.id,
+        version: made.version,
+        fields,
+        note: '왜',
+      });
+    const deep = await edit({ agent_id: member.id });
+    assert.equal(deep.body.code, 'rule_violation', '팀장 아래 팀원은 앱의 운영 팀장이 아니다');
+    const home = await edit({ home: true });
+    assert.equal(home.body.code, 'invalid_request', '첫 화면은 관리자가 앱 관리에서');
+    const proposed = await edit({ agent_id: head.id, policy: '사진 한 장 이상' });
+    assert.equal(proposed.ok, true, JSON.stringify(proposed.body));
+    await decide(proposed.body.approval_id);
+    const { token: next } = await partner();
+    const { apps } = await call(next, 'get_settings', { kind: 'apps' });
+    const app = (apps as Json[]).find((a) => a.slug === slug) as Json;
+    assert.deepEqual([app.agent_id, app.policy, app.home], [head.id, '사진 한 장 이상', false]);
+  });
 });
 
 describe('설정 바꾸기: 플러그인 설정 (D)', () => {

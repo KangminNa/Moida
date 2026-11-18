@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   Actor,
   AgentActor,
+  AgentDirectory,
   Database,
   EntityService,
   Idempotency,
@@ -12,6 +13,8 @@ import {
   type VersionTarget,
 } from '../../platform';
 import { AppRepository } from '../app/app.repository';
+import { AppTeam } from '../app/app-team.policy';
+import type { Menu } from '../menu/menu';
 import { MenuRepository } from '../menu/menu.repository';
 import { Post } from './post';
 import type {
@@ -44,6 +47,7 @@ export class PostService extends EntityService<Post> {
     db: Database,
     private readonly lookups: Lookups,
     private readonly sensitive: SensitivePolicy,
+    private readonly agents: AgentDirectory,
   ) {
     super(db);
   }
@@ -97,7 +101,30 @@ export class PostService extends EntityService<Post> {
   }
 
   /**
-   * 초안을 호에 넣기 · 빼기 (2차 6단계): 발행 전의 호에만, 그 호의 메뉴에 올릴 수 있는 요청자만 (Menu.assertWriter).
+   * blog_save_draft의 놓기 (스토어 2단계): menu_id가 있으면 그 메뉴(null은 메뉴에서 빼고 앱은 그대로, app_id가 있으면 그 앱),
+   * 없으면 app_id의 앱(지금 앱과 같으면 메뉴를 두고 그대로). 함께 보낸 앱이 메뉴의 앱이 아니면 422. 놓는 곳의 운영 팀 안이어야 한다
+   */
+  private async placeDraft(
+    tx: Sql,
+    spaceId: string,
+    post: Post,
+    req: SaveDraftInput,
+    actor: Actor,
+    ranks: readonly string[],
+    now: Date,
+  ): Promise<void> {
+    if (req.menuId === undefined && req.appId === post.appId) return;
+    const menu = req.menuId === undefined ? null : await this.menuOf(tx, spaceId, req.menuId);
+    menu?.assertInApp(req.appId);
+    const appId =
+      menu?.appId ??
+      (req.appId === undefined ? post.appId : await this.appOf(tx, spaceId, req.appId));
+    await this.assertWriter(tx, spaceId, actor, ranks, menu, appId);
+    post.placeIn(appId, menu, actor, now);
+  }
+
+  /**
+   * 초안을 호에 넣기 · 빼기 (2차 6단계): 발행 전의 호에만, 그 호의 메뉴에 올릴 수 있는 요청자만 (운영 팀, AppTeam).
    * 이미 그 호에 든 글은 순서를 그대로 둔다
    */
   private async intoIssue(
@@ -106,13 +133,36 @@ export class PostService extends EntityService<Post> {
     post: Post,
     issueId: string | null,
     actor: Actor,
+    ranks: readonly string[],
     now: Date,
   ): Promise<void> {
     if (issueId === null) return post.joinIssue(null, null, 0, actor, now);
     const slot = await new PostRepository(tx).issueSlot(spaceId, issueId);
     if (slot.status !== 'draft') throw new RuleViolation('이미 발행한 호예요');
-    (await new MenuRepository(tx).holder(spaceId, slot.menu_id)).assertWriter(actor);
+    const menu = await new MenuRepository(tx).holder(spaceId, slot.menu_id);
+    await this.assertWriter(tx, spaceId, actor, ranks, menu, slot.app_id);
     if (post.issueId !== slot.id) post.joinIssue(slot.id, slot.app_id, slot.next, actor, now);
+  }
+
+  /** 놓는 요청자와 그 위 보고 대상 (에이전트만, 트랜잭션 전에 platform AgentDirectory로. 운영 팀 안인지 AppTeam이 본다) */
+  private async ranksOf(actor: Actor): Promise<readonly string[]> {
+    if (!AppTeam.needsRanks(actor) || actor.id === null) return [];
+    return AppTeam.ranks(actor, await this.agents.find(actor, actor.id));
+  }
+
+  /** 놓는 곳의 운영 팀 (스토어 2단계): 메뉴의 팀, 없으면 앱의 팀 안이어야 한다. 관리자 · 기기는 보지 않는다 */
+  private async assertWriter(
+    tx: Sql,
+    spaceId: string,
+    actor: Actor,
+    ranks: readonly string[],
+    menu: Menu | null,
+    appId: string | null,
+  ): Promise<void> {
+    if (!AppTeam.needsRanks(actor)) return;
+    const app = appId === null ? null : await new AppRepository(tx).holder(spaceId, appId);
+    const where = menu?.name ?? app?.name ?? '앱';
+    AppTeam.assertWriter(actor, ranks, menu?.agentId ?? null, app?.agentId ?? null, where);
   }
 
   /** 올릴 메뉴 (공유 잠금: 올리는 동안 지워지지 않게). null은 빼기 */
@@ -158,6 +208,8 @@ export class PostService extends EntityService<Post> {
     const content = PostContent.write(title, body);
     const scope = actor instanceof AgentActor ? actor.taskId : (actor.id ?? spaceId);
     await this.lookups.assertVisible('wiki', actor, req.wikiIds, PostService.NO_WIKI);
+    const placing = req.menuId !== undefined || req.appId !== undefined || req.issueId != null;
+    const ranks = placing ? await this.ranksOf(actor) : [];
     return this.transaction(async (tx) => {
       const posts = new PostRepository(tx);
       const once = new Idempotency(tx, scope, req.requestId, PostService.DRAFT);
@@ -175,10 +227,10 @@ export class PostService extends EntityService<Post> {
         post.edit(content, req.changes, actor, now);
       }
       post.linkWikis(req.mainWikiId, req.refWikiIds, actor, now);
-      if (req.menuId !== undefined)
-        post.placeIn(post.appId, await this.menuOf(tx, spaceId, req.menuId), actor, now);
+      if (req.menuId !== undefined || req.appId !== undefined)
+        await this.placeDraft(tx, spaceId, post, req, actor, ranks, now);
       if (req.issueId !== undefined)
-        await this.intoIssue(tx, spaceId, post, req.issueId, actor, now);
+        await this.intoIssue(tx, spaceId, post, req.issueId, actor, ranks, now);
       await posts.save(post);
       await once.remember({ postId: post.id });
       return post;

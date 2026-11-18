@@ -93,6 +93,8 @@ export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
           visibility: r.visibility,
           sort: r.sort,
           ...(r.icon_blob_hash === null ? {} : { icon: r.icon_blob_hash }),
+          // 첫 화면 고정 (스토어 2단계)만 싣는다. 운영 팀장은 에이전트가 백업에 없고, 편집 방침은 공개 저장소로 갈 수 있어 싣지 않는다
+          ...(r.home ? { home: true } : {}),
         },
       ]);
       return r.visibility === App.PUBLIC ? file : file.keptPrivate();

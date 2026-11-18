@@ -20,12 +20,15 @@ import { AppRepository } from './app.repository';
  * 앱과 메뉴 · 페이지를 한 번에 만드는 이 줄만 메뉴 · 페이지의 Repository를 함께 쓴다 (IssueService와 같은 예외)
  */
 export class AppEdit {
-  /** 대화로 바꾸는 앱 (get_settings apps · propose_setting app). 종류 · 시작 메뉴는 만들 때만, 공개 여부는 없다 */
+  /**
+   * 대화로 바꾸는 앱 (get_settings apps · propose_setting app). 종류 · 시작 메뉴는 만들 때만, 공개 여부 · 첫 화면 고정은 없다.
+   * 운영 팀장 · 편집 방침은 스토어 2단계 (팀장 확인은 AppService가 트랜잭션 전에)
+   */
   static readonly SETTING: SettingShape = {
     setting: 'app',
     list: 'apps',
     ops: ['create', 'edit'],
-    fields: ['name', 'slug', 'kind', 'description', 'sort', 'menus'],
+    fields: ['name', 'slug', 'kind', 'description', 'sort', 'menus', 'agent_id', 'policy'],
     target: 'id',
     versioned: true,
     grants: [],
@@ -74,8 +77,10 @@ export class AppEdit {
 
   /** 설정 바꾸기 하나: body는 get_settings와 같은 칸, key는 만들기의 requestId */
   apply(change: SettingChangeInput, now: Date): Promise<App> {
-    const { kind, menus, ...fields } = change.body;
-    if ('visibility' in fields) throw new RuleViolation('공개 여부는 관리자가 앱 관리에서 바꿔요');
+    const { kind, menus, agent_id: agentId, ...rest } = change.body;
+    if ('visibility' in rest || 'home' in rest)
+      throw new RuleViolation('공개 여부 · 첫 화면은 관리자가 앱 관리에서 바꿔요');
+    const fields = { ...rest, ...(agentId === undefined ? {} : { agentId }) };
     if (change.op === 'create')
       return this.create(
         CreateAppInput.from({ ...fields, kind, menus, requestId: change.key }),

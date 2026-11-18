@@ -127,6 +127,7 @@ describe('앱 (/api/apps)', () => {
       slug: app.slug,
       description: '공개할 앱',
       iconUrl: null,
+      home: false,
     });
     const listed = (ok(await api.get('/api/apps')).apps as Json[]).find((a) => a.slug === app.slug);
     assert.deepEqual(listed, seen);

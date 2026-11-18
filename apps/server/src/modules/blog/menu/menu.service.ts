@@ -5,7 +5,6 @@ import {
   Database,
   EntityService,
   Idempotency,
-  NotFound,
   RuleViolation,
   SettingActor,
   type SettingChangeInput,
@@ -13,6 +12,7 @@ import {
   type Sql,
   type VersionInput,
 } from '../../platform';
+import { AppTeam } from '../app/app-team.policy';
 import type { MenuRow } from '../blog.tables';
 import { Menu } from './menu';
 import type { CreateMenuInput, UpdateMenuInput } from './menu.input';
@@ -105,14 +105,9 @@ export class MenuService extends EntityService<Menu> {
     return this.assertTeam(actor, typeof agentId === 'string' ? { agent_id: agentId } : {});
   }
 
-  /** 운영 팀으로 고른 에이전트: 이 공간에 있고 read_all이 없어야 한다 */
+  /** 운영 팀장으로 고른 에이전트: 이 공간에 있고 read_all이 없어야 한다 (깊이는 보지 않는다, AppTeam) */
   private async assertTeam(actor: Actor, fields: Partial<MenuRow>): Promise<void> {
     if (!fields.agent_id) return;
-    const agent = await this.agents.find(actor, fields.agent_id);
-    if (!agent) throw new NotFound('에이전트를 찾을 수 없어요');
-    if (agent.scopes.includes(Actor.READ_ALL))
-      throw new RuleViolation(
-        `${agent.name}은(는) 비공개를 읽는 에이전트라 메뉴의 운영 팀이 될 수 없어요`,
-      );
+    AppTeam.assertLeader(await this.agents.find(actor, fields.agent_id), false);
   }
 }
