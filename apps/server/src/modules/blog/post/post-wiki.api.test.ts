@@ -95,6 +95,7 @@ async function newWiki(open: boolean): Promise<Json> {
 async function create(more: Json = {}): Promise<Json> {
   return ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: named('글'),
       body: '본문',
@@ -119,13 +120,25 @@ const save = async (post: Json, more: Json = {}): Promise<Json> => ok(await save
 
 const read = async (id: unknown): Promise<Json> => ok(await api.get(`/api/posts/${id}`, owner));
 
-const setStatus = async (post: Json, status: string): Promise<Json> =>
-  ok(
+/** 공개하려면 앱에 든 글이어야 한다 (스토어 1단계): 앱 밖의 글(AI의 초안)은 관리자가 먼저 앱에 넣는다 */
+const setStatus = async (post: Json, status: string): Promise<Json> => {
+  const placed =
+    post.appId === null
+      ? ok(
+          await api.request('POST', `/api/posts/${post.id}/menu`, owner, {
+            version: post.version,
+            menuId: null,
+            appId: await api.blogApp(owner),
+          }),
+        )
+      : post;
+  return ok(
     await api.request('POST', `/api/posts/${post.id}/status`, owner, {
-      version: post.version,
+      version: placed.version,
       status,
     }),
   );
+};
 
 async function drain(): Promise<void> {
   for (let i = 0; i < 200 && (await worker.tick()) > 0; i++);
@@ -550,12 +563,23 @@ describe('그래프까지', () => {
   test('결재한 공개도 연결을 싣고, 결재 결과는 그대로다', async () => {
     const [a, b] = [await newWiki(true), await newWiki(true)];
     const { task, token } = await lease(['read_public', 'write']);
+    // 공개는 앱에 든 글만 (스토어 1단계): AI는 초안을 메뉴에 올려 그 메뉴의 앱에 넣는다
+    const menu = ok(
+      await api.request('POST', '/api/menus', owner, {
+        requestId: randomUUID(),
+        appId: await api.blogApp(owner),
+        kind: 'posts',
+        name: named('결재 메뉴'),
+      }),
+      201,
+    );
     const saved = await call(token, 'blog_save_draft', {
       request_id: 'first-draft',
       title: named('결재할 글'),
       body_md: '본문',
       main_wiki_id: a.id,
       ref_wiki_ids: [b.id],
+      menu_id: menu.id,
     });
     const asked = await call(token, 'request_approval', {
       request_id: `approval-${saved.version}`,

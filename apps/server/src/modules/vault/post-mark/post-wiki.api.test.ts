@@ -34,6 +34,7 @@ const newWiki = async (): Promise<Json> =>
 const newPost = async (more: Json = {}): Promise<Json> =>
   ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `글 ${randomUUID().slice(0, 8)}`,
       body: '본문',

@@ -178,7 +178,11 @@ describe('담기 (POST /api/basket/items)', () => {
 
   test('글: 있어야 담고, 제목을 정하면 그 제목으로. 휴지통 글은 404', async () => {
     const post = ok(
-      await api.request('POST', '/api/posts', owner, { requestId: randomUUID(), title: '담을 글' }),
+      await api.request('POST', '/api/posts', owner, {
+        appId: await api.blogApp(owner),
+        requestId: randomUUID(),
+        title: '담을 글',
+      }),
       201,
     );
     const item = ok(await add({ kind: 'post', refId: post.id }), 201);
@@ -212,7 +216,11 @@ describe('담기 (POST /api/basket/items)', () => {
 describe('지우기 (DELETE /api/basket/items/:id)', () => {
   test('소재만 지운다. 다시 지우면 404', async () => {
     const post = ok(
-      await api.request('POST', '/api/posts', owner, { requestId: randomUUID(), title: '남을 글' }),
+      await api.request('POST', '/api/posts', owner, {
+        appId: await api.blogApp(owner),
+        requestId: randomUUID(),
+        title: '남을 글',
+      }),
       201,
     );
     const item = ok(await add({ kind: 'post', refId: post.id }), 201);

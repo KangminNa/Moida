@@ -136,6 +136,7 @@ before(async () => {
   });
   post = ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `보관 글 ${randomUUID()}`,
       body: '글 본문',

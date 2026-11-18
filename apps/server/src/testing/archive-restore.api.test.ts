@@ -155,6 +155,7 @@ class Cairn {
     const { api, owner } = this;
     const made = ok(
       await api.request('POST', '/api/posts', owner, {
+        appId: await api.blogApp(owner),
         requestId: randomUUID(),
         title,
         body,
@@ -641,7 +642,8 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
   test('결과를 알린다', () => {
     assert.equal(report.counts.get('세션'), 7);
     assert.equal(report.counts.get('원문'), 3);
-    assert.deepEqual(report.notes, []);
+    // 앱을 싣지 않은 백업: 글은 기본 앱 하나에 (스토어 1단계, 마이그레이션과 같은 규칙)
+    assert.deepEqual(report.notes, ['글 4개를 블로그 앱(/blog)에 넣었어요']);
   });
 
   test('id·종류가 그대로이고 판은 첫 판 하나다', async () => {

@@ -8,6 +8,11 @@ export interface MenuListRow extends MenuRow {
   items: number;
 }
 
+/** 방문자의 메뉴 한 줄과 함께 읽는 칸: 든 앱의 주소 */
+export interface PublicMenuRow extends MenuRow {
+  app: string;
+}
+
 /** 메뉴 하나 (관리자) */
 export class MenuView {
   constructor(
@@ -20,8 +25,10 @@ export class MenuView {
     const r = this.row;
     return {
       id: r.id,
+      /** 든 앱 (스토어 1단계, 만들 때만 정한다) */
+      appId: r.app_id,
       name: r.name,
-      /** 바깥 주소 /m/<slug> */
+      /** 바깥 주소 /<앱>/m/<slug> */
       slug: r.slug,
       /** posts(글 목록) · issues(호 목록) · pages(페이지 모음) · page(페이지 하나) */
       kind: r.kind,
@@ -48,13 +55,19 @@ export class MenuListView {
   }
 }
 
-/** 공개 블로그의 메뉴 줄 (방문자 · 기기). 설정 칸은 싣지 않는다 */
+/** 공개 앱의 메뉴 줄 (방문자 · 기기). 설정 칸은 싣지 않는다. app은 든 앱의 주소 */
 export class PublicMenuListView {
-  constructor(private readonly rows: readonly Readonly<MenuRow>[]) {}
+  constructor(private readonly rows: readonly Readonly<PublicMenuRow>[]) {}
 
   toJSON() {
     return {
-      menus: this.rows.map((r) => ({ name: r.name, slug: r.slug, kind: r.kind, rss: r.rss })),
+      menus: this.rows.map((r) => ({
+        app: r.app,
+        name: r.name,
+        slug: r.slug,
+        kind: r.kind,
+        rss: r.rss,
+      })),
     };
   }
 }
@@ -93,6 +106,7 @@ export class MenuSettingView {
     return {
       id: r.id,
       version: r.version,
+      app_id: r.app_id,
       name: r.name,
       slug: r.slug,
       kind: r.kind,

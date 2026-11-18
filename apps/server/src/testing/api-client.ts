@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { CairnApp } from '../cairn-app';
 import { InstallPolicy, ServerRunnerPolicy } from '../modules/account';
@@ -183,6 +183,35 @@ export class ApiClient {
     if (done.status !== 200 || !session)
       throw new Error(`로그인 실패: ${done.status} ${done.text}`);
     return new TestUser({ cairn_session: session });
+  }
+
+  /**
+   * 글을 넣을 공개 앱 (스토어 1단계: 앱에 든 글만 공개된다). 주소 blog의 앱을 찾고, 없으면 블로그 앱을 만들어 공개로 바꾼다.
+   * 시험이 같은 DB를 함께 써서 찾거나 만든다. 앱 id를 돌려준다
+   */
+  async blogApp(owner: TestUser): Promise<string> {
+    const { apps } = (await this.get('/api/apps', owner)).json() as {
+      apps: { id: string; slug: string; visibility: string; version: number }[];
+    };
+    const found = apps.find((a) => a.slug === 'blog');
+    const app =
+      found ??
+      ((
+        await this.request('POST', '/api/apps', owner, {
+          requestId: randomUUID(),
+          kind: 'blog',
+          name: '블로그',
+          slug: 'blog',
+        })
+      ).json() as { id: string; visibility: string; version: number });
+    if (app.visibility !== 'public') {
+      const res = await this.request('PATCH', `/api/apps/${app.id}`, owner, {
+        version: app.version,
+        visibility: 'public',
+      });
+      if (res.status !== 200) throw new Error(`앱을 공개하지 못했어요: ${res.status} ${res.text}`);
+    }
+    return app.id;
   }
 
   /**

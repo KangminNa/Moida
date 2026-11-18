@@ -12,6 +12,8 @@ let api: ApiClient;
 let owner: TestUser;
 /** write 권한을 준 기기의 Bearer 머리글. 관리 일은 이 기기에게도 막혀야 한다 */
 let writer: Readonly<Record<string, string>>;
+/** 메뉴를 둘 공개 앱 (스토어 1단계: 메뉴는 앱 하나에 든다) */
+let app: string;
 const mark = randomUUID().slice(0, 6);
 
 function ok(res: ApiResult, status = 200): Json {
@@ -20,11 +22,12 @@ function ok(res: ApiResult, status = 200): Json {
 }
 
 const create = (body: Json, as = owner, headers: Record<string, string> = {}) =>
-  api.request('POST', '/api/menus', as, { requestId: randomUUID(), ...body }, headers);
+  api.request('POST', '/api/menus', as, { requestId: randomUUID(), appId: app, ...body }, headers);
 
 before(async () => {
   api = await ApiClient.start();
   owner = await api.signIn();
+  app = await api.blogApp(owner);
   writer = { authorization: `Bearer ${await api.writeDevice(owner, `menu-writer-${mark}`)}` };
 });
 after(() => api.close());
@@ -34,6 +37,7 @@ describe('메뉴 (/api/menus)', () => {
     const requestId = randomUUID();
     const body = {
       requestId,
+      appId: app,
       kind: 'posts',
       name: `에세이 ${mark}`,
       policy: '일기 말투로',
@@ -54,7 +58,13 @@ describe('메뉴 (/api/menus)', () => {
     for (const headers of [{}, writer]) {
       const seen = ok(await api.request('GET', '/api/menus', TestUser.visitor, undefined, headers));
       const menu = (seen.menus as Json[]).find((m) => m.slug === made.slug);
-      assert.deepEqual(menu, { name: `에세이 ${mark}`, slug: made.slug, kind: 'posts', rss: true });
+      assert.deepEqual(menu, {
+        app: 'blog',
+        name: `에세이 ${mark}`,
+        slug: made.slug,
+        kind: 'posts',
+        rss: true,
+      });
     }
   });
 
@@ -181,6 +191,7 @@ describe('메뉴 (/api/menus)', () => {
     const pages = ok(await create({ kind: 'pages', name: `페이지들 ${mark}` }), 201);
     const post = ok(
       await api.request('POST', '/api/posts', owner, {
+        appId: await api.blogApp(owner),
         requestId: randomUUID(),
         title: `메뉴 글 ${mark}`,
         body: '본문',

@@ -45,6 +45,8 @@ let worker: OutboxWorker;
 let runner: string;
 /** write 권한을 준 기기 */
 let writer: string;
+/** AI가 초안을 올릴 메뉴 (스토어 1단계: 공개는 앱에 든 글만, 메뉴에 올리면 그 메뉴의 앱에 든다) */
+let menuId: string;
 /** 이 파일이 만든 에이전트 (끝나면 멈춘다) */
 const agents: Json[] = [];
 
@@ -140,6 +142,7 @@ async function draftAndAsk(action = 'blog.post.publish') {
     title,
     body_md: '소재에서 읽은 본문',
     tags: ['cairn'],
+    menu_id: menuId,
   });
   const asked = await call(token, 'request_approval', {
     request_id: `approval-${saved.version}`,
@@ -190,6 +193,13 @@ async function deliverAgain(approvalId: unknown): Promise<void> {
 before(async () => {
   api = await ApiClient.start();
   owner = await api.signIn();
+  const menu = await api.request('POST', '/api/menus', owner, {
+    requestId: randomUUID(),
+    appId: await api.blogApp(owner),
+    kind: 'posts',
+    name: `결재 글 ${randomUUID().slice(0, 6)}`,
+  });
+  menuId = (menu.json() as { id: string }).id;
   db = api.service(Database);
   worker = api.service(OutboxWorker);
   api.service(CoreWorkers).on('blog.post.*', seen);
@@ -253,6 +263,7 @@ describe('결재한 공개', () => {
       slug: draft.slug,
       title,
       status: 'published',
+      appId: post.appId,
       postVersion: post.version,
       mainWikiId: null,
       refWikiIds: [],
@@ -500,6 +511,7 @@ describe('공개하는 길', () => {
   test('사람의 공개에는 결재 결과가 붙지 않는다', async () => {
     const created = ok(
       await api.request('POST', '/api/posts', owner, {
+        appId: await api.blogApp(owner),
         requestId: randomUUID(),
         title: `사람이 올린 글 ${randomUUID().slice(0, 8)}`,
         body: '본문',

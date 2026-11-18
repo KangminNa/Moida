@@ -68,6 +68,8 @@ export class CreatePostInput extends BaseRequest {
     readonly fields: Partial<Unchecked<PostRow>>,
     readonly mainWikiId: string | null | undefined,
     readonly refWikiIds: readonly string[] | undefined,
+    /** 넣을 앱 (스토어 1단계). 없으면 앱에 없는 글로 시작한다 */
+    readonly appId: string | null,
   ) {
     super();
   }
@@ -88,6 +90,7 @@ export class CreatePostInput extends BaseRequest {
           editorColumns(f),
           mainWikiOf(f, raw, 'mainWikiId'),
           refWikisOf(f, 'refWikiIds'),
+          menuOf(f, raw, 'appId') ?? null,
         ),
     );
   }
@@ -167,7 +170,7 @@ export class PostVersionInput extends BaseRequest {
   }
 }
 
-/** 글 목록 (GET /api/posts?status=&cursor=). status: draft · published · unlisted · trash, 없으면 휴지통 말고 전부 */
+/** 글 목록 (GET /api/posts?status=&cursor=&app=&menu=). status: draft · published · unlisted · trash, 없으면 휴지통 말고 전부 */
 export class ListPostsInput extends BaseRequest {
   static readonly TRASH = 'trash';
   private static readonly FILTERS: readonly string[] = [...POST_STATUS, ListPostsInput.TRASH];
@@ -177,8 +180,10 @@ export class ListPostsInput extends BaseRequest {
     readonly status: string | null,
     /** 이 시각·id보다 앞(더 오래된) 글부터 */
     readonly before: readonly [Date, string] | null,
-    /** 이 메뉴(주소)에 올린 글만 (2차 6단계, 공개 블로그의 /m/<주소>) */
+    /** 이 메뉴(주소)에 올린 글만 (2차 6단계, 공개 앱의 /<앱>/m/<주소>). 메뉴 주소는 앱 안에서 하나라 app과 함께 */
     readonly menu: string | null = null,
+    /** 이 앱(주소)에 든 글만 (스토어 1단계, 앱 첫 화면) */
+    readonly app: string | null = null,
   ) {
     super();
   }
@@ -186,6 +191,7 @@ export class ListPostsInput extends BaseRequest {
   static from(query: unknown): ListPostsInput {
     return BaseRequest.read(query, (f) => {
       const menu = f.optionalText('menu', 200);
+      const app = f.optionalText('app', 200);
       const status = f.optionalText('status', 20);
       if (status !== null && !ListPostsInput.FILTERS.includes(status))
         f.reject('status', `${ListPostsInput.FILTERS.join(' · ')} 중 하나예요`);
@@ -197,6 +203,7 @@ export class ListPostsInput extends BaseRequest {
         status,
         match?.[1] && match[2] ? [new Date(match[1]), match[2]] : null,
         menu,
+        app,
       );
     });
   }
@@ -277,12 +284,16 @@ function menuOf(f: RequestFields, raw: unknown, name: string): string | null | u
   return body[name] === null ? null : f.uuid(name);
 }
 
-/** POST /api/posts/:id/menu: 메뉴에 올리기 · 빼기 (2차 6단계, 관리자). 본 version을 함께 보낸다 */
+/**
+ * POST /api/posts/:id/menu: 앱 · 메뉴에 올리기 · 빼기 (2차 6단계 · 스토어 1단계, 관리자). 본 version을 함께 보낸다.
+ * appId: 메뉴 없이 앱만 (null은 앱에서 빼기, 보내지 않으면 지금 앱 그대로). 메뉴를 주면 앱은 그 메뉴의 앱이다
+ */
 export class PostMenuInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
     readonly menuId: string | null,
+    readonly appId: string | null | undefined,
   ) {
     super();
   }
@@ -291,7 +302,7 @@ export class PostMenuInput extends BaseRequest {
     return BaseRequest.read(withId(id, raw), (f) => {
       const menuId = menuOf(f, raw, 'menuId');
       if (menuId === undefined) f.reject('menuId', '메뉴 id나 null이어야 해요');
-      return new PostMenuInput(f.uuid('id'), f.version(), menuId ?? null);
+      return new PostMenuInput(f.uuid('id'), f.version(), menuId ?? null, menuOf(f, raw, 'appId'));
     });
   }
 }

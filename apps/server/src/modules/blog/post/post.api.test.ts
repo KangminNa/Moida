@@ -13,6 +13,7 @@ type Saved = { id: string; slug: string; version: number; status: string; revise
 
 async function create(title: string, more: Record<string, unknown> = {}): Promise<Saved> {
   const res = await api.request('POST', '/api/posts', owner, {
+    appId: await api.blogApp(owner),
     requestId: randomUUID(),
     title,
     body: `${title} 본문`,
@@ -92,7 +93,11 @@ describe('글 쓰기와 고치기', () => {
   });
 
   test('모양이 틀리면 400, 방문자가 쓰려 하면 403', async () => {
-    const bad = await api.request('POST', '/api/posts', owner, { requestId: 'x', title: '' });
+    const bad = await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
+      requestId: 'x',
+      title: '',
+    });
     assert.equal(bad.status, 400);
     assert.deepEqual(Object.keys(bad.json().fields as object).sort(), ['requestId', 'title']);
     const visitor = await api.request('POST', '/api/posts', TestUser.visitor, {
@@ -120,6 +125,7 @@ describe('공개 범위', () => {
     assert.equal(res.json().counts, undefined);
     const first = (res.json().posts as Record<string, unknown>[])[0] ?? {};
     assert.deepEqual(Object.keys(first).sort(), [
+      'app',
       'excerpt',
       'publishedAt',
       'slug',

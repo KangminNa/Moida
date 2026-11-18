@@ -182,12 +182,18 @@ export class PostRestore extends ArchivePart {
     return PostRestore.present([['글', count]]);
   }
 
+  /**
+   * 글은 앱 하나에 넣는다 (스토어 1단계): 앱이 없는 백업은 마이그레이션과 같은 규칙으로 기본 앱(블로그, /blog, 공개) 하나에.
+   * 앱을 싣는 보관 형식(blog/apps.yml)은 1-3단계에서
+   */
   async write(tx: Sql, spaceId: string): Promise<readonly string[]> {
+    if (this.posts.length === 0) return [];
     const repository = new PostRestoreRepository(tx);
+    const appId = await repository.defaultApp(spaceId);
     for (const post of this.posts) {
       const photos = post.photos.filter((hash) => this.photos.has(hash));
-      await repository.save(spaceId, post, photos);
+      await repository.save(spaceId, post, photos, appId);
     }
-    return [];
+    return [`글 ${this.posts.length}개를 블로그 앱(/blog)에 넣었어요`];
   }
 }

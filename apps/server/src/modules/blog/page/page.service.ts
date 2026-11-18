@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type Actor, EntityService, type Sql } from '../../platform';
+import { AppRepository } from '../app/app.repository';
 import { MenuRepository } from '../menu/menu.repository';
 import { Page } from './page';
 import type { EditPageInput, PageBuiltInput, SwitchPageInput } from './page.input';
@@ -44,7 +45,7 @@ export class PageService extends EntityService<Page> {
     });
   }
 
-  /** 제목 · 공개 범위 · 방향 · 메뉴 (메뉴를 정하면 그 메뉴를 잠가 페이지 하나 메뉴에 둘이 들어가지 않게) */
+  /** 제목 · 공개 범위 · 방향 · 앱 · 메뉴 (메뉴를 정하면 그 메뉴를 잠가 페이지 하나 메뉴에 둘이 들어가지 않게) */
   async edit(actor: Actor, req: EditPageInput): Promise<Page> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
@@ -54,6 +55,14 @@ export class PageService extends EntityService<Page> {
       page.assertVersion(req.version);
       const now = new Date();
       page.edit(req.title, req.visibility, req.direction, now);
+      if (req.appId !== undefined) {
+        // 페이지 앱의 페이지는 앱과 함께 정해져 옮기지 않는다 (앱을 지우면 풀린다)
+        const apps = new AppRepository(tx);
+        if (page.appId !== null) (await apps.holder(spaceId, page.appId)).assertLoosePages();
+        const app = req.appId === null ? null : await apps.holder(spaceId, req.appId);
+        app?.assertLoosePages();
+        page.moveToApp(app?.id ?? null, now);
+      }
       if (req.menuId !== undefined) {
         const menu =
           req.menuId === null

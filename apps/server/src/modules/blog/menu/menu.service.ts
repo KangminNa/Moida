@@ -46,7 +46,7 @@ export class MenuService extends EntityService<Menu> {
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, MenuService.CREATE);
       const before = await once.previous();
       if (before) return items.load(spaceId, String(before.id));
-      const menu = new MenuEdit(tx, spaceId).open(req, new Date());
+      const menu = await new MenuEdit(tx, spaceId).open(req, new Date());
       await items.save(menu);
       await once.remember({ id: menu.id });
       return menu;

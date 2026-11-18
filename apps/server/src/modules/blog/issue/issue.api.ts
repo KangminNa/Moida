@@ -34,13 +34,14 @@ export class IssueController {
     return this.query.list(actor, ListIssuesInput.from(query));
   }
 
-  @Get('by-number/:menu/:number')
+  @Get('by-number/:app/:menu/:number')
   byNumber(
     @CurrentActor() actor: Actor,
+    @Param('app') app: string,
     @Param('menu') menu: string,
     @Param('number') number: string,
   ): Promise<PublicIssueView> {
-    return this.query.byNumber(actor, IssueNumberInput.from(menu, number));
+    return this.query.byNumber(actor, IssueNumberInput.from(app, menu, number));
   }
 
   @Get(':id')

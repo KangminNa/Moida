@@ -81,28 +81,41 @@ export class IssuePostsInput extends BaseRequest {
 
 /** GET /api/issues?menu=: 이 메뉴(주소)의 호 */
 export class ListIssuesInput extends BaseRequest {
-  private constructor(readonly menu: string | null) {
+  private constructor(
+    readonly menu: string | null,
+    /** 이 앱(주소)의 호만 (스토어 1단계: 매거진 앱의 첫 화면, 메뉴 주소는 앱 안에서 하나) */
+    readonly app: string | null,
+  ) {
     super();
   }
 
   static from(query: unknown): ListIssuesInput {
-    return BaseRequest.read(query ?? {}, (f) => new ListIssuesInput(f.optionalText('menu', 200)));
+    return BaseRequest.read(
+      query ?? {},
+      (f) => new ListIssuesInput(f.optionalText('menu', 200), f.optionalText('app', 200)),
+    );
   }
 }
 
-/** GET /api/issues/by-number/:menu/:number: 방문자가 여는 호 하나 */
+/** GET /api/issues/by-number/:app/:menu/:number: 방문자가 여는 호 하나 (메뉴 주소는 앱 안에서 하나) */
 export class IssueNumberInput extends BaseRequest {
   private constructor(
+    readonly app: string,
     readonly menu: string,
     readonly number: number,
   ) {
     super();
   }
 
-  static from(menu: string, number: string): IssueNumberInput {
+  static from(app: string, menu: string, number: string): IssueNumberInput {
     return BaseRequest.read(
-      { menu, number: Number(number) },
-      (f) => new IssueNumberInput(f.text('menu', 200), f.integer('number', 1, 100_000)),
+      { app, menu, number: Number(number) },
+      (f) =>
+        new IssueNumberInput(
+          f.text('app', 200),
+          f.text('menu', 200),
+          f.integer('number', 1, 100_000),
+        ),
     );
   }
 }

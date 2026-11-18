@@ -62,14 +62,15 @@ export class IssueService extends EntityService<Issue> {
       issue.assertVersion(req.version);
       issue.assertDraft();
       const now = new Date();
+      const appId = (await new MenuRepository(tx).holder(spaceId, issue.menuId)).appId;
       for (const post of await posts.lockInIssue(spaceId, issue.id))
         if (!req.postIds.includes(post.id)) {
-          post.joinIssue(null, 0, actor, now);
+          post.joinIssue(null, null, 0, actor, now);
           await posts.save(post);
         }
       for (const [index, id] of req.postIds.entries()) {
         const post = await posts.lock(spaceId, id);
-        post.joinIssue(issue.id, index + 1, actor, now);
+        post.joinIssue(issue.id, appId, index + 1, actor, now);
         await posts.save(post);
       }
       issue.edit(null, null, now);
@@ -90,7 +91,7 @@ export class IssueService extends EntityService<Issue> {
       issue.assertDraft();
       const now = new Date();
       for (const post of await posts.lockInIssue(spaceId, issue.id)) {
-        post.joinIssue(null, 0, actor, now);
+        post.joinIssue(null, null, 0, actor, now);
         await posts.save(post);
       }
       await issues.remove(issue);

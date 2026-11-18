@@ -4,9 +4,16 @@ import type { PostRow } from '../blog.tables';
 // 표의 칸 중 무엇을 내보내는지는 여기 한 곳에만 적는다.
 // 보는 사람마다 View가 다르다: 비공개를 볼 수 없는 요청자(방문자)용은 Public…, 주인용은 이름 그대로. Query가 고른다.
 
-/** 누구에게나 보이는 칸 */
-function publicColumns(r: Readonly<PostRow>) {
+/** 읽기에서 글 한 줄과 함께 읽는 칸: 든 앱의 주소 · 이름 (스토어 1단계, 앱에 없는 글은 null) */
+export interface PostAppRow extends PostRow {
+  app_slug: string | null;
+  app_name: string | null;
+}
+
+/** 누구에게나 보이는 칸. app: 든 앱 (바깥 주소 /<앱>/posts/<글>) */
+function publicColumns(r: Readonly<PostAppRow>) {
   return {
+    app: r.app_slug === null ? null : { slug: r.app_slug, name: r.app_name ?? '' },
     slug: r.slug,
     title: r.title ?? '',
     excerpt: r.excerpt ?? '',
@@ -24,14 +31,15 @@ function ownerColumns(r: Readonly<PostRow>, revisionCount: number) {
     updatedAt: r.updated_at.toISOString(),
     deletedAt: r.deleted_at?.toISOString() ?? null,
     version: r.version,
-    /** 올린 메뉴 · 호 (2차 6단계). 없으면 null */
+    /** 든 앱 · 올린 메뉴 · 호 (스토어 1단계 · 2차 6단계). 없으면 null */
+    appId: r.app_id,
     menuId: r.menu_id,
     issueId: r.issue_id,
   };
 }
 
 /** 글 페이지의 칸 (방문자와 주인 모두). listed: 목록에 보이는 글인가 (링크만 글은 검색 엔진에도 알리지 않게 화면이 noindex를 단다) */
-function pageColumns(r: Readonly<PostRow>, body: string) {
+function pageColumns(r: Readonly<PostAppRow>, body: string) {
   return {
     ...publicColumns(r),
     body,
@@ -44,6 +52,7 @@ function pageColumns(r: Readonly<PostRow>, body: string) {
 function savedColumns(r: Readonly<PostRow>, body: string, revisionCount: number, revised: boolean) {
   return {
     id: r.id,
+    appId: r.app_id,
     menuId: r.menu_id,
     issueId: r.issue_id,
     slug: r.slug,
@@ -65,7 +74,7 @@ function savedColumns(r: Readonly<PostRow>, body: string, revisionCount: number,
 /** 글 목록의 한 줄 (주인): 공개 범위·판 수·버전까지 */
 export class PostSummaryView {
   constructor(
-    private readonly row: Readonly<PostRow>,
+    private readonly row: Readonly<PostAppRow>,
     private readonly revisionCount: number,
   ) {}
 
@@ -76,7 +85,7 @@ export class PostSummaryView {
 
 /** 방문자에게 보이는 글 목록의 한 줄: 읽을 것만 */
 export class PublicPostSummaryView {
-  constructor(private readonly row: Readonly<PostRow>) {}
+  constructor(private readonly row: Readonly<PostAppRow>) {}
 
   toJSON() {
     return publicColumns(this.row);
@@ -134,7 +143,7 @@ export class PublicPostPageView {
 /** 글 하나 (주인의 미리 보기·편집기·결재): 목록 정보 + 본문, 공개 범위·버전과 wiki 연결까지 */
 export class PostView {
   constructor(
-    private readonly row: Readonly<PostRow>,
+    private readonly row: Readonly<PostAppRow>,
     private readonly body: string,
     private readonly revisionCount: number,
     private readonly refWikiIds: readonly string[],
@@ -153,7 +162,7 @@ export class PostView {
 /** 방문자의 글 페이지 */
 export class PublicPostView {
   constructor(
-    private readonly row: Readonly<PostRow>,
+    private readonly row: Readonly<PostAppRow>,
     private readonly body: string,
   ) {}
 

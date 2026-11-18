@@ -1,11 +1,11 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { type Actor, CurrentActor, VersionInput } from '../../platform';
-import { CreateMenuInput, UpdateMenuInput } from './menu.input';
+import { CreateMenuInput, ListMenusInput, UpdateMenuInput } from './menu.input';
 import { MenuQuery } from './menu.query';
 import { MenuService } from './menu.service';
 import type { MenuListView, MenuView, PublicMenuListView } from './menu.view';
 
-// 블로그 메뉴 API (2차 6단계). 목록은 누구나(관리자는 설정까지), 만들기 · 고치기 · 지우기는 관리자만.
+// 블로그 메뉴 API (2차 6단계). 목록은 누구나(관리자는 설정까지, 방문자는 공개 앱의 메뉴만), 만들기 · 고치기 · 지우기는 관리자만.
 @Controller('api/menus')
 export class MenuController {
   constructor(
@@ -14,8 +14,11 @@ export class MenuController {
   ) {}
 
   @Get()
-  list(@CurrentActor() actor: Actor): Promise<MenuListView | PublicMenuListView> {
-    return this.query.list(actor);
+  list(
+    @CurrentActor() actor: Actor,
+    @Query() query: unknown,
+  ): Promise<MenuListView | PublicMenuListView> {
+    return this.query.list(actor, ListMenusInput.from(query));
   }
 
   @Post()

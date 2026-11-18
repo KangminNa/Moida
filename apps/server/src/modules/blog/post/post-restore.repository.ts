@@ -13,9 +13,27 @@ export class PostRestoreRepository {
     return Number(row?.n);
   }
 
-  /** photos: 이 글에 붙일 사진 중 파일이 들어온 것 (행에 외래키가 있다) */
-  async save(spaceId: string, p: RestoredPost, photos: readonly string[]): Promise<void> {
-    await this.tx`INSERT INTO blog.posts ${this.tx(p.rowIn(spaceId) as never)}`;
+  /** 복원한 글을 넣을 기본 앱 (블로그, 주소 blog, 공개: 마이그레이션과 같은 규칙). 이미 있으면 그 앱 */
+  async defaultApp(spaceId: string): Promise<string> {
+    await this.tx`
+      INSERT INTO blog.apps (space_id, kind, name, slug, visibility)
+      VALUES (${spaceId}, 'blog', '블로그', 'blog', 'public')
+      ON CONFLICT (space_id, slug) DO NOTHING`;
+    const [row] = await this.tx<{ id: string }[]>`
+      SELECT id FROM blog.apps WHERE space_id = ${spaceId} AND slug = 'blog'`;
+    if (!row) throw new Error('기본 앱을 만들지 못했어요');
+    return row.id;
+  }
+
+  /** photos: 이 글에 붙일 사진 중 파일이 들어온 것 (행에 외래키가 있다). appId: 넣을 앱 */
+  async save(
+    spaceId: string,
+    p: RestoredPost,
+    photos: readonly string[],
+    appId: string,
+  ): Promise<void> {
+    await this
+      .tx`INSERT INTO blog.posts ${this.tx({ ...p.rowIn(spaceId), app_id: appId } as never)}`;
     await this.tx`INSERT INTO blog.post_revisions ${this.tx(p.revision as never)}`;
     for (const wikiId of p.refWikiIds)
       await this.tx`INSERT INTO blog.post_wiki_refs ${this.tx({ post_id: p.id, wiki_id: wikiId })}`;

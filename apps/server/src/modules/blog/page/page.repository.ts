@@ -1,4 +1,4 @@
-import { TableRepository } from '../../platform';
+import { RuleViolation, TableRepository } from '../../platform';
 import { pageRevisions, pages } from '../blog.schema';
 import type { PageRow } from '../blog.tables';
 import { Page } from './page';
@@ -34,6 +34,18 @@ export class PageRepository extends TableRepository<PageRow, Page> {
     const taken = new Set(rows.map((r) => r.name));
     if (!taken.has(wanted)) return wanted;
     for (let n = 2; ; n += 1) if (!taken.has(`${wanted}-${n}`)) return `${wanted}-${n}`;
+  }
+
+  /** 페이지 앱을 만들며 넣을 페이지 (잠근다). 이미 다른 앱에 든 페이지는 넣지 않는다 */
+  async lockForApp(spaceId: string, pageId: string): Promise<Page> {
+    const page = await this.lock(spaceId, pageId);
+    if (page.appId !== null) throw new RuleViolation('이미 앱에 든 페이지예요');
+    return page;
+  }
+
+  /** 앱에 든 페이지를 잠근다 (페이지 앱을 지울 때 그 페이지를 앱 밖으로) */
+  async lockInApp(spaceId: string, appId: string): Promise<Page[]> {
+    return this.find({ space_id: spaceId, app_id: appId }, { lock: true });
   }
 
   /** 메뉴에 있는 다른 페이지의 수 (페이지 하나 메뉴는 하나만) */

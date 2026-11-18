@@ -19,7 +19,8 @@ export class PageView {
       /** 확인을 기다리는 판 (공개 페이지의 새 판). 없으면 null */
       pendingSeq: r.pending_seq,
       direction: r.direction,
-      /** 올린 메뉴 (2차 6단계). 없으면 null */
+      /** 든 앱 · 올린 메뉴 (스토어 1단계 · 2차 6단계). 없으면 null */
+      appId: r.app_id,
       menuId: r.menu_id,
       revisions: r.revisions,
       version: r.version,

@@ -42,6 +42,7 @@ async function upload(
 
 async function newPost(status?: string): Promise<Saved> {
   const res = await api.request('POST', '/api/posts', owner, {
+    appId: await api.blogApp(owner),
     requestId: randomUUID(),
     title: `사진 글 ${randomUUID()}`,
   });

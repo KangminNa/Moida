@@ -59,6 +59,7 @@ describe('쓰지 않는 파일 지우기', () => {
 
   test('아무도 가리키지 않는 오래된 파일만 지운다. 글의 사진과 새 파일은 남는다', async () => {
     const created = await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `사진 글 ${randomUUID()}`,
     });

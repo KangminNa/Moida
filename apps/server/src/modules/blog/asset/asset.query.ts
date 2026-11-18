@@ -1,6 +1,7 @@
 import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
 import { type Actor, BaseQuery, type Blob, BlobStore, Database, NotFound } from '../../platform';
+import { App } from '../app/app';
 import { Post } from '../post/post';
 
 /** 내보낼 파일 하나: 정보와 내용. open: 방문자도 볼 수 있는 파일인가 */
@@ -56,8 +57,9 @@ export class AssetQuery extends BaseQuery {
     const [row] = await this.sql<{ open: boolean }[]>`
       SELECT EXISTS (
         SELECT 1 FROM blog.assets a JOIN blog.posts p ON p.id = a.post_id
+          JOIN blog.apps g ON g.id = p.app_id
         WHERE a.blob_hash = ${hash} AND p.deleted_at IS NULL
-          AND p.status IN (${Post.PUBLISHED}, ${Post.UNLISTED})
+          AND p.status IN (${Post.PUBLISHED}, ${Post.UNLISTED}) AND g.visibility = ${App.PUBLIC}
       ) AS open`;
     return row?.open === true;
   }

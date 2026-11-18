@@ -38,6 +38,7 @@ before(async () => {
   collector = await api.connectDevice(owner, `library-collector-${mark}`, 'collect');
   made.post = ok(
     await api.request('POST', '/api/posts', owner, {
+      appId: await api.blogApp(owner),
       requestId: randomUUID(),
       title: `글 ${mark}`,
       body: '본문',
