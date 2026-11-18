@@ -355,10 +355,14 @@ export const TRIGGER_LABELS: Record<string, string> = {
   after: '다른 레시피가 끝난 뒤',
 };
 
-/** 대화의 받을 것 (chats.deliver). 비우면 대화 답 */
+/** 받을 것 (대화 · 회차 · 레시피, O-3). 비우면 대표가 회차마다 정한다 */
 export const DELIVER_LABELS: Record<string, string> = {
-  html: 'HTML 페이지',
+  answer: '짧은 답',
+  file: '파일',
+  html: '페이지 (HTML)',
+  app_code: '앱 코드',
   blog: '블로그 글',
   browser: '브라우저 동작',
   code: '코드 (PR)',
+  setting: '설정 · 자동화',
 };

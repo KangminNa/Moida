@@ -3494,6 +3494,13 @@ ul.picked > .chip {
   font-size: 0.8125rem;
 }
 
+/* 결과물을 내는 회차의 긴 답 (O-3): 세 줄쯤 보이고 아래로 흐려진다. "펼치기"로 전부 */
+.answer-fold {
+  max-height: 5.4em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+
 /* 과정: 접어 둔다 (팀이 무엇을 하는지는 펼쳐야 보인다) */
 .chat-process {
   align-self: flex-start;
