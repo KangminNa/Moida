@@ -306,7 +306,7 @@ describe('스케줄 (/api/schedules)', () => {
       ok(await api.request('POST', `/api/tasks/${id}/cancel`, owner, { version }));
     };
 
-    test('대화로 보내면 대표가 처음엔 대화를 열고(없으면 대표를 만든다), 다음 차례부터 같은 대화의 회차. 지킬 것은 지시 뒤에, 받을 것은 대화의 받을 것', async () => {
+    test('대화로 보내면 대표가 처음엔 대화를 열고(없으면 대표를 만든다), 다음 차례부터 같은 대화의 회차. 지킬 것은 지시 뒤에, 받을 것은 회차마다 (받을 것을 고쳐도 같은 대화)', async () => {
       const recipe = {
         ...DAILY,
         title: '주간 보고',
@@ -333,7 +333,12 @@ describe('스케줄 (/api/schedules)', () => {
       assert.ok(opened?.chatId, '연 대화를 기억한다');
       const { chat } = ok(await api.get(`/api/chats/${opened?.chatId}`, owner)) as { chat: Json };
       const { lead } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
-      assert.deepEqual([chat.agentId, chat.turns, chat.deliver], [lead.id, 1, 'html']);
+      assert.deepEqual([chat.agentId, chat.turns, chat.deliver], [lead.id, 1, null]);
+      const deliverOf = async (taskId: string) =>
+        (
+          await db.sql`SELECT payload->'chat'->>'deliver' AS d FROM task.tasks WHERE id = ${taskId}`
+        )[0]?.d;
+      assert.equal(await deliverOf(first.id), 'html', '받을 것은 회차에 싣는다 (O-4)');
 
       await makeDue(schedule, 2);
       await job.run();
@@ -345,6 +350,35 @@ describe('스케줄 (/api/schedules)', () => {
       assert.equal(turns.length, 2);
       const again = ok(await api.get(`/api/chats/${opened?.chatId}`, owner)) as { chat: Json };
       assert.equal(again.chat.turns, 2, '같은 대화의 다음 회차');
+
+      // 받을 것을 고쳐도 같은 대화에 이어 쌓이고, 다음 회차가 새 받을 것을 싣는다 (O-4)
+      await cancel(String(turns[1]?.id));
+      const [now] = (await list()).filter((s) => s.id === schedule.id);
+      const edited = ok(
+        await api.request('PATCH', `/api/schedules/${schedule.id}`, owner, {
+          ...recipe,
+          deliver: 'file',
+          version: now?.version,
+        }),
+      );
+      assert.equal(edited.chatId, opened?.chatId, '대화에 묶인 채로');
+      await makeDue(schedule, 1);
+      await job.run();
+      const third = (await turnsOf(schedule))[2];
+      assert.ok(third, '같은 대화의 셋째 회차');
+      assert.equal(await deliverOf(third.id), 'file');
+      // 대화가 아닌 곳으로 보내게 바꾸면 대화를 놓는다
+      await cancel(third.id);
+      const [later] = (await list()).filter((s) => s.id === schedule.id);
+      const moved = ok(
+        await api.request('PATCH', `/api/schedules/${schedule.id}`, owner, {
+          ...recipe,
+          destination: 'task',
+          deliver: null,
+          version: later?.version,
+        }),
+      );
+      assert.equal(moved.chatId, null);
     });
 
     test('대화로 보내는 레시피는 대표가 맡아 담당을 비운다 (O-2), 받을 것은 대화에만 (422)', async () => {

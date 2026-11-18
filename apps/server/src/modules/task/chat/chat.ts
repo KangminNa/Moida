@@ -301,7 +301,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * 대표가 맡는다 (O-2): 맡기 전의 첫 메시지로 첫 회차를 연다. 새 대화는 열 때 바로,
    * O-2 전에 배정을 기다리던 대화는 다음 말에서 (그 말은 첫 회차에 덧붙인 말이 된다)
    */
-  assign(lead: Agent, now: Date): Task {
+  assign(lead: Agent, now: Date, deliver: string | null = null): Task {
     const message = this.row.pending;
     if (this.row.agent_id !== null || message === null) throw new Conflict('이미 맡은 대화예요');
     Chat.assertPartner(lead);
@@ -312,6 +312,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     return this.send(lead, this.row.request_id, message, [], now, {
       deviceId: this.row.device_id,
       refs,
+      deliver,
     });
   }
 

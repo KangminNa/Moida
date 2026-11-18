@@ -241,13 +241,15 @@ describe('Schedule', () => {
     assert.equal(daily({ trigger: 'after', after_id: 'other', enabled: false }).follow(NOW), null);
   });
 
-  test('대화 레시피: 연 대화를 기억하고, 받을 것 · 어디로가 바뀌면 다음 차례에 새 대화', () => {
+  test('대화 레시피: 연 대화를 기억하고, 받을 것을 바꿔도 그 대화에 남는다 (O-4). 대화가 아닌 곳으로 보내면 놓는다', () => {
     const recipe = settings({ destination: 'chat', agent_id: null, instruction: '주간 보고' });
     const chat = daily(recipe);
     chat.openedChat('chat-1');
     chat.configure({ ...recipe, title: '이름만 바꿈' }, NOW);
     assert.equal(chat.chatId, 'chat-1');
     chat.configure({ ...recipe, deliver: 'html' }, NOW);
+    assert.equal(chat.chatId, 'chat-1', '받을 것은 회차마다 싣는다');
+    chat.configure({ ...recipe, destination: 'task' }, NOW);
     assert.equal(chat.chatId, null);
   });
 

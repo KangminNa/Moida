@@ -189,13 +189,9 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('time_zone', timeZone);
     this.put('instruction', instruction);
     this.put('goal_id', goalId);
-    // 대화의 받을 것은 대화를 열 때 정해진다: 바뀌면 다음 차례에 새 대화를 연다 (상대는 늘 대표, O-2)
-    const before = this.row;
-    const reopen =
-      before.agent_id !== agentId ||
-      before.deliver !== recipe.deliver ||
-      recipe.destination !== Schedule.CHAT;
-    if (reopen) this.put('chat_id', null);
+    // 회차를 쌓는 대화는 대화로 보내는 동안 그대로 둔다 (O-4: 상대는 늘 대표, 받을 것은 회차마다 싣는다).
+    // 대화가 아닌 곳으로 보내게 바뀌면 놓는다 (다시 대화로 보내면 다음 차례에 새 대화를 연다)
+    if (recipe.destination !== Schedule.CHAT) this.put('chat_id', null);
     this.put('page_id', pageId);
     this.put('destination', recipe.destination);
     this.put('deliver', recipe.deliver);

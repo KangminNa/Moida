@@ -209,7 +209,7 @@ export class ScheduleService extends EntityService<Schedule> {
 
   /**
    * 레시피 한 번: 어디로에 따라 작업 하나(task · page)나 대표의 대화 회차 하나(chat). 처음 도는 대화 레시피는 대화를 열고
-   * 기억한다 (그 대화의 받을 것이 레시피의 받을 것). 대화에서 승인해 그 대화에 묶인 레시피는(O-3) 회차마다 받을 것을 싣는다.
+   * 기억한다. 받을 것은 회차마다 싣는다 (O-3 · O-4: 대표가 바꾸지 못하고, 레시피를 고쳐도 같은 대화에 이어 쌓인다).
    * 만든 작업, 같은 차례의 일이 이미 있으면 null
    */
   private async start(
@@ -233,8 +233,9 @@ export class ScheduleService extends EntityService<Schedule> {
     const chats = new ChatRepository(tx);
     const requestId = schedule.requestIdFor(slot);
     if (chatId === null) {
-      const chat = Chat.open(spaceId, requestId, instruction, now, { deliver: schedule.deliver });
-      const turn = chat.assign(lead, now);
+      // 받을 것은 대화가 아니라 회차마다 싣는다 (O-4): 레시피의 받을 것이 바뀌어도 같은 대화에 이어 쌓인다
+      const chat = Chat.open(spaceId, requestId, instruction, now);
+      const turn = chat.assign(lead, now, schedule.deliver);
       await chats.save(chat);
       schedule.openedChat(chat.id);
       await new ScheduleRepository(tx).save(schedule);
