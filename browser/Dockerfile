@@ -4,6 +4,15 @@
 # neko 서버(실시간 영상 · 원격 입력 · 비밀번호)는 쓰지 않아 끈다 (2차 3단계): 영상 포트 · 비밀번호가 없다.
 FROM ghcr.io/m1k1o/neko/chromium@sha256:270face8b8111e639744fb7bcdbbf0deed227900bb89d58b2f8adfc12af8c41e
 COPY browser/chromium.conf /etc/neko/supervisord/chromium.conf
+# Chrome을 띄우기 전에 남은 프로필 잠금(Singleton*)을 지운다 (2026-11-18). 프로필은 볼륨이라 컨테이너를 다시 만들면
+# 호스트 이름이 바뀌고, 앞 Chrome이 깔끔히 끝나지 못해 잠금이 남아 있으면 Chrome이 "다른 컴퓨터가 쓰는 프로필"로 보고
+# 프로세스만 살아 있고 창도 조종 포트(9222)도 열지 않는다. 이 컨테이너의 Chrome은 supervisord가 하나만 띄우고
+# 끝난 뒤에만 다시 띄우므로 시작할 때 지워도 두 Chrome이 한 프로필을 함께 쓰는 일은 없다. 쿠키 · 로그인은 그대로다.
+# 스크립트를 저장소 파일로 두지 않고 여기서 만든다: Windows에서 받은 저장소는 줄바꿈이 CRLF가 되어 셸이 읽지 못한다
+RUN printf '%s\n' '#!/bin/sh' \
+    'rm -f /home/neko/.config/chromium/SingletonLock /home/neko/.config/chromium/SingletonSocket /home/neko/.config/chromium/SingletonCookie' \
+    'exec /usr/bin/chromium "$@"' > /usr/local/bin/cairn-chromium \
+  && chmod 755 /usr/local/bin/cairn-chromium
 # 정책: CDP 허락(RemoteDebuggingAllowed · DeveloperToolsAvailability 1), 쿠키를 끈 뒤에도 유지(DefaultCookiesSetting 1:
 # 이미지의 기본 프로필은 "세션에만 쿠키"라 끄면 로그인이 지워졌다), 내려받기 · 파일 열기 · 확장 프로그램 막기,
 # 이 서버 · compose 서비스 · 메타데이터 이름 막기(URLBlocklist: IP 대역은 적을 수 없어 둘러보기는 러너의 프록시가 막는다),
