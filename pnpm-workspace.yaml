@@ -16,3 +16,11 @@ overrides:
   fast-uri: ^3.1.9
   ip-address: ^10.7.4
   multer: ^2.5.0
+
+# pnpm audit(CI의 --audit-level high)에서 빼는 보안 권고. 항목마다 까닭과 지우는 때를 적는다 (사용자 결정 2026-11-18)
+auditConfig:
+  ignoreGhsas:
+    # picomatch ReDoS (GHSA-fc5q-39xc-vjpf, 4.0.7 이하 전부): 패치 버전이 아직 없어 업그레이드로 막을 수 없다.
+    # 개발 도구 knip만 쓰고 운영 이미지에는 없다(서버는 pnpm deploy --prod). knip에 넣는 패턴은 저장소의 설정 파일뿐이다.
+    # picomatch 패치 버전이 나오면 overrides로 올리고 이 줄을 지운다
+    - GHSA-fc5q-39xc-vjpf
