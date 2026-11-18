@@ -29,6 +29,11 @@ RUN pnpm install --frozen-lockfile
 # /data/blobs: 사진 볼륨 자리. 빈 볼륨은 이미지의 폴더 소유자를 물려받는다.
 # 개발 compose로 만든 볼륨을 운영 compose가 이어 써도 node 사용자가 쓸 수 있게 여기서도 node로 둔다
 FROM deps AS dev
+# git: 러너 통합 테스트의 코드 작업(테스트용 git 저장소 · clone · push)이 이 이미지 안에서 돈다 (apps/runner/e2e/run.mjs).
+# 운영 서버 이미지(server)에는 넣지 않는다. 코드 러너 칸(code-runner)은 따로 설치한다
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git \
+ && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN printf '#!/bin/sh\nexec pnpm --silent --filter @cairn/server cli "$@"\n' > /usr/local/bin/cairn-admin \
     && chmod +x /usr/local/bin/cairn-admin \
