@@ -675,6 +675,29 @@ describe('러너가 일을 처리한다', () => {
     assert.ok(String(prompt).includes('남은 위임 횟수: 2'));
   });
 
+  test('대화는 대표가 맡고(O-2), 대표의 지시문에는 lead 단락과 맨 위 팀장 목록이 들어간다', async () => {
+    const head = await newAgent({ name: '대표 아래 팀장' });
+    const spy = new Spy();
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        // 표시는 둘째 줄에: 첫 줄은 회차 작업의 제목(60자로 자름)이 되어 가짜 CLI가 잘린 표시를 읽는다
+        message: `이번 주 글감을 정리해 줘\n${spy.mark}`,
+      }),
+      201,
+    );
+    const { lead } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
+    assert.equal(chat.agentId, lead.id);
+    const { prompt } = await spy.seen();
+    assert.ok(String(prompt).includes('# 대표로 일하는 법'));
+    assert.ok(String(prompt).includes('continue: true'));
+    assert.ok(String(prompt).includes(`대표 아래 팀장 (agent_id: ${head.id})`));
+    await until('대표의 회차가 끝남', async () => {
+      const room = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { turns: Json[] };
+      return room.turns[0]?.status === 'done' ? room : null;
+    });
+  });
+
   test('에이전트가 멈추면 AI CLI를 끄고 일을 돌려준다', async () => {
     const agent = await newAgent();
     const spy = new Spy();

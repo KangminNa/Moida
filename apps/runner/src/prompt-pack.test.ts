@@ -139,6 +139,7 @@ describe('PromptPack', () => {
       'subtask',
       'site',
       'team',
+      'lead',
       'member',
       'skill',
       'work',
@@ -148,6 +149,7 @@ describe('PromptPack', () => {
       'code-replay',
       'make',
       'recipe',
+      'setting-continue',
     ])
       assert.doesNotThrow(() => pack.fill(name), name);
   });
