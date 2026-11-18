@@ -67,11 +67,13 @@ export function ChatTurns({
               who={
                 t.fixBy === 'review'
                   ? '검토 반영 · 검토자가 남긴 고칠 것'
-                  : t.fix
-                    ? '검사 · 받을 것이 없어 다시 맡김'
-                    : t.fromDevice
-                      ? '기기의 AI 도구'
-                      : me
+                  : t.fixBy === 'setting'
+                    ? '승인 뒤 이어서 · 승인한 설정이 적용됨'
+                    : t.fix
+                      ? '검사 · 받을 것이 없어 다시 맡김'
+                      : t.fromDevice
+                        ? '기기의 AI 도구'
+                        : me
               }
               at={t.createdAt}
               text={t.message}
@@ -153,7 +155,7 @@ function Mine({ who, at, text }: { who: string; at?: string; text: string }) {
   );
 }
 
-/** 맡기 전의 주고받음: 질문(지금 질문의 고를 것은 아래 ChatQuestion) · 글로 한 답 · 맡음 */
+/** 맡기 전의 주고받음 (O-2 전 대화의 기록): 질문 · 글로 한 답 · 맡음 */
 function Before({ items, me }: { items: readonly ChatNews[]; me: string }) {
   return items.map((n) =>
     n.kind === 'appended' ? (

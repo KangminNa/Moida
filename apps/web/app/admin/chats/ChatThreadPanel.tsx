@@ -6,25 +6,24 @@ import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { tokens } from '../../_task/labels';
-import { CHAT_DETAIL_TOPICS, useAgents } from '../../_task/live';
+import { CHAT_DETAIL_TOPICS, useLead } from '../../_task/live';
 import type { Chat, ChatDetail, OutputSaved } from '../../_task/types';
 import { ChatCardForm } from './ChatCardForm';
 import { ChatForm, type ChatMessageBody } from './ChatForm';
-import { ChatQuestion } from './ChatQuestion';
 import type { RefChoice } from './ChatRefs';
 import { ChatRuntimeForm } from './ChatRuntimeForm';
 import { ChatTeamPanel } from './ChatTeamPanel';
 import { ChatTurns } from './ChatTurns';
 
 /** 도는 상태 (멈추기가 보인다) */
-const RUNNING = ['routing', 'working'];
+const RUNNING = ['working'];
 /** 끝나지 않은 회차 작업의 상태 (이때 보내면 덧붙인 말) */
 const TURN_OPEN = ['queued', 'running', 'waiting'];
 
 // 대화 하나 (2차 1-5, ChatGPT · Claude 같은 모양): 가운데 주고받음, 아래 입력 칸 하나.
 // 팀이 일하는 동안에는 오른쪽에 "팀이 동시에 일하는 중" 칸이 붙는다 (ChatTeamPanel, 좁은 화면에서는 숨긴다).
-// 맡기 전에는 질문의 고를 것(ChatQuestion)이 아래에 붙고, 승인은 결과 카드 하나로 정한다 (2차 2단계).
-// 일하는 중에도 보낸다: 덧붙인 말이 되고 맡은 에이전트가 짧게 답한다 (2차 1-1). 신호가 오면 다시 읽는다
+// 상대는 늘 대표 (O-2): 대표가 팀에 나눠 맡기고, 승인은 결과 카드 하나로 정한다 (2차 2단계).
+// 일하는 중에도 보낸다: 덧붙인 말이 되고 대표가 짧게 답한다 (2차 1-1). 신호가 오면 다시 읽는다
 export function ChatThreadPanel({ id }: { id: string }) {
   // 대상(id)으로 거르지 않는다: 신호의 대상은 회차 작업 · 승인이라 대화 id가 아니다
   const detail = useLiveValue(
@@ -39,7 +38,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const stopping = useAction();
   const tuning = useAction();
   const uploading = useAction();
-  const agents = useAgents();
+  const lead = useLead();
   /** 응답을 못 받아 다시 보내도 메시지가 한 번만 가게 (보낸 뒤에만 바꾼다) */
   const requestId = useRef('');
   if (!requestId.current) requestId.current = crypto.randomUUID();
@@ -48,7 +47,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const bottom = useRef<HTMLDivElement>(null);
   const d = detail.data;
 
-  // 새 회차 · 답 · 질문 · 카드가 오면 맨 아래로
+  // 새 회차 · 답 · 카드가 오면 맨 아래로
   // biome-ignore lint/correctness/useExhaustiveDependencies: 주고받음의 길이와 상태가 바뀔 때만
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
@@ -63,25 +62,13 @@ export function ChatThreadPanel({ id }: { id: string }) {
       <p className="label-mono">불러오는 중…</p>
     );
 
-  const { partner, question } = d;
-  const blocked = !partner
-    ? null
-    : partner.deleted
-      ? '삭제한 에이전트라 보낼 수 없어요 (복원하면 이어서)'
-      : !partner.topLevel
-        ? '팀원이 된 에이전트예요. 관리자 바로 아래 에이전트와만 대화해요'
-        : partner.paused
-          ? '멈춘 에이전트예요. 재개하면 보낼 수 있어요'
-          : null;
-  const hint = question
-    ? null
-    : d.state === 'routing'
-      ? '맡길 곳 찾는 중. 보내면 함께 봐요'
-      : d.state === 'working'
-        ? '일하는 중. 보내면 덧붙인 말이 되고 짧게 답해요 (회차마다 5개)'
-        : null;
+  // 상대가 없으면(O-2 전에 맡기 전이던 대화) 보내는 말에 대표가 맡는다
+  const { partner } = d;
+  const blocked = partner?.paused ? '대표를 멈췄어요. 설정 › AI에서 다시 시작해요' : null;
+  const hint =
+    d.state === 'working' ? '일하는 중. 보내면 덧붙인 말이 되고 짧게 답해요 (회차마다 5개)' : null;
 
-  async function send(body: ChatMessageBody & { choice?: string }) {
+  async function send(body: ChatMessageBody) {
     const reply = await sending.run(
       'send',
       () =>
@@ -141,9 +128,9 @@ export function ChatThreadPanel({ id }: { id: string }) {
     return { kind: 'output', id: reply.data.id, title: file.name, url: null, browser: false };
   }
 
-  const tool = agents.data?.agents.find((a) => a.id === d.chat.agentId)?.tool ?? null;
-  // 참조는 새 회차에만: 앞 회차가 끝나지 않았으면 덧붙인 말, 맡기 전이면 질문의 답이라 받지 않는다 (서버 ChatHistory.waiting과 같은 규칙)
-  const refsEnabled = !!partner && !question && !TURN_OPEN.includes(d.turns.at(-1)?.status ?? '');
+  const tool = lead.data?.lead?.id === d.chat.agentId ? lead.data.lead.tool : null;
+  // 참조는 새 회차에만: 앞 회차가 끝나지 않았거나 맡기 전이면 덧붙인 말이라 받지 않는다 (서버 ChatHistory.waiting과 같은 규칙)
+  const refsEnabled = !!partner && !TURN_OPEN.includes(d.turns.at(-1)?.status ?? '');
 
   const cancel = (taskId: string, version: number) =>
     cancelling.run(taskId, () => api('POST', `/api/tasks/${taskId}/cancel`, { version }), {
@@ -166,7 +153,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
             </small>
           )}
           {d.chat.deviceId && <span className="pill">기기에서</span>}
-          {tool && partner && !partner.deleted && (
+          {tool && (
             <ChatRuntimeForm
               key={d.chat.version}
               tool={tool}
@@ -202,18 +189,6 @@ export function ChatThreadPanel({ id }: { id: string }) {
           onCancel={cancel}
         />
         {cancelling.problem && <p className="error">{cancelling.problem}</p>}
-        {d.state === 'routing' && d.turns.length === 0 && (
-          <p className="chat-event" aria-live="polite">
-            맡길 곳 찾는 중…
-          </p>
-        )}
-        {question && (
-          <ChatQuestion
-            question={question}
-            busy={sending.busy !== null}
-            onPick={(c) => send({ message: c.name, choice: c.id })}
-          />
-        )}
         {d.card && (
           <ChatCardForm
             key={`${d.card.id}:${d.card.version}`}

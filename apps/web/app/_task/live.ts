@@ -6,6 +6,7 @@ import type { Device } from '../_account/types';
 import { type ApiReply, api } from '../_lib/client-api';
 import { useLiveValue } from '../_lib/use-live';
 import type {
+  AgentLead,
   AgentList,
   AiTools,
   ApprovalPage,
@@ -60,6 +61,11 @@ export function useChats() {
 
 export function useAgents() {
   return useLiveValue('agents', () => api<AgentList>('GET', '/api/agents'), AGENT_TOPICS);
+}
+
+/** 공간의 대표 (O-2): 대화의 상대. 목록(useAgents)에는 없다. 첫 대화 전이면 lead가 null */
+export function useLead() {
+  return useLiveValue('agent-lead', () => api<AgentLead>('GET', '/api/agents/lead'), AGENT_TOPICS);
 }
 
 /** 외부 도구 목록 (설정 › 외부 도구, 에이전트 폼의 허락 칸) */

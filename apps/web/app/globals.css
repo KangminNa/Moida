@@ -3537,56 +3537,6 @@ ul.picked > .chip {
   margin-bottom: 10px;
 }
 
-/* 맡기 전의 질문: 고를 것마다 이름과 맡는 일 */
-.chat-question {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chat-question > .text {
-  margin: 0;
-  font-size: 0.9375rem;
-}
-
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 520px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.choice {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  min-height: 56px;
-  padding: 10px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--bg);
-  color: var(--fg);
-  text-align: left;
-}
-
-.choice.first {
-  border-color: var(--accent);
-}
-
-.choice:hover {
-  background: var(--hover);
-}
-
-.choice small {
-  color: var(--muted);
-  font-size: 0.8125rem;
-}
-
 /* 결과 카드 (2차 2단계): 항목마다 고르는 칸, 검토 의견, 승인 · 수정 요청 · 반려 */
 /* 결과 카드: 떠 있는 카드 (선 대신 그림자), 승인은 크게 */
 .result-card {

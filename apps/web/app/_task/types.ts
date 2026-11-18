@@ -5,6 +5,7 @@ import type {
 } from '../../../../plugins/browser-tabs/server/click-views';
 import type { PullView, TaskAskView } from '../../../../plugins/code-github/server/views';
 import type {
+  AgentLeadView,
   AgentListView,
   AgentTeamListView,
   AgentTeamSavedView,
@@ -80,6 +81,8 @@ export type SettingChangeLine = NonNullable<Approval['changes']>[number];
 export type ApprovalPage = ReturnType<ApprovalPageView['toJSON']>;
 export type Agent = ReturnType<AgentView['toJSON']>;
 export type AgentList = ReturnType<AgentListView['toJSON']>;
+/** 공간의 대표 (O-2, 숨은 에이전트). 첫 대화 전이면 lead가 null */
+export type AgentLead = ReturnType<AgentLeadView['toJSON']>;
 /** 외부 도구 (2차 7단계). 토큰은 실리지 않는다 (hasSecret만) */
 export type ExternalToolList = ReturnType<ExternalToolListView['toJSON']>;
 export type ExternalTool = ExternalToolList['tools'][number];
@@ -122,8 +125,6 @@ export type ChatTeamMember = ChatDetail['team'][number];
 export type ChatCard = NonNullable<ChatDetail['card']>;
 /** 대화의 소식 한 줄 (과정 · 맡기 전의 질문 · 답 · 맡음) */
 export type ChatNews = ChatDetail['news'][number];
-/** 맡기 전의 지금 질문과 고를 에이전트 (2차 1-5) */
-export type ChatQuestion = NonNullable<ChatDetail['question']>;
 /** 대화가 쓴 토큰 (O-1): 대화 전체 · 에이전트별, 회차마다 */
 export type ChatUsage = ChatDetail['usage'];
 export type ChatTurnUsage = ChatUsage['turns'][number];
