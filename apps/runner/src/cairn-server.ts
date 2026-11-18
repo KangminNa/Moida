@@ -1,3 +1,4 @@
+import { AppCodeBase } from './app-code-base';
 import { ApprovedClick, BrowseJob } from './browse-job';
 import type { HeldButton } from './browser-page';
 import { Job } from './job';
@@ -265,6 +266,11 @@ export class CairnServer {
   /** 고칠 페이지의 가장 새 판 (blog page_base, 쥔 만들기 일의 것만). 처음 만드는 페이지면 null */
   async pageBase(taskId: string, stop?: AbortSignal): Promise<PageBase | null> {
     return PageBase.from(await this.mcp.call('page_base', { task_id: taskId }, 0, stop));
+  }
+
+  /** 고칠 앱의 지금 코드 (blog app_code_base, 쥔 만들기 일의 것만): 가장 새 버전, 없으면 시작 코드. 고칠 앱이 없으면 null */
+  async appCodeBase(taskId: string, stop?: AbortSignal): Promise<AppCodeBase | null> {
+    return AppCodeBase.from(await this.mcp.call('app_code_base', { task_id: taskId }, 0, stop));
   }
 
   /** browser-tabs: 빌린 browse 작업이 어디서 도는지 (사이트 · 둘러보기). 패키지가 꺼져 있거나 사이트가 없으면 ToolRefused */

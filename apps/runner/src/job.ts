@@ -145,6 +145,8 @@ export class Job {
     readonly lineage: JobLineage | null = null,
     /** 맡긴 팀장이 정한 결과 형식 (위임 계약 D1). 맡긴 일이 아니거나 정하지 않았으면 null */
     readonly deliver: string | null = null,
+    /** 결과를 앱 코드의 새 버전으로 내는 만들기 작업인가 (payload.appCode, 스토어 1-6). 받은 코드 위에 바뀐 파일만 낸다 */
+    readonly appCode = false,
   ) {}
 
   static from(raw: Json): Job {
@@ -190,6 +192,7 @@ export class Job {
       JobRefs.from(task.child('payload')),
       JobLineage.from(raw.child('run')),
       raw.optionalText('deliver'),
+      task.text('kind') === Job.MAKE && Boolean(task.child('payload').field('appCode')),
     );
   }
 
@@ -249,6 +252,7 @@ export class Job {
       this.refs,
       lineage,
       this.deliver,
+      this.appCode,
     );
   }
 

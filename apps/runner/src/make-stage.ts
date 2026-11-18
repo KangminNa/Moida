@@ -1,5 +1,8 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { AgentUser } from './agent-user';
+import type { AppCodeBase } from './app-code-base';
+import { AppCodeCheck, AppCodeEntry } from './app-code-check';
 import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import {
@@ -46,9 +49,10 @@ export class MakeMaterials {
 }
 
 // 만들기 작업의 앞뒤 (결과물 2차). 칸 안에서 AI가 셸로 PPT · 문서 · 영상을 만들어 outputs/에 두면 JobRun이 결과물로 올린다.
-//   앞: 자리 → 고칠 페이지의 지금 판(page_base, 글 파일을 inputs/page/에) → 재료 결과물을 표로 받아 inputs/에(러너)
-//       → 빈 작업 폴더 · 재료를 agent에게
-//   검사: outputs 폴더에 올릴 파일이 있는가, 페이지 일이면 문(index.html)이 있는가. 떨어지면 JobRun이 AI에게 한 번 더 맡긴다
+//   앞: 자리 → 고칠 페이지의 지금 판(page_base, 글 파일을 inputs/page/에) · 고칠 앱의 지금 코드(app_code_base, inputs/app/에)
+//       → 재료 결과물을 표로 받아 inputs/에(러너) → 빈 작업 폴더 · 재료를 agent에게
+//   검사: outputs 폴더에 올릴 파일이 있는가, 페이지 일이면 문(index.html)이 있는가, 앱 코드 일이면 묶음 · 템플릿(AppCodeCheck).
+//       떨어지면 JobRun이 AI에게 한 번 더 맡긴다. 앱 코드의 묶음 · 문법이 그래도 틀리면 실패로 끝낸다 (틀린 템플릿이 버전이 되지 않게)
 //   뒤: agent 프로세스를 모두 끄고(띄워 둔 변환기 · 서버) 요약을 결과로. 올린 결과물이 없으면 JobRun이 실패로 끝낸다
 //       (검사를 지나도 서버가 받지 않으면 없을 수 있다)
 // 재료 위키는 받지 않는다: 작업 토큰에 봉인한 허락으로 AI가 get_wiki로 읽는다 (지시문에 id만).
@@ -57,6 +61,8 @@ export class MakeStage implements SandboxStage {
   private static readonly SUMMARY_MAX = 4_000;
   /** 페이지의 문 (서버의 PageOrder.ENTRY) */
   private static readonly ENTRY = 'index.html';
+  /** 앱 코드의 cairn.json 한도 (서버의 AppCodeBundle.MANIFEST_BYTES_MAX) */
+  private static readonly MANIFEST_MAX = 16 * 1024;
   readonly awaitsApproval = false;
   readonly needsOutputs = true;
 
@@ -68,6 +74,8 @@ export class MakeStage implements SandboxStage {
   private gone: readonly string[] = [];
   /** 고칠 페이지의 가장 새 판과 그 글 파일을 둔 폴더 (자라는 페이지). 처음 만드는 페이지면 null */
   private base: { page: PageBase; dir: string } | null = null;
+  /** 고칠 앱의 지금 코드와 그 글 파일을 둔 폴더 (앱 코드 일만, 스토어 1-6) */
+  private app: { code: AppCodeBase; dir: string } | null = null;
   private unreached = false;
 
   constructor(
@@ -99,9 +107,10 @@ export class MakeStage implements SandboxStage {
     const { files, gone, room } = this;
     const { wikis } = this.materials;
     const materials = files.length > 0 || wikis.length > 0 || gone.length > 0;
-    if (!materials && !this.job.page) return null;
+    if (!materials && !this.job.page && !this.app) return null;
     const shown = room === null ? [] : files;
     const base = this.base;
+    const app = this.app;
     return prompts.fill('make', {
       materials,
       inputs: room?.inputsDir ?? null,
@@ -114,6 +123,13 @@ export class MakeStage implements SandboxStage {
       baseSeq: base?.page.seq ?? null,
       baseFiles: base?.page.listing ?? null,
       direction: base?.page.direction ?? null,
+      app: app !== null,
+      appName: app?.code.name ?? null,
+      appKind: app?.code.kind ?? null,
+      appVersion: app?.code.version ?? null,
+      appDir: app?.dir ?? null,
+      appFiles: app?.code.listing ?? null,
+      appHosts: app?.code.hosts.join(' · ') || null,
     });
   }
 
@@ -127,25 +143,30 @@ export class MakeStage implements SandboxStage {
     this.room = room;
     // 재료(payload.make)와 대화 · 위임으로 넣은 참조 결과물(payload.refs)을 함께 받는다 (2026-11-15 B)
     const outputs = [...new Set([...this.materials.outputs, ...this.job.refs.outputs])];
-    let page: PageBase | null = null;
-    if (this.job.page) {
-      try {
-        page = await this.server.pageBase(this.job.taskId, signal);
-      } catch (error) {
-        if (signal.aborted) return null;
-        if (error instanceof ToolRefused)
-          return failed(`고칠 페이지를 받지 못했어요: ${error.message}`);
-        if (error instanceof ServerUnreachable) {
-          this.unreached = true;
-          return RunEnding.release(`고칠 페이지를 받지 못해 돌려줘요: ${error.message}`);
-        }
-        throw error;
-      }
-    }
-    const inputs = outputs.length > 0 || page !== null ? await room.openInputs() : null;
+    const id = this.job.taskId;
+    const page = this.job.page
+      ? await this.fetchBase('고칠 페이지', () => this.server.pageBase(id, signal), signal, failed)
+      : null;
+    if (page instanceof RunEnding || page === undefined) return page ?? null;
+    const app = this.job.appCode
+      ? await this.fetchBase(
+          '고칠 앱 코드',
+          () => this.server.appCodeBase(id, signal),
+          signal,
+          failed,
+        )
+      : null;
+    if (app instanceof RunEnding || app === undefined) return app ?? null;
+    if (this.job.appCode && app === null) return failed('고칠 앱을 찾지 못했어요');
+    const opened = outputs.length > 0 || page !== null || app !== null;
+    const inputs = opened ? await room.openInputs() : null;
     if (page !== null && inputs !== null) {
       this.base = { page, dir: await page.writeTo(inputs) };
       note(new RunEvent(RunEvent.READ, `고칠 페이지의 버전 ${page.seq}를 받았어요`, 0));
+    }
+    if (app !== null && inputs !== null) {
+      this.app = { code: app, dir: await app.writeTo(inputs) };
+      note(new RunEvent(RunEvent.READ, `고칠 앱 코드(${app.version})를 받았어요`, 0));
     }
     if (outputs.length > 0 && inputs !== null) {
       const dir = inputs;
@@ -181,9 +202,32 @@ export class MakeStage implements SandboxStage {
   }
 
   /**
+   * 고칠 페이지 · 앱 코드를 서버에서 받는다. 서버가 거절하면 실패, 닿지 못하면 돌려주기(RunEnding),
+   * 멈췄으면 undefined (끝낼 것 없이 나간다)
+   */
+  private async fetchBase<T>(
+    what: string,
+    fetch: () => Promise<T>,
+    signal: AbortSignal,
+    failed: (error: string) => RunEnding,
+  ): Promise<T | RunEnding | undefined> {
+    try {
+      return await fetch();
+    } catch (error) {
+      if (signal.aborted) return undefined;
+      if (error instanceof ToolRefused) return failed(`${what}를 받지 못했어요: ${error.message}`);
+      if (error instanceof ServerUnreachable) {
+        this.unreached = true;
+        return RunEnding.release(`${what}를 받지 못해 돌려줘요: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
    * 만든 파일이 outputs 폴더 바로 아래에 있는가 (OutputBatch가 올리는 이름의 보통 파일).
    * 새 페이지를 만드는 일이면 문(index.html)도 (고치는 일은 바뀐 파일만 내도 된다: 서버의 PageOrder.refusal).
-   * 목록만 읽고 파일은 열지 않는다 (올릴 때 agent 권한으로 옮긴다)
+   * 앱 코드 일이면 받은 코드 위에 얹은 묶음 · 템플릿 (AppCodeCheck). 그 밖에는 목록만 읽고 파일은 열지 않는다
    */
   async check(): Promise<StageCheck[]> {
     if (this.room === null) return [];
@@ -197,6 +241,8 @@ export class MakeStage implements SandboxStage {
     const checks = [
       StageCheck.seen('결과물 파일', made, made ? `${names.length}개` : '없음', none),
     ];
+    if (this.app !== null)
+      return [...checks, ...AppCodeCheck.checks(this.app.code, await this.madeCode(dir, names))];
     if (!this.job.page || this.base !== null) return checks;
     const entry = names.includes(MakeStage.ENTRY);
     const why = `새 페이지는 ${dir}/${MakeStage.ENTRY}가 문이에요. 없으면 페이지가 되지 않아요`;
@@ -204,15 +250,41 @@ export class MakeStage implements SandboxStage {
     return checks;
   }
 
+  /**
+   * 앱 코드 일에서 AI가 낸 파일: 크기와, 템플릿 · cairn.json의 글. 글은 agent 권한으로 읽는다 (AI가 둔 링크를 러너가 따라가지 않게).
+   * 한도를 넘는 글은 null (검사가 떨어진다)
+   */
+  private async madeCode(dir: string, names: readonly string[]): Promise<AppCodeEntry[]> {
+    const made: AppCodeEntry[] = [];
+    for (const name of names) {
+      const path = join(dir, name);
+      const size = (await stat(path).catch(() => null))?.size ?? 0;
+      const max = AppCodeCheck.isTemplate(name)
+        ? AppCodeCheck.TEMPLATE_BYTES_MAX
+        : name === AppCodeCheck.MANIFEST
+          ? MakeStage.MANIFEST_MAX
+          : -1;
+      const text = max < 0 ? null : await this.agent.readFile(path, max);
+      made.push(new AppCodeEntry(name, size, text));
+    }
+    return made;
+  }
+
   async finish(
     summary: string,
-    _checks: readonly StageCheck[],
+    checks: readonly StageCheck[],
     _signal: AbortSignal,
     _note: (event: RunEvent) => void,
     redactor: Redactor,
   ): Promise<RunEnding> {
     // 결과물을 모으기 전에: AI가 띄워 둔 변환기 · 서버가 파일을 쥐고 있지 않게
     await this.agent.killAll();
+    // 앱 코드의 묶음 · 문법이 한 번 더 고친 뒤에도 틀리면 올리지 않는다 (틀린 템플릿이 버전이 되지 않게)
+    const broken = this.app === null ? null : AppCodeCheck.fatal(checks);
+    if (broken) {
+      const error = `앱 코드의 ${broken.name} 검사에 떨어져 새 버전을 만들지 않았어요 (${broken.how})`;
+      return RunEnding.submit(error, RunResult.failed(error, redactor));
+    }
     const brief = summary.trim().slice(0, MakeStage.SUMMARY_MAX) || '(요약 없음)';
     return RunEnding.submit('만들었어요', RunResult.done(brief, redactor));
   }
