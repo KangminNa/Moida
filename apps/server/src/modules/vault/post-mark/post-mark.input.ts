@@ -16,6 +16,8 @@ export class PostEventInput extends BaseRequest {
     readonly mainWikiId: string | null,
     readonly refWikiIds: readonly string[],
     readonly deleted: boolean,
+    /** 든 앱 (스토어 1-2). 앱 밖이면 null, 칸이 없는 옛 이벤트면 undefined (지금 값 그대로) */
+    readonly appId: string | null | undefined,
   ) {
     super();
   }
@@ -35,8 +37,13 @@ export class PostEventInput extends BaseRequest {
           PostEventInput.mainWiki(f, event.data),
           f.optionalTextList('refWikiIds', PostEventInput.REFS_MAX, 36) ?? [],
           event.name === PostEventInput.DELETED,
+          PostEventInput.app(f, event.data),
         ),
     );
+  }
+
+  private static app(f: RequestFields, data: DomainEvent['data']): string | null | undefined {
+    return data.appId === undefined || data.appId === null ? data.appId : f.uuid('appId');
   }
 
   private static mainWiki(f: RequestFields, data: DomainEvent['data']): string | null {

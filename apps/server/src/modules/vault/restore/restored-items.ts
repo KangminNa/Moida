@@ -229,8 +229,10 @@ export class RestoredPostMark extends BaseEntity {
       status: published ? RestoredPostMark.PUBLISHED : RestoredPostMark.DRAFT,
     };
     const mainWikiId = record.optionalId('cairn_main_wiki');
+    // 든 앱 (스토어 1-2): 앱을 싣는 백업(cairn_app, 1-3)만 안다. 모르면 비워 두어 방문자 그래프에서 숨긴다
+    const app = record.optionalId('cairn_app');
     return new RestoredPostMark(
-      { ...fields, ref_wiki_ids: record.ids('cairn_ref_wikis'), post_version: 1 },
+      { ...fields, ref_wiki_ids: record.ids('cairn_ref_wikis'), post_version: 1, app_id: app },
       mainWikiId,
     );
   }

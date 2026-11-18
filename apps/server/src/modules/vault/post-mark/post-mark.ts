@@ -27,6 +27,7 @@ export class PostMark extends TableEntity<LoadedPostMark, NewNode<PostMarkNew>> 
         main_wiki_id: null,
         ref_wiki_ids: [],
         post_version: 0,
+        app_id: null,
       },
       true,
     );
@@ -56,6 +57,8 @@ export class PostMark extends TableEntity<LoadedPostMark, NewNode<PostMarkNew>> 
     );
     this.put('main_wiki_id', live ? event.mainWikiId : null);
     this.put('ref_wiki_ids', live ? event.refWikiIds : []);
+    // 든 앱 (스토어 1-2): 방문자 그래프는 앱도 공개여야 보인다 (app_marks). 칸이 없는 옛 이벤트면 그대로
+    if (event.appId !== undefined) this.put('app_id', event.appId);
     this.put('post_version', event.postVersion);
     this.put('updated_at', now);
   }
