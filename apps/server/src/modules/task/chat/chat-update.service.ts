@@ -3,13 +3,17 @@ import {
   Actor,
   AgentActor,
   BaseService,
+  Conflict,
   Forbidden,
   RuleViolation,
   SystemActor,
 } from '../../platform';
+import { AgentRepository } from '../agent/agent.repository';
+import { TaskRepository } from '../task/task.repository';
 import { ChatRepository } from './chat.repository';
-import type { PostUpdateInput } from './chat-update.input';
+import type { PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
+import { DeliverSetView } from './chat-update.view';
 
 // 대화의 소식 쓰기 (task.chat_updates, 2차 1-1). 소식은 대화 엔티티를 거쳐 쌓이고(Chat.note) 변경 신호로 agent_updates를 깨운다.
 //   일꾼: 대화 안의 작업이 끝나면(task.task.changed) 팀원 끝남 · 실패 · 최종 답 · 덧붙인 말의 답 (ChatUpdateHandler)
@@ -48,6 +52,32 @@ export class ChatUpdateService extends BaseService {
       chat.post(req.kind, req.text, taskId, agentId, posted, now);
       await chats.save(chat);
       return chats.numberOf(chat.addedUpdates[0]?.id ?? '');
+    });
+  }
+
+  /**
+   * 이번 회차의 받을 것 (O-3, MCP set_deliver, 작업 토큰): 대표가 맡은 대화 회차(맨 위 작업)에서만, 끝나기 전에.
+   * 관리자 · 레시피가 대화에 정한 값(chats.deliver)이 있으면 그 값만 받는다 (TurnDeliver). 잠그는 순서는 작업 → (대화는 읽기만)
+   */
+  async setDeliver(actor: Actor, req: SetDeliverInput): Promise<DeliverSetView> {
+    actor.assertCan(Actor.AGENT);
+    if (!(actor instanceof AgentActor) || !actor.spaceId || !actor.id)
+      throw new Forbidden(Actor.AGENT);
+    const { spaceId, id: agentId, taskId } = actor;
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const task = await tasks.lockById(taskId);
+      const lead = await new AgentRepository(tx).findLead(spaceId);
+      if (task?.spaceId !== spaceId || task.agentId !== agentId || lead?.id !== agentId)
+        throw new Forbidden(Actor.AGENT, '대화 회차를 맡은 대표만 정해요');
+      if (!task.open) throw new Conflict('끝난 회차예요');
+      const chats = new ChatRepository(tx);
+      const place = await chats.placeOf(taskId);
+      if (!place) throw new Forbidden(Actor.AGENT, '대화 회차를 맡은 대표만 정해요');
+      const chat = await chats.load(spaceId, place.chat_id);
+      task.declareDeliver(req.deliver, req.note, chat.deliver);
+      await tasks.save(task);
+      return new DeliverSetView(chat.deliver ?? req.deliver, chat.deliver !== null);
     });
   }
 }

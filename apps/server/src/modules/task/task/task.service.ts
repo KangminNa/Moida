@@ -380,7 +380,7 @@ export class TaskService extends BaseService {
    * 작업에 적힌 판이 아니면 그사이 토큰을 바꾼 것이다: 옛 토큰의 결과를 새 토큰에 적지 않는다.
    */
   private async noteAiTest(tx: Sql, task: Task, now: Date): Promise<void> {
-    if (!task.isAiTest || !task.ended) return;
+    if (!task.is(Task.AI_TEST) || !task.ended) return;
     const logins = new AiLoginRepository(tx);
     const login = await logins.lockTool(task.spaceId, task.payloadTool ?? '');
     if (login === null || !task.tests(login.version)) return;

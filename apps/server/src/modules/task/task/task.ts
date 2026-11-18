@@ -13,6 +13,7 @@ import {
 import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
 import { Engines } from '../ai/engines';
+import { TurnDeliver } from '../chat/turn-deliver.policy';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
 import { TASK_EVENT_KIND } from '../task.tables';
@@ -71,10 +72,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 에이전트도 작업 토큰도 없다 (연결 확인과 같다)
    */
   static readonly AI_SIGNIN: TaskKind = 'ai_signin';
-  /**
-   * 대화의 배정 (2차 1-5): 새 대화를 어느 에이전트가 맡을지 AI가 한 번 고른다. 연결 확인처럼 에이전트 없이 지시문 하나를 돌리고,
-   * 답(JSON 한 줄)은 서버가 읽는다 (ChatRoute). payload: { tool, route: { chatId } }
-   */
   /**
    * 세션 노트 (2차 4단계): vault가 원문을 받으면 요청한다 (task.agentless.requested). 에이전트 없이 서버의 로그인으로,
    * 러너가 vault에서 원문을 받아(read_transcript) 지시문 틀 session-note로 쓰고 답을 vault에 보낸다(save_note).
@@ -216,18 +213,19 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return this.row.status === Task.CANCELLED;
   }
 
-  get isAiTest(): boolean {
-    return this.row.kind === Task.AI_TEST;
+  /** 이 종류의 일인가 (연결 확인 · 웹 로그인처럼 종류마다 다른 처리) */
+  is(kind: TaskKind): boolean {
+    return this.row.kind === kind;
   }
 
-  /** 에이전트 없이 러너가 바로 도는 일인가 (연결 확인, 웹 로그인, 배정, 세션 노트) */
+  /** 에이전트 없이 러너가 바로 도는 일인가 (연결 확인, 웹 로그인, 세션 노트, 커넥터 확인) */
   get agentless(): boolean {
     return Task.AGENTLESS.includes(this.row.kind);
   }
 
   /** 웹 로그인의 도구 (claude · codex). 웹 로그인이 아니면 null */
   get signinTool(): string | null {
-    return this.isAiSignin ? String(this.payload.tool) : null;
+    return this.is(Task.AI_SIGNIN) ? String(this.payload.tool) : null;
   }
 
   /**
@@ -335,7 +333,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** 이 러너가 자격을 넘겨 이미 끝난 웹 로그인인가. 응답을 잃은 러너가 다시 보내도 같은 답을 준다 */
   signinDoneBy(runnerId: string): boolean {
-    return this.isAiSignin && this.row.status === Task.DONE && this.row.leased_by === runnerId;
+    const r = this.row;
+    return this.is(Task.AI_SIGNIN) && r.status === Task.DONE && r.leased_by === runnerId;
   }
 
   /**
@@ -363,7 +362,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.holdLease(runnerId, new Date(now.getTime() + Task.LEASE_MS));
     this.put('attempts', this.row.attempts + 1);
     // 웹 로그인을 다시 빌리면(앞 러너가 사라짐) 앞 시도의 주소와 코드는 쓸모가 없다
-    if (this.isAiSignin && this.payload.step !== Task.SIGNIN_STARTING)
+    if (this.is(Task.AI_SIGNIN) && this.payload.step !== Task.SIGNIN_STARTING)
       this.put('payload', { tool: this.payload.tool, step: Task.SIGNIN_STARTING });
   }
 
@@ -524,7 +523,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
       return;
     }
     // 웹 로그인은 자격(ai_signin credential)이 와야 끝난다. 러너가 실패만 알린다
-    if (this.isAiSignin && status === Task.DONE)
+    if (this.is(Task.AI_SIGNIN) && status === Task.DONE)
       throw new RuleViolation('웹 로그인은 ai_signin으로 자격을 보내야 끝나요');
     if (status === Task.DONE) this.finish(result, now);
     else if (status === Task.FAILED) this.fail(error ?? '러너가 실패로 끝냈어요', now, result);
@@ -657,10 +656,11 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** 하위 작업 하나의 결과. 러너는 결과를 { text }로 낸다 */
   private resultView(agentName: string | null): JobSubtaskResultView {
-    return new JobSubtaskResultView(this.row, agentName, this.answer || null, this.failure);
+    const text = this.result?.text;
+    const answer = typeof text === 'string' && text !== '' ? text : null;
+    return new JobSubtaskResultView(this.row, agentName, answer, this.failure);
   }
 
-  /** 에이전트 없는 일(연결 확인 · 웹 로그인 · 배정 · 세션 노트)의 도구. 없으면 null */
   /** 커넥터 확인(tool_check)이면 확인할 도구, 아니면 null */
   get checkedToolId(): string | null {
     return this.row.kind === Task.TOOL_CHECK ? String(this.payload.toolId ?? '') || null : null;
@@ -671,10 +671,9 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return typeof tool === 'string' ? tool : null;
   }
 
-  /** 끝난 일의 답 (러너는 결과를 { text }로 낸다). 없으면 빈 글 */
-  get answer(): string {
-    const text = this.result?.text;
-    return typeof text === 'string' ? text : '';
+  /** 대화 회차의 받을 것 (O-3 set_deliver). 회차인지 · 이미 정했는지 · 관리자가 정한 값은 TurnDeliver가 본다 */
+  declareDeliver(deliver: string, note: string | null, fixed: string | null): void {
+    this.put('payload', TurnDeliver.declare(this.payload, deliver, note, fixed));
   }
 
   private get payload(): Readonly<Record<string, unknown>> {
@@ -683,10 +682,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   private get result(): Readonly<Record<string, unknown>> | null {
     return (this.row.result ?? null) as Readonly<Record<string, unknown>> | null;
-  }
-
-  private get isAiSignin(): boolean {
-    return this.row.kind === Task.AI_SIGNIN;
   }
 
   /** 러너가 쓸 스킬. 없으면 지시만으로 일한다 */
@@ -702,7 +697,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   private assertSigninRunning(): void {
-    if (!this.isAiSignin) throw new RuleViolation('웹 로그인 작업이 아니에요');
+    if (!this.is(Task.AI_SIGNIN)) throw new RuleViolation('웹 로그인 작업이 아니에요');
     if (this.row.status !== Task.RUNNING)
       throw new Conflict(`진행 중인 로그인이 아니에요 (${this.row.status})`);
   }
@@ -725,7 +720,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** 끝나거나 대기열로 돌아간 웹 로그인에는 주소도 코드도 남기지 않는다. 어느 도구였는지만 */
   private forgetSignin(): void {
-    if (this.isAiSignin && Object.keys(this.payload).some((key) => key !== 'tool'))
+    if (this.is(Task.AI_SIGNIN) && Object.keys(this.payload).some((key) => key !== 'tool'))
       this.put('payload', { tool: this.payload.tool });
   }
 

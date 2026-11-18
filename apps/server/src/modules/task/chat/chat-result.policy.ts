@@ -8,6 +8,7 @@ import { ChatReview } from './chat-review.policy';
 /** 지금 회차의 맨 위 작업과 그 회차의 검토 작업 (ChatRepository.turnState. 없으면 칸이 비어 있다) */
 export type ChatTurnStateRow = {
   status: TaskRow['status'] | null;
+  payload: TaskRow['payload'] | null;
   instruction: TaskRow['instruction'] | null;
   result: TaskRow['result'] | null;
   review_status: TaskRow['status'] | null;
@@ -35,7 +36,7 @@ export type ChatTurnSettled = {
 
 // 결과 결재의 판단 (2차 2단계 · 기획서 결정 2026-11-14). 상태 없음:
 //   회차가 가라앉았을 때(도는 일이 없고 남은 일은 카드에 실릴 결재만 기다림) 다음에 할 일 하나,
-//   받을 것(chats.deliver)의 검사, 카드에서 고른 항목.
+//   받을 것(회차에 대표가 정한 값, 없으면 chats.deliver: TurnDeliver)의 검사, 카드에서 고른 항목.
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. 결과 카드의 서비스 · 읽기가 함께 쓴다
 export class ChatResult {
   /** 검사에 떨어져 팀에게 다시 맡기는 회차 수 (넘으면 떨어진 채로 카드에 보인다) */
@@ -50,16 +51,19 @@ export class ChatResult {
   /** 다시 맡긴 회차의 까닭 (payload.chat.fixBy, 검토 반영만 적는다) */
   static readonly BY_REVIEW = 'review';
   /**
-   * 받을 것마다 결과에 있어야 하는 것: 이름 끝이 그것인 결과물, 또는 그 동작 중 하나의 결재
-   * (블로그는 글 하나의 발행이나 매거진 호의 발행, 2차 6단계)
+   * 받을 것마다 결과에 있어야 하는 것: 이름 끝이 그것인 결과물(빈 글이면 어떤 결과물이든), 또는 그 동작 중 하나의 결재
+   * (블로그는 글 하나의 발행이나 매거진 호의 발행, 2차 6단계). answer(짧은 답)는 없다: 검사하지 않는다 (O-3)
    */
   private static readonly NEEDS: Readonly<
     Record<string, { output?: string; actions?: readonly string[] }>
   > = {
+    file: { output: '' },
     html: { output: '.html' },
+    app_code: { actions: ['blog.app_code.show'] },
     blog: { actions: ['blog.post.publish', 'blog.issue.publish'] },
     browser: { actions: ['browser.site.publish'] },
     code: { actions: ['code.pr.merge'] },
+    setting: { actions: ['task.setting.change'] },
   };
 
   /** 받을 것의 모양 검사 (DB의 값 목록). 비우면 null (대화 답) */
@@ -78,18 +82,19 @@ export class ChatResult {
   ): string | null {
     const need = deliver === null ? undefined : ChatResult.NEEDS[deliver];
     if (!need) return null;
-    const has = need.output
-      ? outputs.some((name) => name.toLowerCase().endsWith(need.output as string))
-      : (need.actions ?? []).some((action) => actions.includes(action));
+    const ending = need.output;
+    const has =
+      ending !== undefined
+        ? outputs.some((name) => name.toLowerCase().endsWith(ending))
+        : (need.actions ?? []).some((action) => actions.includes(action));
     return has ? null : deliver;
   }
 
   /** 있어야 하는 것의 이름 (검사 실패 지시문에 싣는다) */
   static needOf(deliver: string): string {
     const need = ChatResult.NEEDS[deliver];
-    return need?.output
-      ? `${need.output} 결과물`
-      : `${need?.actions?.join(' · ') ?? deliver} 승인 요청`;
+    if (need?.output !== undefined) return need.output ? `${need.output} 결과물` : '결과물 하나';
+    return `${need?.actions?.join(' · ') ?? deliver} 승인 요청`;
   }
 
   /**

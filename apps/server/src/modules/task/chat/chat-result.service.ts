@@ -19,6 +19,7 @@ import type { AppCodeAddedInput } from './chat.input';
 import { ChatRepository } from './chat.repository';
 import { ChatResult } from './chat-result.policy';
 import { ChatReview } from './chat-review.policy';
+import { TurnDeliver } from './turn-deliver.policy';
 
 // 결과 결재 (2차 2단계 · 기획서 결정 2026-11-14): 대화의 일이 바뀔 때마다(작업 상태 · 결재 요청) 회차가 가라앉았는지 보고
 // 다음 하나를 한다: 받을 것이 없으면 다시 맡김(result-check) · 검토자 짝의 검토(result-review) ·
@@ -61,8 +62,10 @@ export class ChatResultService extends BaseService {
       const agents = await new AgentRepository(tx).all(spaceId);
       const partner = agents.find((a) => a.id === chat.agentId);
       const reviewer = agents.find((a) => a.id === partner?.reviewerId && !a.deleted) ?? null;
+      // 받을 것: 대표가 회차에 정한 값, 없으면 대화의 값 (O-3, TurnDeliver).
       // 받을 것이 있어도 그 동작의 대상을 가진 모듈이 짚는 빠진 점 (2차 6단계: 메뉴에 올리지 않은 글의 발행)
-      const problems = chat.deliver
+      const deliver = TurnDeliver.effective(turn.payload, chat.deliver);
+      const problems = deliver
         ? await this.checks.problemsOf(
             actor,
             actions.map((a) => ({ action: a.action, targetId: a.targetId })),
@@ -70,10 +73,10 @@ export class ChatResultService extends BaseService {
         : [];
       const missing =
         ChatResult.missing(
-          chat.deliver,
+          deliver,
           actions.map((a) => a.action),
           made.map((o) => o.name),
-        ) ?? (problems.length > 0 ? chat.deliver : null);
+        ) ?? (problems.length > 0 ? deliver : null);
       const review =
         turn.review_status === Task.DONE
           ? ChatReview.parse(ChatResult.textOf(turn.review_result))
@@ -82,7 +85,10 @@ export class ChatResultService extends BaseService {
         root: turn.status,
         items: actions.length + made.length,
         missing: missing !== null,
-        carded: open !== null && open.targetVersion === chat.turns,
+        // 이 회차가 기다리는 카드에 실렸거나, 실린 카드를 이미 정했다 (O-3: 승인한 결재를 기다리던 회차가 끝난 뒤)
+        carded:
+          (open !== null && open.targetVersion === chat.turns) ||
+          (await approvals.cardDecided(chat.id, chat.turns)),
         fixes: ChatResult.fixesIn(previous),
         reviewFixes: ChatResult.fixesIn(previous, ChatResult.BY_REVIEW),
         reviewer: reviewer !== null,
@@ -95,12 +101,18 @@ export class ChatResultService extends BaseService {
           deliver: missing,
           need: problems.length > 0 ? problems.join(' · ') : ChatResult.needOf(missing),
         });
-        const task = chat.fix(partner, message, previous, now);
+        const label = TurnDeliver.label(missing);
+        const note =
+          problems.length > 0
+            ? `받을 것(${label})에 빠진 점이 있어 다시 맡김`
+            : `받을 것(${label})이 없어 다시 맡김`;
+        const task = chat.fix(partner, message, previous, now, { note });
         await chats.save(chat);
         await tasks.insertOnce(task);
       } else if (step === ChatResult.REVIEW_FIX && partner && review) {
         const message = prompts.fill('result-fix', ChatReview.fixFields(review));
-        const task = chat.fix(partner, message, previous, now, ChatResult.BY_REVIEW);
+        const note = `검토자가 고칠 것 ${review.fixes.length}개를 남겨 다시 맡김`;
+        const task = chat.fix(partner, message, previous, now, { by: ChatResult.BY_REVIEW, note });
         await chats.save(chat);
         await tasks.insertOnce(task);
       } else if (step === ChatResult.REVIEW && reviewer) {

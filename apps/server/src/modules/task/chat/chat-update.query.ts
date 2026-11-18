@@ -68,7 +68,7 @@ export class ChatUpdateQuery extends BaseQuery {
     const sql = this.sql;
     // 첫 회차는 맡기 전에 글로 한 답(회차 작업이 없는 덧붙인 말)도 함께 받는다 (2차 1-5)
     const appended = await sql<ChatUpdateLine[]>`
-      SELECT u.*, NULL AS agent, NULL AS choice_list FROM task.chat_updates u
+      SELECT u.*, NULL AS agent FROM task.chat_updates u
       WHERE u.kind = ${ChatUpdates.APPENDED}
         AND (u.task_id = ${taskId} OR (u.task_id IS NULL AND u.chat_id = (
           SELECT (t.payload->'chat'->>'chatId')::uuid FROM task.tasks t WHERE t.id = ${taskId}
@@ -80,7 +80,7 @@ export class ChatUpdateQuery extends BaseQuery {
         UNION ALL
         SELECT t.id FROM task.tasks t JOIN tree ON t.parent_id = tree.id
       )
-      SELECT u.*, a.name AS agent, NULL AS choice_list FROM task.chat_updates u
+      SELECT u.*, a.name AS agent FROM task.chat_updates u
       LEFT JOIN task.agents a ON a.id = u.agent_id
       WHERE u.task_id IN (SELECT id FROM tree)
         AND u.kind = ANY(${ChatUpdates.POSTED as string[]}::text[])
@@ -111,11 +111,7 @@ export class ChatUpdateQuery extends BaseQuery {
   ): Promise<ChatUpdateLine[]> {
     const sql = this.sql;
     const rows = await sql<ChatUpdateLine[]>`
-      SELECT u.*, a.name AS agent,
-        (SELECT json_agg(json_build_object('id', x.id, 'name', x.name,
-            'role', split_part(x.role, E'\n', 1)) ORDER BY o.ord)
-          FROM unnest(u.choices) WITH ORDINALITY AS o(id, ord)
-          JOIN task.agents x ON x.id = o.id) AS choice_list
+      SELECT u.*, a.name AS agent
       FROM task.chat_updates u
       JOIN task.chats c ON c.id = u.chat_id
       LEFT JOIN task.agents a ON a.id = u.agent_id

@@ -189,7 +189,14 @@ export class ChatService extends BaseService {
       const lead = await new AgentRepository(tx).load(spaceId, chat.partnerId);
       const message = prompts.fill('setting-continue', { change: approval.settingLine });
       const previous = await chats.previousTurns(chat, spaceId);
-      const turn = chat.continueAfter(lead, ChatHistory.turnOf(place), message, previous, now);
+      const note = `승인한 설정 적용 · ${approval.settingLine}`.slice(0, Chat.NOTE_MAX);
+      const turn = chat.continueAfter(
+        lead,
+        ChatHistory.turnOf(place),
+        { message, note },
+        previous,
+        now,
+      );
       if (turn) {
         await chats.save(chat);
         await new TaskRepository(tx).insertOnce(turn);

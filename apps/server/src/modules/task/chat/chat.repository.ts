@@ -94,7 +94,7 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
   async turnState(chat: Chat): Promise<ChatTurnStateRow> {
     const turn = ChatRequest.turn(chat.id, chat.turns);
     const [row] = await this.sql<ChatTurnStateRow[]>`
-      SELECT root.status, root.instruction, root.result,
+      SELECT root.status, root.payload, root.instruction, root.result,
         review.status AS review_status, review.result AS review_result
       FROM (SELECT 1) one
       LEFT JOIN task.tasks root ON root.space_id = ${chat.spaceId} AND root.request_id = ${turn}
@@ -103,6 +103,7 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
     return (
       row ?? {
         status: null,
+        payload: null,
         instruction: null,
         result: null,
         review_status: null,
@@ -121,9 +122,10 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
   protected override async saveParts(chat: Chat): Promise<void> {
     const rows = chat.addedUpdates;
     if (rows.length === 0) return;
+    // choices(질문의 고를 에이전트)는 O-2 전 대화의 기록에만 있다: 새 줄에는 적지 않는다
     await this.insertRows(
       chatUpdates,
-      rows.map((r) => ({ ...r, choices: r.choices ? [...r.choices] : null })),
+      rows.map(({ choices: _none, ...row }) => row),
     );
     await ChangeSignal.send(this.sql, [new ChangeSignal(chat.spaceId, ChatUpdates.TOPIC, chat.id)]);
   }

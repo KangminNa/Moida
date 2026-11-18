@@ -114,7 +114,7 @@ export interface ChatUpdateRow {
 export type ChatUpdateNew = Partial<ChatUpdateRow> & Pick<ChatUpdateRow, 'id' | 'space_id' | 'chat_id' | 'kind' | 'text'>;
 
 /** task.chats.deliver (값 목록 CHECK) */
-export const CHAT_DELIVER = ['html', 'blog', 'browser', 'code'] as const;
+export const CHAT_DELIVER = ['answer', 'file', 'html', 'app_code', 'blog', 'browser', 'code', 'setting'] as const;
 export type ChatDeliver = (typeof CHAT_DELIVER)[number];
 /** task.chats.effort (값 목록 CHECK) */
 export const CHAT_EFFORT = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
@@ -295,7 +295,7 @@ export type ScheduleMode = (typeof SCHEDULE_MODE)[number];
 export const SCHEDULE_DESTINATION = ['task', 'chat', 'page'] as const;
 export type ScheduleDestination = (typeof SCHEDULE_DESTINATION)[number];
 /** task.schedules.deliver (값 목록 CHECK) */
-export const SCHEDULE_DELIVER = ['html', 'blog', 'browser', 'code'] as const;
+export const SCHEDULE_DELIVER = ['answer', 'file', 'html', 'app_code', 'blog', 'browser', 'code', 'setting'] as const;
 export type ScheduleDeliver = (typeof SCHEDULE_DELIVER)[number];
 /** task.schedules.trigger (값 목록 CHECK) */
 export const SCHEDULE_TRIGGER = ['time', 'manual', 'after'] as const;

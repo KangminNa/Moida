@@ -33,7 +33,7 @@ import { ChatResultService } from './chat/chat-result.service';
 import { ChatUpdateHandler } from './chat/chat-update.handler';
 import { ChatUpdateQuery } from './chat/chat-update.query';
 import { ChatUpdateService } from './chat/chat-update.service';
-import { AgentUpdatesTool, PostUpdateTool } from './chat/chat-update.tool';
+import { AgentUpdatesTool, PostUpdateTool, SetDeliverTool } from './chat/chat-update.tool';
 import { ExternalToolController } from './external-tool/external-tool.api';
 import { ExternalToolQuery } from './external-tool/external-tool.query';
 import { ExternalToolService } from './external-tool/external-tool.service';
@@ -169,6 +169,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatContinueHandler,
     AgentUpdatesTool,
     PostUpdateTool,
+    SetDeliverTool,
     GoalRunHandler,
     ReportRoundTool,
     // 주소 읽기 (read_url): 서버가 AI 대신 연다. 목줄은 WebReach

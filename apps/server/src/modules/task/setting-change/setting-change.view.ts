@@ -62,6 +62,8 @@ export class ScheduleSettingView {
       after_id: r.after_id,
       daily_max: r.daily_max,
       next_run_at: r.next_run_at?.toISOString() ?? null,
+      // 회차가 쌓이는 대화 (O-3: 대표는 이 대화의 자동화를 찾아 멈추거나 바꾼다)
+      chat_id: r.chat_id,
     };
   }
 }

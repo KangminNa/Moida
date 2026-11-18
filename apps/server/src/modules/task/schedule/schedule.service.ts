@@ -16,6 +16,7 @@ import {
 import { AgentRepository } from '../agent/agent.repository';
 import { AgentEdit } from '../agent/agent-edit';
 import type { AgentUsage } from '../agent/agent-usage';
+import { ApprovalRepository } from '../approval/approval.repository';
 import { Chat } from '../chat/chat';
 import { ChatRepository } from '../chat/chat.repository';
 import { ChatHistory } from '../chat/chat-history.policy';
@@ -101,6 +102,9 @@ export class ScheduleService extends EntityService<Schedule> {
       change.key,
       async (tx) => {
         const schedule = await new ScheduleEdit(tx, spaceId).apply(change, new Date());
+        // 대화에서 올라온 결재로 만든 대화 레시피는 그 대화에 묶는다 (O-3, change.key는 결재 id)
+        if (change.op === 'create')
+          schedule.bindChat((await new ApprovalRepository(tx).load(spaceId, change.key)).chatId);
         await new ScheduleRepository(tx).save(schedule);
       },
     );
@@ -205,7 +209,8 @@ export class ScheduleService extends EntityService<Schedule> {
 
   /**
    * 레시피 한 번: 어디로에 따라 작업 하나(task · page)나 대표의 대화 회차 하나(chat). 처음 도는 대화 레시피는 대화를 열고
-   * 기억한다 (그 대화의 받을 것이 레시피의 받을 것). 만든 작업, 같은 차례의 일이 이미 있으면 null
+   * 기억한다 (그 대화의 받을 것이 레시피의 받을 것). 대화에서 승인해 그 대화에 묶인 레시피는(O-3) 회차마다 받을 것을 싣는다.
+   * 만든 작업, 같은 차례의 일이 이미 있으면 null
    */
   private async start(
     tx: Sql,
@@ -238,7 +243,10 @@ export class ScheduleService extends EntityService<Schedule> {
     const chat = await chats.lock(spaceId, chatId);
     const previous = await chats.previousTurns(chat, spaceId);
     if (ChatHistory.sentAs(previous.at(-1), requestId)) return null;
-    const turn = chat.send(lead, requestId, instruction, previous, now);
+    // 대화에 묶인 레시피(O-3)는 그 회차의 받을 것으로 레시피의 받을 것을 싣는다 (대표가 다른 값을 정하지 못한다)
+    const turn = chat.send(lead, requestId, instruction, previous, now, {
+      deliver: schedule.deliver,
+    });
     await chats.save(chat);
     return (await tasks.insertOnce(turn)) ? turn : null;
   }

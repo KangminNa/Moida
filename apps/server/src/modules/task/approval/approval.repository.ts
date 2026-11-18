@@ -47,6 +47,19 @@ export class ApprovalRepository extends TableRepository<ApprovalRow, Approval> {
     );
   }
 
+  /**
+   * 이 회차가 실린 결과 카드를 관리자가 이미 정했는가 (O-3). 정한 뒤 회차가 끝나도(카드에서 승인한 결재를 기다리던 회차)
+   * 실을 것이 0이라 받을 것이 빠져 보이므로 다시 맡기지 않는다
+   */
+  async cardDecided(chatId: string, turn: number): Promise<boolean> {
+    const [row] = await this.sql`
+      SELECT 1 FROM task.approvals
+      WHERE action = ${Approval.CARD} AND target_id = ${chatId} AND target_version = ${turn}
+        AND status <> ${Approval.PENDING}
+      LIMIT 1`;
+    return row !== undefined;
+  }
+
   /** 대화의 일에서 올라와 아직 카드에 실리지 않은 결재 (기다리는 것만, id 순서로 잠근다) */
   lockUncarded(chatId: string): Promise<readonly Approval[]> {
     return this.find(

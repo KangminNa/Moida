@@ -205,6 +205,11 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     return this.row.task_id;
   }
 
+  /** 대화의 일에서 올라온 결재면 그 대화 (O-3: 대화에서 올린 자동화가 그 대화에 묶인다) */
+  get chatId(): string | null {
+    return this.row.chat_id;
+  }
+
   get targetId(): string {
     return this.row.target_id;
   }

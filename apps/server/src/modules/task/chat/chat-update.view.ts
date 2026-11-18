@@ -1,13 +1,10 @@
-import type { AgentRow, ChatRow, ChatUpdateRow } from '../task.tables';
+import type { ChatRow, ChatUpdateRow } from '../task.tables';
 
 // MCP agent_updates · post_update의 모양 (snake_case, docs/API설계.md 4장). 화면(chat.view.ts)과 나눴다 (O-1, 줄 수).
 // view끼리는 서로 가져오지 못해서(경계 검사) 줄 모양 둘은 chat.view.ts의 ChatUpdateLine · ChatBoardRow와 같은 모양을 여기에도 둔다.
 
 /** 소식 한 줄 (chat.view.ts의 ChatUpdateLine과 같은 모양) */
-type UpdateLine = ChatUpdateRow & {
-  agent: string | null;
-  choice_list: Pick<AgentRow, 'id' | 'name' | 'role'>[] | null;
-};
+type UpdateLine = ChatUpdateRow & { agent: string | null };
 /** 상태판의 대화 한 줄 (chat.view.ts의 ChatBoardRow와 같은 모양) */
 type BoardLine = ChatRow & { partner: string | null; state: string; active: number };
 
@@ -23,8 +20,6 @@ export class ChatUpdateView {
       text: r.text,
       agent: r.agent,
       task_id: r.task_id,
-      /** question이면 고를 에이전트들 (ask_agent의 choice로 답한다). 아니면 null */
-      choices: r.choice_list,
       created_at: r.created_at.toISOString(),
     };
   }
@@ -73,5 +68,17 @@ export class PostedUpdateView {
 
   toJSON() {
     return { n: this.n };
+  }
+}
+
+/** set_deliver의 답 (O-3): 이번 회차의 받을 것과 누가 정했는지 (관리자 · 레시피가 정한 대화면 admin) */
+export class DeliverSetView {
+  constructor(
+    private readonly deliver: string,
+    private readonly byAdmin: boolean,
+  ) {}
+
+  toJSON() {
+    return { deliver: this.deliver, by: this.byAdmin ? 'admin' : 'lead' };
   }
 }

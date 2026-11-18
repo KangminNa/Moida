@@ -4,6 +4,7 @@ import type {
   ChatRow,
   ChatUpdateRow,
   OutputRow,
+  ScheduleRow,
   TaskRow,
 } from '../task.tables';
 
@@ -32,11 +33,8 @@ export type ChatReviewVerdict = {
 };
 /** 회차(맨 위 작업 root)와 그 아래에서 기다리는 결재 */
 export type ChatApprovalRow = Pick<ApprovalRow, 'id'> & { root: string };
-/** 소식 한 줄과 남긴 에이전트의 이름, 질문이면 고를 에이전트들 (role은 맡는 일: 역할의 첫 줄) */
-export type ChatUpdateLine = ChatUpdateRow & {
-  agent: string | null;
-  choice_list: Pick<AgentRow, 'id' | 'name' | 'role'>[] | null;
-};
+/** 소식 한 줄과 남긴 에이전트의 이름 */
+export type ChatUpdateLine = ChatUpdateRow & { agent: string | null };
 /**
  * 상태판의 대화 한 줄: 상대 이름(맡기 전이면 null), 상태(SQL이 정한다: 맡기 전 routing · asking, 맡은 뒤 마지막 회차로
  * working · waiting_approval · done · failed), 지금 도는 작업 수 (마지막 회차와 그 덧붙인 말의 답 아래 전부)
@@ -153,7 +151,15 @@ export class ChatTurnView {
     const result = (t.result ?? {}) as { text?: unknown; error?: unknown };
     const chat = (
       t.payload as {
-        chat?: { turn?: unknown; via?: unknown; fix?: unknown; fixBy?: unknown };
+        chat?: {
+          turn?: unknown;
+          via?: unknown;
+          fix?: unknown;
+          fixBy?: unknown;
+          note?: unknown;
+          deliver?: unknown;
+          deliverNote?: unknown;
+        };
       } | null
     )?.chat;
     return {
@@ -175,8 +181,13 @@ export class ChatTurnView {
       refs: refsOf((t.payload as { refs?: unknown } | null)?.refs),
       /** 서버가 다시 맡긴 회차 (메시지는 관리자의 글이 아니라 지시문 틀 result-check · result-fix) */
       fix: chat?.fix === true,
-      /** 다시 맡긴 까닭: review(검토 반영, 검증 고리 V), 받을 것이 빠져서면 null */
+      /** 다시 맡긴 까닭: review(검토 반영, 검증 고리 V) · setting(승인 뒤 이어서, O-2), 받을 것이 빠져서면 null */
       fixBy: typeof chat?.fixBy === 'string' ? chat.fixBy : null,
+      /** 서버가 연 회차의 화면용 한 줄 (O-3). 관리자의 말이거나 O-3 전 회차면 null */
+      note: typeof chat?.note === 'string' ? chat.note : null,
+      /** 이번 회차의 받을 것 (대표가 set_deliver로 정함 · 레시피, O-3)과 까닭. 정하지 않았으면 null (대화의 받을 것을 본다) */
+      deliver: typeof chat?.deliver === 'string' ? chat.deliver : null,
+      deliverNote: typeof chat?.deliverNote === 'string' ? chat.deliverNote : null,
       outputs: this.outputs
         .filter((o) => o.root === t.id)
         .map((o) => ({ id: o.id, name: o.name, kind: o.kind })),
@@ -287,9 +298,15 @@ export class ChatCardView {
   }
 }
 
+/** 이 대화에 회차를 쌓는 자동화 (O-3, 대화 레시피의 chat_id). 매일이면 시각 "HH:MM" (at_time) */
+export type ChatAutomationRow = Pick<
+  ScheduleRow,
+  'id' | 'title' | 'enabled' | 'trigger' | 'mode' | 'weekdays' | 'every_hours' | 'next_run_at'
+> & { at_time: string | null };
+
 /**
  * 대화 하나와 회차들 (오래된 것부터, 최근 ChatQuery.TURNS개), 상태 · 최근 소식(과정), 결과 카드 (2차 2단계),
- * 맡기 전이면 지금 질문 (2차 1-5)
+ * 이 대화의 자동화 (O-3)
  */
 export class ChatDetailView {
   constructor(
@@ -298,7 +315,7 @@ export class ChatDetailView {
     private readonly turns: readonly ChatTurnView[],
     private readonly board: Readonly<ChatBoardRow> | null,
     private readonly news: readonly ChatUpdateLine[],
-    private readonly question: Readonly<ChatUpdateLine> | null,
+    private readonly automations: readonly ChatAutomationRow[],
     private readonly card: ChatCardView | null,
     /** 이 대화에서 시작해 아직 끝나지 않은 작업 (오래된 것부터) */
     private readonly team: readonly ChatTeamRow[] = [],
@@ -308,7 +325,6 @@ export class ChatDetailView {
 
   toJSON() {
     const p = this.partner;
-    const q = this.question;
     return {
       chat: new ChatView(this.chat).toJSON(),
       /** 맡은 에이전트 (맡기 전이면 null) */
@@ -324,7 +340,7 @@ export class ChatDetailView {
       /** routing · asking · working · waiting_approval · done · failed, 지금 도는 작업 수 */
       state: this.board?.state ?? 'done',
       active: Number(this.board?.active ?? 0),
-      /** 최근 소식 (오래된 것부터): 과정 · 맡기 전의 질문 · 답 · 맡음 */
+      /** 최근 소식 (오래된 것부터): 과정 · 덧붙인 말 · O-2 전 대화의 질문 · 맡음 (기록) */
       news: this.news.map((r) => ({
         n: Number(r.n),
         kind: r.kind,
@@ -333,8 +349,18 @@ export class ChatDetailView {
         taskId: r.task_id,
         createdAt: r.created_at.toISOString(),
       })),
-      /** 맡기 전의 지금 질문과 고를 에이전트 (choice로 답한다). 묻지 않았거나 맡았으면 null */
-      question: q ? { text: q.text, choices: q.choice_list ?? [] } : null,
+      /** 이 대화에 회차를 쌓는 자동화 (O-3): 매일 시각(atTime "HH:MM") · 요일(월 1 ~ 일 7) 또는 N시간마다 */
+      automations: this.automations.map((a) => ({
+        id: a.id,
+        title: a.title,
+        enabled: a.enabled,
+        trigger: a.trigger,
+        mode: a.mode,
+        atTime: a.at_time,
+        weekdays: a.weekdays,
+        everyHours: a.every_hours,
+        nextRunAt: a.next_run_at?.toISOString() ?? null,
+      })),
       /** 기다리는 결과 카드 (없으면 null) */
       card: this.card?.toJSON() ?? null,
       /** 쓴 토큰 (O-1): 대화 전체 · 에이전트별, 회차마다 (배정은 대화 합계에만) */

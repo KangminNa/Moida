@@ -238,7 +238,7 @@ describe('대화', () => {
       RETURNING id, version`;
     const before = await detail(old?.id);
     assert.deepEqual([before.chat.agentId, before.state], [null, 'asking']);
-    assert.equal(before.question, null, '맡을 에이전트를 묻는 질문은 없다');
+    assert.equal('question' in before, false, '맡을 에이전트를 묻는 질문 칸은 없다 (O-3에서 지움)');
     const sent = ok(await send(before.chat, '이것도 같이 봐 줘'), 201);
     assert.deepEqual([sent.agentId, sent.turns, sent.pending], [boss.id, 1, null]);
     const job = await take();

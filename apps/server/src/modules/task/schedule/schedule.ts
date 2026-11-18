@@ -290,6 +290,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('chat_id', chatId);
   }
 
+  /** 대화에서 승인한 대화 레시피는 그 대화에 회차를 쌓는다 (O-3, 대화로 자동화). 다른 곳으로 보내는 레시피는 그대로 */
+  bindChat(chatId: string | null): void {
+    if (chatId !== null && this.row.destination === Schedule.CHAT) this.openedChat(chatId);
+  }
+
   /** 주인이 누른 "지금 한 번". 하루 한도에 함께 센다. 닿았으면 RuleViolation */
   runNow(now: Date): Date {
     if (!this.claimRun(now))

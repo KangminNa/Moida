@@ -15,9 +15,18 @@ import { ChatView } from './chat.view';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatRequest } from './chat-request.policy';
 import { ChatUpdates } from './chat-update.policy';
+import { TurnDeliver } from './turn-deliver.policy';
 
 /** 회차 하나에 더 실을 것 (Chat.send) */
-type ChatTurnExtra = { deviceId?: string | null; fix?: boolean; fixBy?: string; refs?: TaskRefs };
+type ChatTurnExtra = {
+  deviceId?: string | null;
+  fix?: boolean;
+  fixBy?: string;
+  /** 서버가 연 회차의 화면용 한 줄 (O-3) · 물려받은 받을 것 */
+  note?: string;
+  deliver?: string | null;
+  refs?: TaskRefs;
+};
 
 // 대화 하나 (task.chats, 기획서 결정 2026-11-14). 관리자와 바로 아래 에이전트 하나가 채팅처럼 주고받는다.
 // 서버 본체에는 AI가 없어서 메시지 하나 = 상대에게 맡기는 작업 하나다 (회차, request_id chat:<대화>:<회차>).
@@ -33,6 +42,8 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   /** 회차의 답이 왔다: 알림 (TaskNotices, 2차 1-5) */
   static readonly ANSWERED = 'task.chat.answered';
   static readonly TITLE_MAX = 80;
+  /** 서버가 연 회차의 화면용 한 줄 (O-3, payload.chat.note) */
+  static readonly NOTE_MAX = 160;
   static readonly MESSAGE_MAX = 8000;
   static readonly GOAL_MAX = 300;
   /** 회차 작업의 제목 (작업 메뉴에서 대화의 일인지 알아보게) */
@@ -136,10 +147,17 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     previous: readonly ChatTurnRow[],
     now: Date,
     /**
-     * deviceId: 기기가 보냈으면, fix: 서버가 다시 맡기는 회차, fixBy: 다시 맡긴 까닭(검토 반영만, 검증 고리 V),
-     * refs: 이 회차의 참조 (TaskRefs)
+     * deviceId: 기기가 보냈으면, fix: 서버가 다시 맡기는 회차, fixBy: 다시 맡긴 까닭(검토 반영 · 승인 뒤 이어서),
+     * note · deliver: 서버가 연 회차의 화면용 한 줄과 앞 회차의 받을 것 (O-3), refs: 이 회차의 참조 (TaskRefs)
      */
-    { deviceId = null, fix = false, fixBy, refs = TaskRefs.of(null) }: ChatTurnExtra = {},
+    {
+      deviceId = null,
+      fix = false,
+      fixBy,
+      note,
+      deliver,
+      refs = TaskRefs.of(null),
+    }: ChatTurnExtra = {},
   ): Task {
     if (agent.id !== this.row.agent_id) throw new RuleViolation('이 대화의 상대가 아니에요');
     Chat.assertPartner(agent);
@@ -158,7 +176,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
       {
         kind: Task.GENERAL,
         agent_id: agent.id,
-        title: `대화 · ${ChatHistory.firstLine(text, Chat.TASK_TITLE)}`,
+        title: `대화 · ${ChatHistory.firstLine(note ?? text, Chat.TASK_TITLE)}`,
         instruction: text,
         payload: {
           chat: {
@@ -168,6 +186,8 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
             history: ChatHistory.of(previous),
             ...(deviceId === null ? {} : { via: 'device', device: deviceId }),
             ...(fix ? { fix: true, ...(fixBy ? { fixBy } : {}) } : {}),
+            ...(note ? { note } : {}),
+            ...(deliver ? { deliver } : {}),
           },
           ...refs.payload,
           ...AgentRuntime.turnPayload(agent.tool, this.row.model, this.row.effort),
@@ -193,10 +213,18 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * 같은 상대에게 다시 맡긴다 (서버가 연다). 받을 것이 결과에 없으면(2차 2단계, 틀 result-check) 까닭 없이,
    * 검토가 고칠 것을 남겼으면(검증 고리 V, 틀 result-fix) fixBy 'review', 대표가 이어서 하자고 한 설정 바꾸기가 적용되면
    * (O-2, 틀 setting-continue, continueAfter) fixBy 'setting'. message는 그 틀로 채운 글이고
-   * 관리자의 글이 아니라서 payload.chat.fix로 표시한다 (화면이 "검사" · "검토 반영" · "승인 뒤 이어서"로 보인다)
+   * 관리자의 글이 아니라서 payload.chat.fix로 표시한다 (화면이 "검사" · "검토 반영" · "승인 뒤 이어서"로 보인다).
+   * note는 화면 · 작업 제목에 보일 한 줄(지시문 틀 원문 대신, O-3). 앞 회차의 받을 것을 물려받는다 (TurnDeliver)
    */
-  fix(agent: Agent, message: string, previous: readonly ChatTurnRow[], now: Date, by?: string) {
-    const extra = { fix: true, fixBy: by };
+  fix(
+    agent: Agent,
+    message: string,
+    previous: readonly ChatTurnRow[],
+    now: Date,
+    { by, note }: { by?: string; note: string },
+  ) {
+    const deliver = TurnDeliver.of(previous.at(-1)?.payload);
+    const extra = { fix: true, fixBy: by, note, deliver };
     return this.send(agent, `fix:${this.row.turns + 1}`, message, previous, now, extra);
   }
 
@@ -294,12 +322,12 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   continueAfter(
     lead: Agent,
     turn: number,
-    message: string,
+    { message, note }: { message: string; note: string },
     previous: readonly ChatTurnRow[],
     now: Date,
   ): Task | null {
     if (turn !== this.row.turns || ChatHistory.waiting(previous.at(-1))) return null;
-    return this.fix(lead, message, previous, now, 'setting');
+    return this.fix(lead, message, previous, now, { by: 'setting', note });
   }
 
   /** 끝난 작업의 소식 (ChatUpdateService). 회차의 최종 답이면 알림 이벤트도 (답은 앞부분만) */
@@ -315,11 +343,8 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     taskId: string | null,
     agentId: string | null,
     now: Date,
-    choices: readonly string[] | null = null,
   ): void {
-    this.added.push(
-      ChatUpdates.line(BaseEntity.newId(), this, kind, text, taskId, agentId, now, choices),
-    );
+    this.added.push(ChatUpdates.line(BaseEntity.newId(), this, kind, text, taskId, agentId, now));
   }
 
   /** 에이전트가 일하는 도중에 남기는 소식 (MCP post_update). posted: 그 작업이 이미 남긴 수 */

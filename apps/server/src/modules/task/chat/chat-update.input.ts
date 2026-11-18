@@ -1,5 +1,6 @@
 import { BaseRequest, RuleViolation } from '../../platform';
 import { ChatUpdates } from './chat-update.policy';
+import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화의 소식 도구 입력의 모양 (docs/API설계.md 4장). 뜻(대화의 일인지, 한도)은 Chat · Service가 본다.
 
@@ -55,6 +56,30 @@ export class PostUpdateInput extends BaseRequest {
     return BaseRequest.read(
       raw,
       (f) => new PostUpdateInput(f.text('kind', 40), f.text('text', ChatUpdates.TEXT_MAX)),
+    );
+  }
+}
+
+/**
+ * MCP set_deliver { deliver, note? } (O-3, 작업 토큰): 대표가 이번 회차의 받을 것을 정한다.
+ * 값의 목록 · 겹침 · 관리자가 정한 값은 TurnDeliver가 본다
+ */
+export class SetDeliverInput extends BaseRequest {
+  private constructor(
+    readonly deliver: string,
+    readonly note: string | null,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): SetDeliverInput {
+    return BaseRequest.read(
+      raw,
+      (f) =>
+        new SetDeliverInput(
+          f.text('deliver', 20),
+          f.optionalText('note', TurnDeliver.NOTE_MAX) ?? null,
+        ),
     );
   }
 }

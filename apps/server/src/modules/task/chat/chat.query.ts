@@ -6,6 +6,7 @@ import type { ApprovalRow, ChatRow, TaskRow } from '../task.tables';
 import type { ChatIdInput } from './chat.input';
 import {
   type ChatApprovalRow,
+  type ChatAutomationRow,
   type ChatCardOutputRow,
   type ChatCardTaskRow,
   ChatCardView,
@@ -23,6 +24,7 @@ import { ChatRequest } from './chat-request.policy';
 import { ChatResult } from './chat-result.policy';
 import { ChatReview } from './chat-review.policy';
 import { ChatUpdateQuery } from './chat-update.query';
+import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화 읽기 (관리자만). 회차는 작업이라 그 대화의 회차 request_id로 작업을 찾는다.
 // 결과물 · 기다리는 결재는 회차 작업과 그 아래 하위 작업(위임) 모두에서 모은다: 팀장에게 말하면 팀이 일한다.
@@ -74,7 +76,7 @@ export class ChatQuery extends BaseQuery {
       await this.views(turns),
       board ?? null,
       await this.news(chat.id),
-      null,
+      await this.automations(spaceId, chat.id),
       await this.card(chat),
       await this.team(spaceId, chat.id),
       await this.tokens(spaceId, chat.id),
@@ -180,8 +182,10 @@ export class ChatQuery extends BaseQuery {
       ORDER BY created_at, id`;
     const fixes = ChatResult.fixesIn(turns);
     const byReview = ChatResult.fixesIn(turns, ChatResult.BY_REVIEW);
+    // 받을 것: 카드의 회차에 대표가 정한 값, 없으면 대화의 값 (O-3)
+    const deliver = TurnDeliver.effective(turns.at(-1)?.payload, chat.deliver);
     const missing = ChatResult.missing(
-      chat.deliver,
+      deliver,
       actions.map((a) => a.action),
       outputs.map((o) => o.name),
     );
@@ -191,22 +195,29 @@ export class ChatQuery extends BaseQuery {
       actions,
       outputs,
       tasks,
-      chat.deliver,
+      deliver,
       missing === null,
       said ? ChatReview.parse(said) : null,
       { deliver: fixes - byReview, review: byReview },
     );
   }
 
-  /** 이 대화의 최근 소식 (오래된 것부터). 질문이면 고를 에이전트들 (맡는 일은 역할의 첫 줄) */
+  /** 이 대화에 회차를 쌓는 자동화 (O-3, 대화 레시피의 chat_id) */
+  private automations(spaceId: string, chatId: string): Promise<ChatAutomationRow[]> {
+    return this.sql<ChatAutomationRow[]>`
+      SELECT id, title, enabled, trigger, mode, weekdays, every_hours, next_run_at,
+        CASE WHEN at_minute IS NULL THEN NULL
+          ELSE lpad((at_minute / 60)::text, 2, '0') || ':' || lpad((at_minute % 60)::text, 2, '0') END AS at_time
+      FROM task.schedules
+      WHERE space_id = ${spaceId} AND chat_id = ${chatId} AND destination = 'chat'
+      ORDER BY created_at, id`;
+  }
+
+  /** 이 대화의 최근 소식 (오래된 것부터) */
   private news(chatId: string): Promise<ChatUpdateLine[]> {
     return this.sql<ChatUpdateLine[]>`
       SELECT * FROM (
-        SELECT u.*, a.name AS agent,
-          (SELECT json_agg(json_build_object('id', x.id, 'name', x.name,
-              'role', split_part(x.role, E'\n', 1)) ORDER BY c.ord)
-            FROM unnest(u.choices) WITH ORDINALITY AS c(id, ord)
-            JOIN task.agents x ON x.id = c.id) AS choice_list
+        SELECT u.*, a.name AS agent
         FROM task.chat_updates u
         LEFT JOIN task.agents a ON a.id = u.agent_id
         WHERE u.chat_id = ${chatId} ORDER BY u.n DESC LIMIT ${ChatQuery.NEWS}

@@ -25,7 +25,7 @@ export class ChatUpdates {
   static readonly REVIEW = 'review';
   /** 회차의 최종 답 (알림이 된다) */
   static readonly FINAL = 'final';
-  /** 맡을 에이전트를 묻는 질문 (고를 에이전트 choices와 함께, 2차 1-5) */
+  /** 맡을 에이전트를 묻는 질문 (2차 1-5, O-2에서 지움. 그 전 대화의 기록으로만 남는다) */
   static readonly QUESTION = 'question';
   /** 에이전트가 대화를 맡았다 (agent_id, 글은 고른 까닭이나 이름) */
   static readonly ROUTED = 'routed';
@@ -44,7 +44,6 @@ export class ChatUpdates {
     taskId: string | null,
     agentId: string | null,
     now: Date,
-    choices: readonly string[] | null,
   ): ChatUpdateNew {
     return {
       id,
@@ -54,7 +53,6 @@ export class ChatUpdates {
       text: ChatUpdates.text(text),
       task_id: taskId,
       agent_id: agentId,
-      choices: choices ? [...choices] : null,
       created_at: now,
     };
   }
