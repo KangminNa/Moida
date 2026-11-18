@@ -183,6 +183,31 @@ class Cairn {
     assert.equal(res.status, 200, await res.text());
   }
 
+  /** 앱 코드 zip 올리기 (스토어 1-6). 공개 앱이면 확인 대기라 show로 공개한다 */
+  async code(appId: string, files: Readonly<Record<string, string>>, show = false): Promise<void> {
+    const zip = new ZipFile();
+    for (const [name, text] of Object.entries(files)) zip.add(name, text);
+    const [app] = await this.sql`SELECT version FROM blog.apps WHERE id = ${appId}`;
+    const res = await fetch(
+      `${this.api.baseUrl}/api/apps/${appId}/code/versions?version=${app?.version}&note=zip`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/zip', cookie: this.owner.header },
+        body: new Uint8Array(zip.toBuffer()),
+      },
+    );
+    const text = await res.text();
+    assert.equal(res.status, 201, text);
+    if (!show) return;
+    const state = JSON.parse(text) as { version: number; latest: number };
+    ok(
+      await this.api.request('POST', `/api/apps/${appId}/code/current`, this.owner, {
+        version: state.version,
+        seq: state.latest,
+      }),
+    );
+  }
+
   async upload(postId: unknown, bytes: Buffer): Promise<void> {
     const res = await fetch(`${this.api.baseUrl}/api/posts/${postId}/assets`, {
       method: 'POST',
@@ -369,6 +394,14 @@ async function fill(c: Cairn): Promise<void> {
     201,
   );
   seed.hiddenApp = String(hidden.id);
+  // 앱 코드 (스토어 1-6c): 보이는 버전만 나간다. 공개 앱의 확인 대기 버전 2는 빠지고, 비공개 앱은 바로 보인다
+  await c.code(seed.blogApp, { 'index.html': '<p>{{app.name}}</p>', 'style.css': 'p{}' }, true);
+  await c.code(seed.blogApp, { 'index.html': '<p>확인 대기</p>' });
+  await c.code(seed.hiddenApp, {
+    'index.html': '{{> part}}',
+    'part.html': '<b>비공개</b>',
+    'cairn.json': '{"cairn":1,"hosts":["fonts.example.com"]}',
+  });
   const inside = await c.post('비공개 앱의 글', '앱이 닫혀 있다', 'published', {
     appId: seed.hiddenApp,
   });
@@ -491,11 +524,15 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
         ['원문', 3],
         ['선', 3],
         ['앱', 2],
+        ['앱 코드', 2],
         ['글', 5],
         ['사진', 4],
       ],
     );
-    assert.match(report.summary, /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 글 5개 · 사진 4개/);
+    assert.match(
+      report.summary,
+      /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 앱 코드 2개 · 글 5개 · 사진 4개/,
+    );
     assert.equal(await target.rows(), 0);
     const [row] = await target.sql`SELECT count(*)::int AS n FROM platform.blobs`;
     assert.equal(row?.n, 0);
@@ -556,6 +593,19 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     await refuses(
       [...exported, ArchiveFile.text('vault/모르는.txt', '?')],
       /모르는 파일이에요: vault\/모르는\.txt/,
+    );
+    // 앱 코드: 없는 앱의 코드 · 문 없는 묶음 · 틀린 바깥 주소는 들어오지 못한다
+    await refuses(
+      [...exported, ArchiveFile.text('blog/apps/없는앱/code/index.html', '<p></p>')],
+      /없는 앱의 코드예요: blog\/apps\/없는앱\/code\//,
+    );
+    await refuses(
+      exported.filter((f) => f.path !== 'blog/apps/hidden/code/index.html'),
+      /앱 hidden의 코드: index\.html이 없어요/,
+    );
+    await refuses(
+      swap(exported, 'blog/apps/hidden/code/cairn.json', () => '{"cairn":1,"hosts":["*.x.com"]}'),
+      /앱 hidden의 코드: 바깥 주소는 정확한 호스트 이름만/,
     );
     await refuses(
       [...exported, ArchiveFile.text('blog/_meta/모르는.yml', '?')],
@@ -702,6 +752,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     assert.equal(report.counts.get('세션'), 7);
     assert.equal(report.counts.get('원문'), 3);
     assert.equal(report.counts.get('앱'), 2);
+    assert.equal(report.counts.get('앱 코드'), 2);
     assert.deepEqual(report.notes, []);
   });
 
@@ -902,6 +953,38 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
         [seed.hiddenApp, [false, 1]],
       ]),
     );
+  });
+
+  test('앱마다 보이던 코드가 버전 1(복원)로 돌아온다: 확인 대기 버전은 없고, 비공개 앱의 코드는 공개 저장소로 나가지 않는다', async () => {
+    const code = exported.filter((f) => f.path.includes('/code/'));
+    assert.deepEqual(
+      code.map((f) => [f.path, f.isPrivateArea()]),
+      [
+        ['blog/apps/blog/code/index.html', false],
+        ['blog/apps/blog/code/style.css', false],
+        ['blog/apps/hidden/code/cairn.json', true],
+        ['blog/apps/hidden/code/index.html', true],
+        ['blog/apps/hidden/code/part.html', true],
+      ],
+    );
+    assert.equal(code[0]?.asText(), '<p>{{app.name}}</p>', '확인 대기 버전이 아니라 보이던 버전');
+    const rows = await target.sql`
+      SELECT a.slug, a.code_seq, a.code_pending_seq, a.code_versions, v.seq, v.source
+      FROM blog.apps a JOIN blog.app_code_versions v ON v.app_id = a.id ORDER BY a.slug`;
+    assert.deepEqual(
+      rows.map((r) => ({ ...r })),
+      ['blog', 'hidden'].map((slug) => ({
+        slug,
+        code_seq: 1,
+        code_pending_seq: null,
+        code_versions: 1,
+        seq: 1,
+        source: 'restore',
+      })),
+    );
+    const screen = ok(await target.api.get('/api/apps/site/blog/screen?path='));
+    assert.equal((screen.templates as Json)['index.html'], '<p>{{app.name}}</p>');
+    assert.deepEqual(screen.hosts, []);
   });
 
   test('방문자는 공개된 글·wiki·사진만 본다', async () => {
@@ -1231,7 +1314,7 @@ describe('cairn-admin restore (표준 입력의 zip)', () => {
     assert.equal(preview.status, 0, preview.stderr);
     assert.match(
       preview.stdout,
-      /들어올 내용: .*세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 글 5개 · 사진 4개/,
+      /들어올 내용: .*세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 앱 코드 2개 · 글 5개 · 사진 4개/,
     );
     assert.match(preview.stdout, /--apply/);
     assert.equal(await cairn.rows(), 0);
@@ -1306,7 +1389,7 @@ describe('sync-github: 저장소에서 복원', () => {
     assert.equal(preview.ok, true, preview.message as string);
     assert.match(
       String(preview.message),
-      /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 글 5개 · 사진 4개/,
+      /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 앱 코드 2개 · 글 5개 · 사진 4개/,
     );
     assert.equal(await cairn.rows(), 0);
 

@@ -10,6 +10,7 @@ import {
   NotFound,
 } from '../../platform';
 import { App } from '../app/app';
+import { AppCodeQuery } from '../app-code/app-code.query';
 import { ImagePolicy } from '../asset/image.policy';
 import type { AppRow, AssetRow, PostRow } from '../blog.tables';
 import { Post } from './post';
@@ -38,8 +39,9 @@ interface ArchivedPost
   assets: string[] | null;
 }
 
-// 글의 보관 파일 (docs/보관형식.md): 앱 blog/apps/<주소>.yml, 글 blog/posts/<연도>/<주소>.md와 사진 · 앱 아이콘 assets/<sha256>.<확장자>.
-// 공개 저장소에는 공개 앱과, 공개 앱에 든 공개 글 · 그 사진만 (스토어 1-3).
+// 글의 보관 파일 (docs/보관형식.md): 앱 blog/apps/<주소>.yml과 보이는 코드 blog/apps/<주소>/code/<파일>(스토어 1-6c),
+// 글 blog/posts/<연도>/<주소>.md와 사진 · 앱 아이콘 assets/<sha256>.<확장자>.
+// 공개 저장소에는 공개 앱(과 그 코드)과, 공개 앱에 든 공개 글 · 그 사진만 (스토어 1-3).
 // 현재 판만, 휴지통 글과 휴지통 글에만 붙은 사진은 빼고. 글마다 붙은 사진 목록(cairn_assets)도 적어 복원 때 행이 그대로 돌아온다.
 // 카테고리·시리즈·표지는 그 기능이 생기는 단계에서 앞부분에 더한다.
 @Injectable()
@@ -50,6 +52,7 @@ export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
     db: Database,
     private readonly archive: ArchiveQuery,
     private readonly blobs: BlobStore,
+    private readonly code: AppCodeQuery,
   ) {
     super(db);
   }
@@ -61,7 +64,12 @@ export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
 
   async files(actor: Actor): Promise<readonly ArchiveFile[]> {
     const apps = await this.appRows(actor);
-    return [...this.apps(apps), ...(await this.posts(actor)), ...(await this.photos(actor, apps))];
+    return [
+      ...this.apps(apps),
+      ...(await this.appCode(actor, apps)),
+      ...(await this.posts(actor)),
+      ...(await this.photos(actor, apps)),
+    ];
   }
 
   /** 앱 전부 (앱에는 휴지통이 없다), 순서대로. 아이콘은 사진과 함께 assets/로 */
@@ -89,6 +97,34 @@ export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
       ]);
       return r.visibility === App.PUBLIC ? file : file.keptPrivate();
     });
+  }
+
+  /**
+   * 앱마다 방문자에게 보이는 버전의 코드 (시작 코드를 쓰는 앱은 없다). 확인 대기 · 지난 버전은 싣지 않는다.
+   * 디스크에 없는 파일은 사진처럼 빼고 로그를 남긴다 (복원이 묶음 규칙으로 다시 본다)
+   */
+  private async appCode(actor: Actor, apps: readonly AppRow[]): Promise<ArchiveFile[]> {
+    const files: ArchiveFile[] = [];
+    for (const app of apps) {
+      if (app.code_seq === null) continue;
+      const code = await this.code.filesOf(actor, app, app.code_seq);
+      // 이름 순서로: 복원한 버전을 다시 내보내도 같은 차례가 되게
+      const names = code.files
+        .toJSON()
+        .map((f) => f.name)
+        .sort();
+      for (const name of names) {
+        try {
+          const body = await buffer(await this.code.open(actor, code, name));
+          const file = ArchiveFile.bytes(`blog/apps/${app.slug}/code/${name}`, body);
+          files.push(app.visibility === App.PUBLIC ? file : file.keptPrivate());
+        } catch (error) {
+          if (!(error instanceof NotFound)) throw error;
+          this.logger.warn(`디스크에 없어 앱 코드 파일을 뺐어요: ${app.slug}/${name}`);
+        }
+      }
+    }
+    return files;
   }
 
   private async posts(actor: Actor): Promise<ArchiveFile[]> {

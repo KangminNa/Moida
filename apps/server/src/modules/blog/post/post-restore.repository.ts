@@ -1,8 +1,9 @@
 import type { Sql } from '../../platform';
 import type { RestoredApp } from '../app/restored-app';
+import { RestoredAppCode } from '../app-code/restored-app-code';
 import type { RestoredPost } from './post-restore';
 
-// 복원의 blog 쓰기. 앱 + 글 + 첫 판 + 참고 wiki + 사진 행을 새 행으로만 넣는다.
+// 복원의 blog 쓰기. 앱(+ 코드 버전 1) + 글 + 첫 판 + 참고 wiki + 사진 행을 새 행으로만 넣는다.
 // 칸은 RestoredApp · RestoredPost가 정한다. outbox에는 남기지 않는다.
 export class PostRestoreRepository {
   constructor(private readonly tx: Sql) {}
@@ -15,10 +16,19 @@ export class PostRestoreRepository {
     return [Number(row?.apps), Number(row?.posts)];
   }
 
-  /** withIcon: 아이콘 파일이 들어왔을 때만 아이콘을 가리킨다 */
-  async saveApp(spaceId: string, app: RestoredApp, withIcon: boolean): Promise<void> {
+  /** withIcon: 아이콘 파일이 들어왔을 때만 아이콘을 가리킨다. code: 백업 때 보이던 코드가 있으면 버전 1로 */
+  async saveApp(
+    spaceId: string,
+    app: RestoredApp,
+    withIcon: boolean,
+    code: RestoredAppCode | null,
+  ): Promise<void> {
     const row = app.rowIn(spaceId, withIcon ? app.icon : null);
-    await this.tx`INSERT INTO blog.apps ${this.tx(row as never)}`;
+    const shown = code === null ? row : { ...row, ...RestoredAppCode.SHOWN };
+    await this.tx`INSERT INTO blog.apps ${this.tx(shown as never)}`;
+    if (code === null) return;
+    const version = code.versionRow(app.id, spaceId);
+    await this.tx`INSERT INTO blog.app_code_versions ${this.tx(version as never)}`;
   }
 
   /** photos: 이 글에 붙일 사진 중 파일이 들어온 것 (행에 외래키가 있다). appId: 넣을 앱 */

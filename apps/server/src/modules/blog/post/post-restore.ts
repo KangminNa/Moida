@@ -11,6 +11,7 @@ import {
   type Sql,
 } from '../../platform';
 import { RestoredApp } from '../app/restored-app';
+import { RestoredAppCode } from '../app-code/restored-app-code';
 import { ImagePolicy } from '../asset/image.policy';
 import {
   POST_ALIGN,
@@ -127,7 +128,7 @@ export class RestoredPost extends BaseEntity {
   }
 }
 
-// 복원에서 blog의 몫: 앱, 글, 사진. 글 → wiki 연결은 값이라 wiki가 묶음에 없어도(공개 저장소) 그대로 둔다.
+// 복원에서 blog의 몫: 앱, 앱 코드(blog/apps/<주소>/code/, 버전 1이 된다), 글, 사진. 글 → wiki 연결은 값이라 wiki가 묶음에 없어도(공개 저장소) 그대로 둔다.
 // 글 자리 사본(vault.post_marks)과 앱 공개 여부 사본(vault.app_marks)은 vault의 몫이고, 이벤트를 남기지 않는다: 플러그인과 일꾼이 할 일이 생기지 않는다.
 // 앱 파일이 없는데 공개 · 링크 공개 글이 있으면 앱이 생기기 전의 백업이다: 글을 모두 기본 앱(RestoredApp.former)에 넣는다.
 export class PostRestore extends ArchivePart {
@@ -139,6 +140,8 @@ export class PostRestore extends ArchivePart {
     private readonly apps: readonly RestoredApp[],
     private readonly posts: readonly RestoredPost[],
     private readonly photos: ReadonlyMap<string, ArchiveBlob>,
+    /** 앱 주소마다 백업 때 보이던 코드 */
+    private readonly codes: ReadonlyMap<string, RestoredAppCode>,
     /** 앱이 생기기 전의 백업인가 */
     private readonly former: boolean,
   ) {
@@ -149,6 +152,7 @@ export class PostRestore extends ArchivePart {
     const apps: RestoredApp[] = [];
     const posts: RestoredPost[] = [];
     const photos = new Map<string, ArchiveBlob>();
+    const code: ArchiveFile[] = [];
     for (const file of files) {
       if (PostRestore.APP.test(file.path)) {
         const text = PostRestore.textOf(file);
@@ -156,6 +160,8 @@ export class PostRestore extends ArchivePart {
           apps.push(RestoredApp.read(record));
       } else if (PostRestore.POST.test(file.path)) {
         posts.push(RestoredPost.read(PostRestore.document(file, 'post', ArchiveQuery.FORMAT)));
+      } else if (RestoredAppCode.PATH.test(file.path)) {
+        code.push(file);
       } else if (file.path.startsWith('assets/')) {
         const [hash, blob] = PostRestore.photo(file);
         photos.set(hash, blob);
@@ -181,7 +187,11 @@ export class PostRestore extends ArchivePart {
     );
     const former = apps.length === 0 && posts.some((p) => p.shown);
     if (!former) PostRestore.assertInApps(apps, posts);
-    return new PostRestore(apps, posts, photos, former);
+    const codes = RestoredAppCode.read(code);
+    const slugs = new Set(apps.map((a) => a.slug));
+    for (const slug of codes.keys())
+      if (!slugs.has(slug)) throw new RuleViolation(`없는 앱의 코드예요: blog/apps/${slug}/code/`);
+    return new PostRestore(apps, posts, photos, codes, former);
   }
 
   /** 글이 가리키는 앱이 들어오는가, 보이는 글이 앱 안에 있는가 (DB의 외래키 · CHECK에 걸리기 전에 어느 글인지 알린다) */
@@ -210,13 +220,14 @@ export class PostRestore extends ArchivePart {
   get counts(): ReadonlyMap<string, number> {
     return PostRestore.present([
       ['앱', this.apps.length + (this.former ? 1 : 0)],
+      ['앱 코드', this.codes.size],
       ['글', this.posts.length],
       ['사진', this.photos.size],
     ]);
   }
 
   override get blobs(): readonly ArchiveBlob[] {
-    return [...this.photos.values()];
+    return [...this.photos.values(), ...[...this.codes.values()].flatMap((c) => c.blobs)];
   }
 
   override get notes(): readonly string[] {
@@ -246,8 +257,10 @@ export class PostRestore extends ArchivePart {
   async write(tx: Sql, spaceId: string): Promise<readonly string[]> {
     const repository = new PostRestoreRepository(tx);
     const apps = this.former ? [RestoredApp.former(spaceId)] : this.apps;
-    for (const app of apps)
-      await repository.saveApp(spaceId, app, app.icon !== null && this.photos.has(app.icon));
+    for (const app of apps) {
+      const withIcon = app.icon !== null && this.photos.has(app.icon);
+      await repository.saveApp(spaceId, app, withIcon, this.codes.get(app.slug) ?? null);
+    }
     for (const post of this.posts) {
       const photos = post.photos.filter((hash) => this.photos.has(hash));
       await repository.save(spaceId, post, photos, this.former ? spaceId : post.appId);
