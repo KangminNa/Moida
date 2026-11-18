@@ -14,6 +14,7 @@ import {
   type ChatOutputRow,
   type ChatPartnerRow,
   type ChatTeamRow,
+  type ChatTokenRow,
   type ChatTurnTaskRow,
   ChatTurnView,
   type ChatUpdateLine,
@@ -45,7 +46,15 @@ export class ChatQuery extends BaseQuery {
 
   /** 대화 목록 (최근 것부터): 맡은 에이전트의 이름과 상태 (상태판과 같은 규칙) */
   async list(actor: Actor): Promise<ChatListView> {
-    return new ChatListView(await this.updates.ownerBoard(actor, null, ChatQuery.PAGE));
+    const rows = await this.updates.ownerBoard(actor, null, ChatQuery.PAGE);
+    if (rows.length === 0) return new ChatListView(rows);
+    return new ChatListView(
+      rows,
+      await this.tokensByChat(
+        actor.requireSpace(),
+        rows.map((r) => r.id),
+      ),
+    );
   }
 
   async get(actor: Actor, req: ChatIdInput): Promise<ChatDetailView> {
@@ -70,7 +79,54 @@ export class ChatQuery extends BaseQuery {
       chat.agent_id === null ? asked : null,
       await this.card(chat),
       await this.team(spaceId, chat.id),
+      await this.tokens(spaceId, chat.id),
     );
+  }
+
+  /**
+   * 이 대화의 일이 쓴 토큰 (O-1): 회차 · 덧붙인 말의 답 · 검토(request_id `chat:<대화>:<회차>…`) · 배정(`chat-route:<대화>:`)과
+   * 그 아래 하위 작업 전부의 실행 기록. 회차는 맨 위 작업의 request_id 세 번째 칸 (배정은 null)
+   */
+  private tokens(spaceId: string, chatId: string): Promise<ChatTokenRow[]> {
+    return this.sql<ChatTokenRow[]>`
+      WITH RECURSIVE tree AS (
+        SELECT id, request_id AS root FROM task.tasks
+        WHERE space_id = ${spaceId}
+          AND (request_id LIKE ${`${ChatRequest.TURN_PREFIX}${chatId}:%`}
+            OR request_id LIKE ${`${ChatRequest.route(chatId)}%`})
+        UNION ALL
+        SELECT c.id, tree.root FROM task.tasks c JOIN tree ON c.parent_id = tree.id
+      )
+      SELECT
+        CASE WHEN tree.root LIKE ${`${ChatRequest.TURN_PREFIX}%`} AND split_part(tree.root, ':', 3) ~ '^[0-9]+$'
+          THEN split_part(tree.root, ':', 3)::int END AS turn,
+        t.agent_id, a.name AS agent, sum(e.tokens)::bigint AS tokens
+      FROM tree
+      JOIN task.tasks t ON t.id = tree.id
+      JOIN task.task_events e ON e.task_id = tree.id
+      LEFT JOIN task.agents a ON a.id = t.agent_id
+      GROUP BY 1, t.agent_id, a.name
+      HAVING sum(e.tokens) > 0`;
+  }
+
+  /** 대화마다 쓴 토큰의 합 (목록, O-1). 대화 상세의 usage.tokens와 같은 수 */
+  private async tokensByChat(
+    spaceId: string,
+    chatIds: readonly string[],
+  ): Promise<Map<string, number>> {
+    const rows = await this.sql<{ chat_id: string; tokens: string }[]>`
+      WITH RECURSIVE tree AS (
+        SELECT id, split_part(request_id, ':', 2) AS chat_id FROM task.tasks
+        WHERE space_id = ${spaceId}
+          AND (request_id LIKE ${`${ChatRequest.TURN_PREFIX}%`} OR request_id LIKE ${`${ChatRequest.ROUTE_PREFIX}%`})
+          AND split_part(request_id, ':', 2) = ANY(${chatIds as string[]}::text[])
+        UNION ALL
+        SELECT c.id, tree.chat_id FROM task.tasks c JOIN tree ON c.parent_id = tree.id
+      )
+      SELECT tree.chat_id, sum(e.tokens)::bigint AS tokens
+      FROM tree JOIN task.task_events e ON e.task_id = tree.id
+      GROUP BY tree.chat_id`;
+    return new Map(rows.map((r) => [r.chat_id, Number(r.tokens)]));
   }
 
   /**

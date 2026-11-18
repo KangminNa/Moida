@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { ApprovalDetail } from '../../_task/ApprovalDetail';
-import { clock, NEWS_KINDS, OUTPUT_KINDS } from '../../_task/labels';
+import { clock, NEWS_KINDS, OUTPUT_KINDS, tokens } from '../../_task/labels';
 import { MarkdownText } from '../../_task/MarkdownText';
 import { OutputOpen } from '../../_task/parts';
-import type { ChatNews, ChatTurn } from '../../_task/types';
+import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
 import { RefChips } from './ChatRefs';
 
 /** 일하는 중인 회차의 상태 */
@@ -21,6 +21,7 @@ const isBefore = (n: ChatNews) =>
 // 팀이 무엇을 하는지는 과정을 펼쳐야 보인다. 결과 카드에 싣지 않는 승인(사이트 로그인 등)만 답 아래에 둔다
 export function ChatTurns({
   turns,
+  usage,
   news,
   pending,
   pendingRefs,
@@ -30,6 +31,8 @@ export function ChatTurns({
   onCancel,
 }: {
   turns: readonly ChatTurn[];
+  /** 회차마다 쓴 토큰 (O-1). 없는 회차는 아직 실행 기록이 없다 */
+  usage: readonly ChatTurnUsage[];
   news: readonly ChatNews[];
   /** 맡기 전의 첫 메시지 (맡았으면 null) */
   pending: string | null;
@@ -89,7 +92,11 @@ export function ChatTurns({
                   </div>
                 ),
               )}
-            <Process turn={t} items={within.filter((n) => PROCESS.includes(n.kind))} />
+            <Process
+              turn={t}
+              items={within.filter((n) => PROCESS.includes(n.kind))}
+              usage={usage.find((u) => u.turn === t.turn) ?? null}
+            />
             <div className="bubble theirs" aria-live={t.finishedAt ? undefined : 'polite'}>
               <span className="bubble-meta">
                 {partner ?? '에이전트'}
@@ -165,10 +172,21 @@ function Before({ items, me }: { items: readonly ChatNews[]; me: string }) {
   );
 }
 
-/** 회차의 과정: 접어 둔다. 돌면 "일하는 중", 끝나면 "과정". 펼치면 팀이 남긴 소식과 작업 */
-function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[] }) {
+/**
+ * 회차의 과정: 접어 둔다. 돌면 "일하는 중", 끝나면 "과정". 펼치면 팀이 남긴 소식과 작업.
+ * 이 회차가 쓴 토큰(O-1)은 머리에 합계, 펼치면 에이전트별 (일하는 동안 늘어난다)
+ */
+function Process({
+  turn: t,
+  items,
+  usage,
+}: {
+  turn: ChatTurn;
+  items: readonly ChatNews[];
+  usage: ChatTurnUsage | null;
+}) {
   const open = OPEN.includes(t.status);
-  if (!open && items.length === 0) return null;
+  if (!open && items.length === 0 && usage === null) return null;
   // 지금 하는 일 한 줄은 도는 동안만 (승인을 기다리는 동안의 기록은 승인 요청이라 카드가 대신 보인다)
   const doing =
     t.status === 'running'
@@ -180,7 +198,13 @@ function Process({ turn: t, items }: { turn: ChatTurn; items: readonly ChatNews[
         {open ? '일하는 중' : '과정'}
         {items.length > 0 ? ` · 소식 ${items.length}개` : ''}
         {doing ? ` · ${doing}` : ''}
+        {usage ? ` · ${tokens(usage.tokens)} 토큰` : ''}
       </summary>
+      {usage && (
+        <p className="chat-event">
+          {usage.agents.map((a) => `${a.name ?? '배정'} ${tokens(a.tokens)}`).join(' · ')}
+        </p>
+      )}
       <ol>
         {items.map((n) => (
           <li key={n.n}>

@@ -3256,6 +3256,15 @@ ul.picked > .chip {
   flex: none;
 }
 
+/* 대화가 쓴 토큰 (O-1): 목록 줄 끝과 대화 머리에 작게 */
+.chat-link small,
+.chat-tokens {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 새 대화: 가운데 인사와 큰 입력 칸 */
 .chat-home {
   display: flex;

@@ -262,6 +262,82 @@ describe('대화', () => {
     );
   });
 
+  test('대화의 토큰 (O-1): 회차 · 하위 작업의 실행 기록이 대화 · 회차 · 에이전트별로 모이고, 다른 대화와 섞이지 않는다', async () => {
+    const lead = await agent('토큰 팀장');
+    const member = await agent('토큰 팀원', { reportsTo: lead.id });
+    const chat = ok(await open(lead.id, '토큰을 세어 봐'), 201);
+    const other = ok(await open(lead.id, '다른 대화'), 201);
+    const turnOf = async (id: unknown) =>
+      (await jobs()).find((j) => j.task.payload?.chat?.chatId === id) as Json;
+    const spend = (taskId: unknown, tokens: number) =>
+      tool(runner, 'report_progress', {
+        task_id: taskId,
+        request_id: randomUUID(),
+        events: [{ kind: 'read', body: '읽음', tokens }],
+      });
+    const done = (taskId: unknown) =>
+      tool(runner, 'submit_result', {
+        task_id: taskId,
+        request_id: randomUUID(),
+        status: 'done',
+        result: { text: '끝' },
+      });
+
+    const leased = await jobs();
+    const turnIn = (id: unknown) => leased.find((j) => j.task.payload?.chat?.chatId === id) as Json;
+    const [first, elsewhere] = [turnIn(chat.id), turnIn(other.id)];
+    await spend(first.task.id, 1200);
+    await spend(elsewhere.task.id, 500);
+    await tool(first.run_token, 'delegate_task', {
+      subtasks: [
+        {
+          request_id: randomUUID(),
+          to_agent_id: member.id,
+          title: '토큰 하위',
+          instruction: '세어',
+        },
+      ],
+    });
+    const sub = (await jobs()).find((j) => j.task.title === '토큰 하위') as Json;
+    await spend(sub.task.id, 800);
+    await done(sub.task.id);
+    await drain();
+    const back = (await jobs()).find((j) => j.task.id === first.task.id) as Json;
+    await done(back.task.id);
+    await drain();
+
+    const now = await detail(chat.id);
+    ok(await send(now.chat, '한 번 더'), 201);
+    const second = await turnOf(chat.id);
+    await spend(second.task.id, 300);
+
+    const { usage } = await detail(chat.id);
+    assert.equal(usage.tokens, 2300);
+    assert.deepEqual(
+      usage.agents.map((a: Json) => [a.agentId, a.tokens]),
+      [
+        [lead.id, 1500],
+        [member.id, 800],
+      ],
+      '에이전트별 (많은 순)',
+    );
+    assert.deepEqual(
+      usage.turns.map((t: Json) => [t.turn, t.tokens, t.agents.length]),
+      [
+        [1, 2000, 2],
+        [2, 300, 1],
+      ],
+      '회차마다 (하위 작업은 그 회차에)',
+    );
+    const { chats } = ok(await api.get('/api/chats', owner));
+    const tokensOf = (id: unknown) => chats.find((c: Json) => c.id === id)?.tokens;
+    assert.deepEqual(
+      [tokensOf(chat.id), tokensOf(other.id)],
+      [2300, 500],
+      '목록의 합계는 상세와 같다',
+    );
+  });
+
   test('상대를 정해 열면 그 에이전트가 바로 맡는다. 목표 · 프로젝트(git 주소를 맞춘다)와 함께, 주소가 아니면 422', async () => {
     const lead = await agent('콘솔 상대');
     const chat = ok(

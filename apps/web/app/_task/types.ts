@@ -124,3 +124,6 @@ export type ChatCard = NonNullable<ChatDetail['card']>;
 export type ChatNews = ChatDetail['news'][number];
 /** 맡기 전의 지금 질문과 고를 에이전트 (2차 1-5) */
 export type ChatQuestion = NonNullable<ChatDetail['question']>;
+/** 대화가 쓴 토큰 (O-1): 대화 전체 · 에이전트별, 회차마다 */
+export type ChatUsage = ChatDetail['usage'];
+export type ChatTurnUsage = ChatUsage['turns'][number];

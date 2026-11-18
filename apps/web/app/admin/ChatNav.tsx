@@ -1,6 +1,6 @@
 'use client';
 
-import { CHAT_NEEDS_ME, CHAT_STATE } from '../_task/labels';
+import { CHAT_NEEDS_ME, CHAT_STATE, tokens } from '../_task/labels';
 import { useChats } from '../_task/live';
 import type { ChatSummary } from '../_task/types';
 import { CHATS_HREF } from './menu';
@@ -35,6 +35,7 @@ export function ChatNav({ pathname }: { pathname: string | null }) {
                   title={c.title}
                 >
                   <span className="clamp-1">{c.title}</span>
+                  {c.tokens > 0 && <small title="이 대화가 쓴 토큰">{tokens(c.tokens)}</small>}
                   {MARKED.includes(c.state) && (
                     <span className={CHAT_NEEDS_ME.includes(c.state) ? 'pill on' : 'pill'}>
                       {CHAT_STATE[c.state] ?? c.state}

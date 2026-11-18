@@ -135,6 +135,11 @@ function RunnerRow({
             {pinned.length > 0 ? ` · 묶인 에이전트: ${pinned.join(', ')}` : ''}
           </small>
         </div>
+        {runner.browser && (
+          <span className="pill" title="서버 브라우저에 붙은 러너: 브라우저 일을 받아요">
+            브라우저
+          </span>
+        )}
         <span className={runner.online ? 'pill on' : 'pill off'}>
           {runner.online ? '연결됨' : '연결 안 됨'}
         </span>

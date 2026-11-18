@@ -3,11 +3,12 @@ import { Actor, BaseQuery, ChangeStream, Database, Forbidden, RuleViolation } fr
 import { Approval } from '../approval/approval';
 import { JobChatView } from '../task/job.view';
 import { Task } from '../task/task';
-import { AgentUpdatesView, type ChatBoardRow, type ChatUpdateLine } from './chat.view';
+import type { ChatBoardRow, ChatUpdateLine } from './chat.view';
 import { ChatProject } from './chat-project.policy';
 import { ChatRequest } from './chat-request.policy';
 import type { AgentUpdatesInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
+import { AgentUpdatesView } from './chat-update.view';
 
 // 대화의 소식 읽기 (MCP agent_updates, 2차 1-1). 기기의 권한으로 범위를 정한다:
 //   delegate → 그 기기가 연 대화만, news(소식 기기, 훅 · 상태 줄) → 공간의 모든 대화 (읽기만)

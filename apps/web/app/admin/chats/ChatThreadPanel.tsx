@@ -5,6 +5,7 @@ import { useMe } from '../../_account/live';
 import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
+import { tokens } from '../../_task/labels';
 import { CHAT_DETAIL_TOPICS, useAgents } from '../../_task/live';
 import type { Chat, ChatDetail, OutputSaved } from '../../_task/types';
 import { ChatCardForm } from './ChatCardForm';
@@ -156,6 +157,14 @@ export function ChatThreadPanel({ id }: { id: string }) {
       <div className="chat-page">
         <header className="chat-top">
           <h1 className="clamp-1">{d.chat.title}</h1>
+          {d.usage.tokens > 0 && (
+            <small
+              className="chat-tokens"
+              title="이 대화의 일이 쓴 토큰 (설정 › AI 한도와 같은 수)"
+            >
+              토큰 {tokens(d.usage.tokens)}
+            </small>
+          )}
           {d.chat.deviceId && <span className="pill">기기에서</span>}
           {tool && partner && !partner.deleted && (
             <ChatRuntimeForm
@@ -183,6 +192,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
         {tuning.problem && <p className="error">{tuning.problem}</p>}
         <ChatTurns
           turns={d.turns}
+          usage={d.usage.turns}
           news={d.news}
           pending={d.chat.pending}
           pendingRefs={d.chat.pendingRefs}

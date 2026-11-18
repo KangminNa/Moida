@@ -226,6 +226,7 @@ export const runners = taskSchema.table('runners', {
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   sandbox: boolean('sandbox').notNull(),
+  browser: boolean('browser').notNull(),
 });
 
 /** task.schedules */

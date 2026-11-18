@@ -91,11 +91,11 @@ export class TaskService extends BaseService {
    */
   async next(actor: Actor, req: NextJobsInput): Promise<readonly JobView[]> {
     actor.assertCan(Actor.RUN);
-    const [spaceId, runnerId] = TaskService.runnerAt(actor);
+    const [spaceId, runnerId, sandbox] = TaskService.runnerAt(actor);
     const deadline = Date.now() + req.waitSeconds * 1000;
     for (;;) {
       const runner = await this.transaction((tx) =>
-        new RunnerRepository(tx).seen(spaceId, runnerId, new Date(), actor.inSandbox()),
+        new RunnerRepository(tx).seen(spaceId, runnerId, new Date(), sandbox, req.browser),
       );
       const jobs = runner.accepting ? await this.lease(actor, runner, req) : [];
       const left = deadline - Date.now();
@@ -421,9 +421,9 @@ export class TaskService extends BaseService {
     return actor.spaceId;
   }
 
-  /** 러너의 공간과 기기 id (run 권한 기기만 닿는다) */
-  private static runnerAt(actor: Actor): readonly [string, string] {
+  /** 러너의 공간과 기기 id, 코드 러너 칸인지 (run 권한 기기만 닿는다) */
+  private static runnerAt(actor: Actor): readonly [string, string, boolean] {
     if (!actor.spaceId || !actor.id) throw new Forbidden(Actor.RUN);
-    return [actor.spaceId, actor.id];
+    return [actor.spaceId, actor.id, actor.inSandbox()];
   }
 }

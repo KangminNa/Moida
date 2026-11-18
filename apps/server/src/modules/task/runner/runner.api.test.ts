@@ -155,6 +155,23 @@ describe('러너 (/api/runners)', () => {
     assert.equal((await runnerOf(device.id))?.online, true);
   });
 
+  test('서버 브라우저에 붙은 러너는 browser로 보인다 (O-1): next_jobs가 알린 값, 진행 보고는 그대로, 쥔 브라우저 작업이 있으면 참', async () => {
+    const device = await newRunner();
+    const task = await queuedTask();
+    const jobs = (await call(device.token, 'next_jobs', { browser: true })).jobs as {
+      task: Json;
+    }[];
+    assert.equal(jobs[0]?.task.id, task.id);
+    assert.equal((await runnerOf(device.id))?.browser, true, '알린 값');
+    await call(device.token, 'report_progress', { task_id: task.id, events: [] });
+    assert.equal((await runnerOf(device.id))?.browser, true, '진행 보고는 바꾸지 않는다');
+    await call(device.token, 'next_jobs', { browser: false });
+    assert.equal((await runnerOf(device.id))?.browser, false, '다음 next_jobs의 값을 따른다');
+    // 사이트 일이 도는 동안 러너는 false를 알린다: 쥔 실행 중인 브라우저 작업이 있으면 붙은 러너다
+    await db.sql`UPDATE task.tasks SET kind = 'browse' WHERE id = ${String(task.id)}`;
+    assert.equal((await runnerOf(device.id))?.browser, true, '쥔 브라우저 작업');
+  });
+
   test('없는 러너는 404, 모양이 틀리면 400', async () => {
     const missing = await api.request('POST', `/api/runners/${randomUUID()}/accepting`, owner, {
       accepting: false,
