@@ -397,6 +397,22 @@ describe('지시문', () => {
     assert.ok(inApp.includes('이 대화는 앱 하나의 일입니다 (app_id: app-9)'));
   });
 
+  test('대표의 새 앱 만들기 (스토어 2-6): 방문자가 하는 일로 종류를 고르고, 운영 팀까지 승인 한 번에', () => {
+    const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
+    const prompt = job({
+      agent: lead,
+      task: {
+        id: 't',
+        title: '대화 · 앱',
+        payload: { chat: { chatId: 'c', turn: 1, history: [] } },
+      },
+    }).prompt(REPO_PROMPTS, false);
+    assert.ok(prompt.includes('방문자가 무엇을 하는지로 종류를 고릅니다'), '늘 있는 줄');
+    assert.ok(prompt.includes('kind: page (페이지 없이 만들고 화면은 앱 코드로'));
+    assert.ok(prompt.includes('page면 app_code(첫 화면)'), '받을 것은 앱의 첫 결과');
+    assert.ok(prompt.includes('없으면 new_team: true'));
+  });
+
   test('묶인 팀원은 정해진 컴퓨터에서 일한다고 팀장에게 알린다', () => {
     const prompt = job({
       team: [
