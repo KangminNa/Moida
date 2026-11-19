@@ -86,7 +86,8 @@ function PackageLink({ entry, pathname }: { entry: PackageEntry; pathname: strin
 export function ConsoleFoot({ ownerName }: { ownerName: string }) {
   async function logout() {
     await api('POST', '/api/auth/logout');
-    window.location.href = '/';
+    // 바꿔치기: 지금 콘솔 화면을 기록에서 뺀다 (뒤로 가기는 콘솔의 bfcache 확인이 맡는다, 웹 UX U1)
+    window.location.replace('/');
   }
   return (
     <div className="console-foot">

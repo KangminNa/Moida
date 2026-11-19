@@ -11,6 +11,7 @@ import { useToast } from '../_ui/useToast';
 import { useWaitingChanges } from '../_vault/live';
 import { ChatNav } from './ChatNav';
 import { ConsoleDock } from './ConsoleDock';
+import { useConsoleRestore } from './console-restore';
 import { NEW_CHAT, placeOf, SIDE_COOKIE } from './menu';
 import { SectionTabs } from './SectionTabs';
 import { ConsoleFoot, SettingsNav } from './SettingsNav';
@@ -55,6 +56,7 @@ export function AdminShell({
     : null;
   const { section } = place;
   const chat = section.key === 'chat';
+  useConsoleRestore();
 
   useEffect(() => {
     if (!drawer) return;

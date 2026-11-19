@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef } from 'react';
 import { useSpace } from '../../../_account/live';
 import { APP_KIND_LABELS } from '../../../_blog/labels';
 import { useApps, usePages } from '../../../_blog/live';
@@ -16,6 +16,9 @@ import { CHAT_HREF, STORE_HREF } from '../../menu';
 import { APP_TEAM_TEMPLATE, teamLeaders } from '../app-team';
 import { type CreateAppBody, CreateAppForm } from './CreateAppForm';
 
+/** 스토어(앱 종류) 화면의 주소 */
+const STORE_NEW_HREF = `${STORE_HREF}/new`;
+
 /** 앱 종류 카드: 종류 · 아이콘 · 설명 (서버 blog.tables의 APP_KIND) */
 const KINDS: readonly [AdminApp['kind'], string, string][] = [
   ['blog', 'post', '글 · 메뉴 · RSS. 글은 버전으로 남고, 공개는 승인 뒤에'],
@@ -25,13 +28,17 @@ const KINDS: readonly [AdminApp['kind'], string, string][] = [
 
 // 스토어 (스토어 1-5, 시안 2 · 3번): 앱 종류를 골라 만들기 시트를 연다. 만들면 앱 관리로 간다.
 // 커뮤니티는 3단계라 준비 중으로만 보인다. 원하는 종류가 없으면 대화에서 맡긴다 (코드 작업 → 기능 패키지).
-export function StorePanel() {
+// 시트는 주소(?make=종류, page.tsx가 넘김)에 둔다 (웹 UX U1): 열기는 기록을 하나 쌓고, 닫기는 여기서 연 것이면 뒤로 ·
+// 주소로 바로 들어왔으면 바꿔치기, 만든 뒤에는 앱 관리로 바꿔치기한다 (뒤로 가기가 다시 시트를 열지 않게)
+export function StorePanel({ make }: { make: string | null }) {
   const router = useRouter();
   const apps = useApps();
   const pages = usePages();
   const agents = useAgents();
   const save = useAction();
-  const [kind, setKind] = useState<AdminApp['kind'] | null>(null);
+  const kind = KINDS.find(([value]) => value === make)?.[0] ?? null;
+  /** 이 화면에서 시트를 열었는가 (닫을 때 뒤로 갈 수 있는지) */
+  const opened = useRef(false);
   const space = useSpace();
   const list = apps.data?.apps ?? [];
   /** 공개 주소 앞부분: 사이트 주소에서 https:// 와 끝 / 를 뺀 것 */
@@ -66,8 +73,21 @@ export function StorePanel() {
           'PUT',
         ),
       );
-    router.push(`${STORE_HREF}/${app.id}`);
+    router.replace(`${STORE_HREF}/${app.id}`);
     return true;
+  }
+
+  function open(value: AdminApp['kind']) {
+    save.clear();
+    opened.current = true;
+    router.push(`${STORE_NEW_HREF}?make=${value}`, { scroll: false });
+  }
+
+  function close() {
+    save.clear();
+    if (opened.current) router.back();
+    else router.replace(STORE_NEW_HREF, { scroll: false });
+    opened.current = false;
   }
 
   return (
@@ -90,10 +110,7 @@ export function StorePanel() {
           problem={save.problem}
           onSubmit={create}
           onEdit={save.clear}
-          onClose={() => {
-            setKind(null);
-            save.clear();
-          }}
+          onClose={close}
         />
       )}
       <ul className="store-kinds" aria-label="앱 종류">
@@ -111,7 +128,7 @@ export function StorePanel() {
                 type="button"
                 className="cta small"
                 aria-pressed={kind === value}
-                onClick={() => setKind(value)}
+                onClick={() => open(value)}
               >
                 만들기
               </button>

@@ -30,6 +30,13 @@ paths:
 - 오류 문구는 `describe(error)`로만 만든다. 서버 오류의 `message`를 화면에서 다시 조립하지 않는다.
 - 만들기는 `requestId`를 함께 보낸다 (응답을 못 받아 다시 눌러도 하나만 생기게). 고치기는 본 `version`을 함께 보낸다.
 
+## 뒤로 가기 (웹 UX U1)
+
+- 로그인 · 로그아웃 · 만든 뒤의 이동처럼 되돌아가면 안 되는 이동은 기록을 바꿔치기한다 (`location.replace` · `router.replace`). 로그인한 채 `/login`을 열면 돌아갈 곳으로 보낸다.
+- 돌아갈 주소(`?return=`)는 `safeReturnPath`(`_lib/return-path.ts`)로만 읽는다 (서버의 `ReturnPath`와 같은 규칙, 웹 보안 S1).
+- 시트처럼 화면 안에서 열고 닫는 것은 주소(쿼리, 예: 스토어의 `?make=`)에 둔다: 폰의 뒤로 가기가 그것만 닫고, 새로 고쳐도 그대로다. 주소의 값은 `page.tsx`가 읽어 넘긴다. 여기서 연 것이면 닫기는 뒤로, 주소로 바로 들어왔으면 바꿔치기.
+- 콘솔이 뒤로 가기로 메모리(bfcache)에서 되살아나면 로그인을 물어 끝났으면 로그인 화면으로 (`admin/console-restore.ts`).
+
 ## 앱 화면 (스토어 1-6)
 
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`).

@@ -30,7 +30,8 @@ export function LoginForm({
     const reply = await action.run('login', () =>
       api('POST', '/api/auth/login', { login, password }),
     );
-    if (reply?.ok) window.location.href = returnTo;
+    // 바꿔치기: 뒤로 가기로 로그인 화면에 돌아가지 않게 (웹 UX U1)
+    if (reply?.ok) window.location.replace(returnTo);
   }
 
   return (
