@@ -26,9 +26,6 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /.well-known/cairn-domain': 404,
   // 스토어 3-1: 커뮤니티 회원 API는 앱 도메인에서만 (기본 도메인에서는 없는 주소)
   'GET /api/community/me': 404,
-  'GET /api/community/login/methods': 404,
-  'GET /api/community/login/:method/start': 404,
-  'GET /api/community/login/:method/callback': 404,
   'GET /api/apps/by-slug/:slug': 404,
   'GET /api/apps/by-slug/:slug/icon': 404,
   // 스토어 1-6: 앱 화면 · 앱 코드의 파일은 누구나 (없는 앱 · 비공개 앱은 404)

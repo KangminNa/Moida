@@ -183,16 +183,6 @@ export class PluginRegistry {
     return this.loginMethods.find((l) => l.name === name) ?? null;
   }
 
-  /** 커뮤니티 회원도 쓰는 로그인 방법들 (스토어 3-1) */
-  memberLogins(): readonly LoginMethod[] {
-    return this.loginMethods.filter((l) => l.members);
-  }
-
-  /** 회원 로그인에 쓰는 그 방법. 없거나 관리자 로그인 전용이면 null */
-  memberLogin(name: string): LoginMethod | null {
-    return this.memberLogins().find((l) => l.name === name) ?? null;
-  }
-
   /**
    * 기능 패키지의 경로에 맞는 동작과 경로의 값(:id 등). 동작 중인 패키지만 찾는다.
    * route: 목록 파일 api의 열쇠("GET /reads/:id"), path: /api/p/<이름> 뒤의 경로

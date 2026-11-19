@@ -1,30 +1,33 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { resolve } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
 
-// 커뮤니티 회원 (스토어 3-1a, docs/스토어.md 11장): 앱 도메인에서만 열리는 회원 API, 카카오 로그인(테스트용 카카오 서버) →
-// 가입 표 → 가입 → 회원 쿠키, 쓰기의 출처 · CSRF 확인, 원칙 10(회원은 관리자가 아니다 · 관리자 로그인은 회원이 아니다).
-// 도메인은 모든 공간에서 하나이고 테스트 DB를 함께 쓰므로 이 실행의 표시를 붙인다.
+// 커뮤니티 회원 (스토어 3-1a, 아이디 · 비밀번호 가입, docs/스토어.md 11장): 앱 도메인에서만 열리는 회원 API, 가입 → 회원 쿠키 → 로그인,
+// 해킹 대비(실패 문구 하나 · 틀린 시도 제한 · 가입 제한 · 새 세션 · 비밀번호를 바꾸면 다른 로그인 끝남), 쓰기의 출처 · CSRF 확인,
+// 원칙 10(회원은 관리자가 아니다 · 관리자 로그인은 회원이 아니다).
+// 도메인은 모든 공간에서 하나이고 테스트 DB를 함께 쓰므로 이 실행의 표시를 붙인다. 시도 제한은 앱 · 곳(IP)마다 센다:
+// 테스트는 모두 127.0.0.1(앞단 프록시로 믿는 곳)에서 오므로 가입마다 X-Forwarded-For로 다른 곳을 싣는다
 
 type Json = Record<string, unknown>;
 
-/** 플러그인 폴더의 테스트용 카카오 서버 (플러그인 단위 테스트와 같은 것을 쓴다) */
-interface FakeKakao {
-  readonly url: string;
-  close(): Promise<void>;
-}
-
 let api: ApiClient;
 let owner: TestUser;
-let kakao: FakeKakao;
 const mark = randomUUID().slice(0, 8);
 const HOST = `town-${mark}.example.com`;
 const OTHER = `club-${mark}.example.com`;
 const ORIGIN = `http://${HOST}`;
+const PASSWORD = '오늘은 비가 와서 집에 있다';
 let appId = '';
 let appVersion = 0;
+let hostSeq = 0;
+let ipSeq = 0;
+
+/** 가입마다 다른 곳 (가입 제한이 곳마다라서) */
+function nextIp(): string {
+  ipSeq += 1;
+  return `10.20.${Math.floor(ipSeq / 250)}.${(ipSeq % 250) + 1}`;
+}
 
 function ok(res: ApiResult, status = 200): Json {
   assert.equal(res.status, status, res.text);
@@ -64,22 +67,27 @@ function at(
   });
 }
 
-/** 카카오 로그인 한 바퀴: 시작 → 테스트용 카카오 코드 → 돌아오기. 돌아온 응답(302)과 그동안의 쿠키 */
-async function signIn(kakaoId: number, back = '/p/1', host = HOST): Promise<[ApiResult, TestUser]> {
-  const begin = await at(
-    `/api/community/login/kakao/start?return=${encodeURIComponent(back)}`,
-    {},
+/** 새 커뮤니티 앱의 도메인 (가입 제한이 앱 · 곳마다라 가입을 많이 하는 테스트는 앱을 나눈다) */
+async function freshHost(): Promise<string> {
+  hostSeq += 1;
+  const host = `c${hostSeq}-${mark}.example.com`;
+  await newApp('community', `c${hostSeq}-${mark}`, host);
+  return host;
+}
+
+function join(body: Json, host = HOST, ip = nextIp()): Promise<ApiResult> {
+  return at(
+    '/api/community/join',
+    { method: 'POST', body: { ageConfirmed: true, ...body }, headers: { 'x-forwarded-for': ip } },
     host,
   );
-  assert.equal(begin.status, 302, begin.text);
-  const state = new URL(begin.location ?? '').searchParams.get('state') ?? '';
-  const browser = new TestUser(begin.cookies());
-  const done = await at(
-    `/api/community/login/kakao/callback?code=ok-${kakaoId}&state=${encodeURIComponent(state)}`,
-    { as: browser },
-    host,
-  );
-  return [done, browser.with(done.cookies())];
+}
+
+/** 가입까지 마친 회원의 브라우저 */
+async function member(loginId: string, nickname: string, host = HOST): Promise<TestUser> {
+  const res = await join({ loginId, password: PASSWORD, nickname }, host);
+  assert.equal(res.status, 201, res.text);
+  return new TestUser(res.cookies());
 }
 
 /** 이 브라우저의 쓰기 확인 값 */
@@ -87,46 +95,28 @@ async function csrfOf(browser: TestUser, host = HOST): Promise<string> {
   return String(ok(await at('/api/community/me', { as: browser }, host)).csrf);
 }
 
-/** 가입까지 마친 회원의 브라우저 */
-async function member(kakaoId: number, nickname: string): Promise<TestUser> {
-  const [, joining] = await signIn(kakaoId);
-  const csrf = await csrfOf(joining);
-  const joined = await at('/api/community/join', {
-    method: 'POST',
-    as: joining,
-    body: { nickname, ageConfirmed: true },
-    headers: { 'x-cairn-csrf': csrf },
-  });
-  assert.equal(joined.status, 201, joined.text);
-  return joining.with(joined.cookies());
-}
-
 before(async () => {
   api = await ApiClient.start();
   owner = await api.signIn();
-  const entry = resolve(process.cwd(), '../../plugins/login-kakao/server/fake-kakao');
-  const loaded = require(entry) as { FakeKakao: { start(): Promise<FakeKakao> } };
-  kakao = await loaded.FakeKakao.start();
-  assert.equal((await api.request('POST', '/api/plugins/login-kakao/enable', owner)).status, 200);
-  const saved = await api.request('PUT', '/api/plugins/login-kakao/settings', owner, {
-    values: { restApiKey: 'rest-key-1', authUrl: kakao.url, apiUrl: kakao.url },
-  });
-  assert.equal(saved.status, 200, saved.text);
   const town = await newApp('community', `town-${mark}`, HOST);
   appId = String(town.id);
   appVersion = Number(town.version);
   await newApp('community', `club-${mark}`, OTHER);
 });
 after(async () => {
-  await api.request('POST', '/api/plugins/login-kakao/disable', owner);
   await api.close();
-  await kakao.close();
 });
 
 describe('어디서 열리는가', () => {
   test('기본 도메인에서는 없는 주소 (콘솔과 같은 출처에 회원 쿠키를 두지 않는다)', async () => {
     assert.equal((await api.get('/api/community/me')).status, 404);
-    assert.equal((await api.get('/api/community/login/kakao/start')).status, 404);
+    const res = await api.request('POST', '/api/community/join', TestUser.visitor, {
+      loginId: 'mainsite',
+      password: PASSWORD,
+      nickname: '기본도메인',
+      ageConfirmed: true,
+    });
+    assert.equal(res.status, 404);
   });
 
   test('공개된 커뮤니티 앱의 도메인에서만: 블로그 앱 · 비공개 커뮤니티 앱의 도메인은 404', async () => {
@@ -134,115 +124,94 @@ describe('어디서 열리는가', () => {
     await newApp('community', `shut-${mark}`, `shut-${mark}.example.com`, false);
     assert.equal((await at('/api/community/me', {}, `blog-${mark}.example.com`)).status, 404);
     assert.equal((await at('/api/community/me', {}, `shut-${mark}.example.com`)).status, 404);
-    assert.deepEqual(ok(await at('/api/community/me')), {
-      member: null,
-      joining: false,
-      csrf: null,
-    });
+    assert.deepEqual(ok(await at('/api/community/me')), { member: null, csrf: null });
   });
 
   test('관리자 경로(/api/community/admin)와 다른 관리 API는 앱 도메인에서 404', async () => {
     assert.equal((await at('/api/community/admin/x')).status, 404);
     assert.equal((await at('/api/agents', { as: owner })).status, 404);
   });
-
-  test('회원 로그인 버튼은 회원용 로그인 플러그인만 (카카오)', async () => {
-    assert.deepEqual(ok(await at('/api/community/login/methods')), {
-      methods: [{ method: 'kakao', label: '카카오로 로그인' }],
-    });
-    assert.equal((await at('/api/community/login/github/start')).status, 404);
-  });
 });
 
-describe('로그인과 가입', () => {
-  test('시작: 카카오로 보내고 돌아올 주소는 이 앱 도메인', async () => {
-    const begin = await at('/api/community/login/kakao/start?return=%2Fp%2F1');
-    const url = new URL(begin.location ?? '');
-    assert.equal(`${url.origin}${url.pathname}`, `${kakao.url}/oauth/authorize`);
-    assert.equal(
-      url.searchParams.get('redirect_uri'),
-      `${ORIGIN}/api/community/login/kakao/callback`,
-    );
-    assert.ok(begin.cookies().cairn_member_login);
-    assert.equal((await at('/api/community/login/kakao/start?return=//evil.com')).status, 400);
-  });
-
-  test('처음 온 계정은 가입 표를 받아 가입 화면으로, 가입하면 회원 쿠키', async () => {
-    const [done, joining] = await signIn(9001, '/p/7');
-    assert.equal(done.status, 302);
-    assert.equal(done.location, '/_/join?return=%2Fp%2F7');
-    assert.ok(done.cookies().cairn_member_join);
-    assert.equal(done.cookies().cairn_member, undefined);
-    const me = ok(await at('/api/community/me', { as: joining }));
-    assert.equal(me.joining, true);
+describe('가입과 로그인', () => {
+  test('가입하면 바로 로그인된다: 회원 쿠키 · 자기 정보 · 쓰기 확인 값 (비밀번호 해시는 어디에도 없다)', async () => {
+    const res = await join({ loginId: '  Villager ', password: PASSWORD, nickname: '마을사람' });
+    const self = ok(res, 201);
+    assert.equal(self.loginId, 'villager');
+    assert.ok(res.cookies().cairn_member);
+    assert.doesNotMatch(res.text, /scrypt/);
+    const me = ok(await at('/api/community/me', { as: new TestUser(res.cookies()) }));
+    assert.equal((me.member as Json).nickname, '마을사람');
     assert.equal(typeof me.csrf, 'string');
+  });
 
-    const join = (body: object, csrf = String(me.csrf)) =>
-      at('/api/community/join', {
-        method: 'POST',
-        as: joining,
-        body,
-        headers: { 'x-cairn-csrf': csrf },
-      });
-    assert.equal((await join({ nickname: '마을사람', ageConfirmed: true }, 'wrong')).status, 403);
-    assert.match((await join({ nickname: '마을사람', ageConfirmed: false })).text, /만 14세/);
-    assert.match(
-      (await join({ nickname: '운영자김', ageConfirmed: true })).text,
-      /운영자로 보이는/,
+  test('규칙: 만 14세 확인 · 아이디 모양 · 운영자로 보이는 이름 · 쉬운 비밀번호는 422, 겹치면 409', async () => {
+    const host = await freshHost();
+    const try1 = (body: Json) =>
+      join({ loginId: 'rules_one', password: PASSWORD, nickname: '규칙', ...body }, host);
+    assert.match((await try1({ ageConfirmed: false })).text, /만 14세/);
+    assert.match((await try1({ loginId: '1abc' })).text, /영문 소문자로 시작/);
+    assert.match((await try1({ loginId: 'admin_kim' })).text, /운영자로 보이는 아이디/);
+    assert.equal((await try1({ password: 'short' })).status, 422);
+    assert.match((await try1({ password: '1234567890' })).text, /너무 쉬운/);
+    assert.equal((await try1({})).status, 201);
+    const again = await join(
+      { loginId: 'RULES_ONE', password: PASSWORD, nickname: '다른이름' },
+      host,
     );
-    const joined = await join({ nickname: '마을사람', ageConfirmed: true });
-    assert.equal(joined.status, 201, joined.text);
-    assert.equal(joined.json().nickname, '마을사람');
-    assert.ok(joined.cookies().cairn_member);
-    assert.equal(joined.cookies().cairn_member_join, '');
-
-    const signed = joining.with(joined.cookies());
-    const after = ok(await at('/api/community/me', { as: signed }));
-    assert.equal((after.member as Json).nickname, '마을사람');
-    assert.equal(after.joining, false);
+    assert.match(again.text, /이미 쓰는 아이디/);
+    assert.equal(again.status, 409);
   });
 
-  test('가입한 계정으로 다시 로그인하면 돌아갈 곳으로 바로', async () => {
-    await member(9002, '두번째');
-    const [done] = await signIn(9002, '/p/9');
-    assert.equal(done.location, '/p/9');
-    assert.ok(done.cookies().cairn_member);
+  test('로그인: 맞으면 새 세션, 틀린 비밀번호와 없는 아이디는 같은 문구', async () => {
+    await member('login_ok', '로그인됨');
+    const login = (loginId: string, password: string) =>
+      at('/api/community/login', { method: 'POST', body: { loginId, password } });
+    const res = await login('LOGIN_OK', PASSWORD);
+    const self = ok(res);
+    assert.equal(self.loginId, 'login_ok');
+    assert.ok(res.cookies().cairn_member);
+    const wrong = await login('login_ok', '틀린 비밀번호입니다');
+    const missing = await login('nobody_here', PASSWORD);
+    assert.equal(wrong.status, 401);
+    assert.equal(missing.status, 401);
+    assert.equal(wrong.json().message, missing.json().message);
   });
 
-  test('같은 닉네임(대소문자 · 공백 무시)은 409, 가입 표 없이 가입은 401', async () => {
-    await member(9003, 'Kim Lee');
-    const [, joining] = await signIn(9004);
-    const csrf = await csrfOf(joining);
-    const res = await at('/api/community/join', {
-      method: 'POST',
-      as: joining,
-      body: { nickname: 'kim.lee', ageConfirmed: true },
-      headers: { 'x-cairn-csrf': csrf },
-    });
-    assert.equal(res.status, 409, res.text);
-    const bare = await at('/api/community/join', {
-      method: 'POST',
-      body: { nickname: '아무개', ageConfirmed: true },
-    });
-    assert.equal(bare.status, 401, bare.text);
+  test('틀린 로그인은 아이디마다 15분에 5번까지, 넘으면 맞는 비밀번호도 429', async () => {
+    const host = await freshHost();
+    await member('locked_one', '잠길사람', host);
+    const login = (password: string) =>
+      at(
+        '/api/community/login',
+        { method: 'POST', body: { loginId: 'locked_one', password } },
+        host,
+      );
+    for (let i = 0; i < 5; i += 1)
+      assert.equal((await login(`틀린 비밀번호 ${i}번째`)).status, 401);
+    assert.equal((await login(PASSWORD)).status, 429);
   });
 
-  test('시작하지 않은 브라우저 · 틀린 코드는 로그인 화면으로 (?error=)', async () => {
-    const forged = await at('/api/community/login/kakao/callback?code=ok-1&state=nope');
-    assert.equal(forged.status, 302);
-    assert.match(forged.location ?? '', /^\/_\/login\?error=/);
-    const begin = await at('/api/community/login/kakao/start');
-    const state = new URL(begin.location ?? '').searchParams.get('state') ?? '';
-    const bad = await at(`/api/community/login/kakao/callback?code=bad&state=${state}`, {
-      as: new TestUser(begin.cookies()),
-    });
-    assert.match(bad.location ?? '', /^\/_\/login\?error=/);
+  test('가입은 한 곳에서 1시간에 3번까지 (겹친 아이디로 찔러보는 것도 센다)', async () => {
+    const host = await freshHost();
+    const ip = '10.99.0.1';
+    const signUp = (loginId: string, nickname: string, from = ip) =>
+      join({ loginId, password: PASSWORD, nickname }, host, from);
+    assert.equal((await signUp('spam_one', 'spam_one')).status, 201);
+    assert.equal((await signUp('spam_two', 'spam_two')).status, 201);
+    assert.equal((await signUp('spam_one', '찔러보기')).status, 409);
+    assert.equal((await signUp('spam_four', 'spam_four')).status, 429);
+    assert.equal(
+      (await signUp('spam_four', 'spam_four', nextIp())).status,
+      201,
+      '다른 곳은 그대로',
+    );
   });
 });
 
-describe('회원 정보와 로그아웃', () => {
+describe('회원 정보 · 비밀번호 · 로그아웃', () => {
   test('닉네임 바꾸기: 버전이 맞아야 하고 7일에 한 번', async () => {
-    const me = await member(9101, '바꿀사람');
+    const me = await member('rename_me', '바꿀사람');
     const csrf = await csrfOf(me);
     const self = ok(await at('/api/community/me', { as: me })).member as Json;
     const rename = (nickname: string, version: unknown) =>
@@ -258,8 +227,41 @@ describe('회원 정보와 로그아웃', () => {
     assert.match((await rename('또바꿈', renamed.version)).text, /7일에 한 번/);
   });
 
+  test('비밀번호 바꾸기: 지금 비밀번호가 맞아야 하고, 이 브라우저 말고 다른 로그인은 끝난다', async () => {
+    const first = await member('change_pw', '바꾸는사람');
+    const second = new TestUser(
+      (
+        await at('/api/community/login', {
+          method: 'POST',
+          body: { loginId: 'change_pw', password: PASSWORD },
+        })
+      ).cookies(),
+    );
+    const csrf = await csrfOf(first);
+    const change = (current: string, next: string) =>
+      at('/api/community/me/password', {
+        method: 'PATCH',
+        as: first,
+        body: { current, next },
+        headers: { 'x-cairn-csrf': csrf },
+      });
+    assert.match(
+      (await change('틀린 지금 비밀번호', '새로운 긴 비밀번호입니다')).text,
+      /지금 비밀번호/,
+    );
+    assert.equal((await change(PASSWORD, 'change_pw')).status, 422);
+    assert.equal((await change(PASSWORD, '새로운 긴 비밀번호입니다')).status, 204);
+    assert.notEqual(ok(await at('/api/community/me', { as: first })).member, null);
+    assert.equal(ok(await at('/api/community/me', { as: second })).member, null);
+    const old = await at('/api/community/login', {
+      method: 'POST',
+      body: { loginId: 'change_pw', password: PASSWORD },
+    });
+    assert.equal(old.status, 401);
+  });
+
   test('로그아웃하면 그 쿠키는 더 회원이 아니다', async () => {
-    const me = await member(9102, '나갈사람');
+    const me = await member('logout_me', '나갈사람');
     const csrf = await csrfOf(me);
     const out = await at('/api/community/logout', {
       method: 'POST',
@@ -273,7 +275,7 @@ describe('회원 정보와 로그아웃', () => {
 
 describe('쓰기 확인 (11.1 세션 탈취 · CSRF)', () => {
   test('다른 사이트에서 온 쓰기 · 다른 출처 · 확인 값 없는 쓰기는 403', async () => {
-    const me = await member(9201, '조심하는');
+    const me = await member('careful_one', '조심하는');
     const csrf = await csrfOf(me);
     const body = { nickname: '바뀌면안됨', version: 1 };
     const patch = (headers: Record<string, string>) =>
@@ -288,11 +290,20 @@ describe('쓰기 확인 (11.1 세션 탈취 · CSRF)', () => {
     );
     assert.equal((await patch({ origin: ORIGIN })).status, 403);
   });
+
+  test('다른 사이트가 남의 브라우저로 로그인 · 가입을 보내면 403 (쿠키가 없어도)', async () => {
+    const res = await api.viaHost('/api/community/login', HOST, {
+      method: 'POST',
+      body: { loginId: 'careful_one', password: PASSWORD },
+      headers: { origin: 'https://evil.example' },
+    });
+    assert.equal(res.status, 403);
+  });
 });
 
 describe('회원은 관리자가 아니다 (원칙 10)', () => {
   test('회원 쿠키는 기본 도메인에서 방문자, 다른 앱의 도메인에서 회원이 아니다', async () => {
-    const me = await member(9301, '구경꾼');
+    const me = await member('watcher_one', '구경꾼');
     assert.equal((await api.get('/api/auth/me', me)).status, 401);
     assert.equal((await api.get('/api/agents', me)).status, 403);
     assert.equal(ok(await at('/api/community/me', { as: me }, OTHER)).member, null);

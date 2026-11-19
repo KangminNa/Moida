@@ -58,7 +58,7 @@ platform
 - 주인은 공간마다 한 명 (DB 부분 유일 인덱스)
 - 비밀번호는 `PasswordHasher`로 바꾼 값만. 틀렸을 때는 아이디가 없어도 같은 문구·같은 시간 (아이디가 있는지 알 수 없게)
 - 외부 로그인(GitHub 등)은 코어에 두지 않는다. 로그인 플러그인이 더하고, `login_links`에 연결된 계정으로만 로그인된다
-- 로그인 뒤 돌아갈 곳은 이 사이트 안의 경로만 (platform `ReturnPath`, community의 회원 로그인과 함께 쓴다: 브라우저와 같은 URL 해석으로 출처가 그대로인지 보고 해석한 경로로 보낸다. `/\evil.com` · 탭이 낀 값은 `//evil.com`으로 읽혀 거절. 웹의 `safeReturnPath`와 같은 규칙, 웹 보안 S1)
+- 로그인 뒤 돌아갈 곳은 이 사이트 안의 경로만 (`ReturnPath`: 브라우저와 같은 URL 해석으로 출처가 그대로인지 보고 해석한 경로로 보낸다. `/\evil.com` · 탭이 낀 값은 `//evil.com`으로 읽혀 거절. 웹의 `safeReturnPath`와 같은 규칙, 웹 보안 S1)
 - 기기는 지우지 않고 `revoked_at`으로 끊는다 (다른 모듈이 기기 id를 값으로 갖고 있다). 끊으면 모든 토큰이 바로 무효
 - OAuth 오류는 `OAuthError`({ error, error_description }) 모양으로. AI 도구는 이 모양만 읽는다
 - 갱신 토큰은 한 번만 쓴다. 이미 쓴 것이 다시 오면 기기를 끊는다 (도난 감지)

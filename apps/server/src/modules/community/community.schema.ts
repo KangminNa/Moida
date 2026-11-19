@@ -5,16 +5,6 @@ import { integer, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const communitySchema = pgSchema('community');
 
-/** community.member_logins */
-export const memberLogins = communitySchema.table('member_logins', {
-  id: uuid('id').notNull(),
-  member_id: uuid('member_id').notNull(),
-  app_id: uuid('app_id').notNull(),
-  method: text('method').notNull(),
-  subject: text('subject').notNull(),
-  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
-});
-
 /** community.member_sessions */
 export const memberSessions = communitySchema.table('member_sessions', {
   id: uuid('id').notNull(),
@@ -39,4 +29,7 @@ export const members = communitySchema.table('members', {
   renamed_at: timestamp('renamed_at', { withTimezone: true }),
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
   version: integer('version').notNull(),
+  login_id: text('login_id').notNull(),
+  password_hash: text('password_hash').notNull(),
+  password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
 });

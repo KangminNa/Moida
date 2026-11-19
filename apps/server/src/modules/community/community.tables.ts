@@ -2,17 +2,6 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
-/** community.member_logins */
-export interface MemberLoginRow {
-  id: string;
-  member_id: string;
-  app_id: string;
-  method: string;
-  subject: string;
-  created_at: Date;
-}
-export type MemberLoginNew = Partial<MemberLoginRow> & Pick<MemberLoginRow, 'id' | 'member_id' | 'app_id' | 'method' | 'subject'>;
-
 /** community.member_sessions */
 export interface MemberSessionRow {
   id: string;
@@ -38,5 +27,8 @@ export interface MemberRow {
   renamed_at: Date | null;
   last_seen_at: Date | null;
   version: number;
+  login_id: string;
+  password_hash: string;
+  password_changed_at: Date;
 }
-export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at'>;
+export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at' | 'login_id' | 'password_hash' | 'password_changed_at'>;

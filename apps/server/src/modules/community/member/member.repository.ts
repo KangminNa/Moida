@@ -1,11 +1,11 @@
 import { Conflict, Database, type Row, TableRepository } from '../../platform';
-import { memberLogins, memberSessions, members } from '../community.schema';
+import { memberSessions, members } from '../community.schema';
 import type { MemberRow } from '../community.tables';
 import { Member } from './member';
 import { MemberSession } from './member-session';
 
-// community.members ↔ Member (+ 가입할 때의 로그인 · 로그인할 때의 세션). 회원은 공간이 아니라 앱에 든다:
-// load · lock의 첫 값은 앱 id다. 닉네임 · 로그인이 겹치면 DB가 막고 409로 바꾼다
+// community.members ↔ Member (+ 로그인할 때의 세션 · 비밀번호를 바꿀 때 다른 세션 끝내기). 회원은 공간이 아니라 앱에 든다:
+// load · lock의 첫 값은 앱 id다. 아이디 · 닉네임이 겹치면 DB가 막고 409로 바꾼다
 export class MemberRepository extends TableRepository<MemberRow, Member> {
   protected readonly table = members;
   protected readonly noun = '회원';
@@ -24,25 +24,25 @@ export class MemberRepository extends TableRepository<MemberRow, Member> {
     } catch (error) {
       if (Database.isUniqueViolation(error, 'members_nickname_key'))
         throw new Conflict('이미 쓰는 닉네임이에요');
-      if (Database.isUniqueViolation(error, 'member_logins_subject_key'))
-        throw new Conflict('이미 가입한 계정이에요. 다시 로그인해 주세요');
+      if (Database.isUniqueViolation(error, 'members_login_key'))
+        throw new Conflict('이미 쓰는 아이디예요');
       throw error;
     }
   }
 
   protected override async saveParts(member: Member): Promise<void> {
-    if (member.addedLogin) await this.insertRows(memberLogins, member.addedLogin);
+    const keep = member.sessionToKeep;
+    if (keep !== null)
+      await this.sql`
+        UPDATE community.member_sessions SET ended_at = now()
+        WHERE member_id = ${member.id} AND ended_at IS NULL AND token_hash <> ${keep}`;
     const session = member.startedSession;
     if (session?.isNew) await this.insertRows(memberSessions, session.unsaved);
   }
 
-  /** 소셜 로그인의 회원 번호로 그 앱의 회원 */
-  async findByLogin(appId: string, method: string, subject: string): Promise<Member | null> {
-    const [row] = await this.sql<MemberRow[]>`
-      SELECT m.* FROM community.members m
-      JOIN community.member_logins l ON l.member_id = m.id
-      WHERE l.app_id = ${appId} AND l.method = ${method} AND l.subject = ${subject}`;
-    return row ? this.toEntity(row) : null;
+  /** 아이디로 그 앱의 회원 (로그인). lock: 로그인을 열 때 */
+  findByLogin(appId: string, loginId: string, lock = false): Promise<Member | null> {
+    return this.findOne({ app_id: appId, login_id: loginId }, { lock });
   }
 
   /** 로그아웃: 그 세션을 끝낸다 */

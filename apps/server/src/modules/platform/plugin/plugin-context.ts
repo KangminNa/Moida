@@ -50,11 +50,6 @@ export class LoginMethod {
     readonly plugin: string,
     readonly name: string,
     readonly login: BaseLogin,
-    /**
-     * 커뮤니티 회원 로그인에도 쓰는가 (스토어 3-1). 회원은 앱 도메인마다 돌아올 주소가 달라서, 그 서비스가 주소를 여럿 받을 때만 켠다
-     * (GitHub OAuth 앱은 돌아올 주소가 하나라 관리자 로그인만)
-     */
-    readonly members: boolean,
   ) {}
 }
 
@@ -118,13 +113,10 @@ export class PluginContext {
     this.actions.push(new PluginAction(this.manifest.name, name, action));
   }
 
-  /**
-   * 로그인 방법. 이름이 로그인 주소가 된다 (/api/auth/login/<이름>/…). members: 커뮤니티 회원 로그인에도 쓴다
-   * (/api/community/login/<이름>/…, 스토어 3-1)
-   */
-  addLogin(name: string, login: BaseLogin, options: { members?: boolean } = {}): void {
+  /** 로그인 방법. 이름이 로그인 주소가 된다 (/api/auth/login/<이름>/…) */
+  addLogin(name: string, login: BaseLogin): void {
     this.require(`login:${name}`);
-    this.logins.push(new LoginMethod(this.manifest.name, name, login, options.members === true));
+    this.logins.push(new LoginMethod(this.manifest.name, name, login));
   }
 
   /**

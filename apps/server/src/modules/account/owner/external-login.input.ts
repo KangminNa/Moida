@@ -1,4 +1,5 @@
-import { BaseRequest, ReturnPath, type SecretBox } from '../../platform';
+import { BaseRequest, type SecretBox } from '../../platform';
+import { ReturnPath } from './return-path.policy';
 
 /**
  * 외부 로그인(로그인 플러그인) 시작: ?return=/install. 로그인 뒤 돌아갈 곳은 이 사이트 안의 경로만.
