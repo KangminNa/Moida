@@ -88,16 +88,20 @@ type HtmlNode = {
   children?: HtmlNode[];
 };
 
-/** 바깥 주소(http · https) 링크는 새 탭으로 (웹 UX U3). 연 쪽 창을 건드리지 못하고 주소가 Referer로 새지 않게 */
-function externalLinks() {
+/**
+ * 바깥 주소(http · https) 링크는 새 탭으로 (웹 UX U3). 연 쪽 창을 건드리지 못하고 주소가 Referer로 새지 않게.
+ * ugc: 회원이 쓴 글(커뮤니티, 스토어 3-2)이면 검색 엔진이 따라가지 않게 nofollow ugc를 더한다 (스팸 링크의 이득을 없앤다)
+ */
+function externalLinks(ugc: boolean) {
   const walk = (node: HtmlNode): void => {
     const href = node.tagName === 'a' ? node.properties?.href : undefined;
     if (typeof href === 'string' && /^https?:\/\//i.test(href)) {
       node.properties = { ...node.properties, target: '_blank', rel: 'noopener noreferrer' };
+      if (ugc) node.properties.rel = `nofollow ugc ${node.properties.rel}`;
     }
     node.children?.forEach(walk);
   };
-  return (tree: HtmlNode) => {
+  return () => (tree: HtmlNode) => {
     walk(tree);
   };
 }
@@ -112,20 +116,25 @@ const schema: typeof defaultSchema = {
   },
 };
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkGfm)
-  .use(remarkCjkFriendly)
-  .use(remarkDirective)
-  .use(cairnBlocks)
-  .use(remarkRehype)
-  .use(rehypeSanitize, schema)
-  .use(externalLinks)
-  .use(rehypeStringify);
+const processorOf = (ugc: boolean) =>
+  unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkCjkFriendly)
+    .use(remarkDirective)
+    .use(cairnBlocks)
+    .use(remarkRehype)
+    .use(rehypeSanitize, schema)
+    .use(externalLinks(ugc))
+    .use(rehypeStringify);
+
+const processor = processorOf(false);
+const ugcProcessor = processorOf(true);
 
 /** "::: center"처럼 콜론 뒤에 빈칸을 둔 블록도 받는다 (remark-directive는 ":::center"만 읽는다) */
 const SPACED_FENCE = /^([ \t]{0,3}:{3,})[ \t]+(?=[a-z])/gim;
 
-export function renderMarkdown(md: string): string {
-  return String(processor.processSync(md.replace(SPACED_FENCE, '$1')));
+/** ugc: 회원이 쓴 글 (커뮤니티). 바깥 링크에 nofollow ugc를 더한다 */
+export function renderMarkdown(md: string, { ugc = false }: { ugc?: boolean } = {}): string {
+  return String((ugc ? ugcProcessor : processor).processSync(md.replace(SPACED_FENCE, '$1')));
 }

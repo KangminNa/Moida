@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { appOfHost } from './app/_blog/app-domains';
 import { hostOf } from './app/_blog/request-host';
 import { RETURN_HEADER } from './app/_lib/return-path';
-import { isAppScreenRoot, SCREEN_HEADERS } from './app/_lib/screen-headers';
+import { isAppScreenRoot, isMemberScreen, SCREEN_HEADERS } from './app/_lib/screen-headers';
 
 // 화면 요청이 지나는 곳. 두 가지를 한다.
 // 1. 앱 도메인 (스토어 3-0): 연결을 확인한 앱 도메인으로 온 요청은 그 앱의 주소(/<앱>/…)로 넘긴다 (rewrite: 주소창은 그대로).
@@ -24,7 +24,11 @@ export async function proxy(request: NextRequest) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return NextResponse.next();
     const url = request.nextUrl.clone();
     url.pathname = `${prefix}${pathname === '/' ? '' : pathname}`;
-    return NextResponse.rewrite(url);
+    const res = NextResponse.rewrite(url);
+    // 커뮤니티의 고정 화면(/_/…, 스토어 3-2)은 Cairn이 그리는 화면이라 화면 머리글을 붙인다:
+    // 로그인 · 가입 폼을 다른 사이트가 겹쳐 놓고 누르게 하지 못하게 (앱 화면은 격리 머리글을 그대로 둔다)
+    if (isMemberScreen(pathname)) for (const h of SCREEN_HEADERS) res.headers.set(h.key, h.value);
+    return res;
   }
   if (isAppScreenRoot(pathname)) {
     const res = NextResponse.next();

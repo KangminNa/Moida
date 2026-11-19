@@ -22,3 +22,13 @@ test('거르기는 그대로: javascript: 링크는 주소가 지워지고 새 �
   assert.doesNotMatch(html, /javascript:/);
   assert.doesNotMatch(html, /target=/);
 });
+
+test('회원이 쓴 글(ugc)의 바깥 링크에는 nofollow ugc를 더한다 (스토어 3-2)', () => {
+  const html = renderMarkdown('[밖](https://example.com/a) [안](/t/1)', { ugc: true });
+  assert.match(
+    html,
+    /<a href="https:\/\/example\.com\/a" target="_blank" rel="nofollow ugc noopener noreferrer">밖<\/a>/,
+  );
+  assert.match(html, /<a href="\/t\/1">안<\/a>/);
+  assert.match(renderMarkdown('[밖](https://example.com)'), /rel="noopener noreferrer"/);
+});

@@ -3,10 +3,16 @@ import type { ApiError } from './types';
 // 브라우저에서 서버 API 부르기. 같은 주소(/api/…)라 쿠키가 함께 간다.
 export type ApiReply<T> = { ok: true; data: T } | { ok: false; status: number; error: ApiError };
 
-export async function api<T>(method: string, path: string, body?: object): Promise<ApiReply<T>> {
+/** headers: 더 실을 머리글 (커뮤니티 회원 쓰기의 X-Cairn-CSRF, 스토어 3-2) */
+export async function api<T>(
+  method: string,
+  path: string,
+  body?: object,
+  headers: Readonly<Record<string, string>> = {},
+): Promise<ApiReply<T>> {
   return send<T>(path, {
     method,
-    headers: body ? { 'content-type': 'application/json' } : {},
+    headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
 }
@@ -61,6 +67,10 @@ async function send<T>(path: string, init: RequestInit): Promise<ApiReply<T>> {
 const FIELD_LABELS: Record<string, string> = {
   code: '설치 코드',
   login: '아이디',
+  loginId: '아이디',
+  nickname: '닉네임',
+  body: '본문',
+  reason: '까닭',
   password: '비밀번호',
   current: '지금 비밀번호',
   next: '새 비밀번호',

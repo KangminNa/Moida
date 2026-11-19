@@ -252,6 +252,20 @@ describe('회원 정보 · 비밀번호 · 로그아웃', () => {
       body: { loginId: 'change_pw', password: PASSWORD },
     });
     assert.equal(old.status, 401);
+
+    // 끝난 로그인의 쿠키가 남은 브라우저: me가 그 쿠키의 확인 값을 주어 다시 로그인할 수 있다
+    const stale = ok(await at('/api/community/me', { as: second }));
+    assert.equal(stale.member, null);
+    assert.ok(stale.csrf, '쿠키가 있으면 로그인이 끝났어도 확인 값');
+    const again = (headers: Record<string, string>) =>
+      at('/api/community/login', {
+        method: 'POST',
+        as: second,
+        body: { loginId: 'change_pw', password: '새로운 긴 비밀번호입니다' },
+        headers,
+      });
+    assert.equal((await again({})).status, 403, '쿠키를 실었으면 확인 값이 있어야');
+    assert.equal((await again({ 'x-cairn-csrf': String(stale.csrf) })).status, 200);
   });
 
   test('로그아웃하면 그 쿠키는 더 회원이 아니다', async () => {

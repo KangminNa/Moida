@@ -16,6 +16,12 @@ export async function appOfHost(host: string | null): Promise<string | null> {
   return (await slugs()).get(host) ?? null;
 }
 
+/** 이 앱을 여는 도메인 (공개 앱의 확인한 도메인). 없으면 null. 커뮤니티 미리 보기가 그 도메인의 글을 읽을 때 쓴다 (스토어 3-2) */
+export async function hostOfApp(slug: string): Promise<string | null> {
+  for (const [host, app] of await slugs()) if (app === slug) return host;
+  return null;
+}
+
 async function slugs(): Promise<ReadonlyMap<string, string>> {
   if (known && Date.now() - known.at < KEEP_MS) return known.slugs;
   loading ??= load().finally(() => {
