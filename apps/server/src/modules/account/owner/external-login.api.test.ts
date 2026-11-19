@@ -71,6 +71,14 @@ describe('로그인 방법', () => {
     );
   });
 
+  test('돌아갈 곳이 브라우저가 다른 사이트로 읽는 값이면 400 (열린 리다이렉트, 웹 보안 S1)', async () => {
+    const start = (back: string) =>
+      api.get(`/api/auth/login/github/start?return=${encodeURIComponent(back)}`);
+    for (const back of ['/\\evil.com', '/\t/evil.com', '//evil.com', 'https://evil.com'])
+      assert.equal((await start(back)).status, 400, JSON.stringify(back));
+    assert.equal((await start('/admin/store?tab=team')).status, 302);
+  });
+
   test('연결하기 전에는 GitHub로 로그인되지 않는다 (로그인 화면으로 돌려보내며 이유)', async () => {
     const res = await roundTrip('/api/auth/login/github/start', OWNER_GITHUB, TestUser.visitor);
     assert.equal(res.status, 302);

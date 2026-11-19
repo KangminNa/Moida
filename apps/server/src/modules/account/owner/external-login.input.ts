@@ -1,4 +1,5 @@
 import { BaseRequest, type SecretBox } from '../../platform';
+import { ReturnPath } from './return-path.policy';
 
 /**
  * 외부 로그인(로그인 플러그인) 시작: ?return=/install. 로그인 뒤 돌아갈 곳은 이 사이트 안의 경로만.
@@ -19,10 +20,10 @@ export class ExternalStartInput extends BaseRequest {
 
   static from(method: string, mode: string, query: unknown): ExternalStartInput {
     return BaseRequest.read(query, (f) => {
-      const returnTo = f.optionalText('return', 300) ?? '/';
-      if (!returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('\\'))
-        f.reject('return', '이 사이트 안의 경로(/로 시작)여야 해요');
-      return new ExternalStartInput(method, mode, returnTo);
+      // 브라우저가 다른 사이트로 읽는 값(`/\evil.com` 등)은 거절하고, 해석한 경로로 보낸다 (ReturnPath)
+      const returnTo = ReturnPath.safe(f.optionalText('return', 300) ?? '/');
+      if (returnTo === null) f.reject('return', '이 사이트 안의 경로(/로 시작)여야 해요');
+      return new ExternalStartInput(method, mode, returnTo ?? '/');
     });
   }
 }

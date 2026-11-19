@@ -16,6 +16,7 @@
     "jsx": "react-jsx",
     "allowJs": false,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "incremental": true,
     "plugins": [
       {
