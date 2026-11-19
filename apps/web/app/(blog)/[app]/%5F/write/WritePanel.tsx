@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { memberApi } from '../../../../_community/member-api';
+import { newRequestId } from '../../../../_community/request-id';
 import type { TopicDetail, TopicSaved } from '../../../../_community/types';
 import { useAction } from '../../../../_lib/use-action';
 
@@ -18,7 +19,7 @@ export function WritePanel({
 }) {
   const [title, setTitle] = useState(topic?.title ?? '');
   const [body, setBody] = useState(topic?.body ?? '');
-  const [requestId] = useState(() => crypto.randomUUID());
+  const [requestId] = useState(newRequestId);
   const save = useAction();
   const remove = useAction();
   const busy = save.busy !== null || remove.busy !== null;

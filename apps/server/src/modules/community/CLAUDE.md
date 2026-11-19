@@ -3,11 +3,13 @@
 ## 하는 일
 스토어 3단계 커뮤니티 ([docs/스토어.md](../../../../../docs/스토어.md) 11장, 인터페이스 11.5): 앱 도메인의 방문자가 아이디 · 비밀번호로 회원이 되어 글 · 댓글을 쓰고 신고한다.
 관리자 계정(account)과 표 · 쿠키 · 권한을 나눈다 (원칙 10: 회원은 관리자가 아니다). 3-1a: 회원 · 가입 · 로그인 · 세션. 3-1b: 글 · 글 버전 · 댓글 · 쓰기 규칙. 3-1c: 신고 · 임시 가림 · 관리자 결정 · 차단 · 비밀번호 초기화 · 알림.
+화면(3-2, 스토어 11.6)은 웹이 이 API로 그린다: 목록 · 글은 앱 코드의 템플릿에 웹이 `me` · `topics` · `topics/:id`를 앱 도메인으로 읽어 채우고, 가입 · 로그인 · 글쓰기 · 댓글 · 신고는 앱 도메인의 고정 화면 `/_/…`, 관리는 앱 관리의 커뮤니티 탭. 응답 모양은 웹이 view의 `toJSON` 반환 타입으로 쓴다 (`toJSON(): object`로 적지 않고 안쪽 view는 `.toJSON()`으로 펼친다)
 
 - `member/`: 회원(`Member`, 앱마다 따로) · 회원 세션(`MemberSession`, `cairn_member` 쿠키).
   규칙: 아이디 `LoginId`(영문 소문자로 시작하는 4~20자, 소문자로, 운영자로 보이는 아이디 막기, 바꾸지 않음) · 비밀번호 `MemberPassword`(10~200자, 아이디 · 닉네임과 같은 값 · 한 글자 되풀이 · 흔한 값 막기) · 닉네임 `Nickname`(2~20자 · 운영자로 보이는 이름 막기 · 겹침 열쇠, 7일에 한 번 바꿈) · 가입 대기 `Member.JOIN_WAIT_MS` · 차단(`blocked_until`, 무기한은 `Member.FOREVER`)이면 `assertActive`가 403.
   `MemberService`: 가입(`join`, 회원 + 첫 세션을 한 저장에, 아이디 · 닉네임이 겹치면 DB가 막고 409) · 로그인(`login`) · 비밀번호 바꾸기(`changePassword`, 지금 비밀번호 확인, 다른 로그인 끝냄: `Member.changePassword` → `MemberRepository.saveParts`) · 닉네임 바꾸기 · 로그아웃 · 마지막 접근. 해킹 대비는 서비스 머리 주석의 목록 (실패 문구 하나 · 같은 시간 · 시도 제한 · 가입 제한 · 새 세션)
-  `api/community`(`MemberController`): `me` · `join` · `login` · `logout` · `PATCH me` · `PATCH me/password`. 가입 · 로그인 화면은 웹의 고정 화면(3-2)
+  `api/community`(`MemberController`): `me` · `join` · `login` · `logout` · `PATCH me` · `PATCH me/password`. 가입 · 로그인 화면은 웹의 고정 화면(3-2).
+  `me`의 `csrf`는 회원 쿠키가 있으면 로그인이 끝났어도 그 쿠키의 값이다: 쿠키를 실은 쓰기는 이 값이 있어야 해서(MemberGuard), 끝난 로그인의 쿠키가 남은 브라우저(비밀번호 초기화 · 30일)도 다시 로그인 · 가입한다
 - `topic/`: 글(`Topic` + 추가만 하는 버전 `topic_revisions`). 제목 · 본문이 바뀔 때마다 버전 하나, 쓴 회원의 지우기는 상태 `deleted`(내용 · 버전은 남는다, 원칙 2). 상태 `hidden`(가림: `hidden_by` reports · owner) · `removed`(관리자가 내림)는 `Moderation`의 규칙 (`Topic.decide` · `hideByReports`, 댓글도 같다). 쓰기 규칙은 `WriteLimits`(가입 대기는 `Member.assertCanWrite`, 시간 · 하루 한도, 링크 수, 같은 본문 24시간): 쓰기 트랜잭션에서 쓴 회원의 행을 먼저 잠그고 DB에서 센다.
   `api/community/topics`(`TopicController`): 목록(보이는 글, 최근부터 30개, `cursor`는 마지막 글 id) · 글 하나(보이는 댓글 200개까지 함께) · 쓰기 · 고치기 · 지우기. 읽기는 누구나(`TopicQuery`), 작성자는 닉네임만, 내 글 · 댓글이면 `version`
 - `comment/`: 댓글(`Comment`). 보이는 글에만 달고(트랜잭션 전에 `TopicQuery.assertOpen`), 고치지 않는다(1차). `api/community/topics/:id/comments`(달기) · `api/community/comments/:id`(지우기, `CommentController`)

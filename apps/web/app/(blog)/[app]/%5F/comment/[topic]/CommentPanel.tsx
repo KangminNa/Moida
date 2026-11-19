@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { formatDate } from '../../../../../_blog/format';
 import { memberApi } from '../../../../../_community/member-api';
+import { newRequestId } from '../../../../../_community/request-id';
 import type { TopicDetail } from '../../../../../_community/types';
 import { useAction } from '../../../../../_lib/use-action';
 
@@ -19,7 +20,7 @@ export function CommentPanel({
 }) {
   const router = useRouter();
   const [body, setBody] = useState('');
-  const [requestId] = useState(() => crypto.randomUUID());
+  const [requestId] = useState(newRequestId);
   const write = useAction();
   const remove = useAction();
   const mine = topic.comments.filter((c) => c.mine);
