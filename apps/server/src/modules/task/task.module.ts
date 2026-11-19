@@ -58,6 +58,9 @@ import { OutputQuery } from './output/output.query';
 import { OutputService } from './output/output.service';
 import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
 import { OutputPurgeJob } from './output/output-purge.job';
+import { OutputShareController } from './output-share/output-share.api';
+import { OutputShareQuery } from './output-share/output-share.query';
+import { OutputShareService } from './output-share/output-share.service';
 import { RunnerController } from './runner/runner.api';
 import { RunnerQuery } from './runner/runner.query';
 import { RunnerService } from './runner/runner.service';
@@ -148,6 +151,8 @@ import { WebPageGateway } from './web/web-page.gateway';
     { provide: OutputPolicy, useFactory: () => OutputPolicy.fromEnv() },
     OutputQuery,
     OutputService,
+    OutputShareQuery,
+    OutputShareService,
     BeginUploadTool,
     // 목표 실행: 회차 루프와 결재 (GoalRunHandler가 회차 끝 · 결재를 받는다)
     GoalRunQuery,
@@ -208,6 +213,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     RunnerController,
     SkillController,
     OutputController,
+    OutputShareController,
     GoalRunController,
     ChatController,
     ExternalToolController,

@@ -231,6 +231,18 @@ export interface GoalRow {
 }
 export type GoalNew = Partial<GoalRow> & Pick<GoalRow, 'id' | 'space_id' | 'title'>;
 
+/** task.output_shares */
+export interface OutputShareRow {
+  id: string;
+  space_id: string;
+  output_id: string;
+  expires_at: Date;
+  ended_at: Date | null;
+  created_at: Date;
+  version: number;
+}
+export type OutputShareNew = Partial<OutputShareRow> & Pick<OutputShareRow, 'id' | 'space_id' | 'output_id' | 'expires_at'>;
+
 /** task.outputs.kind (값 목록 CHECK) */
 export const OUTPUT_KIND = ['document', 'slides', 'sheet', 'image', 'video', 'other'] as const;
 export type OutputKind = (typeof OUTPUT_KIND)[number];

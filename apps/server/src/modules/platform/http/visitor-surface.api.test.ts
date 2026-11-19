@@ -78,6 +78,9 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/outputs': 403,
   'GET /api/outputs/download': 403,
   'GET /api/outputs/:id/file': 403,
+  // 결과물 공유 링크: 목록은 관리자만, 링크로 열기는 누구나 (없는 링크는 404, 기획서 결정 2026-11-19)
+  'GET /api/output-shares': 403,
+  'GET /api/output-shares/open/:token': 404,
   'GET /api/posts/:id': 403,
   'GET /api/push/key': 403,
   'GET /api/runner-skills': 403,

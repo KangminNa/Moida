@@ -32,6 +32,10 @@ import type {
   OutputSavedView,
 } from '../../../server/src/modules/task/output/output.view';
 import type {
+  OutputShareListView,
+  OutputShareView,
+} from '../../../server/src/modules/task/output-share/output-share.view';
+import type {
   RunnerListView,
   RunnerView,
 } from '../../../server/src/modules/task/runner/runner.view';
@@ -64,6 +68,8 @@ export type OutputPage = ReturnType<OutputPageView['toJSON']>;
 export type Output = OutputPage['outputs'][number];
 export type OutputUsage = OutputPage['usage'];
 export type OutputSaved = ReturnType<OutputSavedView['toJSON']>;
+export type OutputShare = ReturnType<OutputShareView['toJSON']>;
+export type OutputShareList = ReturnType<OutputShareListView['toJSON']>;
 export type Goal = ReturnType<GoalView['toJSON']>;
 export type GoalList = ReturnType<GoalListView['toJSON']>;
 export type GoalRunList = ReturnType<GoalRunListView['toJSON']>;

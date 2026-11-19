@@ -50,6 +50,7 @@ export class App extends TableEntity<AppRow, AppNew> {
     'pages',
     'posts',
     'rss',
+    'share',
     'store',
   ];
   private static readonly SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;

@@ -40,6 +40,7 @@
 - `runner/`: 러너의 상태 (`Runner`). 마지막으로 닿은 때, 일 받기 켜기·끄기, 코드 러너 칸인지(`sandbox`, 기기 권한으로 닿을 때마다 적는다), 서버 브라우저에 붙었는지(`browser`, `next_jobs`만 적는다 · 목록은 쥔 브라우저 작업도 본다, O-1). `api/runners`. 기기 이름·종류는 account의 것이라 화면이 합친다.
   에이전트를 러너에 묶는다 (`agents.runner_id`, 2026-11-14): `Agent.edit(changes, runner)`가 칸 · code/make를 막고, 일을 빌릴 때 `Agent.runsOn(러너 id)`가 아닌 에이전트는 `ready`에서 뺀다 (자동 배정도). 일의 `agent.bound` · 팀원의 `bound`로 러너 · 팀장에게 알린다 (내 컴퓨터 러너는 묶인 일에만 나눈 폴더를 준다)
 - `output/`: 결과물 (`Output`, 이름 · 종류 · 형식 · 한도 `OutputPolicy`, 올리기 표 `UploadTicket`, 재료 내려받기 표 `DownloadTicket`). 러너가 MCP `begin_upload`로 표를 받아 `PUT api/outputs/upload`(머리글 `x-cairn-upload`)로 파일을 흘려 보낸다. 만들기 작업의 재료는 거꾸로 `begin_download` → `GET api/outputs/download`(머리글 `x-cairn-download`). `api/outputs`(주인만: 목록 · 내려받기 · 휴지통 · 올리기 `POST api/outputs/files`), 일꾼 `OutputPurgeJob`. 주인이 올린 파일은 작업 · 실행 없이(`task_id` · `run_id` 둘 다 null, DB CHECK) 결과물이 되어 만들기 일의 재료로 쓴다 (2026-11-13)
+- `output-share/`: 결과물 공유 링크 (`OutputShare`, 토큰 `ShareLink`, 기획서 결정 2026-11-19). 관리자가 결과물 하나를 로그인 없이 볼 수 있는 링크로 기간(1 · 7 · 30일)을 정해 연다. `api/output-shares`(관리자만: 목록 · 만들기 · 끄기, 누구나: `open/:token` = 웹의 `/share/<토큰>`). 토큰은 저장하지 않는다: `SecretBox.derive`로 나눈 열쇠의 HMAC으로 공유 id에 서명해 같은 링크를 다시 보여 주고, 서버 키를 바꾸면 이전 링크는 열리지 않는다. 링크가 열리는 조건(서명 · 끄지 않음 · 기간 안 · 결과물이 휴지통에 없음)은 `OutputShareQuery.open`의 SQL 한 곳이고, 열리지 않으면 까닭 없이 404. 파일은 `OutputFile`로 결과물 메뉴의 "열기"(`?view=1`)와 같이 열고 `sharedCsp`(`frame-ancestors 'none'`) · no-referrer · noindex · no-store. AI · 기기는 만들지 못한다 (바깥 공유는 외부 전송)
 - `goal-run/`: 목표 실행 (`GoalRun`, 회차 보고 `GoalRound`, 기획서 결정 2026-11-13). 주인이 목표 하나를 팀장 에이전트에게 맡기면 회차(작업 하나)가 저절로 이어 돌고, 주인은 중간 · 최종 결재문만 받는다. `api/goal-runs`(주인만: 목록 · 상세 · 시작 · 멈추기), MCP `report_round`(작업 토큰, 회차마다 한 번). 회차 작업이 끝나거나(`task.task.changed`) 결재가 정해지면(`task.approval.*`, 대상 `goal_run`) `GoalRunHandler`가 다음을 정한다
 - `web/`: 주소 읽기 (MCP `read_url`, 작업 토큰). 서버가 AI 대신 페이지를 열어 글자만 준다 (`WebQuery`). 목줄은 `WebReach`: 비공개를 볼 수 있는 일(전체 읽기 · 쓰기 · 코드 권한, 재료 읽기 허락)은 주인의 지시(위임된 일이면 맨 위 일, 맨 위가 목표 실행의 회차 작업이면 실행의 지시)에 적힌 사이트와 그 하위만, 아니면 공개 주소 어디든. 내부망 · 이 서버 · 메타데이터 주소는 이름을 풀어 본 뒤 그 주소로만 붙어 막는다 (`WebPageGateway`, 리다이렉트 3번까지 매번 다시). 2MB · 15초, 글이 아닌 형식은 거절. 받은 글은 자료라는 표시(`note`, 지시문 틀 `read-url-note`)와 함께
 - `skill/`: 러너 스킬의 콘솔 판 (`Skill`, 파일 규칙과 해시 `SkillFiles`, 쓸 판 고르기 `SkillPackage`, 저장소 판 읽기 `RepoSkillGateway`). `api/runner-skills`. `next_jobs`의 `skill_package`로 러너에게 간다.
@@ -50,7 +51,7 @@
 도구 모양은 docs/API설계.md 4장이 원본이다. `report_progress`는 기록을 모아 받고, 러너가 쓰므로 바꾸면 `apps/runner`도 함께 고친다.
 
 ## 소유 데이터
-스키마 `task`: agents, agent_revisions(추가만), external_tools, chats, chat_updates(추가만), goals, schedules, tasks, task_events(추가만), task_runs(추가만, model · cli_session · resumed만 한 번), approvals, plan_usage, ai_logins, runners, skills, skill_revisions(추가만), outputs, goal_runs, goal_rounds(추가만)
+스키마 `task`: agents, agent_revisions(추가만), external_tools, chats, chat_updates(추가만), goals, schedules, tasks, task_events(추가만), task_runs(추가만, model · cli_session · resumed만 한 번), approvals, plan_usage, ai_logins, runners, skills, skill_revisions(추가만), outputs, output_shares, goal_runs, goal_rounds(추가만)
 
 ## 데이터 묶음
 - 에이전트: agents + agent_revisions (조직도는 `reports_to`, 설정 판은 `settings_revision`)
@@ -61,6 +62,7 @@
 - 작업: tasks + task_events + task_runs (빌려 줄 때마다 규칙 판 한 줄)
 - 스킬: skills + skill_revisions
 - 결과물: outputs (파일은 platform.blobs를 값으로)
+- 결과물 공유: output_shares (결과물을 바로 지우면 함께 지워진다, 외래키 CASCADE)
 - 목표 실행: goal_runs + goal_rounds (회차 작업은 tasks의 줄, 결재는 approvals의 줄이라 각자의 묶음에 저장한다)
 - 결재: approvals
 - 구독 사용률: plan_usage (창마다 마지막 값 하나. `window`는 Postgres 예약어라 열은 `period`, API는 `window`)

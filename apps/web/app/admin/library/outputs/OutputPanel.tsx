@@ -11,6 +11,8 @@ import { isHtmlOutput, OutputOpen } from '../../../_task/parts';
 import type { Output, OutputPage, OutputSaved, OutputUsage, Task } from '../../../_task/types';
 import { NewTabLink } from '../../../_ui/NewTabLink';
 import { type MakeBody, MakeForm } from './MakeForm';
+import { fileUrl, Preview } from './OutputPreview';
+import { OutputSharePanel } from './OutputSharePanel';
 
 type Tab = 'all' | 'trash' | keyof typeof OUTPUT_KINDS;
 
@@ -24,8 +26,6 @@ const MATERIALS_MAX = 10;
 /** 글자로 미리 볼 수 있는 크기 */
 const TEXT_PREVIEW_MAX = 1024 * 1024;
 
-const fileUrl = (output: Output, inline = false) =>
-  `/api/outputs/${output.id}/file${inline ? '?inline=1' : ''}`;
 const previewable = (o: Output) =>
   INLINE_MIMES.includes(o.mime) || (TEXT_MIMES.includes(o.mime) && o.sizeBytes <= TEXT_PREVIEW_MAX);
 /** 더 읽은 쪽을 앞 쪽 뒤에 잇는다. 쓰는 공간은 새로 읽은 값 */
@@ -42,6 +42,8 @@ export function OutputPanel({ taskId }: { taskId: string | null }) {
   /** 읽어 둔 쪽 수. 종류를 바꾸면 처음으로 돌아간다 */
   const pages = useRef(1);
   const [open, setOpen] = useState<Output | null>(null);
+  /** 공유 칸을 연 결과물 */
+  const [sharing, setSharing] = useState<Output | null>(null);
   const action = useAction();
   const make = useAction();
   /** 만들기 폼이 열렸는가, 재료로 고른 결과물, 고쳐 달라로 열렸으면 그 결과물 */
@@ -150,6 +152,11 @@ export function OutputPanel({ taskId }: { taskId: string | null }) {
       )}
       {error && <p className="error">{error}</p>}
       {open && <Preview output={open} onClose={() => setOpen(null)} />}
+      {sharing ? (
+        <OutputSharePanel key={sharing.id} output={sharing} onClose={() => setSharing(null)} />
+      ) : (
+        tab !== 'trash' && <OutputSharePanel output={null} />
+      )}
       {page === null ? (
         !error && <p className="label-mono">불러오는 중…</p>
       ) : page.outputs.length === 0 ? (
@@ -227,6 +234,9 @@ export function OutputPanel({ taskId }: { taskId: string | null }) {
                         수정 요청
                       </button>
                     )}
+                    <button type="button" className="ghost" onClick={() => setSharing(o)}>
+                      공유
+                    </button>
                     <button
                       type="button"
                       className="ghost"
@@ -277,47 +287,5 @@ function Usage({ usage }: { usage: OutputUsage }) {
         </p>
       )}
     </>
-  );
-}
-
-/** 미리 보기. 그림 · 영상은 바로, PDF는 새 탭, 글자 파일은 글자로만 (HTML로 그리지 않는다) */
-function Preview({ output, onClose }: { output: Output; onClose: () => void }) {
-  const [text, setText] = useState<string | null>(null);
-  const isText = TEXT_MIMES.includes(output.mime);
-
-  useEffect(() => {
-    if (!isText) return;
-    let alive = true;
-    void fetch(fileUrl(output))
-      .then((res) => (res.ok ? res.text() : '읽지 못했어요'))
-      .then((body) => alive && setText(body));
-    return () => {
-      alive = false;
-    };
-  }, [output, isText]);
-
-  return (
-    <section className="panel" aria-label={`미리 보기: ${output.name}`}>
-      <div className="sec-title flat">
-        <h2>{output.name}</h2>
-        <button type="button" className="ghost" onClick={onClose}>
-          닫기
-        </button>
-      </div>
-      {output.mime.startsWith('image/') && (
-        // biome-ignore lint/performance/noImgElement: 주인만 받는 파일이라 Next의 이미지 최적화를 거치지 않는다
-        <img className="output-preview" src={fileUrl(output, true)} alt={output.name} />
-      )}
-      {output.mime.startsWith('video/') && (
-        // biome-ignore lint/a11y/useMediaCaption: AI가 만든 영상에는 자막 파일이 없다
-        <video className="output-preview" src={fileUrl(output, true)} controls />
-      )}
-      {output.mime === 'application/pdf' && (
-        <NewTabLink className="ghost" href={fileUrl(output, true)}>
-          새 탭에서 열기
-        </NewTabLink>
-      )}
-      {isText && <pre className="raw">{text ?? '불러오는 중…'}</pre>}
-    </section>
   );
 }
