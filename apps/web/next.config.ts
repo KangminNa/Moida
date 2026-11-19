@@ -57,6 +57,11 @@ const PAGE_FRAME_HEADERS = new Set([
 ]);
 const pageHeaders = securityHeaders.filter((h) => !PAGE_FRAME_HEADERS.has(h.key));
 
+// 결과물 공유 링크(/share/<토큰>, 기획서 결정 2026-11-19)도 서버가 격리 머리글(sandbox · frame-ancestors 'none' · no-referrer)을 붙여 보낸다.
+// 화면의 CSP · Referrer-Policy를 함께 붙이면 서버의 것을 덮어 격리가 풀릴 수 있어 그 둘만 뺀다 (X-Frame-Options DENY는 둔다)
+const SHARE_OWN_HEADERS = new Set(['Content-Security-Policy', 'Referrer-Policy']);
+const shareHeaders = securityHeaders.filter((h) => !SHARE_OWN_HEADERS.has(h.key));
+
 // 웹이 그리는 화면의 최상위 경로 (서버로 넘기는 경로 포함). 화면 머리글은 이 경로와 첫 화면(/)에만 붙인다.
 // 그 밖의 /<이름>/…은 앱 화면(스토어 1-6)이라 route handler가 앱마다 격리 머리글을 붙인다: 화면의 frame-ancestors 'none' ·
 // X-Frame-Options가 함께 붙으면 콘솔의 미리 보기가 막히고 CSP 둘이 겹친다. 구조 검사가 app/ 폴더 · App.RESERVED와 맞춰 본다
@@ -105,6 +110,7 @@ const config: NextConfig = {
       // 공개 페이지 목록(/pages)은 화면이라 화면의 머리글을 받는다
       { source: '/pages', headers: securityHeaders },
       { source: '/pages/:path+', headers: pageHeaders },
+      { source: '/share/:token', headers: shareHeaders },
     ];
   },
   async rewrites() {
@@ -115,6 +121,8 @@ const config: NextConfig = {
       { source: '/.well-known/:path*', destination: `${server}/.well-known/:path*` },
       // AI가 만든 페이지의 바깥 주소 (기획서 12장 2026-11-12). 파일은 서버가 내보낸다
       { source: '/pages/:path+', destination: `${server}/api/pages/site/:path+` },
+      // 결과물 공유 링크 (기획서 결정 2026-11-19). 파일과 격리 머리글은 서버가 낸다
+      { source: '/share/:token', destination: `${server}/api/output-shares/open/:token` },
     ];
   },
 };

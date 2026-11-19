@@ -188,6 +188,17 @@ export const goals = taskSchema.table('goals', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
+/** task.output_shares */
+export const outputShares = taskSchema.table('output_shares', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  output_id: uuid('output_id').notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+  ended_at: timestamp('ended_at', { withTimezone: true }),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  version: integer('version').notNull(),
+});
+
 /** task.outputs */
 export const outputs = taskSchema.table('outputs', {
   id: uuid('id').notNull(),

@@ -30,8 +30,9 @@ export class OutputFile {
    * 격리해서 여는 HTML: AI가 만든 페이지(blog의 PageSiteAnswer.CSP)와 같다. 스크립트는 돌지만 다른 출처로 취급되어
    * 로그인 쿠키 · 서버 API에 닿지 못한다. 틀 안에 넣는 것은 이 사이트만
    */
-  static readonly VIEW_CSP =
-    "sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads; frame-ancestors 'self'";
+  private static readonly VIEW_SANDBOX =
+    'sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads';
+  static readonly VIEW_CSP = `${OutputFile.VIEW_SANDBOX}; frame-ancestors 'self'`;
   private static readonly HTML = 'text/html; charset=utf-8';
 
   constructor(
@@ -50,6 +51,11 @@ export class OutputFile {
 
   get csp(): string {
     return this.isolated ? OutputFile.VIEW_CSP : OutputFile.CSP;
+  }
+
+  /** 공유 링크로 열 때 (결과물 공유, 2026-11-19): 같은 격리에 어느 사이트의 틀 안에도 넣지 못하게 */
+  get sharedCsp(): string {
+    return `${this.isolated ? OutputFile.VIEW_SANDBOX : OutputFile.CSP}; frame-ancestors 'none'`;
   }
 
   /** Content-Disposition. 한글 이름은 RFC 5987(filename*)로, 옛 브라우저용 이름은 ASCII만 */
