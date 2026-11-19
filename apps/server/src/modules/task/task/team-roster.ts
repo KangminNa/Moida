@@ -7,7 +7,7 @@ import type { JobTeamMemberView, TeamStatRow } from './job.view';
 // 바로 아래 팀원마다 맡길 수 있는 일 · 지금 쥔 일 수 · 최근 7일의 끝냄 · 실패 · 고쳐 달라 · 반려 수 · AI 도구 ·
 // 허락받았고 켜진 커넥터, 그리고 그 팀원 아래 팀 전체의 요약(사람 수 · 맡길 수 있는 일마다 몇 명 · 커넥터마다 몇 명, 이름은 없음).
 // 팀장은 한 층만 본다: 손자 팀의 이름과 일은 보이지 않는다. 대표(O-2)도 같은 규칙으로 맨 위 팀장들과 그 아래 요약을 본다.
-// 일을 빌려 줄 때 한 번 만든다 (TaskService.lease)
+// 일을 빌려 줄 때 한 번 만든다 (JobService.lease)
 export class TeamRoster {
   /** 바로 아래 팀원 정보의 최근 기간 */
   static readonly RECENT_DAYS = 7;

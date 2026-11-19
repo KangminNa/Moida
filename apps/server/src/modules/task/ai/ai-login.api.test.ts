@@ -13,7 +13,7 @@ import {
   SystemActor,
   VisitorActor,
 } from '../../platform';
-import { TaskService } from '../task/task.service';
+import { JobService } from '../task/job.service';
 import { AiLoginInput } from './ai-login.input';
 import { AiLoginQuery } from './ai-login.query';
 import { AiLoginService } from './ai-login.service';
@@ -506,7 +506,7 @@ describe('연결 확인', () => {
       UPDATE task.tasks SET attempts = 3, lease_until = now() - interval '1 minute'
       WHERE id = ${String(taskId)}`;
 
-    await api.service(TaskService).reclaim(new SystemActor());
+    await api.service(JobService).reclaim(new SystemActor());
 
     assert.equal((await getTask(taskId)).status, 'failed');
     assert.match(String((await claude()).lastError), /임대/);
@@ -519,7 +519,7 @@ describe('연결 확인', () => {
     await db.sql`
       UPDATE task.tasks SET lease_until = now() - interval '1 minute' WHERE id = ${String(taskId)}`;
 
-    await api.service(TaskService).reclaim(new SystemActor());
+    await api.service(JobService).reclaim(new SystemActor());
 
     assert.equal((await getTask(taskId)).status, 'queued');
     assert.equal((await claude()).checkedAt, null);

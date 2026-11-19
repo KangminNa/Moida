@@ -8,7 +8,7 @@ import { TaskKinds } from './task-kinds';
 //   대화의 일(회차 · 덧붙인 말의 답 · 검토 · 다시 맡김)은 chat:<대화>:<에이전트>, 목표 실행의 회차는 goal-run:<실행>,
 //   나머지(하위 작업 포함)는 task:<작업>. 하위 작업이 끝나 깨어난 위 작업은 같은 작업이라 같은 키다.
 // 작업 세션의 키 (vault의 세션 하나 = 요청 하나): 맨 위 작업의 chat:<대화> · goal-run:<실행> · task:<맨 위 작업>.
-// biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. RunRecord · TaskService · TaskQuery가 함께 쓴다
+// biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. RunRecord · JobService · TaskQuery가 함께 쓴다
 export class RunLineage {
   /** 세션 키. 기록하지 않는 일(에이전트 없는 일 · 세션 정리)은 null */
   static of(task: TaskRow): string | null {

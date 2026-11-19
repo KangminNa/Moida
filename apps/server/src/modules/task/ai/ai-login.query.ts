@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseQuery, Database, Forbidden, RuleViolation, SecretBox } from '../../platform';
 import { Task } from '../task/task';
+import { TaskSignin } from '../task/task-signin';
 import { aiLogins, tasks } from '../task.schema';
 import { AI_LOGIN_TOOL, type TaskRow } from '../task.tables';
 import type { AiLoginInput } from './ai-login.input';
@@ -81,7 +82,7 @@ export class AiLoginQuery extends BaseQuery {
   /** 진행 중인 웹 로그인의 단계. 러너가 아직 받지 않았으면 시작 중이다 */
   private static stepOf(row: Pick<TaskRow, 'status' | 'payload'>): string {
     const step = (row.payload as Readonly<Record<string, unknown>> | null)?.step;
-    if (row.status === Task.QUEUED || typeof step !== 'string') return Task.SIGNIN_STARTING;
+    if (row.status === Task.QUEUED || typeof step !== 'string') return TaskSignin.STARTING;
     return step;
   }
 }

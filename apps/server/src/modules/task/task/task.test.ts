@@ -369,7 +369,7 @@ describe('위임', () => {
       attempts: 1,
       request_id: 'r',
       parent_id: 'p',
-      depth: Task.DEPTH_MAX,
+      depth: DelegationPolicy.DEPTH_MAX,
       rounds: 0,
     } as TaskRow);
     assert.throws(() => deep.assertCanDelegate(lead.id, 1, 0, NOW), RuleViolation);
@@ -387,7 +387,7 @@ describe('위임', () => {
       request_id: 'r',
       parent_id: null,
       depth: 0,
-      rounds: Task.ROUNDS_MAX,
+      rounds: DelegationPolicy.ROUNDS_MAX,
     } as TaskRow);
     assert.throws(() => tired.assertCanDelegate(lead.id, 1, 0, NOW), RuleViolation);
 
