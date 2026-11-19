@@ -24,6 +24,8 @@ function subtaskOrder(
     paths,
     refs,
     deliver,
+    appId: null,
+    model: null,
   } as unknown as SubtaskOrder;
 }
 
