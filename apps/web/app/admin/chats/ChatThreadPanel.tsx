@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useMe } from '../../_account/live';
+import { useApps } from '../../_blog/live';
 import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { scheduleLabel, tokens } from '../../_task/labels';
 import { CHAT_DETAIL_TOPICS, useLead } from '../../_task/live';
 import type { Chat, ChatDetail, OutputSaved } from '../../_task/types';
+import { STORE_HREF } from '../menu';
 import { ChatCardForm } from './ChatCardForm';
 import { ChatForm, type ChatMessageBody } from './ChatForm';
 import type { RefChoice } from './ChatRefs';
@@ -33,6 +35,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
     CHAT_DETAIL_TOPICS,
   );
   const me = useMe();
+  const apps = useApps();
   const sending = useAction();
   const cancelling = useAction();
   const deciding = useAction();
@@ -154,6 +157,15 @@ export function ChatThreadPanel({ id }: { id: string }) {
             </small>
           )}
           {d.chat.deviceId && <span className="pill">기기에서</span>}
+          {d.chat.appId && (
+            <Link
+              className="pill"
+              href={`${STORE_HREF}/${d.chat.appId}?tab=team`}
+              title="이 대화의 앱"
+            >
+              앱 · {apps.data?.apps.find((a) => a.id === d.chat.appId)?.name ?? '…'}
+            </Link>
+          )}
           {d.automations.map((a) => (
             <Link key={a.id} className="pill" href="/admin/schedules" title={a.title}>
               자동화 · {scheduleLabel(a)}

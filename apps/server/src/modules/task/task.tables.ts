@@ -138,6 +138,7 @@ export interface ChatRow {
   model: string | null;
   effort: ChatEffort | null;
   pending_refs: unknown | null;
+  app_id: string | null;
 }
 export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'title' | 'request_id'>;
 

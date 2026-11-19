@@ -7,11 +7,13 @@ export class AgentCard {
     readonly id: string,
     readonly name: string,
     readonly scopes: readonly string[],
+    /** 보고 대상을 위로 따라간 id (가까운 순). 맨 위 에이전트면 비어 있다 (스토어 2단계: 운영 팀 안인지) */
+    readonly chain: readonly string[],
   ) {}
 }
 
 // 에이전트 확인 (2차 6단계): 에이전트의 표를 갖지 않은 모듈이 "이 id의 에이전트가 있는가, 무슨 권한인가"를 물을 길.
-// 예: blog의 메뉴는 운영 팀으로 비공개를 읽지 않는 에이전트만 받는다. 에이전트를 가진 모듈이 시작할 때 한 번 등록하고,
+// 예: blog의 앱 · 메뉴는 운영 팀으로 비공개를 읽지 않는 에이전트만 받고, 글을 놓는 에이전트가 그 팀 안인지 본다. 에이전트를 가진 모듈이 시작할 때 한 번 등록하고,
 // platform은 누가 등록하는지 모른다 (Leases · ArchiveQuery와 같은 방식). 트랜잭션 밖에서 묻는다
 @Injectable()
 export class AgentDirectory {

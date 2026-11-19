@@ -1,5 +1,12 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { ActionChecks, BlobStore, CoreWorkers, EventCatalog, LibraryQuery } from '../platform';
+import {
+  ActionChecks,
+  BlobStore,
+  CoreWorkers,
+  EventCatalog,
+  LibraryQuery,
+  Lookups,
+} from '../platform';
 import { AppController } from './app/app.api';
 import { AppQuery } from './app/app.query';
 import { AppService } from './app/app.service';
@@ -120,6 +127,7 @@ export class BlogModule implements OnModuleInit {
     private readonly appCodeBuilt: AppCodeBuiltHandler,
     private readonly appCodeShow: AppCodeShowHandler,
     private readonly appCode: AppCodeQuery,
+    private readonly lookups: Lookups,
   ) {}
 
   onModuleInit(): void {
@@ -136,6 +144,8 @@ export class BlogModule implements OnModuleInit {
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
     this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
+    // 앱 이름 (스토어 2단계): task가 대화의 앱을 확인한다 (관리자는 공간의 앱, 그 밖은 공개 앱)
+    this.lookups.provide('app', (a, ids) => this.apps.names(a, ids));
     // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
     this.checks.register(PostPublish.ACTION, (a, id) => this.posts.publishProblem(a, id));
     this.checks.register(Issue.ACTION, (a, id) => this.issues.publishProblem(a, id));

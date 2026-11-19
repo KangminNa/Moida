@@ -25,8 +25,8 @@ function refsOf(f: RequestFields, body: Record<string, unknown>): readonly RefPi
 }
 
 /**
- * POST /api/chats { requestId, message, goal?, project?, deliver?, refs? }. 대화와 첫 메시지를 함께. 같은 requestId는 처음 만든 대화.
- * 상대는 늘 대표 (O-2): 예전 화면이 보내는 agentId는 읽지 않는다
+ * POST /api/chats { requestId, message, goal?, project?, deliver?, refs?, appId? }. 대화와 첫 메시지를 함께. 같은 requestId는 처음 만든 대화.
+ * 상대는 늘 대표 (O-2): 예전 화면이 보내는 agentId는 읽지 않는다. appId: 앱 관리에서 연 대화의 앱 (스토어 2단계, 정하면 그대로)
  */
 export class CreateChatInput extends BaseRequest {
   private constructor(
@@ -38,6 +38,7 @@ export class CreateChatInput extends BaseRequest {
     /** 받을 것 (html · blog · browser · code, 비우면 대화 답. ChatResult.deliverOf가 본다) */
     readonly deliver: string | null,
     readonly refs: readonly RefPick[],
+    readonly appId: string | null,
   ) {
     super();
   }
@@ -54,7 +55,23 @@ export class CreateChatInput extends BaseRequest {
           f.optionalText('project', 400),
           f.optionalText('deliver', 20),
           refsOf(f, body),
+          body.appId === undefined || body.appId === null ? null : f.uuid('appId'),
         ),
+    );
+  }
+}
+
+/** GET /api/chats?app=<앱 id>: 그 앱의 대화만 (스토어 2단계). 없으면 모든 대화 */
+export class ListChatsInput extends BaseRequest {
+  private constructor(readonly appId: string | null) {
+    super();
+  }
+
+  static from(query: unknown): ListChatsInput {
+    const body = (query ?? {}) as Record<string, unknown>;
+    return BaseRequest.read(
+      body,
+      (f) => new ListChatsInput(body.app === undefined || body.app === '' ? null : f.uuid('app')),
     );
   }
 }

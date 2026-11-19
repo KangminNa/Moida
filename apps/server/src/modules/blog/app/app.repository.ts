@@ -35,6 +35,13 @@ export class AppRepository extends TableRepository<AppRow, App> {
     return this.toEntity(row);
   }
 
+  /** 공간의 앱을 모두 쓰기 잠금 (첫 화면 고정이 공간마다 하나이게, 스토어 2단계). 늘 id 순서로 잠근다 */
+  async lockAll(spaceId: string): Promise<App[]> {
+    const rows = await this.sql<AppRow[]>`
+      SELECT * FROM blog.apps WHERE space_id = ${spaceId} ORDER BY id FOR UPDATE`;
+    return rows.map((row) => this.toEntity(row));
+  }
+
   /** 이 공간에서 다른 앱이 쓰는 주소인가 (exceptId: 고치는 앱 자신) */
   async slugTaken(spaceId: string, slug: string, exceptId: string | null): Promise<boolean> {
     const [row] = await this.sql<{ taken: boolean }[]>`

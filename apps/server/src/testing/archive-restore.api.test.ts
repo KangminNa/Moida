@@ -382,6 +382,9 @@ async function fill(c: Cairn): Promise<void> {
   // 앱 (스토어 1-3): 글이 드는 공개 앱에 아이콘을 달고, 공개 글이 든 비공개 앱을 하나 더
   seed.blogApp = await api.blogApp(owner);
   await c.icon(seed.blogApp, seed.iconPhoto);
+  // 첫 화면 고정 (스토어 2단계): 앱 파일에 home으로 나가고 그대로 돌아온다
+  const pinned = await api.request('PUT', '/api/apps/home', owner, { appId: seed.blogApp });
+  assert.equal(pinned.status, 204, pinned.text);
   const hidden = ok(
     await api.request('POST', '/api/apps', owner, {
       requestId: randomUUID(),
@@ -910,7 +913,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
 
   test('앱이 id · 종류 · 공개 여부 · 아이콘째 돌아오고, 글이 든 앱과 그래프 사본이 맞는다', async () => {
     const apps = await target.sql`
-      SELECT id, kind, name, slug, description, visibility, sort, icon_blob_hash, version
+      SELECT id, kind, name, slug, description, visibility, sort, icon_blob_hash, home, version
       FROM blog.apps ORDER BY sort`;
     assert.deepEqual(
       apps.map((a) => ({ ...a })),
@@ -924,6 +927,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
           visibility: 'public',
           sort: 0,
           icon_blob_hash: sha256(seed.iconPhoto),
+          home: true,
           version: 1,
         },
         {
@@ -935,6 +939,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
           visibility: 'private',
           sort: 5,
           icon_blob_hash: null,
+          home: false,
           version: 1,
         },
       ],

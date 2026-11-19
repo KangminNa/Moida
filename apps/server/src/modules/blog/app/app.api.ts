@@ -12,12 +12,18 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { type Actor, CurrentActor, type HttpResponse, VersionInput } from '../../platform';
-import { AppSlugInput, CreateAppInput, UpdateAppInput, UploadIconInput } from './app.input';
+import {
+  AppSlugInput,
+  CreateAppInput,
+  HomeAppInput,
+  UpdateAppInput,
+  UploadIconInput,
+} from './app.input';
 import { AppQuery } from './app.query';
 import { AppService } from './app.service';
 import type { AppListView, AppView, PublicAppListView, PublicAppView } from './app.view';
 
-// 앱 API (스토어 1단계). 목록 · 앱 머리 · 아이콘은 누구나(방문자는 공개 앱만), 만들기 · 고치기 · 지우기 · 아이콘 올리기는 관리자만.
+// 앱 API (스토어 1단계). 목록 · 앱 머리 · 아이콘은 누구나(방문자는 공개 앱만), 만들기 · 고치기 · 지우기 · 아이콘 올리기 · 첫 화면 고정(2단계)은 관리자만.
 @Controller('api/apps')
 export class AppController {
   constructor(
@@ -59,6 +65,13 @@ export class AppController {
   @Post()
   async create(@CurrentActor() actor: Actor, @Body() body: unknown): Promise<AppView> {
     return (await this.service.create(actor, CreateAppInput.from(body))).view();
+  }
+
+  /** 방문자 첫 화면으로 고정할 앱 (스토어 2단계). 화면은 목록을 다시 읽는다 */
+  @HttpCode(204)
+  @Put('home')
+  async pinHome(@CurrentActor() actor: Actor, @Body() body: unknown): Promise<void> {
+    await this.service.pinHome(actor, HomeAppInput.from(body));
   }
 
   @Patch(':id')

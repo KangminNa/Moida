@@ -38,6 +38,9 @@ export const apps = blogSchema.table('apps', {
   code_seq: integer('code_seq'),
   code_pending_seq: integer('code_pending_seq'),
   code_versions: integer('code_versions').notNull(),
+  agent_id: uuid('agent_id'),
+  policy: text('policy').notNull(),
+  home: boolean('home').notNull(),
 });
 
 /** blog.assets */

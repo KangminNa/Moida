@@ -6,6 +6,8 @@
 - `app/`: 스토어의 앱 (`App`, 스토어 1단계, [docs/스토어.md](../../../../../docs/스토어.md) 8장). 종류(blog · magazine · page, 만들 때만) · 주소(`/<slug>`, `App.checkSlug` · 못 쓰는 이름 `App.RESERVED`) · 공개 여부(비공개로 만들고 관리자만 공개) · 순서 · 설명 · 아이콘.
   `api/apps`(목록 · `by-slug/:slug` · `by-slug/:slug/icon`은 누구나 — 방문자는 공개 앱만, 만들기 · 고치기 · 지우기 · 아이콘은 관리자). 만들기 · 고치기는 `AppEdit` 한 줄을 지난다(관리자 REST · 설정 바꾸기 제안의 미리 해 보기 · 승인 뒤 적용): 만들기는 시작 메뉴(블로그: 글, 매거진: 호, 이름을 주면 그 글 목록 메뉴들)와 페이지 앱의 페이지까지 준비하고 `save`가 앱 → 메뉴 → 페이지 순서로 저장한다. 대화의 `propose_setting app`은 공개 여부를 받지 않는다 (페이지와 같다: AI · 기기가 공개하는 길은 없다).
   지우기는 글 · 페이지 · 호가 없을 때만, 빈 메뉴는 함께 지우고 페이지 앱의 페이지는 앱 밖으로 푼다. 공개 여부가 바뀌거나 지우면 `blog.app.changed`(vault의 그래프 사본, 1-2단계)
+  앱별 운영 (스토어 2단계, [docs/스토어.md](../../../../../docs/스토어.md) 10장): 운영 팀장(`apps.agent_id`) · 편집 방침(`apps.policy`). 운영 팀은 팀장과 그 아래 팀 전체이고 판단은 `AppTeam` 한 곳(앱 · 메뉴가 함께 쓴다): 팀장은 맨 위의, 비공개를 읽지 않는 에이전트만(`assertLeader`, 메뉴는 깊이를 보지 않는다), 앱 · 메뉴에 글을 놓는 에이전트는 비공개를 읽지 않고 운영 팀(메뉴의 팀, 없으면 앱의 팀) 안이어야 한다(`assertWriter` · `allows`, 관리자 · 기기는 늘). 팀 안인지는 요청자의 보고 대상(platform `AgentCard.chain`, 에이전트 자신도 읽는다)으로 트랜잭션 전에 본다: `PostService`(`placeDraft` · `intoIssue`) · `MenuQuery.forTool`(`can_write`). 대화의 `propose_setting app`도 `agent_id` · `policy`를 받는다.
+  방문자 첫 화면 고정(`apps.home`, 공개 앱만 · 공간마다 하나): `PUT api/apps/home`(관리자만, 공간의 앱을 모두 잠그고 푸는 것부터 저장), 비공개로 바꾸면 `App.edit`이 푼다. 대화로는 바꾸지 않는다
 
 - `app-code/`: 앱 코드 (스토어 1-6, [docs/스토어.md](../../../../../docs/스토어.md) 9장). 앱마다 자기 코드 묶음(HTML · CSS · JS · 그림)을 버전으로 쌓는다(`AppCode`: `apps`의 코드 칸 + 추가만 하는 `app_code_versions`). 묶음 규칙은 `AppCodeBundle`(파일 규칙은 `PageFiles` 그대로 + 크기 · `cairn.json`의 바깥 주소), 코드가 없는 앱은 종류의 시작 코드(`AppStarterGateway`: 저장소 `apps/server/starters/base` 위에 종류 폴더, `AppCodeFiles.starter`).
   공개 앱의 새 버전은 확인 대기(`code_pending_seq`, `blog.app_code.added`의 `pending` → 즉시 알림), 관리자가 `show`로 공개하면 풀린다(`blog.app_code.shown`의 `settled`). 비공개 앱의 새 버전은 바로 보인다.
@@ -32,8 +34,8 @@
   자라는 페이지 (2차 5단계): 방향(`pages.direction`, 관리자만 `edit`), 있는 페이지의 새 판은 앞 판 위에 이번 파일을 얹는다(`PageFiles.overlay`, 고칠 페이지가 없는데 문이 없으면 만들지 않는다). 공개 페이지의 새 판은 확인 대기(`pending_seq`, 이벤트 `blog.page.pending` → `BlogNotices` 즉시 알림)이고 `switchTo`로 그 판(이상)을 보이면 풀린다(`blog.page.shown` → 알림 읽음). 대기 판은 판 번호를 봉인한 보기 표(`PageTicket(pageId, seq)`)로 미리 본다.
   바뀐 점 `GET api/pages/:id/revisions/:seq/changes`(`PageDataDiff`: 앞 판과 `data.json`의 잎을 비교, 주인만). MCP `page_base`(run, `page.tool.ts`): 페이지를 고치는 만들기 일을 쥔 러너만(platform `Leases`) 가장 새 판의 글 파일 · 방향을 받는다
 
-- `menu/`: 블로그 메뉴(`Menu`, 2차 6단계, 쓰지 않던 categories를 넓힘). 앱 하나에 든다(스토어 1단계, 만들 때만, 페이지 앱에는 없다) · 종류(posts · issues · pages · page, 만들 때만) · 주소(`/<앱>/m/<주소>`, 앱 안에서 하나) · 순서 · 편집 방침 · 운영 팀 · RSS. `api/menus?app=`(목록은 누구나 — 방문자는 공개 앱의 이름 · 주소 · 종류 · 앱 주소만, 쓰기는 관리자), MCP `blog_menus`(write: 메뉴 · 편집 방침 · 만드는 중인 호).
-  운영 팀은 이 공간의, `read_all` 없는 에이전트만: blog는 task를 모르므로 트랜잭션 전에 platform `AgentDirectory`로 묻는다. 무엇을 담는지는 `Menu.assertHolds`, 누가 올리는지는 `Menu.assertWriter`(관리자 · 기기는 늘, 에이전트는 비공개를 읽지 않고 운영 팀이면). 담긴 것이 있으면 지우지 않는다.
+- `menu/`: 블로그 메뉴(`Menu`, 2차 6단계, 쓰지 않던 categories를 넓힘). 앱 하나에 든다(스토어 1단계, 만들 때만, 페이지 앱에는 없다) · 종류(posts · issues · pages · page, 만들 때만) · 주소(`/<앱>/m/<주소>`, 앱 안에서 하나) · 순서 · 편집 방침 · 운영 팀 · RSS. `api/menus?app=`(목록은 누구나 — 방문자는 공개 앱의 이름 · 주소 · 종류 · 앱 주소만, 쓰기는 관리자), MCP `blog_menus`(write: 앱 · 메뉴 · 편집 방침 · 만드는 중인 호 · `can_write`, `app_id`로 한 앱만).
+  운영 팀장은 이 공간의, `read_all` 없는 에이전트만: blog는 task를 모르므로 트랜잭션 전에 platform `AgentDirectory`로 묻는다. 무엇을 담는지는 `Menu.assertHolds`, 누가 올리는지는 `AppTeam`(위의 앱: 메뉴의 운영 팀은 그 에이전트와 그 아래 팀, 스토어 2단계에서 넓힘). `blog_save_draft`의 `app_id`와 `menu_id`가 다른 앱이면 `Menu.assertInApp`이 422. 담긴 것이 있으면 지우지 않는다.
   올리기: 글은 `POST api/posts/:id/menu`(관리자) · `blog_save_draft`의 `menu_id`(`Post.placeIn`), 페이지는 `PATCH api/pages/:id`의 `menuId`(`Page.placeIn`, 페이지 하나 메뉴는 메뉴를 잠가 하나만). 올린 것은 공개 대기이고 공개는 공개 범위로. 글 · 페이지 목록의 `?menu=`, 보관함 줄의 `place`. 결과 카드 전에 메뉴에 올리지 않은 글의 발행을 짚는다(platform `ActionChecks`, `PostQuery.publishProblem`)
 - `issue/`: 매거진 호(`Issue`, 쓰지 않던 series를 넓힘). 호 목록 메뉴 안의 번호(메뉴를 잠가 다음 수), 글은 `posts.issue_id` · `issue_order`로(`Post.joinIssue`, 메뉴에서는 빠진다). `api/issues`(발행한 호 · `by-number/:menu/:number`는 누구나, 쓰기 · 발행은 관리자), `blog_save_draft`의 `issue_id`.
   발행은 호 전체를 한 번에: 관리자의 `publish`(못 하면 422)와 결재 동작 `blog.issue.publish`(`IssuePublishHandler` → `IssueService.publishApproved`, 결과 `blog.issue.published` · `publish_failed`, 같은 결재는 `Idempotency`로 앞 결과를 다시). 휴지통 글 · 빈 호 · 결재 뒤 바뀐 호면 아무것도 바꾸지 않는다. 결재한 공개의 요청자 · 결과는 글과 같은 `PostPublish` 정책
@@ -78,7 +80,7 @@
 `task.app_code.built` (taskId, runId, appId, note, files): 앱 코드의 새 버전 (스토어 1-6). 두 번 받아도 버전은 하나다 (`UNIQUE(app_id, run_id)`와 `AppCodeRepository.hasRun`). 그사이 다른 버전이 생겼으면 409로 다시 받는다
 
 ## 써도 되는 모듈
-platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄)
+platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄). 거꾸로 앱 이름은 `Lookups`의 `app`으로 준다 (스토어 2단계, `AppQuery.names`: 관리자는 공간의 앱, 그 밖은 공개 앱. task가 대화의 앱을 확인한다)
 
 ## 지켜야 할 것
 - 글 → wiki 연결은 blog가 값으로 갖는다 (외래키 없음): 대표 `posts.main_wiki_id`, 참고 `post_wiki_refs`. 발행·수정 때 이벤트로 vault에 알린다

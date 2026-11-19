@@ -1,7 +1,7 @@
 import { Actor } from '../../platform';
 import type { AgentTeamRow } from './agent.view';
 
-// 팀 템플릿 가운데 만들기 · 글 · 코드 계열 (AgentTeams가 모은다). 구성원은 보고 대상이 앞에 오게 적는다.
+// 팀 템플릿 가운데 만들기 · 데이터 · 코드 · 정리 계열 (AgentTeams가 모은다, 글 · 앱 운영은 writing-teams.ts). 구성원은 보고 대상이 앞에 오게 적는다.
 // 만들기(make) · 코드(code)는 전체 읽기 · 쓰기와 한 에이전트에 두지 않는다 (Agent 규칙).
 export const WORK_TEAMS: readonly AgentTeamRow[] = [
   {
@@ -112,40 +112,6 @@ export const WORK_TEAMS: readonly AgentTeamRow[] = [
           '데이터 분석 팀의 데이터 분석가 (만들기 작업, 샌드박스에서 돈다).',
           '- 붙인 파일(엑셀 · CSV)을 읽어 정리 → 계산 → 요약 보고서를 HTML로 만든다: 표는 HTML 표(정렬 · 차트, .csv도 함께), 해석은 HTML 문서.',
           '- 빈 값 · 이상한 값을 어떻게 다뤘는지 적고, 결론은 숫자와 함께 쓴다. 파일에 없는 숫자는 만들지 않는다.',
-        ].join('\n'),
-      },
-    ],
-  },
-  {
-    key: 'blog',
-    title: '블로그 글 팀',
-    description:
-      '위키 · 세션의 소재로 초안을 쓰고, 공개는 결재로. 사실 · 수치는 자료 조사가 찾는다',
-    needs: [],
-    members: [
-      {
-        key: 'writer',
-        reports_to: null,
-        name: '글쓴이',
-        scopes: [Actor.READ_ALL, Actor.WRITE],
-        approval_actions: ['blog.post.publish'],
-        role: [
-          '블로그 글 팀의 글쓴이.',
-          '- 위키 · 세션에서 소재를 찾아 초안을 쓴다. 사실 · 수치 확인이 필요하면 delegate_task로 자료 조사에게 맡긴다.',
-          '- 공개는 직접 하지 않고 결재(request_approval, blog.post.publish)를 올린다.',
-          '- 비공개 내용(세션의 개인 정보 · 비밀값)은 글에 옮기지 않는다.',
-        ].join('\n'),
-      },
-      {
-        key: 'research',
-        reports_to: 'writer',
-        name: '자료 조사',
-        scopes: [Actor.READ_PUBLIC],
-        approval_actions: [],
-        role: [
-          '블로그 글 팀의 자료 조사.',
-          '- 글에 넣을 사실 · 수치 · 인용을 웹 검색과 read_url로 찾아 출처 주소와 함께 정리한다.',
-          '- 자료끼리 엇갈리면 둘 다 적는다.',
         ].join('\n'),
       },
     ],

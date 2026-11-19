@@ -1,4 +1,4 @@
-import type { IssueRow, MenuRow } from '../blog.tables';
+import type { AppRow, IssueRow, MenuRow } from '../blog.tables';
 
 // 메뉴의 읽기 모양 (2차 6단계). 웹이 `import type`으로 가져온다 (객체설계 6장).
 // 보는 사람마다 둘이다: 관리자는 설정 칸 전부와 담긴 수, 방문자는 메뉴 줄에 필요한 이름 · 주소 · 종류만.
@@ -72,23 +72,40 @@ export class PublicMenuListView {
   }
 }
 
-/** blog_menus의 답: 글을 쓸 AI가 고를 메뉴와 편집 방침, 호 목록 메뉴에는 만드는 중인 호. MCP는 snake_case */
+/**
+ * blog_menus의 답: 글을 쓸 AI가 고를 앱 · 메뉴와 편집 방침, 호 목록 메뉴에는 만드는 중인 호. MCP는 snake_case.
+ * 앱 · 운영 팀 · can_write는 스토어 2단계에서 더했다 (MCP는 칸을 더하기만 한다)
+ */
 export class ToolMenuView {
   constructor(
+    private readonly apps: readonly Readonly<AppRow>[],
     private readonly rows: readonly Readonly<MenuRow>[],
     private readonly drafts: readonly Readonly<
       Pick<IssueRow, 'id' | 'menu_id' | 'number' | 'title'>
     >[],
+    /** 이 요청자가 글을 놓을 수 있는 앱 · 메뉴의 id (운영 팀, AppTeam) */
+    private readonly writable: ReadonlySet<string>,
   ) {}
 
   toJSON() {
     return {
+      apps: this.apps.map((a) => ({
+        id: a.id,
+        name: a.name,
+        slug: a.slug,
+        kind: a.kind,
+        policy: a.policy,
+        agent_id: a.agent_id,
+        can_write: this.writable.has(a.id),
+      })),
       menus: this.rows.map((r) => ({
         id: r.id,
+        app_id: r.app_id,
         name: r.name,
         kind: r.kind,
         policy: r.policy,
         agent_id: r.agent_id,
+        can_write: this.writable.has(r.id),
         issues: this.drafts
           .filter((i) => i.menu_id === r.id)
           .map((i) => ({ id: i.id, number: i.number, title: i.title })),

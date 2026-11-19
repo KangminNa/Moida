@@ -3,7 +3,7 @@ import { type Actor, BaseQuery, Database, NotFound } from '../../platform';
 import { Approval } from '../approval/approval';
 import { Task } from '../task/task';
 import type { ApprovalRow, ChatRow, TaskRow } from '../task.tables';
-import type { ChatIdInput } from './chat.input';
+import type { ChatIdInput, ListChatsInput } from './chat.input';
 import {
   type ChatApprovalRow,
   type ChatAutomationRow,
@@ -45,9 +45,9 @@ export class ChatQuery extends BaseQuery {
     super(db);
   }
 
-  /** 대화 목록 (최근 것부터): 맡은 에이전트의 이름과 상태 (상태판과 같은 규칙) */
-  async list(actor: Actor): Promise<ChatListView> {
-    const rows = await this.updates.ownerBoard(actor, null, ChatQuery.PAGE);
+  /** 대화 목록 (최근 것부터): 맡은 에이전트의 이름과 상태 (상태판과 같은 규칙). 앱을 주면 그 앱의 대화만 (스토어 2단계) */
+  async list(actor: Actor, req: ListChatsInput): Promise<ChatListView> {
+    const rows = await this.updates.ownerBoard(actor, null, ChatQuery.PAGE, req.appId);
     if (rows.length === 0) return new ChatListView(rows);
     return new ChatListView(
       rows,

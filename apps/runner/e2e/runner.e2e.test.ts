@@ -730,6 +730,36 @@ describe('러너가 일을 처리한다', () => {
     assert.ok([200, 204].includes(stopped.status), stopped.text);
   });
 
+  test('앱 관리에서 연 대화의 대표 지시문에 그 앱이 실린다 (스토어 2단계: 그 앱의 운영 팀장에게)', async () => {
+    const app = ok(
+      await api.request('POST', '/api/apps', owner, {
+        requestId: randomUUID(),
+        kind: 'blog',
+        name: '운영 앱',
+        slug: `ops-${randomUUID().slice(0, 6)}`,
+      }),
+      201,
+    );
+    const spy = new Spy();
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: `이 앱에 글 하나 써 줘\n${spy.mark}`,
+        appId: app.id,
+      }),
+      201,
+    );
+    const prompt = String((await spy.seen()).prompt);
+    assert.ok(prompt.includes(`이 대화는 앱 하나의 일입니다 (app_id: ${app.id})`), prompt);
+    assert.ok(prompt.includes('get_settings kind: apps'));
+    await settle();
+    const now = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { chat: Json };
+    const stopped = await api.request('POST', `/api/chats/${chat.id}/stop`, owner, {
+      version: now.chat.version,
+    });
+    assert.ok([200, 204].includes(stopped.status), stopped.text);
+  });
+
   test('대표가 대화에서 자동화를 제안하고, 승인하면 그 대화에 묶인다 (O-3 대화로 자동화)', async () => {
     const title = `아침 정리 ${randomUUID().slice(0, 6)}`;
     const chat = ok(

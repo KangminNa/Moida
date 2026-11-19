@@ -75,3 +75,18 @@ export class ListMenusInput extends BaseRequest {
     return BaseRequest.read(query ?? {}, (f) => new ListMenusInput(f.optionalText('app', 200)));
   }
 }
+
+/** blog_menus { app_id? } (스토어 2단계): 한 앱과 그 메뉴만. 없으면 모든 앱 */
+export class ToolMenusInput extends BaseRequest {
+  private constructor(readonly appId: string | null) {
+    super();
+  }
+
+  static from(raw: unknown): ToolMenusInput {
+    const body = (raw ?? {}) as Record<string, unknown>;
+    return BaseRequest.read(
+      body,
+      (f) => new ToolMenusInput(body.app_id === undefined ? null : f.uuid('app_id')),
+    );
+  }
+}

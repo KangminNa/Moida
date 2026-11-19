@@ -29,6 +29,9 @@ const app = {
   code_seq: null,
   code_pending_seq: null,
   code_versions: 0,
+  agent_id: null,
+  policy: '',
+  home: false,
 } satisfies AppRow;
 const menu = {
   id: 'm1',

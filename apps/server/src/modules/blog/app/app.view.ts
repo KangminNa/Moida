@@ -42,6 +42,12 @@ export class AppView {
       visibility: r.visibility,
       sort: r.sort,
       iconUrl: iconUrl(r),
+      /** 운영 팀장 (에이전트 id, 스토어 2단계). 운영 팀은 그 에이전트와 그 아래 팀. 없으면 null */
+      agentId: r.agent_id,
+      /** 편집 방침 (이 앱에 쓰는 AI가 읽는다) */
+      policy: r.policy,
+      /** 방문자 첫 화면(/)으로 고정했는가 */
+      home: r.home,
       /** 공개 글 · 임시 글(휴지통 제외) · 메뉴 · 페이지의 수 */
       counts: this.counts,
       version: r.version,
@@ -81,6 +87,8 @@ export class PublicAppView {
       slug: r.slug,
       description: r.description,
       iconUrl: iconUrl(r),
+      /** 첫 화면(/)으로 고정한 앱 (스토어 2단계): 웹의 /가 이 앱으로 보낸다 */
+      home: r.home,
     };
   }
 }
@@ -108,8 +116,14 @@ export class AppSettingView {
       kind: r.kind,
       description: r.description,
       sort: r.sort,
+      /** 운영 팀장 (맨 위 에이전트, 스토어 2단계). 이 앱의 일은 이 에이전트에게 맡긴다. 없으면 null */
+      agent_id: r.agent_id,
+      /** 편집 방침 */
+      policy: r.policy,
       /** 읽기만: 공개는 관리자가 앱 관리에서 바꾼다 */
       visibility: r.visibility,
+      /** 읽기만: 방문자 첫 화면으로 고정했는가 (관리자가 바꾼다) */
+      home: r.home,
     };
   }
 }

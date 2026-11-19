@@ -16,6 +16,7 @@ export class RestoredApp extends BaseEntity {
     'visibility',
     'sort',
     'icon',
+    'home',
   ]);
 
   private constructor(
@@ -35,6 +36,10 @@ export class RestoredApp extends BaseEntity {
     if (icon !== null && !Blob.isHash(icon))
       throw record.problem(`icon의 해시가 틀렸어요: ${icon}`);
     const at = record.createdAt;
+    const visibility = record.oneOf('visibility', APP_VISIBILITY);
+    const home = record.flag('home', false);
+    if (home && visibility !== App.PUBLIC)
+      throw record.problem('첫 화면으로 고정한 앱은 공개 앱이어야 해요');
     return new RestoredApp(
       {
         id: record.id(),
@@ -44,7 +49,8 @@ export class RestoredApp extends BaseEntity {
         description: record.attempt(() =>
           App.checked('description', record.optionalText('description') ?? ''),
         ),
-        visibility: record.oneOf('visibility', APP_VISIBILITY),
+        visibility,
+        home,
         sort: record.attempt(() => App.checked('sort', record.number('sort'))),
         created_at: at,
         updated_at: at,
@@ -72,6 +78,11 @@ export class RestoredApp extends BaseEntity {
 
   get slug(): string {
     return this.fields.slug;
+  }
+
+  /** 방문자 첫 화면으로 고정한 앱 (스토어 2단계, 묶음에 하나까지) */
+  get home(): boolean {
+    return this.fields.home === true;
   }
 
   get isPage(): boolean {

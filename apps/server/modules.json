@@ -11,9 +11,13 @@
     "blog": {
       "dependsOn": ["platform"],
       "schemas": ["blog", "work"],
-      "lookups": { "asks": ["wiki", "session"] }
+      "lookups": { "provides": ["app"], "asks": ["wiki", "session"] }
     },
-    "task": { "dependsOn": ["platform"], "schemas": ["task"] },
+    "task": {
+      "dependsOn": ["platform"],
+      "schemas": ["task"],
+      "lookups": { "asks": ["app"] }
+    },
     "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }
   },
   "frameworkPackages": ["@nestjs/common", "@nestjs/core", "node:"],

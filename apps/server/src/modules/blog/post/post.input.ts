@@ -250,6 +250,8 @@ export class SaveDraftInput extends BaseRequest {
     readonly menuId: string | null | undefined = undefined,
     /** 넣을 호 (blog_menus의 issues). 보내지 않으면 그대로, null은 호에서 빼기 */
     readonly issueId: string | null | undefined = undefined,
+    /** 넣을 앱 (스토어 2단계, 메뉴 없이). 메뉴와 함께면 그 메뉴의 앱이어야 한다. 보내지 않으면 그대로, null은 앱에서 빼기 */
+    readonly appId: string | null | undefined = undefined,
   ) {
     super();
   }
@@ -272,12 +274,13 @@ export class SaveDraftInput extends BaseRequest {
         refWikisOf(f, 'ref_wiki_ids'),
         menuOf(f, raw, 'menu_id'),
         menuOf(f, raw, 'issue_id'),
+        menuOf(f, raw, 'app_id'),
       );
     });
   }
 }
 
-/** 메뉴 칸: 보내지 않으면 undefined(그대로), null은 빼기 */
+/** 메뉴 · 호 · 앱 칸: 보내지 않으면 undefined(그대로), null은 빼기 */
 function menuOf(f: RequestFields, raw: unknown, name: string): string | null | undefined {
   const body = (raw ?? {}) as Record<string, unknown>;
   if (!(name in body)) return undefined;
