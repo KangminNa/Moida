@@ -87,6 +87,19 @@ export class Listener {
 @Injectable()
 export class Database implements OnApplicationShutdown {
   /**
+   * 코어 모듈이 쓰는 스키마 (apps/server/modules.json의 schemas: 경계 검사가 맞춰 본다).
+   * 서버 이미지에는 modules.json이 없어 여기 한 곳에 둔다 (상태 확인의 표 수, 기능 패키지가 못 쓰는 이름)
+   */
+  static readonly MODULE_SCHEMAS: readonly string[] = [
+    'platform',
+    'account',
+    'vault',
+    'blog',
+    'work',
+    'task',
+    'mcp',
+  ];
+  /**
    * 연결마다 거는 시간 제한. 풀과 LISTEN 연결이 모두 시작할 때 받는다.
    * 잠금 하나를 오래 쥔 쪽이 있어도 기다리는 요청이 연결을 붙잡고 풀(10개)을 다 쓰지 않게 한다.
    * 잠금 대기 · 긴 쿼리는 입구에서 Busy(503)가 되고, 쉬다 끊긴 트랜잭션은 우리 코드의 버그라 500으로 둔다.

@@ -1,22 +1,39 @@
 {
-  "$comment": "모듈 지도. 의존해도 되는 모듈과 소유 스키마. scripts/check-boundaries.mjs가 이 파일로 코드와 DB를 검사한다. 바꾸려면 docs/객체설계.md 모듈 규칙부터 고친다.",
+  "$comment": "모듈 지도. 의존해도 되는 모듈과 소유 스키마, import 없이 잇는 모듈 사이 읽기(lookups)와 platform 등록부(registries: 주는 것 · 묻는 것). scripts/check-boundaries.mjs가 이 파일로 코드와 DB를 검사하고, --graph로 모듈 사이 의존 전부를 보여 준다. 바꾸려면 docs/객체설계.md 모듈 규칙부터 고친다.",
   "modules": {
-    "platform": { "dependsOn": [], "schemas": ["platform"] },
-    "account": { "dependsOn": ["platform"], "schemas": ["account"] },
+    "platform": {
+      "dependsOn": [],
+      "schemas": ["platform"],
+      "registries": { "provides": ["settings"], "asks": ["leases"] }
+    },
+    "account": {
+      "dependsOn": ["platform"],
+      "schemas": ["account"],
+      "registries": { "provides": ["settings", "site"] }
+    },
     "vault": {
       "dependsOn": ["platform"],
       "schemas": ["vault"],
-      "lookups": { "provides": ["wiki", "session"] }
+      "lookups": { "provides": ["wiki", "session"] },
+      "registries": { "provides": ["settings"], "asks": ["leases", "run-records"] }
     },
     "blog": {
       "dependsOn": ["platform"],
       "schemas": ["blog", "work"],
-      "lookups": { "provides": ["app"], "asks": ["wiki", "session"] }
+      "lookups": { "provides": ["app"], "asks": ["wiki", "session"] },
+      "registries": {
+        "provides": ["action-checks", "app-hosts", "settings"],
+        "asks": ["agents", "leases", "site", "teams"]
+      }
     },
     "task": {
       "dependsOn": ["platform"],
       "schemas": ["task"],
-      "lookups": { "asks": ["app"] }
+      "lookups": { "asks": ["app"] },
+      "registries": {
+        "provides": ["agents", "leases", "run-records", "settings", "teams"],
+        "asks": ["action-checks", "settings"]
+      }
     },
     "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }
   },

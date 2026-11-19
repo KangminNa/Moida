@@ -57,7 +57,7 @@ describe('GET /health', () => {
 
   test('주인: 모듈 스키마마다 테이블이 있다', async () => {
     const tables = (await api.get('/api/health', owner)).json().tables as Record<string, number>;
-    for (const schema of ['platform', 'account', 'vault', 'blog', 'work', 'mcp']) {
+    for (const schema of ['platform', 'account', 'vault', 'blog', 'work', 'task', 'mcp']) {
       assert.ok((tables[schema] ?? 0) > 0, `${schema} 스키마에 테이블이 없다`);
     }
   });

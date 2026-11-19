@@ -13,12 +13,12 @@ import {
   OutboxWorker,
 } from '../platform';
 
-// 시험이 흉내 내는 주제: 결과 이벤트는 어느 주제든 approvalId · outcome을 실으면 결과다 (ApprovalResultHandler).
-// 다른 모듈의 진짜 주제를 칸을 덜 채워 흉내 내지 않고, 시험용 주제를 이벤트 목록에 더한다 (EventCatalog, 리팩토링 R3c)
-const PROBE_RESULT = 'task.probe.result';
+// 결과 이벤트: 결과를 담는 주제(ApprovalResultHandler.TOPICS) 가운데 칸이 approvalId · outcome · error?뿐인 task의 주제로
+// 실행하는 모듈 없이 결과를 흉내 낸다 (다른 모듈의 진짜 주제를 칸을 덜 채워 흉내 내지 않는다, 리팩토링 R3c).
+// 시험만의 주제는 이벤트 목록에 더한다 (EventCatalog)
+const PROBE_RESULT = 'task.setting.changed';
 EventCatalog.define('task', {
   topics: {
-    [PROBE_RESULT]: { fields: ['approvalId', 'outcome', 'error?'] },
     'task.probe.committed': { fields: ['id'] },
     'task.probe.rolled_back': { fields: ['id'] },
   },

@@ -104,7 +104,7 @@
 - `blog.app_code.added`: 대화의 make 일이 만든 확인 대기 버전이면 그 대화의 결과 카드에 공개 승인 (`AppCodeCardHandler`, 스토어 1-6b). 그 밖은 넘어간다
 - `task.agentless.requested`: 에이전트 없이 서버의 로그인으로 돌 일 (2차 4단계, 지금은 vault의 세션 노트). 내용 `requestId, kind, title, targetKind, targetId, baseVersion?`. 같은 `requestId`는 작업 하나 (`AgentlessRequestHandler`)
 - `task.task.requested`: 어느 모듈이든 일을 요청한다. 내용 `requestId, kind, title, instruction?, payload?, targetKind?, targetId?, baseVersion?, agentId?, priority?`. 같은 `requestId`는 작업 하나 (`TaskRequestedHandler`)
-- 실행 결과: 주제는 묻지 않는다. 어느 이벤트든 내용에 `approvalId`와 `outcome`(`done` · `failed`)을 실으면 결과다. 실패면 `error`에 이유 (`ApprovalResultHandler`, `*`로 받는다). 두 번 와도 같다
+- 실행 결과: 내용에 `approvalId`와 `outcome`(`done` · `failed`)을 실은 이벤트가 결과다. 실패면 `error`에 이유. 받는 주제는 `ApprovalResultHandler.TOPICS`(이벤트 목록에서 그 두 칸을 가진 주제 + 기능 패키지의 `plugin.*`)이고, 결과를 담는 주제를 새로 만들면 그 목록에도 더한다 (`approval-result.handler.test.ts`가 이벤트 목록과 맞춰 본다). 두 번 와도 같다
 
 ## 써도 되는 모듈
 platform. blog의 앱은 platform `Lookups`의 `app`으로만 묻는다 (스토어 2단계, `modules.json`의 lookups.asks)
