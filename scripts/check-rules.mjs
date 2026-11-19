@@ -11,6 +11,8 @@
 //   7. 지시문의 글도 코드에 두지 않는다 (2차 1-0): 러너와 task 모듈의 코드에 마크다운 제목('# …')으로 시작하는 글자를 쓰지 않는다.
 //      글은 러너 스킬 cairn-runner의 틀(skills/cairn-runner/references/prompts.md)에
 //   8. 웹이 들인 라이브러리는 정해 둔 한 파일에서만 가져온다 (객체설계 10장 "고치는 범위"): mustache → _blog/app-screen.ts
+//   9. 새 탭은 연 쪽 창을 건드리지 못하고 주소가 Referer로 새지 않게 (웹 UX U3): target="_blank"에는 rel="noopener noreferrer",
+//      window.open에는 'noopener,noreferrer'
 //
 // 예외 목록(scripts/ratchet.json)은 줄어들기만 한다: 새 항목을 더하지 않고, 고친 파일은 목록에서 지운다.
 // 목록의 why에는 아직 남은 화면마다 까닭을 적어 둔다 (검사는 보지 않는다).
@@ -164,6 +166,33 @@ for (const file of webFiles) {
   for (const [, , , from] of text.matchAll(IMPORT))
     if (from in ONE_PLACE && at(file) !== ONE_PLACE[from])
       problems.push(`${at(file)}: ${from}은(는) ${ONE_PLACE[from]}에서만 가져와요`);
+}
+
+// --- 새 탭 (웹 UX U3) ---
+// target="_blank"(JSX) · target: '_blank'(속성 객체)가 있는 요소 · 객체 안에 rel이 있고 noopener · noreferrer를 모두 담는가.
+// 요소의 끝은 화살표(=>)가 아닌 첫 '>', 객체의 끝은 첫 '}'로 본다 (속성 순서는 상관없다)
+const NEW_TAB = /target(?:=\{?|:\s*)['"]_blank['"]/g;
+const REL = /rel(?:=\{?|:\s*)['"]([^'"]*)['"]/;
+const WINDOW_OPEN = /\b(?:window|globalThis)\.open\(([^)]*)\)/g;
+const lineOf = (text, index) => text.slice(0, index).split('\n').length;
+for (const file of webFiles.filter((f) => /\.(tsx?|jsx?)$/.test(f))) {
+  const text = readFileSync(file, 'utf8');
+  for (const hit of text.matchAll(NEW_TAB)) {
+    const jsx = hit[0].startsWith('target=');
+    const from = jsx ? text.lastIndexOf('<', hit.index) : text.lastIndexOf('{', hit.index);
+    const rest = text.slice(hit.index);
+    const to = hit.index + (jsx ? rest.search(/[^=]>/) + 1 : rest.indexOf('}'));
+    const rel = REL.exec(text.slice(from, to))?.[1] ?? '';
+    if (!/\bnoopener\b/.test(rel) || !/\bnoreferrer\b/.test(rel))
+      problems.push(
+        `${at(file)}:${lineOf(text, hit.index)} 새 탭(target="_blank")에는 rel="noopener noreferrer"를 함께 (웹 UX U3)`,
+      );
+  }
+  for (const hit of text.matchAll(WINDOW_OPEN))
+    if (!/noopener/.test(hit[1]) || !/noreferrer/.test(hit[1]))
+      problems.push(
+        `${at(file)}:${lineOf(text, hit.index)} window.open에는 'noopener,noreferrer'를 함께 (웹 UX U3)`,
+      );
 }
 
 // --- 패턴 목록의 본보기 ---

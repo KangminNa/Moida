@@ -19,6 +19,7 @@
 - 조각: `{{> header}}`는 같은 묶음의 `header.html`을 그 자리에 넣는다. 시작 코드는 `head` · `header` · `footer` · `post-list` · `page-list` · `issue-body`를 조각으로 쓴다.
 - 파일은 폴더 없이 나란히 100개까지, 합쳐 20MB, 템플릿(.html)은 합쳐 1MB. 이름에 `/`를 넣지 않고 점으로 시작하지 않는다.
 - 같은 묶음의 파일은 `{{files}}/style.css`처럼 연다. 앱의 첫 화면 링크는 `{{base}}`다 (미리 보기 주소에는 토큰이 들어 있어서 `/<앱>`을 직접 쓰면 미리 보기를 벗어난다).
+- 앱 안의 링크는 같은 탭, 다른 사이트로 가는 링크는 `target="_blank" rel="noopener noreferrer"`로 새 탭에 연다. 글 본문(`post.html`)의 바깥 링크는 웹이 이미 그렇게 그린다.
 
 ## 문법 (로직 없는 Mustache)
 

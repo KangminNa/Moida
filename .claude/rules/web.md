@@ -43,6 +43,13 @@ paths:
 - 로그인 화면으로 보낼 때는 `loginPath(돌아올 곳)`(`_lib/return-path.ts`)으로 지금 주소를 넘긴다. 서버에서 그리는 콘솔 틀은 지금 주소를 몰라 `proxy.ts`가 머리글(`RETURN_HEADER`)로 붙인다.
 - 콘솔에서 API가 401 · 403이면(로그인이 끝나면 관리 API는 403) `api()`가 신호(`DENIED_EVENT`)를 내고, 콘솔 틀(`SignedOutBar`)이 정말 끝났는지 물어 "다시 로그인"을 띄운다. 쓰던 글이 사라지지 않게 화면을 바로 옮기지 않는다.
 
+## 새 탭 (웹 UX U3)
+
+- 사이트 안 이동은 같은 탭 (`target` 없이). 로그인 · 외부 계정 연결처럼 다녀오는 흐름도 같은 탭.
+- 새 탭으로 여는 것: 다른 사이트(GitHub PR · 저장소 · AI 로그인 주소 · 소스 링크), 콘솔에서 공개 화면(앱 · 글 · 메뉴 · 페이지)과 결과물 보기를 열 때 (콘솔은 그대로 두고 보는 쪽을 새 탭에).
+- ★ 새 탭은 늘 `target="_blank" rel="noopener noreferrer"`: 열린 쪽이 연 창(콘솔)을 바꿔치기하지 못하고, 주소가 Referer로 새지 않게. 코드로 열 때는 `window.open(주소, '_blank', 'noopener,noreferrer')`.
+- 글 · AI 답(마크다운)의 http · https 링크는 `renderMarkdown`이 새 탭으로 그린다 (`_lib/markdown.ts`).
+
 ## 앱 화면 (스토어 1-6)
 
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`).

@@ -12,6 +12,7 @@ import { usePageTasks } from '../../../_task/live';
 import { TaskPill } from '../../../_task/parts';
 import type { Task } from '../../../_task/types';
 import { InstructionForm } from '../../../_ui/InstructionForm';
+import { NewTabLink } from '../../../_ui/NewTabLink';
 import { PageChangesPanel } from './PageChangesPanel';
 import { PageEditForm } from './PageEditForm';
 
@@ -107,9 +108,9 @@ export function PageDetailPanel({ id }: { id: string }) {
               편집
             </button>
           )}
-          <a className="ghost" href={path} target="_blank" rel="noreferrer">
+          <NewTabLink className="ghost" href={path}>
             새 탭에서 열기
-          </a>
+          </NewTabLink>
         </div>
       </header>
       {problem && <p className="error">{problem}</p>}

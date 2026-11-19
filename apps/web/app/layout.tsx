@@ -3,6 +3,7 @@ import type { SpaceInfo } from './_account/types';
 import { serverGet } from './_lib/server-api';
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './globals.css';
+import { NewTabLink } from './_ui/NewTabLink';
 import { SOURCE_URL } from './_ui/source';
 import { PAGE_FLIP_SCRIPT } from './admin/page-flip';
 
@@ -42,9 +43,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
-        <a className="source" href={SOURCE_URL} rel="noopener">
+        <NewTabLink className="source" href={SOURCE_URL}>
           소스 · AGPL-3.0
-        </a>
+        </NewTabLink>
       </body>
     </html>
   );

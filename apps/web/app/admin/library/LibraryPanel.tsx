@@ -9,6 +9,7 @@ import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import type { LibraryPage } from '../../_platform/types';
 import { readPages } from '../../_task/live';
+import { NewTabLink } from '../../_ui/NewTabLink';
 import type { ProjectRules } from '../../_vault/types';
 
 /** 종류 → 화면 이름 (서버의 LIBRARY_KIND) */
@@ -210,9 +211,9 @@ export function LibraryPanel() {
                 </select>
               )}
               {i.url && (
-                <a className="ghost small" href={i.url} target="_blank" rel="noreferrer">
+                <NewTabLink className="ghost small" href={i.url}>
                   열기
-                </a>
+                </NewTabLink>
               )}
             </li>
           ))}

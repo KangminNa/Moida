@@ -7,6 +7,7 @@ import { APP_KIND_LABELS } from '../../_blog/labels';
 import { useApps } from '../../_blog/live';
 import type { AdminApp } from '../../_blog/types';
 import { useAgents, useChats } from '../../_task/live';
+import { NewTabLink } from '../../_ui/NewTabLink';
 import { STORE_HREF } from '../menu';
 
 /** 카드의 한 줄 요약: 든 것의 수 */
@@ -72,9 +73,9 @@ export function AppsPanel() {
               </div>
               <div className="row">
                 {a.visibility === 'public' && (
-                  <a className="ghost" href={appPath(a.slug)} target="_blank" rel="noreferrer">
+                  <NewTabLink className="ghost" href={appPath(a.slug)}>
                     열기
-                  </a>
+                  </NewTabLink>
                 )}
                 <Link className="ghost" href={`${STORE_HREF}/${a.id}`}>
                   관리

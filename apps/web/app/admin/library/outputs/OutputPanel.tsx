@@ -9,6 +9,7 @@ import { bytes, INLINE_MIMES, OUTPUT_KINDS, TEXT_MIMES, when } from '../../../_t
 import { readPages } from '../../../_task/live';
 import { isHtmlOutput, OutputOpen } from '../../../_task/parts';
 import type { Output, OutputPage, OutputSaved, OutputUsage, Task } from '../../../_task/types';
+import { NewTabLink } from '../../../_ui/NewTabLink';
 import { type MakeBody, MakeForm } from './MakeForm';
 
 type Tab = 'all' | 'trash' | keyof typeof OUTPUT_KINDS;
@@ -312,9 +313,9 @@ function Preview({ output, onClose }: { output: Output; onClose: () => void }) {
         <video className="output-preview" src={fileUrl(output, true)} controls />
       )}
       {output.mime === 'application/pdf' && (
-        <a className="ghost" href={fileUrl(output, true)} target="_blank" rel="noreferrer">
+        <NewTabLink className="ghost" href={fileUrl(output, true)}>
           새 탭에서 열기
-        </a>
+        </NewTabLink>
       )}
       {isText && <pre className="raw">{text ?? '불러오는 중…'}</pre>}
     </section>

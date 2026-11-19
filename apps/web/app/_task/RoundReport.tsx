@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { NewTabLink } from '../_ui/NewTabLink';
 import { when } from './labels';
 import type { GoalRound } from './types';
 
@@ -73,18 +74,13 @@ function Items({ items, empty }: { items: readonly string[]; empty: string }) {
 }
 
 function Evidence({ url, outputId }: { url?: string; outputId?: string }) {
-  if (url && WEB_LINK.test(url))
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer">
-        {url}
-      </a>
-    );
+  if (url && WEB_LINK.test(url)) return <NewTabLink href={url}>{url}</NewTabLink>;
   // 결과물은 서버가 알맞게 연다 (view=1: HTML은 격리해서 새 탭에, 나머지는 내려받기)
   if (outputId)
     return (
-      <a href={`/api/outputs/${outputId}/file?view=1`} target="_blank" rel="noopener">
+      <NewTabLink href={`/api/outputs/${outputId}/file?view=1`}>
         결과물 {outputId.slice(0, 8)}
-      </a>
+      </NewTabLink>
     );
   return <>{url ?? ''}</>;
 }
