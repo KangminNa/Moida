@@ -6,13 +6,16 @@ import './globals.css';
 import { SOURCE_URL } from './_ui/source';
 import { PAGE_FLIP_SCRIPT } from './admin/page-flip';
 
-/** 사이트 로고를 올렸으면 브라우저 탭 아이콘으로도 쓴다 */
+/** 로고를 올리지 않았을 때의 탭 아이콘 (cairn.svg/route.ts) */
+const CAIRN_ICON = '/cairn.svg';
+
+/** 사이트 로고를 올렸으면 브라우저 탭 아이콘으로도 쓴다. 없으면 Cairn 표식 */
 export async function generateMetadata() {
   const space = await serverGet<SpaceInfo>('/api/space', true);
   return {
     title: 'Cairn',
     description: '내 서버에서 도는 Personal AI OS. AI 세션, 작업, 블로그를 한곳에서',
-    ...(space?.logoUrl ? { icons: { icon: space.logoUrl } } : {}),
+    icons: { icon: space?.logoUrl ?? CAIRN_ICON },
   };
 }
 

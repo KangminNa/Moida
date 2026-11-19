@@ -78,7 +78,7 @@ const WEB_ROUTES = [
 const consoleHeaders = [{ key: 'Cross-Origin-Opener-Policy', value: 'same-origin' }];
 
 /** 웹이 내는 파일 (route handler · Next가 만드는 것) */
-const WEB_FILES = ['rss.xml', 'sw.js', 'manifest.webmanifest', 'favicon.ico'];
+const WEB_FILES = ['rss.xml', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'cairn.svg'];
 
 const config: NextConfig = {
   output: 'standalone',

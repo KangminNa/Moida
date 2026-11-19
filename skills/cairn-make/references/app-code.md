@@ -38,7 +38,7 @@
 | `title` | 모두 | 이 화면의 제목 (`<title>`에) |
 | `base` · `files` | 모두 | 앱 첫 화면 주소 · 이 묶음의 파일 주소 앞부분 |
 | `site` | 모두 | `{ name, home, loginUrl, graphUrl }` (`graphUrl`은 공개 글이 없으면 null) |
-| `app` | 모두 | `{ name, description, kind, url, iconUrl, rssUrl }` (`iconUrl`이 없으면 `{{files}}/icon.svg`) |
+| `app` | 모두 | `{ name, description, kind, url, iconUrl, rssUrl }` (`iconUrl`이 없으면 `{{files}}/icon.svg`. `head`에 탭 아이콘 `<link rel="icon">`으로 둔다) |
 | `apps` · `others` | 모두 | 공개 앱 `[{ name, url, iconUrl, current }]`, `others`는 이 앱을 뺀 것 |
 | `menus` | 모두 | `[{ name, url, kind, active }]` |
 | `menu` | 메뉴 · 호 · 매거진 첫 화면 | `{ name, url, kind, isPosts, isIssues, isPages, isPage, rssUrl }` |
