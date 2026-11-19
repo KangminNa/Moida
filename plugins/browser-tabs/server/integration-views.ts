@@ -202,6 +202,8 @@ export class BuildSavedView {
       rounds: number;
       /** 쓰기 도구라 검토자에게 넘겼다 (러너는 켜기 결재를 올리지 않는다) */
       review: boolean;
+      /** 읽기 도구라 바로 켰다 (2026-11-19, 러너는 켜기 결재를 올리지 않는다) */
+      enabled: boolean;
       problems: readonly { name: string; problem: string }[];
     },
   ) {}
@@ -216,6 +218,7 @@ export class BuildSavedView {
       total: s.total,
       rounds: s.rounds,
       review: s.review,
+      enabled: s.enabled,
       problems: s.problems,
     };
   }

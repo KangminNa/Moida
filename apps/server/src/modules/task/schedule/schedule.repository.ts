@@ -44,6 +44,13 @@ export class ScheduleRepository extends TableRepository<ScheduleRow, Schedule> {
   }
 
   /** 지운다 (설정이라 판을 남기지 않는다. 이미 만든 작업은 그대로) */
+  /** 이 대화로 보내는 자동화가 있는가 (대화를 휴지통으로 보내기 전에, 2026-11-19 휴지통 A) */
+  async boundToChat(spaceId: string, chatId: string): Promise<boolean> {
+    const rows = await this.sql`
+      SELECT 1 FROM task.schedules WHERE space_id = ${spaceId} AND chat_id = ${chatId} LIMIT 1`;
+    return rows.length > 0;
+  }
+
   async remove(schedule: Schedule): Promise<void> {
     await this.deleteRows(schedules, { space_id: schedule.spaceId, id: schedule.id });
   }

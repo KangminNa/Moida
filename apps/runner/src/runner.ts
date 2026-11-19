@@ -13,6 +13,7 @@ import { IntegrationRunner } from './integration-runner';
 import type { Job } from './job';
 import { JobPool } from './job-pool';
 import { CliUnavailable, JobRun } from './job-run';
+import { LoginRunner } from './login-runner';
 import { MakeStage } from './make-stage';
 import { AccessDenied, McpClient, ToolRefused } from './mcp-client';
 import { NoteStage } from './note-stage';
@@ -143,6 +144,13 @@ export class Runner {
       this.pages && this.ability.browser
         ? new ClickRunner(this.server, this.pages, this.slot, this.log).run(stop).catch(aside)
         : null;
+    // 로그인 카드 (2026-11-19): 관리자가 카드의 칸에 넣은 값을 AI 없이 로그인 화면에 넣는다. 결재된 클릭과 같은 러너만
+    const logins =
+      this.pages && this.ability.browser
+        ? new LoginRunner(this.server.logins, this.pages, this.slot, this.log)
+            .run(stop)
+            .catch(aside)
+        : null;
     // 사이트 도구 실행 (2026-11-16 MCP 2단계): 브라우저가 있는 러너만, 브라우저 자리를 나눠 쓴다
     const sites =
       this.ability.browser && browserUrl
@@ -160,7 +168,7 @@ export class Runner {
       await this.loop(stop);
     } finally {
       this.stopper.abort();
-      await Promise.all([tabs, clicks, sites]);
+      await Promise.all([tabs, clicks, logins, sites]);
     }
     if (tabFailure instanceof AccessDenied) throw new TokenRejected(tabFailure.message);
     if (tabFailure) throw new RunnerHalted((tabFailure as Error).message);

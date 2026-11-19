@@ -28,6 +28,7 @@ function task(more: Partial<TaskRow> = {}): TaskRow {
     lease_until: new Date(NOW.getTime() + 60_000),
     leased_by: 'runner-1',
     attempts: 1,
+    wait_until: null,
     request_id: 'req-1',
     version: 1,
     created_at: NOW,

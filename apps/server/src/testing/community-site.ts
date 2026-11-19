@@ -25,14 +25,43 @@ export class CommunitySite {
       slug,
     });
     assert.equal(made.status, 201, made.text);
-    const app = made.json();
-    const opened = await api.request('PATCH', `/api/apps/${app.id}`, owner, {
-      version: app.version,
-      domain: host,
-      visibility: 'public',
-    });
-    assert.equal(opened.status, 200, opened.text);
+    const app = await CommunitySite.link(api, owner, made.json(), host, true);
     return new CommunitySite(api, host, String(app.id));
+  }
+
+  /**
+   * 앱에 도메인을 정하고 그 도메인의 확인 값으로 연결을 확인한다. open이면 그 뒤에 공개한다
+   * (커뮤니티는 연결을 확인한 도메인이 있어야 공개된다, 스토어 3-2). 답은 앱의 마지막 모습
+   */
+  static async link(
+    api: ApiClient,
+    owner: TestUser,
+    app: Record<string, unknown>,
+    host: string,
+    open: boolean,
+  ): Promise<Record<string, unknown>> {
+    const expect = async (res: Promise<ApiResult>) => {
+      const done = await res;
+      assert.equal(done.status, 200, done.text);
+      return done.json();
+    };
+    const set = await expect(
+      api.request('PATCH', `/api/apps/${app.id}`, owner, { version: app.version, domain: host }),
+    );
+    const { token } = await expect(api.viaHost('/.well-known/cairn-domain', host));
+    const checked = await expect(
+      api.request('POST', `/api/apps/${app.id}/domain/check`, owner, {
+        version: set.version,
+        token,
+      }),
+    );
+    if (!open) return checked;
+    return expect(
+      api.request('PATCH', `/api/apps/${app.id}`, owner, {
+        version: checked.version,
+        visibility: 'public',
+      }),
+    );
   }
 
   get origin(): string {

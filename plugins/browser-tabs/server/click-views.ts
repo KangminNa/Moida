@@ -65,12 +65,21 @@ export class HeldView {
   }
 }
 
-/** browser_login_needed의 답: 결재(browser.site.login)의 대상 browser_site · id · 판 */
+/** browser_login_needed의 답: 결재(browser.site.login)의 대상 browser_site · id · 판, 로그인 카드에 칸을 띄웠는지 */
 export class LoginNoticedView {
-  constructor(private readonly site: Readonly<SiteRow>) {}
+  constructor(
+    private readonly site: Readonly<SiteRow>,
+    /** 로그인 카드에 칸을 띄웠다 (믿는 출처 · 확인한 칸) */
+    private readonly card = false,
+  ) {}
 
   toJSON() {
-    return { site_id: this.site.id, site_version: this.site.version };
+    return {
+      site_id: this.site.id,
+      site_version: this.site.version,
+      site_name: this.site.name,
+      login_card: this.card,
+    };
   }
 }
 

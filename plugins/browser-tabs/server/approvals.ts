@@ -123,10 +123,11 @@ export class ApprovalDecided extends Command<DecidedInput> {
         input.approvalId,
         '로그인 요청은 "로그인했어요"로 이어 가요',
       );
+    // "로그인했어요": 관리자가 그 사이트에 로그인했다 = 그 출처를 믿는다 (다음부터 로그인 카드에 칸이 뜬다, 2026-11-19)
     if (this.decision === 'revised' && input.targetKind === SITE_TARGET && input.targetId)
       await work.updateRows(
         sites,
-        { login_needed_at: null },
+        { login_needed_at: null, trusted_at: Rule.now },
         { id: input.targetId, space_id: input.spaceId },
       );
   }

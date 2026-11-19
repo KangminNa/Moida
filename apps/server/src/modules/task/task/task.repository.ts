@@ -183,7 +183,7 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
    * 끝나지 않은 아래 작업(하위의 하위까지)을 잠근다. 위 작업을 취소할 때 함께 취소한다.
    * 위 작업을 먼저 잠근 뒤에 부른다 (위 → 아래 순서. 하위 작업이 끝날 때 깨우는 쪽은 위 작업만 잠근다)
    */
-  async lockOpenDescendants(parentId: string): Promise<readonly Task[]> {
+  async lockOpenDescendants(parentId: string, keepApprovals = false): Promise<readonly Task[]> {
     const rows = await this.sql<TaskRow[]>`
       WITH RECURSIVE below AS (
         SELECT id FROM task.tasks WHERE parent_id = ${parentId}
@@ -193,6 +193,7 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       SELECT * FROM task.tasks
       WHERE id IN (SELECT id FROM below)
         AND status IN (${Task.QUEUED}, ${Task.RUNNING}, ${Task.WAITING})
+        AND (NOT ${keepApprovals} OR wait_reason IS DISTINCT FROM ${Task.WAIT_APPROVAL})
       ORDER BY id
       FOR UPDATE`;
     return rows.map((r) => this.toEntity(r));

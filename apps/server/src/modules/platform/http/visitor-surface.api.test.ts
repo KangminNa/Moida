@@ -74,6 +74,9 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/approvals/:id': 403,
   'GET /api/chats': 403,
   'GET /api/chats/:id': 403,
+  // 휴지통 (2026-11-19 휴지통 A): 관리자만
+  'GET /api/chats/trash': 403,
+  'GET /api/sessions/trash': 403,
   'GET /api/archive.zip': 403,
   'GET /api/auth/links': 403,
   'GET /api/auth/sessions': 403,

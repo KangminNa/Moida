@@ -3,7 +3,7 @@ import { nodes } from '../vault.schema';
 import type { GraphNode, GraphNodeRow, NodeDetailRow, TargetEntity } from './change-target';
 
 // vault.nodes에 행이 있는 표의 저장소: 세션 · wiki · 카테고리. 새 행은 점을 먼저 넣고, 표의 열쇠는 id가 아니라 node_id다.
-// 고칠 때는 휴지통만 오갔어도(바뀐 칸이 없어도) version을 올린다.
+// 고칠 때는 휴지통만 오갔어도(바뀐 칸이 없어도) version을 올리고, 휴지통 표시는 점(vault.nodes)에 적는다.
 export abstract class NodeRepository<
   R extends NodeDetailRow,
   E extends TargetEntity<R>,
@@ -14,7 +14,13 @@ export abstract class NodeRepository<
   override async save(entity: E): Promise<void> {
     if (entity.isNew) await this.insertNode(entity);
     else if (entity.changed) await this.updateNode(entity);
+    // 딸린 표가 휴지통에 넣을지를 볼 수 있게(카테고리: wiki가 남았으면 409) 휴지통 표시는 그 뒤에 적는다
     await this.saveParts(entity);
+    const trash = entity.trashChange;
+    if (trash) {
+      await this.updateRows(nodes, trash, { id: entity.id });
+      entity.trashSaved();
+    }
     await this.publishEvents(entity);
   }
 
@@ -53,14 +59,6 @@ export abstract class GraphNodeRepository<
         throw new Conflict('이미 쓰는 주소예요 (휴지통 포함)');
       throw error;
     }
-  }
-
-  /** 휴지통에 넣었거나 꺼냈으면 점에 적는다 */
-  protected override async saveParts(node: E): Promise<void> {
-    const trash = node.trashChange;
-    if (!trash) return;
-    await this.updateRows(nodes, trash, { id: node.id });
-    node.trashSaved();
   }
 
   /** 이 주소이거나 "이 주소-숫자"인 점의 주소들 (휴지통 포함). 주소에는 %·_가 없다 (SlugPolicy) */

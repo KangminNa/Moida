@@ -79,10 +79,11 @@ import { SkillQuery } from './skill/skill.query';
 import { SkillService } from './skill/skill.service';
 import { AgentlessService } from './task/agentless.service';
 import { AgentlessRequestHandler } from './task/agentless-request.handler';
-import { DelegateTaskTool } from './task/delegate.tool';
+import { DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
 import { JobService } from './task/job.service';
 import { LeaseJob } from './task/lease.job';
 import { SubtaskSettledHandler } from './task/subtask-settled.handler';
+import { SubtaskWaitJob } from './task/subtask-wait.job';
 import { Task } from './task/task';
 import { TaskController } from './task/task.api';
 import { TaskQuery } from './task/task.query';
@@ -136,6 +137,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     ReleaseJobTool,
     RequestApprovalTool,
     DelegateTaskTool,
+    WaitSubtasksTool,
     TaskTools,
     TaskRequestedHandler,
     AgentlessRequestHandler,
@@ -145,6 +147,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     SubtaskSettledHandler,
     ApprovalResultHandler,
     LeaseJob,
+    SubtaskWaitJob,
     // 저장소 skills/의 러너 스킬 (서버 이미지에 함께 든 판). 처음 한 번 읽는다
     { provide: RepoSkillGateway, useFactory: () => RepoSkillGateway.fromEnv() },
     SkillQuery,
@@ -232,6 +235,7 @@ export class TaskModule implements OnModuleInit {
     private readonly chatUpdates: ChatUpdateHandler,
     private readonly results: ApprovalResultHandler,
     private readonly leases: LeaseJob,
+    private readonly waits: SubtaskWaitJob,
     private readonly schedules: ScheduleJob,
     private readonly rotation: SecretRotation,
     private readonly logins: AiLoginService,
@@ -273,6 +277,7 @@ export class TaskModule implements OnModuleInit {
     this.workers.on(Task.CHANGED, this.follows);
     for (const topic of ApprovalResultHandler.TOPICS) this.workers.on(topic, this.results);
     this.workers.due(this.leases, Task.CHANGED);
+    this.workers.due(this.waits, Task.CHANGED);
     this.workers.due(this.schedules);
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
     // 외부 도구 (2차 7단계): 제안의 결재가 정해지면 붙이거나 지우고, 서버 키를 바꾸면 토큰을 다시 잠근다

@@ -324,7 +324,7 @@ before(async () => {
 
 beforeEach(async () => {
   await db.sql`
-    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
 });
 
@@ -693,7 +693,7 @@ describe('러너가 일을 처리한다', () => {
     const { prompt } = await spy.seen();
     assert.ok(String(prompt).includes('# 맡긴 하위 작업의 결과'));
     assert.ok(String(prompt).includes('## [완료] 조사 1에게 맡긴 조사 (조사 1)'));
-    assert.ok(String(prompt).includes('남은 위임 횟수: 2'));
+    assert.ok(String(prompt).includes('남은 위임 · 기다리기 횟수: 2'));
   });
 
   test('대화는 대표가 맡고(O-2), 대표의 지시문에는 lead 단락과 맨 위 팀장 목록이 들어간다', async () => {
@@ -2014,6 +2014,10 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
   let port: number;
   /** 시험 사이트에 간 게시(POST)의 본문 */
   const posts: string[] = [];
+  /** 시험 사이트의 로그인 칸으로 온 로그인(POST /session)의 본문 */
+  const logins: string[] = [];
+  /** 로그인 카드로 넣는 테스트용 비밀번호 (어디에도 남지 않는지 본다) */
+  const PASSWORD = `pw-${randomUUID()}`;
   const worker = () => api.service(OutboxWorker);
   const drain = async () => {
     for (let i = 0; i < 200 && (await worker().tick()) > 0; i++);
@@ -2111,6 +2115,15 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
     });
   };
 
+  /** 그 호스트의 로그인 쿠키를 지운다 */
+  const signOut = async (host: string) => {
+    await fetch(`${chromium.endpoint}/json/new?http://${host}:${port}/signout`, { method: 'PUT' });
+    await until('로그아웃됨', async () => {
+      const tabs = (await (await fetch(`${chromium.endpoint}/json/list`)).json()) as Json[];
+      return tabs.some((t) => String(t.title) === '로그아웃됨') ? true : null;
+    });
+  };
+
   before(async () => {
     ok(await api.request('POST', `/api/plugins/browser-tabs/enable`, owner));
     // 시험 사이트: /signin에 들어오면 로그인 쿠키, /form은 로그인했으면 글쓰기 · 아니면 로그인 화면, 게시(POST)는 기록
@@ -2123,15 +2136,27 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
           body += c;
         });
         req.on('end', () => {
+          // 로그인 칸으로 온 로그인 (로그인 카드): 맞는 비밀번호면 로그인 쿠키
+          if (req.url?.startsWith('/session')) {
+            logins.push(body);
+            const right = new URLSearchParams(body).get('pw') === PASSWORD;
+            return right
+              ? html('<title>로그인됨</title>', { 'set-cookie': 'sid=ok; Path=/' })
+              : html('<title>로그인</title><p>틀렸어요</p>');
+          }
           posts.push(body);
           html('<title>완료</title><p>게시했어요</p>');
         });
         return;
       }
+      if (req.url?.startsWith('/signout'))
+        return html('<title>로그아웃됨</title>', { 'set-cookie': 'sid=; Path=/; Max-Age=0' });
       if (req.url?.startsWith('/signin'))
         return html('<title>로그인됨</title>', { 'set-cookie': 'sid=ok; Path=/' });
       if (!String(req.headers.cookie).includes('sid=ok'))
-        return html('<title>로그인</title><input type="password">');
+        return html(
+          '<title>로그인</title><form action="/session" method="post"><label>아이디 <input name="id"></label><label>비밀번호 <input name="pw" type="password"></label><button type="submit">로그인</button></form>',
+        );
       html(
         '<title>글쓰기</title><form action="/done" method="post"><input id="title" name="title"><button type="submit">게시</button></form>',
       );
@@ -2303,6 +2328,65 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
         shots.map((s) => s.kind),
         ['login', 'step', 'before', 'after'],
       );
+    } finally {
+      await stopRunner(runner);
+    }
+  });
+
+  test('로그인 카드: AI가 알린 칸에 관리자가 넣으면 러너가 AI 없이 로그인하고, 같은 작업이 이어서 끝까지 (값은 남지 않는다)', async () => {
+    await signOut('localhost');
+    const siteRow = await newSite('localhost');
+    const task = await ask(siteRow, await browseAgent(), '[fake:browse] [fake:login-form]');
+    const runner = serverRunner(chromium.endpoint);
+    try {
+      const login = await pendingOf(task.id);
+      assert.match(String(login.note), /로그인 필요: 시험 블로그\. 카드의 칸에 넣어/);
+      const card = ok(await api.get(`${BASE}/sites/${siteRow.id}/login`, owner));
+      assert.deepEqual(card.fields, [{ kind: 'id' }, { kind: 'password' }]);
+      assert.equal(card.origin, `http://localhost:${port}`);
+
+      ok(
+        await api.request('POST', `${BASE}/sites/${siteRow.id}/login`, owner, {
+          values: { id: 'me', password: PASSWORD },
+        }),
+      );
+      const done = await until(
+        '러너가 넣고 누름',
+        async () => {
+          const now = ok(await api.get(`${BASE}/sites/${siteRow.id}/login`, owner));
+          const attempt = now.attempt as Json | null;
+          return attempt && attempt.status !== 'sent' && attempt.status !== 'filling'
+            ? attempt
+            : null;
+        },
+        30_000,
+      );
+      assert.equal(done.status, 'submitted', JSON.stringify({ ...done, image: null }));
+      assert.equal(done.afterUrl, `http://localhost:${port}/session`);
+      assert.equal(new URLSearchParams(logins.at(-1)).get('pw'), PASSWORD, '값은 사이트로 갔다');
+
+      // 카드가 하는 일: 로그인 뒤 "로그인했어요"로 같은 작업을 잇는다
+      await decide(login, 'revise', '로그인했어요');
+      const publish = await until(
+        '이어서 클릭 결재가 올라옴',
+        async () => {
+          await drain();
+          const next = await pendingNow(task.id);
+          return next?.action === 'browser.site.publish' ? next : null;
+        },
+        30_000,
+      );
+      await decide(publish, 'approve');
+      await settled(task.id, 'done');
+
+      // 값은 러너 로그 · 실행 기록 · 결재 · 패키지 표 어디에도 없다
+      assert.equal(runner.logs.includes(PASSWORD), false);
+      const [found] = await db.sql<{ n: number }[]>`
+        SELECT (SELECT count(*) FROM task.task_events WHERE body LIKE ${`%${PASSWORD}%`})
+          + (SELECT count(*) FROM task.approvals WHERE coalesce(note, '') LIKE ${`%${PASSWORD}%`})
+          + (SELECT count(*) FROM browser_tabs.sites WHERE coalesce(login_form::text, '') LIKE ${`%${PASSWORD}%`})
+          + (SELECT count(*) FROM task.tasks WHERE coalesce(result::text, '') LIKE ${`%${PASSWORD}%`}) AS n`;
+      assert.equal(Number(found?.n), 0);
     } finally {
       await stopRunner(runner);
     }

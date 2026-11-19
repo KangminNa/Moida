@@ -6,7 +6,7 @@ export class CommentSavedView {
     private readonly r: Pick<CommentRow, 'id' | 'topic_id' | 'body' | 'created_at' | 'version'>,
   ) {}
 
-  toJSON(): object {
+  toJSON() {
     const r = this.r;
     return {
       id: r.id,

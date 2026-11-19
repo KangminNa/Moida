@@ -109,7 +109,7 @@ before(async () => {
 // 다른 시험의 일이 먼저 빌려 가지 않게
 beforeEach(async () => {
   await db.sql`
-    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
 });
 after(() => api.close());

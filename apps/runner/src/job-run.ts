@@ -152,9 +152,9 @@ export class JobRun {
   /** 시작도 하지 않고 끝낼 일 */
   private refusal(): RunEnding | null {
     if (this.stop.aborted) return RunEnding.release(JobRun.STOPPING);
-    if (EngineAdapters.of(this.job.tool) !== null) return null;
-    const error = `${this.job.tool}는 아직 러너가 지원하지 않아요`;
-    return RunEnding.submit(error, RunResult.failed(error, this.redactor));
+    // 모르는 엔진 · 쓰지 않는 모델(Fable, 2026-11-19)
+    const error = EngineAdapters.refusal(this.job.tool) ?? this.job.runtime.refusal;
+    return error === null ? null : RunEnding.submit(error, RunResult.failed(error, this.redactor));
   }
 
   /**

@@ -1,7 +1,7 @@
 import type { CommentRow, TopicRow } from '../community.tables';
 
 /** 작성자는 닉네임만 보인다 (회원 id는 다른 사람에게 싣지 않는다) */
-function author(nickname: string): object {
+function author(nickname: string) {
   return { nickname };
 }
 
@@ -14,7 +14,7 @@ export class TopicLineView {
     },
   ) {}
 
-  toJSON(): object {
+  toJSON() {
     const r = this.r;
     return {
       id: r.id,
@@ -35,8 +35,8 @@ export class TopicListView {
     private readonly nextCursor: string | null,
   ) {}
 
-  toJSON(): object {
-    return { topics: this.topics, nextCursor: this.nextCursor };
+  toJSON() {
+    return { topics: this.topics.map((t) => t.toJSON()), nextCursor: this.nextCursor };
   }
 }
 
@@ -49,7 +49,7 @@ export class TopicCommentView {
     private readonly mine: boolean,
   ) {}
 
-  toJSON(): object {
+  toJSON() {
     const r = this.r;
     return {
       id: r.id,
@@ -75,7 +75,7 @@ export class TopicView {
     private readonly comments: readonly TopicCommentView[],
   ) {}
 
-  toJSON(): object {
+  toJSON() {
     const r = this.r;
     return {
       id: r.id,
@@ -86,7 +86,7 @@ export class TopicView {
       editedAt: r.edited_at?.toISOString() ?? null,
       mine: this.mine,
       ...(this.mine ? { version: r.version } : {}),
-      comments: this.comments,
+      comments: this.comments.map((c) => c.toJSON()),
     };
   }
 }
@@ -100,7 +100,7 @@ export class TopicSavedView {
     >,
   ) {}
 
-  toJSON(): object {
+  toJSON() {
     const r = this.r;
     return {
       id: r.id,

@@ -1,7 +1,9 @@
 import { Actor, Forbidden, RuleViolation } from '../../platform';
 import type { Agent } from '../agent/agent';
+import { ModelTier } from '../agent/model-tier.policy';
 import type { TaskNew, TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
+import { SubtaskWait } from './subtask-wait.policy';
 import type { SubtaskOrder } from './task.input';
 import { TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
@@ -64,11 +66,12 @@ export class DelegationPolicy {
    * 한 번에 DELEGATE_AT_ONCE개, 작업 하나에 SUBTASKS_MAX개(made는 이미 맡긴 수), 깊이 DEPTH_MAX, 라운드 ROUNDS_MAX까지
    */
   static assertLimits(
-    parent: Pick<TaskRow, 'depth' | 'rounds'>,
+    parent: Pick<TaskRow, 'depth' | 'rounds' | 'payload'>,
     count: number,
     made: number,
   ): void {
     const P = DelegationPolicy;
+    SubtaskWait.assertNotHurried(parent.payload);
     if (count < 1 || count > P.DELEGATE_AT_ONCE)
       throw new RuleViolation(`한 번에 1~${P.DELEGATE_AT_ONCE}개를 맡길 수 있어요 (한도)`);
     if (made + count > P.SUBTASKS_MAX)
@@ -78,7 +81,14 @@ export class DelegationPolicy {
     if (parent.depth + 1 > P.DEPTH_MAX)
       throw new RuleViolation(`위임은 ${P.DEPTH_MAX}단계까지예요 (한도)`);
     if (parent.rounds + 1 > P.ROUNDS_MAX)
-      throw new RuleViolation(`작업 하나가 위임할 수 있는 횟수는 ${P.ROUNDS_MAX}번이에요 (한도)`);
+      throw new RuleViolation(
+        `작업 하나가 위임하거나 더 기다릴 수 있는 횟수는 ${P.ROUNDS_MAX}번이에요 (한도)`,
+      );
+  }
+
+  /** 위임에 쓰는 하위 작업의 request_id. AI가 만든 값을 위 작업마다 따로 센다 */
+  static requestIdOf(parentId: string, requestId: string): string {
+    return `delegate:${parentId}:${requestId}`;
   }
 
   /** 이 작업이 아직 위임할 수 있는 횟수 (러너가 일과 함께 받는다) */
@@ -104,6 +114,12 @@ export class DelegationPolicy {
     const { kind } = fields;
     const needs = TaskKinds.SCOPES[kind] ?? [];
     DelegationPolicy.assert(manager, worker, kind, TaskKinds.DELEGABLE, needs, tainted);
+    // 모델 상한: 맡기는 일이 쓰는 모델(대화가 정한 것 → 맡기는 에이전트의 설정) 이하에서 (ModelTier)
+    const model = ModelTier.forSubtask(
+      DelegationPolicy.modelOf(parent) || manager.model,
+      order.model,
+      worker,
+    );
     return {
       ...fields,
       agent_id: worker.id,
@@ -114,11 +130,19 @@ export class DelegationPolicy {
         ...(order.deliver ? { deliver: order.deliver } : {}),
         // 앱 코드를 고치는 make 일 (스토어 1-6b): 어느 앱인지만 물려준다. make 일이 아니면 MakeOrder가 막는다
         ...(order.appId ? { appCode: { appId: order.appId } } : {}),
+        // 고른 모델 · 낮춘 모델: JobView가 팀원의 설정 대신 보내고, 이 일이 다시 맡기면 그 상한이 된다
+        ...(model ? { runtime: { model } } : {}),
       },
       priority: parent.priority,
       goal_id: parent.goal_id,
       parent_id: parent.id,
       depth: parent.depth + 1,
     };
+  }
+
+  /** 일에 실린 모델 (payload.runtime.model: 대화의 회차 · 모델을 정해 맡긴 하위 작업). 없으면 빈 글 */
+  private static modelOf(task: TaskRow): string {
+    const runtime = (task.payload as { runtime?: { model?: unknown } } | null)?.runtime;
+    return typeof runtime?.model === 'string' ? runtime.model : '';
   }
 }

@@ -10,7 +10,7 @@ export class MemberSelfView {
     private readonly writableAt: Date,
   ) {}
 
-  toJSON(): object {
+  toJSON() {
     const r = this.r;
     return {
       id: r.id,
@@ -31,7 +31,7 @@ export class MemberMeView {
     private readonly csrf: string | null,
   ) {}
 
-  toJSON(): object {
-    return { member: this.member, csrf: this.csrf };
+  toJSON() {
+    return { member: this.member?.toJSON() ?? null, csrf: this.csrf };
   }
 }

@@ -37,7 +37,7 @@ export const CHAT_TOPICS = ['task.chat.changed', 'task.task.changed'];
 /** 대화의 소식이 쌓임 (변경 신호, agent_updates와 같은 것: 질문 · 맡음도) */
 const CHAT_NEWS_TOPICS = ['task.chat.updated'];
 /** 대화 목록 (왼쪽 칸): 상태(질문 · 승인)가 소식 · 승인으로도 바뀐다 */
-const CHAT_LIST_TOPICS = [...CHAT_TOPICS, ...CHAT_NEWS_TOPICS, 'task.approval.*'];
+export const CHAT_LIST_TOPICS = [...CHAT_TOPICS, ...CHAT_NEWS_TOPICS, 'task.approval.*'];
 /** 대화 하나: 진행 기록(생각 중… 줄) · 소식 · 승인까지 따라간다 */
 export const CHAT_DETAIL_TOPICS = [
   ...CHAT_TOPICS,

@@ -87,6 +87,8 @@ describe('AI CLI 부르기', () => {
       'Edit(//Users/owner/**)',
     ]);
     assert.deepEqual(JSON.parse(ClaudeCli.settings(undefined)).permissions.deny, []);
+    // Fable은 쓰지 않는다 (2026-11-19): 서버 · 러너가 먼저 거르고, CLI 안에서 고르는 모델도 이 셋으로
+    assert.deepEqual(settings.availableModels, ['opus', 'sonnet', 'haiku']);
     const config = JSON.parse(ClaudeCli.mcpConfig('https://blog/mcp', 'run-token'));
     assert.deepEqual(config, {
       mcpServers: {
@@ -129,6 +131,21 @@ describe('AI CLI 부르기', () => {
     assert.equal(cli.args(plain).includes('--model'), false, '비었으면 CLI의 기본');
     assert.equal(cli.args(plain).includes('--effort'), false);
     await plain.remove();
+  });
+
+  test('Fable 모델이 실려 오면 돌지 않을 까닭을 낸다 (옛 서버 · 그 전에 저장된 값)', () => {
+    const runtime = (model: string) =>
+      Job.from(
+        Json.of({
+          task: { id: 't', title: '정리' },
+          agent: { name: '정리', tool: 'claude', model },
+          run_token: 'run-token',
+        }),
+      ).runtime.refusal;
+    for (const model of ['fable', 'claude-fable-5-2', 'best'])
+      assert.match(String(runtime(model)), /Fable 모델\(.+\)은 쓰지 않아요/, model);
+    for (const model of ['', 'opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'bestow'])
+      assert.equal(runtime(model), null, model);
   });
 
   test('연결 확인은 MCP 설정도 도구도 없이 띄운다', async () => {
@@ -289,7 +306,7 @@ describe('지시문', () => {
     );
     assert.equal(prompt.includes('둘째 줄'), false);
     assert.ok(prompt.includes('delegate_task'));
-    assert.ok(prompt.includes('남은 위임 횟수: 2'));
+    assert.ok(prompt.includes('남은 위임 · 기다리기 횟수: 2'));
     assert.ok(
       prompt.includes('## [완료] 초안 (글쓰기 팀원)\n썼어요\n결과물: 발표.pptx (output_id: o1)'),
     );
@@ -327,6 +344,9 @@ describe('지시문', () => {
     assert.ok(prompt.includes('글쓰기 (agent_id: w1) · 맡길 수 있는 일: general · 쥔 일 0개'));
     assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|아래 팀)/.test(prompt), false);
     assert.ok(prompt.includes('## 나누는 법'));
+    // 모델은 맡기는 쪽이 일마다 고르고, 상한은 내 모델 (2026-11-19). 정하지 않았으면 CLI 기본(opus)
+    assert.ok(prompt.includes('delegate_task의 model로 고릅니다'));
+    assert.ok(prompt.includes('내 모델(opus)보다 높게 고를 수 없습니다'));
     assert.ok(prompt.includes('propose_setting'), '맞는 담당이 없으면 팀 바꾸기를 제안한다');
     assert.ok(prompt.includes('## [완료] 조사 (조사 팀장)\n요청한 형식: 표 하나\n표'));
 
@@ -334,6 +354,50 @@ describe('지시문', () => {
     assert.ok(child.includes('# 돌려줄 결과의 형식'));
     assert.ok(child.includes('후보 3개를 표로'));
     assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('돌려줄 결과의 형식'), false);
+  });
+
+  test('먼저 깬 일 (팀원 기다리기): 깬 까닭, 끝나지 않은 일의 상태 · 몇 분째 · task_id, 고르는 법. 관리자가 재촉했으면 마무리만', () => {
+    const since = new Date(Date.now() - 7 * 60_000).toISOString();
+    const open = { summary: null, error: null, deliver: null, since };
+    const results = [
+      { task_id: 'c1', title: '조사', agent: '조사 팀원', status: 'failed', error: '자료 없음' },
+      { ...open, task_id: 'c2', title: '정리', agent: '정리 팀원', status: 'running' },
+      {
+        ...open,
+        task_id: 'c3',
+        title: '공개',
+        agent: '글쓰기',
+        status: 'waiting',
+        waiting: 'approval',
+      },
+    ];
+    const woke = job({ subtask_results: results, wake: 'failed', rounds_left: 2 }).prompt(
+      REPO_PROMPTS,
+      false,
+    );
+    assert.ok(woke.includes('하위 작업 하나가 실패해 다른 팀원을 기다리지 않고 먼저 깨웠습니다'));
+    assert.ok(woke.includes('## [실패] 조사 (조사 팀원)\n자료 없음'));
+    assert.ok(woke.includes('## [일하는 중 · 7분째] 정리 (정리 팀원) · task_id: c2'));
+    assert.ok(woke.includes('## [승인 기다림 · 7분째] 공개 (글쓰기) · task_id: c3'));
+    assert.ok(woke.includes('wait_subtasks로 더 기다립니다'));
+    assert.ok(woke.includes('남은 위임 · 기다리기 횟수: 2'));
+    assert.equal(
+      woke.includes('결과 글 없음'),
+      false,
+      '끝나지 않은 일은 결과 글이 없다고 하지 않는다',
+    );
+
+    const hurried = job({ subtask_results: results, wake: 'owner', rounds_left: 2 }).prompt(
+      REPO_PROMPTS,
+      false,
+    );
+    assert.ok(hurried.includes('관리자가 더 기다리지 말고 지금까지의 결과로 답해 달라고 했습니다'));
+    assert.equal(hurried.includes('wait_subtasks로 더 기다립니다'), false, '마무리만');
+
+    const all = job({ subtask_results: [results[0]], wake: 'all' }).prompt(REPO_PROMPTS, false);
+    assert.ok(all.includes('결과를 모아 할 일을 마무리하고'));
+    assert.equal(all.includes('아직 끝나지 않은 일'), false);
+    assert.equal(all.includes('먼저 깨웠습니다'), false);
   });
 
   test('대표의 일(agent.lead, O-2)에는 lead 단락을 넣는다: 나눠 맡기기 · continue로 팀 바꾸기 제안 · 결과 중심', () => {

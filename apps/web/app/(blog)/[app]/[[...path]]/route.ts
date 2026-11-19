@@ -6,12 +6,15 @@ import { slugFrom } from '../../../_blog/format';
 import { hostOf, originOf } from '../../../_blog/request-host';
 import { brokenAnswer, missingAnswer, unreachableAnswer } from '../../../_blog/site-answer';
 import type { AppScreen, AppScreenRedirect } from '../../../_blog/types';
+import { communityScreen } from '../../../_community/app-screen';
 import { serverFetch, serverGet, serverRaw } from '../../../_lib/server-api';
 
 // 앱 화면 (/<앱>/…, 스토어 1-6, docs/스토어.md 9.4). 앱마다 자기 코드(템플릿 · CSS · JS)로 그린다:
 //   /<앱>/files/<이름>        앱 코드의 파일 (서버가 흘려보낸다)
 //   /<앱>/~<토큰>/…           미리 보기 (그 토큰의 앱 · 버전, 비공개 앱도 공개된 것처럼)
 //   그 밖 (/, posts/<글>, m/<메뉴>, m/<메뉴>/<번호>)  서버가 준 템플릿 · 데이터를 채워 격리 머리글과 함께
+//   커뮤니티 앱 (/, t/<글>)    + 회원 API로 읽은 글 · 댓글 · 회원 링크 (_community/app-screen.ts, 스토어 3-2).
+//                              쓰기 화면은 템플릿이 아니라 고정 화면 /_/… (%5F/ 폴더, 앱 도메인에서만)
 // 없는 앱 · 비공개 앱 · 틀린 토큰과 웹의 다른 없는 주소는 모두 같은 Cairn 404 (앱이 있다는 사실이 드러나지 않게).
 // 앱 RSS(/<앱>/rss.xml · /<앱>/m/<메뉴>/rss.xml)는 따로 있는 경로라 여기에 오지 않는다.
 // 앱 도메인 (스토어 3-0): proxy.ts가 앱 도메인의 요청을 이 경로로 넘긴다. 방문자가 연 호스트를 서버에 넘기면 서버가 주소 기준을 정한다
@@ -78,10 +81,19 @@ async function screen(
     return Response.redirect(new URL(answer.redirect, request.url), answer.permanent ? 308 : 307);
   const shown = answer as AppScreen;
   if (shown.template === null) return missingAnswer();
+  // 커뮤니티 (스토어 3-2): 글 · 댓글 · 회원 링크는 회원 API로 읽어 더한다. 글이 없으면 그 앱의 404.html
+  let [template, status] = [shown.template, shown.status];
+  let extra: Record<string, unknown> = {};
+  if (shown.data.app.kind === 'community') {
+    const filled = await communityScreen(shown.data, app, host, parts, cursor);
+    extra = filled.extra;
+    if (filled.missing) [template, status] = ['404.html', 404];
+    if (!shown.templates[template]) return missingAnswer();
+  }
   const space = await serverGet<SpaceInfo>('/api/space', true);
   let html: string;
   try {
-    html = renderAppScreen(shown, shown.template, space?.name || 'Cairn', ticket);
+    html = renderAppScreen(shown, template, space?.name || 'Cairn', ticket, extra);
   } catch (error) {
     // 템플릿 문법 오류: 미리 보기에서만 까닭을 보인다 (공개 버전은 미리 본 뒤에 공개한다)
     return brokenAnswer(ticket && error instanceof Error ? error.message : null);
@@ -93,5 +105,5 @@ async function screen(
     : new URL(space?.siteUrl || request.nextUrl.origin).origin;
   const headers = appHeaders(site, shown.hosts, ticket !== null);
   headers.set('Content-Type', 'text/html; charset=utf-8');
-  return new Response(html, { status: shown.status, headers });
+  return new Response(html, { status, headers });
 }

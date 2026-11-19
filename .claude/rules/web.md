@@ -62,6 +62,12 @@ paths:
 - `mustache`는 `_blog/app-screen.ts`에서만 가져온다 (규칙 검사).
 - 앱 도메인 (스토어 3-0): `proxy.ts`가 연결을 확인한 앱 도메인의 요청을 `/<앱>/…`로 넘긴다(`_blog/app-domains.ts`, 30초 기억). 앱 화면은 방문자가 연 호스트(`_blog/request-host.ts`)를 서버에 넘기고, 앱 링크는 서버가 준 `url`(확인한 도메인이면 그 도메인)로 건다. `next.config`의 머리글은 들어온 경로로 붙어 앱 화면의 격리 머리글을 덮으므로, 앱 도메인에서 앱 화면이 되는 경로(`/` · `/posts` · `/m`)의 화면 머리글은 `proxy.ts`가 기본 도메인에서만 붙인다 (`_lib/screen-headers.ts`). 웹에 그런 경로를 더하면 `APP_SCREEN_ROOTS`에도 적는다
 
+## 커뮤니티 화면 (스토어 3-2)
+
+- 커뮤니티 앱의 목록 · 글은 앱 화면(템플릿) 그대로다. route handler가 `_community/app-screen.ts`로 회원 API(`me` · `topics` · `topics/:id`)를 앱 도메인(`serverFetch`의 `host`)으로 읽어 템플릿 데이터에 더한다(`renderAppScreen`의 `extra`). 앱 도메인으로 온 화면만 회원 쿠키를 넘기고 회원 링크를 연다. 템플릿에는 닉네임과 내 것인지(`mine`)만 싣는다.
+- 가입 · 로그인 · 내 정보 · 글쓰기 · 댓글 · 신고는 고정 화면 `app/(blog)/[app]/%5F/…`(주소 `/_/…`)다. `page.tsx`는 `memberPlace`로 시작한다 (그 앱의 도메인으로 온 요청 · 커뮤니티 앱이 아니면 404). 회원 쓰기는 `memberApi(csrf, …)`로 `X-Cairn-CSRF`를 싣고, 만들기의 `requestId`는 `newRequestId()`(http로 연 시험용 도메인에도 있게). 회원 화면에는 콘솔의 변경 신호(`/api/stream`)가 없어 `useLiveValue`를 쓰지 않는다: 바꾼 뒤에는 `router.refresh()`나 화면을 다시 연다.
+- 앱 도메인의 `/_/…`에는 `proxy.ts`가 화면 머리글을 붙인다 (`isMemberScreen`). 회원 글 본문은 `renderMarkdown(body, { ugc: true })`(바깥 링크에 nofollow ugc).
+
 ## 서버와 함께 쓰는 것
 
 - ★ 서버 코드는 `import type`으로만 가져온다. 값(클래스 · 상수)을 가져오면 서버 코드가 브라우저 묶음에 들어간다.

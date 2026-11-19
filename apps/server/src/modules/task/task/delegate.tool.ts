@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseTool } from '../../platform';
+import { ModelTier } from '../agent/model-tier.policy';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import type { DelegatedView } from './job.view';
+import { WaitSubtasksInput } from './subtask-wait.input';
+import { SubtaskWait } from './subtask-wait.policy';
 import { Task } from './task';
 import { DelegateTaskInput, SubtaskOrder } from './task.input';
 import { TaskService } from './task.service';
@@ -56,10 +59,12 @@ export class DelegateTaskTool extends BaseTool {
             },
             deliver: { type: 'string', maxLength: SubtaskOrder.DELIVER_MAX },
             app_id: { type: 'string', format: 'uuid' },
+            model: { type: 'string', enum: [...ModelTier.CHOICES] },
           },
           required: ['request_id', 'to_agent_id', 'title', 'instruction'],
         },
       },
+      wait_minutes: { type: 'integer', minimum: 1, maximum: SubtaskWait.MINUTES_MAX },
     },
     required: ['subtasks'],
   };
@@ -71,5 +76,28 @@ export class DelegateTaskTool extends BaseTool {
   /** 작업은 하위 작업을 기다리므로 에이전트는 여기서 멈춘다 */
   async handle(actor: Actor, raw: unknown): Promise<DelegatedView> {
     return Task.delegatedView(await this.tasks.delegate(actor, DelegateTaskInput.from(raw)));
+  }
+}
+
+// MCP 도구 wait_subtasks (팀원 기다리기, 2026-11-19): 먼저 깨어난 위 작업(기한 · 실패 · 관리자 재촉)이
+// 끝나지 않은 하위 작업을 더 기다린다. 골라서 취소할 수 있다. 위임처럼 라운드 하나를 쓰고, 에이전트는 여기서 멈춘다
+@Injectable()
+export class WaitSubtasksTool extends BaseTool {
+  readonly name = 'wait_subtasks';
+  readonly scope = Actor.AGENT;
+  readonly readOnly = false;
+  readonly inputSchema = {
+    properties: {
+      minutes: { type: 'integer', minimum: 1, maximum: SubtaskWait.MINUTES_MAX },
+      cancel: { type: 'array', maxItems: 10, items: { type: 'string', format: 'uuid' } },
+    },
+  };
+
+  constructor(private readonly tasks: TaskService) {
+    super();
+  }
+
+  async handle(actor: Actor, raw: unknown): Promise<DelegatedView> {
+    return Task.delegatedView(await this.tasks.waitMore(actor, WaitSubtasksInput.from(raw)));
   }
 }

@@ -10,6 +10,7 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
   `search_sessions`(`SearchSessionsTool`: 제목·지금 판 본문의 키워드 찾기, pg_bigm `LIKE likequery()`라 대소문자 구분. 순서와 커서는 바뀌지 않는 세션 id)와
   `get_session`(`GetSessionTool`: 지금 판 하나). 두 읽기 도구는 `read_public`이나 `read_all` 중 하나로 열리고(`BaseTool.orScope`), 볼 수 없는 세션은 없는 세션과 똑같이 답한다. 작업 토큰에 봉인된 읽기 허락(`Actor.mayRead`, 대화의 참조 2026-11-15 B)이 있는 세션은 비공개를 읽는 권한 없이도 그 작업에서 읽힌다 (노트 · 원문 읽기도 같다).
   관리 화면 API `api/sessions`(목록·상세·지난 판 · 원문, 비공개까지 볼 수 있는 요청자만)
+  휴지통 (2026-11-19 휴지통 A): `api/sessions/trash`(목록) · `:id/trash` · `:id/restore`(관리자만, `{ version }`). wiki와 같이 변경 묶음(`session.trash` · `session.restore`, `change/session-trash-op.ts`, 사람만)으로 남아 되돌릴 수 있다. 세션은 `TrashTarget`(휴지통 표시의 기반, wiki · 카테고리의 `GraphNode`도 이 위에)이고 `purge_after`를 적지 않는다 (지우지 않는다, 원칙 2). 휴지통의 세션은 읽기마다 빠지고(목록 · 찾기 · 그래프 · 정리 · 보관함 · 보관 형식), 같은 대화가 다시 올라오면 판 · 원문은 쌓이되 휴지통에 남고 `vault.session.saved` · 노트 일은 내지 않는다
   원문 (2차 4단계, `SessionTranscript`, `session_transcripts` 추가만): 수집 훅 · 확장이 MCP `save_transcript`(upload, `transcript.tool.ts`)로 올린다. 같은 대화 자리를 잠그고(`lockBySource`), 같은 원문은 쌓지 않고, 새 원문이면 `Session.receiveTranscript`가 원문을 쌓고 세션 노트 일을 요청한다 (`task.agentless.requested`, kind `session_note`, 대상 세션 · 판은 원문 번호, requestId `note:<세션>:<번호>`. 원문은 이벤트에 싣지 않는다). 노트가 아직 없는 세션은 `head_revision_id` NULL이고 보낸 제목을 보인다.
   세션 노트 일을 쥔 러너만(platform `Leases`, `Session.noteWork`) MCP `read_transcript`(run)로 원문을 받고(`forPrompt`: 앞 4만 · 뒤 8만 자), `save_note`(run)로 AI의 답을 보낸다: `SessionNote.fromAnswer`가 JSON을 읽고(글 목록은 줄마다 "- ", 길면 자름) 민감정보를 지운 뒤 `Session.writeNote`가 원본 판(`actor_type` ai)으로 쌓는다. 더 새 원문의 노트가 이미 있으면(`noted_seq`) 쌓지 않는다(skipped)
   작업 세션 (기획서 결정 2026-11-17 "에이전트 실행의 기록은 작업 세션이다", S1): 에이전트의 요청 하나(대화 · 목표 실행 · 맨 위 작업, task가 정한 작업 세션 키)가 세션 하나다 (도구 `cairn-agent`, 비공개, 러너 기기와 상관없이 하나: 부분 유일 색인 `sessions_agent_flow`, `SessionRepository.lockByFlow`). 기기의 저장(`save_session` · `save_transcript`)은 이 도구 이름을 쓰지 못한다 (`Session.open`).
@@ -37,7 +38,7 @@ AI 작업 세션과 그래프. 세션·wiki 저장(판 쌓기), 카테고리와 
 - `restore/`: 복원의 vault 몫(`VaultRestore`, `ArchiveQuery.registerRestore`로 등록). 파일을 읽는 `RestoredCategory` · `RestoredWiki` · `RestoredSession`(노트 없는 세션 `cairn_note: false`는 판 없이) · `RestoredTranscript`(세션 원문, 모르는 앞부분 키는 보관할 칸이 없어 거절) · `RestoredEdge` · `RestoredPin` · `RestoredPostMark` · `RestoredAppMark`(앱 파일 `blog/apps/<주소>.yml`에서 id와 공개 여부만), 새 행만 넣는 `VaultRestoreRepository`. 앱 파일이 없는데 공개 · 링크 공개 글이 있으면 앱이 생기기 전의 백업이라, blog와 같은 형식 규칙으로 기본 앱(id = 공간 id, 공개) 사본 하나를 만들고 글 자리를 모두 그 앱에 둔다. 원문은 들어오는 세션을 가리키고 세션 안에서 번호가 1부터 이어지고 내용이 겹치지 않아야 한다 (`VaultRestore.transcriptsOf`). 세션의 `transcript_count`는 원문 수, `noted_seq`는 `cairn_noted_seq`
 
 엔티티는 `TableEntity`(platform)로 표 한 줄을 들고, Repository(`TableRepository`)는 바뀐 칸만 저장한다 (객체설계 6장). 칼럼을 아는 곳은 `vault.tables.ts`, Entity의 `RULES`, Input의 `COLUMNS`, View의 `toJSON`, 그리고 칸을 다른 형식으로 옮기는 `ChangeOp`의 payload · `snapshot` · 보관 · 복원이다.
-- 변경 대상(세션 · wiki · 카테고리 · 선)은 `TargetEntity`, 휴지통으로 가는 점(wiki · 카테고리)은 `GraphNode`다 (`change/change-target.ts`). 변경과 묶음은 `ChangeTarget` 약속으로만 대상을 다룬다
+- 변경 대상(세션 · wiki · 카테고리 · 선)은 `TargetEntity`, 휴지통으로 가는 것(세션 · wiki · 카테고리)은 `TrashTarget`, 그중 주소가 있는 점(wiki · 카테고리)은 `GraphNode`다 (`change/change-target.ts`). 휴지통 표시는 점의 저장소(`NodeRepository`)가 딸린 표를 저장한 뒤 적는다. 변경과 묶음은 `ChangeTarget` 약속으로만 대상을 다룬다
 - 열쇠가 `id`가 아닌 표는 읽을 때 `node_id AS id`(세션 · wiki · 카테고리), `space_id AS id`(정리 설정), `post_id AS id`(글 자리 사본)로 맞춘다. 점의 저장소(`NodeRepository` · `GraphNodeRepository`, `change/change-target.repository.ts`)가 새 점을 `vault.nodes`에 먼저 넣고, 휴지통 표시는 점에 따로 적는다
 - 없는 대상은 실패가 아니라 `missing`이라 `lockOrNull`로 잠근다. 판(세션 · wiki)은 엔티티가 새 행(`…RevisionNew`)으로 들고 `saveParts`가 넣기만 한다
 - 카테고리의 칸은 `Category.RULES` · `COLUMNS`를 지나 `edit(changes)`로 바뀐다(변경 `category.create` · `category.update`가 칸 묶음을 들고 간다). wiki의 제목 · 본문 · 공개 · 카테고리, 세션의 대표 wiki, 선의 지우기 · 되살리기는 동사 메서드로만 바뀐다
@@ -113,7 +114,7 @@ platform
 - wiki를 지우는 것은 사람뿐이다 (`wiki.trash` · `wiki.restore`는 `ChangeOps.FOR_AI`에 없다). 지워도 판 · 선 · 세션의 대표는 남아 되살리면 돌아온다
 - 대체(`replaces`)는 wiki끼리만, 옛 wiki 하나에 하나만, 서로 대체는 안 된다. AI의 대체는 `ReplacesRule`이 늘 검토로 보낸다
 - 그래프는 대표 하나 + 선: 대표는 열(`sessions.wiki_id`, `wikis.category_id`), 비어 있으면 도착 구역·미분류. 옮기기는 대표 값 하나만 바꾼다
-- 부모를 지워도 자식을 지우지 않는다 (`RESTRICT`·`SET NULL`). 세션은 사람이 직접 지울 때만 휴지통으로
+- 부모를 지워도 자식을 지우지 않는다 (`RESTRICT`·`SET NULL`). 세션은 사람이 직접 지울 때만 휴지통으로 (`session.trash`는 `ChangeOps.FOR_AI`에 없다)
 - AI가 쓴 wiki 본문·제목도 판이 되기 전에 `SensitivePolicy`로 지운다 (`ChangeService.submit`)
 - 보관 파일에 비밀값을 넣지 않는다. 동기화 플러그인은 공간 없는 `SystemActor`로 읽으므로 공간 조건을 그에 맞춘다
 - 글의 자리는 blog 이벤트로 받은 사본(`post_marks`)으로 안다. `post_version`이 더 큰 이벤트만 반영한다. `status`는 published와 draft뿐이라 링크만 공개(unlisted)는 draft로 적는다. 휴지통의 글은 대표를 비워 그래프에서 뺀다

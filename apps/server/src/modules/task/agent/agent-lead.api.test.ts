@@ -43,7 +43,7 @@ before(async () => {
 });
 after(async () => {
   await db.sql`
-    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
   await api.close();
 });

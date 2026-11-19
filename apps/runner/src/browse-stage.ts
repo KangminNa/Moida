@@ -1,9 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pause } from './backoff';
-import type { BrowseJob, BrowseSite } from './browse-job';
+import type { BrowseJob } from './browse-job';
+import { type AskedApproval, BrowseLogin } from './browse-login';
 import { BrowsePlan } from './browser-mcp';
 import { BrowserPages, type BrowserTab, ButtonProblem, type HeldButton } from './browser-page';
 import type { BrowserSlot } from './browser-slot';
@@ -13,6 +12,7 @@ import { CairnServer } from './cairn-server';
 import { ExploreProxy } from './explore-proxy';
 import { IntegrationExec } from './integration-exec';
 import type { Job } from './job';
+import type { LoginFormRef } from './login-form-ref';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
@@ -23,16 +23,6 @@ import type { SandboxStage } from './sandbox-stage';
 import { SiteBuild } from './site-build';
 import type { StageCheck } from './stage-check';
 import { StepShots } from './step-shots';
-
-/** 러너가 올릴 결재 하나 (작업 토큰으로, 에이전트의 이름으로) */
-export type AskedApproval = {
-  requestId: string;
-  action: string;
-  targetKind: string;
-  targetId: string;
-  targetVersion: number;
-  note: string;
-};
 
 type Note = (event: RunEvent) => void;
 
@@ -46,9 +36,6 @@ type Note = (event: RunEvent) => void;
 // 결재는 AI가 아니라 러너가 올린다: 지문과 화면이 있어야 승인 뒤에 "같은 버튼"을 확인할 수 있다 (ClickRunner가 누른다).
 export class BrowseStage implements SandboxStage {
   static readonly PUBLISH_ACTION = 'browser.site.publish';
-  static readonly LOGIN_ACTION = 'browser.site.login';
-  /** 탭을 새로 열고 로그인 화면이 그려지기를 기다리는 시간 */
-  private static readonly OPEN_MS = 2_000;
   private static readonly STOPPING = '러너가 멈춰요';
 
   readonly workspaceRoom = null;
@@ -63,6 +50,7 @@ export class BrowseStage implements SandboxStage {
   /** AI가 뜨기 전에 열려 있던 탭: AI가 새로 연 탭을 먼저 본다 */
   private before = new Set<string>();
   private approval: AskedApproval | null = null;
+  private readonly login: BrowseLogin;
 
   constructor(
     private readonly job: Job,
@@ -70,7 +58,9 @@ export class BrowseStage implements SandboxStage {
     private readonly server: CairnServer,
     private readonly slot: BrowserSlot,
     private readonly pages: BrowserPages,
-  ) {}
+  ) {
+    this.login = new BrowseLogin(server, pages, job.taskId);
+  }
 
   /** 결과 뒤에 올릴 결재가 있는가 (클릭 · 로그인) */
   get awaitsApproval(): boolean {
@@ -111,9 +101,9 @@ export class BrowseStage implements SandboxStage {
       this.before = new Set(tabs.map((t) => t.id));
       if (!this.plan.loginNeeded) return null;
       // 로그인이 풀려 있다고 적혀 있다: AI를 띄우지 않고 로그인 결재를 바로 올린다 (관리자가 로그인할 탭을 열어 둔다)
-      const tab = await this.loginTab(site, tabs, signal);
+      const tab = await this.login.tab(site.startUrl, site.origins, signal);
       const url = tab.url || site.startUrl;
-      const ending = await this.needLogin(site, url, tab, signal, note, redactor);
+      const ending = await this.needLogin(url, tab, signal, note, redactor);
       const asked = ending ?? (await this.requestApproval(signal, redactor));
       return asked ?? RunEnding.quiet('로그인이 필요해 결재를 올렸어요');
     } catch (error) {
@@ -156,7 +146,7 @@ export class BrowseStage implements SandboxStage {
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
     if (this.dir)
       await new StepShots(this.server, this.job.taskId).ship(join(this.dir, 'steps'), signal, note);
-    // 사이트 도구 굳히기: 남긴 파일로 시험을 돌려 채점받고, 통과하면 켜기 결재를 올린다 (SiteBuild)
+    // 사이트 도구 굳히기: 남긴 파일로 시험을 돌려 채점받는다. 통과하면 읽기 도구는 서버가 바로 켜고, 그 밖은 켜기 결재 (SiteBuild)
     if (this.plan?.build && this.plan.site) {
       const exec = new IntegrationExec(this.config.browserUrl ?? '');
       const build = new SiteBuild(this.server.siteTools, exec, this.job.taskId);
@@ -182,21 +172,30 @@ export class BrowseStage implements SandboxStage {
     }
     const site = this.plan?.site ?? null;
     if (stop === null) return done;
+    // 사람이 해야 하는 화면: 사이트 일이면 AI가 연 탭을, 둘러보기면 유지 프로필에 같은 주소를 열어 (등록 없이, 2026-11-19)
+    if (stop.kind === 'login') {
+      const origin = new URL(stop.pageUrl).origin;
+      const tab = site
+        ? await this.tabOf(stop.pageUrl, signal)
+        : await this.login.tab(stop.pageUrl, [origin], signal).catch(() => null);
+      const asked = this.needLogin(
+        stop.pageUrl,
+        tab,
+        signal,
+        note,
+        redactor,
+        stop.reason,
+        stop.form,
+      );
+      return (await asked) ?? done;
+    }
     if (site === null) {
       note(
-        new RunEvent(
-          RunEvent.ERROR,
-          '둘러보기에서는 누르거나 로그인하지 않아요 (멈춘 자리는 두고 끝내요)',
-          0,
-        ),
+        new RunEvent(RunEvent.ERROR, '둘러보기에서는 누르지 않아요 (멈춘 자리는 두고 끝내요)', 0),
       );
       return done;
     }
     const tab = await this.tabOf(stop.pageUrl, signal);
-    if (stop.kind === 'login')
-      return (
-        (await this.needLogin(site, stop.pageUrl, tab, signal, note, redactor, stop.reason)) ?? done
-      );
     if (tab === null) return failed('멈춘 페이지의 탭을 찾지 못했어요');
     let held: HeldButton;
     try {
@@ -260,60 +259,32 @@ export class BrowseStage implements SandboxStage {
     if (this.dir) await rm(this.dir, { recursive: true, force: true });
   }
 
-  /** 로그인 화면을 남기고 로그인 결재를 준비한다. 남기지 못하면 실패로 끝낼 그 끝 */
+  /** 로그인 화면을 남기고 로그인 결재를 준비한다 (BrowseLogin). 남기지 못하면 실패로 끝낼 그 끝 */
   private async needLogin(
-    site: BrowseSite,
     url: string,
     tab: BrowserTab | null,
     signal: AbortSignal,
     note: Note,
     redactor: Redactor,
-    /** 로그인이 아닌 까닭 (가입 · 본인 인증 · 캡차 …). 카드가 메모 앞의 "확인 필요(까닭)"을 읽어 제목으로 쓴다 */
     reason: string | null = null,
+    form: LoginFormRef | null = null,
   ): Promise<RunEnding | null> {
-    const image = tab ? await this.pages.shot(tab, signal) : null;
     try {
-      const target = await this.server.loginNeeded(this.job.taskId, {
-        url,
-        title: tab?.title ?? '',
-        image,
-      });
-      this.approval = {
-        requestId: `browser-login:${randomUUID()}`,
-        action: BrowseStage.LOGIN_ACTION,
-        targetKind: 'browser_site',
-        targetId: target.siteId,
-        targetVersion: target.siteVersion,
-        note: reason
-          ? `확인 필요(${reason}): ${site.name}. 화면에서 직접 한 뒤 "로그인했어요"를 눌러 주세요`
-          : `로그인 필요: ${site.name}. 화면에서 로그인한 뒤 "로그인했어요"를 눌러 주세요`,
-      };
+      const asked = await this.login.need(url, tab, signal, reason, form);
+      this.approval = asked.approval;
+      const what = reason ? `확인이 필요해요(${reason})` : '로그인이 필요해요';
+      const card = asked.card
+        ? ' · 카드에 로그인 칸을 띄웠어요'
+        : asked.problem
+          ? ` · 로그인 칸은 쓰지 않아요 (${asked.problem})`
+          : '';
+      note(new RunEvent(RunEvent.WRITE, `${what}: ${asked.siteName}${card}`, 0));
+      return null;
     } catch (error) {
       if (!(error instanceof ToolRefused || error instanceof ServerUnreachable)) throw error;
       const message = `로그인 필요를 남기지 못했어요: ${error.message}`;
       return RunEnding.submit(message, RunResult.failed(message, redactor));
     }
-    note(
-      new RunEvent(
-        RunEvent.WRITE,
-        reason ? `확인이 필요해요(${reason}): ${site.name}` : `로그인이 필요해요: ${site.name}`,
-        0,
-      ),
-    );
-    return null;
-  }
-
-  /** 관리자가 로그인할 탭: 사이트의 탭이 있으면 그것, 없으면 시작 주소를 새 탭으로 열고 잠깐 기다린다 */
-  private async loginTab(
-    site: BrowseSite,
-    tabs: BrowserTab[],
-    signal: AbortSignal,
-  ): Promise<BrowserTab> {
-    const open = tabs.find((t) => BrowseStage.within(t.url, site));
-    if (open) return open;
-    const made = await this.pages.open(site.startUrl, signal);
-    await pause(BrowseStage.OPEN_MS, signal);
-    return made;
   }
 
   /** 멈춘 주소의 탭. AI가 새로 연 탭을 먼저, 없으면 같은 주소의 탭, 그래도 없고 새 탭이 하나뿐이면 그 탭 */
@@ -323,11 +294,6 @@ export class BrowseStage implements SandboxStage {
     const same = (t: BrowserTab) => BrowserPages.withoutHash(t.url) === want;
     const fresh = tabs.filter((t) => !this.before.has(t.id));
     return fresh.find(same) ?? tabs.find(same) ?? (fresh.length === 1 ? (fresh[0] ?? null) : null);
-  }
-
-  /** 주소가 사이트의 허용 출처 안인가 */
-  private static within(url: string, site: BrowseSite): boolean {
-    return URL.canParse(url) && site.origins.includes(new URL(url).origin);
   }
 
   private static host(url: string): string {

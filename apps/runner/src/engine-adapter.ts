@@ -70,6 +70,11 @@ export class EngineAdapters {
     return EngineAdapters.ALL.find((engine) => engine.name === name) ?? null;
   }
 
+  /** 이 러너가 돌리지 못하는 엔진이면 그 까닭 (일을 시작하지 않고 실패로 낸다). 아니면 null */
+  static refusal(name: string): string | null {
+    return EngineAdapters.of(name) === null ? `${name}는 아직 러너가 지원하지 않아요` : null;
+  }
+
   static names(): readonly string[] {
     return EngineAdapters.ALL.map((engine) => engine.name);
   }

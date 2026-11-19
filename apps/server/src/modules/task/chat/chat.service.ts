@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   Actor,
   BaseService,
+  Conflict,
   Database,
   Forbidden,
   Idempotency,
@@ -18,6 +19,7 @@ import { AgentEdit } from '../agent/agent-edit';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
 import { OutputQuery } from '../output/output.query';
+import { ScheduleRepository } from '../schedule/schedule.repository';
 import { SkillQuery } from '../skill/skill.query';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
@@ -87,6 +89,7 @@ export class ChatService extends BaseService {
     const refs = await this.refsOf(actor, req.refs);
     return this.transaction(async (tx) => {
       const chat = await new ChatRepository(tx).lock(spaceId, req.id);
+      chat.assertSender(null);
       const seen = chat.agentId === null ? undefined : req.version; // 맡으면(partnerOf) 판이 오른다
       const lead = await this.partnerOf(tx, chat, now, req.version);
       const text = { requestId: req.requestId, message: req.message, refs };
@@ -135,6 +138,7 @@ export class ChatService extends BaseService {
     return this.transaction(async (tx) => {
       const chats = new ChatRepository(tx);
       const chat = await chats.lock(spaceId, req.id);
+      chat.assertSender(null);
       chat.assertVersion(req.version);
       const agent = await new AgentRepository(tx).load(spaceId, chat.partnerId);
       chat.tune(req.model, req.effort, agent.tool, new Date());
@@ -152,6 +156,45 @@ export class ChatService extends BaseService {
       const chat = await new ChatRepository(tx).lock(spaceId, req.id);
       chat.assertVersion(req.version);
       await this.cancelOpen(tx, spaceId, chat.id, now);
+      return chat;
+    });
+  }
+
+  /**
+   * 휴지통으로 (2026-11-19 휴지통 A): 멈추기처럼 도는 일 · 기다리는 결재 · 결과 카드를 취소하고 목록에서 뺀다.
+   * 이 대화로 보내는 자동화가 있으면 409 (자동화가 휴지통의 대화에 회차를 보내지 않게, 자동화를 먼저 바꾼다)
+   */
+  async trash(actor: Actor, req: VersionInput): Promise<Chat> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const chats = new ChatRepository(tx);
+      const chat = await chats.lock(spaceId, req.id);
+      chat.assertVersion(req.version);
+      if (chat.trashed) return chat;
+      if (await new ScheduleRepository(tx).boundToChat(spaceId, chat.id))
+        throw new Conflict(
+          '이 대화로 보내는 자동화가 있어요. 자동화를 바꾼 뒤에 휴지통으로 보내요',
+        );
+      await this.cancelOpen(tx, spaceId, chat.id, now);
+      chat.trash(now);
+      await chats.save(chat);
+      return chat;
+    });
+  }
+
+  /** 휴지통에서 꺼낸다. 멈춘 일은 다시 돌지 않는다 (다음 메시지부터 이어서) */
+  async restore(actor: Actor, req: VersionInput): Promise<Chat> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    return this.transaction(async (tx) => {
+      const chats = new ChatRepository(tx);
+      const chat = await chats.lock(spaceId, req.id);
+      chat.assertVersion(req.version);
+      if (!chat.trashed) return chat;
+      chat.trash(null);
+      await chats.save(chat);
       return chat;
     });
   }
@@ -194,6 +237,7 @@ export class ChatService extends BaseService {
       const once = new Idempotency(tx, spaceId, `continue:${approval.id}`, ChatService.CONTINUE);
       if (await once.previous()) return;
       const chat = await chats.lock(spaceId, place.chat_id);
+      if (chat.trashed) return;
       const lead = await new AgentRepository(tx).load(spaceId, chat.partnerId);
       const message = prompts.fill('setting-continue', { change: approval.settingLine });
       const previous = await chats.previousTurns(chat, spaceId);

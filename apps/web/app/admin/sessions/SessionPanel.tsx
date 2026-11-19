@@ -6,8 +6,8 @@ import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import type { SessionDetail, SessionRevision, Transcript } from '../../_vault/types';
 
-/** 세션이 저장되거나 노트 · 대표 위키가 정해지면 다시 읽는다 */
-export const SESSION_TOPICS = ['vault.session.*'];
+/** 세션이 저장되거나 노트 · 대표 위키가 정해지거나 휴지통을 오가면(변경 묶음) 다시 읽는다 */
+export const SESSION_TOPICS = ['vault.session.*', 'vault.change.*'];
 const KIND_LABELS: Record<string, string> = { origin: '원본', human: '사람', merge: '합침' };
 const ACTOR_LABELS: Record<string, string> = { ai: '서버 러너', device: '기기', user: '관리자' };
 /** 판 번호는 최근 몇 개만 펼쳐 둔다 (판이 많으면 노트가 밀려 내려가므로) */
@@ -53,15 +53,35 @@ export function SessionPanel({
     if (reply?.ok) setPast(reply.data);
   }
 
+  /** 휴지통으로 (2026-11-19 휴지통 A): 목록에서 빠지고 휴지통에서 복원할 수 있다 */
+  async function trash(version: number) {
+    if (!window.confirm('휴지통으로 보낼까요? 휴지통에서 복원할 수 있어요')) return;
+    const send = () => api('POST', `/api/sessions/${id}/trash`, { version });
+    const reply = await action.run('trash', send, { done: '휴지통으로 보냈어요' });
+    if (reply?.ok) onBack();
+  }
+
   const headings = Object.fromEntries(
     (shown?.sections ?? []).map((s) => [s.name, s.heading] as const),
   );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <button type="button" className="ghost" style={{ alignSelf: 'flex-start' }} onClick={onBack}>
-        ← 목록
-      </button>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <button type="button" className="ghost" onClick={onBack}>
+          ← 목록
+        </button>
+        {detail && (
+          <button
+            type="button"
+            className="ghost"
+            disabled={action.busy !== null}
+            onClick={() => trash(detail.version)}
+          >
+            휴지통으로
+          </button>
+        )}
+      </div>
       {error && <p className="error">{error}</p>}
       {detail ? (
         <>

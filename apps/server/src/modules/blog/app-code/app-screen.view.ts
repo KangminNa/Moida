@@ -116,6 +116,7 @@ export class AppScreenDataView {
       isPost: this.screen === 'post',
       isMenu: this.screen === 'menu',
       isIssue: this.screen === 'issue',
+      isTopic: this.screen === 'topic',
       title: this.title(),
       base: this.home(),
       files: `${this.base}/files`,

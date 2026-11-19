@@ -127,6 +127,13 @@ export class JobService extends BaseService {
       const task = await tasks.lock(spaceId, req.taskId);
       task.submit(runnerId, req.status, req.result, req.error, now, await tasks.madeBy(task));
       await tasks.save(task);
+      // 팀원 기다리기: 끝나지 않은 하위 작업을 두고 마무리했으면 그 일은 멈춘다 (먼저 깨어난 뒤).
+      // 승인을 기다리는 일은 관리자가 정하게 둔다 (대화의 결과 카드에 실린다). 잠그는 순서는 위 작업 → 아래 작업
+      if (task.ended)
+        for (const left of await tasks.lockOpenDescendants(task.id, true)) {
+          left.cancel(now);
+          await tasks.save(left);
+        }
       await this.noteAiTest(tx, task, now);
       await once.remember({ taskId: task.id });
       return task;

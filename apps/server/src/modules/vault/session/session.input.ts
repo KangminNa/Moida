@@ -1,4 +1,6 @@
 import { BaseRequest, type RequestFields } from '../../platform';
+import { EditInput } from '../change/change.input';
+import { SessionRestoreOp, SessionTrashOp } from '../change/session-trash-op';
 import { SessionNote } from './session-note';
 import { SessionTranscript } from './session-transcript';
 
@@ -256,5 +258,29 @@ export class ReadSessionInput extends BaseRequest {
       if (seq !== null && !/^[1-9]\d*$/.test(seq)) f.reject('seq', '1 이상의 버전 번호여야 해요');
       return new ReadSessionInput(f.uuid('id'), seq === null ? null : Number(seq));
     });
+  }
+}
+
+/** POST /api/sessions/:id/trash { version }. 휴지통으로 간다 (판 · 원문 · 대표 wiki는 남는다) */
+export class TrashSessionInput extends BaseRequest {
+  static from(id: string, raw: unknown): EditInput {
+    return BaseRequest.read(
+      { ...(raw as object), id },
+      (f) =>
+        new EditInput(null, '세션을 휴지통으로', [
+          new SessionTrashOp(1, f.uuid('id'), f.version()),
+        ]),
+    );
+  }
+}
+
+/** POST /api/sessions/:id/restore { version }. 휴지통에서 꺼낸다 */
+export class RestoreSessionInput extends BaseRequest {
+  static from(id: string, raw: unknown): EditInput {
+    return BaseRequest.read(
+      { ...(raw as object), id },
+      (f) =>
+        new EditInput(null, '세션 되살리기', [new SessionRestoreOp(1, f.uuid('id'), f.version())]),
+    );
   }
 }

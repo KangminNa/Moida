@@ -163,6 +163,8 @@ export const sites = browserTabsSchema.table('sites', {
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
   version: integer('version').notNull(),
   login_needed_at: timestamp('login_needed_at', { withTimezone: true }),
+  login_form: jsonb('login_form'),
+  trusted_at: timestamp('trusted_at', { withTimezone: true }),
 });
 
 /** browser_tabs.suggestions */

@@ -17,6 +17,11 @@ export class AgentRuntime {
   private static readonly MODEL_MAX = 80;
   /** 모델 이름: 영문 · 숫자 · . _ - 와 [ ] (예: 문맥 크기 표시). 설정 파일에 그대로 쓰므로 따옴표 · 공백은 받지 않는다 */
   private static readonly MODEL = /^[A-Za-z0-9._[\]-]+$/;
+  /**
+   * 쓰지 않는 모델 (2026-11-19 사용자 결정): Fable 계열. best는 러너의 Claude Code(2.1.302)에서 Fable로 풀린다
+   * (2.1.321부터 opus). 러너도 같은 이름을 거절한다 (apps/runner의 CliRuntime)
+   */
+  private static readonly BLOCKED = /fable|^best$/i;
   /** AI 도구 (agents.tool의 값 목록) */
   static tool(value: string): AgentTool {
     if (!ValueList.has(AGENT_TOOL, value))
@@ -27,6 +32,7 @@ export class AgentRuntime {
   static model(value: string): string {
     const model = value.trim();
     if (model === '') return '';
+    if (AgentRuntime.BLOCKED.test(model)) throw new RuleViolation('Fable 모델은 쓰지 않아요');
     if (model.length > AgentRuntime.MODEL_MAX || !AgentRuntime.MODEL.test(model))
       throw new RuleViolation(
         `모델 이름은 영문 · 숫자 · . _ - [ ] ${AgentRuntime.MODEL_MAX}자까지예요`,

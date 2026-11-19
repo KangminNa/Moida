@@ -1,7 +1,7 @@
 {
   "name": "browser-tabs",
-  "version": "0.6.0",
-  "cairn": ">=0.6",
+  "version": "0.7.0",
+  "cairn": ">=0.7",
   "description": "서버 브라우저로 하는 일: 주소를 탭으로 읽고, 등록한 사이트(로그인된 프로필)나 둘러보기(새 빈 창)에서 AI 에이전트가 일하고, 마지막 버튼은 결재 뒤 러너가 같은 버튼인지 확인하고 누른다. 콘솔에서 화면을 보고 누르고 사이트 세션을 지운다. 되풀이하는 일은 사이트 도구(Playwright 코드)로 굳혀 에이전트가 AI 없이 부른다 (쓰기 도구는 검토자 짝 · 부를 때마다 결재)",
   "settings": {
     "autoRepair": {
@@ -22,6 +22,8 @@
     "DELETE /sites/:id": "deleteSite",
     "POST /sites/:id/tasks": "requestBrowse",
     "POST /sites/:id/clear-session": "clearSession",
+    "GET /sites/:id/login": "loginCard",
+    "POST /sites/:id/login": "sendLogin",
     "POST /explore": "requestExplore",
     "GET /clicks": "listClicks",
     "GET /clicks/:id": "click",
@@ -79,7 +81,7 @@
     },
     "browser_sites": {
       "operation": "agentSites",
-      "description": "관리자가 등록한 사이트 목록 (로그인된 서버 브라우저로 일할 곳). 브라우저 담당에게 사이트 일을 맡길 때 delegate_task에 kind: browse, target_kind: browser_site, target_id: id, target_version: version으로 적는다. 대상 없이 kind: browse로 맡기면 둘러보기다 (로그인 없는 새 창, 공개 사이트만). login_needed면 관리자가 콘솔에서 다시 로그인해야 한다.",
+      "description": "관리자가 등록한 사이트 목록 (로그인된 서버 브라우저로 일할 곳). 브라우저 담당에게 사이트 일을 맡길 때 delegate_task에 kind: browse, target_kind: browser_site, target_id: id, target_version: version으로 적는다. 대상 없이 kind: browse로 맡기면 둘러보기다 (로그인 없는 새 창, 공개 사이트만). 목록에 없는 사이트도 등록 없이 맡긴다: 지시에 주소를 적어 둘러보기로 맡기면, 로그인이 필요할 때 그 주소로 사이트가 생기고 관리자가 로그인한 뒤 같은 일이 그 사이트의 일로 이어진다 (2026-11-19). login_needed면 관리자가 다시 로그인해야 한다.",
       "input": {
         "properties": {}
       }
@@ -128,7 +130,7 @@
     },
     "browser_login_needed": {
       "operation": "loginNeeded",
-      "description": "사이트 일이 로그인 화면을 만났다고 남긴다 (사이트의 로그인 필요 표시와 그 화면). 받은 site_id · site_version으로 request_approval(browser.site.login, target_kind browser_site)을 올린다. 그 작업의 임대를 쥔 러너만.",
+      "description": "브라우저 일이 로그인 화면을 만났다고 남긴다 (사이트의 로그인 필요 표시와 그 화면). 둘러보기면 page_url의 출처로 사이트를 찾거나 만든다 (등록 없이, 2026-11-19, 답의 site_name). form은 러너가 그 화면에서 다시 찾아 확인한 로그인 칸(종류 · 역할 · 이름, 값 없음)이고, 믿는 출처(관리자가 등록 · 로그인한 사이트, 관리자의 지시에 적힌 도메인)일 때만 로그인 카드에 칸으로 뜬다 (답의 login_card). 받은 site_id · site_version으로 request_approval(browser.site.login, target_kind browser_site)을 올린다. 그 작업의 임대를 쥔 러너만.",
       "input": {
         "properties": {
           "task_id": {
@@ -149,9 +151,93 @@
             "type": "string",
             "maxLength": 409604,
             "description": "화면 그림 (JPEG · PNG, base64, 300KB까지)"
+          },
+          "form": {
+            "type": "object",
+            "description": "로그인 칸 (2026-11-19 로그인 카드). 값은 싣지 않는다",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["id", "password", "code"]
+                    },
+                    "role": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": ["kind", "role", "name"]
+                }
+              },
+              "submit": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": ["role", "name"]
+              }
+            },
+            "required": ["fields", "submit"]
           }
         },
         "required": ["task_id", "page_url"]
+      }
+    },
+    "browser_login_next": {
+      "operation": "nextLogin",
+      "description": "관리자가 로그인 카드의 칸에 넣은 값 하나를 가져온다 (그 로그인 화면을 연 러너만, AI 없이). 가져가면 서버 메모리에서 지운다. 없으면 login: null. 받은 값은 그 사이트의 칸에만 넣고 어디에도 남기지 않는다.",
+      "input": {
+        "properties": {}
+      }
+    },
+    "browser_login_save": {
+      "operation": "saveLogin",
+      "description": "가져간 로그인의 결과를 남긴다: submitted(칸에 넣고 로그인 단추를 눌렀다, 그 뒤 화면) 또는 failed(넣지 못했다, 까닭). 카드가 보고 같은 작업을 잇는다. 화면은 서버 메모리에만 10분.",
+      "input": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "browser_login_next의 login.site_id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["submitted", "failed"]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "넣지 못한 까닭 (failed)"
+          },
+          "after_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "누른 뒤의 주소"
+          },
+          "image": {
+            "type": "string",
+            "maxLength": 409604,
+            "description": "누른 뒤 화면 (JPEG · PNG, base64, 300KB까지)"
+          }
+        },
+        "required": ["site_id", "outcome"]
       }
     },
     "browser_click_hold": {
@@ -378,7 +464,7 @@
     },
     "site_build_save": {
       "operation": "saveBuild",
-      "description": "사이트 도구를 굳힌 결과를 남긴다 (그 굳히기 작업을 쥔 러너). AI가 쓴 입출력 형식 · 코드와, 러너가 시험 3~10개를 돌린 결과(답 또는 오류). 서버가 형식으로 채점해 새 버전으로 남기고 70% 이상이면 받아들인다(accepted). 받아들였으면 integration_version으로 켜기 결재(browser.integration.enable, 대상 browser_integration)를 올린다. 쓰기 도구(build.mode: write)의 시험은 마른 실행(site.commit 앞에서 멈춤)이라 output 없이 보내고, 받아들여지면 review: true로 검토자에게 넘어가 러너는 켜기 결재를 올리지 않는다.",
+      "description": "사이트 도구를 굳힌 결과를 남긴다 (그 굳히기 작업을 쥔 러너). AI가 쓴 입출력 형식 · 코드와, 러너가 시험 3~10개를 돌린 결과(답 또는 오류). 서버가 형식으로 채점해 새 버전으로 남기고 70% 이상이면 받아들인다(accepted). 읽기 도구는 받아들이면 서버가 바로 켠다(enabled: true, 2026-11-19, 켜기 결재 없음). enabled가 아니고 받아들였으면 integration_version으로 켜기 결재(browser.integration.enable, 대상 browser_integration)를 올린다. 쓰기 도구(build.mode: write)의 시험은 마른 실행(site.commit 앞에서 멈춤)이라 output 없이 보내고, 받아들여지면 review: true로 검토자에게 넘어가 러너는 켜기 결재를 올리지 않는다.",
       "input": {
         "properties": {
           "task_id": {
@@ -486,6 +572,8 @@
     "tool:browser_job",
     "tool:browser_shot_save",
     "tool:browser_login_needed",
+    "tool:browser_login_next",
+    "tool:browser_login_save",
     "tool:browser_click_hold",
     "tool:browser_click_next",
     "tool:browser_click_save",

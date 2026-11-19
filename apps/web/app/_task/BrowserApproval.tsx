@@ -7,6 +7,7 @@ import { useAction } from '../_lib/use-action';
 import { useLiveValue } from '../_lib/use-live';
 import { Screen } from '../_plugins/installed/browser-tabs/Screen';
 import { callFor } from '../_plugins/packages';
+import { LoginFields, useLoginCard } from './LoginFields';
 import { LOGGED_IN_NOTE } from './labels';
 import type { Approval, BrowserClick, BrowserShot, BrowserShots } from './types';
 
@@ -122,8 +123,14 @@ export function ClickTarget({ approval }: { approval: Approval }) {
   );
 }
 
-/** browser.site.login: 러너가 만난 로그인 화면 */
-export function LoginTarget({ approval }: { approval: Approval }) {
+/** browser.site.login: 러너가 만난 로그인 화면. 로그인 칸이 있으면 칸에 넣어 로그인(2026-11-19), 화면에서 직접도 된다 */
+export function LoginTarget({
+  approval,
+  reload,
+}: {
+  approval: Approval;
+  reload?: () => Promise<void>;
+}) {
   const taskId = approval.taskId;
   const shots = useLiveValue<BrowserShots | null>(
     `browser-shots:${taskId}`,
@@ -145,20 +152,32 @@ export function LoginTarget({ approval }: { approval: Approval }) {
   // 기다리는 동안의 메모는 러너가 남긴 요청 메모다 (정한 뒤에는 결정의 말로 바뀐다)
   const pending = approval.status === 'pending';
   const reason = pending ? (REASON.exec(approval.note ?? '')?.[1] ?? null) : null;
+  const card = useLoginCard(pending ? approval.target.id : null);
+  const fields = card.data?.fields ? card.data : null;
   return (
     <section className="preview" aria-label="로그인 필요">
       <b>{reason ? `확인이 필요해요 · ${reason}` : '로그인이 풀렸어요'}</b>
       {login && <p className="label-mono">{login.url}</p>}
       {shot.data && <MarkedShot image={shot.data.image} box={null} label="멈춘 화면" />}
+      {pending && fields && (
+        <LoginFields approval={approval} card={fields} reloadCard={card.reload} reload={reload} />
+      )}
       {pending && login ? (
-        <>
-          <p className="note">
-            아래 화면을 열어 그 사이트에서 직접 로그인 · 인증(2단계 인증 포함)한 뒤 “
-            {LOGGED_IN_NOTE}
-            ”를 누르면 같은 작업이 처음부터 이어서 해요. 비밀번호는 어디에도 남지 않아요
-          </p>
-          <Screen call={browserCall} pin={{ url: login.url }} />
-        </>
+        fields ? (
+          <details>
+            <summary>화면에서 직접 하기</summary>
+            <Screen call={browserCall} pin={{ url: login.url }} />
+          </details>
+        ) : (
+          <>
+            <p className="note">
+              아래 화면을 열어 그 사이트에서 직접 로그인 · 인증(2단계 인증 포함)한 뒤 “
+              {LOGGED_IN_NOTE}
+              ”를 누르면 같은 작업이 처음부터 이어서 해요. 비밀번호는 어디에도 남지 않아요
+            </p>
+            <Screen call={browserCall} pin={{ url: login.url }} />
+          </>
+        )
       ) : (
         <p className="note">
           <Link href={BROWSER_PAGE}>브라우저 화면</Link>에서 그 사이트에 로그인(2단계 인증 포함)한

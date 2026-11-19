@@ -191,6 +191,8 @@ export interface SiteRow {
   updated_at: Date;
   version: number;
   login_needed_at: Date | null;
+  login_form: unknown | null;
+  trusted_at: Date | null;
 }
 export type SiteNew = Partial<SiteRow> & Pick<SiteRow, 'id' | 'space_id' | 'name' | 'start_url' | 'origins'>;
 

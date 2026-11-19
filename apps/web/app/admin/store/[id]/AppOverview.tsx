@@ -24,15 +24,19 @@ export function AppOverview({ app }: { app: AdminApp }) {
   );
   const c = app.counts;
   const recent = posts.data?.posts.slice(0, RECENT) ?? null;
+  // 커뮤니티(스토어 3-2)의 글 · 회원은 커뮤니티 탭에서 본다 (블로그 글 · 메뉴가 없다)
+  const blogLike = app.kind === 'blog' || app.kind === 'magazine';
   const counts: readonly [string, number | undefined][] =
-    app.kind === 'page'
-      ? [['페이지', c?.pages]]
-      : [
-          ['공개 글', c?.published],
-          ['초안', c?.drafts],
-          ['메뉴', c?.menus],
-          ['페이지', c?.pages],
-        ];
+    app.kind === 'community'
+      ? []
+      : app.kind === 'page'
+        ? [['페이지', c?.pages]]
+        : [
+            ['공개 글', c?.published],
+            ['초안', c?.drafts],
+            ['메뉴', c?.menus],
+            ['페이지', c?.pages],
+          ];
 
   return (
     <>
@@ -71,7 +75,14 @@ export function AppOverview({ app }: { app: AdminApp }) {
           </ul>
         )}
       </section>
-      <ul className="app-counts" aria-label="든 것의 수">
+      {app.kind === 'community' && (
+        <p className="row">
+          <Link className="ghost small" href={`${STORE_HREF}/${app.id}?tab=community`}>
+            신고 · 글 · 회원 보기
+          </Link>
+        </p>
+      )}
+      <ul className="app-counts" aria-label="든 것의 수" hidden={counts.length === 0}>
         {counts.map(([label, n]) => (
           <li key={label} className="panel">
             <b>{n ?? '–'}</b>
@@ -79,7 +90,7 @@ export function AppOverview({ app }: { app: AdminApp }) {
           </li>
         ))}
       </ul>
-      {app.kind !== 'page' && (
+      {blogLike && (
         <section className="stack" aria-label="최근 글">
           <div className="row">
             <b>최근 글</b>

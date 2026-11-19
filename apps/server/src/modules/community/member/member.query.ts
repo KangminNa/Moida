@@ -35,11 +35,15 @@ export class MemberQuery extends BaseQuery {
   /** 이 브라우저가 누구인가: 로그인한 회원이면 자기 정보와 쓰기 요청의 확인 값(회원 쿠키로 만든 MemberCsrf), 아니면 둘 다 null */
   async me(actor: Actor, place: MemberPlace, memberCookie: string | null): Promise<MemberMeView> {
     await this.assertCommunity(actor, place);
-    if (!(actor instanceof MemberActor) || !memberCookie) return new MemberMeView(null, null);
+    if (!memberCookie) return new MemberMeView(null, null);
+    // 쿠키를 실은 쓰기는 이 값이 있어야 한다 (MemberGuard): 끝난 로그인의 쿠키가 남은 브라우저(비밀번호 초기화 · 30일)도
+    // 이 값을 실어 다시 로그인 · 가입할 수 있게, 로그인이 없어도 쿠키의 값을 준다
+    const csrf = this.csrf.tokenOf(memberCookie);
+    if (!(actor instanceof MemberActor)) return new MemberMeView(null, csrf);
     const row = await this.row(members, { id: actor.id ?? '', app_id: place.appId });
-    if (!row) return new MemberMeView(null, null);
+    if (!row) return new MemberMeView(null, csrf);
     const writable = new Date(row.joined_at.getTime() + Member.JOIN_WAIT_MS);
-    return new MemberMeView(new MemberSelfView(row, writable), this.csrf.tokenOf(memberCookie));
+    return new MemberMeView(new MemberSelfView(row, writable), csrf);
   }
 
   /** 쓰기 요청의 확인 값이 이 쿠키의 것과 맞는가 (MemberGuard) */

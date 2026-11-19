@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
+import { CommunitySite } from '../../../testing/community-site';
 
 // 커뮤니티 회원 (스토어 3-1a, 아이디 · 비밀번호 가입, docs/스토어.md 11장): 앱 도메인에서만 열리는 회원 API, 가입 → 회원 쿠키 → 로그인,
 // 해킹 대비(실패 문구 하나 · 틀린 시도 제한 · 가입 제한 · 새 세션 · 비밀번호를 바꾸면 다른 로그인 끝남), 쓰기의 출처 · CSRF 확인,
@@ -34,12 +35,7 @@ function ok(res: ApiResult, status = 200): Json {
   return res.json();
 }
 
-async function newApp(
-  kind: string,
-  slug: string,
-  domain: string | null,
-  open = true,
-): Promise<Json> {
+async function newApp(kind: string, slug: string, domain: string, open = true): Promise<Json> {
   const made = ok(
     await api.request('POST', '/api/apps', owner, {
       requestId: randomUUID(),
@@ -49,9 +45,7 @@ async function newApp(
     }),
     201,
   );
-  const body: Json = { version: made.version, domain };
-  if (open) body.visibility = 'public';
-  return ok(await api.request('PATCH', `/api/apps/${made.id}`, owner, body));
+  return CommunitySite.link(api, owner, made, domain, open);
 }
 
 /** 앱 도메인으로 보내는 요청. 쓰기는 이 도메인의 화면에서 보낸 것처럼 Origin을 붙인다 */
@@ -258,6 +252,20 @@ describe('회원 정보 · 비밀번호 · 로그아웃', () => {
       body: { loginId: 'change_pw', password: PASSWORD },
     });
     assert.equal(old.status, 401);
+
+    // 끝난 로그인의 쿠키가 남은 브라우저: me가 그 쿠키의 확인 값을 주어 다시 로그인할 수 있다
+    const stale = ok(await at('/api/community/me', { as: second }));
+    assert.equal(stale.member, null);
+    assert.ok(stale.csrf, '쿠키가 있으면 로그인이 끝났어도 확인 값');
+    const again = (headers: Record<string, string>) =>
+      at('/api/community/login', {
+        method: 'POST',
+        as: second,
+        body: { loginId: 'change_pw', password: '새로운 긴 비밀번호입니다' },
+        headers,
+      });
+    assert.equal((await again({})).status, 403, '쿠키를 실었으면 확인 값이 있어야');
+    assert.equal((await again({ 'x-cairn-csrf': String(stale.csrf) })).status, 200);
   });
 
   test('로그아웃하면 그 쿠키는 더 회원이 아니다', async () => {

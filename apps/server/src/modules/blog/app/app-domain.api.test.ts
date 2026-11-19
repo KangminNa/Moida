@@ -30,11 +30,11 @@ function viaHost(
   return api.viaHost(path, host, { ...rest, headers: cookie ? { cookie } : {} });
 }
 
-async function newApp(slug: string): Promise<Json> {
+async function newApp(slug: string, kind = 'blog'): Promise<Json> {
   return ok(
     await api.request('POST', '/api/apps', owner, {
       requestId: randomUUID(),
-      kind: 'blog',
+      kind,
       name: `앱 ${slug}`,
       slug,
     }),
@@ -220,5 +220,58 @@ describe('도메인으로 여는 앱과 화면 (GET /api/apps/domains, screen?ho
     assert.equal(apps.find((a) => a.slug === `shop-${mark}`)?.url, `https://${domainOf('shop')}/`);
     assert.equal(apps.find((a) => a.slug === `wait-${mark}`)?.url, `/wait-${mark}`);
     assert.ok(shown.domainCheckedAt);
+  });
+});
+
+describe('커뮤니티 앱의 공개와 화면 (스토어 3-2)', () => {
+  test('연결을 확인한 도메인이 있어야 공개되고, 공개 중에는 도메인을 바꾸지 않는다', async () => {
+    let town = await newApp(`town-${mark}`, 'community');
+    const plain = await patch(town, { visibility: 'public' });
+    assert.equal(plain.status, 422, plain.text);
+    assert.match(plain.json().message as string, /도메인 연결을 확인한 뒤에 공개/);
+    town = ok(await patch(town, { domain: domainOf('town') }));
+    assert.equal((await patch(town, { visibility: 'public' })).status, 422, '확인 전');
+
+    town = ok(await patch(await linked(town, domainOf('town')), { visibility: 'public' }));
+    assert.equal(town.visibility, 'public');
+    for (const domain of [domainOf('town2'), null]) {
+      const moved = await patch(town, { domain });
+      assert.equal(moved.status, 422, moved.text);
+      assert.match(moved.json().message as string, /비공개로 바꾼 뒤에 도메인을/);
+    }
+    // 비공개로 두면 도메인을 바꿀 수 있다 (확인은 비워진다)
+    town = ok(await patch(town, { visibility: 'private' }));
+    const moved = ok(await patch(town, { domain: domainOf('town2') }));
+    assert.equal(moved.domainCheckedAt, null);
+    // 블로그 앱은 그대로 도메인 없이 공개된다
+    ok(await patch(await newApp(`plainblog-${mark}`), { visibility: 'public' }));
+  });
+
+  test('화면: 첫 화면은 index.html, 글은 t/<글 id> → topic.html, 그 밖의 주소는 404.html', async () => {
+    const club = ok(
+      await patch(await linked(await newApp(`club-${mark}`, 'community'), domainOf('club')), {
+        visibility: 'public',
+      }),
+    );
+    const screen = (path: string) =>
+      api.get(
+        `/api/apps/site/${club.slug}/screen?${new URLSearchParams({ host: domainOf('club'), path })}`,
+      );
+    const home = ok(await screen(''));
+    assert.deepEqual([home.status, home.template], [200, 'index.html']);
+    const templates = home.templates as Record<string, string>;
+    for (const name of ['index.html', 'topic.html', 'header.html', '404.html'])
+      assert.ok(templates[name], `${name} (${Object.keys(templates).join()})`);
+    assert.equal((home.data as Json).isHome, true);
+
+    const id = '01970000-0000-7000-8000-000000000000';
+    const topic = ok(await screen(`t/${id}`));
+    assert.deepEqual([topic.status, topic.template], [200, 'topic.html']);
+    assert.deepEqual([(topic.data as Json).isTopic, (topic.data as Json).screen], [true, 'topic']);
+
+    for (const path of ['t/not-an-id', `t/${id}/more`, 'posts/hello', 'm/posts']) {
+      const missing = ok(await screen(path));
+      assert.deepEqual([missing.status, missing.template], [404, '404.html'], path);
+    }
   });
 });

@@ -158,7 +158,7 @@ async function spaceId(): Promise<string> {
 /** 이 테스트의 일만 보이게 앞 테스트가 남긴 일을 치운다 */
 beforeEach(async () => {
   await db.sql`
-    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
 });
 
@@ -873,6 +873,7 @@ describe('작업 토큰', () => {
       'neighbors',
       'request_approval',
       'delegate_task',
+      'wait_subtasks',
       'read_url',
       'report_round',
       'post_update',
@@ -900,6 +901,7 @@ describe('작업 토큰', () => {
       'save_session',
       'save_transcript',
       'set_deliver',
+      'wait_subtasks',
     ]);
   });
 
@@ -1215,16 +1217,18 @@ describe('위임', () => {
             status: 'failed',
             error: '세션이 없어요',
           });
-    assert.equal((await finish(first)).ok, true);
-    await drain();
-    assert.equal((await getTask(parent.id)).status, 'waiting', '하나가 남아 아직 기다린다');
-
     const second = await take();
     assert.deepEqual(
       [first.task.id, second.task.id].sort(),
       made.map((m) => String(m.task_id)).sort(),
     );
-    assert.equal((await finish(second)).ok, true);
+    // 끝낸 쪽부터: 하나가 남으면 아직 기다린다 (실패면 형제를 기다리지 않고 깬다, 팀원 기다리기 subtask-wait.api.test)
+    const writerJob = first.agent.name === '글쓰기 팀원' ? first : second;
+    const failingJob = writerJob === first ? second : first;
+    assert.equal((await finish(writerJob)).ok, true);
+    await drain();
+    assert.equal((await getTask(parent.id)).status, 'waiting', '하나가 남아 아직 기다린다');
+    assert.equal((await finish(failingJob)).ok, true);
     await drain();
     const woke = await getTask(parent.id);
     assert.equal(woke.status, 'queued');
@@ -1233,6 +1237,7 @@ describe('위임', () => {
     const back = (await take()) as Awaited<ReturnType<typeof take>> & Json;
     assert.equal(back.task.id, parent.id);
     assert.equal(back.agent.name, '팀장');
+    assert.equal(back.wake, 'all', '모두 끝나 깼다');
     assert.deepEqual(
       (back.subtask_results as Json[])
         .map((r) => [r.title, r.agent, r.status, r.summary, r.error, r.deliver])

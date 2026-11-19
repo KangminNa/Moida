@@ -3531,6 +3531,18 @@ ul.picked > .chip {
   color: var(--muted);
 }
 
+.lane-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.lane-wait .ghost {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
 .lane-event {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -4051,4 +4063,20 @@ ul.picked > .chip {
 .app-preview.phone {
   width: 390px;
   max-width: 100%;
+}
+
+/* 앱 관리 › 커뮤니티 (스토어 3-2): 회원 글 · 댓글은 글자 그대로, 임시 비밀번호는 한 번만 크게 */
+.community-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.community-secret {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
+  user-select: all;
 }

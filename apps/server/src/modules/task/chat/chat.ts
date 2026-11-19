@@ -10,7 +10,7 @@ import type { Agent } from '../agent/agent';
 import { AgentRuntime } from '../agent/agent-runtime.policy';
 import { Task } from '../task/task';
 import { TaskRefs } from '../task/task-refs.policy';
-import type { ChatNew, ChatRow, ChatUpdateKind, ChatUpdateNew } from '../task.tables';
+import type { ChatNew, ChatRow, ChatUpdateKind, ChatUpdateNew, TaskNew } from '../task.tables';
 import { ChatView } from './chat.view';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatRequest } from './chat-request.policy';
@@ -133,8 +133,19 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * 관리자의 대화를 이어 쓰면 앞 대화(비공개일 수 있다)가 그 기기의 회차에 실린다. 남의 대화는 없는 것처럼 (404)
    */
   assertSender(deviceId: string | null): void {
-    if (deviceId !== null && this.row.device_id !== deviceId)
+    if (this.trashed || (deviceId !== null && this.row.device_id !== deviceId))
       throw new NotFound('대화를 찾을 수 없어요');
+  }
+
+  /** 휴지통에 있는가 (2026-11-19 휴지통 A). 휴지통의 대화에는 보내지 못하고(assertSender) 서버도 회차를 열지 않는다 */
+  get trashed(): boolean {
+    return this.row.deleted_at !== null;
+  }
+
+  /** 휴지통으로 넣거나(now) 꺼낸다(null). 회차 작업 · 결과물 · 소식은 그대로 남는다 (원칙 2) */
+  trash(now: Date | null): void {
+    this.put('deleted_at', now);
+    this.changed();
   }
 
   /**
@@ -173,11 +184,9 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     this.put('turns', turn);
     this.put('updated_at', now);
     this.changed();
-    return Task.open(
-      this.row.space_id,
+    return this.task(
       ChatRequest.turn(this.id, turn),
       {
-        kind: Task.GENERAL,
         agent_id: agent.id,
         title: `대화 · ${ChatHistory.firstLine(note ?? text, Chat.TASK_TITLE)}`,
         instruction: text,
@@ -237,11 +246,9 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * instruction은 지시문 틀 result-review로 채운 글. 답은 소식(review)과 결과 카드에 실린다
    */
   review(reviewer: Agent, instruction: string, now: Date): Task {
-    return Task.open(
-      this.row.space_id,
+    return this.task(
       ChatRequest.review(this.id, this.row.turns),
       {
-        kind: Task.GENERAL,
         agent_id: reviewer.id,
         title: `검토 · ${ChatHistory.firstLine(this.row.title, Chat.TASK_TITLE)}`,
         instruction,
@@ -278,11 +285,9 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     this.changed();
     if (current.status === Task.QUEUED) return null;
     const turn = this.row.turns;
-    return Task.open(
-      this.row.space_id,
+    return this.task(
       `${ChatRequest.turn(this.id, turn)}:reply:${appended + 1}`,
       {
-        kind: Task.GENERAL,
         agent_id: agent.id,
         title: `대화 · ${ChatHistory.firstLine(text, Chat.TASK_TITLE)}`,
         instruction: text,
@@ -390,5 +395,11 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
 
   private changed(): void {
     this.announce(Chat.CHANGED, { turns: this.row.turns });
+  }
+
+  /** 대화의 일 하나 (회차 · 덧붙인 말의 답 · 검토): 관리자가 기다리는 일이라 대기열에서 먼저 (ChatRequest.PRIORITY) */
+  private task(requestId: string, fields: Omit<TaskNew, 'id' | 'space_id' | 'kind'>, now: Date) {
+    const order = { kind: Task.GENERAL, priority: ChatRequest.PRIORITY };
+    return Task.open(this.row.space_id, requestId, { ...fields, ...order }, now);
   }
 }

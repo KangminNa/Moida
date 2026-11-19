@@ -6,6 +6,8 @@ import {
   Conflict,
   Database,
   Forbidden,
+  RuleViolation,
+  type Sql,
   type VersionInput,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
@@ -13,11 +15,15 @@ import { ApprovalRepository } from '../approval/approval.repository';
 import { GoalRepository } from '../goal/goal.repository';
 import { OutputQuery } from '../output/output.query';
 import { CodeScope } from './code-scope';
+import { DelegationPolicy } from './delegation.policy';
+import type { WaitSubtasksInput } from './subtask-wait.input';
+import { SubtaskWait } from './subtask-wait.policy';
 import { Task } from './task';
-import type { CreateTaskInput, DelegateTaskInput } from './task.input';
+import type { CreateTaskInput, DelegateTaskInput, TaskIdInput } from './task.input';
 import { TaskRepository } from './task.repository';
 
 // 작업 쓰기: 만들기와 취소(주인), 일 요청(이벤트), 위임(에이전트가 작업 토큰으로)과 하위 작업이 끝났을 때 위 작업 깨우기(일꾼).
+// 팀원 기다리기 (2026-11-19, SubtaskWait): 기한 · 실패 · 관리자 재촉으로 먼저 깨우기, 더 기다리기(wait_subtasks).
 // 러너 쪽(빌리기 · 진행 · 끝내기 · 돌려주기 · 끝난 임대 되돌리기)은 JobService.
 // 잠그는 순서는 어디서나 작업 → 결재 → 에이전트.
 @Injectable()
@@ -52,15 +58,7 @@ export class TaskService extends BaseService {
       task.assertVersion(req.version);
       // 잠그는 순서는 위 작업 → 아래 작업 → 결재 (작업은 모두 먼저 잠갔다)
       const below = await tasks.lockOpenDescendants(task.id);
-      const approvals = new ApprovalRepository(tx);
-      for (const one of [task, ...below]) {
-        one.cancel(now);
-        await tasks.save(one);
-        const pending = await approvals.lockPending(one.id);
-        if (!pending) continue;
-        pending.cancel();
-        await approvals.save(pending);
-      }
+      await TaskService.stop(tx, tasks, [task, ...below], now);
       return task;
     });
   }
@@ -77,7 +75,7 @@ export class TaskService extends BaseService {
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const parent = await tasks.lock(spaceId, taskId);
-      const keys = req.subtasks.map((s) => parent.subtaskRequestId(s.requestId));
+      const keys = req.subtasks.map((s) => DelegationPolicy.requestIdOf(parent.id, s.requestId));
       const before = await tasks.findByRequests(spaceId, keys);
       if (before.length > 0) {
         // 응답을 놓쳐 같은 호출을 다시 보냈다: 그때 만든 것을 그대로. 일부만 겹치면 다른 호출이다
@@ -101,25 +99,89 @@ export class TaskService extends BaseService {
       for (const child of made)
         if (!(await tasks.insertOnce(child)))
           throw new Conflict('같은 하위 작업이 동시에 만들어졌어요. 다시 보내 주세요');
-      parent.waitForSubtasks(made.length, now);
+      const kinds = req.subtasks.map((s) => String(s.fields.kind ?? Task.GENERAL));
+      const until = SubtaskWait.until(now, req.waitMinutes, kinds);
+      parent.waitForSubtasks(`하위 작업 ${made.length}개를 맡겼어요`, until, now);
       await tasks.save(parent);
       return made;
     });
   }
 
   /**
-   * 하위 작업 하나가 끝났다 (일꾼이 task.task.changed로 부른다). 형제가 모두 끝났으면 위 작업을 대기열로 돌린다.
+   * 먼저 깨어난 위 작업이 끝나지 않은 하위 작업을 더 기다린다 (MCP wait_subtasks). 위임처럼 라운드 하나를 쓴다.
+   * cancel의 하위 작업(바로 아래, 끝나지 않은 것)은 그 아래까지 멈추고, 남은 것을 기한까지 기다린다.
+   * 남은 것이 없으면 러너가 AI를 끈 뒤 곧 깨운다 (그사이 끝난 결과는 다음 실행이 받는다). 답은 기다리는 하위 작업
+   */
+  async waitMore(actor: Actor, req: WaitSubtasksInput): Promise<readonly Task[]> {
+    actor.assertCan(Actor.AGENT);
+    if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
+    const { spaceId, agentId, taskId } = actor;
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const parent = await tasks.lock(spaceId, taskId);
+      // 기다리기도 위임처럼 살아 있는 임대 · 라운드 한도 · 관리자 재촉을 본다 (한 번 더 맡기는 것과 같은 자리)
+      parent.assertCanDelegate(agentId, 1, 0, now);
+      const children = await tasks.children(parent.id);
+      const open = children.filter((c) => c.open && !req.cancel.includes(c.id));
+      SubtaskWait.assertLeft(open.length, req.cancel.length);
+      const stopping: Task[] = [];
+      for (const id of req.cancel) {
+        const child = children.find((c) => c.id === id && c.open);
+        if (!child) throw new RuleViolation(`끝나지 않은 바로 아래 하위 작업이 아니에요: ${id}`);
+        const locked = await tasks.lockById(child.id);
+        if (locked) stopping.push(locked, ...(await tasks.lockOpenDescendants(child.id)));
+      }
+      await TaskService.stop(tx, tasks, stopping, now);
+      const until =
+        open.length > 0 ? SubtaskWait.until(now, req.minutes, []) : SubtaskWait.soon(now);
+      parent.waitForSubtasks(`하위 작업 ${open.length}개를 더 기다려요`, until, now);
+      await tasks.save(parent);
+      return open;
+    });
+  }
+
+  /** 관리자가 지금까지의 결과로 답하라고 한다 (대화의 팀 칸 "지금까지로 답하기"). 기다리는 중이면 바로 깨운다 */
+  async hurry(actor: Actor, req: TaskIdInput): Promise<Task> {
+    actor.assertOwner();
+    const spaceId = TaskService.spaceOf(actor);
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const task = await tasks.lock(spaceId, req.id);
+      task.hurry(new Date());
+      await tasks.save(task);
+      return task;
+    });
+  }
+
+  /** 기다리는 기한이 지난 위 작업을 깨운다 (마감 작업 SubtaskWaitJob). 하나씩 잠가 기한을 다시 본다 */
+  async wakeOverdue(actor: Actor, ids: readonly string[], now: Date): Promise<void> {
+    actor.assertCan(Actor.RUN);
+    for (const id of ids)
+      await this.transaction(async (tx) => {
+        const tasks = new TaskRepository(tx);
+        const task = await tasks.lockById(id);
+        if (!task) return;
+        task.wakeIfOverdue(now);
+        await tasks.save(task);
+      });
+  }
+
+  /**
+   * 하위 작업 하나가 끝났다 (일꾼이 task.task.changed로 부른다). 형제가 모두 끝났거나 이것이 실패했으면
+   * 위 작업을 대기열로 돌린다 (SubtaskWait.wakeOn: 실패는 형제를 기다리지 않고 바로, 팀원 기다리기).
    * 위 작업만 잠그고 세므로, 둘이 동시에 끝나도 늦게 커밋한 쪽이 깨운다. 두 번 불려도 같다
    */
-  async settleSubtask(actor: Actor, taskId: string): Promise<void> {
+  async settleSubtask(actor: Actor, taskId: string, status: string): Promise<void> {
     actor.assertCan(Actor.RUN);
     await this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const parentId = await tasks.parentOf(taskId);
       const parent = parentId === null ? null : await tasks.lockById(parentId);
       if (!parent?.waitingForSubtasks) return;
-      if ((await tasks.openChildren(parent.id)) > 0) return;
-      parent.wakeAfterSubtasks(new Date());
+      const reason = SubtaskWait.wakeOn(status, await tasks.openChildren(parent.id));
+      if (reason === null) return;
+      parent.wakeAfterSubtasks(reason, new Date());
       await tasks.save(parent);
     });
   }
@@ -138,6 +200,24 @@ export class TaskService extends BaseService {
       if (goalId !== null) (await new GoalRepository(tx).load(spaceId, goalId)).assertActive();
       return (await tasks.insertOnce(task)) ? task : tasks.findByRequest(spaceId, req.requestId);
     });
+  }
+
+  /** 작업들을 멈추고 기다리던 결재도 닫는다. 작업은 모두 먼저 잠가 둔다 (잠그는 순서: 작업 → 결재) */
+  private static async stop(
+    tx: Sql,
+    tasks: TaskRepository,
+    list: readonly Task[],
+    now: Date,
+  ): Promise<void> {
+    const approvals = new ApprovalRepository(tx);
+    for (const one of list) {
+      one.cancel(now);
+      await tasks.save(one);
+      const pending = await approvals.lockPending(one.id);
+      if (!pending) continue;
+      pending.cancel();
+      await approvals.save(pending);
+    }
   }
 
   private static spaceOf(actor: Actor): string {

@@ -2,6 +2,7 @@ import { BaseRequest, type RequestFields, type Unchecked } from '../../platform'
 import type { PlanUsageRow, TaskNew } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { MakeMaterials } from './make-materials';
+import { SubtaskWait } from './subtask-wait.policy';
 
 // 작업 입력의 모양. REST(콘솔)는 camelCase, MCP(러너)는 다른 도구처럼 snake_case로 받는다.
 
@@ -326,6 +327,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly deliver: string | null,
     /** make 일의 결과를 이 앱 코드의 새 버전으로 (payload.appCode, 스토어 1-6b). 다른 일에는 없다 */
     readonly appId: string | null,
+    /** 이 일의 모델 (haiku · sonnet · opus, 맡기는 일의 모델 이하, ModelTier). 없으면 팀원의 설정 */
+    readonly model: string | null,
   ) {
     super();
   }
@@ -348,6 +351,7 @@ export class SubtaskOrder extends BaseRequest {
       f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
       f.optionalText('deliver', SubtaskOrder.DELIVER_MAX),
       f.optionalText('app_id', 36) === null ? null : f.uuid('app_id'),
+      f.optionalText('model', 20),
     );
   }
 }
@@ -359,7 +363,11 @@ export class SubtaskOrder extends BaseRequest {
 export class DelegateTaskInput extends BaseRequest {
   private static readonly SHAPE_MAX = 20;
 
-  private constructor(readonly subtasks: readonly SubtaskOrder[]) {
+  private constructor(
+    readonly subtasks: readonly SubtaskOrder[],
+    /** 기다리는 기한(분, 팀원 기다리기). 없으면 맡긴 일의 종류로 (SubtaskWait.until) */
+    readonly waitMinutes: number | null,
+  ) {
     super();
   }
 
@@ -369,6 +377,7 @@ export class DelegateTaskInput extends BaseRequest {
       (f) =>
         new DelegateTaskInput(
           f.nestedList('subtasks', DelegateTaskInput.SHAPE_MAX).map((s) => SubtaskOrder.from(s)),
+          f.optionalInteger('wait_minutes', 1, SubtaskWait.MINUTES_MAX),
         ),
     );
   }

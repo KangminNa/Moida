@@ -13,13 +13,17 @@ Mustache.templateCache = undefined;
 /** 글 사진 주소 (/api/files/<해시>) */
 const FILE_SRC = /(src=")(\/api\/files\/[0-9a-f]+)(")/g;
 
-/** 웹이 데이터에 더하는 것: 글 본문의 HTML · 날짜 글자 · 사이트 이름 (서버는 방문자 데이터만 준다) */
+/**
+ * 웹이 데이터에 더하는 것: 글 본문의 HTML · 날짜 글자 · 사이트 이름 (서버는 방문자 데이터만 준다).
+ * extra: 웹이 다른 API에서 읽어 더하는 이름 (커뮤니티의 글 · 댓글 · 회원 링크, 스토어 3-2)
+ */
 function enrich(
   data: AppScreenData,
+  extra: Readonly<Record<string, unknown>>,
   siteName: string,
   ticket: string | null,
 ): Record<string, unknown> {
-  const withDates = addDates(data) as Record<string, unknown>;
+  const withDates = addDates({ ...data, ...extra }) as Record<string, unknown>;
   const post = withDates.post as Record<string, unknown> | null;
   if (post) {
     // 서버의 md → HTML은 본문의 HTML을 그리지 않고 결과를 한 번 더 거른다 (_lib/markdown.ts)
@@ -61,8 +65,9 @@ export function renderAppScreen(
   template: string,
   siteName: string,
   ticket: string | null,
+  extra: Readonly<Record<string, unknown>> = {},
 ): string {
-  const data = enrich(screen.data, siteName, ticket);
+  const data = enrich(screen.data, extra, siteName, ticket);
   const templates = screen.templates as Record<string, string>;
   const html = Mustache.render(
     templates[template] ?? '',

@@ -6,7 +6,7 @@ import type { AgentRow, ChatUpdateRow, ExternalToolRow, OutputRow, TaskRow } fro
 /** 하위 작업이 만든 결과물 한 줄 (깨어난 위 작업에게 보인다) */
 export type SubtaskOutputRow = Pick<OutputRow, 'id' | 'task_id' | 'name' | 'kind'>;
 
-/** 대화의 모델 · 생각 강도 (payload.runtime). 대화의 회차에만 있다 */
+/** 일에 실린 모델 · 생각 강도 (payload.runtime): 대화의 회차, 모델을 정해 맡긴 하위 작업 */
 function runtimeOf(r: Readonly<TaskRow>): { model?: string; effort?: string } | null {
   return (r.payload as { runtime?: { model?: string; effort?: string } } | null)?.runtime ?? null;
 }
@@ -15,6 +15,12 @@ function runtimeOf(r: Readonly<TaskRow>): { model?: string; effort?: string } | 
 function deliverOf(r: Readonly<TaskRow>): string | null {
   const deliver = (r.payload as { deliver?: unknown } | null)?.deliver;
   return typeof deliver === 'string' && deliver !== '' ? deliver : null;
+}
+
+/** 하위 작업을 기다리다 깬 까닭 (payload.wake: all · failed · deadline · owner, 팀원 기다리기 SubtaskWait). 없으면 null */
+function wakeOf(r: Readonly<TaskRow>): string | null {
+  const wake = (r.payload as { wake?: unknown } | null)?.wake;
+  return typeof wake === 'string' ? wake : null;
 }
 
 /** 작업의 대상. 없으면 null (task.view.ts와 같은 모양) */
@@ -108,6 +114,9 @@ export class JobSubtaskResultView {
       summary: this.summary?.slice(0, JobSubtaskResultView.SUMMARY_MAX) ?? null,
       error: this.error,
       deliver: deliverOf(r),
+      // 끝나지 않은 일(먼저 깨어났을 때): 기다리는 것(approval · subtasks)과 맡긴 때 (러너가 몇 분째인지 센다)
+      waiting: r.wait_reason,
+      since: r.created_at.toISOString(),
     };
   }
 }
@@ -270,9 +279,12 @@ export class JobView {
       prompt_package: this.promptPackage?.toJSON() ?? null,
       chat_updates: this.chat?.toJSON() ?? null,
       revision_note: this.revisionNote,
+      // 하위 작업을 기다리다 깬 까닭 (팀원 기다리기). 처음 빌려 가는 일이면 null
+      wake: wakeOf(r),
       // bound: 이 러너에 묶인 에이전트 (묶인 일은 그 러너만 빌린다). 러너는 이때만 나눈 폴더를 연다
       // model · effort: AI CLI에 넘길 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계).
-      // 대화가 정해 둔 것(payload.runtime, 2026-11-15 B)이 있으면 그 회차에는 그것을 쓴다 (팀원의 일에는 없다).
+      // 대화가 정해 둔 것(payload.runtime, 2026-11-15 B)이 있으면 그 회차에는 그것을 쓴다. 하위 작업에는 맡긴 쪽이 고르거나
+      // 상한으로 낮춘 모델이 실린다 (ModelTier, 2026-11-19).
       // lead: 대표의 일 (O-2). 러너가 지시문 틀의 lead 단락을 넣는다 (나눠 맡기기 · 설정 제안 · 결과 중심)
       agent:
         a === null

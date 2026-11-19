@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, AgentActor, BaseQuery, Database, Forbidden } from '../../platform';
 import { SkillQuery } from '../skill/skill.query';
+import { TaskQuery } from '../task/task.query';
 import type { ReadUrlInput } from './web.input';
 import { WebPageView } from './web.view';
 import { WebPageGateway } from './web-page.gateway';
@@ -15,6 +16,8 @@ export class WebQuery extends BaseQuery {
     private readonly pages: WebPageGateway,
     /** 답에 함께 싣는 알림의 글 (지시문 틀) */
     private readonly skills: SkillQuery,
+    /** 관리자가 쓴 지시 (목줄의 기준) */
+    private readonly tasks: TaskQuery,
   ) {
     super(db);
   }
@@ -22,34 +25,9 @@ export class WebQuery extends BaseQuery {
   async readUrl(actor: Actor, req: ReadUrlInput): Promise<WebPageView> {
     actor.assertCan(Actor.AGENT);
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
-    const reach = WebReach.of(actor, await this.ownerText(actor.spaceId, actor.taskId));
+    const reach = WebReach.of(actor, await this.tasks.ownerText(actor, actor.taskId));
     const page = await this.pages.read(req.url, (url) => reach.assertAllowed(url));
     const note = (await this.skills.prompts(actor, actor.spaceId)).fill('read-url-note');
     return new WebPageView(page.url, page.title, page.text, page.truncated, page.contentType, note);
-  }
-
-  /**
-   * 주인이 쓴 지시: 위임된 일이면 맨 위 일(주인이 맡긴 일)의 제목과 지시. 하위 일의 지시는 AI가 썼다.
-   * 맨 위 일이 목표 실행의 회차 작업이면 실행의 지시: 회차 작업의 지시에는 앞 회차의 보고(AI가 쓴 글)가 실린다.
-   * 맨 위 일이 기기(MCP ask_agent)가 보낸 대화의 회차면 비어 있다: 관리자가 아니라 그 기기의 AI가 쓴 글일 수 있다
-   */
-  private async ownerText(spaceId: string, taskId: string): Promise<string> {
-    const [root] = await this.sql<{ text: string }[]>`
-      WITH RECURSIVE up AS (
-        SELECT id, parent_id, title, instruction, payload, 0 AS step FROM task.tasks
-        WHERE space_id = ${spaceId} AND id = ${taskId}
-        UNION ALL
-        SELECT t.id, t.parent_id, t.title, t.instruction, t.payload, up.step + 1 FROM task.tasks t
-        JOIN up ON t.id = up.parent_id AND t.space_id = ${spaceId}
-        WHERE up.step < 10
-      )
-      SELECT CASE WHEN up.payload -> 'chat' ->> 'via' = 'device' THEN ''
-                  WHEN r.id IS NULL THEN up.title || E'\n' || up.instruction
-                  ELSE r.title || E'\n' || r.instruction END AS text
-      FROM up
-      LEFT JOIN task.goal_runs r
-        ON r.space_id = ${spaceId} AND r.id::text = up.payload -> 'goalRun' ->> 'runId'
-      WHERE up.parent_id IS NULL ORDER BY up.step DESC LIMIT 1`;
-    return root?.text ?? '';
   }
 }

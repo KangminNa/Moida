@@ -95,7 +95,7 @@ after(() => api.close());
 /** 이 테스트의 일만 빌려 가게 앞 테스트가 남긴 일을 치운다 */
 beforeEach(async () => {
   await db.sql`
-    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
     WHERE status IN ('queued', 'running', 'waiting')`;
 });
 

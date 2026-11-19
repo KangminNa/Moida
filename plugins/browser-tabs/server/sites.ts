@@ -51,6 +51,35 @@ function checkSite(site: SiteInput): SiteInput {
   return { ...site, origins: [...new Set(site.origins)] };
 }
 
+/**
+ * 등록 없이 (2026-11-19 사용자 결정): 둘러보기가 사람이 해야 하는 화면(로그인 · 인증)을 만나면 그 주소의 출처로 사이트를 쓴다.
+ * 그 출처를 가진 사이트가 있으면 그것, 없으면 만든다 (이름은 호스트, 시작 주소는 출처의 첫 화면). 관리자는 사이트를 미리
+ * 등록하지 않고, 로그인 승인으로 그 사이트를 쓰게 된다. 허용 출처는 그 출처 하나 (넓히는 것은 관리자가 사이트 편집에서).
+ * 저절로 만든 사이트는 믿는 출처가 아니다(trusted_at 없음): 관리자가 화면에서 로그인하거나 지시에 그 도메인을 적어야 카드에 칸이 뜬다
+ */
+export async function siteForPage(work: Work, actor: Actor, pageUrl: string): Promise<SiteRow> {
+  const space = actor.requireSpace();
+  const { origin, host } = new URL(pageUrl);
+  if (!ORIGIN.test(origin)) throw new RuleViolation(`사이트로 쓸 수 없는 주소예요: ${origin}`);
+  const [found] = await work.sql<SiteRow[]>`
+    SELECT * FROM browser_tabs.sites WHERE space_id = ${space} AND ${origin} = ANY(origins)
+    ORDER BY id LIMIT 1`;
+  if (found) return found;
+  await work.insertRows(sites, {
+    space_id: space,
+    name: host.slice(0, 60),
+    start_url: `${origin}/`,
+    origins: [origin],
+  });
+  const made = await work.row(
+    sites,
+    { space_id: space, start_url: `${origin}/` },
+    { order: ['id desc'] },
+  );
+  if (!made) throw new NotFound('만든 사이트를 찾지 못했어요');
+  return made;
+}
+
 async function siteOf(work: Work, actor: Actor, id: string): Promise<SiteRow> {
   const row = await work.row(sites, { id, space_id: actor.requireSpace() });
   if (!row) throw new NotFound('없는 사이트예요');
@@ -114,11 +143,13 @@ export class CreateSite extends Command<SiteInput> {
   async run(work: Work, actor: Actor, input: SiteInput): Promise<SiteView> {
     const site = checkSite(input);
     const space = actor.requireSpace();
+    // 관리자가 직접 등록한 출처는 믿는다 (로그인 카드에 칸이 뜬다, 2026-11-19)
     await work.insertRows(sites, {
       space_id: space,
       name: site.name,
       start_url: site.startUrl,
       origins: [...site.origins],
+      trusted_at: new Date(),
     });
     const [row] = await work.rows(sites, { space_id: space }, { order: ['id desc'], limit: 1 });
     return new SiteView(row as SiteRow);

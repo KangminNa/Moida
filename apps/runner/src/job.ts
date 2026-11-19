@@ -146,6 +146,8 @@ export class Job {
     readonly appCode = false,
     /** 공간의 대표의 일 (agent.lead, O-2): 지시문 틀의 lead 단락(나눠 맡기기 · 설정 제안 · 결과 중심)을 넣는다 */
     readonly lead = false,
+    /** 하위 작업을 기다리다 깬 까닭 (next_jobs의 wake, 팀원 기다리기). 처음 빌린 일이면 null */
+    readonly wake: string | null = null,
   ) {}
 
   static from(raw: Json): Job {
@@ -193,6 +195,7 @@ export class Job {
       raw.optionalText('deliver'),
       task.text('kind') === Job.MAKE && Boolean(task.child('payload').field('appCode')),
       agent.flag('lead'),
+      raw.optionalText('wake'),
     );
   }
 
@@ -260,6 +263,7 @@ export class Job {
       this.deliver,
       this.appCode,
       this.lead,
+      this.wake,
     );
   }
 
@@ -341,17 +345,15 @@ export class Job {
       parts.push(prompts.fill('goal', { chain: this.goalChain.join(' › ') }));
     if (this.revisionNote) parts.push(prompts.fill('revision', { note: this.revisionNote }));
     if (this.subtaskResults.length > 0)
-      parts.push(
-        prompts.fill('subtasks', {
-          results: this.subtaskResults.map((r) => r.line(prompts)).join('\n'),
-        }),
-      );
+      parts.push(SubtaskResult.part(prompts, this.subtaskResults, this.wake, this.roundsLeft));
     if (this.brief) parts.push(this.brief);
     if (this.team.length > 0)
       parts.push(
         prompts.fill('team', {
           members: this.team.map((m) => m.line(prompts)).join('\n'),
           rounds: this.roundsLeft,
+          // 하위 작업 모델의 상한 (서버 ModelTier): 이 일이 쓰는 모델, 빈 글이면 CLI 기본(구독은 opus)
+          ceiling: (this.tool === 'claude' && this.runtime.model) || 'opus',
         }),
       );
     // 대표 (O-2 · O-3 · 스토어 2단계): 이 대화의 id(자동화 찾기), 이미 정해진 받을 것, 대화의 앱

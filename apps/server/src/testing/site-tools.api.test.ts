@@ -153,26 +153,18 @@ const listed = async (name: string): Promise<Json> => {
   return found;
 };
 
-/** 굳히고 켜기 결재를 승인해 켠 도구 */
+/** 굳힌 읽기 도구 (시험을 통과하면 승인 없이 바로 켜진다, 2026-11-19). 굳히기 작업은 러너가 끝낸다 */
 async function liveTool(name: string): Promise<Json> {
-  const { taskId, run } = await building(name);
+  const { taskId } = await building(name);
   const saved = await save(taskId, [{ price: 1 }, { price: 2 }, { price: 3 }]);
-  const asked = await tool(run, 'request_approval', {
-    request_id: `enable-${name}`,
-    action: 'browser.integration.enable',
-    target_kind: 'browser_integration',
-    target_id: (await listed(name)).id,
-    target_version: saved.body.integration_version,
-    note: '시험 3/3',
+  assert.equal(saved.body.enabled, true, JSON.stringify(saved.body));
+  const done = await tool(runner, 'submit_result', {
+    task_id: taskId,
+    request_id: randomUUID(),
+    status: 'done',
+    result: { text: '켰어요' },
   });
-  assert.equal(asked.ok, true, JSON.stringify(asked.body));
-  const approval = ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner));
-  ok(
-    await api.request('POST', `/api/approvals/${approval.id}/decide`, owner, {
-      version: approval.version,
-      decision: 'approve',
-    }),
-  );
+  assert.equal(done.ok, true, JSON.stringify(done.body));
   await drain();
   return listed(name);
 }
@@ -257,32 +249,10 @@ describe('사이트 도구: 굳히기', () => {
     assert.equal((detail.revisions as Json[])[0]?.seq, 1);
   });
 
-  test('통과하면 켜기 결재로 켜고 작업이 끝난다. 결재 뒤 바뀐 도구는 켜지 않는다', async () => {
+  test('읽기 도구는 시험을 통과하면 승인 없이 바로 켜진다 (2026-11-19, 쓰기 도구는 검토 · 켜기 승인)', async () => {
     const live = await liveTool('quote_ok');
     assert.equal(live.status, 'on');
     assert.equal(live.liveSeq, 1);
-    const { taskId, run } = await building('quote_stale');
-    const saved = await save(taskId, [{ price: 1 }, { price: 2 }, { price: 3 }]);
-    assert.equal(saved.body.accepted, true);
-    const asked = await tool(run, 'request_approval', {
-      request_id: 'enable-stale',
-      action: 'browser.integration.enable',
-      target_kind: 'browser_integration',
-      target_id: (await listed('quote_stale')).id,
-      target_version: Number(saved.body.integration_version) - 1,
-      note: '낡은 판',
-    });
-    const approval = ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner));
-    ok(
-      await api.request('POST', `/api/approvals/${approval.id}/decide`, owner, {
-        version: approval.version,
-        decision: 'approve',
-      }),
-    );
-    await drain();
-    assert.equal((await listed('quote_stale')).status, 'review');
-    const task = ok(await api.get(`/api/tasks/${taskId}`, owner));
-    assert.equal(task.status, 'failed');
   });
 });
 

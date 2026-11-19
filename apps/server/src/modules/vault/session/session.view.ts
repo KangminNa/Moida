@@ -239,6 +239,8 @@ export class SessionDetailView {
     return {
       ...new SessionSummaryView(this.row).toJSON(),
       sourceSessionId: this.row.source_session_id,
+      /** 휴지통으로 보낼 때 함께 보낸다 (2026-11-19 휴지통 A) */
+      version: this.row.version,
       head: this.head?.toJSON() ?? null,
       history: this.history.map((h) => h.toJSON()),
       transcripts: this.transcripts.map((t) => t.toJSON()),

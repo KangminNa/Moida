@@ -7,6 +7,7 @@ import { readPages } from '../../_task/live';
 import type { SessionPage } from '../../_vault/types';
 import { ProjectsPanel } from './ProjectsPanel';
 import { SESSION_TOPICS, SessionPanel, when } from './SessionPanel';
+import { SessionTrashPanel } from './SessionTrashPanel';
 import { TidyPanel } from './TidyPanel';
 
 function mergePages(before: SessionPage, more: SessionPage): SessionPage {
@@ -18,6 +19,8 @@ function mergePages(before: SessionPage, more: SessionPage): SessionPage {
 export function SessionsPanel({ initialId }: { initialId: string | null }) {
   const [project, setProject] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(initialId);
+  /** 휴지통 보기 (2026-11-19 휴지통 A) */
+  const [trashOpen, setTrashOpen] = useState(false);
   /** 읽어 둔 쪽 수. "더 보기"로 늘고 프로젝트를 바꾸면 첫 쪽부터 */
   const pages = useRef(1);
   const path = project ? `/api/sessions?${new URLSearchParams({ project })}` : '/api/sessions';
@@ -50,10 +53,30 @@ export function SessionsPanel({ initialId }: { initialId: string | null }) {
       />
     );
 
+  const trashChip = (
+    <button
+      type="button"
+      className="chip"
+      aria-pressed={trashOpen}
+      style={{ alignSelf: 'flex-start' }}
+      onClick={() => setTrashOpen(!trashOpen)}
+    >
+      휴지통
+    </button>
+  );
+  if (trashOpen)
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {trashChip}
+        <SessionTrashPanel />
+      </div>
+    );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <TidyPanel />
       <ProjectsPanel />
+      {trashChip}
       {projects.length > 1 && (
         <fieldset className="row" style={{ border: 0, margin: 0, padding: 0 }}>
           <legend className="sr">프로젝트</legend>

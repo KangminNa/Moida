@@ -23,6 +23,7 @@ import {
 import { ChatRequest } from './chat-request.policy';
 import { ChatResult } from './chat-result.policy';
 import { ChatReview } from './chat-review.policy';
+import { ChatTrashLineView, ChatTrashView } from './chat-trash.view';
 import { ChatUpdateQuery } from './chat-update.query';
 import { TurnDeliver } from './turn-deliver.policy';
 
@@ -33,6 +34,7 @@ import { TurnDeliver } from './turn-deliver.policy';
 @Injectable()
 export class ChatQuery extends BaseQuery {
   private static readonly PAGE = 100;
+  private static readonly TRASH_LIMIT = 200;
   /** 상세에 싣는 최근 회차 수 */
   private static readonly TURNS = 100;
   /** 상세에 싣는 최근 소식 수 */
@@ -58,11 +60,25 @@ export class ChatQuery extends BaseQuery {
     );
   }
 
+  /** 휴지통의 대화 (관리자만). 넣은 때가 늦은 순으로 TRASH_LIMIT개까지 (2026-11-19 휴지통 A) */
+  async trash(actor: Actor): Promise<ChatTrashView> {
+    actor.assertOwner();
+    const rows = await this.sql<
+      (Pick<ChatRow, 'id' | 'title' | 'turns' | 'app_id' | 'updated_at' | 'version'> & {
+        deleted_at: Date;
+      })[]
+    >`
+      SELECT id, title, turns, app_id, updated_at, version, deleted_at FROM task.chats
+      WHERE space_id = ${actor.requireSpace()} AND deleted_at IS NOT NULL
+      ORDER BY deleted_at DESC, id DESC LIMIT ${ChatQuery.TRASH_LIMIT}`;
+    return new ChatTrashView(rows.map((r) => new ChatTrashLineView(r)));
+  }
+
   async get(actor: Actor, req: ChatIdInput): Promise<ChatDetailView> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     const [chat] = await this.sql<ChatRow[]>`
-      SELECT * FROM task.chats WHERE space_id = ${spaceId} AND id = ${req.id}`;
+      SELECT * FROM task.chats WHERE space_id = ${spaceId} AND id = ${req.id} AND deleted_at IS NULL`;
     if (!chat) throw new NotFound('대화를 찾을 수 없어요');
     const [partner] = await this.sql<ChatPartnerRow[]>`
       SELECT name, status, reports_to, deleted_at FROM task.agents WHERE id = ${chat.agent_id}`;
@@ -144,7 +160,7 @@ export class ChatQuery extends BaseQuery {
         SELECT c.id FROM task.tasks c JOIN tree ON c.parent_id = tree.id
         WHERE c.status = ANY(${open}::text[])
       )
-      SELECT t.id, t.agent_id, t.title, t.status, t.wait_reason, t.created_at, t.parent_id,
+      SELECT t.id, t.agent_id, t.title, t.status, t.wait_reason, t.wait_until, t.created_at, t.parent_id,
         a.name AS agent,
         (SELECT e.body FROM task.task_events e
           WHERE e.task_id = t.id AND e.body <> '' ORDER BY e.id DESC LIMIT 1) AS last_event

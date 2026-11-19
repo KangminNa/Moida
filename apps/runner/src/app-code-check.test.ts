@@ -37,7 +37,7 @@ const short = (checks: readonly StageCheck[]) => checks.map((c) => [c.name, c.ok
 
 describe('템플릿 훑기 (AppCodeCheck.scan)', () => {
   test('시작 코드 셋의 템플릿은 문제도 모르는 이름도 없다', async () => {
-    for (const kind of ['blog', 'magazine', 'page']) {
+    for (const kind of ['blog', 'magazine', 'page', 'community']) {
       const names = new Map<string, string>();
       for (const dir of ['base', kind])
         for (const file of await readdir(join(STARTERS, dir)))

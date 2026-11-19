@@ -204,6 +204,15 @@ export class App extends TableEntity<AppRow, AppNew> {
     this.accept(changes, App.RULES);
     if (this.row === before) return;
     if (this.row.visibility !== App.PUBLIC) this.put('home', false);
+    // 커뮤니티는 회원 가입 · 쓰기가 앱 도메인에서만 되어, 확인한 도메인 없이 공개하면 아무도 가입하지 못한다 (스토어 3-2).
+    // 공개로 바꿀 때만 본다 (복원한 공개 커뮤니티는 도메인이 없어도 다른 칸을 고칠 수 있다)
+    if (
+      this.row.kind === App.COMMUNITY &&
+      this.row.visibility === App.PUBLIC &&
+      before.visibility !== App.PUBLIC &&
+      this.row.domain_checked_at === null
+    )
+      throw new RuleViolation('커뮤니티는 도메인 연결을 확인한 뒤에 공개할 수 있어요');
     this.put('updated_at', now);
     if (this.row.visibility !== before.visibility) this.record(this.changed(false));
   }
@@ -224,6 +233,14 @@ export class App extends TableEntity<AppRow, AppNew> {
   setDomain(value: string | null, siteHost: string | null, now: Date): void {
     const domain = value === null || value.trim() === '' ? null : App.checkDomain(value, siteHost);
     if (domain === this.row.domain) return;
+    // 공개 중인 커뮤니티의 확인한 도메인을 바꾸면 확인이 비워져 회원이 들어오지 못한다 (스토어 3-2): 비공개로 바꾼 뒤에.
+    // 확인한 도메인이 없는 공개 커뮤니티(도메인은 백업에 없어 복원한 앱)는 그대로 정하고 확인한다
+    if (
+      this.row.kind === App.COMMUNITY &&
+      this.row.visibility === App.PUBLIC &&
+      this.row.domain_checked_at !== null
+    )
+      throw new RuleViolation('공개 중인 커뮤니티는 비공개로 바꾼 뒤에 도메인을 바꿔요');
     this.put('domain', domain);
     this.put('domain_checked_at', null);
     this.put('updated_at', now);

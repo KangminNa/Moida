@@ -5,6 +5,11 @@
 export class ChatRequest {
   /** 회차 작업의 맨 앞 (SQL이 대화 id · 회차를 이어 붙인다) */
   static readonly TURN_PREFIX = 'chat:';
+  /**
+   * 대화의 일(회차 · 덧붙인 말의 답 · 검토)의 대기열 우선순위 (팀원 기다리기, 2026-11-19): 관리자가 기다리는 일이라
+   * 스케줄 · 목표의 배경 일(0)보다 먼저 빌려 준다. 하위 작업은 위 작업의 우선순위를 물려받는다
+   */
+  static readonly PRIORITY = 10;
   /** O-2 전 배정 일의 맨 앞 (대화의 토큰 합계에만, SQL이 대화 id를 이어 붙인다) */
   static readonly ROUTE_PREFIX = 'chat-route:';
 

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { BrowseSite } from './browse-job';
-import type { AskedApproval } from './browse-stage';
+import type { AskedApproval } from './browse-login';
 import type { IntegrationExec } from './integration-exec';
 import type { Json } from './json';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
@@ -69,7 +69,7 @@ export class SiteBuildPlan {
 /**
  * 사이트 도구 굳히기의 뒤 (2026-11-16 MCP 2단계, docs/MCP.md 6장). AI(Claude)가 Playwright MCP로 사이트를 둘러보고
  * 작업 폴더의 site-tool/에 tool.json(입출력 형식) · code.js(본문) · tests.json(시험 3~10개)을 남기면, 러너가 시험을 하나씩
- * 직접 돌려(IntegrationExec, AI 없음) site_build_save로 보낸다. 서버가 채점해 70% 이상이면 켜기 결재를 올리고,
+ * 직접 돌려(IntegrationExec, AI 없음) site_build_save로 보낸다. 서버가 채점해 70% 이상이면 읽기 도구는 서버가 바로 켜고(2026-11-19) 그 밖은 켜기 결재를 올리고,
  * 아니면 첫 회차는 일을 돌려줘(다음 회차가 틀린 시험을 힌트로 받는다) 한 번 더, 두 번째도 못 넘으면 실패로 끝낸다
  */
 export class SiteBuild {
@@ -138,6 +138,13 @@ export class SiteBuild {
     const score = `시험 ${verdict.passed}/${verdict.total} 통과`;
     if (verdict.accepted && verdict.review) {
       const summary = `${plan.title} (${plan.name}, 쓰기) 버전 ${verdict.seq}: ${score} (마른 실행). 검토자에게 넘겼어요`;
+      return {
+        ending: RunEnding.submit('끝났어요', RunResult.done(summary, redactor)),
+        approval: null,
+      };
+    }
+    if (verdict.accepted && verdict.enabled) {
+      const summary = `${plan.title} (${plan.name}) 버전 ${verdict.seq}: ${score}. 바로 켰어요 (읽기 도구)`;
       return {
         ending: RunEnding.submit('끝났어요', RunResult.done(summary, redactor)),
         approval: null,
