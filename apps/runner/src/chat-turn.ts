@@ -24,6 +24,8 @@ export class ChatTurn {
     private readonly team: readonly (readonly [string, string, string])[] = [],
     /** 이미 정해진 이번 회차의 받을 것 (레시피 · 다시 맡긴 회차, payload.chat.deliver). 없으면 대표가 정한다 (O-3) */
     readonly deliver: string | null = null,
+    /** 앱 관리에서 연 대화의 앱 (payload.chat.appId, 스토어 2단계). 대표가 그 앱의 운영 팀장에게 맡긴다 */
+    readonly appId: string | null = null,
   ) {}
 
   /** 대화의 회차가 아니면 null. updates: next_jobs의 chat_updates (없을 수 있다) */
@@ -44,6 +46,7 @@ export class ChatTurn {
         (u) => [u.text('kind'), u.text('agent'), u.text('text')] as const,
       ),
       chat.text('deliver') || null,
+      chat.text('appId') || null,
     );
   }
 

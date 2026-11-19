@@ -382,6 +382,21 @@ describe('지시문', () => {
     assert.equal(fixed.includes('set_deliver로 이번 회차의'), false);
   });
 
+  test('대표의 앱 일 (스토어 2단계): 앱의 일은 운영 팀장에게, 앱으로 연 대화면 그 앱 하나만', () => {
+    const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
+    const turn = (chat: object) =>
+      job({
+        agent: lead,
+        task: { id: 't', title: '대화 · 글', payload: { chat: { turn: 1, history: [], ...chat } } },
+      }).prompt(REPO_PROMPTS, false);
+    const plain = turn({ chatId: 'chat-1' });
+    assert.ok(plain.includes('get_settings kind: apps'), '앱의 일은 운영 팀장에게 (늘 있는 줄)');
+    assert.ok(plain.includes('setting: app, op: edit, fields: { agent_id }'));
+    assert.equal(plain.includes('이 대화는 앱 하나의 일입니다'), false);
+    const inApp = turn({ chatId: 'chat-2', appId: 'app-9' });
+    assert.ok(inApp.includes('이 대화는 앱 하나의 일입니다 (app_id: app-9)'));
+  });
+
   test('묶인 팀원은 정해진 컴퓨터에서 일한다고 팀장에게 알린다', () => {
     const prompt = job({
       team: [

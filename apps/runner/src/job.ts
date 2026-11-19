@@ -348,12 +348,13 @@ export class Job {
           rounds: this.roundsLeft,
         }),
       );
-    // 대표 (O-2 · O-3): 이 대화의 id(자동화 찾기)와 이미 정해진 받을 것
+    // 대표 (O-2 · O-3 · 스토어 2단계): 이 대화의 id(자동화 찾기), 이미 정해진 받을 것, 대화의 앱
     if (this.lead)
       parts.push(
         prompts.fill('lead', {
           chat: this.chat?.chatId ?? null,
           deliver: this.chat?.deliver ?? null,
+          app: this.chat?.appId ?? null,
         }),
       );
     if (this.skill && skillReady) parts.push(prompts.fill('skill', { name: this.skill }));
