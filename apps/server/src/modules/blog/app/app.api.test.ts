@@ -158,7 +158,7 @@ describe('앱 (/api/apps)', () => {
     }
   });
 
-  test('주소: 형식 · 못 쓰는 이름은 422, 겹치면 409. 종류가 틀리면 422, 페이지 앱은 페이지가 있어야 한다', async () => {
+  test('주소: 형식 · 못 쓰는 이름은 422, 겹치면 409. 종류가 틀리면 422, 페이지 앱은 페이지 없이도 만든다 (스토어 2-6)', async () => {
     for (const slug of ['A', 'x', 'has space', '한글', '-dash', 'admin', 'posts', 'api'])
       assert.equal((await createApp({ kind: 'blog', name: '틀림', slug })).status, 422, slug);
     await newApp(`taken-${mark}`);
@@ -167,9 +167,17 @@ describe('앱 (/api/apps)', () => {
       409,
     );
     assert.equal((await createApp({ kind: 'shop', name: '종류', slug: `k-${mark}` })).status, 422);
-    const page = await createApp({ kind: 'page', name: '지도', slug: `map-${mark}` });
-    assert.equal(page.status, 422);
-    assert.match(page.text, /페이지가 있어야/);
+    const page = ok(await createApp({ kind: 'page', name: '지도', slug: `map-${mark}` }), 201);
+    assert.equal(page.kind, 'page');
+    assert.deepEqual(ok(await api.get(`/api/menus?app=${page.slug}`, owner)).menus, []);
+    const menus = await createApp({
+      kind: 'page',
+      name: '메뉴',
+      slug: `pm-${mark}`,
+      menus: ['글'],
+    });
+    assert.equal(menus.status, 422);
+    assert.match(menus.text, /메뉴를 둘 수 없어요/);
   });
 
   test('비공개 앱의 글 · 메뉴 · 호는 방문자에게 없는 것과 같다. 공개로 바꾸면 보인다', async () => {

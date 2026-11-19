@@ -196,7 +196,11 @@ export class ChatQuery extends BaseQuery {
       outputs,
       tasks,
       deliver,
-      missing === null,
+      // 받을 것이 아직 없어도 승인 뒤 이어서 낼 것이면 그렇게 보인다 (스토어 2-6)
+      {
+        passed: missing === null,
+        continues: missing !== null && ChatResult.continuesAfter(actions),
+      },
       said ? ChatReview.parse(said) : null,
       { deliver: fixes - byReview, review: byReview },
     );

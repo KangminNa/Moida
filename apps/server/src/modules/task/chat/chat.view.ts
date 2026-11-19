@@ -240,7 +240,7 @@ export class ChatCardView {
     /** 항목을 낸 작업들의 결과 (하네스 검사) */
     private readonly tasks: readonly ChatCardTaskRow[],
     private readonly deliver: string | null,
-    private readonly passed: boolean,
+    private readonly check: { passed: boolean; continues: boolean },
     private readonly review: ChatReviewVerdict | null,
     /** 이 카드까지 서버가 다시 맡긴 회차 수: 받을 것이 빠져서 · 검토 반영 (검증 고리 V) */
     private readonly fixed: { deliver: number; review: number },
@@ -289,9 +289,12 @@ export class ChatCardView {
           checks: this.checksFor(o.task_id),
         })),
       ],
-      /** 받을 것과 검사 (받을 것을 정하지 않았으면 deliver null, passed true) */
+      /**
+       * 받을 것과 검사 (받을 것을 정하지 않았으면 deliver null, passed true). continues: 아직 없지만 카드의 설정 바꾸기를
+       * 승인하면 대표가 이어서 낸다 (O-2 continue, 스토어 2-6)
+       */
       deliver: this.deliver,
-      passed: this.passed,
+      ...this.check,
       /** 검토자 짝의 판정 (검토하지 않았으면 null, 검증 고리 V) */
       review: this.review,
       /** 서버가 다시 맡긴 회차 수 (받을 것 · 검토 반영) */

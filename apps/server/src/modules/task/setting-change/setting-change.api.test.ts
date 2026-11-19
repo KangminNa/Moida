@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
-import { Database, OutboxWorker } from '../../platform';
+import {
+  AgentDirectory,
+  ApprovedActor,
+  Database,
+  Forbidden,
+  OutboxWorker,
+  SettingKinds,
+} from '../../platform';
 
 // 설정 바꾸기 제안 (2026-11-15 C · D): get_settings → propose_setting(미리 해 보기 + 결재 task.setting.change) → 승인 → 적용.
 // 러너는 MCP로, 관리자는 REST로 들어오고 승인 뒤 적용은 outbox와 일꾼을 실제로 거친다. AI는 띄우지 않는다.
@@ -593,6 +600,72 @@ describe('설정 바꾸기: 스토어의 앱 (스토어 1단계)', () => {
     const app = (apps as Json[]).find((a) => a.slug === slug) as Json;
     assert.deepEqual([app.agent_id, app.policy, app.home], [head.id, '사진 한 장 이상', false]);
   });
+
+  test('운영 팀 새로 만들기(new_team): 승인 한 번에 앱 운영 팀과 페이지 없는 페이지 앱이 함께 생긴다 (스토어 2-6)', async () => {
+    const { token, head } = await partner();
+    const slug = `trip-${randomUUID().slice(0, 6)}`;
+    const fields = { name: '여행 계획', slug, kind: 'page', new_team: true };
+    const both = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'app',
+      op: 'create',
+      fields: { ...fields, agent_id: head.id },
+      note: '왜',
+    });
+    assert.equal(both.body.code, 'rule_violation', '팀장을 고르거나 새로 만들거나 하나만');
+    const made = await propose(token, { setting: 'app', op: 'create', fields });
+    const approval = ok(await api.get(`/api/approvals/${made.approval_id}`, owner));
+    const line = (approval.changes as Json[]).find((c) => c.field === 'new_team') as Json;
+    assert.deepEqual([line.after, line.grant], [true, true], '에이전트를 더하는 줄은 굵게');
+    const agentsNow = async () => ok(await api.get('/api/agents', owner)).agents as Json[];
+    const before = (await agentsNow()).length;
+
+    await decide(made.approval_id);
+    const app = (ok(await api.get('/api/apps', owner)).apps as Json[]).find(
+      (a) => a.slug === slug,
+    ) as Json;
+    assert.deepEqual([app.kind, app.visibility], ['page', 'private']);
+    const agents = await agentsNow();
+    const leader = agents.find((a) => a.id === app.agentId) as Json;
+    assert.deepEqual([leader.name, leader.reportsTo], ['편집장', null]);
+    assert.deepEqual(
+      agents
+        .filter((a) => a.reportsTo === leader.id)
+        .map((a) => a.name)
+        .sort(),
+      ['앱 디자이너', '자료 조사', '작가'].sort(),
+    );
+    assert.equal(agents.length, before + 4);
+
+    // 같은 결재로 다시 부르면 같은 팀 (결재마다 하나). 다른 결재 · 관리자는 팀을 부르지 못한다
+    const [row] = await db.sql<{ space_id: string; decided_by: string }[]>`
+      SELECT space_id, decided_by FROM task.approvals WHERE id = ${made.approval_id}`;
+    const directory = api.service(AgentDirectory);
+    const as = (approvalId: unknown) =>
+      new ApprovedActor(
+        String(row?.space_id),
+        String(row?.decided_by),
+        String(approvalId),
+        SettingKinds.ACTION,
+      );
+    assert.equal(await directory.teamFor(as(made.approval_id)), app.agentId);
+    assert.equal((await agentsNow()).length, before + 4);
+    await assert.rejects(directory.teamFor(as(randomUUID())), Forbidden);
+
+    const { token: next } = await partner();
+    const { apps } = await call(next, 'get_settings', { kind: 'apps' });
+    const listed = (apps as Json[]).find((a) => a.slug === slug) as Json;
+    const edit = await tool(next, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'app',
+      op: 'edit',
+      target_id: listed.id,
+      version: listed.version,
+      fields: { new_team: true },
+      note: '왜',
+    });
+    assert.equal(edit.body.code, 'rule_violation', '운영 팀 새로 만들기는 만들 때만');
+  });
 });
 
 describe('설정 바꾸기: 플러그인 설정 (D)', () => {
@@ -756,6 +829,16 @@ describe('승인 뒤 이어서 (O-2): 대표의 propose_setting continue', () =>
     assert.match(after.turns[1].message, /agent edit/);
     await drain();
     assert.equal((await room(chat.id)).chat.turns, 2, '두 번 열지 않는다');
+  });
+
+  test('받을 것이 아직 없어도 이어서 하자는 설정 바꾸기가 카드에 있으면 "승인하면 이어서"로 보인다 (스토어 2-6)', async () => {
+    const member = await agent({ model: 'sonnet' });
+    const { chat, job } = await chatTurn('조사 팀을 강하게 해서 보고서 파일로 줘');
+    await call(String(job.run_token), 'set_deliver', { deliver: 'file' });
+    await proposeModel(String(job.run_token), member, { continue: true });
+    await drain();
+    const { card } = await room(chat.id);
+    assert.deepEqual([card.deliver, card.passed, card.continues], ['file', false, true]);
   });
 
   test('적용이 실패하면 열지 않는다. 대표가 아닌 에이전트의 continue는 읽지 않는다', async () => {

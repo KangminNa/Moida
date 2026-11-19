@@ -112,6 +112,22 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
     );
   }
 
+  /**
+   * 이번 회차(맨 위 회차 작업과 그 아래)에서 앱 코드 만들기 일(payload.appCode)이 끝났는가 (스토어 2-6).
+   * 비공개 앱의 새 버전은 승인 없이 바로 보여서 받을 것 app_code의 증거가 이것뿐이다
+   */
+  async madeAppCode(chat: Chat): Promise<boolean> {
+    const [row] = await this.sql<{ made: boolean }[]>`
+      WITH RECURSIVE tree AS (
+        SELECT id, status, payload FROM task.tasks
+        WHERE space_id = ${chat.spaceId} AND request_id = ${ChatRequest.turn(chat.id, chat.turns)}
+        UNION ALL
+        SELECT t.id, t.status, t.payload FROM task.tasks t JOIN tree ON t.parent_id = tree.id
+      )
+      SELECT EXISTS (SELECT 1 FROM tree WHERE status = ${Task.DONE} AND payload ? 'appCode') AS made`;
+    return row?.made === true;
+  }
+
   /** 쌓은 소식의 번호 (커서). 저장한 뒤에 읽는다 */
   async numberOf(updateId: string): Promise<number> {
     const [row] = await this.sql<{ n: string }[]>`

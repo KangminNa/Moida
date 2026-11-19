@@ -1,4 +1,4 @@
-import { RuleViolation, ValueList } from '../../platform';
+import { RuleViolation, SettingKinds, ValueList } from '../../platform';
 import { Task } from '../task/task';
 import { CHAT_DELIVER, type ChatDeliver, type TaskRow } from '../task.tables';
 import type { ChatReviewVerdict } from './chat.view';
@@ -52,14 +52,15 @@ export class ChatResult {
   static readonly BY_REVIEW = 'review';
   /**
    * 받을 것마다 결과에 있어야 하는 것: 이름 끝이 그것인 결과물(빈 글이면 어떤 결과물이든), 또는 그 동작 중 하나의 결재
-   * (블로그는 글 하나의 발행이나 매거진 호의 발행, 2차 6단계). answer(짧은 답)는 없다: 검사하지 않는다 (O-3)
+   * (블로그는 글 하나의 발행이나 매거진 호의 발행, 2차 6단계). answer(짧은 답)는 없다: 검사하지 않는다 (O-3).
+   * made: 결재 대신 이번 회차에서 끝난 그 주문의 일도 증거다 (앱 코드: 비공개 앱의 새 버전은 승인 없이 바로 보인다, 스토어 2-6)
    */
   private static readonly NEEDS: Readonly<
-    Record<string, { output?: string; actions?: readonly string[] }>
+    Record<string, { output?: string; actions?: readonly string[]; made?: string }>
   > = {
     file: { output: '' },
     html: { output: '.html' },
-    app_code: { actions: ['blog.app_code.show'] },
+    app_code: { actions: ['blog.app_code.show'], made: 'appCode' },
     blog: { actions: ['blog.post.publish', 'blog.issue.publish'] },
     browser: { actions: ['browser.site.publish'] },
     code: { actions: ['code.pr.merge'] },
@@ -74,11 +75,12 @@ export class ChatResult {
     return raw;
   }
 
-  /** 받을 것이 결과에 없으면 그 받을 것, 있거나 정하지 않았으면 null */
+  /** 받을 것이 결과에 없으면 그 받을 것, 있거나 정하지 않았으면 null. made는 이번 회차에서 끝난 주문 (appCode) */
   static missing(
     deliver: string | null,
     actions: readonly string[],
     outputs: readonly string[],
+    made: readonly string[] = [],
   ): string | null {
     const need = deliver === null ? undefined : ChatResult.NEEDS[deliver];
     if (!need) return null;
@@ -86,8 +88,26 @@ export class ChatResult {
     const has =
       ending !== undefined
         ? outputs.some((name) => name.toLowerCase().endsWith(ending))
-        : (need.actions ?? []).some((action) => actions.includes(action));
+        : (need.actions ?? []).some((action) => actions.includes(action)) ||
+          (need.made !== undefined && made.includes(need.made));
     return has ? null : deliver;
+  }
+
+  /**
+   * 카드에 대표가 이어서 하자고 한 설정 바꾸기(O-2 continue)가 있는가: 받을 것은 승인 뒤 이어서 낸다 (스토어 2-6, 앱 만들기 →
+   * 첫 화면). 그때 카드는 "검사에 떨어짐"이 아니라 "승인하면 이어서"로 보인다
+   */
+  static continuesAfter(actions: readonly { action: string; payload: unknown }[]): boolean {
+    return actions.some(
+      (a) =>
+        a.action === SettingKinds.ACTION &&
+        (a.payload as { continue?: unknown } | null)?.continue === true,
+    );
+  }
+
+  /** 받을 것이 이번 회차에서 끝난 주문으로도 채워지는가 (그때만 그 일을 찾아본다) */
+  static countsMade(deliver: string | null): string | null {
+    return (deliver === null ? undefined : ChatResult.NEEDS[deliver]?.made) ?? null;
   }
 
   /** 있어야 하는 것의 이름 (검사 실패 지시문에 싣는다) */

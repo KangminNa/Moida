@@ -5,6 +5,7 @@ import {
   BlobStore,
   Conflict,
   Database,
+  DomainError,
   EntityService,
   Idempotency,
   NotFound,
@@ -81,21 +82,37 @@ export class AppService extends EntityService<App> {
     });
   }
 
-  /** 승인한 설정 바꾸기: 결재마다 한 번 적용하고 결과(blog.setting.changed)를 남긴다. 승인한 뒤 바뀌었으면 실패 */
+  /**
+   * 승인한 설정 바꾸기: 결재마다 한 번 적용하고 결과(blog.setting.changed)를 남긴다. 승인한 뒤 바뀌었으면 실패.
+   * new_team이면 트랜잭션 전에 task에 앱 운영 팀을 부탁하고(platform AgentDirectory.teamFor, 결재마다 팀 하나) 그 팀장을 넣는다.
+   * 팀 만들기가 규칙에 막히면 그 까닭으로 실패를 남긴다. 팀은 만들었는데 앱이 막히면 팀은 남는다 (스토어 2-6)
+   */
   async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
     const spaceId = SettingOutcome.spaceOf(actor, change.key);
+    const leader = AppEdit.wantsTeam(change) ? await this.teamFor(actor) : null;
     await SettingOutcome.settle(
       (work) => this.transaction(work),
       SettingOutcome.topicOf('blog'),
       spaceId,
       change.key,
       async (tx) => {
-        await this.assertLeader(actor, change.body.agent_id);
+        if (leader instanceof DomainError) throw leader;
+        await this.assertLeader(actor, leader ?? change.body.agent_id);
         const edit = new AppEdit(tx, spaceId);
-        await edit.apply(change, new Date());
+        await edit.apply(change, new Date(), leader);
         await edit.save();
       },
     );
+  }
+
+  /** 승인한 앱 만들기의 운영 팀장 id. 규칙에 막히면 그 오류를 돌려준다 (결과를 실패로 남기게) */
+  private async teamFor(actor: Actor): Promise<string | DomainError> {
+    try {
+      return await this.agents.teamFor(actor);
+    } catch (error) {
+      if (error instanceof DomainError) return error;
+      throw error;
+    }
   }
 
   /**

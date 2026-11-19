@@ -7,7 +7,8 @@
 {{> header}}
 <main class="blog-main">
   {{#app.description}}<p class="blog-intro">{{app.description}}</p>{{/app.description}}
-  {{> page-list}}
+  {{#pages.length}}{{> page-list}}{{/pages.length}}
+  {{^pages.length}}<p class="blog-empty">준비 중</p>{{/pages.length}}
 </main>
 {{> footer}}
 </body>

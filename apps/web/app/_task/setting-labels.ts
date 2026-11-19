@@ -1,3 +1,5 @@
+import { APP_KIND_LABELS } from '../_blog/labels';
+
 // 설정 바꾸기 (2026-11-15 C · D)의 화면 문구: 설정 이름, 칸 이름과 값. 결과 카드 · 승인 화면의 바뀔 칸(ChangeLines)이 쓴다
 
 /** 바꾸는 설정 (서버 propose_setting의 setting) */
@@ -5,6 +7,7 @@ export const SETTING_NAMES: Readonly<Record<string, string>> = {
   agent: '에이전트',
   schedule: '스케줄',
   goal: '목표',
+  app: '앱',
   menu: '블로그 메뉴',
   site: '사이트',
   notice: '알림',
@@ -62,6 +65,17 @@ export const SETTING_FIELDS: Readonly<Record<string, string>> = {
   auto_tidy: '자동 정리',
   cadence: '정리 주기',
   collect: '모으기',
+  menus: '시작 메뉴',
+  new_team: '운영 팀',
+};
+
+/**
+ * 칸마다 따로 읽는 값 (켜고 끔 · 영어 값으로 읽으면 뜻이 틀리는 것). 키는 "칸" 또는 같은 칸 이름이 설정마다 뜻이 다르면 "설정.칸".
+ * 앱 만들기의 new_team(스토어 2-6)은 true만 온다
+ */
+const SETTING_VALUES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  new_team: { true: '앱 운영 팀 새로 만들기 (편집장 · 작가 · 자료 조사 · 앱 디자이너)' },
+  'app.kind': APP_KIND_LABELS,
 };
 
 /**
@@ -75,8 +89,12 @@ export function settingField(field: string, label?: string): string {
   return `${SETTING_FIELDS[head] ?? head} · ${label ?? field.slice(dot + 1)}`;
 }
 
-/** 바뀔 값 한 칸을 글로 (빈 값 · 목록 · 켜고 끔). 긴 글은 앞부분만 */
-export function settingValue(value: unknown): string {
+/** 바뀔 값 한 칸을 글로 (빈 값 · 목록 · 켜고 끔, 칸마다 따로 읽는 값). 긴 글은 앞부분만 */
+export function settingValue(value: unknown, field?: string, setting?: string | null): string {
+  const own = field
+    ? (SETTING_VALUES[`${setting}.${field}`] ?? SETTING_VALUES[field])?.[String(value)]
+    : undefined;
+  if (own) return own;
   if (value === null || value === undefined || value === '') return '없음';
   if (typeof value === 'boolean') return value ? '켬' : '끔';
   if (Array.isArray(value)) return value.length === 0 ? '없음' : value.join(' · ');

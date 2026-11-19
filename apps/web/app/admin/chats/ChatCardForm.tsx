@@ -46,9 +46,13 @@ export function ChatCardForm({
         <small className="label-mono">회차 {card.turn}</small>
       </div>
       {card.deliver && (
-        <p className={card.passed ? 'note' : 'warn'}>
+        <p className={card.passed || card.continues ? 'note' : 'warn'}>
           받을 것 · {DELIVER_LABELS[card.deliver] ?? card.deliver}{' '}
-          {card.passed ? '· 검사 통과' : '· 검사에 떨어짐 (결과에 없음)'}
+          {card.passed
+            ? '· 검사 통과'
+            : card.continues
+              ? '· 승인하면 이어서 만듦'
+              : '· 검사에 떨어짐 (결과에 없음)'}
         </p>
       )}
       {/* 넓으면 두 칸: 왼쪽 검토 판정, 오른쪽 항목 · 메모 · 단추 (검토가 없으면 한 칸) */}

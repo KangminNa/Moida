@@ -242,6 +242,7 @@ export class TaskModule implements OnModuleInit {
     private readonly follows: ScheduleFollowHandler,
     private readonly directory: AgentDirectory,
     private readonly agentQuery: AgentQuery,
+    private readonly agentService: AgentService,
     private readonly toolPlugs: ExternalToolPlugHandler,
     private readonly externalTools: ExternalToolService,
     private readonly settingApply: SettingApplyHandler,
@@ -286,6 +287,10 @@ export class TaskModule implements OnModuleInit {
     );
     // 다른 모듈이 묻는 에이전트 (2차 6단계, blog 메뉴의 운영 팀)
     this.directory.register((actor, id) => this.agentQuery.card(actor, id));
+    // 승인한 앱 만들기의 앱 운영 팀 (스토어 2-6, blog의 new_team)
+    this.directory.registerTeamMaker(
+      async (actor) => (await this.agentService.createAppTeam(actor)).id,
+    );
     // 보관함의 결과물 (2차 5단계)
     this.library.register([OutputQuery.LIBRARY_KIND], (a, f) => this.outputs.library(a, f));
   }
