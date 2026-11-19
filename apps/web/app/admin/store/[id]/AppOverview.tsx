@@ -6,13 +6,17 @@ import { POST_STATUS_LABELS } from '../../../_blog/labels';
 import type { AdminApp, AdminPostList } from '../../../_blog/types';
 import { api } from '../../../_lib/client-api';
 import { useLiveValue } from '../../../_lib/use-live';
-import { STORE_HREF } from '../../menu';
+import { CHAT_NEEDS_ME, CHAT_STATE } from '../../../_task/labels';
+import { useAppChats } from '../../../_task/live';
+import { CHATS_HREF, STORE_HREF } from '../../menu';
 
 const POST_TOPICS = ['blog.post.*'];
 const RECENT = 5;
 
-// 앱 관리 › 개요 (스토어 1-5): 든 것의 수와 최근에 고친 글 다섯. 승인 대기 · 운영 팀의 진행은 2단계(앱별 운영)
+// 앱 관리 › 개요 (스토어 1-5): 든 것의 수와 최근에 고친 글 다섯. 이 앱의 대화(승인 대기 · 일하는 중, 스토어 2단계)
 export function AppOverview({ app }: { app: AdminApp }) {
+  const chats = useAppChats(app.id);
+  const talks = chats.data?.chats.slice(0, RECENT) ?? null;
   const posts = useLiveValue(
     `app-posts:${app.slug}`,
     () => api<AdminPostList>('GET', `/api/posts?app=${encodeURIComponent(app.slug)}`),
@@ -37,6 +41,36 @@ export function AppOverview({ app }: { app: AdminApp }) {
           {app.visibility === 'public' ? '미리 보기' : '미리 보기 (비공개 앱)'}
         </Link>
       </p>
+      <section className="stack" aria-label="이 앱의 대화">
+        <div className="row">
+          <b>이 앱의 대화</b>
+          <Link className="ghost small" href={`${STORE_HREF}/${app.id}?tab=team`}>
+            맡기기
+          </Link>
+        </div>
+        {chats.error && <p className="error">{chats.error}</p>}
+        {talks === null ? (
+          !chats.error && <p className="label-mono">불러오는 중…</p>
+        ) : talks.length === 0 ? (
+          <p className="rows-empty">아직 대화 없음 · 운영 팀 탭에서 맡기기</p>
+        ) : (
+          <ul className="list">
+            {talks.map((c) => (
+              <li key={c.id} className="list-cell">
+                <Link className="item-main" href={`${CHATS_HREF}/${c.id}`}>
+                  <b className="clamp-1">{c.title}</b>
+                  <small>
+                    {formatDate(c.updatedAt)}{' '}
+                    <span className={CHAT_NEEDS_ME.includes(c.state) ? 'pill on' : 'pill'}>
+                      {CHAT_STATE[c.state] ?? c.state}
+                    </span>
+                  </small>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <ul className="app-counts" aria-label="든 것의 수">
         {counts.map(([label, n]) => (
           <li key={label} className="panel">

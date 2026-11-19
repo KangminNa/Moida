@@ -6,8 +6,9 @@ import { SiteFooter } from '../_blog/SiteFooter';
 import { SiteHeader } from '../_blog/SiteHeader';
 import { siteNow } from '../_blog/site';
 
-// 첫 화면 (스토어 1-4, 시안 6 · 7 · 8번): 공개 앱이 0개면 사이트 이름 · 소개 · "공개한 앱 없음",
-// 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다), 2개 이상이면 앱 아이콘 목록. 관리자가 열어도 방문자가 보는 그대로다.
+// 첫 화면 (스토어 1-4, 시안 6 · 7 · 8번): 관리자가 공개 앱 하나로 고정했으면 그 앱으로(스토어 2단계, 설정 › 사이트 "첫 화면"),
+// 아니면 자동: 공개 앱이 0개면 사이트 이름 · 소개 · "공개한 앱 없음", 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다),
+// 2개 이상이면 앱 아이콘 목록. 관리자가 열어도 방문자가 보는 그대로다.
 export const dynamic = 'force-dynamic';
 
 /** 예전 관리 시트 주소 (?sheet=이름). 이미 저장된 링크가 있어서 콘솔 주소로 넘긴다 */
@@ -48,7 +49,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       </main>
     );
   if (!site.space.installed) redirect('/install');
-  // 공개 앱이 하나면 그 앱의 주소로 (307): 앱 화면은 앱 코드가 그린다 (스토어 1-6)
+  // 고정한 앱(스토어 2단계)이나 하나뿐인 공개 앱이면 그 앱의 주소로 (307): 앱 화면은 앱 코드가 그린다 (스토어 1-6)
+  const pinned = site.apps.find((a) => a.home);
+  if (pinned) redirect(appPath(pinned.slug));
   const [only] = site.apps;
   if (only && site.apps.length === 1) redirect(appPath(only.slug));
   const { space } = site;

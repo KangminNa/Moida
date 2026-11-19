@@ -9,8 +9,11 @@ import { useApps, usePages } from '../../../_blog/live';
 import type { AdminApp } from '../../../_blog/types';
 import { api, uploadFile } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
+import { useAgents } from '../../../_task/live';
+import type { AgentTeamSaved } from '../../../_task/types';
 import { Icon } from '../../../_ui/Icon';
 import { CHAT_HREF, STORE_HREF } from '../../menu';
+import { APP_TEAM_TEMPLATE, teamLeaders } from '../app-team';
 import { type CreateAppBody, CreateAppForm } from './CreateAppForm';
 
 /** 앱 종류 카드: 종류 · 아이콘 · 설명 (서버 blog.tables의 APP_KIND) */
@@ -26,6 +29,7 @@ export function StorePanel() {
   const router = useRouter();
   const apps = useApps();
   const pages = usePages();
+  const agents = useAgents();
   const save = useAction();
   const [kind, setKind] = useState<AdminApp['kind'] | null>(null);
   const space = useSpace();
@@ -33,9 +37,23 @@ export function StorePanel() {
   /** 공개 주소 앞부분: 사이트 주소에서 https:// 와 끝 / 를 뺀 것 */
   const origin = (space.data?.siteUrl ?? '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
-  async function create(body: CreateAppBody, icon: File | null, requestId: string) {
+  /** 새 팀이면 앱 운영 팀을 먼저 만들고(같은 requestId: 다시 눌러도 팀은 하나) 편집장을 운영 팀장으로 */
+  async function create(
+    body: CreateAppBody,
+    icon: File | null,
+    requestId: string,
+    newTeam: boolean,
+  ) {
+    let agentId = body.agentId;
+    if (newTeam) {
+      const team = await save.run('team', () =>
+        api<AgentTeamSaved>('POST', '/api/agent-teams', { requestId, team: APP_TEAM_TEMPLATE }),
+      );
+      agentId = team?.ok ? team.data.agents[0]?.id : undefined;
+      if (!agentId) return false;
+    }
     const made = await save.run('create', () =>
-      api<AdminApp>('POST', '/api/apps', { ...body, requestId }),
+      api<AdminApp>('POST', '/api/apps', { ...body, ...(agentId ? { agentId } : {}), requestId }),
     );
     if (!made?.ok) return false;
     const app = made.data;
@@ -66,6 +84,8 @@ export function StorePanel() {
           kind={kind}
           origin={origin}
           pages={(pages.data?.pages ?? []).filter((p) => p.appId === null)}
+          leaders={teamLeaders(agents.data?.agents ?? [])}
+          apps={list}
           busy={save.busy !== null}
           problem={save.problem}
           onSubmit={create}

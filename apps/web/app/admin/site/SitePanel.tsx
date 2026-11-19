@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useState } from 'react';
 import type { SpaceInfo } from '../../_account/types';
+import { useApps } from '../../_blog/live';
 import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { CairnMark } from '../../_ui/CairnMark';
@@ -12,13 +13,25 @@ import { BlogForm } from './BlogForm';
 /** 서버가 받는 로고 형식 (UploadLogoInput). SVG는 받지 않는다 */
 const LOGO_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
-// 사이트 정보(이름·소개·주소), 로고, 백업 받기. 틀(제목)은 page.tsx에 있다.
+// 사이트 정보(이름·소개·주소), 로고, 방문자 첫 화면(스토어 2단계), 백업 받기. 틀(제목)은 page.tsx에 있다.
 // 로고를 바꾸면 공간의 version이 올라서, 정보 폼도 그 version으로 새로 만든다 (key)
 export function SitePanel({ space: first }: { space: SpaceInfo }) {
   const notify = useNotify();
   const router = useRouter();
   const [space, setSpace] = useState(first);
   const logo = useAction();
+  const home = useAction();
+  const apps = useApps();
+  const open = (apps.data?.apps ?? []).filter((a) => a.visibility === 'public');
+  const pinned = open.find((a) => a.home) ?? null;
+
+  /** 방문자 첫 화면(/)을 공개 앱 하나로 고정하거나 자동으로 (PUT /api/apps/home) */
+  function pin(appId: string) {
+    void home.run('home', () => api('PUT', '/api/apps/home', { appId: appId || null }), {
+      done: appId ? '첫 화면 고정함' : '첫 화면 자동',
+      reload: apps.reload,
+    });
+  }
 
   /** 저장한 공간을 들고, 콘솔 머리(왼쪽 위 로고)도 서버에서 다시 그린다 */
   function saved(next: SpaceInfo) {
@@ -104,6 +117,33 @@ export function SitePanel({ space: first }: { space: SpaceInfo }) {
             </button>
           )}
         </div>
+      </section>
+      <section className="plugin" aria-label="첫 화면">
+        <div className="plugin-head">
+          <div>
+            <b>첫 화면</b>
+            <p>
+              방문자가 사이트 주소(/)로 오면 보는 화면. 자동: 공개 앱이 하나면 그 앱, 둘 이상이면 앱
+              아이콘 목록
+            </p>
+          </div>
+        </div>
+        {(home.problem ?? apps.error) && <p className="error">{home.problem ?? apps.error}</p>}
+        <select
+          className="input"
+          aria-label="첫 화면으로 보일 앱"
+          value={pinned?.id ?? ''}
+          disabled={home.busy !== null || apps.data === null}
+          onChange={(e) => pin(e.target.value)}
+        >
+          <option value="">자동</option>
+          {open.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} (/{a.slug})
+            </option>
+          ))}
+        </select>
+        {open.length === 0 && <small>공개 앱 없음 · 앱을 공개하면 고를 수 있음</small>}
       </section>
       <section className="plugin" aria-label="백업">
         <div className="plugin-head">
