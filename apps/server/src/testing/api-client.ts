@@ -155,7 +155,10 @@ export class ApiClient {
     const headers: Record<string, string> = {
       ...(options.forwarded ? { 'x-forwarded-host': host } : { host }),
       ...(as.header ? { cookie: as.header } : {}),
-      ...(body ? { 'content-type': 'application/json' } : {}),
+      // DELETE는 node가 본문을 저절로 나눠 보내지 않아 길이를 적어야 서버가 본문을 읽는다
+      ...(body
+        ? { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)) }
+        : {}),
       ...options.headers,
     };
     return new Promise((done, fail) => {

@@ -109,6 +109,13 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
     return this.keptSession;
   }
 
+  /** 글 · 댓글을 쓰기 전에: 차단 중이면 403, 가입하고 JOIN_WAIT_MS가 지나지 않았으면 422 (스팸 계정이 가입하자마자 쓰지 못하게) */
+  assertCanWrite(now: Date): void {
+    this.assertActive(now);
+    if (now.getTime() - this.row.joined_at.getTime() < Member.JOIN_WAIT_MS)
+      throw new RuleViolation(`가입하고 ${Member.JOIN_WAIT_MS / 60_000}분 뒤부터 쓸 수 있어요`);
+  }
+
   /** 쓰기 · 신고 · 닉네임 바꾸기 전에: 차단 중이면 403 (무기한 차단은 FOREVER) */
   assertActive(now: Date): void {
     const until = this.row.blocked_until;

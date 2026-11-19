@@ -2,8 +2,23 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { integer, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { CommentState, TopicState } from './community.tables';
 
 const communitySchema = pgSchema('community');
+
+/** community.comments */
+export const comments = communitySchema.table('comments', {
+  id: uuid('id').notNull(),
+  topic_id: uuid('topic_id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  member_id: uuid('member_id').notNull(),
+  body: text('body').notNull(),
+  body_key: text('body_key').notNull(),
+  state: text('state').$type<CommentState>().notNull(),
+  request_id: text('request_id').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  version: integer('version').notNull(),
+});
 
 /** community.member_sessions */
 export const memberSessions = communitySchema.table('member_sessions', {
@@ -32,4 +47,30 @@ export const members = communitySchema.table('members', {
   login_id: text('login_id').notNull(),
   password_hash: text('password_hash').notNull(),
   password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
+});
+
+/** community.topic_revisions */
+export const topicRevisions = communitySchema.table('topic_revisions', {
+  id: uuid('id').notNull(),
+  topic_id: uuid('topic_id').notNull(),
+  seq: integer('seq').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+/** community.topics */
+export const topics = communitySchema.table('topics', {
+  id: uuid('id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  member_id: uuid('member_id').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  body_key: text('body_key').notNull(),
+  state: text('state').$type<TopicState>().notNull(),
+  revisions: integer('revisions').notNull(),
+  request_id: text('request_id').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  edited_at: timestamp('edited_at', { withTimezone: true }),
+  version: integer('version').notNull(),
 });
