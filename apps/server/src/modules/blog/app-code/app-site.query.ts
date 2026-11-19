@@ -38,6 +38,7 @@ export class AppSiteQuery extends BaseQuery {
     [AppScreenQuery.POST]: 'post.html',
     [AppScreenQuery.MENU]: 'list.html',
     [AppScreenQuery.ISSUE]: 'issue.html',
+    [AppScreenQuery.TOPIC]: 'topic.html',
   };
   private static readonly NOT_FOUND = '404.html';
 

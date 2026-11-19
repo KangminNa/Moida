@@ -21,9 +21,12 @@ export class AppScreenQuery extends BaseQuery {
   static readonly POST = 'post';
   static readonly MENU = 'menu';
   static readonly ISSUE = 'issue';
+  /** 커뮤니티 글 하나 (t/<글>, 스토어 3-2). 글은 community에 있어 웹이 회원 API로 채운다 */
+  static readonly TOPIC = 'topic';
   static readonly MISSING = 'missing';
   private static readonly PAGE = 20;
   private static readonly NUMBER = /^[1-9]\d{0,8}$/;
+  private static readonly ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
   /**
    * 앱 안 경로의 화면: '' 첫 화면, posts/<글>, m/<메뉴>, m/<메뉴>/<번호>. 그 밖은 missing.
@@ -41,6 +44,14 @@ export class AppScreenQuery extends BaseQuery {
     const [first, second, third, ...rest] = path;
     if (rest.length > 0) return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
     if (first === undefined) return this.home(actor, app, base, site, cursor);
+    // 커뮤니티 (스토어 3-2): 목록과 글 하나의 틀만 준다. 글 · 댓글은 community에 있어 웹이 회원 API로 채운다
+    if (app.kind === App.COMMUNITY)
+      return first === 't' &&
+        second !== undefined &&
+        third === undefined &&
+        AppScreenQuery.ID.test(second)
+        ? this.frame(actor, AppScreenQuery.TOPIC, app, base, site)
+        : this.frame(actor, AppScreenQuery.MISSING, app, base, site);
     if (first === 'posts' && second !== undefined && third === undefined)
       return this.post(actor, app, base, site, second);
     if (first === 'm' && second !== undefined) {
@@ -62,6 +73,7 @@ export class AppScreenQuery extends BaseQuery {
     cursor: string | null,
   ) {
     const view = await this.frame(actor, AppScreenQuery.HOME, app, base, site);
+    if (app.kind === App.COMMUNITY) return view;
     if (app.kind === App.PAGE) return view.withPages(await this.pagesOf(app.id, null));
     if (app.kind === 'magazine') {
       const [menu] = await this.rows(

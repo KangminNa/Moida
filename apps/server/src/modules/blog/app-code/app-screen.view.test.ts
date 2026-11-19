@@ -9,8 +9,18 @@ import { AppScreenDataView } from './app-screen.view';
 // 모두 알아야 한다: 모르는 이름은 "약속에 없는 이름"으로 AI에게 다시 고치게 한다. 약속에 이름을 더하면 그 목록에도 더한다.
 
 const NOW = new Date('2026-11-18T00:00:00Z');
-/** 웹이 더하는 이름 (글 본문의 html · 날짜 글자 · 사이트 이름)과 웹이 빼는 이름 (md 본문) */
-const WEB_ADDS = ['html', 'dateText', 'name'];
+/**
+ * 웹이 더하는 이름 (글 본문의 html · 날짜 글자 · 사이트 이름, 커뮤니티의 글 · 댓글 · 회원 칸: 스토어 3-2)과
+ * 웹이 빼는 이름 (md 본문)
+ */
+const WEB_ADDS = [
+  'html',
+  'dateText',
+  'name',
+  ...['topics', 'topic', 'author', 'nickname', 'comments', 'edited', 'mine'],
+  ...['editUrl', 'commentUrl', 'reportUrl', 'community', 'open', 'member'],
+  ...['loginUrl', 'joinUrl', 'meUrl', 'writeUrl'],
+];
 const WEB_DROPS = ['body'];
 
 const app = {
@@ -93,6 +103,7 @@ describe('앱 화면 데이터의 이름 (cairn: 1)', () => {
       view('menu').withMenu(menu).withIssues([issue]),
       view('issue').withMenu(menu).withIssue(issue, [post]),
       view('home').withPages([{ name: 'map', title: '지도', updated_at: NOW }]),
+      view('topic'),
       view('missing'),
     ];
     const used = new Set<string>(WEB_ADDS);

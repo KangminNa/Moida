@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
+import { CommunitySite } from '../../../testing/community-site';
 
 // 커뮤니티 회원 (스토어 3-1a, 아이디 · 비밀번호 가입, docs/스토어.md 11장): 앱 도메인에서만 열리는 회원 API, 가입 → 회원 쿠키 → 로그인,
 // 해킹 대비(실패 문구 하나 · 틀린 시도 제한 · 가입 제한 · 새 세션 · 비밀번호를 바꾸면 다른 로그인 끝남), 쓰기의 출처 · CSRF 확인,
@@ -34,12 +35,7 @@ function ok(res: ApiResult, status = 200): Json {
   return res.json();
 }
 
-async function newApp(
-  kind: string,
-  slug: string,
-  domain: string | null,
-  open = true,
-): Promise<Json> {
+async function newApp(kind: string, slug: string, domain: string, open = true): Promise<Json> {
   const made = ok(
     await api.request('POST', '/api/apps', owner, {
       requestId: randomUUID(),
@@ -49,9 +45,7 @@ async function newApp(
     }),
     201,
   );
-  const body: Json = { version: made.version, domain };
-  if (open) body.visibility = 'public';
-  return ok(await api.request('PATCH', `/api/apps/${made.id}`, owner, body));
+  return CommunitySite.link(api, owner, made, domain, open);
 }
 
 /** 앱 도메인으로 보내는 요청. 쓰기는 이 도메인의 화면에서 보낸 것처럼 Origin을 붙인다 */

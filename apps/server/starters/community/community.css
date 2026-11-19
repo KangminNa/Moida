@@ -1,0 +1,12 @@
+/* 커뮤니티 시작 코드 (스토어 3-2): 글 목록 · 글 하나의 댓글. 색 · 글꼴은 style.css의 변수를 쓴다 */
+.topic-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.topic-list a { display: block; padding: 14px 12px; border-radius: var(--radius); color: inherit; text-decoration: none; }
+.topic-list a:hover { background: var(--hover); }
+.topic-list h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.topic-list p { margin: 0 0 6px; color: var(--muted); }
+.topic-actions { display: flex; gap: 12px; margin: 16px 0; font-size: 0.875rem; }
+.topic-actions a, .comment .post-meta a { color: var(--faint); }
+.comments { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 16px; }
+.comments h2 { font-size: 1rem; margin: 0 0 12px; }
+.comment { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.comment p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

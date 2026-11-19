@@ -35,7 +35,8 @@ export class AppCodeCheck {
   static readonly SYNTAX = '템플릿 문법';
   static readonly DATA = '데이터 이름';
   /**
-   * 데이터 약속 cairn: 1의 이름 (docs/스토어.md 9.3, 서버 app-screen.view.ts + 웹이 더하는 html · dateText · site.name).
+   * 데이터 약속 cairn: 1의 이름 (docs/스토어.md 9.3, 서버 app-screen.view.ts + 웹이 더하는 html · dateText · site.name,
+   * 커뮤니티의 topics · topic · community는 웹이 회원 API로 채운다: 스토어 3-2).
    * 섹션 안에서는 항목의 칸을 이름만으로 쓰므로 어느 깊이의 이름이든 받는다. 약속은 이름을 더하기만 한다:
    * 서버 테스트(app-code.api.test)가 실제 화면 데이터의 이름이 모두 여기 있는지 본다
    */
@@ -49,6 +50,8 @@ export class AppCodeCheck {
     'posts', 'more', 'excerpt', 'date', 'dateText', 'tags',
     'post', 'html', 'center', 'listed', 'back',
     'issues', 'issue', 'number', 'intro', 'pages', 'length',
+    'isTopic', 'topic', 'topics', 'author', 'nickname', 'comments', 'body', 'edited', 'mine',
+    'editUrl', 'commentUrl', 'reportUrl', 'community', 'open', 'member', 'joinUrl', 'meUrl', 'writeUrl',
   ];
   private static readonly KNOWN = new Set(AppCodeCheck.NAMES);
   private static readonly TEMPLATE = /\.html$/i;

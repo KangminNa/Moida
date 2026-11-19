@@ -7,7 +7,21 @@
 {{> header}}
 <main class="blog-main">
   {{#app.description}}<p class="blog-intro">{{app.description}}</p>{{/app.description}}
-  <p class="blog-empty">준비 중</p>
+  {{#topics.length}}
+  <ol class="topic-list">
+    {{#topics}}
+    <li>
+      <a href="{{url}}">
+        <h2>{{title}}</h2>
+        {{#excerpt}}<p>{{excerpt}}</p>{{/excerpt}}
+        <div class="post-meta"><span>{{author.nickname}}</span><time datetime="{{date}}">{{dateText}}</time><span>댓글 {{comments}}</span></div>
+      </a>
+    </li>
+    {{/topics}}
+  </ol>
+  {{/topics.length}}
+  {{^topics.length}}<p class="blog-empty">아직 글 없음</p>{{/topics.length}}
+  {{#more}}<a class="blog-more" href="{{more.url}}">이전 글 더 보기</a>{{/more}}
 </main>
 {{> footer}}
 </body>

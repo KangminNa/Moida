@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+{{> head}}
+</head>
+<body>
+{{> header}}
+<main class="blog-main">
+  <article class="post topic">
+    <header class="post-head">
+      <h1>{{topic.title}}</h1>
+      <div class="post-meta"><span>{{topic.author.nickname}}</span><time datetime="{{topic.date}}">{{topic.dateText}}</time>{{#topic.edited}}<span>고침</span>{{/topic.edited}}</div>
+    </header>
+    <div class="prose">{{{topic.html}}}</div>
+    <div class="topic-actions">
+      {{#topic.editUrl}}<a href="{{topic.editUrl}}">고치기 · 지우기</a>{{/topic.editUrl}}
+      {{#topic.reportUrl}}<a href="{{topic.reportUrl}}">신고</a>{{/topic.reportUrl}}
+    </div>
+    <section class="comments" aria-label="댓글">
+      <h2>댓글 {{topic.comments.length}}</h2>
+      {{#topic.comments}}
+      <div class="comment">
+        <div class="post-meta"><span>{{author.nickname}}</span><time datetime="{{date}}">{{dateText}}</time>{{#mine}}<a href="{{topic.commentUrl}}">지우기</a>{{/mine}}{{#reportUrl}}<a href="{{reportUrl}}">신고</a>{{/reportUrl}}</div>
+        <p>{{body}}</p>
+      </div>
+      {{/topic.comments}}
+      {{^topic.comments.length}}<p class="blog-empty">아직 댓글 없음</p>{{/topic.comments.length}}
+      {{#topic.commentUrl}}<a class="blog-more" href="{{topic.commentUrl}}">댓글 쓰기</a>{{/topic.commentUrl}}
+    </section>
+    <footer class="post-foot"><a href="{{base}}">← 글 목록</a></footer>
+  </article>
+</main>
+{{> footer}}
+</body>
+</html>

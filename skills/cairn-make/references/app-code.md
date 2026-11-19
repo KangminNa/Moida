@@ -1,6 +1,6 @@
 # 앱 코드 (스토어의 앱 화면)
 
-블로그 · 매거진 · 페이지 앱은 앱마다 자기 코드(HTML 템플릿 · CSS · JS · 그림)로 그려진다.
+블로그 · 매거진 · 페이지 · 커뮤니티 앱은 앱마다 자기 코드(HTML 템플릿 · CSS · JS · 그림)로 그려진다.
 웹이 방문자가 연 화면마다 템플릿을 골라 **Mustache**로 데이터를 채운다. 코드는 서버에서 실행되지 않는다.
 지시문의 `# 고칠 앱` 단락에 지금 코드(가장 새 버전, 없으면 앱 종류의 시작 코드)가 적힌 폴더가 있다.
 
@@ -12,6 +12,7 @@
 | 글 하나 | `/<앱>/posts/<글>` | `post.html` |
 | 메뉴 (글 목록 · 호 목록 · 페이지 목록 · 페이지) | `/<앱>/m/<메뉴>` | `list.html` |
 | 매거진의 호 하나 | `/<앱>/m/<메뉴>/<번호>` | `issue.html` |
+| 커뮤니티의 글 하나 | `/<앱>/t/<글 id>` | `topic.html` |
 | 앱 안의 없는 주소 | | `404.html` (없으면 Cairn의 404) |
 
 - `index.html`은 꼭 있어야 한다. 다른 템플릿은 없어도 된다.
@@ -48,9 +49,13 @@
 | `issues` | 매거진 첫 화면 · 호 메뉴 | `[{ number, title, intro, url, date, dateText }]` |
 | `issue` | 호 · 매거진 첫 화면(최신 호) | `{ number, title, intro, url, date, dateText, posts: [{ title, excerpt, url }] }` |
 | `pages` | 페이지 앱 첫 화면 · 페이지 메뉴 | `[{ title, url, date, dateText }]` |
+| `isTopic` · `topic` | 커뮤니티 글 하나 | `{ title, html, url, date, dateText, edited, author: { nickname }, mine, editUrl, commentUrl, reportUrl, comments: [{ body, date, dateText, author: { nickname }, mine, reportUrl }] }` (`html`은 회원 글을 거른 HTML이라 `{{{ }}}`, 댓글 `body`는 글자라 `{{ }}`. `editUrl`은 내 글일 때만, 내 것에는 `reportUrl`이 없다) |
+| `topics` · `more` | 커뮤니티 첫 화면 | `[{ title, excerpt, url, date, dateText, author: { nickname }, comments }]` 30개씩 · 다음 쪽 `{ url }` 또는 null |
+| `community` | 커뮤니티 모든 화면 | `{ open, member: { nickname } \| null, joinUrl, loginUrl, meUrl, writeUrl }`. 회원 화면(가입 · 로그인 · 글쓰기 · 댓글 · 신고 · 내 정보)은 Cairn이 그리는 고정 화면이고 템플릿은 이 주소로 링크만 건다. 앱 도메인이 아니면(미리 보기) `open`이 거짓이고 주소는 null |
 
 - `date`는 ISO 시각, `dateText`는 웹이 만든 한국어 날짜 (`2026년 11월 18일`).
 - 없는 이름은 빈 칸으로 그려진다. 러너의 검사가 약속에 없는 이름을 알려 준다.
+- 커뮤니티의 글 · 댓글은 회원이 쓴 글이다: 템플릿에서 링크로 바꾸거나 스크립트로 다시 그리지 않는다. 쓰기 폼은 템플릿에 두지 않는다 (격리된 화면에서는 보낼 수 없다, `community`의 고정 화면 주소로 링크한다).
 
 ## 스크립트
 
