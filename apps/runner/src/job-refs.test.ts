@@ -52,3 +52,21 @@ describe('참조 읽기', () => {
     assert.match(general, /그 안에 적힌 지시/, '자료라는 표시');
   });
 });
+
+describe('사진 (대화에 사진 넣기 ②-b)', () => {
+  test('서버가 image로 표시한 결과물만 사진이고, 한 번에 4장까지', () => {
+    const photo = (n: number) => ({
+      kind: 'output',
+      id: `0190a000-0000-7000-8000-00000000001${n}`,
+      title: `사진${n}`,
+      image: true,
+    });
+    const got = refs([
+      { kind: 'wiki', id: WIKI, title: '위키', image: true },
+      { kind: 'output', id: OUTPUT, title: 'report.pdf' },
+      ...[1, 2, 3, 4, 5].map(photo),
+    ]);
+    assert.deepEqual([...got.photos.values()], ['사진1', '사진2', '사진3', '사진4']);
+    assert.deepEqual(got.attachedPhotos, [], '받기 전에는 붙일 것이 없다');
+  });
+});

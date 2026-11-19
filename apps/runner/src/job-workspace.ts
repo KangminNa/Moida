@@ -6,6 +6,7 @@ import type { AgentUser } from './agent-user';
 import type { Job, SkillPackage } from './job';
 import type { LineagePlace } from './lineage-store';
 import type { PromptPack } from './prompt-pack';
+import type { RunLog } from './redactor';
 import type { SandboxRoom } from './sandbox-room';
 import type { SharedCopy, SharedFolders } from './shared-folders';
 
@@ -171,6 +172,14 @@ export class JobWorkspace {
     if (this.room) return this.room.agent.readFile(path, maxBytes);
     const text = await readFile(path, 'utf8').catch(() => null);
     return text === null || text.length > maxBytes ? null : text;
+  }
+
+  /** 이 일이 쓰는 스킬을 로그에 남긴다: 서버가 실어 보낸 판, 또는 디스크에도 없어 지시만으로 하는 것 */
+  static logSkill(job: Job, skillsDir: string, log: RunLog): void {
+    const { skill, skillPackage: shipped } = job;
+    if (shipped) log.info(`스킬 ${shipped.name}: ${shipped.label}`);
+    else if (skill && JobWorkspace.skillText(skill, skillsDir) === null)
+      log.info(`스킬 ${skill}이 없어 지시만으로 해요`);
   }
 
   /** 스킬의 SKILL.md 글. 이름의 모양이 틀렸거나 없으면 null (스킬 폴더를 읽지 못하는 CLI에게 지시문으로 준다) */

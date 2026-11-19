@@ -506,6 +506,11 @@ describe('대화 입력창 (2026-11-15 B): 참조 · 모델', () => {
       ]);
     const photo = await upload('사진.png', png());
     const sheet = await upload('메모.csv', Buffer.from('가,나\n'));
+    // 이름으로 정한 그림(SVG)은 종류가 image여도 사진이 아니다 (AI CLI가 보지 못한다)
+    const drawing = await upload(
+      '도형.svg',
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+    );
     const chat = ok(
       await api.request('POST', '/api/chats', owner, {
         requestId: randomUUID(),
@@ -513,6 +518,7 @@ describe('대화 입력창 (2026-11-15 B): 참조 · 모델', () => {
         refs: [
           { kind: 'output', id: photo.id },
           { kind: 'output', id: sheet.id },
+          { kind: 'output', id: drawing.id },
         ],
       }),
       201,
@@ -523,6 +529,7 @@ describe('대화 입력창 (2026-11-15 B): 참조 · 모델', () => {
       [
         ['사진.png', true],
         ['메모.csv', false],
+        ['도형.svg', false],
       ],
     );
     assert.equal((await task(turn.taskId)).payload.refs[0].image, true);

@@ -289,6 +289,8 @@ export class ClaudeEngine implements EngineAdapter {
   readonly bin = { env: 'CAIRN_RUNNER_CLI', fallback: 'claude' };
   readonly ownLogin = 'CLAUDE_CODE_OAUTH_TOKEN';
   readonly resumes = true;
+  /** 작업 폴더의 photos/에 받은 사진을 Read로 본다 (그림 파일을 읽으면 그림으로 받는다) */
+  readonly photos = 'read';
   readonly signin = new ClaudeSignin();
 
   tool(credential: string, config: RunnerConfig): AiTool {

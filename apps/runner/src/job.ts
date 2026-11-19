@@ -2,7 +2,7 @@ import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
 import { JobLineage } from './job-lineage';
-import { JobRefs } from './job-refs';
+import { JobRefs, type RefPhotos } from './job-refs';
 import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
 import { SubtaskResult } from './subtask-result';
@@ -216,11 +216,17 @@ export class Job {
     return this.copy(this.instruction, this.browse, this.brief, lineage);
   }
 
+  /** 받은 대화의 사진을 참조에 실은 같은 일 (JobPhotos, 대화에 사진 넣기 ②-b) */
+  withPhotos(received: RefPhotos): Job {
+    return this.copy(this.instruction, this.browse, this.brief, this.lineage, received);
+  }
+
   private copy(
     instruction: string,
     browse: BrowsePlan | null,
     brief: string | null,
     lineage = this.lineage,
+    photos: RefPhotos | null = null,
   ): Job {
     return new Job(
       this.taskId,
@@ -249,7 +255,7 @@ export class Job {
       this.bound,
       this.promptPackage,
       this.runtime,
-      this.refs,
+      photos ? this.refs.withPhotos(photos) : this.refs,
       lineage,
       this.deliver,
       this.appCode,

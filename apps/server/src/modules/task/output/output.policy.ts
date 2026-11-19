@@ -26,6 +26,16 @@ export class OutputPolicy {
     FileSniff.MP4,
     FileSniff.WEBM,
   ]);
+  /**
+   * 사진 (대화에 사진 넣기, 2026-11-19): 앞부분으로 알아본 그림. AI CLI가 직접 보는 형식이다.
+   * 이름으로 정한 그림(SVG)은 종류는 image지만 사진이 아니다
+   */
+  static readonly PHOTO_MIMES: readonly string[] = [
+    FileSniff.PNG,
+    FileSniff.JPEG,
+    FileSniff.GIF,
+    FileSniff.WEBP,
+  ];
   /** 앞부분으로 알아본 형식의 종류 */
   private static readonly SNIFFED_KIND: Readonly<Record<string, OutputKind>> = {
     [FileSniff.PNG]: 'image',

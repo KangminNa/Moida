@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 테스트용 가짜 Claude CLI. claude -p --output-format stream-json이 내는 줄을 그대로 흉내 낸다.
 // 러너는 AI CLI에게 환경 변수를 거의 넘기지 않으므로, 무엇을 할지는 지시문 안의 표시로 정한다.
-//   [fake:spy=<파일>]   받은 인자·환경·폴더를 파일에 적는다
+//   [fake:spy=<파일>]   받은 인자·환경·폴더를 파일에 적는다 (작업 폴더의 photos/에 받은 사진의 이름 · sha256도)
 //   [fake:hang]         끝나지 않는다
 //   [fake:stubborn]     끝나지 않고 SIGTERM도 듣지 않는다
 //   [fake:fail]         오류를 내고 코드 3으로 끝난다
@@ -28,9 +28,10 @@
 // 연결 확인(MCP 설정 없음)은 ok라고 답한다. 토큰에 wrong이 들어 있으면 로그인 실패처럼 끝난다
 // setup-token은 웹 로그인이다: 터미널이어야 뜨고, 주소를 보이고, 붙여 넣은 코드로 토큰을 그린다.
 //   코드에 wrong이 있으면 실패. 코드와 Enter가 한 덩어리로 오면 Ink처럼 붙여 넣기로 보고 제출하지 않는다
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -161,6 +162,14 @@ if (spy) {
       env: process.env,
       cwd: process.cwd(),
       cwdEntries: readdirSync(process.cwd()),
+      photos: existsSync('photos')
+        ? readdirSync('photos').map((name) => ({
+            name,
+            sha256: createHash('sha256')
+              .update(readFileSync(join('photos', name)))
+              .digest('hex'),
+          }))
+        : [],
       configEntries: readdirSync(process.env.CLAUDE_CONFIG_DIR),
       mcpConfigPath,
       mcpConfigMode: statSync(mcpConfigPath).mode & 0o777,

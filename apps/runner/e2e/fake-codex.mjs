@@ -2,7 +2,7 @@
 // 테스트용 가짜 Codex CLI. 두 가지를 흉내 낸다 (화면 문구와 사건 모양은 실제 0.164.0의 것).
 //   login --device-auth  주소와 한 번 쓰는 코드를 보이고, 사람이 넣을 시간을 두었다가 CODEX_HOME에 auth.json을 쓴다
 //   exec --json …  -     지시문을 표준 입력으로 받아 사건을 JSONL로 낸다. 지시문 안의 표시로 할 일을 정한다:
-//     [fake:spy=<파일>]  받은 인자 · 환경 · 설정 · 지시문을 파일에 적는다
+//     [fake:spy=<파일>]  받은 인자 · 환경 · 설정 · 지시문을 파일에 적는다 (--image로 붙인 사진의 sha256도: 작업 폴더 기준)
 //     [fake:rotate]      실행 중에 갱신 토큰이 바뀐 것처럼 auth.json을 바꾼다
 //     [fake:approval]    작업 토큰(환경 변수)으로 cairn MCP에 결재를 올린다
 //     [fake:shell]       셸 명령을 실행하려 한다 (셸을 꺼 두었으니 격리가 깨진 것)
@@ -10,7 +10,7 @@
 //     [fake:leak]        auth.json의 갱신 토큰을 답에 섞는다 (러너가 지우는지)
 //     [fake:hang]        끝나지 않는다
 // 러너가 넘긴 환경을 본다: 빈 CODEX_HOME, 셸을 끈 설정, 다른 인증 값 · 기기 토큰 없음.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -105,6 +105,11 @@ async function exec() {
         config,
         prompt,
         cwd: process.cwd(),
+        images: process.argv.flatMap((arg, i) =>
+          process.argv[i - 1] === '--image'
+            ? [{ path: arg, sha256: createHash('sha256').update(readFileSync(arg)).digest('hex') }]
+            : [],
+        ),
       }),
     );
 

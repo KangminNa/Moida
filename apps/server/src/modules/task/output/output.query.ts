@@ -118,7 +118,7 @@ export class OutputQuery extends BaseQuery {
   }
 
   /**
-   * 넘긴 id 중 사진인 결과물 (대화에 사진 넣기, 2026-11-19): 서버가 앞부분으로 알아본 그림(PNG · JPEG · GIF · WebP)이고
+   * 넘긴 id 중 사진인 결과물 (대화에 사진 넣기, 2026-11-19): 서버가 앞부분으로 알아본 그림(`OutputPolicy.PHOTO_MIMES`)이고
    * 휴지통에 없는 것. 러너가 받아 AI CLI가 직접 본다
    */
   async imageIds(actor: Actor, ids: readonly string[]): Promise<ReadonlySet<string>> {
@@ -126,7 +126,7 @@ export class OutputQuery extends BaseQuery {
     if (ids.length === 0) return new Set();
     const rows = await this.rows(
       outputs,
-      { space_id: actor.requireSpace(), id: ids, kind: 'image', deleted_at: null },
+      { space_id: actor.requireSpace(), id: ids, mime: OutputPolicy.PHOTO_MIMES, deleted_at: null },
       { columns: ['id'] },
     );
     return new Set(rows.map((r) => r.id));
