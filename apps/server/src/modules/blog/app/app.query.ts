@@ -100,24 +100,29 @@ export class AppQuery extends BaseQuery {
 
   /**
    * 다른 모듈이 platform Lookups 'app'으로 묻는 앱 이름 (스토어 2단계: 대화의 앱). 관리자는 공간의 앱, 그 밖은 공개 앱만.
-   * 볼 수 없거나 없는 앱은 빠진다
+   * 볼 수 없거나 없는 앱은 빠진다. kind를 주면 그 종류의 앱만 (Lookups 'community-app', 스토어 3-1: 커뮤니티가 공개된 커뮤니티 앱인지 묻는다)
    */
-  async names(actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+  async names(
+    actor: Actor,
+    ids: readonly string[],
+    kind: AppRow['kind'] | null = null,
+  ): Promise<ReadonlyMap<string, string>> {
     const where =
       actor.kind === 'owner'
         ? this.sql`AND space_id = ${actor.requireSpace()}`
         : this.sql`AND visibility = ${App.PUBLIC}`;
+    const ofKind = kind === null ? this.sql`` : this.sql`AND kind = ${kind}`;
     const rows = await this.sql<Pick<AppRow, 'id' | 'name'>[]>`
-      SELECT id, name FROM blog.apps WHERE id = ANY(${ids as string[]}::uuid[]) ${where}`;
+      SELECT id, name FROM blog.apps WHERE id = ANY(${ids as string[]}::uuid[]) ${where} ${ofKind}`;
     return new Map(rows.map((r) => [r.id, r.name]));
   }
 
-  /** 모든 앱의 도메인, 확인 전 것까지 (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
-  async hosts(actor: Actor): Promise<readonly string[]> {
+  /** 모든 앱의 도메인(확인 전 것까지) → 앱 id (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
+  async hosts(actor: Actor): Promise<ReadonlyMap<string, string>> {
     actor.assertOwnerOrSystem();
-    const rows = await this.sql<{ domain: string }[]>`
-      SELECT domain FROM blog.apps WHERE domain IS NOT NULL`;
-    return rows.map((r) => r.domain);
+    const rows = await this.sql<{ domain: string; id: string }[]>`
+      SELECT domain, id FROM blog.apps WHERE domain IS NOT NULL`;
+    return new Map(rows.map((r) => [r.domain, r.id]));
   }
 
   /**

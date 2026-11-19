@@ -1,4 +1,4 @@
-import { Forbidden } from './errors';
+import { Forbidden, Unauthenticated } from './errors';
 import type { SecretBox } from './secret-box';
 
 // 요청한 주체. Guard가 만들고, Service는 첫 줄에서 권한을 묻고, Query는 공개 범위를 거를 때 쓴다.
@@ -295,6 +295,32 @@ export class VisitorActor extends Actor {
 
   can(): boolean {
     return false;
+  }
+}
+
+/**
+ * 커뮤니티 회원 (스토어 3-1, 원칙 10): 앱 하나의 회원이고 권한이 없다. 관리 확인(assertOwner · assertCan)은 모두 막힌다.
+ * 앱 도메인의 /api/community에서 회원 쿠키로만 생긴다 (community MemberGuard). 공간이 없어 다른 모듈의 읽기에는 방문자와 같다
+ */
+export class MemberActor extends Actor {
+  readonly kind = 'member';
+
+  constructor(
+    /** 이 회원이 든 앱 */
+    readonly appId: string,
+    memberId: string,
+  ) {
+    super(null, memberId);
+  }
+
+  can(): boolean {
+    return false;
+  }
+
+  /** 이 앱의 회원이면 그 회원, 아니면 401 */
+  static require(actor: Actor, appId: string): MemberActor {
+    if (actor instanceof MemberActor && actor.appId === appId) return actor;
+    throw new Unauthenticated('로그인이 필요해요');
   }
 }
 

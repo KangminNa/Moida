@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import { CairnApp } from '../cairn-app';
 import { InstallPolicy, ServerRunnerPolicy } from '../modules/account';
@@ -131,6 +132,51 @@ export class ApiClient {
 
   get(path: string, as: TestUser = TestUser.visitor): Promise<ApiResult> {
     return this.request('GET', path, as);
+  }
+
+  /**
+   * Host 머리글을 정해 보내는 요청 (앱 도메인, 스토어 3-0 · 3-1). fetch는 Host를 바꾸지 못해 node:http로 보낸다.
+   * forwarded: 앞단 프록시를 거친 요청처럼 X-Forwarded-Host로만 도메인을 싣는다. headers: Origin · Sec-Fetch-Site · CSRF 등
+   */
+  viaHost(
+    path: string,
+    host: string,
+    options: {
+      method?: string;
+      as?: TestUser;
+      body?: object;
+      headers?: Readonly<Record<string, string>>;
+      forwarded?: boolean;
+    } = {},
+  ): Promise<ApiResult> {
+    const url = new URL(path, this.baseUrl);
+    const as = options.as ?? TestUser.visitor;
+    const body = options.body ? JSON.stringify(options.body) : null;
+    const headers: Record<string, string> = {
+      ...(options.forwarded ? { 'x-forwarded-host': host } : { host }),
+      ...(as.header ? { cookie: as.header } : {}),
+      ...(body ? { 'content-type': 'application/json' } : {}),
+      ...options.headers,
+    };
+    return new Promise((done, fail) => {
+      const req = httpRequest(
+        url,
+        { method: options.method ?? 'GET', headers, setHost: options.forwarded === true },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => {
+            const out = new Headers();
+            for (const [name, value] of Object.entries(res.headers))
+              for (const one of Array.isArray(value) ? value : [value ?? ''])
+                out.append(name, String(one));
+            done(new ApiResult(res.statusCode ?? 0, Buffer.concat(chunks).toString('utf8'), out));
+          });
+        },
+      );
+      req.on('error', fail);
+      req.end(body ?? undefined);
+    });
   }
 
   /** form으로 보내기 (OAuth 토큰 요청처럼 application/x-www-form-urlencoded) */

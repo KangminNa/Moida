@@ -21,6 +21,7 @@ export const APP_KIND_LABELS: Record<PublicApp['kind'], string> = {
   blog: '블로그',
   magazine: '매거진',
   page: '페이지 앱',
+  community: '커뮤니티',
 };
 
 /** 앱 코드 버전이 어디서 왔나 (서버 blog.tables의 APP_CODE_VERSION_SOURCE) */

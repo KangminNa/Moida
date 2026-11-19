@@ -130,7 +130,8 @@ export class AppScreenDataView {
         kind: app.kind,
         url: this.appUrl(app),
         iconUrl: iconOf(app),
-        rssUrl: app.kind === 'page' ? null : `${this.feedBase()}/rss.xml`,
+        rssUrl:
+          app.kind === 'page' || app.kind === 'community' ? null : `${this.feedBase()}/rss.xml`,
       },
       apps,
       others: apps.filter((a) => !a.current),

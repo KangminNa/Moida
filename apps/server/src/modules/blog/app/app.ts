@@ -24,6 +24,8 @@ import type { AppDomainProof } from './app-domain.policy';
 export class App extends TableEntity<AppRow, AppNew> {
   static readonly PUBLIC: AppVisibility = 'public';
   static readonly PAGE: AppKind = 'page';
+  /** 커뮤니티 (스토어 3-1): 회원 · 글 · 댓글은 community 모듈에 있다. 메뉴 · 블로그 글 · 페이지를 두지 않고 지우지 않는다 */
+  static readonly COMMUNITY: AppKind = 'community';
   static readonly NAME_MAX = 40;
   static readonly SLUG_MIN = 2;
   static readonly SLUG_MAX = 30;
@@ -244,9 +246,17 @@ export class App extends TableEntity<AppRow, AppNew> {
     this.put('updated_at', now);
   }
 
-  /** 메뉴를 둘 수 있는가: 페이지 앱은 페이지 하나가 앱의 전부라 메뉴가 없다 */
+  /** 메뉴를 둘 수 있는가: 페이지 앱은 페이지 하나가 앱의 전부라, 커뮤니티 앱은 회원의 글이 앱의 전부라 메뉴가 없다 */
   assertHoldsMenus(): void {
     if (this.row.kind === App.PAGE) throw new RuleViolation('페이지 앱에는 메뉴를 둘 수 없어요');
+    if (this.row.kind === App.COMMUNITY)
+      throw new RuleViolation('커뮤니티 앱에는 메뉴를 둘 수 없어요');
+  }
+
+  /** 블로그 글을 넣을 수 있는가: 커뮤니티 앱의 글은 회원의 글이다 (community) */
+  assertHoldsPosts(): void {
+    if (this.row.kind === App.COMMUNITY)
+      throw new RuleViolation('커뮤니티 앱에는 블로그 글을 넣을 수 없어요');
   }
 
   /** 페이지를 넣고 뺄 수 있는 앱인가: 페이지 앱의 페이지는 만들 때 정하고 앱을 지울 때까지 그대로다 */
@@ -255,8 +265,13 @@ export class App extends TableEntity<AppRow, AppNew> {
       throw new RuleViolation('페이지 앱의 페이지는 바꿀 수 없어요. 앱을 지운 뒤 옮겨 주세요');
   }
 
-  /** 지우기 전에 (Service가 안이 비었는지 본 뒤): 그래프 사본이 이 앱의 글을 숨기게 알린다 */
+  /**
+   * 지우기 전에 (Service가 안이 비었는지 본 뒤): 그래프 사본이 이 앱의 글을 숨기게 알린다.
+   * 커뮤니티 앱은 지우지 않는다: 회원 · 글이 community에 남아 있다 (비공개로 둔다, 스토어 3-1)
+   */
   remove(): void {
+    if (this.row.kind === App.COMMUNITY)
+      throw new RuleViolation('커뮤니티 앱은 지울 수 없어요. 비공개로 바꿔 주세요');
     this.record(this.changed(true));
   }
 

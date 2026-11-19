@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { request as httpRequest } from 'node:http';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, ApiResult, TestUser } from '../../../testing/api-client';
 
@@ -21,41 +20,14 @@ function ok(res: ApiResult, status = 200): Json {
   return res.json();
 }
 
-/**
- * Host 머리글을 정해 보내는 요청 (fetch는 Host를 바꾸지 못해 node:http로).
- * 앞단 프록시를 거친 요청이면 forwarded: X-Forwarded-Host로만 앱 도메인을 싣는다
- */
+/** Host 머리글을 정해 보내는 요청 (앱 도메인). cookie: 관리자 쿠키를 실어 볼 때 */
 function viaHost(
   path: string,
   host: string,
   options: { method?: string; cookie?: string; forwarded?: boolean } = {},
 ): Promise<ApiResult> {
-  const url = new URL(path, api.baseUrl);
-  const headers: Record<string, string> = options.forwarded
-    ? { 'x-forwarded-host': host }
-    : { host };
-  if (options.cookie) headers.cookie = options.cookie;
-  return new Promise((done, fail) => {
-    const req = httpRequest(
-      url,
-      { method: options.method ?? 'GET', headers, setHost: options.forwarded === true },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () =>
-          done(
-            new ApiResult(
-              res.statusCode ?? 0,
-              Buffer.concat(chunks).toString('utf8'),
-              new Headers(res.headers as Record<string, string>),
-            ),
-          ),
-        );
-      },
-    );
-    req.on('error', fail);
-    req.end();
-  });
+  const { cookie, ...rest } = options;
+  return api.viaHost(path, host, { ...rest, headers: cookie ? { cookie } : {} });
 }
 
 async function newApp(slug: string): Promise<Json> {

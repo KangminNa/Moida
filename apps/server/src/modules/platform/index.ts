@@ -10,6 +10,7 @@ export {
   AgentActor,
   ApprovedActor,
   DeviceActor,
+  MemberActor,
   OwnerActor,
   SettingActor,
   SystemActor,
@@ -74,6 +75,7 @@ export { HostGate } from './http/host-gate';
 export { HttpSetup } from './http/http-setup';
 export type { HttpRequest, HttpResponse, HttpUpload } from './http/http-types';
 export { type RequestLogSink, RequestTrace } from './http/request-trace';
+export { ReturnPath } from './http/return-path.policy';
 export { LibraryInput } from './library/library.input';
 export { LibraryQuery } from './library/library.query';
 export type { LibraryRow } from './library/library.view';

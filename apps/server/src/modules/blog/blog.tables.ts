@@ -21,7 +21,7 @@ export interface AppCodeVersionRow {
 export type AppCodeVersionNew = Partial<AppCodeVersionRow> & Pick<AppCodeVersionRow, 'id' | 'app_id' | 'space_id' | 'seq' | 'files' | 'source'>;
 
 /** blog.apps.kind (값 목록 CHECK) */
-export const APP_KIND = ['blog', 'magazine', 'page'] as const;
+export const APP_KIND = ['blog', 'magazine', 'page', 'community'] as const;
 export type AppKind = (typeof APP_KIND)[number];
 /** blog.apps.visibility (값 목록 CHECK) */
 export const APP_VISIBILITY = ['private', 'public'] as const;

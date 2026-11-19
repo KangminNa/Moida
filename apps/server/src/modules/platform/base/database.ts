@@ -97,6 +97,7 @@ export class Database implements OnApplicationShutdown {
     'blog',
     'work',
     'task',
+    'community',
     'mcp',
   ];
   /**

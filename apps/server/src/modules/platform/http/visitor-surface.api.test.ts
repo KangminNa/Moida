@@ -24,6 +24,11 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   // 스토어 3-0: 도메인으로 여는 공개 앱 (웹이 Host로 앱을 고른다). 연결 확인 값은 앱 도메인에서만 (기본 도메인은 404)
   'GET /api/apps/domains': 200,
   'GET /.well-known/cairn-domain': 404,
+  // 스토어 3-1: 커뮤니티 회원 API는 앱 도메인에서만 (기본 도메인에서는 없는 주소)
+  'GET /api/community/me': 404,
+  'GET /api/community/login/methods': 404,
+  'GET /api/community/login/:method/start': 404,
+  'GET /api/community/login/:method/callback': 404,
   'GET /api/apps/by-slug/:slug': 404,
   'GET /api/apps/by-slug/:slug/icon': 404,
   // 스토어 1-6: 앱 화면 · 앱 코드의 파일은 누구나 (없는 앱 · 비공개 앱은 404)
