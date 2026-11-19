@@ -2804,6 +2804,17 @@ ul.picked > .chip {
   z-index: 60;
 }
 
+/* 로그인이 끝났을 때 (웹 UX U2): 사라지지 않는 한 줄과 다시 로그인 링크. 한 줄 알림보다 위에 */
+.toast.signed-out {
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+
+.toast.signed-out a {
+  color: inherit;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
 /* 소스 링크 (AGPL-3.0: 서비스 이용자도 소스를 받을 수 있게) */
 .source {
   position: fixed;

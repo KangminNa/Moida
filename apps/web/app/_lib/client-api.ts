@@ -27,9 +27,16 @@ export async function uploadFile<T>(
   });
 }
 
+/**
+ * 401 · 403을 받았다는 신호 (웹 UX U2). 로그인이 끝난 콘솔의 관리 API는 403(관리자만)이다.
+ * 콘솔 틀(admin/SignedOutBar)이 듣고 로그인이 정말 끝났는지 묻는다 (지금 비밀번호 틀림 · 권한 없음처럼 살아 있어도 오는 답이 있다)
+ */
+export const DENIED_EVENT = 'cairn:denied';
+
 async function send<T>(path: string, init: RequestInit): Promise<ApiReply<T>> {
   try {
     const res = await fetch(path, init);
+    if (res.status === 401 || res.status === 403) window.dispatchEvent(new Event(DENIED_EVENT));
     const json = (await res.json().catch(() => ({}))) as T & ApiError;
     if (res.ok) return { ok: true, data: json };
     return {

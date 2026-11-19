@@ -165,7 +165,7 @@ export class OwnerService extends BaseService {
 
   /**
    * 로그인의 마지막 접근 (Guard가 주인을 알아본 요청마다 부른다). 프로세스마다 WebSession.SEEN_MS에 한 번만 적고
-   * version은 올리지 않는다. 주소가 IP 모양이 아니면 시각만
+   * version은 올리지 않는다. 주소가 IP 모양이 아니면 시각만. 함께 끝나는 날을 늘린다 (마지막으로 쓴 날부터 30일, 웹 UX U2)
    */
   async seen(token: string, ip: string, now: Date): Promise<void> {
     const tokenHash = WebSession.hash(token);

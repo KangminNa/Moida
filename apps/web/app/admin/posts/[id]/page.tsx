@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import '../../../_blog/blog.css';
 import type { Owner } from '../../../_account/types';
+import { loginPath } from '../../../_lib/return-path';
 import { serverGet } from '../../../_lib/server-api';
 import { PostEditor } from '../PostEditor';
 import type { LinkedPost } from '../post-settings';
@@ -20,7 +21,8 @@ export default async function EditPost({
 }) {
   const [{ id }, { app }] = await Promise.all([params, searchParams]);
   const owner = await serverGet<Owner>('/api/auth/me');
-  if (!owner) redirect(`/login?return=${encodeURIComponent(`/admin/posts/${id}`)}`);
+  if (!owner)
+    redirect(loginPath(`/admin/posts/${id}${app ? `?app=${encodeURIComponent(app)}` : ''}`));
   if (id === 'new') return <PostEditor initial={null} app={app ?? null} />;
   const post = await serverGet<LinkedPost>(`/api/posts/${encodeURIComponent(id)}`);
   if (!post) notFound();

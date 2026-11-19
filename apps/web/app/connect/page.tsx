@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Consent } from '../_account/types';
 import { ConsentCard } from '../_install/ConsentCard';
+import { loginPath } from '../_lib/return-path';
 import { serverFetch } from '../_lib/server-api';
 
 // 기기 연결 승인 화면. AI 도구(Claude Code 등)가 브라우저를 열어 여기로 보낸다 (?request=서명한 승인 요청).
@@ -15,7 +16,7 @@ export default async function ConnectPage({
   const { request = '' } = await searchParams;
   const reply = await serverFetch<Consent>(`/api/connect?request=${encodeURIComponent(request)}`);
   if (reply.status === 403 || reply.status === 401)
-    redirect(`/login?return=${encodeURIComponent(`/connect?request=${request}`)}`);
+    redirect(loginPath(`/connect?request=${request}`));
   return (
     <ConsentCard
       request={request}

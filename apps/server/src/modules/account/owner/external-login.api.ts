@@ -95,7 +95,7 @@ export class ExternalLoginController {
         String(req.headers['user-agent'] ?? ''),
       );
       if (session)
-        Cookies.set(res, req, WebSession.COOKIE, session.token ?? '', WebSession.DAYS * 86_400);
+        Cookies.set(res, req, WebSession.COOKIE, session.token ?? '', WebSession.COOKIE_SECONDS);
       res.redirect(302, request.returnTo);
     } catch (error) {
       if (!(error instanceof DomainError)) throw error;

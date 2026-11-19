@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { safeReturnPath } from './return-path.ts';
+import { loginPath, safeReturnPath } from './return-path.ts';
 
 test('돌아갈 곳: 이 사이트 안의 경로는 해석한 모양 그대로, 없으면 콘솔', () => {
   assert.equal(safeReturnPath('/admin/store?tab=team#top'), '/admin/store?tab=team#top');
@@ -24,4 +24,15 @@ test('돌아갈 곳: 브라우저가 다른 사이트로 읽는 값은 모두 �
     '/\r\n/evil.com',
   ])
     assert.equal(safeReturnPath(raw), '/admin', JSON.stringify(raw));
+});
+
+test('로그인 화면 주소: 돌아올 곳(쿼리 포함)을 한 칸으로 싸고, 로그인 화면이 풀어 읽으면 그대로', () => {
+  const back = '/admin/chats/abc?make=blog&x=a b';
+  const url = new URL(loginPath(back), 'http://return.invalid');
+  assert.equal(url.pathname, '/login');
+  assert.deepEqual([...url.searchParams.keys()], ['return']);
+  assert.equal(
+    safeReturnPath(url.searchParams.get('return')),
+    '/admin/chats/abc?make=blog&x=a%20b',
+  );
 });

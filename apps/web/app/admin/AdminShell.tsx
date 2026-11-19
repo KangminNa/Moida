@@ -11,10 +11,10 @@ import { useToast } from '../_ui/useToast';
 import { useWaitingChanges } from '../_vault/live';
 import { ChatNav } from './ChatNav';
 import { ConsoleDock } from './ConsoleDock';
-import { useConsoleRestore } from './console-restore';
 import { NEW_CHAT, placeOf, SIDE_COOKIE } from './menu';
 import { SectionTabs } from './SectionTabs';
 import { ConsoleFoot, SettingsNav } from './SettingsNav';
+import { SignedOutBar } from './SignedOutBar';
 
 /** 폰 화면 (globals.css의 좁은 화면과 같은 폭): 옆 칸이 접히는 대신 서랍으로 열린다 */
 const PHONE = '(max-width: 760px)';
@@ -56,7 +56,6 @@ export function AdminShell({
     : null;
   const { section } = place;
   const chat = section.key === 'chat';
-  useConsoleRestore();
 
   useEffect(() => {
     if (!drawer) return;
@@ -165,6 +164,7 @@ export function AdminShell({
           {toast}
         </div>
       )}
+      <SignedOutBar />
     </NotifyContext.Provider>
   );
 }

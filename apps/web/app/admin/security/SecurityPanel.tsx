@@ -57,7 +57,7 @@ export function SecurityPanel() {
           <ul className="facts">
             <li>
               <span>로그인 유지</span>
-              <b>{list.limits.sessionDays}일</b>
+              <b>마지막으로 쓴 날부터 {list.limits.sessionDays}일</b>
             </li>
             <li>
               <span>틀린 로그인</span>

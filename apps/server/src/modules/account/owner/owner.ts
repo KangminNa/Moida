@@ -22,8 +22,14 @@ export type LoadedOwner = UserRow & { space_id: string };
 /** 관리 화면 로그인 한 번 (web_sessions). 토큰 원문은 만든 순간에만 메모리에 있고, DB에는 해시만 둔다 */
 export class WebSession extends TableEntity<WebSessionRow, WebSessionNew> {
   static readonly COOKIE = 'cairn_session';
+  /** 로그인 유지: 마지막으로 쓴 날부터 (웹 UX U2). 쓸 때마다(마지막 접근을 적을 때) 끝나는 날이 늘어난다 */
   static readonly DAYS = 30;
-  /** 마지막 접근은 이 간격에 한 번만 적는다 (요청마다 쓰지 않게) */
+  /**
+   * 쿠키는 브라우저가 지키는 가장 긴 기간(400일)으로 둔다. 로그인이 살아 있는지는 서버의 expires_at이 정해서,
+   * 끝나는 날을 늘릴 때 쿠키를 다시 보내지 않아도 된다 (웹이 서버에서 그린 첫 화면의 요청은 Set-Cookie가 브라우저에 닿지 않는다)
+   */
+  static readonly COOKIE_SECONDS = 400 * 86_400;
+  /** 마지막 접근(과 끝나는 날)은 이 간격에 한 번만 적는다 (요청마다 쓰지 않게) */
   static readonly SEEN_MS = 5 * 60_000;
   /** 틀린 로그인을 받는 수: 한 아이디에 · 한 곳(IP)에서, 그 시간(ms) 안에 (맞는 로그인은 세지 않는다). 보안 화면에도 보인다 */
   static readonly TRIES_PER_LOGIN = 5;
@@ -49,10 +55,15 @@ export class WebSession extends TableEntity<WebSessionRow, WebSessionNew> {
         token_hash: WebSession.hash(token),
         ip: ip || null,
         user_agent: userAgent,
-        expires_at: new Date(now.getTime() + WebSession.DAYS * 86_400_000),
+        expires_at: WebSession.expiresFrom(now),
       },
       token,
     );
+  }
+
+  /** 이때 썼다면 로그인이 끝나는 때 */
+  static expiresFrom(now: Date): Date {
+    return new Date(now.getTime() + WebSession.DAYS * 86_400_000);
   }
 
   static restore(row: WebSessionRow): WebSession {
