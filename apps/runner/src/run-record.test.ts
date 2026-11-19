@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -161,6 +165,22 @@ describe('세션 키의 자리 (LineageStore)', () => {
     await store.sweep();
     assert.equal(existsSync(stale.root), false, '24시간 지난 자리');
     assert.ok(existsSync(place.root), '최근 자리는 남는다');
+  });
+
+  test('세션 키 폴더가 링크면 쓰지 않고, 내 폴더가 넓게 열려 있으면 700으로 좁힌다 (공유 임시 폴더)', async () => {
+    const real = join(dir, 'real');
+    mkdirSync(real, { mode: 0o700 });
+    symlinkSync(real, join(dir, 'link'));
+    await assert.rejects(new LineageStore(join(dir, 'link')).claim('chat:링크'), /링크/);
+    assert.deepEqual(readdirSync(real), [], '링크 너머에 쓰지 않는다');
+
+    const open = join(dir, 'open');
+    mkdirSync(open);
+    chmodSync(open, 0o777);
+    const place = await new LineageStore(open).claim('chat:열림');
+    assert.ok(place);
+    assert.equal(statSync(open).mode & 0o777, 0o700);
+    await place.release();
   });
 });
 

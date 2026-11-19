@@ -1847,6 +1847,13 @@ describe('Codex로 일한다', () => {
         }),
       );
     };
+    // 앞 테스트(연결 확인)가 에이전트를 모두 멈춰 둘 수 있다: 대화를 받게 대표를 다시 움직인다
+    if (lead.status === 'paused')
+      ok(
+        await api.request('POST', `/api/agents/${lead.id}/resume`, owner, {
+          version: lead.version,
+        }),
+      );
     await tool('codex');
     try {
       const photo = await uploadPhoto('화이트보드.png');
