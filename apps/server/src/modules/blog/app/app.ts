@@ -16,6 +16,7 @@ import {
   type AppVisibility,
 } from '../blog.tables';
 import { AppView } from './app.view';
+import type { AppDomainProof } from './app-domain.policy';
 
 // 앱 하나 (blog.apps, 스토어 1단계, docs/스토어.md). 앱 종류(blog · magazine · page)로 만든 서비스 하나이고 바깥 주소는 /<slug>다.
 // 비공개로 만들어지고 관리자가 공개로 바꾼다. 방문자에게 앱의 글 · 메뉴 · 호 · 페이지가 보이려면 앱도 공개여야 한다
@@ -54,6 +55,10 @@ export class App extends TableEntity<AppRow, AppNew> {
     'store',
   ];
   private static readonly SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  /** 도메인 모양 (DB CHECK apps_domain_format과 같다): 점으로 나눈 이름 둘 이상, 끝은 영어 또는 xn-- */
+  private static readonly DOMAIN =
+    /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
+  private static readonly DOMAIN_LENGTH = [4, 253] as const;
 
   /** 관리자가 정하는 칸과 그 규칙 (종류는 만들 때 open이 본다) */
   private static readonly RULES: ColumnRules<AppRow> = {
@@ -98,6 +103,33 @@ export class App extends TableEntity<AppRow, AppNew> {
       );
     if (App.RESERVED.includes(slug)) throw new RuleViolation(`${slug}는 앱 주소로 쓸 수 없어요`);
     return slug;
+  }
+
+  /**
+   * 도메인 규칙 (스토어 3-0): 도메인만 받는다 (https:// · 포트 · 경로 없이). 소문자로, 국제 도메인은 xn-- 꼴로 바꿔 둔다.
+   * IP 주소 · localhost와 사이트 주소의 도메인(콘솔이 있는 기본 도메인)은 받지 않는다. 다른 앱과 겹침은 AppEdit이 미리, DB UNIQUE가 끝에 본다
+   */
+  static checkDomain(value: string, siteHost: string | null): string {
+    const text = value.trim().toLowerCase().replace(/\.$/, '');
+    if (!/^[^\s/:@?#\\[\]]+$/.test(text))
+      throw new RuleViolation(
+        '도메인만 적어 주세요 (예: blog.example.com). https:// · 포트 · 경로는 빼요',
+      );
+    let host: string;
+    try {
+      host = new URL(`https://${text}`).hostname;
+    } catch {
+      throw new RuleViolation('도메인 모양이 아니에요 (예: blog.example.com)');
+    }
+    if (/^\d+$/.test(host.split('.').at(-1) ?? ''))
+      throw new RuleViolation('IP 주소는 도메인으로 쓸 수 없어요');
+    if (host === 'localhost' || host.endsWith('.localhost'))
+      throw new RuleViolation('localhost는 도메인으로 쓸 수 없어요');
+    const [min, max] = App.DOMAIN_LENGTH;
+    if (host.length < min || host.length > max || !App.DOMAIN.test(host))
+      throw new RuleViolation('도메인 모양이 아니에요 (예: blog.example.com)');
+    if (host === siteHost) throw new RuleViolation('사이트 주소와 같은 도메인은 앱에 쓸 수 없어요');
+    return host;
   }
 
   /** 칸 하나를 관리자가 고칠 때와 같은 규칙으로 본다 (복원: RestoredApp) */
@@ -156,6 +188,11 @@ export class App extends TableEntity<AppRow, AppNew> {
     return this.row.name;
   }
 
+  /** 앱 도메인 (스토어 3-0). 없으면 null */
+  get domain(): string | null {
+    return this.row.domain;
+  }
+
   /**
    * 관리자가 고친 칸을 적는다. 종류는 바꾸지 않는다. 공개 여부가 바뀌면 알리고,
    * 비공개가 되면 첫 화면 고정도 푼다 (방문자에게 없는 앱이 첫 화면일 수 없다, DB CHECK)
@@ -175,6 +212,28 @@ export class App extends TableEntity<AppRow, AppNew> {
       throw new RuleViolation('공개 앱만 첫 화면으로 고정할 수 있어요');
     if (on === this.row.home) return;
     this.put('home', on);
+    this.put('updated_at', now);
+  }
+
+  /**
+   * 도메인을 정하거나 바꾼다 (관리자만, 대화의 제안에는 없다). null · ""은 빼기.
+   * 바뀌면 연결 확인을 비운다: 새 도메인은 다시 확인해야 기본 도메인의 앱 주소가 그리로 보낸다
+   */
+  setDomain(value: string | null, siteHost: string | null, now: Date): void {
+    const domain = value === null || value.trim() === '' ? null : App.checkDomain(value, siteHost);
+    if (domain === this.row.domain) return;
+    this.put('domain', domain);
+    this.put('domain_checked_at', null);
+    this.put('updated_at', now);
+  }
+
+  /** 관리자의 브라우저가 그 도메인에서 읽어 온 확인 값이 맞으면 연결된 도메인으로 적는다. 틀리면 422 */
+  confirmDomain(proof: AppDomainProof, token: string, now: Date): void {
+    const domain = this.row.domain;
+    if (domain === null) throw new RuleViolation('도메인부터 정해 주세요');
+    if (!proof.matches(this.id, domain, token))
+      throw new RuleViolation('연결되지 않은 도메인이에요. DNS와 프록시 설정을 확인해 주세요');
+    this.put('domain_checked_at', now);
     this.put('updated_at', now);
   }
 

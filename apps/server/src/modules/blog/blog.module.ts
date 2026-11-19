@@ -4,10 +4,11 @@ import {
   BlobStore,
   CoreWorkers,
   EventCatalog,
+  HostGate,
   LibraryQuery,
   Lookups,
 } from '../platform';
-import { AppController } from './app/app.api';
+import { AppController, AppDomainController } from './app/app.api';
 import { AppQuery } from './app/app.query';
 import { AppService } from './app/app.service';
 import { AppCodeController, AppSiteController } from './app-code/app-code.api';
@@ -104,6 +105,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     MenuController,
     IssueController,
     AppController,
+    AppDomainController,
     AppCodeController,
     AppSiteController,
   ],
@@ -128,6 +130,7 @@ export class BlogModule implements OnModuleInit {
     private readonly appCodeShow: AppCodeShowHandler,
     private readonly appCode: AppCodeQuery,
     private readonly lookups: Lookups,
+    private readonly gate: HostGate,
   ) {}
 
   onModuleInit(): void {
@@ -146,6 +149,16 @@ export class BlogModule implements OnModuleInit {
     this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
     // 앱 이름 (스토어 2단계): task가 대화의 앱을 확인한다 (관리자는 공간의 앱, 그 밖은 공개 앱)
     this.lookups.provide('app', (a, ids) => this.apps.names(a, ids));
+    // 앱마다 도메인 (스토어 3-0): 앱 도메인으로 온 요청이 닿는 경로는 글의 사진 · 앱 아이콘 · 연결 확인 값뿐이다
+    // (화면은 웹이 그리고, 웹은 서버를 기본 이름으로 부른다)
+    this.gate.registerApps(
+      (a) => this.apps.hosts(a),
+      [
+        /^\/api\/files\/[^/]+$/,
+        /^\/api\/apps\/by-slug\/[^/]+\/icon$/,
+        /^\/\.well-known\/cairn-domain$/,
+      ],
+    );
     // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
     this.checks.register(PostPublish.ACTION, (a, id) => this.posts.publishProblem(a, id));
     this.checks.register(Issue.ACTION, (a, id) => this.issues.publishProblem(a, id));

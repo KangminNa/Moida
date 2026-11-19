@@ -27,33 +27,41 @@ export class AppScreenQuery extends BaseQuery {
 
   /**
    * 앱 안 경로의 화면: '' 첫 화면, posts/<글>, m/<메뉴>, m/<메뉴>/<번호>. 그 밖은 missing.
-   * 다른 공개 앱에 든 글이면 그 앱의 주소로 보낸다 (글은 앱을 옮길 수 있다)
+   * 다른 공개 앱에 든 글이면 그 앱의 주소로 보낸다 (글은 앱을 옮길 수 있다).
+   * base: 이 화면의 앱 주소 앞부분, site: 앱 도메인으로 연 화면이면 기본 도메인의 출처 (AppScreenDataView)
    */
   async screen(
     actor: Actor,
     app: Readonly<AppRow>,
     base: string,
+    site: string | null,
     path: readonly string[],
     cursor: string | null,
   ): Promise<AppScreenDataView | AppScreenRedirectView> {
     const [first, second, third, ...rest] = path;
-    if (rest.length > 0) return this.frame(actor, AppScreenQuery.MISSING, app, base);
-    if (first === undefined) return this.home(actor, app, base, cursor);
+    if (rest.length > 0) return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
+    if (first === undefined) return this.home(actor, app, base, site, cursor);
     if (first === 'posts' && second !== undefined && third === undefined)
-      return this.post(actor, app, base, second);
+      return this.post(actor, app, base, site, second);
     if (first === 'm' && second !== undefined) {
       const menu = (await this.rows(menus, { app_id: app.id, slug: second }))[0] ?? null;
-      if (menu === null) return this.frame(actor, AppScreenQuery.MISSING, app, base);
-      if (third === undefined) return this.menu(actor, app, base, menu, cursor);
+      if (menu === null) return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
+      if (third === undefined) return this.menu(actor, app, base, site, menu, cursor);
       if (menu.kind === 'issues' && AppScreenQuery.NUMBER.test(third))
-        return this.issue(actor, app, base, menu, Number(third));
+        return this.issue(actor, app, base, site, menu, Number(third));
     }
-    return this.frame(actor, AppScreenQuery.MISSING, app, base);
+    return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
   }
 
   /** 첫 화면: 블로그는 글 목록, 매거진은 첫 호 메뉴의 최신 호, 페이지 앱은 공개 페이지 */
-  private async home(actor: Actor, app: Readonly<AppRow>, base: string, cursor: string | null) {
-    const view = await this.frame(actor, AppScreenQuery.HOME, app, base);
+  private async home(
+    actor: Actor,
+    app: Readonly<AppRow>,
+    base: string,
+    site: string | null,
+    cursor: string | null,
+  ) {
+    const view = await this.frame(actor, AppScreenQuery.HOME, app, base, site);
     if (app.kind === App.PAGE) return view.withPages(await this.pagesOf(app.id, null));
     if (app.kind === 'magazine') {
       const [menu] = await this.rows(
@@ -71,7 +79,13 @@ export class AppScreenQuery extends BaseQuery {
     return view.withPosts(rows, next);
   }
 
-  private async post(actor: Actor, app: Readonly<AppRow>, base: string, slug: string) {
+  private async post(
+    actor: Actor,
+    app: Readonly<AppRow>,
+    base: string,
+    site: string | null,
+    slug: string,
+  ) {
     const [row] = await this.sql<(ScreenArticleRow & { app_id: string | null })[]>`
       SELECT p.slug, p.title, p.excerpt, p.tags, p.published_at, p.align, p.status, p.app_id,
              r.body_md AS body, m.slug AS menu_slug
@@ -79,17 +93,18 @@ export class AppScreenQuery extends BaseQuery {
         LEFT JOIN blog.menus m ON m.id = p.menu_id
       WHERE p.space_id = ${app.space_id} AND p.slug = ${slug} AND p.deleted_at IS NULL
         AND p.status IN ('published', 'unlisted')`;
-    if (!row) return this.frame(actor, AppScreenQuery.MISSING, app, base);
+    if (!row) return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
     if (row.app_id !== app.id) {
       // 다른 공개 앱에 든 글: 그 앱의 주소로. 비공개 앱 · 앱 밖의 글은 없는 글과 같다
       const [other] =
         row.app_id === null
           ? []
           : await this.rows(apps, { id: row.app_id, visibility: App.PUBLIC });
-      if (!other) return this.frame(actor, AppScreenQuery.MISSING, app, base);
-      return new AppScreenRedirectView(`/${other.slug}/posts/${encodeURIComponent(row.slug)}`);
+      if (!other) return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
+      const home = AppScreenDataView.homeOf(other, site ?? '');
+      return new AppScreenRedirectView(`${home}/posts/${encodeURIComponent(row.slug)}`);
     }
-    const view = await this.frame(actor, AppScreenQuery.POST, app, base);
+    const view = await this.frame(actor, AppScreenQuery.POST, app, base, site);
     return view.withArticle(row);
   }
 
@@ -97,10 +112,11 @@ export class AppScreenQuery extends BaseQuery {
     actor: Actor,
     app: Readonly<AppRow>,
     base: string,
+    site: string | null,
     menu: Readonly<MenuRow>,
     cursor: string | null,
   ) {
-    const view = (await this.frame(actor, AppScreenQuery.MENU, app, base)).withMenu(menu);
+    const view = (await this.frame(actor, AppScreenQuery.MENU, app, base, site)).withMenu(menu);
     if (menu.kind === 'issues') return view.withIssues(await this.publishedIssues(menu.id));
     if (menu.kind === 'pages' || menu.kind === 'page')
       return view.withPages(await this.pagesOf(app.id, menu.id));
@@ -112,12 +128,13 @@ export class AppScreenQuery extends BaseQuery {
     actor: Actor,
     app: Readonly<AppRow>,
     base: string,
+    site: string | null,
     menu: Readonly<MenuRow>,
     number: number,
   ) {
     const [row] = await this.rows(issues, { menu_id: menu.id, number, status: 'published' });
-    if (!row) return this.frame(actor, AppScreenQuery.MISSING, app, base);
-    const view = await this.frame(actor, AppScreenQuery.ISSUE, app, base);
+    if (!row) return this.frame(actor, AppScreenQuery.MISSING, app, base, site);
+    const view = await this.frame(actor, AppScreenQuery.ISSUE, app, base, site);
     return view.withMenu(menu).withIssue(row, await this.issuePosts(row.id));
   }
 
@@ -127,6 +144,7 @@ export class AppScreenQuery extends BaseQuery {
     screen: string,
     app: Readonly<AppRow>,
     base: string,
+    site: string | null,
   ): Promise<AppScreenDataView> {
     const [shown, list, [graph]] = await Promise.all([
       this.rows(
@@ -142,7 +160,7 @@ export class AppScreenQuery extends BaseQuery {
             AND a.visibility = ${App.PUBLIC}
         ) AS open`,
     ]);
-    return new AppScreenDataView(screen, app, base, shown, list, graph?.open === true);
+    return new AppScreenDataView(screen, app, base, shown, list, graph?.open === true, site);
   }
 
   /** 앱(과 메뉴)의 공개 글 한 쪽, 발행한 순서. 다음 쪽이 있으면 그 커서 */

@@ -85,12 +85,20 @@ export class CreateAppInput extends BaseRequest {
   }
 }
 
-/** PATCH /api/apps/:id. 본 version을 함께 보낸다 (낙관적 잠금). 종류는 바꾸지 않는다. 첫 화면 고정은 PUT /api/apps/home */
+/**
+ * PATCH /api/apps/:id. 본 version을 함께 보낸다 (낙관적 잠금). 종류는 바꾸지 않는다. 첫 화면 고정은 PUT /api/apps/home.
+ * domain(스토어 3-0): 앱 도메인, null · ""은 빼기. 관리자의 REST만 받는다 (대화의 제안은 AppEdit.apply가 막는다)
+ */
 export class UpdateAppInput extends BaseRequest {
+  /** 도메인 칸에 받는 글자 (규칙은 App.checkDomain: 253자) */
+  private static readonly DOMAIN_MAX = 300;
+
   private constructor(
     readonly id: string,
     readonly version: number,
     readonly changes: Partial<Unchecked<AppRow>>,
+    /** 보내지 않으면 undefined (그대로) */
+    readonly domain: string | null | undefined,
   ) {
     super();
   }
@@ -99,8 +107,48 @@ export class UpdateAppInput extends BaseRequest {
     const body = { ...(raw as object), id } as Record<string, unknown>;
     return BaseRequest.read(
       body,
-      (f) => new UpdateAppInput(f.uuid('id'), f.version(), changesOf(f, body)),
+      (f) =>
+        new UpdateAppInput(
+          f.uuid('id'),
+          f.version(),
+          changesOf(f, body),
+          !('domain' in body)
+            ? undefined
+            : body.domain === null || body.domain === ''
+              ? null
+              : f.text('domain', UpdateAppInput.DOMAIN_MAX),
+        ),
     );
+  }
+}
+
+/** POST /api/apps/:id/domain/check { version, token }: 관리자의 브라우저가 앱 도메인의 /.well-known/cairn-domain에서 읽은 값 */
+export class CheckDomainInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly version: number,
+    readonly token: string,
+  ) {
+    super();
+  }
+
+  static from(id: string, raw: unknown): CheckDomainInput {
+    const body = { ...(raw as object), id } as Record<string, unknown>;
+    return BaseRequest.read(
+      body,
+      (f) => new CheckDomainInput(f.uuid('id'), f.version(), f.text('token', 200)),
+    );
+  }
+}
+
+/** GET /.well-known/cairn-domain: 앱 도메인으로 온 요청의 도메인 (HostGate가 적는다). 기본 도메인이면 null (Query가 404) */
+export class DomainProofInput extends BaseRequest {
+  private constructor(readonly host: string | null) {
+    super();
+  }
+
+  static from(appHost: string | undefined): DomainProofInput {
+    return new DomainProofInput(appHost ?? null);
   }
 }
 

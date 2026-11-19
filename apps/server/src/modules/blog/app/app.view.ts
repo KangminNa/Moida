@@ -10,6 +10,11 @@ function iconUrl(r: Readonly<AppRow>): string | null {
     : null;
 }
 
+/** 앱의 바깥 주소: 연결을 확인한 도메인이 있으면 그 도메인, 아니면 기본 도메인의 /<slug> (스토어 3-0) */
+function urlOf(r: Readonly<AppRow>): string {
+  return r.domain && r.domain_checked_at ? `https://${r.domain}/` : `/${r.slug}`;
+}
+
 /** 앱 한 줄과 함께 읽는 칸: 든 것의 수 (관리자 목록) */
 export interface AppListRow extends AppRow {
   published: number;
@@ -48,6 +53,12 @@ export class AppView {
       policy: r.policy,
       /** 방문자 첫 화면(/)으로 고정했는가 */
       home: r.home,
+      /** 앱 도메인 (스토어 3-0). 없으면 null */
+      domain: r.domain,
+      /** 그 도메인이 이 서버로 이어진 것을 확인한 때. 확인 전이면 null (도메인을 바꾸면 비워진다) */
+      domainCheckedAt: r.domain_checked_at?.toISOString() ?? null,
+      /** 바깥 주소: 확인한 도메인이면 https://<도메인>/, 아니면 /<slug> */
+      url: urlOf(r),
       /** 공개 글 · 임시 글(휴지통 제외) · 메뉴 · 페이지의 수 */
       counts: this.counts,
       version: r.version,
@@ -89,6 +100,8 @@ export class PublicAppView {
       iconUrl: iconUrl(r),
       /** 첫 화면(/)으로 고정한 앱 (스토어 2단계): 웹의 /가 이 앱으로 보낸다 */
       home: r.home,
+      /** 바깥 주소: 확인한 도메인이면 https://<도메인>/, 아니면 /<slug> (스토어 3-0) */
+      url: urlOf(r),
     };
   }
 }
@@ -99,6 +112,15 @@ export class PublicAppListView {
 
   toJSON() {
     return { apps: this.rows.map((r) => new PublicAppView(r).toJSON()) };
+  }
+}
+
+/** 도메인으로 여는 공개 앱 (GET /api/apps/domains, 스토어 3-0): 웹이 요청의 Host로 앱을 고른다 */
+export class AppDomainListView {
+  constructor(private readonly rows: readonly Readonly<Pick<AppRow, 'domain' | 'slug'>>[]) {}
+
+  toJSON() {
+    return { domains: this.rows.map((r) => ({ domain: r.domain ?? '', slug: r.slug })) };
   }
 }
 

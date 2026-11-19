@@ -1,4 +1,4 @@
-import { BaseRequest, NotFound, TooLarge, UnsupportedType } from '../../platform';
+import { BaseRequest, HostGate, NotFound, TooLarge, UnsupportedType } from '../../platform';
 import { AppCodeBundle } from './app-code-bundle';
 import { AppTicket } from './app-ticket';
 
@@ -135,8 +135,9 @@ export class AppCodeIdInput extends BaseRequest {
 }
 
 /**
- * GET /api/apps/site/:slug/screen?path=&cursor=&ticket=: 앱 화면 하나 (웹의 /<앱>/… 이 넘긴다).
- * path는 앱 안의 경로 ('' · posts/<글> · m/<메뉴> · m/<메뉴>/<번호>), ticket은 미리 보기 토큰
+ * GET /api/apps/site/:slug/screen?path=&cursor=&ticket=&host=: 앱 화면 하나 (웹의 /<앱>/… 이 넘긴다).
+ * path는 앱 안의 경로 ('' · posts/<글> · m/<메뉴> · m/<메뉴>/<번호>), ticket은 미리 보기 토큰,
+ * host는 방문자가 연 호스트 (스토어 3-0: 앱 도메인이면 그 도메인의 뿌리가 앱 주소, 기본 도메인이면 확인한 도메인으로 보낸다)
  */
 export class AppScreenInput extends BaseRequest {
   private static readonly PATH_MAX = 600;
@@ -147,6 +148,8 @@ export class AppScreenInput extends BaseRequest {
     readonly path: readonly string[],
     readonly cursor: string | null,
     readonly ticket: string | null,
+    /** 소문자 · 포트 없이. 보내지 않으면 null (주소 기준을 바꾸지 않는다) */
+    readonly host: string | null,
   ) {
     super();
   }
@@ -154,7 +157,13 @@ export class AppScreenInput extends BaseRequest {
   static from(slug: string, query: unknown): AppScreenInput {
     const q = (query ?? {}) as Record<string, unknown>;
     return BaseRequest.read(
-      { slug, path: q.path ?? '', cursor: q.cursor ?? null, ticket: q.ticket ?? null },
+      {
+        slug,
+        path: q.path ?? '',
+        cursor: q.cursor ?? null,
+        ticket: q.ticket ?? null,
+        host: q.host ?? null,
+      },
       (f) =>
         new AppScreenInput(
           f.text('slug', 200),
@@ -164,6 +173,7 @@ export class AppScreenInput extends BaseRequest {
             .map((part) => AppScreenInput.decoded(part)),
           f.optionalText('cursor', 200),
           AppScreenInput.ticketOf(f.optionalText('ticket', 2000)),
+          HostGate.normalize(f.optionalText('host', 300)),
         ),
     );
   }

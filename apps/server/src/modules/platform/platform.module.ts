@@ -20,6 +20,7 @@ import { FailedEventService } from './failed-event/failed-event.service';
 import { HealthController } from './health/health.api';
 import { HealthQuery } from './health/health.query';
 import { DomainErrorFilter } from './http/domain-error.filter';
+import { HostGate } from './http/host-gate';
 import { LibraryController } from './library/library.api';
 import { LibraryQuery } from './library/library.query';
 import { NoticeCatalog } from './notice/notice-catalog';
@@ -91,6 +92,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     LibraryQuery,
     AgentDirectory,
     Lookups,
+    HostGate,
     ActionChecks,
     SettingKinds,
     PlatformSettings,
@@ -138,6 +140,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     LibraryQuery,
     AgentDirectory,
     Lookups,
+    HostGate,
     ActionChecks,
     SettingKinds,
     ChangeStream,

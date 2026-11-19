@@ -1,6 +1,6 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { BlobStore, EventCatalog, PasswordHasher, SecretBox } from '../platform';
+import { BlobStore, EventCatalog, HostGate, PasswordHasher, SecretBox } from '../platform';
 import events from './account.events.json';
 import { AccountNotices } from './account-notices';
 import { AccountSecurity } from './account-security';
@@ -76,6 +76,7 @@ export class AccountModule implements OnModuleInit {
   constructor(
     private readonly blobs: BlobStore,
     private readonly spaces: SpaceQuery,
+    private readonly gate: HostGate,
   ) {}
 
   onModuleInit(): void {
@@ -84,5 +85,7 @@ export class AccountModule implements OnModuleInit {
     this.blobs.registerUse(['account.spaces.logo_blob_hash'], (actor, hashes) =>
       this.spaces.usedBlobs(actor, hashes),
     );
+    // 기본 도메인 (스토어 3-0): 사이트 주소의 호스트는 앱 도메인으로 치지 않는다
+    this.gate.registerSite(async (actor) => (await this.spaces.info(actor)).siteUrl);
   }
 }

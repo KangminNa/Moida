@@ -7,8 +7,10 @@ import {
   Database,
   DomainError,
   EntityService,
+  HostGate,
   Idempotency,
   NotFound,
+  SecretBox,
   SettingActor,
   type SettingChangeInput,
   SettingOutcome,
@@ -18,8 +20,15 @@ import {
 import { MenuRepository } from '../menu/menu.repository';
 import { PageRepository } from '../page/page.repository';
 import type { App } from './app';
-import type { CreateAppInput, HomeAppInput, UpdateAppInput, UploadIconInput } from './app.input';
+import type {
+  CheckDomainInput,
+  CreateAppInput,
+  HomeAppInput,
+  UpdateAppInput,
+  UploadIconInput,
+} from './app.input';
 import { AppRepository } from './app.repository';
+import { AppDomainProof } from './app-domain.policy';
 import { AppEdit } from './app-edit';
 import { AppTeam } from './app-team.policy';
 
@@ -27,6 +36,8 @@ import { AppTeam } from './app-team.policy';
 // 공개 여부는 관리자의 고치기에서만 바뀐다 (대화의 제안에는 없다). 지우기는 글 · 페이지 · 호가 없을 때만, 빈 메뉴는 함께 지운다.
 // 앱과 메뉴 · 페이지를 한 번에 바꾸는 이 Service만 메뉴 · 페이지의 Repository를 함께 쓴다 (IssueService와 같은 예외).
 // 운영 팀장(스토어 2단계)은 트랜잭션 전에 platform AgentDirectory로 확인한다: 맨 위의, 비공개를 읽지 않는 에이전트만 (AppTeam)
+// 도메인(스토어 3-0)은 관리자의 고치기에서만 바뀐다. 기본 도메인은 트랜잭션 전에 platform HostGate에 묻고,
+// 도메인이 바뀌거나 앱을 지우면 HostGate가 앱 도메인 목록을 다시 읽게 한다
 @Injectable()
 export class AppService extends EntityService<App> {
   private static readonly CREATE = 'create_app';
@@ -35,6 +46,8 @@ export class AppService extends EntityService<App> {
     db: Database,
     private readonly blobs: BlobStore,
     private readonly agents: AgentDirectory,
+    private readonly gate: HostGate,
+    private readonly box: SecretBox,
   ) {
     super(db);
   }
@@ -60,17 +73,26 @@ export class AppService extends EntityService<App> {
     });
   }
 
-  /** 본 version이 지금과 다르면 409. 공개 여부가 바뀌면 그래프 사본에 알린다 (App.edit) */
+  /** 본 version이 지금과 다르면 409. 공개 여부가 바뀌면 그래프 사본에 알린다 (App.edit). 다른 앱의 도메인이면 409 */
   async update(actor: Actor, req: UpdateAppInput): Promise<App> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     await this.assertLeader(actor, req.changes.agent_id);
-    return this.transaction(async (tx) => {
+    const siteHost = req.domain === undefined ? null : await this.gate.siteHost();
+    const app = await this.transaction(async (tx) => {
       const edit = new AppEdit(tx, spaceId);
-      const app = await edit.update(req, new Date());
+      const app = await edit.update(req, new Date(), siteHost);
       await edit.save();
       return app;
     });
+    if (req.domain !== undefined) this.gate.stale();
+    return app;
+  }
+
+  /** 도메인 연결 확인 (스토어 3-0): 관리자의 브라우저가 앱 도메인에서 읽어 온 값이 맞으면 확인한 때를 적는다. 틀리면 422 */
+  checkDomain(actor: Actor, req: CheckDomainInput): Promise<App> {
+    const proof = new AppDomainProof(this.box);
+    return this.changeAsOwner(actor, req, (app) => app.confirmDomain(proof, req.token, new Date()));
   }
 
   /** 설정 바꾸기 제안의 미리 해 보기: 같은 줄(AppEdit)을 지나고 저장하지 않는다 */
@@ -159,6 +181,7 @@ export class AppService extends EntityService<App> {
       app.remove();
       await apps.remove(app);
     });
+    this.gate.stale();
   }
 
   /**

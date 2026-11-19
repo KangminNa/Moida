@@ -15,6 +15,8 @@ export type HttpRequest = {
   requestId?: string;
   /** 요청 로그에 덧붙일, 이 요청이 한 일 (MCP 도구 이름) */
   traced?: string;
+  /** 앱 도메인으로 온 요청이면 그 도메인 (HostGate, 스토어 3-0). 요청자는 늘 방문자다 */
+  appHost?: string;
 };
 
 /** 본문을 흘려 읽는 요청 (JSON으로 읽지 않은 본문: 결과물 올리기). 받는 쪽이 크기를 세며 읽는다 */

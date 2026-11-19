@@ -32,6 +32,8 @@ const app = {
   agent_id: null,
   policy: '',
   home: false,
+  domain: null,
+  domain_checked_at: null,
 } satisfies AppRow;
 const menu = {
   id: 'm1',
@@ -109,5 +111,81 @@ describe('앱 화면 데이터의 이름 (cairn: 1)', () => {
       [],
       '러너의 AppCodeCheck.NAMES에 더해 주세요',
     );
+  });
+});
+
+describe('앱 도메인의 주소 (스토어 3-0)', () => {
+  const blog = { ...app, id: 'a2', kind: 'blog' as const, name: '블로그', slug: 'blog' };
+  const linked = {
+    ...blog,
+    id: 'a3',
+    slug: 'shop',
+    domain: 'shop.example.com',
+    domain_checked_at: NOW,
+  };
+  const unchecked = { ...blog, id: 'a4', slug: 'wait', domain: 'wait.example.com' };
+  const posts = { ...menu, kind: 'posts' as const, slug: 'notes' };
+
+  test('앱 도메인으로 연 화면: 앱 주소는 도메인의 뿌리, 기본 도메인에 있는 것은 사이트 주소로', () => {
+    const own = { ...blog, domain: 'blog.example.com', domain_checked_at: NOW };
+    const site = 'https://cairn.example.com';
+    const data = new AppScreenDataView(
+      'home',
+      own,
+      '',
+      [own, linked, unchecked],
+      [posts],
+      true,
+      site,
+    )
+      .withPosts([post], 'next')
+      .withPages([{ name: 'map', title: '지도', updated_at: NOW }])
+      .toJSON();
+    assert.equal(data.base, '/', '템플릿의 첫 화면 링크(href="{{base}}")');
+    assert.equal(data.files, '/files');
+    assert.equal(data.app.url, '/');
+    assert.equal(data.app.rssUrl, '/rss.xml');
+    assert.equal(data.menus[0]?.url, '/m/notes');
+    assert.equal(data.posts[0]?.url, '/posts/p');
+    assert.equal(data.more?.url, '/?cursor=next');
+    assert.deepEqual(data.site, {
+      home: `${site}/`,
+      loginUrl: `${site}/login`,
+      graphUrl: `${site}/graph`,
+    });
+    assert.equal(data.pages[0]?.url, `${site}/pages/map/`);
+    assert.deepEqual(
+      data.others.map((a) => a.url),
+      ['https://shop.example.com/', `${site}/wait`],
+      '확인한 도메인은 그 도메인, 확인 전이면 기본 도메인의 /<slug>',
+    );
+  });
+
+  test('기본 도메인으로 연 화면: 지금과 같고, 연결을 확인한 도메인의 앱만 그 도메인으로', () => {
+    const data = new AppScreenDataView(
+      'home',
+      blog,
+      '/blog',
+      [blog, linked, unchecked],
+      [posts],
+      true,
+    )
+      .withPosts([post], null)
+      .toJSON();
+    assert.equal(data.base, '/blog');
+    assert.equal(data.files, '/blog/files');
+    assert.equal(data.app.rssUrl, '/blog/rss.xml');
+    assert.equal(data.site.home, '/');
+    assert.deepEqual(
+      data.others.map((a) => a.url),
+      ['https://shop.example.com/', '/wait'],
+    );
+  });
+
+  test('미리 보기 토큰 주소에서도 RSS는 토큰 없이', () => {
+    const data = new AppScreenDataView('home', blog, '/blog/~tok', [blog], [posts], false).toJSON();
+    assert.equal(data.base, '/blog/~tok');
+    assert.equal(data.app.url, '/blog/~tok');
+    assert.equal(data.app.rssUrl, '/blog/rss.xml');
   });
 });

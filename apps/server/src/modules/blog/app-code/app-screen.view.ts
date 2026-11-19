@@ -4,6 +4,8 @@ import type { AppRow, IssueRow, MenuRow, PageRow, PostRow } from '../blog.tables
 // 같은 값을 <script id="cairn-data">로 싣는다. 약속은 이름을 더하기만 한다 (빼거나 바꾸면 cairn: 2).
 // 방문자 데이터만 담는다: 누가 보든(관리자 · 미리 보기 토큰도) 같은 모양이고, 보이는지는 Query가 앱을 정할 때 이미 걸렀다.
 // 웹이 더하는 것: 날짜 글자(dateText), 글 본문의 HTML(post.html), 사이트 이름(site.name).
+// 앱 도메인으로 연 화면(스토어 3-0)은 그 앱의 주소가 도메인의 뿌리(/)이고, 기본 도메인에 있는 것(사이트 첫 화면 · 로그인 · 그래프 ·
+// 페이지 · 다른 앱)은 기본 도메인의 전체 주소로 적는다. 연결을 확인한 도메인이 있는 다른 앱은 어디서든 그 도메인으로 적는다.
 
 /** 글 목록 한 줄과 함께 읽는 칸 */
 export interface ScreenPostRow
@@ -31,6 +33,14 @@ function iconOf(r: Readonly<AppRow>): string | null {
 }
 
 export class AppScreenDataView {
+  /**
+   * 앱 하나의 바깥 주소 (끝에 / 없이): 연결을 확인한 도메인이면 https://<도메인>, 아니면 기본 도메인의 /<slug>.
+   * site: 기본 도메인의 출처 (기본 도메인에서 그리면 ""). 다른 앱에 든 글로 보낼 때도 쓴다 (AppScreenQuery)
+   */
+  static homeOf(r: Readonly<AppRow>, site: string): string {
+    return r.domain && r.domain_checked_at ? `https://${r.domain}` : `${site}/${r.slug}`;
+  }
+
   private posts: readonly ScreenPostRow[] = [];
   private next: string | null = null;
   private article: { row: ScreenArticleRow; back: string } | null = null;
@@ -43,13 +53,18 @@ export class AppScreenDataView {
     /** home · post · menu · issue · missing (AppScreenQuery가 정한다) */
     readonly screen: string,
     private readonly app: Readonly<AppRow>,
-    /** 이 화면의 앱 주소 (/<앱> 또는 미리 보기 /<앱>/~<토큰>) */
+    /** 이 화면의 앱 주소 앞부분 (/<앱> 또는 미리 보기 /<앱>/~<토큰>, 앱 도메인이면 "" 또는 /~<토큰>). 끝에 / 없이 */
     private readonly base: string,
     /** 공개 앱 (순서대로) */
     private readonly apps: readonly AppRow[],
     private readonly menus: readonly MenuRow[],
     /** 공개 앱에 공개 글이 있는가 (그래프 링크) */
     private readonly graph: boolean,
+    /**
+     * 앱 도메인으로 연 화면이면 기본 도메인의 출처 (https://<사이트>, 사이트 주소를 정하기 전이면 ""),
+     * 기본 도메인으로 연 화면이면 null (스토어 3-0)
+     */
+    private readonly site: string | null = null,
   ) {}
 
   /** 글 목록 한 쪽. next가 있으면 ?cursor=next로 다음 쪽 */
@@ -60,7 +75,7 @@ export class AppScreenDataView {
   }
 
   withArticle(row: ScreenArticleRow): this {
-    const back = row.menu_slug === null ? this.base : this.menuUrl(row.menu_slug);
+    const back = row.menu_slug === null ? this.home() : this.menuUrl(row.menu_slug);
     this.article = { row, back };
     return this;
   }
@@ -88,10 +103,9 @@ export class AppScreenDataView {
   toJSON() {
     const app = this.app;
     const here = this.menu?.slug ?? null;
-    const appUrl = (r: Readonly<AppRow>) => `/${r.slug}`;
     const apps = this.apps.map((r) => ({
       name: r.name,
-      url: appUrl(r),
+      url: this.appUrl(r),
       iconUrl: iconOf(r),
       current: r.id === app.id,
     }));
@@ -103,16 +117,20 @@ export class AppScreenDataView {
       isMenu: this.screen === 'menu',
       isIssue: this.screen === 'issue',
       title: this.title(),
-      base: this.base,
+      base: this.home(),
       files: `${this.base}/files`,
-      site: { home: '/', loginUrl: '/login', graphUrl: this.graph ? '/graph' : null },
+      site: {
+        home: `${this.origin()}/`,
+        loginUrl: `${this.origin()}/login`,
+        graphUrl: this.graph ? `${this.origin()}/graph` : null,
+      },
       app: {
         name: app.name,
         description: app.description,
         kind: app.kind,
-        url: appUrl(app),
+        url: this.appUrl(app),
         iconUrl: iconOf(app),
-        rssUrl: app.kind === 'page' ? null : `/${app.slug}/rss.xml`,
+        rssUrl: app.kind === 'page' ? null : `${this.feedBase()}/rss.xml`,
       },
       apps,
       others: apps.filter((a) => !a.current),
@@ -130,7 +148,7 @@ export class AppScreenDataView {
       issue: this.issueJson(),
       pages: this.pages.map((p) => ({
         title: p.title,
-        url: `/pages/${enc(p.name)}/`,
+        url: `${this.origin()}/pages/${enc(p.name)}/`,
         date: p.updated_at.toISOString(),
       })),
     };
@@ -145,7 +163,29 @@ export class AppScreenDataView {
   }
 
   private here(): string {
-    return this.screen === 'menu' && this.menu ? this.menuUrl(this.menu.slug) : this.base;
+    return this.screen === 'menu' && this.menu ? this.menuUrl(this.menu.slug) : this.home();
+  }
+
+  /** 이 앱의 첫 화면 (앱 도메인의 뿌리면 /) */
+  private home(): string {
+    return this.base || '/';
+  }
+
+  /** 앱 목록의 주소: 이 앱은 이 화면의 앱 주소, 다른 앱은 그 앱의 바깥 주소 */
+  private appUrl(r: Readonly<AppRow>): string {
+    if (r.id === this.app.id) return this.home();
+    const home = AppScreenDataView.homeOf(r, this.origin());
+    return r.domain && r.domain_checked_at ? `${home}/` : home;
+  }
+
+  /** 기본 도메인에 있는 것의 앞부분: 기본 도메인으로 연 화면이면 "" (같은 출처) */
+  private origin(): string {
+    return this.site ?? '';
+  }
+
+  /** RSS의 앞부분: 미리 보기 토큰 없이 (RSS는 공개 앱만, 웹이 그린다). 앱 도메인이면 그 뿌리 */
+  private feedBase(): string {
+    return this.site === null ? `/${this.app.slug}` : '';
   }
 
   private menuUrl(slug: string): string {
@@ -173,7 +213,7 @@ export class AppScreenDataView {
       isIssues: m.kind === 'issues',
       isPages: m.kind === 'pages',
       isPage: m.kind === 'page',
-      rssUrl: m.kind === 'posts' && m.rss ? `/${this.app.slug}/m/${enc(m.slug)}/rss.xml` : null,
+      rssUrl: m.kind === 'posts' && m.rss ? `${this.feedBase()}/m/${enc(m.slug)}/rss.xml` : null,
     };
   }
 
@@ -241,11 +281,18 @@ export class AppScreenView {
   }
 }
 
-/** 다른 주소로 보내기: 다른 앱에 든 글, 관리자가 토큰 없이 연 비공개 앱(토큰 주소) */
+/**
+ * 다른 주소로 보내기: 다른 앱에 든 글, 관리자가 토큰 없이 연 비공개 앱(토큰 주소),
+ * 연결을 확인한 도메인이 있는 앱을 기본 도메인으로 연 화면(그 도메인으로, permanent: 스토어 3-0)
+ */
 export class AppScreenRedirectView {
-  constructor(readonly url: string) {}
+  constructor(
+    readonly url: string,
+    /** 늘 그 주소로 가는가 (웹이 308로 보낸다). 아니면 307 */
+    private readonly permanent = false,
+  ) {}
 
   toJSON() {
-    return { redirect: this.url };
+    return { redirect: this.url, permanent: this.permanent };
   }
 }

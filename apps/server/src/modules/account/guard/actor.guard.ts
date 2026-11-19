@@ -15,7 +15,8 @@ import { OwnerService } from '../owner/owner.service';
 import { SpaceQuery } from '../space/space.query';
 
 // 모든 요청에서 요청자를 정한다: 작업 토큰 → 에이전트, 그 밖의 Bearer 토큰 → 기기 (둘 다 /mcp에서만),
-// 로그인 쿠키 → 주인, 없으면 방문자.
+// 로그인 쿠키 → 주인, 없으면 방문자. 앱 도메인으로 온 요청(HostGate의 appHost, 스토어 3-0)은 늘 방문자다:
+// 앱 도메인에는 관리 API가 없고, 그 도메인의 쿠키 · 토큰으로 관리자가 되는 길을 두지 않는다.
 // AI의 입구는 /mcp 하나다: Bearer 토큰은 REST(/api)에서 요청자가 되지 않아 방문자와 같다.
 // REST의 관리 일에 권한 확인이 하나 빠져도 AI 토큰은 닿지 않게 구조로 막는다 (2026-11-06).
 // 누구인지 정하는 것 말고 막는 일은 하나뿐이다: 로그인 쿠키로 오는 쓰기 요청의 출처 확인.
@@ -39,6 +40,7 @@ export class ActorGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<HttpRequest & { path: string }>();
+    if (request.appHost !== undefined) return true;
     const bearer = /^Bearer\s+(\S+)$/i.exec(String(request.headers.authorization ?? ''))?.[1];
     if (bearer) {
       // AI 토큰은 MCP 입구에서만 쓴다. 작업 토큰은 호출마다 작업을 확인하는 곳이 거기뿐이고,
