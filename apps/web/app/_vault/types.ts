@@ -11,6 +11,7 @@ import type {
   SessionRevisionView,
   TranscriptView,
 } from '../../../server/src/modules/vault/session/session.view';
+import type { SessionTrashView } from '../../../server/src/modules/vault/session/session-trash.view';
 import type {
   TidyBacklogView,
   TidySettingsView,
@@ -38,6 +39,9 @@ export type SessionRevision = ReturnType<SessionRevisionView['toJSON']>;
 export type SessionDetail = ReturnType<SessionDetailView['toJSON']>;
 /** 세션의 원문 하나 (수집 훅 · 확장이 올린 대화 글) */
 export type Transcript = ReturnType<TranscriptView['toJSON']>;
+/** 휴지통의 세션들 (2026-11-19 휴지통 A) */
+export type SessionTrash = ReturnType<SessionTrashView['toJSON']>;
+export type TrashedSession = SessionTrash['sessions'][number];
 /** 프로젝트별 원문 모으기 */
 export type ProjectRules = ReturnType<ProjectRuleListView['toJSON']>;
 export type WikiPage = ReturnType<WikiPageView['toJSON']>;

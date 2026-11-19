@@ -6,7 +6,7 @@ import {
   RuleViolation,
   ValueList,
 } from '../../platform';
-import { type ChangeWork, type NewNode, TargetEntity } from '../change/change-target';
+import { type ChangeWork, type NewNode, TrashTarget } from '../change/change-target';
 import {
   type RunMemoNew,
   type RunMemoRow,
@@ -22,6 +22,7 @@ import type { AgentRunRecord } from './agent-run-record';
 import { SessionNote } from './session-note';
 import { SessionReceipt } from './session-receipt';
 import type { SessionTranscript } from './session-transcript';
+import { SessionTrashedView } from './session-trash.view';
 
 /** sessions 한 줄 + 점의 id. 대표 wiki를 바꿀 때는 휴지통 표시, 대화로 찾을 때는 있는 판의 내용을 함께 읽는다 */
 export interface LoadedSession extends SessionRow {
@@ -42,7 +43,7 @@ export interface LoadedSession extends SessionRow {
 // 서버 러너가 그 원문으로 쓴 노트가 원본 판이 된다 (세션 노트 일, 에이전트 없이 서버의 로그인으로).
 // 작업 세션(도구 cairn-agent, 2026-11-17): 에이전트의 요청 하나가 세션 하나다. 실행마다 원문 한 줄과 인수인계 메모를 쌓고,
 // 노트는 메모를 이어 붙여 시스템이 쓴다. 세션 노트 일 · 자동 정리 · 세션 알림은 부르지 않는다 (정리는 끝난 요청만, S2).
-export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
+export class Session extends TrashTarget<LoadedSession, NewNode<SessionNew>> {
   static readonly PRIVATE: SessionVisibility = 'private';
   static readonly PUBLIC: SessionVisibility = 'public';
   /** 사람이 정한 대표 wiki를 pinned_sections에 적는 이름. 칸 이름과 겹치지 않는다 */
@@ -71,6 +72,8 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
   };
 
   readonly targetKind = 'session';
+  /** 휴지통의 세션은 지우지 않는다 (원칙 2, 2026-11-19 휴지통 A): 지워도 되는 때를 적지 않는다 */
+  protected readonly keepMs = null;
   private readonly known = new Map<string, number>();
   private readonly transcripts = new Map<string, number>();
   private added: SessionRevisionNew | null = null;
@@ -169,10 +172,6 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     return this.pinned.includes(Session.WIKI_KEY);
   }
 
-  get gone(): boolean {
-    return (this.row.deleted_at ?? null) !== null;
-  }
-
   /** 대표 wiki를 정한다. null이면 도착 구역으로. 사람이 정하면 표시가 남는다 */
   assignTo(wikiId: string | null, work: ChangeWork): void {
     if (work.human && !this.wikiPinned)
@@ -184,15 +183,46 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     );
   }
 
-  snapshot(): Readonly<Record<string, unknown>> {
-    return { version: this.version, wiki_id: this.wikiId, pinned_sections: this.pinned };
+  /**
+   * 휴지통으로 (사람만, 관리 화면). 목록 · 찾기 · 그래프 · AI 읽기에서 빠지고, 판 · 원문 · 대표 wiki는 남아 되살리면 돌아온다.
+   * 휴지통에 있는 동안 같은 대화가 다시 올라와도 판은 쌓이되 휴지통에 남는다 (사람이 정한 것이 우선, 원칙 3)
+   */
+  trash(work: ChangeWork): void {
+    if (!work.human) throw new RuleViolation('세션은 사람만 지워요');
+    this.moveToTrash(work.now);
   }
 
-  /** 앞 상태로 돌아간다. 세션은 변경 묶음이 만들지 않으므로 before는 늘 있다 */
-  rollBack(before: Readonly<Record<string, unknown>> | null): void {
+  /** 휴지통에서 꺼낸다 (사람만) */
+  untrash(work: ChangeWork): void {
+    if (!work.human) throw new RuleViolation('세션은 사람만 되살려요');
+    this.takeOutOfTrash();
+  }
+
+  /** 휴지통에 넣거나 꺼낸 뒤의 모양 (관리 화면) */
+  trashedView(changeSetId: string): SessionTrashedView {
+    return new SessionTrashedView(
+      { node_id: this.id, version: this.version },
+      this.trashedAt,
+      changeSetId,
+    );
+  }
+
+  snapshot(): Readonly<Record<string, unknown>> {
+    return {
+      version: this.version,
+      wiki_id: this.wikiId,
+      pinned_sections: this.pinned,
+      deleted: this.gone,
+    };
+  }
+
+  /** 앞 상태로 돌아간다. 세션은 변경 묶음이 만들지 않으므로 before는 늘 있다 (휴지통 표시가 없는 옛 기록은 휴지통 밖) */
+  rollBack(before: Readonly<Record<string, unknown>> | null, work: ChangeWork): void {
     if (before === null) return;
     this.put('wiki_id', before.wiki_id === null ? null : String(before.wiki_id));
     this.put('pinned_sections', before.pinned_sections as string[]);
+    if (before.deleted === true) this.moveToTrash(work.now);
+    else this.takeOutOfTrash();
   }
 
   /**
@@ -220,6 +250,8 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     if (same !== undefined) return SessionReceipt.unchanged(this.id, same, transcript.redactions);
     const seq = this.appendText(transcript, by, now);
     if (title && (this.row.revision_count ?? 0) === 0) this.put('head_title', title);
+    // 휴지통의 세션은 노트 일을 요청하지 않는다 (원문은 쌓는다)
+    if (this.gone) return SessionReceipt.saved(this.id, seq, transcript.redactions);
     const shown = this.row.head_title || title || Session.UNTITLED;
     this.record(
       new DomainEvent(Session.NOTE_REQUESTED, 1, this.spaceId, {
@@ -327,8 +359,9 @@ export class Session extends TargetEntity<LoadedSession, NewNode<SessionNew>> {
     this.put('head_text', revision.body_md);
     this.put('revision_count', revision.seq);
     this.put('last_revision_at', now);
-    // 작업 세션의 판은 알리지 않는다: 자동 정리 · 세션 알림은 사람의 AI 도구 세션만 (작업 세션 정리는 S2)
-    if (this.row.tool !== Session.AGENT_TOOL)
+    // 작업 세션의 판은 알리지 않는다: 자동 정리 · 세션 알림은 사람의 AI 도구 세션만 (작업 세션 정리는 S2).
+    // 휴지통의 세션도 알리지 않는다: 지운 세션을 정리하거나 들어왔다고 알리지 않게
+    if (this.row.tool !== Session.AGENT_TOOL && !this.gone)
       this.record(
         new DomainEvent('vault.session.saved', 1, this.spaceId, {
           sessionId: this.id,

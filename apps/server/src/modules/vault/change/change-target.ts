@@ -93,30 +93,34 @@ export abstract class TargetEntity<R extends TargetRow, N extends TableRow = R>
     return Object.keys(this.unsaved).length > 0;
   }
 
+  /** 이번에 휴지통에 넣었거나 꺼냈으면 vault.nodes에 적을 칸 (점의 저장소가 고친다). 휴지통이 없는 대상은 늘 null */
+  get trashChange(): Pick<NodeRow, 'deleted_at' | 'purge_after'> | null {
+    return null;
+  }
+
+  /** 휴지통 표시를 저장한 뒤 점의 저장소가 부른다 */
+  trashSaved(): void {}
+
   get spaceId(): string {
     return this.row.space_id;
   }
 }
 
-// 그래프의 점 (vault.nodes에 행이 있는 대상 중 휴지통으로 가는 것): wiki · 카테고리.
-// 휴지통 표시는 vault.nodes의 칸이라 표의 칸과 따로 들고 있다가 Repository가 점에 적는다.
-export abstract class GraphNode<
-  R extends GraphNodeRow,
+// 휴지통으로 가는 대상의 기반 (vault.nodes의 휴지통 표시): 세션과, 주소가 있는 점(GraphNode: wiki · 카테고리).
+// 휴지통 표시는 vault.nodes의 칸이라 표의 칸과 따로 들고 있다가 점의 저장소(NodeRepository)가 점에 적는다.
+// 휴지통에 든 대상은 목록 · 찾기 · 그래프 · AI 읽기에서 빠지고, 판 · 원문은 그대로 남아 되살리면 돌아온다 (원칙 2)
+export abstract class TrashTarget<
+  R extends NodeDetailRow,
   N extends TableRow = R,
 > extends TargetEntity<R, N> {
-  /** 휴지통 보관 기간 */
-  private static readonly PURGE_MS = 30 * 24 * 60 * 60 * 1000;
+  /** 휴지통에 둔 뒤 지워도 되는 때까지 (purge_after). null이면 적지 않는다: 지우지 않는 대상 */
+  protected abstract readonly keepMs: number | null;
 
   private deletedAt: Date | null;
   private purgeAfter: Date | null = null;
   private trashMoved = false;
 
-  protected constructor(
-    row: R | N,
-    fresh: boolean,
-    /** 사람이 정한 주소인가. 겹치면 번호를 붙이지 않고 거절한다 */
-    private readonly manualSlug: boolean,
-  ) {
+  protected constructor(row: R | N, fresh = false) {
     super(row, fresh);
     this.deletedAt = (row as Partial<GraphNodeRow>).deleted_at ?? null;
   }
@@ -125,13 +129,12 @@ export abstract class GraphNode<
     return this.deletedAt !== null;
   }
 
-  /** 지금 주소 (새 점이면 겹치지 않게 정하기 전의 주소) */
-  get slug(): string {
-    return this.row.slug;
+  /** 휴지통에 넣은 때 (아니면 null) */
+  get trashedAt(): Date | null {
+    return this.deletedAt;
   }
 
-  /** 이번에 휴지통에 넣었거나 꺼냈으면 vault.nodes에 적을 칸 (Repository가 고친다). 아니면 null */
-  get trashChange(): Pick<NodeRow, 'deleted_at' | 'purge_after'> | null {
+  override get trashChange(): Pick<NodeRow, 'deleted_at' | 'purge_after'> | null {
     return this.trashMoved ? { deleted_at: this.deletedAt, purge_after: this.purgeAfter } : null;
   }
 
@@ -139,20 +142,14 @@ export abstract class GraphNode<
     return super.changed || this.trashMoved;
   }
 
-  /** 저장이 끝난 뒤 Repository가 부른다 */
-  trashSaved(): void {
+  override trashSaved(): void {
     this.trashMoved = false;
-  }
-
-  /** 새 점의 주소를 정한다. taken: 이 주소이거나 "이 주소-숫자"인 같은 종류의 주소들 */
-  settleSlug(taken: ReadonlySet<string>): void {
-    this.put('slug', SlugPolicy.pick(this.row.slug, taken, this.manualSlug) as R['slug']);
   }
 
   protected moveToTrash(now: Date): void {
     if (this.gone) return;
     this.deletedAt = now;
-    this.purgeAfter = new Date(now.getTime() + GraphNode.PURGE_MS);
+    this.purgeAfter = this.keepMs === null ? null : new Date(now.getTime() + this.keepMs);
     this.trashMoved = true;
   }
 
@@ -161,5 +158,33 @@ export abstract class GraphNode<
     this.deletedAt = null;
     this.purgeAfter = null;
     this.trashMoved = true;
+  }
+}
+
+// 그래프의 점 중 주소가 있는 것: wiki · 카테고리. 휴지통 보관 기간을 적는다.
+export abstract class GraphNode<R extends GraphNodeRow, N extends TableRow = R> extends TrashTarget<
+  R,
+  N
+> {
+  /** 휴지통 보관 기간 */
+  protected readonly keepMs = 30 * 24 * 60 * 60 * 1000;
+
+  protected constructor(
+    row: R | N,
+    fresh: boolean,
+    /** 사람이 정한 주소인가. 겹치면 번호를 붙이지 않고 거절한다 */
+    private readonly manualSlug: boolean,
+  ) {
+    super(row, fresh);
+  }
+
+  /** 지금 주소 (새 점이면 겹치지 않게 정하기 전의 주소) */
+  get slug(): string {
+    return this.row.slug;
+  }
+
+  /** 새 점의 주소를 정한다. taken: 이 주소이거나 "이 주소-숫자"인 같은 종류의 주소들 */
+  settleSlug(taken: ReadonlySet<string>): void {
+    this.put('slug', SlugPolicy.pick(this.row.slug, taken, this.manualSlug) as R['slug']);
   }
 }

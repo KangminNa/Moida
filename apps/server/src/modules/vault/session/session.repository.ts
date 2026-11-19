@@ -34,7 +34,7 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
   }
 
   /**
-   * AI 도구의 대화 하나로 세션을 찾아 잠근다. 없으면 null.
+   * AI 도구의 대화 하나로 세션을 찾아 잠근다 (휴지통의 것도: 같은 대화가 다시 와도 새 세션을 만들지 않게). 없으면 null.
    * 같은 대화의 첫 저장이 동시에 와도 세션이 하나만 생기도록, 세션이 아직 없어도 그 대화 자리를 잠근다
    * (트랜잭션이 끝나면 풀린다). 뒤에 온 저장은 앞의 저장이 커밋된 뒤 그 세션을 찾는다.
    */
@@ -48,8 +48,8 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
     await this.sql`SELECT pg_advisory_xact_lock(hashtextextended(${place}, 0))`;
     return this.maybeOne(
       await this.sql`
-        SELECT s.*, s.node_id AS id, ${this.hashes()}
-        FROM vault.sessions s
+        SELECT s.*, s.node_id AS id, n.deleted_at, ${this.hashes()}
+        FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
         WHERE s.space_id = ${spaceId} AND s.device_id = ${deviceId}
           AND s.tool = ${tool} AND s.source_session_id = ${sourceSessionId}
         FOR UPDATE OF s`,
@@ -65,8 +65,8 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
     await this.sql`SELECT pg_advisory_xact_lock(hashtextextended(${place}, 0))`;
     return this.maybeOne(
       await this.sql`
-        SELECT s.*, s.node_id AS id, ${this.hashes()}
-        FROM vault.sessions s
+        SELECT s.*, s.node_id AS id, n.deleted_at, ${this.hashes()}
+        FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
         WHERE s.space_id = ${spaceId} AND s.tool = ${Session.AGENT_TOOL}
           AND s.source_session_id = ${flow}
         FOR UPDATE OF s`,

@@ -120,7 +120,7 @@ export class ChatUpdateQuery extends BaseQuery {
       FROM task.chat_updates u
       JOIN task.chats c ON c.id = u.chat_id
       LEFT JOIN task.agents a ON a.id = u.agent_id
-      WHERE u.space_id = ${spaceId}
+      WHERE u.space_id = ${spaceId} AND c.deleted_at IS NULL
         ${device === null ? sql`` : sql`AND c.device_id = ${device}`}
         ${chatId === null ? sql`` : sql`AND c.id = ${chatId}`}
         ${project === null ? sql`` : sql`AND c.project = ${project}`}
@@ -168,7 +168,7 @@ export class ChatUpdateQuery extends BaseQuery {
       LEFT JOIN task.agents a ON a.id = c.agent_id
       LEFT JOIN task.tasks last
         ON last.space_id = c.space_id AND last.request_id = ${prefix} || c.id || ':' || c.turns
-      WHERE c.space_id = ${spaceId}
+      WHERE c.space_id = ${spaceId} AND c.deleted_at IS NULL
         ${device === null ? sql`` : sql`AND c.device_id = ${device}`}
         ${chatId === null ? sql`` : sql`AND c.id = ${chatId}`}
         ${project === null ? sql`` : sql`AND c.project = ${project}`}

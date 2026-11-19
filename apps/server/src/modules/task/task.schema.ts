@@ -113,6 +113,7 @@ export const chats = taskSchema.table('chats', {
   effort: text('effort').$type<ChatEffort>(),
   pending_refs: jsonb('pending_refs'),
   app_id: uuid('app_id'),
+  deleted_at: timestamp('deleted_at', { withTimezone: true }),
 });
 
 /** task.external_tools */

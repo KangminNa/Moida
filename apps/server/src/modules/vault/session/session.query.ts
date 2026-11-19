@@ -48,6 +48,7 @@ import {
 } from './session.view';
 import { SessionNote } from './session-note';
 import { SessionTranscript } from './session-transcript';
+import { SessionTrashLineView, SessionTrashView } from './session-trash.view';
 
 // 세션 읽기. 관리 화면의 목록·상세·판은 비공개까지 볼 수 있는 요청자(주인, read_all 기기)만,
 // AI 도구의 찾기·읽기(search · note)는 read_public이나 read_all 중 하나로, read_public은 공개 세션만 본다.
@@ -57,6 +58,7 @@ export class SessionQuery extends BaseQuery {
   /** 보관함의 종류 (세션) */
   static readonly LIBRARY_KIND = 'session';
   private static readonly PAGE = 30;
+  private static readonly TRASH_LIMIT = 200;
   /** 찾은 결과의 본문 조각: 전체 길이, 그중 찾은 말 앞에 남길 길이 */
   private static readonly EXCERPT = 160;
   private static readonly EXCERPT_LEAD = 40;
@@ -116,6 +118,29 @@ export class SessionQuery extends BaseQuery {
       items.map((r) => new SessionSummaryView(r)),
       next,
     );
+  }
+
+  /** 휴지통의 세션 (관리자만). 넣은 때가 늦은 순으로 TRASH_LIMIT개까지 */
+  async trash(actor: Actor): Promise<SessionTrashView> {
+    actor.assertOwner();
+    const rows = await this.sql<
+      (Pick<
+        SessionRow,
+        | 'node_id'
+        | 'head_title'
+        | 'project'
+        | 'tool'
+        | 'revision_count'
+        | 'last_revision_at'
+        | 'version'
+      > & { deleted_at: Date })[]
+    >`
+      SELECT s.node_id, s.head_title, s.project, s.tool, s.revision_count, s.last_revision_at,
+        s.version, n.deleted_at
+      FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
+      WHERE s.space_id = ${actor.requireSpace()} AND n.deleted_at IS NOT NULL
+      ORDER BY n.deleted_at DESC, s.node_id DESC LIMIT ${SessionQuery.TRASH_LIMIT}`;
+    return new SessionTrashView(rows.map((r) => new SessionTrashLineView(r)));
   }
 
   /** 세션 하나: 지금 판(원문만 있고 노트가 아직 없으면 null), 판 기록, 원문 기록 (내용 없이) */

@@ -133,8 +133,19 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * 관리자의 대화를 이어 쓰면 앞 대화(비공개일 수 있다)가 그 기기의 회차에 실린다. 남의 대화는 없는 것처럼 (404)
    */
   assertSender(deviceId: string | null): void {
-    if (deviceId !== null && this.row.device_id !== deviceId)
+    if (this.trashed || (deviceId !== null && this.row.device_id !== deviceId))
       throw new NotFound('대화를 찾을 수 없어요');
+  }
+
+  /** 휴지통에 있는가 (2026-11-19 휴지통 A). 휴지통의 대화에는 보내지 못하고(assertSender) 서버도 회차를 열지 않는다 */
+  get trashed(): boolean {
+    return this.row.deleted_at !== null;
+  }
+
+  /** 휴지통으로 넣거나(now) 꺼낸다(null). 회차 작업 · 결과물 · 소식은 그대로 남는다 (원칙 2) */
+  trash(now: Date | null): void {
+    this.put('deleted_at', now);
+    this.changed();
   }
 
   /**

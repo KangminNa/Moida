@@ -10,9 +10,11 @@ import {
 import { ChatQuery } from './chat.query';
 import { ChatService } from './chat.service';
 import type { ChatDetailView, ChatListView, ChatView } from './chat.view';
+import type { ChatTrashView } from './chat-trash.view';
 
 // 대화 (콘솔 운영 › 대화). 모두 관리자만 (Service · Query 첫 줄에서 확인).
 // 답을 멈추려면 회차 작업을 취소하고(api/tasks/:id/cancel), 결재는 api/approvals/:id/decide로 정한다.
+// 휴지통 (2026-11-19 휴지통 A): GET trash, POST :id/trash { version }(멈추고 넣는다), POST :id/restore { version }
 @Controller('api/chats')
 export class ChatController {
   constructor(
@@ -23,6 +25,11 @@ export class ChatController {
   @Get()
   list(@CurrentActor() actor: Actor, @Query() query: unknown): Promise<ChatListView> {
     return this.query.list(actor, ListChatsInput.from(query));
+  }
+
+  @Get('trash')
+  trash(@CurrentActor() actor: Actor): Promise<ChatTrashView> {
+    return this.query.trash(actor);
   }
 
   @Get(':id')
@@ -63,5 +70,25 @@ export class ChatController {
     @Body() body: unknown,
   ): Promise<ChatView> {
     return (await this.service.stop(actor, VersionInput.from(id, body))).view();
+  }
+
+  @Post(':id/trash')
+  @HttpCode(200)
+  async trashOne(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<ChatView> {
+    return (await this.service.trash(actor, VersionInput.from(id, body))).view();
+  }
+
+  @Post(':id/restore')
+  @HttpCode(200)
+  async restore(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<ChatView> {
+    return (await this.service.restore(actor, VersionInput.from(id, body))).view();
   }
 }

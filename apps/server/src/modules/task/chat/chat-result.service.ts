@@ -51,7 +51,8 @@ export class ChatResultService extends BaseService {
     await this.transaction(async (tx) => {
       const chats = new ChatRepository(tx);
       const chat = await chats.lock(spaceId, chatId);
-      if (chat.agentId === null || (await chats.busy(chat))) return;
+      // 휴지통의 대화(2026-11-19 휴지통 A)는 다시 맡기거나 카드를 만들지 않는다
+      if (chat.agentId === null || chat.trashed || (await chats.busy(chat))) return;
       const approvals = new ApprovalRepository(tx);
       const outputs = new OutputRepository(tx);
       const actions = await approvals.lockUncarded(chat.id);
@@ -163,6 +164,7 @@ export class ChatResultService extends BaseService {
       const chatId = await new TaskRepository(tx).chatOf(taskId);
       if (chatId === null) return;
       const chat = await new ChatRepository(tx).lock(spaceId, chatId);
+      if (chat.trashed) return;
       const once = new Idempotency(
         tx,
         spaceId,

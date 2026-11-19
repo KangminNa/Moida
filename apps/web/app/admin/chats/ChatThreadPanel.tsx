@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useMe } from '../../_account/live';
 import { useApps } from '../../_blog/live';
@@ -41,6 +42,8 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const cancelling = useAction();
   const deciding = useAction();
   const stopping = useAction();
+  const trashing = useAction();
+  const router = useRouter();
   const tuning = useAction();
   const uploading = useAction();
   const lead = useLead();
@@ -108,6 +111,19 @@ export function ChatThreadPanel({ id }: { id: string }) {
       reload: detail.reload,
       conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요',
     });
+
+  /** 휴지통으로 (2026-11-19 휴지통 A): 도는 일은 멈추고 목록에서 빠진다. 대화 휴지통에서 복원한다 */
+  const trash = async () => {
+    if (!window.confirm('휴지통으로 보낼까요? 도는 일은 멈춰요. 휴지통에서 복원할 수 있어요'))
+      return;
+    const send = () => api('POST', `/api/chats/${id}/trash`, { version: d.chat.version });
+    const reply = await trashing.run('trash', send, {
+      done: '휴지통으로 보냈어요',
+      conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요',
+      reload: detail.reload,
+    });
+    if (reply?.ok) router.replace('/admin');
+  };
 
   const tune = (body: { model: string | null; effort: string | null }) =>
     tuning.run(
@@ -200,9 +216,18 @@ export function ChatThreadPanel({ id }: { id: string }) {
               {stopping.busy ? '멈추는 중' : '멈추기'}
             </button>
           )}
+          <button
+            type="button"
+            className="ghost small"
+            disabled={trashing.busy !== null}
+            onClick={trash}
+          >
+            휴지통으로
+          </button>
         </header>
         {detail.error && <p className="error">{detail.error}</p>}
         {stopping.problem && <p className="error">{stopping.problem}</p>}
+        {trashing.problem && <p className="error">{trashing.problem}</p>}
         {tuning.problem && <p className="error">{tuning.problem}</p>}
         <ChatTurns
           turns={d.turns}
