@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { RuleViolation } from '../../platform';
 
 // 회원 비밀번호 규칙 (스토어 3-1). 관리자 비밀번호와 같이 길이로 본다: 10~200자, 숫자 · 특수문자 조합은 요구하지 않는다
@@ -7,6 +8,9 @@ import { RuleViolation } from '../../platform';
 export class MemberPassword {
   static readonly MIN = 10;
   static readonly MAX = 200;
+  /** 임시 비밀번호: 헷갈리는 글자(0 · O · 1 · l · I)를 뺀 소문자 · 숫자 16자 (약 80비트) */
+  private static readonly TEMP_LENGTH = 16;
+  private static readonly TEMP_LETTERS = 'abcdefghijkmnpqrstuvwxyz23456789';
   private static readonly COMMON: ReadonlySet<string> = new Set([
     '1234567890',
     '0123456789',
@@ -37,5 +41,14 @@ export class MemberPassword {
       throw new RuleViolation('아이디 · 닉네임과 같은 비밀번호는 쓸 수 없어요');
     if (new Set(lower).size === 1 || MemberPassword.COMMON.has(lower))
       throw new RuleViolation('너무 쉬운 비밀번호예요. 다른 비밀번호를 써 주세요');
+  }
+
+  /** 관리자가 초기화할 때 주는 임시 비밀번호 (회원이 로그인한 뒤 바꾼다) */
+  static temporary(): string {
+    const letters = MemberPassword.TEMP_LETTERS;
+    return Array.from(
+      { length: MemberPassword.TEMP_LENGTH },
+      () => letters[randomInt(letters.length)],
+    ).join('');
   }
 }

@@ -1,5 +1,6 @@
-import { BaseEntity, Forbidden, RuleViolation, TableEntity } from '../../platform';
+import { BaseEntity, Conflict, Forbidden, RuleViolation, TableEntity } from '../../platform';
 import type { MemberNew, MemberRow } from '../community.tables';
+import { MemberDecidedView, MemberResetView } from '../moderation/moderation.view';
 import { MemberSelfView } from './member.view';
 import { MemberSession } from './member-session';
 import { Nickname } from './nickname.policy';
@@ -17,8 +18,12 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
   static readonly FOREVER = new Date('9999-12-31T00:00:00Z');
 
   private session: MemberSession | null = null;
-  /** 비밀번호를 바꿔 이 세션(해시) 말고 다른 로그인을 모두 끝낸다 */
+  /** 이번 저장에서 로그인을 끝낸다 (비밀번호 바꾸기 · 초기화) */
+  private endingSessions = false;
+  /** 로그인을 끝낼 때 남길 세션(토큰 해시). 비밀번호 초기화는 모두 끝낸다 (null) */
   private keptSession: string | null = null;
+  /** 관리자가 초기화해 만든 임시 비밀번호 (이번 응답에 한 번만, 저장하지 않는다) */
+  private issuedPassword: string | null = null;
 
   /**
    * 가입: 만 14세 이상이라고 확인해야 한다 (개인정보, 11.0). 아이디 · 비밀번호 규칙은 Service가 해시를 만들기 전에
@@ -101,12 +106,48 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
   changePassword(passwordHash: string, keepSession: string, now: Date): void {
     this.put('password_hash', passwordHash);
     this.put('password_changed_at', now);
+    this.endingSessions = true;
     this.keptSession = keepSession;
   }
 
-  /** 다른 로그인을 모두 끝낼 때 남길 세션의 토큰 해시 (Repository가 끝낸다). 끝낼 것이 없으면 null */
+  /**
+   * 관리자의 비밀번호 초기화 (3-1c): 이메일을 받지 않아 비밀번호를 잊은 회원은 관리자에게 묻는다 (11.0 ④).
+   * 임시 비밀번호(MemberPassword.temporary)는 이번 응답에만 싣고, 모든 로그인을 끝낸다
+   */
+  resetPassword(passwordHash: string, temporary: string, now: Date): void {
+    this.put('password_hash', passwordHash);
+    this.put('password_changed_at', now);
+    this.endingSessions = true;
+    this.keptSession = null;
+    this.issuedPassword = temporary;
+  }
+
+  /** 이번 저장에서 로그인을 끝내는가 (Repository가 끝낸다) */
+  get endsSessions(): boolean {
+    return this.endingSessions;
+  }
+
+  /** 로그인을 끝낼 때 남길 세션의 토큰 해시. 모두 끝내면 null */
   get sessionToKeep(): string | null {
     return this.keptSession;
+  }
+
+  /**
+   * 관리자의 차단 (3-1c): until까지, 없으면 무기한(FOREVER). 차단 중이면 쓰기 · 신고 · 닉네임 바꾸기가 403이고
+   * 로그인 · 읽기 · 자기 글 지우기는 된다 (차단된 것을 내 정보에서 본다)
+   */
+  block(until: Date | null, now: Date): void {
+    const end = until ?? Member.FOREVER;
+    if (end.getTime() <= now.getTime() || end.getTime() > Member.FOREVER.getTime())
+      throw new RuleViolation('차단이 끝나는 때는 지금보다 뒤여야 해요');
+    this.put('blocked_until', end);
+  }
+
+  /** 차단 풀기: 차단 중인 회원만 (아니면 409) */
+  unblock(now: Date): void {
+    const until = this.row.blocked_until;
+    if (!until || until.getTime() <= now.getTime()) throw new Conflict('차단된 회원이 아니에요');
+    this.put('blocked_until', null);
   }
 
   /** 글 · 댓글을 쓰기 전에: 차단 중이면 403, 가입하고 JOIN_WAIT_MS가 지나지 않았으면 422 (스팸 계정이 가입하자마자 쓰지 못하게) */
@@ -127,6 +168,16 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
         ? '차단된 회원이에요'
         : `차단된 회원이에요 (${day}까지)`,
     );
+  }
+
+  /** 관리자 결정 뒤의 회원 (차단 · 풀기) */
+  decidedView(): MemberDecidedView {
+    return new MemberDecidedView(this.row);
+  }
+
+  /** 비밀번호 초기화의 답: 임시 비밀번호를 한 번 싣는다 */
+  resetView(): MemberResetView {
+    return new MemberResetView(this.row, this.issuedPassword ?? '');
   }
 
   view(): MemberSelfView {

@@ -7,6 +7,8 @@ import { BaseRequest, type HttpRequest, NotFound } from '../../platform';
 export class MemberPlace extends BaseRequest {
   private constructor(
     readonly appId: string,
+    /** 앱이 든 공간 (이벤트 · 알림이 쓴다) */
+    readonly spaceId: string,
     readonly origin: string,
     /** 요청한 곳 (시도 제한의 열쇠, 서버 메모리에서만 쓰고 저장하지 않는다) */
     readonly ip: string,
@@ -15,10 +17,10 @@ export class MemberPlace extends BaseRequest {
   }
 
   static from(req: HttpRequest): MemberPlace {
-    if (!req.appId) throw new NotFound('없는 주소예요');
+    if (!req.appId || !req.appSpaceId) throw new NotFound('없는 주소예요');
     const raw = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '');
     const host = raw.split(',')[0]?.trim().toLowerCase() || (req.appHost ?? '');
-    return new MemberPlace(req.appId, `${req.protocol}://${host}`, req.ip ?? '');
+    return new MemberPlace(req.appId, req.appSpaceId, `${req.protocol}://${host}`, req.ip ?? '');
   }
 }
 

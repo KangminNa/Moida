@@ -2,7 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { integer, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { CommentState, TopicState } from './community.tables';
+import type { CommentHiddenBy, CommentState, DecisionAction, DecisionByKind, ReportReason, ReportState, TopicHiddenBy, TopicState } from './community.tables';
 
 const communitySchema = pgSchema('community');
 
@@ -18,6 +18,22 @@ export const comments = communitySchema.table('comments', {
   request_id: text('request_id').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   version: integer('version').notNull(),
+  hidden_by: text('hidden_by').$type<CommentHiddenBy>(),
+  decided_at: timestamp('decided_at', { withTimezone: true }),
+});
+
+/** community.decisions */
+export const decisions = communitySchema.table('decisions', {
+  id: uuid('id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  topic_id: uuid('topic_id'),
+  comment_id: uuid('comment_id'),
+  member_id: uuid('member_id'),
+  action: text('action').$type<DecisionAction>().notNull(),
+  by_kind: text('by_kind').$type<DecisionByKind>().notNull(),
+  by_id: uuid('by_id'),
+  note: text('note'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 /** community.member_sessions */
@@ -49,6 +65,21 @@ export const members = communitySchema.table('members', {
   password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
 });
 
+/** community.reports */
+export const reports = communitySchema.table('reports', {
+  id: uuid('id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  topic_id: uuid('topic_id'),
+  comment_id: uuid('comment_id'),
+  member_id: uuid('member_id').notNull(),
+  reason: text('reason').$type<ReportReason>().notNull(),
+  note: text('note'),
+  state: text('state').$type<ReportState>().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  closed_at: timestamp('closed_at', { withTimezone: true }),
+  version: integer('version').notNull(),
+});
+
 /** community.topic_revisions */
 export const topicRevisions = communitySchema.table('topic_revisions', {
   id: uuid('id').notNull(),
@@ -73,4 +104,6 @@ export const topics = communitySchema.table('topics', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   edited_at: timestamp('edited_at', { withTimezone: true }),
   version: integer('version').notNull(),
+  hidden_by: text('hidden_by').$type<TopicHiddenBy>(),
+  decided_at: timestamp('decided_at', { withTimezone: true }),
 });

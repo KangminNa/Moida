@@ -68,6 +68,29 @@ export class TopicQuery extends BaseQuery {
     await this.shown(place, id);
   }
 
+  /**
+   * 신고할 대상을 쓴 회원 (ReportService가 트랜잭션 전에): 그 앱의 보이는 글이나, 보이는 글에 달린 보이는 댓글.
+   * 아니면 404 (가렸거나 지운 것은 없는 것과 같다)
+   */
+  async authorOf(
+    actor: Actor,
+    place: MemberPlace,
+    topicId: string | null,
+    commentId: string | null,
+  ): Promise<string> {
+    await this.assertCommunity(actor, place);
+    const [row] =
+      commentId === null
+        ? await this.sql<Pick<TopicRow, 'member_id'>[]>`
+            SELECT member_id FROM community.topics
+            WHERE app_id = ${place.appId} AND id = ${topicId} AND state = 'shown'`
+        : await this.sql<Pick<CommentRow, 'member_id'>[]>`
+            SELECT c.member_id FROM community.comments c JOIN community.topics t ON t.id = c.topic_id
+            WHERE c.app_id = ${place.appId} AND c.id = ${commentId} AND c.state = 'shown' AND t.state = 'shown'`;
+    if (!row) throw new NotFound(commentId === null ? TopicQuery.MISSING : '없는 댓글이에요');
+    return row.member_id;
+  }
+
   private async shown(
     place: MemberPlace,
     id: string,

@@ -5,6 +5,9 @@
 /** community.comments.state (값 목록 CHECK) */
 export const COMMENT_STATE = ['shown', 'hidden', 'removed', 'deleted'] as const;
 export type CommentState = (typeof COMMENT_STATE)[number];
+/** community.comments.hidden_by (값 목록 CHECK) */
+export const COMMENT_HIDDEN_BY = ['reports', 'owner'] as const;
+export type CommentHiddenBy = (typeof COMMENT_HIDDEN_BY)[number];
 /** community.comments */
 export interface CommentRow {
   id: string;
@@ -17,8 +20,31 @@ export interface CommentRow {
   request_id: string;
   created_at: Date;
   version: number;
+  hidden_by: CommentHiddenBy | null;
+  decided_at: Date | null;
 }
 export type CommentNew = Partial<CommentRow> & Pick<CommentRow, 'id' | 'topic_id' | 'app_id' | 'member_id' | 'body' | 'body_key' | 'request_id'>;
+
+/** community.decisions.action (값 목록 CHECK) */
+export const DECISION_ACTION = ['hide', 'show', 'remove', 'block', 'unblock', 'reset_password'] as const;
+export type DecisionAction = (typeof DECISION_ACTION)[number];
+/** community.decisions.by_kind (값 목록 CHECK) */
+export const DECISION_BY_KIND = ['system', 'owner'] as const;
+export type DecisionByKind = (typeof DECISION_BY_KIND)[number];
+/** community.decisions */
+export interface DecisionRow {
+  id: string;
+  app_id: string;
+  topic_id: string | null;
+  comment_id: string | null;
+  member_id: string | null;
+  action: DecisionAction;
+  by_kind: DecisionByKind;
+  by_id: string | null;
+  note: string | null;
+  created_at: Date;
+}
+export type DecisionNew = Partial<DecisionRow> & Pick<DecisionRow, 'id' | 'app_id' | 'action' | 'by_kind'>;
 
 /** community.member_sessions */
 export interface MemberSessionRow {
@@ -51,6 +77,28 @@ export interface MemberRow {
 }
 export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at' | 'login_id' | 'password_hash' | 'password_changed_at'>;
 
+/** community.reports.reason (값 목록 CHECK) */
+export const REPORT_REASON = ['spam', 'abuse', 'illegal', 'privacy', 'other'] as const;
+export type ReportReason = (typeof REPORT_REASON)[number];
+/** community.reports.state (값 목록 CHECK) */
+export const REPORT_STATE = ['open', 'accepted', 'dismissed'] as const;
+export type ReportState = (typeof REPORT_STATE)[number];
+/** community.reports */
+export interface ReportRow {
+  id: string;
+  app_id: string;
+  topic_id: string | null;
+  comment_id: string | null;
+  member_id: string;
+  reason: ReportReason;
+  note: string | null;
+  state: ReportState;
+  created_at: Date;
+  closed_at: Date | null;
+  version: number;
+}
+export type ReportNew = Partial<ReportRow> & Pick<ReportRow, 'id' | 'app_id' | 'member_id' | 'reason'>;
+
 /** community.topic_revisions */
 export interface TopicRevisionRow {
   id: string;
@@ -65,6 +113,9 @@ export type TopicRevisionNew = Partial<TopicRevisionRow> & Pick<TopicRevisionRow
 /** community.topics.state (값 목록 CHECK) */
 export const TOPIC_STATE = ['shown', 'hidden', 'removed', 'deleted'] as const;
 export type TopicState = (typeof TOPIC_STATE)[number];
+/** community.topics.hidden_by (값 목록 CHECK) */
+export const TOPIC_HIDDEN_BY = ['reports', 'owner'] as const;
+export type TopicHiddenBy = (typeof TOPIC_HIDDEN_BY)[number];
 /** community.topics */
 export interface TopicRow {
   id: string;
@@ -79,5 +130,7 @@ export interface TopicRow {
   created_at: Date;
   edited_at: Date | null;
   version: number;
+  hidden_by: TopicHiddenBy | null;
+  decided_at: Date | null;
 }
 export type TopicNew = Partial<TopicRow> & Pick<TopicRow, 'id' | 'app_id' | 'member_id' | 'title' | 'body' | 'body_key' | 'request_id'>;

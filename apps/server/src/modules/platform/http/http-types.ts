@@ -17,8 +17,9 @@ export type HttpRequest = {
   traced?: string;
   /** 앱 도메인으로 온 요청이면 그 도메인 (HostGate, 스토어 3-0). 관리자 쿠키 · 토큰은 보지 않는다 */
   appHost?: string;
-  /** 그 도메인의 앱 (HostGate, 스토어 3-1: 커뮤니티가 어느 앱인지 안다) */
+  /** 그 도메인의 앱과 앱이 든 공간 (HostGate, 스토어 3-1: 커뮤니티가 어느 앱인지, 이벤트 · 알림이 어느 공간인지 안다) */
   appId?: string;
+  appSpaceId?: string;
 };
 
 /** 본문을 흘려 읽는 요청 (JSON으로 읽지 않은 본문: 결과물 올리기). 받는 쪽이 크기를 세며 읽는다 */

@@ -9,6 +9,8 @@ export class WriteLimits {
   static readonly TOPICS_PER_HOUR = 5;
   static readonly TOPICS_PER_DAY = 20;
   static readonly COMMENTS_PER_HOUR = 30;
+  /** 신고: 한 회원이 시간당 (3-1c) */
+  static readonly REPORTS_PER_HOUR = 10;
   /** 링크 수: 글 · 댓글 하나에 */
   static readonly TOPIC_LINKS = 5;
   static readonly COMMENT_LINKS = 2;
@@ -43,6 +45,11 @@ export class WriteLimits {
   static assertCommentPace(lastHour: number): void {
     if (lastHour >= WriteLimits.COMMENTS_PER_HOUR)
       throw new TooManyRequests(`한 시간에 댓글은 ${WriteLimits.COMMENTS_PER_HOUR}개까지예요`);
+  }
+
+  static assertReportPace(lastHour: number): void {
+    if (lastHour >= WriteLimits.REPORTS_PER_HOUR)
+      throw new TooManyRequests(`한 시간에 신고는 ${WriteLimits.REPORTS_PER_HOUR}개까지예요`);
   }
 
   /** 같은 본문을 SAME_BODY_MS 안에 다시 올리면 409 (도배 막기) */

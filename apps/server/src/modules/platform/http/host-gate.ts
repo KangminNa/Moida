@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { type Actor, SystemActor } from '../base/actor';
 import { NotFound } from '../base/errors';
 
-/** 앱 도메인 목록 읽기 (blog가 등록): 모든 앱의 도메인(확인 전 것까지) → 그 앱의 id */
-type AppHostsRead = (actor: Actor) => Promise<ReadonlyMap<string, string>>;
+/** 앱 도메인 목록 읽기 (blog가 등록): 모든 앱의 도메인(확인 전 것까지) → [그 앱의 id, 앱이 든 공간의 id] */
+type AppHostsRead = (actor: Actor) => Promise<ReadonlyMap<string, readonly [string, string]>>;
 /** 사이트 주소 읽기 (account가 등록): 관리자가 정한 기본 도메인의 주소. 정하기 전이면 null */
 type SiteRead = (actor: Actor) => Promise<string | null>;
 
@@ -14,6 +14,7 @@ type GateRequest = {
   headers: Record<string, unknown>;
   appHost?: string;
   appId?: string;
+  appSpaceId?: string;
 };
 type GateResponse = { status(code: number): { json(body: object): void } };
 
@@ -22,8 +23,8 @@ class HostSnapshot {
   constructor(
     readonly siteOrigin: string | null,
     readonly siteHost: string | null,
-    /** 앱 도메인 → 앱 id */
-    readonly apps: ReadonlyMap<string, string>,
+    /** 앱 도메인 → [앱 id, 공간 id] */
+    readonly apps: ReadonlyMap<string, readonly [string, string]>,
     readonly at: number,
   ) {}
 }
@@ -33,7 +34,7 @@ class HostSnapshot {
 // (Lookups와 같은 방식). 요청의 Host와 앞단 프록시가 넘긴 X-Forwarded-Host 가운데 하나라도 앱 도메인이면 앱 도메인 요청이다:
 // - 등록한 경로만 지나고 나머지는 없는 주소와 같은 404 (콘솔 · 관리 API · MCP · OAuth는 기본 도메인에서만).
 //   열 경로는 모듈이 등록한다 (openPaths): 읽기(GET · HEAD)만이거나, 쓰기까지 (커뮤니티의 회원 API, 스토어 3-1)
-// - request.appHost · appId에 그 도메인과 앱을 적는다. ActorGuard는 관리자 쿠키 · 토큰을 보지 않는다 (회원은 커뮤니티가 따로 정한다)
+// - request.appHost · appId · appSpaceId에 그 도메인과 앱, 앱이 든 공간을 적는다 (커뮤니티의 이벤트 · 알림이 공간을 안다). ActorGuard는 관리자 쿠키 · 토큰을 보지 않는다 (회원은 커뮤니티가 따로 정한다)
 // 사이트 주소의 호스트는 앱 도메인으로 치지 않는다: 같은 값이 들어가도 콘솔이 막히지 않게 (blog도 그 값을 받지 않는다).
 // 둘 다 머리글을 하나 더 속여 보내면 더 막힐 뿐 더 열리지 않는다. 도메인 목록은 30초 동안 기억하고, 바뀌면 stale로 바로 다시 읽는다.
 @Injectable()
@@ -89,7 +90,7 @@ export class HostGate {
     return (req, res, next) => {
       this.appOf(req.headers).then((found) => {
         if (found === null) return next();
-        [req.appHost, req.appId] = found;
+        [req.appHost, req.appId, req.appSpaceId] = found;
         if (this.isOpen(req.method, req.path)) return next();
         const missing = new NotFound('없는 주소예요');
         res.status(missing.status).json(missing.toJSON());
@@ -102,15 +103,16 @@ export class HostGate {
     return HostGate.READS.has(method.toUpperCase()) && this.openReads.some((p) => p.test(path));
   }
 
-  /** 요청이 앱 도메인으로 왔으면 [그 도메인, 앱 id]. Host와 X-Forwarded-Host를 모두 본다 */
-  private async appOf(headers: Record<string, unknown>): Promise<[string, string] | null> {
+  /** 요청이 앱 도메인으로 왔으면 [그 도메인, 앱 id, 공간 id]. Host와 X-Forwarded-Host를 모두 본다 */
+  private async appOf(headers: Record<string, unknown>): Promise<[string, string, string] | null> {
     const hosts = [headers.host, headers['x-forwarded-host']]
       .map((value) => HostGate.normalize(value))
       .filter((host): host is string => host !== null);
     if (hosts.length === 0 || !this.appHosts) return null;
     const known = await this.read();
     const host = hosts.find((h) => h !== known.siteHost && known.apps.has(h));
-    return host === undefined ? null : [host, known.apps.get(host) ?? ''];
+    const [appId, spaceId] = host === undefined ? [] : (known.apps.get(host) ?? []);
+    return host === undefined || !appId || !spaceId ? null : [host, appId, spaceId];
   }
 
   /** 머리글의 호스트: 첫 값, 소문자, 포트와 끝의 점을 뺀다. 비었으면 null */
@@ -141,7 +143,7 @@ export class HostGate {
     try {
       const [siteUrl, apps] = await Promise.all([
         this.site ? this.site(actor) : null,
-        this.appHosts ? this.appHosts(actor) : new Map<string, string>(),
+        this.appHosts ? this.appHosts(actor) : new Map<string, readonly [string, string]>(),
       ]);
       const site = siteUrl ? new URL(siteUrl) : null;
       const read = new HostSnapshot(

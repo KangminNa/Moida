@@ -1,0 +1,16 @@
+{
+  "topics": {
+    "community.report.added": {
+      "fields": ["appId", "reportId", "reason", "topicId", "commentId"]
+    },
+    "community.content.hidden": {
+      "fields": ["appId", "decisionId", "reports", "topicId", "commentId"]
+    },
+    "community.content.decided": {
+      "fields": ["appId", "decisionId", "action", "topicId", "commentId"]
+    },
+    "community.member.decided": {
+      "fields": ["appId", "decisionId", "action", "memberId"]
+    }
+  }
+}

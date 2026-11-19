@@ -31,11 +31,12 @@ export class MemberRepository extends TableRepository<MemberRow, Member> {
   }
 
   protected override async saveParts(member: Member): Promise<void> {
-    const keep = member.sessionToKeep;
-    if (keep !== null)
+    // 비밀번호를 바꾸면 지금 로그인 말고, 초기화하면 모두 끝낸다 (토큰 해시는 빈 글자가 아니다)
+    if (member.endsSessions)
       await this.sql`
         UPDATE community.member_sessions SET ended_at = now()
-        WHERE member_id = ${member.id} AND ended_at IS NULL AND token_hash <> ${keep}`;
+        WHERE member_id = ${member.id} AND ended_at IS NULL
+          AND token_hash <> ${member.sessionToKeep ?? ''}`;
     const session = member.startedSession;
     if (session?.isNew) await this.insertRows(memberSessions, session.unsaved);
   }

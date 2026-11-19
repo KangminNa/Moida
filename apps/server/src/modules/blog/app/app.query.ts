@@ -117,12 +117,12 @@ export class AppQuery extends BaseQuery {
     return new Map(rows.map((r) => [r.id, r.name]));
   }
 
-  /** 모든 앱의 도메인(확인 전 것까지) → 앱 id (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
-  async hosts(actor: Actor): Promise<ReadonlyMap<string, string>> {
+  /** 모든 앱의 도메인(확인 전 것까지) → [앱 id, 공간 id] (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
+  async hosts(actor: Actor): Promise<ReadonlyMap<string, readonly [string, string]>> {
     actor.assertOwnerOrSystem();
-    const rows = await this.sql<{ domain: string; id: string }[]>`
-      SELECT domain, id FROM blog.apps WHERE domain IS NOT NULL`;
-    return new Map(rows.map((r) => [r.domain, r.id]));
+    const rows = await this.sql<{ domain: string; id: string; space_id: string }[]>`
+      SELECT domain, id, space_id FROM blog.apps WHERE domain IS NOT NULL`;
+    return new Map(rows.map((r) => [r.domain, [r.id, r.space_id] as const]));
   }
 
   /**
