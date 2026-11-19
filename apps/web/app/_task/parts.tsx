@@ -1,3 +1,4 @@
+import { NewTabLink } from '../_ui/NewTabLink';
 import { APPROVAL_STATUS, taskStatusLabel, tokens } from './labels';
 import type { Agent } from './types';
 
@@ -71,9 +72,9 @@ export const isHtmlOutput = (name: string) => /\.html?$/i.test(name);
  */
 export function OutputOpen({ id, name }: { id: string; name: string }) {
   return isHtmlOutput(name) ? (
-    <a className="ghost" href={`/api/outputs/${id}/file?view=1`} target="_blank" rel="noopener">
+    <NewTabLink className="ghost" href={`/api/outputs/${id}/file?view=1`}>
       열기
-    </a>
+    </NewTabLink>
   ) : (
     <a className="ghost" href={`/api/outputs/${id}/file`} download={name}>
       내려받기

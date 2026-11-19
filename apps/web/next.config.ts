@@ -72,8 +72,13 @@ const WEB_ROUTES = [
   'oauth',
   'posts',
 ];
+// 콘솔(/admin)만 다른 창과의 연결을 끊는다 (Cross-Origin-Opener-Policy, 웹 보안 S2): AI가 만든 페이지 · 앱 화면은 링크를
+// 격리 밖의 새 창으로 열 수 있어(allow-popups-to-escape-sandbox), 연 쪽이 그 창(콘솔)을 가짜 화면으로 바꿔치기할 수 있다.
+// /connect · /login에는 넣지 않는다: Claude · ChatGPT 앱 연결이 이 화면을 팝업으로 열고 돌아오는 흐름이 끊긴다
+const consoleHeaders = [{ key: 'Cross-Origin-Opener-Policy', value: 'same-origin' }];
+
 /** 웹이 내는 파일 (route handler · Next가 만드는 것) */
-const WEB_FILES = ['rss.xml', 'sw.js', 'manifest.webmanifest', 'favicon.ico'];
+const WEB_FILES = ['rss.xml', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'cairn.svg'];
 
 const config: NextConfig = {
   output: 'standalone',
@@ -87,6 +92,8 @@ const config: NextConfig = {
     const routes = WEB_ROUTES.join('|');
     return [
       { source: '/', headers: securityHeaders },
+      { source: '/admin', headers: consoleHeaders },
+      { source: '/admin/:rest*', headers: consoleHeaders },
       { source: `/:route(${routes})`, headers: securityHeaders },
       { source: `/:route(${routes})/:rest*`, headers: securityHeaders },
       {

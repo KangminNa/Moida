@@ -6,7 +6,6 @@ import { Placeholder } from '@tiptap/extensions';
 import { type Editor, EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { postPath } from '../../_blog/format';
 import { POST_STATUS_LABELS } from '../../_blog/labels';
 import type { Asset, PostStatus, SavedPost } from '../../_blog/types';
 import { type ApiReply, api, describe, uploadFile } from '../../_lib/client-api';
@@ -15,6 +14,7 @@ import { useToast } from '../../_ui/useToast';
 import { BigQuote } from './editor/big-quote';
 import { docToMarkdown, markdownToEditorHtml } from './editor/markdown-doc';
 import { PostAppField } from './PostAppField';
+import { PostEditorFoot } from './PostEditorFoot';
 import { type LinkedPost, sameIds, settingsOf, tagsOf } from './post-settings';
 import { WikiPicker } from './WikiPicker';
 
@@ -536,20 +536,7 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
         </div>
       </article>
 
-      <footer className="editor-foot">
-        {post && post.status !== 'draft' && !trashed ? (
-          <a className="ghost" href={postPath(post.slug, null)} target="_blank" rel="noopener">
-            글 보기 ↗
-          </a>
-        ) : (
-          <span />
-        )}
-        {post && !post.deletedAt && (
-          <button type="button" className="ghost danger" onClick={trash}>
-            휴지통으로
-          </button>
-        )}
-      </footer>
+      <PostEditorFoot post={post} onTrash={trash} />
 
       {toast && (
         <div className="toast" role="status">

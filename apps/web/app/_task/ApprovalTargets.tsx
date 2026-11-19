@@ -5,6 +5,7 @@ import { POST_STATUS_LABELS } from '../_blog/labels';
 import type { EditablePost } from '../_blog/types';
 import { api } from '../_lib/client-api';
 import { useLiveValue } from '../_lib/use-live';
+import { NewTabLink } from '../_ui/NewTabLink';
 import { ChangeLines } from './ChangeLines';
 import { CHECKPOINTS, GOAL_COMPLETE, GOAL_RUN_STATUS, TARGET_LABELS, tokens } from './labels';
 import { useGoalRun } from './live';
@@ -78,9 +79,9 @@ export function PullTarget({ approval }: { approval: Approval }) {
   return (
     <section className="preview" aria-label="PR">
       <b>
-        <a href={pull.url} target="_blank" rel="noreferrer">
+        <NewTabLink href={pull.url}>
           {pull.repoName} #{pull.number}
-        </a>
+        </NewTabLink>
       </b>
       {pull.version !== version && (
         <p className="warn">
@@ -119,10 +120,7 @@ export function AskTarget({ approval }: { approval: Approval }) {
   return (
     <section className="preview" aria-label="코드 작업 요청">
       <b>
-        <a href={ask.repo.url} target="_blank" rel="noreferrer">
-          {ask.repo.name}
-        </a>{' '}
-        · {ask.repo.base}
+        <NewTabLink href={ask.repo.url}>{ask.repo.name}</NewTabLink> · {ask.repo.base}
       </b>
       {ask.version !== version && (
         <p className="warn">승인 뒤 요청이 바뀌었어요. 승인해도 열리지 않아요</p>

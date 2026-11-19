@@ -1,6 +1,7 @@
 import { api } from '../_lib/client-api';
 import type { PackageEntry } from '../_plugins/package-types';
 import { Icon } from '../_ui/Icon';
+import { NewTabLink } from '../_ui/NewTabLink';
 import { SOURCE_URL } from '../_ui/source';
 import { ThemeToggle } from '../_ui/ThemeToggle';
 import { MENU, PACKAGE_GROUPS } from './menu';
@@ -86,7 +87,8 @@ function PackageLink({ entry, pathname }: { entry: PackageEntry; pathname: strin
 export function ConsoleFoot({ ownerName }: { ownerName: string }) {
   async function logout() {
     await api('POST', '/api/auth/logout');
-    window.location.href = '/';
+    // 바꿔치기: 지금 콘솔 화면을 기록에서 뺀다 (뒤로 가기는 콘솔의 bfcache 확인이 맡는다, 웹 UX U1)
+    window.location.replace('/');
   }
   return (
     <div className="console-foot">
@@ -106,9 +108,7 @@ export function ConsoleFoot({ ownerName }: { ownerName: string }) {
         <button type="button" onClick={logout}>
           로그아웃
         </button>
-        <a href={SOURCE_URL} rel="noopener">
-          소스 · AGPL-3.0
-        </a>
+        <NewTabLink href={SOURCE_URL}>소스 · AGPL-3.0</NewTabLink>
       </div>
     </div>
   );

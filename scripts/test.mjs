@@ -56,6 +56,8 @@ docker([
   ...extra,
 ]);
 execFileSync('pnpm', ['--filter', '@cairn/cli', 'test', ...extra], { cwd: root, stdio: 'inherit' });
+// 웹은 화면 밖의 순수한 규칙만 단위 테스트한다 (돌아갈 주소 등, Node의 타입 지우기로 그대로)
+execFileSync('pnpm', ['--filter', '@cairn/web', 'test', ...extra], { cwd: root, stdio: 'inherit' });
 execFileSync('pnpm', ['--filter', '@cairn/extension', 'test', ...extra], {
   cwd: root,
   stdio: 'inherit',

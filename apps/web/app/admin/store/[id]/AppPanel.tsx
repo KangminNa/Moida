@@ -8,6 +8,7 @@ import { useApps } from '../../../_blog/live';
 import type { AdminApp } from '../../../_blog/types';
 import { api } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
+import { NewTabLink } from '../../../_ui/NewTabLink';
 import { STORE_HREF } from '../../menu';
 import { AppCodeTab } from './AppCodeTab';
 import { AppMenus } from './AppMenus';
@@ -78,9 +79,7 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
           <p>
             {APP_KIND_LABELS[app.kind]} ·{' '}
             {open ? (
-              <a href={appPath(app.slug)} target="_blank" rel="noreferrer">
-                {appPath(app.slug)}
-              </a>
+              <NewTabLink href={appPath(app.slug)}>{appPath(app.slug)}</NewTabLink>
             ) : (
               `${appPath(app.slug)} (비공개: 방문자에게 없는 주소)`
             )}

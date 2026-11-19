@@ -9,6 +9,7 @@ import type { AdminApp, Menu } from '../../../_blog/types';
 import { api } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
 import { useAgents } from '../../../_task/live';
+import { NewTabLink } from '../../../_ui/NewTabLink';
 import { STORE_HREF } from '../../menu';
 import { type MenuBody, MenuForm } from './MenuForm';
 
@@ -100,9 +101,9 @@ export function AppMenus({ app }: { app: AdminApp }) {
                     {m.name} <span className="pill">{MENU_KIND_LABELS[m.kind] ?? m.kind}</span>
                   </b>
                   <small>
-                    <a href={menuPath(m.slug, app.slug)} target="_blank" rel="noreferrer">
+                    <NewTabLink href={menuPath(m.slug, app.slug)}>
                       /{app.slug}/m/{m.slug}
-                    </a>{' '}
+                    </NewTabLink>{' '}
                     · {m.items ?? 0}개 · 운영 팀{' '}
                     {agentList.find((a) => a.id === m.agentId)?.name ?? '없음'}
                     {m.rss && m.kind === 'posts' ? ' · RSS' : ''}

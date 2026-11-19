@@ -15,6 +15,7 @@ import { unified } from 'unified';
 //   사진은 일반 md: ![설명](/api/files/<해시>). 거르기가 http·https와 이 사이트 안의 주소만 남긴다 (javascript:·data: 는 지운다)
 // 갤러리(::: gallery)·영상(::youtube{…})·링크 카드(::link{…})는 뒤 단계에서 더한다.
 // 본문에 쓴 HTML은 그리지 않고(remark-rehype 기본), 결과도 한 번 더 거른다(rehype-sanitize).
+// 바깥 주소(http · https) 링크는 거른 뒤에 새 탭 · rel="noopener noreferrer"를 붙인다 (웹 UX U3). 사이트 안 주소는 같은 탭.
 
 /** md 문법 나무의 마디 (remark가 만드는 모양 중 여기서 보는 것만) */
 type MdNode = {
@@ -79,6 +80,28 @@ function cairnBlocks() {
   };
 }
 
+/** HTML 나무의 마디 (rehype가 만드는 모양 중 여기서 보는 것만) */
+type HtmlNode = {
+  type: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HtmlNode[];
+};
+
+/** 바깥 주소(http · https) 링크는 새 탭으로 (웹 UX U3). 연 쪽 창을 건드리지 못하고 주소가 Referer로 새지 않게 */
+function externalLinks() {
+  const walk = (node: HtmlNode): void => {
+    const href = node.tagName === 'a' ? node.properties?.href : undefined;
+    if (typeof href === 'string' && /^https?:\/\//i.test(href)) {
+      node.properties = { ...node.properties, target: '_blank', rel: 'noopener noreferrer' };
+    }
+    node.children?.forEach(walk);
+  };
+  return (tree: HtmlNode) => {
+    walk(tree);
+  };
+}
+
 /** 기본 거르기 + Cairn 블록의 class 두 개만 더 허락 */
 const schema: typeof defaultSchema = {
   ...defaultSchema,
@@ -97,6 +120,7 @@ const processor = unified()
   .use(cairnBlocks)
   .use(remarkRehype)
   .use(rehypeSanitize, schema)
+  .use(externalLinks)
   .use(rehypeStringify);
 
 /** "::: center"처럼 콜론 뒤에 빈칸을 둔 블록도 받는다 (remark-directive는 ":::center"만 읽는다) */

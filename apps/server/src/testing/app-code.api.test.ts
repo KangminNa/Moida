@@ -233,6 +233,11 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
     );
     const templates = home.templates as Record<string, string>;
     assert.ok(templates['header.html']?.includes('{{app.name}}'), Object.keys(templates).join());
+    // 탭 아이콘: 앱 아이콘, 없으면 종류의 기본 icon.svg
+    assert.match(
+      templates['head.html'] ?? '',
+      /<link rel="icon" href="[^"]*\{\{files\}\}\/icon\.svg/,
+    );
     const data = home.data as Json;
     assert.deepEqual([data.cairn, data.isHome, data.base], [1, true, `/${app.slug}`]);
     assert.equal((data.app as Json).name, app.name);
@@ -258,6 +263,9 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
     assert.match(String(css.header('content-security-policy')), /sandbox/);
     assert.match(String(css.header('content-type')), /text\/css/);
     assert.equal((await api.get(`/api/apps/site/${app.slug}/files/index.html`)).status, 404);
+    const icon = await api.get(`/api/apps/site/${app.slug}/files/icon.svg`);
+    assert.equal(icon.status, 200, icon.text);
+    assert.match(String(icon.header('content-type')), /image\/svg\+xml/);
   });
 
   test('비공개 앱과 없는 앱은 같은 404. 관리자는 미리 보기 토큰 주소로 보내고, 토큰으로는 공개된 것처럼 본다', async () => {

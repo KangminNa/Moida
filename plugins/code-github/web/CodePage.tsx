@@ -272,7 +272,7 @@ function Pulls({ pulls }: { pulls: Pull[] | null }) {
           {pulls.map((p) => (
             <li key={p.id} className="list-cell stack">
               <div className="row">
-                <a href={p.url} target="_blank" rel="noreferrer">
+                <a href={p.url} target="_blank" rel="noopener noreferrer">
                   {p.repoName} #{p.number}
                 </a>
                 <span className="label-mono">

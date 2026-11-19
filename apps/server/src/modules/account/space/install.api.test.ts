@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, TestUser } from '../../../testing/api-client';
 import { Database, SystemActor, Unauthenticated, VisitorActor } from '../../platform';
+import { WebSession } from '../owner/owner';
 import { OwnerService } from '../owner/owner.service';
 
 // 설치 마법사와 주인 로그인 (M1 A, 비밀번호). 빈 서버 → 설치 코드 → 주인 계정(바로 로그인) → 그 뒤로는 아이디·비밀번호.
@@ -309,6 +310,34 @@ describe('보안 머리글과 쓰기 요청 출처', () => {
     assert.equal(res.header('x-powered-by'), null);
   });
 
+  test('로그인 쿠키는 HttpOnly · SameSite=Lax. 앞단 프록시가 https를 알리거나 사이트 주소(CAIRN_WEB_URL)가 https면 Secure (웹 보안 S2)', async () => {
+    const before = process.env.CAIRN_WEB_URL;
+    const cookieOf = async (site: string, headers: Record<string, string> = {}) => {
+      process.env.CAIRN_WEB_URL = site;
+      const res = await api.request(
+        'POST',
+        '/api/auth/login',
+        TestUser.visitor,
+        { login: LOGIN, password: PASSWORD },
+        headers,
+      );
+      assert.equal(res.status, 200, res.text);
+      return String(res.header('set-cookie'));
+    };
+    try {
+      const plain = await cookieOf('http://localhost:3000');
+      assert.match(plain, /HttpOnly/);
+      assert.match(plain, /SameSite=Lax/i);
+      assert.doesNotMatch(plain, /Secure/, '개발(http)에서는 붙이지 않는다');
+      const proxied = await cookieOf('http://localhost:3000', { 'x-forwarded-proto': 'https' });
+      assert.match(proxied, /Secure/, '이 컴퓨터의 프록시가 https를 알리면');
+      assert.match(await cookieOf('https://blog.example'), /Secure/, '사이트 주소가 https면 늘');
+    } finally {
+      if (before === undefined) delete process.env.CAIRN_WEB_URL;
+      else process.env.CAIRN_WEB_URL = before;
+    }
+  });
+
   test('다른 사이트가 주인의 로그인 쿠키로 보낸 쓰기 요청은 403 (origin)', async () => {
     // 막히지 않으면 옛 version이라 409가 난다
     const stale = { name: '옛 화면', version: 1 };
@@ -400,6 +429,31 @@ describe('로그아웃과 시도 제한', () => {
     assert.equal((await api.request('POST', '/api/auth/logout', session)).status, 200);
     assert.equal((await api.get('/api/auth/me', session)).status, 401);
     assert.equal((await api.get('/api/auth/me', owner)).status, 200, '다른 로그인은 그대로');
+  });
+
+  test('로그인은 마지막으로 쓴 날부터 30일: 쓰면 끝나는 날이 늘고, 끝난 로그인은 되살아나지 않는다. 쿠키는 400일 (웹 UX U2)', async () => {
+    const res = await api.login(LOGIN, PASSWORD);
+    assert.match(String(res.header('set-cookie')), /Max-Age=34560000/, '400일');
+    const token = res.cookies().cairn_session ?? '';
+    const session = new TestUser({ cairn_session: token });
+    const db = api.service(Database);
+    const daysLeft = async () => {
+      const [row] = await db.sql<{ days: number }[]>`
+        SELECT extract(epoch FROM expires_at - now()) / 86400 AS days
+        FROM account.web_sessions WHERE token_hash = ${WebSession.hash(token)}`;
+      return Number(row?.days);
+    };
+    // 하루 남은 로그인을 쓰면 (이 로그인의 첫 요청이라 마지막 접근을 적는다) 다시 30일
+    await db.sql`UPDATE account.web_sessions SET expires_at = now() + interval '1 day'
+      WHERE token_hash = ${WebSession.hash(token)}`;
+    assert.equal((await api.get('/api/auth/me', session)).status, 200);
+    assert.ok((await daysLeft()) > 29.9, `남은 날 ${await daysLeft()}`);
+    // 끝난 로그인은 주인이 아니고, 마지막 접근을 적어도 끝나는 날이 늘지 않는다
+    await db.sql`UPDATE account.web_sessions SET expires_at = now() - interval '1 minute'
+      WHERE token_hash = ${WebSession.hash(token)}`;
+    assert.equal((await api.get('/api/auth/me', session)).status, 401);
+    await api.service(OwnerService).seen(token, '', new Date(Date.now() + WebSession.SEEN_MS * 2));
+    assert.ok((await daysLeft()) < 0, '되살아나지 않는다');
   });
 
   test('틀린 비밀번호를 거듭 넣으면 429, 그동안 맞는 비밀번호도 막힌다', async () => {

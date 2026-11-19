@@ -7,6 +7,7 @@ import type { AppCodeChanges, AppCodePreview, AppCodeState } from '../../../../.
 import { api } from '../../../../../_lib/client-api';
 import { useAction } from '../../../../../_lib/use-action';
 import { useLiveValue } from '../../../../../_lib/use-live';
+import { NewTabLink } from '../../../../../_ui/NewTabLink';
 import { STORE_HREF } from '../../../../menu';
 
 /** 앱 화면의 격리와 같다 (틀에도 한 번 더): 앱의 스크립트는 콘솔과 로그인에 닿지 못한다 */
@@ -90,9 +91,9 @@ export function AppPreviewPanel({ id, seq }: { id: string; seq: number | null })
             ))}
           </fieldset>
           {url && (
-            <a className="ghost small" href={url} target="_blank" rel="noreferrer">
+            <NewTabLink className="ghost small" href={url}>
               새 창
-            </a>
+            </NewTabLink>
           )}
           {canShow && (
             <button

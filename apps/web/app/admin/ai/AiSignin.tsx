@@ -6,6 +6,7 @@ import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { TASK_TOPICS } from '../../_task/live';
 import type { AiTest, AiTool, Engine, TaskDetail } from '../../_task/types';
+import { NewTabLink } from '../../_ui/NewTabLink';
 import { useNotify } from '../../_ui/notify';
 
 // AI 메뉴의 웹 로그인 (AiPanel에서 나눔): 러너가 로그인 명령을 대신 돌리고, 관리자는 주소에서 로그인한다.
@@ -117,9 +118,9 @@ function SigninSteps({ signin, tool, flow }: { signin: Signin; tool: string; flo
     return <p className="label-mono">러너가 로그인을 여는 중…</p>;
   if (signin.step === 'verifying') return <p className="label-mono">코드를 확인하는 중…</p>;
   const open = (
-    <a className="cta small fit" href={url} target="_blank" rel="noopener noreferrer">
+    <NewTabLink className="cta small fit" href={url}>
       로그인 페이지 열기
-    </a>
+    </NewTabLink>
   );
   if (flow === 'device_code')
     return (

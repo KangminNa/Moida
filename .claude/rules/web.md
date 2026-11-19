@@ -30,6 +30,26 @@ paths:
 - 오류 문구는 `describe(error)`로만 만든다. 서버 오류의 `message`를 화면에서 다시 조립하지 않는다.
 - 만들기는 `requestId`를 함께 보낸다 (응답을 못 받아 다시 눌러도 하나만 생기게). 고치기는 본 `version`을 함께 보낸다.
 
+## 뒤로 가기 (웹 UX U1)
+
+- 로그인 · 로그아웃 · 만든 뒤의 이동처럼 되돌아가면 안 되는 이동은 기록을 바꿔치기한다 (`location.replace` · `router.replace`). 로그인한 채 `/login`을 열면 돌아갈 곳으로 보낸다.
+- 돌아갈 주소(`?return=`)는 `safeReturnPath`(`_lib/return-path.ts`)로만 읽는다 (서버의 `ReturnPath`와 같은 규칙, 웹 보안 S1).
+- 시트처럼 화면 안에서 열고 닫는 것은 주소(쿼리, 예: 스토어의 `?make=`)에 둔다: 폰의 뒤로 가기가 그것만 닫고, 새로 고쳐도 그대로다. 주소의 값은 `page.tsx`가 읽어 넘긴다. 여기서 연 것이면 닫기는 뒤로, 주소로 바로 들어왔으면 바꿔치기.
+- 콘솔이 뒤로 가기로 메모리(bfcache)에서 되살아나면 로그인을 물어 끝났으면 로그인 화면으로 (`admin/SignedOutBar.tsx`).
+
+## 로그인 유지 (웹 UX U2)
+
+- 로그인은 마지막으로 쓴 날부터 30일 (서버 `WebSession.DAYS`). 쿠키는 400일이고, 살아 있는지는 서버가 정한다.
+- 로그인 화면으로 보낼 때는 `loginPath(돌아올 곳)`(`_lib/return-path.ts`)으로 지금 주소를 넘긴다. 서버에서 그리는 콘솔 틀은 지금 주소를 몰라 `proxy.ts`가 머리글(`RETURN_HEADER`)로 붙인다.
+- 콘솔에서 API가 401 · 403이면(로그인이 끝나면 관리 API는 403) `api()`가 신호(`DENIED_EVENT`)를 내고, 콘솔 틀(`SignedOutBar`)이 정말 끝났는지 물어 "다시 로그인"을 띄운다. 쓰던 글이 사라지지 않게 화면을 바로 옮기지 않는다.
+
+## 새 탭 (웹 UX U3)
+
+- 사이트 안 이동은 같은 탭 (`target` 없이). 로그인 · 외부 계정 연결처럼 다녀오는 흐름도 같은 탭.
+- 새 탭으로 여는 것: 다른 사이트(GitHub PR · 저장소 · AI 로그인 주소 · 소스 링크), 콘솔에서 공개 화면(앱 · 글 · 메뉴 · 페이지)과 결과물 보기를 열 때 (콘솔은 그대로 두고 보는 쪽을 새 탭에).
+- ★ 새 탭은 늘 `target="_blank" rel="noopener noreferrer"`: 열린 쪽이 연 창(콘솔)을 바꿔치기하지 못하고, 주소가 Referer로 새지 않게. 코드로 열 때는 `window.open(주소, '_blank', 'noopener,noreferrer')`.
+- 글 · AI 답(마크다운)의 http · https 링크는 `renderMarkdown`이 새 탭으로 그린다 (`_lib/markdown.ts`).
+
 ## 앱 화면 (스토어 1-6)
 
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`).

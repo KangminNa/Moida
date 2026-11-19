@@ -1,4 +1,4 @@
-import { BaseRepository, Conflict, Database } from '../../platform';
+import { BaseRepository, Conflict, Database, Rule } from '../../platform';
 import { loginLinks, spaceMembers, webSessions } from '../account.schema';
 import type { UserRow, WebSessionRow } from '../account.tables';
 import { type LoadedOwner, Owner, WebSession } from './owner';
@@ -60,12 +60,15 @@ export class OwnerRepository extends BaseRepository<Owner> {
     return rows.map((r) => r.ip);
   }
 
-  /** 로그인의 마지막 접근. version도 다른 칸도 건드리지 않는다 (요청마다 부르지 않게 Service가 간격을 둔다) */
+  /**
+   * 로그인의 마지막 접근과 끝나는 날(마지막으로 쓴 날부터 WebSession.DAYS). version도 다른 칸도 건드리지 않는다
+   * (요청마다 부르지 않게 Service가 간격을 둔다). 이미 끝난 로그인은 되살리지 않는다
+   */
   async touchSession(tokenHash: string, ip: string | null, now: Date): Promise<void> {
     await this.updateRows(
       webSessions,
-      { last_seen_at: now, last_ip: ip },
-      { token_hash: tokenHash, revoked_at: null },
+      { last_seen_at: now, last_ip: ip, expires_at: WebSession.expiresFrom(now) },
+      { token_hash: tokenHash, revoked_at: null, expires_at: Rule.after(now) },
     );
   }
 
