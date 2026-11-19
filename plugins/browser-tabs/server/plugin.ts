@@ -12,6 +12,8 @@ import {
   RebuildIntegration,
   TurnOffIntegration,
 } from './integrations';
+import { LoginCard, NextLogin, SaveLogin, SendLogin } from './login-card';
+import { LoginInbox } from './login-inbox';
 import { ListReads, PendingReads, RequestRead, SaveRead } from './reads';
 import { DismissSuggestion, ListSuggestions } from './repeats';
 import { ReviewMaterial, SaveReview } from './reviews';
@@ -46,6 +48,8 @@ import { ManualRun } from './write-runs';
 export default class BrowserTabsPlugin extends BasePlugin {
   register(cairn: PluginContext): void {
     const screen = new BrowserScreenGateway();
+    // 로그인 카드의 값: 이 프로세스의 메모리에만 (DB에 남기지 않는다, 2026-11-19)
+    const logins = new LoginInbox();
     // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 autoRepair, 기본 켬)
     const autoRepair = cairn.settings().get('autoRepair') !== 'false';
     for (const operation of [
@@ -63,6 +67,10 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new ClearSession(screen),
       new BrowserJob(),
       new LoginNeeded(),
+      new LoginCard(logins),
+      new SendLogin(logins),
+      new NextLogin(logins),
+      new SaveLogin(logins),
       new HoldClick(),
       new NextClick(),
       new SaveClick(),

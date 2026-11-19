@@ -3,6 +3,7 @@ import type {
   ShotImageView,
   ShotListView,
 } from '../../../../plugins/browser-tabs/server/click-views';
+import type { LoginCardView } from '../../../../plugins/browser-tabs/server/login-views';
 import type { PullView, TaskAskView } from '../../../../plugins/code-github/server/views';
 import type {
   AgentLeadView,
@@ -118,6 +119,8 @@ export type BrowserClick = ReturnType<ClickDetailView['toJSON']>;
 /** browser-tabs 패키지의 작업 화면 목록 · 하나 */
 export type BrowserShots = ReturnType<ShotListView['toJSON']>;
 export type BrowserShot = ReturnType<ShotImageView['toJSON']>;
+/** browser-tabs 패키지의 로그인 카드: 칸(종류만) · 값이 갈 곳 · 러너의 진행 상태 (2026-11-19) */
+export type BrowserLoginCard = ReturnType<LoginCardView['toJSON']>;
 export type ChatList = ReturnType<ChatListView['toJSON']>;
 export type ChatSummary = ChatList['chats'][number];
 /** 휴지통의 대화들 (2026-11-19 휴지통 A) */

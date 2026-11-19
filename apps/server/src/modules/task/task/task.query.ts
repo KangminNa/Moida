@@ -158,7 +158,36 @@ export class TaskQuery extends BaseQuery {
       row.target_id,
       row.base_version,
       row.instruction,
+      await this.ownerText(actor, row.id),
     );
+  }
+
+  /**
+   * 관리자가 쓴 지시: 위임된 일이면 맨 위 일(관리자가 맡긴 일)의 제목과 지시. 하위 일의 지시는 AI가 썼다.
+   * 맨 위 일이 목표 실행의 회차 작업이면 실행의 지시: 회차 작업의 지시에는 앞 회차의 보고(AI가 쓴 글)가 실린다.
+   * 맨 위 일이 기기(MCP ask_agent)가 보낸 대화의 회차면 비어 있다: 관리자가 아니라 그 기기의 AI가 쓴 글일 수 있다.
+   * read_url의 기준(WebQuery)과 기능 패키지의 믿는 주소(LeasedWork.ownerText, browser-tabs의 로그인 카드)가 쓴다
+   */
+  async ownerText(actor: Actor, taskId: string): Promise<string> {
+    if (!actor.spaceId) throw new Forbidden(Actor.RUN);
+    const spaceId = actor.spaceId;
+    const [root] = await this.sql<{ text: string }[]>`
+      WITH RECURSIVE up AS (
+        SELECT id, parent_id, title, instruction, payload, 0 AS step FROM task.tasks
+        WHERE space_id = ${spaceId} AND id = ${taskId}
+        UNION ALL
+        SELECT t.id, t.parent_id, t.title, t.instruction, t.payload, up.step + 1 FROM task.tasks t
+        JOIN up ON t.id = up.parent_id AND t.space_id = ${spaceId}
+        WHERE up.step < 10
+      )
+      SELECT CASE WHEN up.payload -> 'chat' ->> 'via' = 'device' THEN ''
+                  WHEN r.id IS NULL THEN up.title || E'\n' || up.instruction
+                  ELSE r.title || E'\n' || r.instruction END AS text
+      FROM up
+      LEFT JOIN task.goal_runs r
+        ON r.space_id = ${spaceId} AND r.id::text = up.payload -> 'goalRun' ->> 'runId'
+      WHERE up.parent_id IS NULL ORDER BY up.step DESC LIMIT 1`;
+    return root?.text ?? '';
   }
 
   /**

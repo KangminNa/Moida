@@ -239,7 +239,7 @@ describe('브라우저 에이전트: 관리자 입구', () => {
     assert.equal(missing.status, 404);
   });
 
-  test('둘러보기를 맡기면 대상 없는 browse 작업이 되고, 러너에게는 explore. 누르기 · 로그인은 거절', async () => {
+  test('둘러보기를 맡기면 대상 없는 browse 작업이 되고, 러너에게는 explore. 누르기는 거절', async () => {
     const mark = randomUUID().slice(0, 8);
     ok(
       await api.request('POST', `${BASE}/explore`, owner, {
@@ -265,11 +265,64 @@ describe('브라우저 에이전트: 관리자 입구', () => {
     const held = await hold(String(task.id));
     assert.equal(held.ok, false);
     assert.match(JSON.stringify(held.body), /둘러보기에서는/);
-    const login = await tool(runner, 'browser_login_needed', {
-      task_id: task.id,
-      page_url: 'https://x.example/login',
+  });
+
+  test('등록 없이 (2026-11-19): 둘러보기가 로그인 화면을 만나면 그 출처로 사이트가 생기고, "로그인했어요" 뒤에 같은 작업이 사이트 일로 이어진다', async () => {
+    const mark = randomUUID().slice(0, 8);
+    ok(
+      await api.request('POST', `${BASE}/explore`, owner, {
+        requestId: randomUUID(),
+        instruction: `shop-${mark}.example에서 내 주문 목록 정리`,
+        agentId,
+      }),
+    );
+    await drain();
+    const job = await leased(mark);
+    const taskId = String((job.task as Json).id);
+    const page = `https://shop-${mark}.example/login?next=/orders`;
+    const noticed = await tool(runner, 'browser_login_needed', {
+      task_id: taskId,
+      page_url: page,
+      page_title: '로그인',
+      image: JPEG,
     });
-    assert.equal(login.ok, false);
+    assert.equal(noticed.ok, true, JSON.stringify(noticed.body));
+    assert.equal(noticed.body.site_name, `shop-${mark}.example`);
+    const made = (ok(await api.get(`${BASE}/sites`, owner)).sites as Json[]).find(
+      (s) => s.id === noticed.body.site_id,
+    ) as Json;
+    assert.deepEqual(
+      [made.startUrl, made.origins, made.loginNeededAt !== null],
+      [`https://shop-${mark}.example/`, [`https://shop-${mark}.example`], true],
+    );
+    // 같은 출처면 같은 사이트를 쓴다 (또 만들지 않는다)
+    const again = await tool(runner, 'browser_login_needed', { task_id: taskId, page_url: page });
+    assert.equal(again.body.site_id, noticed.body.site_id);
+
+    const asked = await tool(String(job.run_token), 'request_approval', {
+      request_id: `login-${taskId}`,
+      action: 'browser.site.login',
+      target_kind: 'browser_site',
+      target_id: noticed.body.site_id,
+      target_version: noticed.body.site_version,
+      note: `로그인 필요: shop-${mark}.example`,
+    });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    await decide(
+      ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)),
+      'revise',
+      '로그인했어요',
+    );
+    assert.equal((await taskOf(taskId)).status, 'queued');
+    const back = await leased(mark);
+    assert.deepEqual(back.target, {
+      kind: 'browser_site',
+      id: noticed.body.site_id,
+      version: noticed.body.site_version,
+    });
+    const plan = await tool(runner, 'browser_job', { task_id: taskId });
+    assert.equal(plan.body.mode, 'site', '로그인된 브라우저의 사이트 일로 이어진다');
+    assert.equal(plan.body.login_needed, false);
   });
 });
 
@@ -482,7 +535,12 @@ describe('브라우저 에이전트: 로그인 필요', () => {
       page_title: '로그인',
       image: JPEG,
     });
-    assert.deepEqual(noticed.body, { site_id: site.id, site_version: site.version });
+    assert.deepEqual(noticed.body, {
+      site_id: site.id,
+      site_version: site.version,
+      site_name: SITE.name,
+      login_card: false,
+    });
     const sites = (ok(await api.get(`${BASE}/sites`, owner)).sites as Json[]).find(
       (s) => s.id === site.id,
     ) as Json;
@@ -535,6 +593,199 @@ describe('브라우저 에이전트: 로그인 필요', () => {
       const task = await taskOf(taskId);
       assert.equal(task.status, status, decision);
       if (decision === 'approve') assert.match(String((task.result as Json).error), /로그인했어요/);
+    }
+  });
+});
+
+/** 러너가 확인한 로그인 칸 (값 없음) */
+const FORM = {
+  fields: [
+    { kind: 'id', role: 'textbox', name: '아이디' },
+    { kind: 'password', role: 'textbox', name: '비밀번호' },
+  ],
+  submit: { role: 'button', name: '로그인' },
+};
+/** 테스트용 비밀번호 (카드 · DB · 실행 기록에 남지 않는지 본다) */
+const PASSWORD = `pw-${randomUUID()}`;
+
+describe('로그인 카드 (2026-11-19)', () => {
+  const card = async (siteId: unknown) => ok(await api.get(`${BASE}/sites/${siteId}/login`, owner));
+
+  test('믿는 출처(등록한 사이트)면 칸이 뜨고, 넣은 값은 그 화면을 연 러너가 한 번만 꺼내 간다. 결과는 카드가 본다', async () => {
+    const site = await newSite();
+    const { taskId } = await siteJob(site);
+    const noticed = await tool(runner, 'browser_login_needed', {
+      task_id: taskId,
+      page_url: 'https://login.blog.example/signin',
+      form: FORM,
+    });
+    assert.equal(noticed.body.login_card, true, '같은 도메인의 로그인 주소');
+    const shown = await card(site.id);
+    assert.deepEqual(
+      [shown.origin, shown.fields, shown.trusted, shown.attempt],
+      ['https://login.blog.example', [{ kind: 'id' }, { kind: 'password' }], true, null],
+    );
+    // 보는 사람별: 방문자 · write 기기는 카드를 읽지도 넣지도 못한다
+    for (const headers of [{}, writer]) {
+      const read = await api.request(
+        'GET',
+        `${BASE}/sites/${site.id}/login`,
+        TestUser.visitor,
+        undefined,
+        headers,
+      );
+      assert.equal(read.status, 403, read.text);
+      const values = { values: { id: 'x', password: 'y' } };
+      const sent = await api.request(
+        'POST',
+        `${BASE}/sites/${site.id}/login`,
+        TestUser.visitor,
+        values,
+        headers,
+      );
+      assert.equal(sent.status, 403, sent.text);
+    }
+    const missing = await api.request('POST', `${BASE}/sites/${site.id}/login`, owner, {
+      values: { id: 'me' },
+    });
+    assert.equal(missing.status, 422, missing.text);
+    assert.equal((await tool(runner, 'browser_login_next')).body.login, null, '넣기 전');
+
+    const sent = ok(
+      await api.request('POST', `${BASE}/sites/${site.id}/login`, owner, {
+        values: { id: 'me', password: PASSWORD },
+      }),
+    );
+    assert.equal((sent.attempt as Json).status, 'sent');
+    assert.doesNotMatch(
+      JSON.stringify(sent) + JSON.stringify(await card(site.id)),
+      new RegExp(PASSWORD),
+    );
+    assert.equal(
+      (await tool(other, 'browser_login_next')).body.login,
+      null,
+      '다른 러너는 못 꺼낸다',
+    );
+    const next = (await tool(runner, 'browser_login_next')).body.login as Json;
+    assert.deepEqual(
+      [next.site_id, next.page_url, (next.fields as Json[]).map((f) => [f.kind, f.name, f.value])],
+      [
+        site.id,
+        'https://login.blog.example/signin',
+        [
+          ['id', '아이디', 'me'],
+          ['password', '비밀번호', PASSWORD],
+        ],
+      ],
+    );
+    assert.deepEqual(next.submit, FORM.submit);
+    assert.equal((await tool(runner, 'browser_login_next')).body.login, null, '한 번만');
+    assert.equal(((await card(site.id)).attempt as Json).status, 'filling');
+
+    const stranger = await tool(other, 'browser_login_save', {
+      site_id: site.id,
+      outcome: 'submitted',
+    });
+    assert.equal(stranger.ok, false, '꺼내 간 러너만 결과를 남긴다');
+    const saved = await tool(runner, 'browser_login_save', {
+      site_id: site.id,
+      outcome: 'submitted',
+      after_url: 'https://blog.example/write',
+      image: JPEG,
+    });
+    assert.equal(saved.ok, true, JSON.stringify(saved.body));
+    const done = (await card(site.id)).attempt as Json;
+    assert.deepEqual(
+      [done.status, done.afterUrl, done.image],
+      ['submitted', 'https://blog.example/write', JPEG],
+    );
+    // 값은 DB 어디에도 남지 않는다 (사이트의 칸 · 실행 기록 · 결재)
+    const db = api.service(Database);
+    const [found] = await db.sql<{ n: number }[]>`
+      SELECT (SELECT count(*) FROM browser_tabs.sites WHERE login_form::text LIKE ${`%${PASSWORD}%`})
+        + (SELECT count(*) FROM task.task_events WHERE body LIKE ${`%${PASSWORD}%`})
+        + (SELECT count(*) FROM task.approvals WHERE coalesce(note, '') LIKE ${`%${PASSWORD}%`}) AS n`;
+    assert.equal(Number(found?.n), 0);
+  });
+
+  test('믿지 않는 출처면 칸이 뜨지 않는다: 다른 도메인 · 저절로 만든 사이트. 관리자의 지시에 그 도메인이 있거나 "로그인했어요" 뒤에는 뜬다', async () => {
+    const site = await newSite();
+    const { taskId } = await siteJob(site);
+    const elsewhere = await tool(runner, 'browser_login_needed', {
+      task_id: taskId,
+      page_url: 'https://blog-example-login.example/signin',
+      form: FORM,
+    });
+    assert.equal(elsewhere.body.login_card, false, '사이트와 다른 도메인');
+    assert.equal((await card(site.id)).fields, null);
+    const refused = await api.request('POST', `${BASE}/sites/${site.id}/login`, owner, {
+      values: { id: 'me', password: PASSWORD },
+    });
+    assert.equal(refused.status, 422, refused.text);
+
+    const explore = async (instruction: string) => {
+      const mark = randomUUID().slice(0, 8);
+      ok(
+        await api.request('POST', `${BASE}/explore`, owner, {
+          requestId: randomUUID(),
+          instruction: `${instruction} ${mark}`,
+          agentId,
+        }),
+      );
+      await drain();
+      return { job: await leased(mark), mark };
+    };
+    const host = `mall-${randomUUID().slice(0, 6)}.co.kr`;
+    const quiet = await explore('주문 내역을 정리해 주세요');
+    const page = `https://www.${host}/member/login`;
+    const unknown = await tool(runner, 'browser_login_needed', {
+      task_id: (quiet.job.task as Json).id,
+      page_url: page,
+      form: FORM,
+    });
+    assert.equal(unknown.body.login_card, false, '저절로 만든 사이트 · 지시에 없는 도메인');
+    assert.equal((await card(unknown.body.site_id)).trusted, false);
+
+    const named = await explore(`${host}에서 주문 내역을 정리해 주세요`);
+    const mentioned = await tool(runner, 'browser_login_needed', {
+      task_id: (named.job.task as Json).id,
+      page_url: page,
+      form: FORM,
+    });
+    assert.equal(mentioned.body.site_id, unknown.body.site_id);
+    assert.equal(mentioned.body.login_card, true, '관리자의 지시에 적힌 도메인 (등록 단위)');
+
+    // 화면에서 로그인하고 "로그인했어요" → 그 사이트를 믿는다
+    const asked = await tool(String(quiet.job.run_token), 'request_approval', {
+      request_id: `login-${(quiet.job.task as Json).id}`,
+      action: 'browser.site.login',
+      target_kind: 'browser_site',
+      target_id: unknown.body.site_id,
+      target_version: unknown.body.site_version,
+    });
+    await decide(
+      ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)),
+      'revise',
+      '로그인했어요',
+    );
+    await drain();
+    assert.equal((await card(unknown.body.site_id)).trusted, true);
+  });
+
+  test('틀린 모양의 칸은 받지 않는다 (같은 종류 둘 · 모르는 종류)', async () => {
+    const site = await newSite();
+    const { taskId } = await siteJob(site);
+    for (const form of [
+      { ...FORM, fields: [FORM.fields[0], FORM.fields[0]] },
+      { ...FORM, fields: [{ kind: 'card', role: 'textbox', name: '카드 번호' }] },
+      { ...FORM, fields: [] },
+    ]) {
+      const res = await tool(runner, 'browser_login_needed', {
+        task_id: taskId,
+        page_url: 'https://blog.example/login',
+        form,
+      });
+      assert.equal(res.ok, false, JSON.stringify(form));
     }
   });
 });

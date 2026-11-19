@@ -18,6 +18,7 @@
 //   [fake:app-broken]   앱 코드 일: 닫지 않은 섹션이 든 list.html도 낸다. [fake:app-fix]가 있으면 다시 맡긴 실행에서 고쳐 낸다
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
+//   [fake:login-form]   (browse와 함께) 로그인 화면이면 login에 로그인 칸(아이디 · 비밀번호 · 로그인 단추)을 함께 적는다
 //   [fake:memo=<글>]    인수인계 메모 파일(CAIRN_MEMO_FILE)에 그 글을 쓴다 (작업 세션, 2026-11-17)
 //   [fake:deliver=<값>] 대표의 회차(O-3): 지시문이 받을 것을 정하라고 하면 set_deliver로 그 값을 정한다 (정해진 회차면 부르지 않는다)
 //   [fake:automate=<제목>] 대표의 회차(O-3): 받을 것을 setting으로 정하고 이 대화로 보내는 매일 08:00 자동화를 제안한다
@@ -422,7 +423,16 @@ async function browse() {
   const title = await evaluate(tab.webSocketDebuggerUrl, 'document.title');
   const stop = (body) =>
     writeFileSync(join(process.cwd(), 'browser-stop.json'), JSON.stringify(body));
-  if (String(title).includes('로그인')) return stop({ stop: 'login', page_url: page });
+  // [fake:login-form]: 로그인 화면의 칸을 함께 알린다 (로그인 카드, 값은 적지 않는다)
+  const form = {
+    fields: [
+      { kind: 'id', role: 'textbox', name: '아이디' },
+      { kind: 'password', role: 'textbox', name: '비밀번호' },
+    ],
+    submit: { role: 'button', name: '로그인' },
+  };
+  if (String(title).includes('로그인'))
+    return stop({ stop: 'login', page_url: page, ...(has('login-form') ? { form } : {}) });
   await evaluate(tab.webSocketDebuggerUrl, "document.querySelector('#title').value = '시험 글'");
   writeFileSync(join(steps, 'page-1.jpeg'), Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]));
   stop({

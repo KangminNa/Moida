@@ -13,6 +13,11 @@ export class LeasedWork {
     readonly targetVersion: number | null = null,
     /** 일의 지시 (플러그인 API 0.5, 2026-11-16): 되풀이되는 일을 알아채려고 (browser-tabs의 사이트 도구 제안) */
     readonly instruction: string = '',
+    /**
+     * 관리자가 쓴 지시 (플러그인 API 0.7, 2026-11-19): 위임된 일이면 맨 위 일의 제목과 지시 (하위 일의 지시는 AI가 썼다).
+     * read_url의 기준과 같은 글. browser-tabs가 로그인 카드를 띄울 믿는 주소인지 본다
+     */
+    readonly ownerText: string = '',
   ) {}
 }
 

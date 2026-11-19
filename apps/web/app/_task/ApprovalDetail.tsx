@@ -145,7 +145,7 @@ function Loaded({
       ) : a.action === PUBLISH_SITE ? (
         <ClickTarget approval={a} />
       ) : a.action === LOGIN_SITE ? (
-        <LoginTarget approval={a} />
+        <LoginTarget approval={a} reload={reload} />
       ) : a.target.kind === GOAL_RUN ? (
         <GoalRunTarget approval={a} />
       ) : a.target.kind === 'chat' ? (

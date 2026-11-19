@@ -4,6 +4,7 @@ import type { HeldButton } from './browser-page';
 import { Job } from './job';
 import { RunMemo } from './job-lineage';
 import type { Json } from './json';
+import { LoginCalls } from './login-calls';
 import type { McpClient } from './mcp-client';
 import { NoteSource } from './note-source';
 import { PageBase } from './page-base';
@@ -29,9 +30,12 @@ export class SigninReply {
 export class CairnServer {
   /** browser-tabs 0.5 사이트 도구의 러너 쪽 도구 (실행 꺼내기 · 남기기, 굳힌 결과 남기기) */
   readonly siteTools: SiteToolCalls;
+  /** browser-tabs 0.7 로그인 (로그인 필요 · 로그인 카드의 값 꺼내기 · 결과) */
+  readonly logins: LoginCalls;
 
   constructor(private readonly mcp: McpClient) {
     this.siteTools = new SiteToolCalls(mcp);
+    this.logins = new LoginCalls(mcp);
   }
 
   /** 일을 limit개까지 빌린다. 없으면 waitSeconds까지 기다린다. 서버는 이 러너가 할 수 있는 일만 준다 */
@@ -284,20 +288,6 @@ export class CairnServer {
     shot: { url: string; title: string; image: string },
   ): Promise<void> {
     await this.mcp.call('browser_shot_save', { task_id: taskId, ...shot });
-  }
-
-  /** browser-tabs: 로그인 화면을 만났다. 로그인 결재의 대상(사이트와 판)을 돌려준다 */
-  async loginNeeded(
-    taskId: string,
-    page: { url: string; title: string; image: string | null },
-  ): Promise<{ siteId: string; siteVersion: number }> {
-    const body = await this.mcp.call('browser_login_needed', {
-      task_id: taskId,
-      page_url: page.url,
-      page_title: page.title,
-      ...(page.image ? { image: page.image } : {}),
-    });
-    return { siteId: body.text('site_id'), siteVersion: body.number('site_version') };
   }
 
   /** browser-tabs: 다시 찾은 마지막 버튼을 붙잡는다. 클릭 결재의 대상(클릭과 판)을 돌려준다 */

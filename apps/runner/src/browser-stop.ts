@@ -1,5 +1,6 @@
 import { lstat, readFile } from 'node:fs/promises';
 import { ButtonRef } from './browser-page';
+import { LoginFormRef } from './login-form-ref';
 
 /** 멈춘 자리를 읽지 못함 (모양이 틀림). 누를 것을 붙잡지 않는다 */
 export class BrowserStopProblem extends Error {}
@@ -7,7 +8,11 @@ export class BrowserStopProblem extends Error {}
 // AI가 멈춘 자리 (cairn-browse 스킬). AI는 결재를 올리지 않고 작업 폴더에 browser-stop.json을 쓰고 끝낸다:
 //   { "stop": "final_click", "page_url": "...", "button": { "role": "button", "name": "게시", "nth": 0 }, "note": "..." }
 //   { "stop": "login", "page_url": "...", "reason": "캡차" }
+//   { "stop": "login", "page_url": "...", "form": { "fields": [{ "kind": "id", "role": "textbox", "name": "아이디" }, …],
+//     "submit": { "role": "button", "name": "로그인" } } }
 // login은 사람이 해야 하는 화면이다 (2026-11-17 넓힘): 로그인뿐 아니라 가입 · 본인 인증 · 캡차 · 새 기기 확인. reason은 그 까닭 (없으면 로그인).
+// form은 그 화면의 로그인 칸 (로그인 카드, 2026-11-19): 칸마다 종류 · 역할 · 이름만 적고 값은 적지 않는다. 관리자가 카드의 칸에 넣은 값은
+// AI 없이 러너가 그 칸에 넣는다 (LoginRunner). 모양이 틀리면 form만 버린다 (화면에서 직접 로그인으로).
 // 러너(AI 없음)가 읽어 버튼을 다시 찾아 붙잡거나(결재된 클릭) 로그인 필요 결재를 올린다. 믿지 않는 입력이라 모양을 본다.
 export class BrowserStop {
   static readonly FILE = 'browser-stop.json';
@@ -24,6 +29,8 @@ export class BrowserStop {
     readonly note: string | null,
     /** 사람이 해야 하는 까닭 (login만, 승인 메모 · 카드 제목에 보인다). 없으면 로그인 */
     readonly reason: string | null = null,
+    /** 로그인 칸 (login만). 없거나 모양이 틀리면 null */
+    readonly form: LoginFormRef | null = null,
   ) {}
 
   /** 파일을 읽는다. 없으면 null (AI가 멈추지 않고 끝냈다). 링크 · 큰 파일 · 틀린 모양은 BrowserStopProblem */
@@ -48,7 +55,14 @@ export class BrowserStop {
       throw new BrowserStopProblem('page_url은 http · https 주소여야 해요');
     const note = typeof r.note === 'string' && r.note.trim() ? r.note.trim().slice(0, 500) : null;
     if (r.stop === 'login')
-      return new BrowserStop('login', url, null, note, BrowserStop.reasonOf(r));
+      return new BrowserStop(
+        'login',
+        url,
+        null,
+        note,
+        BrowserStop.reasonOf(r),
+        LoginFormRef.of(r.form),
+      );
     if (r.stop !== 'final_click')
       throw new BrowserStopProblem('stop은 final_click · login 중 하나예요');
     const b = (r.button ?? {}) as Record<string, unknown>;

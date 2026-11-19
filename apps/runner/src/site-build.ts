@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { BrowseSite } from './browse-job';
-import type { AskedApproval } from './browse-stage';
+import type { AskedApproval } from './browse-login';
 import type { IntegrationExec } from './integration-exec';
 import type { Json } from './json';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
