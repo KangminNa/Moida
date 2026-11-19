@@ -31,6 +31,13 @@ export class TaskController {
     return (await this.service.create(actor, CreateTaskInput.from(body))).view();
   }
 
+  /** 지금까지의 결과로 답하기 (팀원 기다리기): 하위 작업을 기다리는 작업을 바로 깨운다 */
+  @HttpCode(200)
+  @Post(':id/hurry')
+  async hurry(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<TaskView> {
+    return (await this.service.hurry(actor, TaskIdInput.from(id))).view();
+  }
+
   @HttpCode(200)
   @Post(':id/cancel')
   async cancel(

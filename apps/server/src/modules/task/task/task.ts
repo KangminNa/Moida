@@ -29,6 +29,7 @@ import {
 import { MakeMaterials } from './make-materials';
 import { MakeOrder } from './make-order';
 import type { RunRecord } from './run-record';
+import { SubtaskWait } from './subtask-wait.policy';
 import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
 import { type TaskKind, TaskKinds } from './task-kinds';
@@ -166,10 +167,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** delegate_task의 답: 맡긴 하위 작업들. 위 작업은 하위 작업을 기다린다 */
   static delegatedView(subtasks: readonly Task[]): DelegatedView {
-    return new DelegatedView(
-      subtasks.map((t) => t.row),
-      Task.WAIT_SUBTASKS,
-    );
+    const rows = subtasks.map((t) => t.row);
+    return new DelegatedView(rows, Task.WAIT_SUBTASKS);
   }
 
   get spaceId(): string {
@@ -243,11 +242,9 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    */
   get holdsCode(): boolean {
     const r = this.row;
-    return (
-      r.kind === Task.CODE &&
-      (r.status === Task.RUNNING ||
-        (r.status === Task.WAITING && r.wait_reason === Task.WAIT_APPROVAL))
-    );
+    // 결재를 기다리는 것(wait_reason approval)은 늘 waiting이다 (DB CHECK)
+    const holding = r.status === Task.RUNNING || r.wait_reason === Task.WAIT_APPROVAL;
+    return r.kind === Task.CODE && holding;
   }
 
   /** 결과를 내고 끝났는가. 취소는 결과가 없어서 뺀다 */
@@ -365,11 +362,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.holdLease(null, null);
   }
 
-  /** 위임에 쓰는 하위 작업의 request_id. AI가 만든 값을 작업마다 따로 센다 */
-  subtaskRequestId(requestId: string): string {
-    return `delegate:${this.id}:${requestId}`;
-  }
-
   /** 이번에 count개를 맡길 수 있는가. 이 작업의 에이전트가 살아 있는 임대로 일하는 중이어야 한다. 한도는 DelegationPolicy */
   assertCanDelegate(agentId: string, count: number, made: number, now: Date): void {
     const r = this.row;
@@ -389,29 +381,50 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
       order,
       tainted,
     );
-    return Task.open(this.row.space_id, this.subtaskRequestId(order.requestId), fields, now);
+    const requestId = DelegationPolicy.requestIdOf(this.id, order.requestId);
+    return Task.open(this.row.space_id, requestId, fields, now);
   }
 
   /**
-   * 하위 작업을 맡겼다: running → waiting(subtasks). 임대는 결재 대기처럼 남은 시간까지 둔다:
+   * 하위 작업을 기다린다: running → waiting(subtasks). 맡겼을 때(delegate_task)와 더 기다릴 때(wait_subtasks).
+   * until: 기한 (SubtaskWait, 지나면 다 끝나지 않아도 깨운다). 임대는 결재 대기처럼 남은 시간까지 둔다:
    * 러너는 진행 보고의 답으로 AI를 끄고 제출하지 않는다.
    */
-  waitForSubtasks(count: number, now: Date): void {
+  waitForSubtasks(note: string, until: Date, now: Date): void {
     this.move([Task.RUNNING], Task.WAITING, Task.WAIT_SUBTASKS);
     this.put('rounds', this.row.rounds + 1);
-    this.log(Task.LOG_WRITE, `하위 작업 ${count}개를 맡겼어요`, 0, now);
+    this.put('wait_until', until);
+    this.log(Task.LOG_WRITE, note, 0, now);
   }
 
   /**
-   * 하위 작업이 모두 끝났다: waiting(subtasks) → queued. 같은 에이전트가 결과를 받아 모은다.
+   * 하위 작업을 기다리다 깬다: waiting(subtasks) → queued. 같은 에이전트가 결과를 받아 모은다.
+   * reason: 깬 까닭 (SubtaskWait: 모두 끝남 · 실패 · 기한 · 관리자). 끝나지 않은 하위 작업은 계속 돈다.
    * 다시 빌려 가는 일이라 시도 횟수는 새로 센다.
    */
-  wakeAfterSubtasks(now: Date): void {
+  wakeAfterSubtasks(reason: string, now: Date): void {
     this.assertWaitingFor(Task.WAIT_SUBTASKS);
     this.move([Task.WAITING], Task.QUEUED);
     this.holdLease(null, null);
     this.put('attempts', 0);
-    this.log(Task.LOG_READ, '하위 작업이 모두 끝나 다시 대기열로 돌아갔어요', 0, now);
+    this.put('payload', SubtaskWait.woken(this.payload, reason));
+    this.log(Task.LOG_READ, SubtaskWait.noteOf(reason), 0, now);
+  }
+
+  /** 기한이 지났으면 깨운다 (마감 작업). 그사이 깨어났거나 기한을 다시 정했으면 그대로 */
+  wakeIfOverdue(now: Date): void {
+    if (this.waitingForSubtasks && SubtaskWait.overdue(this.row.wait_until, now))
+      this.wakeAfterSubtasks(SubtaskWait.DEADLINE, now);
+  }
+
+  /**
+   * 관리자가 지금까지의 결과로 답하라고 한다: 하위 작업을 기다리는 중이면 바로 깨우고,
+   * 대기 · 실행 중(먼저 깨어난 뒤)이면 더 맡기거나 기다리지 못하게 적어 둔다 (SubtaskWait.assertNotHurried)
+   */
+  hurry(now: Date): void {
+    SubtaskWait.assertHurriable(this.row);
+    this.put('payload', SubtaskWait.woken(this.payload, SubtaskWait.OWNER));
+    if (this.waitingForSubtasks) this.wakeAfterSubtasks(SubtaskWait.OWNER, now);
   }
 
   /**
@@ -447,17 +460,14 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.assertHeldBy(runnerId, now);
     const page = status === Task.DONE && made !== null ? MakeOrder.of(this.row.payload) : null;
     const refusal = page === null || made === null ? null : page.refusal(made);
-    if (refusal !== null) {
-      this.fail(refusal, now);
-      return;
-    }
-    // 웹 로그인은 자격(ai_signin credential)이 와야 끝난다. 러너가 실패만 알린다
+    // 웹 로그인은 자격(ai_signin credential)이 와야 끝난다. 러너가 실패만 알린다 (웹 로그인은 만들기 일이 아니다)
     if (this.is(Task.AI_SIGNIN) && status === Task.DONE)
       throw new RuleViolation('웹 로그인은 ai_signin으로 자격을 보내야 끝나요');
-    if (status === Task.DONE) this.finish(result, now);
+    if (refusal !== null) this.fail(refusal, now);
+    else if (status === Task.DONE) this.finish(result, now);
     else if (status === Task.FAILED) this.fail(error ?? '러너가 실패로 끝냈어요', now, result);
     else throw new RuleViolation(`결과는 ${Task.DONE} · ${Task.FAILED} 중 하나예요`);
-    if (page && made) this.record(page.built(this.row, made));
+    if (refusal === null && page && made) this.record(page.built(this.row, made));
   }
 
   /**
@@ -596,8 +606,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   get payloadTool(): string | null {
-    const tool = this.payload.tool;
-    return typeof tool === 'string' ? tool : null;
+    return typeof this.payload.tool === 'string' ? this.payload.tool : null;
   }
 
   /** 대화 회차의 받을 것 (O-3 set_deliver). 회차인지 · 이미 정했는지 · 관리자가 정한 값은 TurnDeliver가 본다 */
@@ -621,8 +630,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** 주인이 결재에서 고쳐 달라고 남긴 말 */
   private get revisionNote(): string | null {
-    const note = this.payload.revisionNote;
-    return typeof note === 'string' ? note : null;
+    return typeof this.payload.revisionNote === 'string' ? this.payload.revisionNote : null;
   }
 
   private assertSigninRunning(): void {
@@ -632,8 +640,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   private leaseAlive(now: Date): boolean {
-    const until = this.row.lease_until;
-    return until !== null && until.getTime() > now.getTime();
+    return this.row.lease_until !== null && this.row.lease_until.getTime() > now.getTime();
   }
 
   private holdLease(runnerId: string | null, until: Date | null): void {
@@ -678,6 +685,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.put('status', to);
     const reason = to === Task.WAITING ? waitReason : null;
     if (reason !== this.row.wait_reason) this.put('wait_reason', reason);
+    // 기한은 하위 작업을 기다리는 동안만 (waitForSubtasks가 이 뒤에 적는다, DB CHECK)
+    if (this.row.wait_until) this.put('wait_until', null);
     this.announce(more);
   }
 

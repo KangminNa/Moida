@@ -49,6 +49,24 @@ export class TaskQuery extends BaseQuery {
     return row?.lease_until ?? null;
   }
 
+  /** 기다리는 기한이 지난 위 작업 (팀원 기다리기, 마감 작업이 하나씩 잠가 깨운다) */
+  async overdueWaits(actor: Actor, now: Date): Promise<readonly string[]> {
+    actor.assertOwnerOrSystem();
+    const rows = await this.sql<Pick<TaskRow, 'id'>[]>`
+      SELECT id FROM task.tasks
+      WHERE wait_until <= ${now} AND status = ${Task.WAITING} AND wait_reason = ${Task.WAIT_SUBTASKS}
+      ORDER BY wait_until LIMIT 50`;
+    return rows.map((r) => r.id);
+  }
+
+  /** 가장 이른 기다리는 기한. 없으면 null (작업이 바뀌는 신호로 다시 잰다) */
+  async nextWaitEnd(actor: Actor): Promise<Date | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<TaskRow, 'wait_until'>[]>`
+      SELECT min(wait_until) AS wait_until FROM task.tasks WHERE wait_until IS NOT NULL`;
+    return row?.wait_until ?? null;
+  }
+
   async list(actor: Actor, req: ListTasksInput): Promise<TaskPageView> {
     actor.assertOwner();
     const rows = await this.sql<(TaskRow & { last_event: string | null })[]>`

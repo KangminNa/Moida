@@ -3531,6 +3531,18 @@ ul.picked > .chip {
   color: var(--muted);
 }
 
+.lane-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.lane-wait .ghost {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
 .lane-event {
   display: -webkit-box;
   -webkit-box-orient: vertical;

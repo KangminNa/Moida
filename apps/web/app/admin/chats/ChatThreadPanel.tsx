@@ -46,6 +46,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const router = useRouter();
   const tuning = useAction();
   const uploading = useAction();
+  const hurrying = useAction();
   const lead = useLead();
   /** 응답을 못 받아 다시 보내도 메시지가 한 번만 가게 (보낸 뒤에만 바꾼다) */
   const requestId = useRef('');
@@ -124,6 +125,13 @@ export function ChatThreadPanel({ id }: { id: string }) {
     });
     if (reply?.ok) router.replace('/admin');
   };
+
+  /** 팀원을 기다리는 작업을 지금까지의 결과로 마무리하게 깨운다 (팀원 기다리기) */
+  const hurry = (taskId: string) =>
+    hurrying.run(`hurry:${taskId}`, () => api('POST', `/api/tasks/${taskId}/hurry`), {
+      done: '지금까지의 결과로 답하게 했어요',
+      reload: detail.reload,
+    });
 
   const tune = (body: { model: string | null; effort: string | null }) =>
     tuning.run(
@@ -264,7 +272,12 @@ export function ChatThreadPanel({ id }: { id: string }) {
         {/* 입력 칸 아래: 여기로 내리면 입력 칸이 마지막 말풍선을 가리지 않는다 */}
         <div ref={bottom} />
       </div>
-      <ChatTeamPanel team={d.team} />
+      <ChatTeamPanel
+        team={d.team}
+        busy={hurrying.busy}
+        problem={hurrying.problem}
+        onHurry={hurry}
+      />
     </div>
   );
 }

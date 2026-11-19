@@ -254,6 +254,14 @@ export function elapsed(iso: string, now: number): string {
   return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분째`;
 }
 
+/** 기한까지 남은 때 (팀원 기다리기: 지나면 다 끝나지 않아도 대표 · 팀장이 깬다) */
+export function remaining(iso: string, now: number): string {
+  const minutes = Math.ceil((new Date(iso).getTime() - now) / 60_000);
+  if (minutes <= 0) return '기한 지남';
+  if (minutes < 60) return `${minutes}분 남음`;
+  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남음`;
+}
+
 /** 실행 로그의 시:분 */
 export function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString('ko-KR', {

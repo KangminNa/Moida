@@ -44,7 +44,8 @@ export type ChatBoardRow = ChatRow & { partner: string | null; state: string; ac
 export type ChatTeamRow = Pick<
   TaskRow,
   'id' | 'agent_id' | 'title' | 'status' | 'wait_reason' | 'created_at' | 'parent_id'
-> & { agent: string | null; last_event: string | null };
+> &
+  Pick<TaskRow, 'wait_until'> & { agent: string | null; last_event: string | null };
 
 /** 참조의 칸 (payload.refs · chats.pending_refs). 서버가 적은 값이지만 내보낼 칸은 여기서 고른다 */
 function refsOf(raw: unknown) {
@@ -71,12 +72,10 @@ export type ChatTokenRow = {
   tokens: number | string;
 };
 
+type TokenShare = { agentId: string | null; name: string | null; tokens: number };
 /** 합계와 에이전트별 몫 (많은 순) */
 function tokensOf(rows: readonly ChatTokenRow[]) {
-  const agents = new Map<
-    string | null,
-    { agentId: string | null; name: string | null; tokens: number }
-  >();
+  const agents = new Map<string | null, TokenShare>();
   for (const r of rows) {
     const one = agents.get(r.agent_id) ?? { agentId: r.agent_id, name: r.agent, tokens: 0 };
     agents.set(r.agent_id, { ...one, tokens: one.tokens + Number(r.tokens) });
@@ -384,6 +383,8 @@ export class ChatDetailView {
         title: t.title,
         status: t.status,
         waitReason: t.wait_reason,
+        /** 하위 작업을 기다리는 기한 (지나면 다 끝나지 않아도 깬다, 팀원 기다리기) */
+        waitUntil: t.wait_until?.toISOString() ?? null,
         parentId: t.parent_id,
         createdAt: t.created_at.toISOString(),
         lastEvent: t.last_event,

@@ -17,6 +17,12 @@ function deliverOf(r: Readonly<TaskRow>): string | null {
   return typeof deliver === 'string' && deliver !== '' ? deliver : null;
 }
 
+/** 하위 작업을 기다리다 깬 까닭 (payload.wake: all · failed · deadline · owner, 팀원 기다리기 SubtaskWait). 없으면 null */
+function wakeOf(r: Readonly<TaskRow>): string | null {
+  const wake = (r.payload as { wake?: unknown } | null)?.wake;
+  return typeof wake === 'string' ? wake : null;
+}
+
 /** 작업의 대상. 없으면 null (task.view.ts와 같은 모양) */
 function targetOf(r: Readonly<TaskRow>) {
   return r.target_kind === null
@@ -108,6 +114,9 @@ export class JobSubtaskResultView {
       summary: this.summary?.slice(0, JobSubtaskResultView.SUMMARY_MAX) ?? null,
       error: this.error,
       deliver: deliverOf(r),
+      // 끝나지 않은 일(먼저 깨어났을 때): 기다리는 것(approval · subtasks)과 맡긴 때 (러너가 몇 분째인지 센다)
+      waiting: r.wait_reason,
+      since: r.created_at.toISOString(),
     };
   }
 }
@@ -270,6 +279,8 @@ export class JobView {
       prompt_package: this.promptPackage?.toJSON() ?? null,
       chat_updates: this.chat?.toJSON() ?? null,
       revision_note: this.revisionNote,
+      // 하위 작업을 기다리다 깬 까닭 (팀원 기다리기). 처음 빌려 가는 일이면 null
+      wake: wakeOf(r),
       // bound: 이 러너에 묶인 에이전트 (묶인 일은 그 러너만 빌린다). 러너는 이때만 나눈 폴더를 연다
       // model · effort: AI CLI에 넘길 모델 · 생각 강도. 빈 글이면 CLI의 기본 (2차 7단계).
       // 대화가 정해 둔 것(payload.runtime, 2026-11-15 B)이 있으면 그 회차에는 그것을 쓴다. 하위 작업에는 맡긴 쪽이 고르거나

@@ -3,6 +3,7 @@ import type { Agent } from '../agent/agent';
 import { ModelTier } from '../agent/model-tier.policy';
 import type { TaskNew, TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
+import { SubtaskWait } from './subtask-wait.policy';
 import type { SubtaskOrder } from './task.input';
 import { TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
@@ -65,11 +66,12 @@ export class DelegationPolicy {
    * 한 번에 DELEGATE_AT_ONCE개, 작업 하나에 SUBTASKS_MAX개(made는 이미 맡긴 수), 깊이 DEPTH_MAX, 라운드 ROUNDS_MAX까지
    */
   static assertLimits(
-    parent: Pick<TaskRow, 'depth' | 'rounds'>,
+    parent: Pick<TaskRow, 'depth' | 'rounds' | 'payload'>,
     count: number,
     made: number,
   ): void {
     const P = DelegationPolicy;
+    SubtaskWait.assertNotHurried(parent.payload);
     if (count < 1 || count > P.DELEGATE_AT_ONCE)
       throw new RuleViolation(`한 번에 1~${P.DELEGATE_AT_ONCE}개를 맡길 수 있어요 (한도)`);
     if (made + count > P.SUBTASKS_MAX)
@@ -79,7 +81,14 @@ export class DelegationPolicy {
     if (parent.depth + 1 > P.DEPTH_MAX)
       throw new RuleViolation(`위임은 ${P.DEPTH_MAX}단계까지예요 (한도)`);
     if (parent.rounds + 1 > P.ROUNDS_MAX)
-      throw new RuleViolation(`작업 하나가 위임할 수 있는 횟수는 ${P.ROUNDS_MAX}번이에요 (한도)`);
+      throw new RuleViolation(
+        `작업 하나가 위임하거나 더 기다릴 수 있는 횟수는 ${P.ROUNDS_MAX}번이에요 (한도)`,
+      );
+  }
+
+  /** 위임에 쓰는 하위 작업의 request_id. AI가 만든 값을 위 작업마다 따로 센다 */
+  static requestIdOf(parentId: string, requestId: string): string {
+    return `delegate:${parentId}:${requestId}`;
   }
 
   /** 이 작업이 아직 위임할 수 있는 횟수 (러너가 일과 함께 받는다) */

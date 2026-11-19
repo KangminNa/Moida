@@ -160,7 +160,7 @@ export class ChatQuery extends BaseQuery {
         SELECT c.id FROM task.tasks c JOIN tree ON c.parent_id = tree.id
         WHERE c.status = ANY(${open}::text[])
       )
-      SELECT t.id, t.agent_id, t.title, t.status, t.wait_reason, t.created_at, t.parent_id,
+      SELECT t.id, t.agent_id, t.title, t.status, t.wait_reason, t.wait_until, t.created_at, t.parent_id,
         a.name AS agent,
         (SELECT e.body FROM task.task_events e
           WHERE e.task_id = t.id AND e.body <> '' ORDER BY e.id DESC LIMIT 1) AS last_event

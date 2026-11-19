@@ -311,7 +311,7 @@ describe('위임', () => {
     assert.equal(child.unsaved.priority, 7);
     assert.match(String(child.requestId), new RegExp(`^delegate:${parent.id}:`));
 
-    parent.waitForSubtasks(1, NOW);
+    parent.waitForSubtasks('하위 작업 1개를 맡겼어요', LATER, NOW);
     assert.equal(parent.unsaved.status, Task.WAITING);
     assert.equal(parent.unsaved.wait_reason, Task.WAIT_SUBTASKS);
     assert.equal(parent.unsaved.rounds, 1);
@@ -393,15 +393,15 @@ describe('위임', () => {
     } as TaskRow);
     assert.throws(() => tired.assertCanDelegate(lead.id, 1, 0, NOW), RuleViolation);
 
-    parent.waitForSubtasks(1, NOW);
+    parent.waitForSubtasks('하위 작업 1개를 맡겼어요', LATER, NOW);
     assert.throws(() => parent.assertCanDelegate(lead.id, 1, 0, NOW), Conflict);
   });
 
   test('하위 작업이 끝나면 깨어나 대기열로: 시도 횟수는 새로, 기다리는 이유는 지운다', () => {
     const { lead } = org();
     const parent = leadTask(lead);
-    parent.waitForSubtasks(2, NOW);
-    parent.wakeAfterSubtasks(NOW);
+    parent.waitForSubtasks('하위 작업 2개를 맡겼어요', LATER, NOW);
+    parent.wakeAfterSubtasks('all', NOW);
     assert.equal(parent.unsaved.status, Task.QUEUED);
     assert.equal(parent.unsaved.wait_reason, null);
     assert.equal(parent.unsaved.attempts, 0);
@@ -411,7 +411,7 @@ describe('위임', () => {
 
   test('결재를 기다리는 작업은 하위 작업으로 깨울 수 없고, 취소하면 기다리는 이유가 지워진다', () => {
     const task = waiting();
-    assert.throws(() => task.wakeAfterSubtasks(NOW), RuleViolation);
+    assert.throws(() => task.wakeAfterSubtasks('all', NOW), RuleViolation);
     task.cancel(NOW);
     assert.equal(task.unsaved.wait_reason, null);
     assert.equal(task.unsaved.status, Task.CANCELLED);
@@ -504,7 +504,7 @@ describe('코드 일 나눠 맡기기 (코드 작업 5단계)', () => {
     const { lead } = team();
     const running = leadTask(lead);
     assert.equal(running.holdsCode, true);
-    running.waitForSubtasks(1, NOW);
+    running.waitForSubtasks('하위 작업 1개를 맡겼어요', LATER, NOW);
     assert.equal(running.holdsCode, false);
     const reviewing = leadTask(lead);
     reviewing.waitFor(NOW);

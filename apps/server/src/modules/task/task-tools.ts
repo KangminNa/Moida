@@ -9,7 +9,7 @@ import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxTool } from './inbox/inbox.tool';
 import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
 import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
-import { DelegateTaskTool } from './task/delegate.tool';
+import { DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
 import {
   NextJobsTool,
   ReleaseJobTool,
@@ -33,6 +33,7 @@ export class TaskTools {
     releaseJob: ReleaseJobTool,
     requestApproval: RequestApprovalTool,
     delegateTask: DelegateTaskTool,
+    waitSubtasks: WaitSubtasksTool,
     aiLogin: AiLoginTool,
     aiLoginRefresh: AiLoginRefreshTool,
     aiSignin: AiSigninTool,
@@ -56,6 +57,7 @@ export class TaskTools {
       releaseJob,
       requestApproval,
       delegateTask,
+      waitSubtasks,
       aiLogin,
       aiLoginRefresh,
       aiSignin,
