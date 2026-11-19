@@ -1,5 +1,4 @@
-import { appPath } from '../../../_blog/format';
-import { rssResponse } from '../../../_blog/rss';
+import { appBase, postUrl, rssResponse } from '../../../_blog/rss';
 import { appIn, siteNow } from '../../../_blog/site';
 import type { PostList } from '../../../_blog/types';
 import { serverGet } from '../../../_lib/server-api';
@@ -19,12 +18,14 @@ export async function GET(
   const list = await serverGet<PostList>(`/api/posts?app=${encodeURIComponent(app.slug)}`, true);
   if (!list) return new Response('', { status: 503 });
   const { space } = site;
+  const origin = (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
+  const base = appBase(app, origin);
   return rssResponse({
-    site: (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, ''),
     title: `${app.name} · ${space.name || 'Cairn'}`,
     description: app.description || space.description || app.name,
-    page: appPath(app.slug),
-    self: `${appPath(app.slug)}/rss.xml`,
+    page: base,
+    self: `${base}/rss.xml`,
     posts: list.posts,
+    link: (post) => postUrl(post, origin, site.apps),
   });
 }

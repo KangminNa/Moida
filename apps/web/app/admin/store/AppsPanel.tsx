@@ -68,12 +68,12 @@ export function AppsPanel() {
                   {waiting(a) > 0 && <span className="pill on">승인 대기 {waiting(a)}</span>}
                 </b>
                 <small>
-                  {appPath(a.slug)} · {summary(a)} · {leaderOf(a)}
+                  {a.domainCheckedAt ? a.domain : appPath(a.slug)} · {summary(a)} · {leaderOf(a)}
                 </small>
               </div>
               <div className="row">
                 {a.visibility === 'public' && (
-                  <NewTabLink className="ghost" href={appPath(a.slug)}>
+                  <NewTabLink className="ghost" href={a.url}>
                     열기
                   </NewTabLink>
                 )}

@@ -1,6 +1,5 @@
-import { menuPath } from '../../../../../_blog/format';
-import { rssResponse } from '../../../../../_blog/rss';
-import { siteNow } from '../../../../../_blog/site';
+import { appBase, postUrl, rssResponse } from '../../../../../_blog/rss';
+import { appIn, siteNow } from '../../../../../_blog/site';
 import type { PostList, PublicMenuList } from '../../../../../_blog/types';
 import { serverGet } from '../../../../../_lib/server-api';
 
@@ -25,13 +24,16 @@ export async function GET(
   const list = await serverGet<PostList>(`/api/posts?${query}`, true);
   if (!list) return new Response('', { status: 503 });
   const { space } = site;
-  const page = menuPath(menu.slug, menu.app);
+  const holder = appIn(site, menu.app);
+  if (!holder) return new Response('', { status: 404 });
+  const origin = (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
+  const page = `${appBase(holder, origin)}/m/${encodeURIComponent(menu.slug)}`;
   return rssResponse({
-    site: (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, ''),
     title: `${menu.name} · ${space.name || 'Cairn'}`,
     description: space.description || space.name || 'Cairn',
     page,
     self: `${page}/rss.xml`,
     posts: list.posts,
+    link: (post) => postUrl(post, origin, site.apps),
   });
 }

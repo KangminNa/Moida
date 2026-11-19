@@ -1,6 +1,6 @@
 import type { SpaceInfo } from '../_account/types';
-import { rssResponse } from '../_blog/rss';
-import type { PostList } from '../_blog/types';
+import { postUrl, rssResponse } from '../_blog/rss';
+import type { PostList, PublicAppList } from '../_blog/types';
 import { serverGet } from '../_lib/server-api';
 
 // 사이트 전체 RSS: 공개 앱의 공개 글 20개를 발행한 순서로 (서버의 글 목록 한 쪽이 20개다). 방문자로 묻는다: 주인이 열어도 공개 글만.
@@ -9,18 +9,20 @@ import { serverGet } from '../_lib/server-api';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request): Promise<Response> {
-  const [space, list] = await Promise.all([
+  const [space, list, apps] = await Promise.all([
     serverGet<SpaceInfo>('/api/space', true),
     serverGet<PostList>('/api/posts', true),
+    serverGet<PublicAppList>('/api/apps', true),
   ]);
-  if (!space || !list) return new Response('', { status: 503 });
+  if (!space || !list || !apps) return new Response('', { status: 503 });
   const name = space.name || 'Cairn';
+  const site = (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
   return rssResponse({
-    site: (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, ''),
     title: name,
     description: space.description || name,
-    page: '/',
-    self: '/rss.xml',
+    page: site,
+    self: `${site}/rss.xml`,
     posts: list.posts,
+    link: (post) => postUrl(post, site, apps.apps),
   });
 }

@@ -60,6 +60,7 @@ paths:
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`).
 - 웹의 최상위 경로를 더하면 `next.config.ts`의 `WEB_ROUTES`에도 적는다 (화면 머리글이 붙는 목록, 구조 검사가 본다). 앱 주소에는 Cairn 화면 머리글을 붙이지 않는다.
 - `mustache`는 `_blog/app-screen.ts`에서만 가져온다 (규칙 검사).
+- 앱 도메인 (스토어 3-0): `proxy.ts`가 연결을 확인한 앱 도메인의 요청을 `/<앱>/…`로 넘긴다(`_blog/app-domains.ts`, 30초 기억). 앱 화면은 방문자가 연 호스트(`_blog/request-host.ts`)를 서버에 넘기고, 앱 링크는 서버가 준 `url`(확인한 도메인이면 그 도메인)로 건다. `next.config`의 머리글은 들어온 경로로 붙어 앱 화면의 격리 머리글을 덮으므로, 앱 도메인에서 앱 화면이 되는 경로(`/` · `/posts` · `/m`)의 화면 머리글은 `proxy.ts`가 기본 도메인에서만 붙인다 (`_lib/screen-headers.ts`). 웹에 그런 경로를 더하면 `APP_SCREEN_ROOTS`에도 적는다
 
 ## 서버와 함께 쓰는 것
 
