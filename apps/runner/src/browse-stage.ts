@@ -156,7 +156,7 @@ export class BrowseStage implements SandboxStage {
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
     if (this.dir)
       await new StepShots(this.server, this.job.taskId).ship(join(this.dir, 'steps'), signal, note);
-    // 사이트 도구 굳히기: 남긴 파일로 시험을 돌려 채점받고, 통과하면 켜기 결재를 올린다 (SiteBuild)
+    // 사이트 도구 굳히기: 남긴 파일로 시험을 돌려 채점받는다. 통과하면 읽기 도구는 서버가 바로 켜고, 그 밖은 켜기 결재 (SiteBuild)
     if (this.plan?.build && this.plan.site) {
       const exec = new IntegrationExec(this.config.browserUrl ?? '');
       const build = new SiteBuild(this.server.siteTools, exec, this.job.taskId);

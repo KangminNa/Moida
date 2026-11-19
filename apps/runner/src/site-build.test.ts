@@ -179,6 +179,22 @@ describe('SiteBuild.finish', () => {
     assert.ok(failed && !failed.outcome.ok && !failed.outcome.error.includes(SECRET));
   });
 
+  test('읽기 도구를 서버가 바로 켰으면(enabled, 2026-11-19) 켜기 결재 없이 끝낸다', async () => {
+    await writeTool(GOOD);
+    const exec = fakeExec(() => ({ ok: true, output: { p: 1 }, ms: 3 }));
+    const { calls } = fakeCalls({ accepted: true, enabled: true, passed: 3, seq: 2 });
+    const built = await new SiteBuild(calls, exec, 't1').finish(
+      plan,
+      site,
+      work,
+      never,
+      noop,
+      redactor,
+    );
+    assert.equal(built.ending.succeeded, true);
+    assert.equal(built.approval, null);
+  });
+
   test('70% 미만이면 첫 회차는 일을 돌려주고(다음 회차가 고친다), 두 번째는 실패로 끝낸다', async () => {
     await writeTool(GOOD);
     const exec = fakeExec(() => ({ ok: true, output: { p: 'x' }, ms: 1 }));

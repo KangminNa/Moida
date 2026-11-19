@@ -378,7 +378,7 @@
     },
     "site_build_save": {
       "operation": "saveBuild",
-      "description": "사이트 도구를 굳힌 결과를 남긴다 (그 굳히기 작업을 쥔 러너). AI가 쓴 입출력 형식 · 코드와, 러너가 시험 3~10개를 돌린 결과(답 또는 오류). 서버가 형식으로 채점해 새 버전으로 남기고 70% 이상이면 받아들인다(accepted). 받아들였으면 integration_version으로 켜기 결재(browser.integration.enable, 대상 browser_integration)를 올린다. 쓰기 도구(build.mode: write)의 시험은 마른 실행(site.commit 앞에서 멈춤)이라 output 없이 보내고, 받아들여지면 review: true로 검토자에게 넘어가 러너는 켜기 결재를 올리지 않는다.",
+      "description": "사이트 도구를 굳힌 결과를 남긴다 (그 굳히기 작업을 쥔 러너). AI가 쓴 입출력 형식 · 코드와, 러너가 시험 3~10개를 돌린 결과(답 또는 오류). 서버가 형식으로 채점해 새 버전으로 남기고 70% 이상이면 받아들인다(accepted). 읽기 도구는 받아들이면 서버가 바로 켠다(enabled: true, 2026-11-19, 켜기 결재 없음). enabled가 아니고 받아들였으면 integration_version으로 켜기 결재(browser.integration.enable, 대상 browser_integration)를 올린다. 쓰기 도구(build.mode: write)의 시험은 마른 실행(site.commit 앞에서 멈춤)이라 output 없이 보내고, 받아들여지면 review: true로 검토자에게 넘어가 러너는 켜기 결재를 올리지 않는다.",
       "input": {
         "properties": {
           "task_id": {

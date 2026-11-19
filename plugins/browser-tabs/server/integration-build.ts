@@ -132,11 +132,16 @@ export class SaveBuild extends Command<SaveBuildInput> {
       WHERE integration_id = ${row.id} AND build_task_id = ${input.taskId}`;
     let version = row.version;
     const review = accepted && row.mode === 'write';
+    // 읽기 도구는 시험 · 규칙 검사를 통과하면 승인 없이 바로 켠다 (2026-11-19 사용자 결정: 승인 줄이기, MCP 먼저).
+    // 쓰기 도구는 지금처럼 검토자 짝 → 켜기 승인, 부를 때마다 승인
+    const enabled = accepted && row.mode !== 'write';
     if (accepted) {
       version = row.version + 1;
+      const live = enabled ? { live_seq: seq, fail_streak: 0 } : {};
+      const status = review ? 'reviewing' : enabled ? 'on' : 'review';
       await work.updateRows(
         integrations,
-        { status: review ? 'reviewing' : 'review', draft_seq: seq, version, updated_at: Rule.now },
+        { status, draft_seq: seq, ...live, version, updated_at: Rule.now },
         { id: row.id, version: row.version },
       );
       // 쓰기 도구는 켜기 결재 대신 검토자 짝에게 (검토자가 통과시키면 켜기 결재를 올린다)
@@ -153,6 +158,7 @@ export class SaveBuild extends Command<SaveBuildInput> {
       total: tests.length,
       rounds: made?.n ?? 1,
       review,
+      enabled,
       problems,
     });
   }

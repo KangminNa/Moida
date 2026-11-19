@@ -30,6 +30,8 @@ export type BuildVerdict = {
   rounds: number;
   /** 쓰기 도구라 검토자에게 넘겼다 (러너는 켜기 결재를 올리지 않는다) */
   review: boolean;
+  /** 읽기 도구라 서버가 바로 켰다 (2026-11-19, 러너는 켜기 결재를 올리지 않는다). 옛 서버면 false */
+  enabled: boolean;
   problems: readonly string[];
 };
 
@@ -101,6 +103,7 @@ export class SiteToolCalls {
       total: body.number('total'),
       rounds: body.number('rounds'),
       review: body.flag('review'),
+      enabled: body.flag('enabled'),
       problems: body.list('problems').map((p) => `${p.text('name')}: ${p.text('problem')}`),
     };
   }
