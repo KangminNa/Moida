@@ -11,16 +11,18 @@ import { useAction } from '../../../_lib/use-action';
 import { NewTabLink } from '../../../_ui/NewTabLink';
 import { STORE_HREF } from '../../menu';
 import { AppCodeTab } from './AppCodeTab';
+import { AppCommunityTab } from './AppCommunityTab';
 import { AppMenus } from './AppMenus';
 import { AppOverview } from './AppOverview';
 import { AppPosts } from './AppPosts';
 import { AppSettings } from './AppSettings';
 import { AppTeamTab } from './AppTeamTab';
 
-export type AppTab = 'overview' | 'team' | 'menus' | 'posts' | 'code' | 'settings';
+export type AppTab = 'overview' | 'community' | 'team' | 'menus' | 'posts' | 'code' | 'settings';
 
 const TAB_NAMES: Record<AppTab, string> = {
   overview: '개요',
+  community: '커뮤니티',
   team: '운영 팀',
   menus: '메뉴',
   posts: '글',
@@ -28,11 +30,21 @@ const TAB_NAMES: Record<AppTab, string> = {
   settings: '설정',
 };
 
+/** 앱 종류마다의 탭: 커뮤니티(스토어 3-2)는 블로그 글 · 메뉴 대신 커뮤니티 탭 */
+const BLOG_TABS: readonly AppTab[] = ['overview', 'team', 'menus', 'posts', 'code', 'settings'];
+const TABS_OF: Record<AdminApp['kind'], readonly AppTab[]> = {
+  blog: BLOG_TABS,
+  magazine: BLOG_TABS,
+  page: BLOG_TABS,
+  community: ['overview', 'community', 'team', 'code', 'settings'],
+};
+
 const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어요';
 
 // 앱 관리 (스토어 1-5): 머리(아이콘 · 이름 · 종류 · 주소 · 공개 전환)와 탭(개요 · 운영 팀 · 메뉴 · 글 · 코드 · 설정,
-// 코드는 스토어 1-6, 운영 팀은 2단계). 공개는 관리자만 이 전환 하나로 한다 (AI · 대화는 공개를 제안하지 못한다).
-export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
+// 코드는 스토어 1-6, 운영 팀은 2단계, 커뮤니티 앱은 메뉴 · 글 대신 커뮤니티 탭: 3-2). 공개는 관리자만 이 전환 하나로 한다
+// (AI · 대화는 공개를 제안하지 못한다).
+export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
   const apps = useApps();
   const visibility = useAction();
   const app = apps.data?.apps.find((a) => a.id === id) ?? null;
@@ -47,11 +59,21 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
       !problem && <p className="label-mono">불러오는 중…</p>
     );
 
+  const tabs = TABS_OF[app.kind];
+  const tab = tabs.includes(asked) ? asked : 'overview';
+  const community = app.kind === 'community';
+  /** 커뮤니티는 연결을 확인한 도메인이 있어야 공개된다 (스토어 3-2, 서버 App.edit) */
+  const needsDomain = community && app.visibility !== 'public' && !app.domainCheckedAt;
+
   function flip(target: AdminApp) {
     const open = target.visibility !== 'public';
-    const ask = open
-      ? `${target.name}을(를) 공개할까요? 방문자에게 이 앱과 앱의 공개 글이 보여요`
-      : `${target.name}을(를) 비공개로 바꿀까요? 앱의 글 · 메뉴 · 호가 방문자에게서 사라져요`;
+    const ask = community
+      ? open
+        ? `${target.name}을(를) 공개할까요? 방문자가 앱 도메인에서 가입하고 글 · 댓글을 쓸 수 있어요`
+        : `${target.name}을(를) 비공개로 바꿀까요? 회원 · 글은 남고 방문자에게서 사라져요`
+      : open
+        ? `${target.name}을(를) 공개할까요? 방문자에게 이 앱과 앱의 공개 글이 보여요`
+        : `${target.name}을(를) 비공개로 바꿀까요? 앱의 글 · 메뉴 · 호가 방문자에게서 사라져요`;
     if (!window.confirm(ask)) return;
     void visibility.run(
       'visibility',
@@ -88,15 +110,22 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
         <button
           type="button"
           className={open ? 'ghost small' : 'cta small'}
-          disabled={visibility.busy !== null}
+          disabled={visibility.busy !== null || needsDomain}
           onClick={() => flip(app)}
         >
           {open ? '비공개로 바꾸기' : '공개하기'}
         </button>
       </header>
+      {needsDomain && (
+        <p className="note">
+          커뮤니티는 회원 가입 · 글쓰기가 앱 도메인에서만 돼요.{' '}
+          <Link href={`${STORE_HREF}/${app.id}?tab=settings`}>설정</Link>에서 도메인을 연결하고
+          확인하면 공개할 수 있어요
+        </p>
+      )}
       {problem && <p className="error">{problem}</p>}
       <nav className="row" aria-label="앱 관리">
-        {(Object.keys(TAB_NAMES) as AppTab[]).map((t) => (
+        {tabs.map((t) => (
           <Link
             key={t}
             className="chip"
@@ -108,6 +137,7 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
         ))}
       </nav>
       {tab === 'overview' && <AppOverview app={app} />}
+      {tab === 'community' && <AppCommunityTab app={app} />}
       {tab === 'team' && <AppTeamTab app={app} onChanged={apps.reload} />}
       {tab === 'menus' &&
         (app.kind === 'page' ? (

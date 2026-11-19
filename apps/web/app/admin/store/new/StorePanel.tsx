@@ -24,10 +24,11 @@ const KINDS: readonly [AdminApp['kind'], string, string][] = [
   ['blog', 'post', '글 · 메뉴 · RSS. 글은 버전으로 남고, 공개는 승인 뒤에'],
   ['magazine', 'book', '호 단위로 글을 묶어 한 번에 발행. 호 목록 · 이번 호'],
   ['page', 'site', 'AI가 HTML · JS로 만든 화면 하나. 데이터 파일만 바꿔 갱신. 서버 기능 없음'],
+  ['community', 'team', '회원 가입 · 글 · 댓글 · 신고. 도메인을 연결해야 공개'],
 ];
 
 // 스토어 (스토어 1-5, 시안 2 · 3번): 앱 종류를 골라 만들기 시트를 연다. 만들면 앱 관리로 간다.
-// 커뮤니티는 3단계라 준비 중으로만 보인다. 원하는 종류가 없으면 대화에서 맡긴다 (코드 작업 → 기능 패키지).
+// 커뮤니티(스토어 3-2)는 회원 기능이 앱 도메인에서만 열려 도메인 연결을 확인해야 공개된다. 원하는 종류가 없으면 대화에서 맡긴다 (코드 작업 → 기능 패키지).
 // 시트는 주소(?make=종류, page.tsx가 넘김)에 둔다 (웹 UX U1): 열기는 기록을 하나 쌓고, 닫기는 여기서 연 것이면 뒤로 ·
 // 주소로 바로 들어왔으면 바꿔치기, 만든 뒤에는 앱 관리로 바꿔치기한다 (뒤로 가기가 다시 시트를 열지 않게)
 export function StorePanel({ make }: { make: string | null }) {
@@ -135,15 +136,6 @@ export function StorePanel({ make }: { make: string | null }) {
             </li>
           );
         })}
-        <li className="panel store-kind" aria-disabled="true">
-          <span className="store-kind-icon" aria-hidden="true">
-            <Icon name="team" />
-          </span>
-          <b>
-            커뮤니티 <span className="pill">준비 중</span>
-          </b>
-          <p>회원 가입 · 글 · 댓글 · 신고. 따로 설계 · 보안 검토 뒤에 열림</p>
-        </li>
       </ul>
       <section className="panel stack" aria-label="원하는 종류가 없을 때">
         <b>원하는 종류가 없을 때</b>
