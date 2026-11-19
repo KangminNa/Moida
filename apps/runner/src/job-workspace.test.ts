@@ -87,6 +87,8 @@ describe('AI CLI 부르기', () => {
       'Edit(//Users/owner/**)',
     ]);
     assert.deepEqual(JSON.parse(ClaudeCli.settings(undefined)).permissions.deny, []);
+    // Fable은 쓰지 않는다 (2026-11-19): 서버 · 러너가 먼저 거르고, CLI 안에서 고르는 모델도 이 셋으로
+    assert.deepEqual(settings.availableModels, ['opus', 'sonnet', 'haiku']);
     const config = JSON.parse(ClaudeCli.mcpConfig('https://blog/mcp', 'run-token'));
     assert.deepEqual(config, {
       mcpServers: {
@@ -129,6 +131,21 @@ describe('AI CLI 부르기', () => {
     assert.equal(cli.args(plain).includes('--model'), false, '비었으면 CLI의 기본');
     assert.equal(cli.args(plain).includes('--effort'), false);
     await plain.remove();
+  });
+
+  test('Fable 모델이 실려 오면 돌지 않을 까닭을 낸다 (옛 서버 · 그 전에 저장된 값)', () => {
+    const runtime = (model: string) =>
+      Job.from(
+        Json.of({
+          task: { id: 't', title: '정리' },
+          agent: { name: '정리', tool: 'claude', model },
+          run_token: 'run-token',
+        }),
+      ).runtime.refusal;
+    for (const model of ['fable', 'claude-fable-5-2', 'best'])
+      assert.match(String(runtime(model)), /Fable 모델\(.+\)은 쓰지 않아요/, model);
+    for (const model of ['', 'opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'bestow'])
+      assert.equal(runtime(model), null, model);
   });
 
   test('연결 확인은 MCP 설정도 도구도 없이 띄운다', async () => {
@@ -327,6 +344,9 @@ describe('지시문', () => {
     assert.ok(prompt.includes('글쓰기 (agent_id: w1) · 맡길 수 있는 일: general · 쥔 일 0개'));
     assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|아래 팀)/.test(prompt), false);
     assert.ok(prompt.includes('## 나누는 법'));
+    // 모델은 맡기는 쪽이 일마다 고르고, 상한은 내 모델 (2026-11-19). 정하지 않았으면 CLI 기본(opus)
+    assert.ok(prompt.includes('delegate_task의 model로 고릅니다'));
+    assert.ok(prompt.includes('내 모델(opus)보다 높게 고를 수 없습니다'));
     assert.ok(prompt.includes('propose_setting'), '맞는 담당이 없으면 팀 바꾸기를 제안한다');
     assert.ok(prompt.includes('## [완료] 조사 (조사 팀장)\n요청한 형식: 표 하나\n표'));
 

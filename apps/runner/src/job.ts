@@ -352,6 +352,8 @@ export class Job {
         prompts.fill('team', {
           members: this.team.map((m) => m.line(prompts)).join('\n'),
           rounds: this.roundsLeft,
+          // 하위 작업 모델의 상한 (서버 ModelTier): 이 일이 쓰는 모델, 빈 글이면 CLI 기본(구독은 opus)
+          ceiling: (this.tool === 'claude' && this.runtime.model) || 'opus',
         }),
       );
     // 대표 (O-2 · O-3 · 스토어 2단계): 이 대화의 id(자동화 찾기), 이미 정해진 받을 것, 대화의 앱

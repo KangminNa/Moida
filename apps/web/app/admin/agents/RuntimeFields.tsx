@@ -41,7 +41,9 @@ export function RuntimeFields({
           aria-describedby={`${id}-model-help`}
           onChange={(e) => onChange({ ...value, model: e.target.value })}
         />
-        <small id={`${id}-model-help`}>비우면 AI 도구의 기본 모델. 예: opus · sonnet · gpt-5</small>
+        <small id={`${id}-model-help`}>
+          비우면 AI 도구의 기본 모델. 예: opus · sonnet · gpt-5. 맡겨 받은 일은 맡긴 쪽 모델 이하로
+        </small>
       </div>
       <div className="field">
         <label htmlFor={`${id}-effort`}>생각 강도</label>

@@ -56,6 +56,9 @@ export class ClaudeCli implements AiTool {
     'http_proxy',
     'no_proxy',
   ];
+  /** 일에 쓰는 모델 계열 (Claude Code의 availableModels). 서버의 위임 모델 고르기(ModelTier.CHOICES)와 같다 */
+  private static readonly MODELS: readonly string[] = ['opus', 'sonnet', 'haiku'];
+
   private static readonly HEADLESS_ENV: Readonly<Record<string, string>> = {
     ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
@@ -180,6 +183,8 @@ export class ClaudeCli implements AiTool {
     const deny = home ? ClaudeCli.FILE_TOOLS.map((tool) => `${tool}(/${home}/**)`) : [];
     return JSON.stringify({
       permissions: { deny },
+      // 쓰는 모델 (2026-11-19, Fable은 쓰지 않음): 서버 · 러너가 먼저 거절하고, 그래도 들어오면 CLI가 허락된 가장 새 모델로 바꾼다
+      availableModels: ClaudeCli.MODELS,
       ...(memoHook ? { hooks: MemoHook.settings() } : {}),
     });
   }

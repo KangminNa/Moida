@@ -11,6 +11,8 @@ export class CliRuntime {
   /** 모델 이름의 글자 (서버 AgentRuntime.MODEL과 같다): 따옴표 · 공백 · 줄바꿈이 설정 파일에 들어가지 않게 */
   private static readonly MODEL = /^[A-Za-z0-9._[\]-]{1,80}$/;
   private static readonly EFFORT = /^[a-z]{1,10}$/;
+  /** 쓰지 않는 모델 (서버 AgentRuntime.BLOCKED와 같다, 2026-11-19): Fable 계열. best는 이 이미지의 Claude Code에서 Fable */
+  private static readonly BLOCKED = /fable|^best$/i;
 
   private constructor(
     readonly model: string,
@@ -28,6 +30,13 @@ export class CliRuntime {
       CliRuntime.EFFORT.test(effort) ? effort : '',
       ExternalMcp.list(tools),
     );
+  }
+
+  /** 쓰지 않는 모델이면 그 까닭 (일을 돌지 않고 실패로 낸다: 옛 서버나 그 전에 저장된 값). 아니면 null */
+  get refusal(): string | null {
+    return CliRuntime.BLOCKED.test(this.model)
+      ? `Fable 모델(${this.model})은 쓰지 않아요. 에이전트 · 대화의 모델을 opus · sonnet · haiku 가운데로 바꿔 주세요`
+      : null;
   }
 
   /** 로그와 기록에서 지울 값 (외부 도구의 머리글 값) */

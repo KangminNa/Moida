@@ -326,6 +326,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly deliver: string | null,
     /** make 일의 결과를 이 앱 코드의 새 버전으로 (payload.appCode, 스토어 1-6b). 다른 일에는 없다 */
     readonly appId: string | null,
+    /** 이 일의 모델 (haiku · sonnet · opus, 맡기는 일의 모델 이하, ModelTier). 없으면 팀원의 설정 */
+    readonly model: string | null,
   ) {
     super();
   }
@@ -348,6 +350,7 @@ export class SubtaskOrder extends BaseRequest {
       f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
       f.optionalText('deliver', SubtaskOrder.DELIVER_MAX),
       f.optionalText('app_id', 36) === null ? null : f.uuid('app_id'),
+      f.optionalText('model', 20),
     );
   }
 }
