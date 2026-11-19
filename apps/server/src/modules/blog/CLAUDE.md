@@ -10,7 +10,8 @@
   방문자 첫 화면 고정(`apps.home`, 공개 앱만 · 공간마다 하나): `PUT api/apps/home`(관리자만, 공간의 앱을 모두 잠그고 푸는 것부터 저장), 비공개로 바꾸면 `App.edit`이 푼다. 대화로는 바꾸지 않는다
   앱마다 도메인 (스토어 3-0, [docs/스토어.md](../../../../../docs/스토어.md) 11.4): `apps.domain`(모든 공간에서 하나) · `domain_checked_at`. 규칙은 `App.checkDomain`(도메인만 · IP · localhost · 사이트 주소의 도메인 422), 겹침은 `AppEdit.update`가 미리(409) · DB UNIQUE가 끝에. 관리자의 `PATCH`만 바꾸고(기본 도메인은 트랜잭션 전에 platform `HostGate.siteHost`), 대화의 제안은 `AppEdit.apply`가 막는다. 바꾸면 확인을 비운다.
   연결 확인: 앱 도메인의 `GET /.well-known/cairn-domain`(`AppDomainController`, `AppQuery.domainProof`)이 `AppDomainProof`(서버 키 `app-domain` HMAC, "앱 id:도메인")를 내고, 관리자의 브라우저가 그 값을 `POST api/apps/:id/domain/check`로 보내면 `App.confirmDomain`. 서버는 밖으로 요청하지 않는다. `GET api/apps/domains`(누구나): 공개 앱의 확인한 도메인 → 웹이 Host로 앱을 고른다.
-  `BlogModule`이 platform `HostGate`에 앱 도메인 목록(`AppQuery.hosts`, 확인 전 것까지)과 앱 도메인에서 열 경로(사진 · 앱 아이콘 · 연결 확인 값)를 등록한다. 도메인을 바꾸거나 앱을 지우면 `HostGate.stale`. 보관 형식에는 넣지 않는다 (배포마다의 값)
+  `BlogModule`이 platform `HostGate`에 앱 도메인 목록(`AppQuery.hosts`: 도메인 → 앱 id, 확인 전 것까지, `registerApps`)과 앱 도메인에서 열 경로(사진 · 앱 아이콘 · 연결 확인 값의 GET, `openPaths`)를 등록한다. 도메인을 바꾸거나 앱을 지우면 `HostGate.stale`. 보관 형식에는 넣지 않는다 (배포마다의 값)
+  커뮤니티 앱 (스토어 3-1, `App.COMMUNITY`): 회원 · 글 · 댓글은 community 모듈에 있고 앱 행만 여기 있다. 메뉴(`assertHoldsMenus`) · 블로그 글(`assertHoldsPosts`, `PostService.appOf`)을 둘 수 없고, 지우지 않는다(`App.remove` 422, 비공개로 둔다). 시작 메뉴 · RSS 없음, 시작 코드 `starters/community`. community가 공개된 커뮤니티 앱인지 Lookups `community-app`으로 묻는다 (`AppQuery.names`의 kind)
 
 - `app-code/`: 앱 코드 (스토어 1-6, [docs/스토어.md](../../../../../docs/스토어.md) 9장). 앱마다 자기 코드 묶음(HTML · CSS · JS · 그림)을 버전으로 쌓는다(`AppCode`: `apps`의 코드 칸 + 추가만 하는 `app_code_versions`). 묶음 규칙은 `AppCodeBundle`(파일 규칙은 `PageFiles` 그대로 + 크기 · `cairn.json`의 바깥 주소), 코드가 없는 앱은 종류의 시작 코드(`AppStarterGateway`: 저장소 `apps/server/starters/base` 위에 종류 폴더, `AppCodeFiles.starter`).
   공개 앱의 새 버전은 확인 대기(`code_pending_seq`, `blog.app_code.added`의 `pending` → 즉시 알림), 관리자가 `show`로 공개하면 풀린다(`blog.app_code.shown`의 `settled`). 비공개 앱의 새 버전은 바로 보인다.
@@ -83,7 +84,7 @@
 `task.app_code.built` (taskId, runId, appId, note, files): 앱 코드의 새 버전 (스토어 1-6). 두 번 받아도 버전은 하나다 (`UNIQUE(app_id, run_id)`와 `AppCodeRepository.hasRun`). 그사이 다른 버전이 생겼으면 409로 다시 받는다
 
 ## 써도 되는 모듈
-platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄). 거꾸로 앱 이름은 `Lookups`의 `app`으로 준다 (스토어 2단계, `AppQuery.names`: 관리자는 공간의 앱, 그 밖은 공개 앱. task가 대화의 앱을 확인한다)
+platform. vault는 가져오지 않는다 (리팩토링 R3b): 글의 wiki · 스크랩의 세션은 platform `Lookups`의 `wiki` · `session`으로 묻는다 (`modules.json`의 lookups.asks, 경계 검사가 맞춰 봄). 거꾸로 앱 이름은 `Lookups`의 `app`으로 준다 (스토어 2단계, `AppQuery.names`: 관리자는 공간의 앱, 그 밖은 공개 앱. task가 대화의 앱을 확인한다). 커뮤니티 앱은 `community-app`(같은 규칙에 종류 community만, community가 묻는다, 스토어 3-1)
 
 ## 지켜야 할 것
 - 글 → wiki 연결은 blog가 값으로 갖는다 (외래키 없음): 대표 `posts.main_wiki_id`, 참고 `post_wiki_refs`. 발행·수정 때 이벤트로 vault에 알린다

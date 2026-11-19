@@ -145,9 +145,13 @@ export class AppEdit {
       throw new Conflict('이미 쓰는 앱 주소예요');
   }
 
-  /** 시작 메뉴: 이름을 주면 그 이름들의 글 목록 메뉴, 아니면 종류의 기본. 페이지 앱은 없다 */
+  /** 시작 메뉴: 이름을 주면 그 이름들의 글 목록 메뉴, 아니면 종류의 기본. 페이지 앱 · 커뮤니티 앱은 없다 */
   private starters(app: App, names: readonly string[] | null, now: Date): Menu[] {
     if (app.kind === App.PAGE) return [];
+    if (app.kind === App.COMMUNITY) {
+      if (names !== null) app.assertHoldsMenus();
+      return [];
+    }
     if (names === null) {
       const [name, slug, kind] =
         app.kind === 'magazine' ? AppEdit.MAGAZINE_STARTER : AppEdit.BLOG_STARTER;

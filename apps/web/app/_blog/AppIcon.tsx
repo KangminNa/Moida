@@ -6,6 +6,7 @@ const KIND_ICONS: Record<PublicApp['kind'], string> = {
   blog: 'post',
   magazine: 'book',
   page: 'site',
+  community: 'chat',
 };
 
 // 앱 아이콘 (스토어 1-4): 앱마다 올린 그림, 없으면 종류의 선 아이콘. size는 앱 목록의 타일 · 머리의 작은 것

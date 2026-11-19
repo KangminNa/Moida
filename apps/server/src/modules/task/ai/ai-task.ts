@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Task } from '../task/task';
+import { TaskSignin } from '../task/task-signin';
 
 // AI 로그인이 여는 일 (연결 확인 · 웹 로그인). 에이전트도 작업 토큰도 없이 러너가 바로 돌고 (Task.AGENTLESS, request_id는 한 번 쓰는 값),
 // 쌓인 일보다 먼저 돈다. 커넥터 확인(ExternalTool.checkTask)도 같은 우선순위를 쓴다
@@ -16,7 +17,7 @@ export class AiTasks {
     const fields = {
       kind: Task.AI_SIGNIN,
       title: `${tool} 로그인`,
-      payload: { tool, step: Task.SIGNIN_STARTING },
+      payload: TaskSignin.start(tool),
       priority: AiTasks.PRIORITY,
     };
     return Task.open(spaceId, randomUUID(), fields, now);

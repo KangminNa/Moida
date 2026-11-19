@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Actor, BaseTool } from '../../platform';
 import { PLAN_USAGE_STATUS } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
+import { JobService } from './job.service';
 import { type JobStateView, NextJobsView, type ProgressView } from './job.view';
 import { SubmitResultInput } from './submit-result.input';
 import { NextJobsInput, ReleaseJobInput, ReportProgressInput } from './task.input';
-import { TaskService } from './task.service';
 
 // 러너가 쓰는 MCP 도구 (run 권한). 러너는 일을 빌리고, AI CLI에게는 작업 토큰만 준다.
 // 입력 모양을 바꾸면 러너와 스킬을 함께 고친다. 깨지는 변경은 새 도구 이름으로 (API설계 2장).
@@ -59,7 +59,7 @@ export class NextJobsTool extends BaseTool {
     },
   };
 
-  constructor(private readonly tasks: TaskService) {
+  constructor(private readonly tasks: JobService) {
     super();
   }
 
@@ -128,7 +128,7 @@ export class ReportProgressTool extends BaseTool {
     required: ['task_id', 'events'],
   };
 
-  constructor(private readonly tasks: TaskService) {
+  constructor(private readonly tasks: JobService) {
     super();
   }
 
@@ -157,7 +157,7 @@ export class SubmitResultTool extends BaseTool {
     required: ['task_id', 'request_id', 'status'],
   };
 
-  constructor(private readonly tasks: TaskService) {
+  constructor(private readonly tasks: JobService) {
     super();
   }
 
@@ -179,7 +179,7 @@ export class ReleaseJobTool extends BaseTool {
     required: ['task_id', 'reason'],
   };
 
-  constructor(private readonly tasks: TaskService) {
+  constructor(private readonly tasks: JobService) {
     super();
   }
 

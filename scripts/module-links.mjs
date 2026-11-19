@@ -34,6 +34,7 @@ const REGISTRIES = {
     siteHost: ['asks', 'site'],
     siteOrigin: ['asks', 'site'],
     stale: null,
+    openPaths: null,
   },
 };
 

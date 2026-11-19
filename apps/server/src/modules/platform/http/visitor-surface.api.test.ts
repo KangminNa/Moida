@@ -24,6 +24,16 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   // 스토어 3-0: 도메인으로 여는 공개 앱 (웹이 Host로 앱을 고른다). 연결 확인 값은 앱 도메인에서만 (기본 도메인은 404)
   'GET /api/apps/domains': 200,
   'GET /.well-known/cairn-domain': 404,
+  // 스토어 3-1: 커뮤니티 회원 API는 앱 도메인에서만 (기본 도메인에서는 없는 주소)
+  'GET /api/community/me': 404,
+  'GET /api/community/topics': 404,
+  'GET /api/community/topics/:id': 404,
+  // 스토어 3-1c: 커뮤니티 관리는 관리자만 (기본 도메인에서)
+  'GET /api/community/admin/:appId/topics': 403,
+  'GET /api/community/admin/:appId/topics/:id': 403,
+  'GET /api/community/admin/:appId/reports': 403,
+  'GET /api/community/admin/:appId/members': 403,
+  'GET /api/community/admin/:appId/decisions': 403,
   'GET /api/apps/by-slug/:slug': 404,
   'GET /api/apps/by-slug/:slug/icon': 404,
   // 스토어 1-6: 앱 화면 · 앱 코드의 파일은 누구나 (없는 앱 · 비공개 앱은 404)
@@ -122,6 +132,7 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
 /** 경로의 :자리를 채울 값. 모두 없는 것이다 (skill 파일만 실제 이름: 있어도 방문자에게는 닫혀 있어야 한다) */
 const FILL: Readonly<Record<string, string>> = {
   id: '01a1a000-0000-7000-8000-000000000000',
+  appId: '01a1a000-0000-7000-8000-000000000001',
   seq: '1',
   hash: 'a'.repeat(64),
   slug: 'no-such-post',

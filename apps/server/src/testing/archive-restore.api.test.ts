@@ -640,7 +640,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     );
     await refuses(
       swap(exported, 'blog/apps/hidden.yml', (t) => t.replace('kind: magazine', 'kind: shop')),
-      /kind은\(는\) blog · magazine · page 중 하나/,
+      /kind은\(는\) blog · magazine · page · community 중 하나/,
     );
   });
 

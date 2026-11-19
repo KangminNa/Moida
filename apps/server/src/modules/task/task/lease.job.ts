@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseDueJob, SystemActor } from '../../platform';
+import { JobService } from './job.service';
 import { TaskQuery } from './task.query';
-import { TaskService } from './task.service';
 
 // 임대가 끝난 작업을 되돌린다. 러너가 하나도 없어도 세 번 끝난 작업이 실패로 보이게 일꾼이 돈다.
 // 마감 작업 (리팩토링 2단계): 진행 중 작업의 임대가 가장 먼저 끝나는 때에 깬다. 빌리면 상태가 바뀌어(task.task.changed) 다시 잰다.
@@ -11,7 +11,7 @@ export class LeaseJob extends BaseDueJob {
   readonly name = 'task.leases';
 
   constructor(
-    private readonly tasks: TaskService,
+    private readonly tasks: JobService,
     private readonly query: TaskQuery,
   ) {
     super();

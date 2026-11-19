@@ -170,9 +170,12 @@ export class PostService extends EntityService<Post> {
     return menuId === null ? Promise.resolve(null) : new MenuRepository(tx).holder(spaceId, menuId);
   }
 
-  /** 넣을 앱 (공유 잠금: 넣는 동안 지워지지 않게, 이 공간의 앱만). null은 빼기 */
+  /** 넣을 앱 (공유 잠금: 넣는 동안 지워지지 않게, 이 공간의 앱만, 글을 넣는 앱만). null은 빼기 */
   private async appOf(tx: Sql, spaceId: string, appId: string | null): Promise<string | null> {
-    return appId === null ? null : (await new AppRepository(tx).holder(spaceId, appId)).id;
+    if (appId === null) return null;
+    const app = await new AppRepository(tx).holder(spaceId, appId);
+    app.assertHoldsPosts();
+    return app.id;
   }
 
   /** 고쳐 쓰기: 제목·본문이 바뀌었으면 새 판. 주소·wiki 연결을 보내지 않으면 지금 그대로 */

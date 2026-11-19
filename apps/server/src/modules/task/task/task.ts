@@ -12,7 +12,6 @@ import {
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
-import { Engines } from '../ai/engines';
 import { TurnDeliver } from '../chat/turn-deliver.policy';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
@@ -34,6 +33,7 @@ import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
 import { type TaskKind, TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
+import { TaskSignin } from './task-signin';
 import type { TeamRoster } from './team-roster';
 
 // 작업 하나. 러너가 임대로 빌려 가고, 에이전트가 결재를 올리고, 결재 뒤 실행 결과로 끝난다.
@@ -93,11 +93,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 칸 수가 곧 이 일의 병렬 수라서 칸에 다른 일을 넣지 않는다
    */
   static readonly SANDBOXED = TaskKinds.SANDBOXED;
-  /** 웹 로그인의 단계 (payload.step) */
-  static readonly SIGNIN_STARTING = 'starting';
-  static readonly SIGNIN_OPEN_URL = 'open_url';
-  static readonly SIGNIN_WAITING_CODE = 'waiting_code';
-  static readonly SIGNIN_VERIFYING = 'verifying';
   static readonly GENERAL: TaskKind = 'general';
   static readonly WAIT_APPROVAL = 'approval';
   static readonly WAIT_SUBTASKS = 'subtasks';
@@ -108,22 +103,13 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * browse는 대상(browser_site)이 있으면 그 사이트, 없으면 둘러보기. 맡기는 쪽도 비공개를 읽지 못해야 한다 (DelegationPolicy)
    */
   static readonly DELEGABLE = TaskKinds.DELEGABLE;
-  /** 위임 한도: 깊이(주인이 맡긴 작업이 0), 작업 하나가 위임하는 횟수, 한 번에, 작업 하나에 */
-  static readonly DEPTH_MAX = 3;
-  static readonly ROUNDS_MAX = 3;
-  static readonly DELEGATE_AT_ONCE = 5;
-  static readonly SUBTASKS_MAX = 10;
   /** 실행 기록의 종류 */
   static readonly LOG_READ = 'read';
   static readonly LOG_WRITE = 'write';
   static readonly LOG_RESULT = 'result';
   static readonly LOG_ERROR = 'error';
-  /** 연결 확인은 쌓인 일보다 먼저 돈다 */
-  private static readonly AI_TEST_PRIORITY = 1000;
-  private static readonly AI_TEST_PROMPT = 'ok라고만 답하세요.';
   /** 실패 이벤트에 싣는 이유의 길이 (알림 본문) */
   private static readonly EVENT_ERROR_MAX = 300;
-  /** 깨어난 위 작업에게 보내는 하위 작업 결과의 길이 */
   private static readonly SKILLS = TaskKinds.SKILLS;
   /** 이 종류의 일을 맡으려면 에이전트에게 있어야 하는 권한. 없는 종류는 누구나 맡는다 (세션은 기본이 비공개라 정리하려면 비공개까지 읽어야 한다) */
   static readonly SCOPES = TaskKinds.SCOPES;
@@ -175,9 +161,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** 작업 상세에 보일 payload. 웹 로그인의 코드는 암호문이어도 내보내지 않는다 */
   static shownPayload(kind: string, payload: unknown): unknown {
-    if (kind !== Task.AI_SIGNIN || typeof payload !== 'object' || payload === null) return payload;
-    const { code: _sealed, ...rest } = payload as Record<string, unknown>;
-    return rest;
+    return kind === Task.AI_SIGNIN ? TaskSignin.shown(payload) : payload;
   }
 
   /** delegate_task의 답: 맡긴 하위 작업들. 위 작업은 하위 작업을 기다린다 */
@@ -225,16 +209,12 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
 
   /** 웹 로그인의 도구 (claude · codex). 웹 로그인이 아니면 null */
   get signinTool(): string | null {
-    return this.is(Task.AI_SIGNIN) ? String(this.payload.tool) : null;
+    return this.is(Task.AI_SIGNIN) ? TaskSignin.toolOf(this.payload) : null;
   }
 
-  /**
-   * 사람이 붙여 넣은 코드 (암호화한 값). 로그인이 끝날 때까지 물을 때마다 같은 것을 준다:
-   * 응답을 잃어도 러너가 다시 받을 수 있게. 러너는 한 번만 쳐 넣는다. 끝나면 지운다 (forgetSignin)
-   */
+  /** 사람이 붙여 넣은 코드 (암호화한 값, TaskSignin.codeOf) */
   get signinCode(): string | null {
-    const code = this.payload.code;
-    return typeof code === 'string' ? code : null;
+    return TaskSignin.codeOf(this.payload);
   }
 
   /** 코드 작업이 고치는 자리 (저장소 + 경로). code 작업이 아니거나 저장소 정보가 없으면 null */
@@ -292,30 +272,16 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return needed === undefined || needed.every((scope) => scopes.includes(scope));
   }
 
-  /**
-   * 러너가 로그인 주소를 찾았다. 코드를 붙여 넣는 엔진(Claude)은 이제 사람이 브라우저의 코드를 붙여 넣을 차례고,
-   * 기기 코드 엔진(Codex)은 사람이 주소에서 코드를 입력하면 CLI가 스스로 끝난다 (엔진 목록의 login.flow)
-   */
+  /** 러너가 로그인 주소를 찾았다 (TaskSignin.withUrl) */
   showSignin(url: string, userCode: string | null): void {
     this.assertSigninRunning();
-    const payload = this.payload;
-    // 주소는 한 번만 정한다. 러너가 같은 것을 다시 보내면(응답을 못 받은 재시도) 그대로 둔다
-    if (payload.step !== Task.SIGNIN_STARTING) {
-      if (payload.url === url && (payload.userCode ?? null) === userCode) return;
-      throw new Conflict('이미 로그인 주소를 알렸어요');
-    }
-    const step = Engines.of(this.signinTool ?? '').login.pastesCode
-      ? Task.SIGNIN_WAITING_CODE
-      : Task.SIGNIN_OPEN_URL;
-    this.put('payload', { ...payload, url, userCode, step });
+    this.putSignin(TaskSignin.withUrl(this.payload, url, userCode));
   }
 
   /** 사람이 붙여 넣은 코드를 받는다 (암호화한 값). 러너가 가져갈 때까지만 둔다 */
   acceptSigninCode(sealedCode: string): void {
     this.assertSigninRunning();
-    if (this.payload.step !== Task.SIGNIN_WAITING_CODE)
-      throw new RuleViolation('코드를 붙여 넣을 차례가 아니에요');
-    this.put('payload', { ...this.payload, code: sealedCode, step: Task.SIGNIN_VERIFYING });
+    this.putSignin(TaskSignin.withCode(this.payload, sealedCode));
   }
 
   /**
@@ -362,8 +328,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.holdLease(runnerId, new Date(now.getTime() + Task.LEASE_MS));
     this.put('attempts', this.row.attempts + 1);
     // 웹 로그인을 다시 빌리면(앞 러너가 사라짐) 앞 시도의 주소와 코드는 쓸모가 없다
-    if (this.is(Task.AI_SIGNIN) && this.payload.step !== Task.SIGNIN_STARTING)
-      this.put('payload', { tool: this.payload.tool, step: Task.SIGNIN_STARTING });
+    if (this.is(Task.AI_SIGNIN)) this.putSignin(TaskSignin.restarted(this.payload));
   }
 
   /**
@@ -405,62 +370,26 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return `delegate:${this.id}:${requestId}`;
   }
 
-  /**
-   * 이번에 count개를 맡길 수 있는가. 이 작업의 에이전트가 살아 있는 임대로 일하는 중이어야 하고,
-   * 한 번에 DELEGATE_AT_ONCE개, 작업 하나에 SUBTASKS_MAX개(made는 이미 맡긴 수), 깊이 DEPTH_MAX, 라운드 ROUNDS_MAX까지
-   */
+  /** 이번에 count개를 맡길 수 있는가. 이 작업의 에이전트가 살아 있는 임대로 일하는 중이어야 한다. 한도는 DelegationPolicy */
   assertCanDelegate(agentId: string, count: number, made: number, now: Date): void {
     const r = this.row;
     if (r.agent_id !== agentId) throw new Forbidden(Actor.AGENT, '이 에이전트의 작업이 아니에요');
     if (r.status !== Task.RUNNING || !this.leaseAlive(now))
       throw new Conflict(`실행 중인 작업이 아니에요 (${r.status})`);
-    if (count < 1 || count > Task.DELEGATE_AT_ONCE)
-      throw new RuleViolation(`한 번에 1~${Task.DELEGATE_AT_ONCE}개를 맡길 수 있어요 (한도)`);
-    if (made + count > Task.SUBTASKS_MAX)
-      throw new RuleViolation(
-        `작업 하나가 맡길 수 있는 하위 작업은 ${Task.SUBTASKS_MAX}개예요 (한도, 이미 ${made}개)`,
-      );
-    if (r.depth + 1 > Task.DEPTH_MAX)
-      throw new RuleViolation(`위임은 ${Task.DEPTH_MAX}단계까지예요 (한도)`);
-    if (r.rounds + 1 > Task.ROUNDS_MAX)
-      throw new RuleViolation(
-        `작업 하나가 위임할 수 있는 횟수는 ${Task.ROUNDS_MAX}번이에요 (한도)`,
-      );
+    DelegationPolicy.assertLimits(r, count, made);
   }
 
-  /**
-   * 하위 작업 하나를 만든다. 받는 쪽은 manager의 바로 아래 팀원이어야 하고, 그 에이전트의 권한으로 할 수 있는 종류여야 한다 (DelegationPolicy).
-   * 하위 작업은 이 작업의 목표와 우선순위를 물려받고, 담당은 worker로 정해진다.
-   * code는 code 작업에서만 맡긴다: 이 작업의 저장소 · 명령을 물려받고 경로(paths)는 이 작업의 경로 안으로 좁힌다 (CodeScope).
-   * 참조(refs)는 이 작업의 참조 가운데 고른 것만 넘긴다 (TaskRefs.handOn). tainted: 이 일의 대화가 비공개를 읽었다 (브라우저 일 막기)
-   */
+  /** 하위 작업 하나를 만든다. 받는 쪽 · 종류 · 물려주는 것은 DelegationPolicy.subtask */
   subtask(manager: Agent, worker: Agent | null, order: SubtaskOrder, now: Date, tainted = false) {
-    const { fields, paths, refs } = order;
-    const { kind } = fields;
-    const needs = Task.SCOPES[kind] ?? [];
-    DelegationPolicy.assert(manager, worker, kind, Task.DELEGABLE, needs, tainted);
-    const r = this.row;
-    return Task.open(
-      r.space_id,
-      this.subtaskRequestId(order.requestId),
-      {
-        ...fields,
-        agent_id: worker.id,
-        payload: {
-          delegatedBy: this.id,
-          ...CodeScope.forSubtask(kind, paths, this.codeScope),
-          ...TaskRefs.of(r.payload).handOn(refs, worker).payload,
-          ...(order.deliver ? { deliver: order.deliver } : {}),
-          // 앱 코드를 고치는 make 일 (스토어 1-6b): 어느 앱인지만 물려준다. make 일이 아니면 MakeOrder가 막는다
-          ...(order.appId ? { appCode: { appId: order.appId } } : {}),
-        },
-        priority: r.priority,
-        goal_id: r.goal_id,
-        parent_id: this.id,
-        depth: r.depth + 1,
-      },
-      now,
+    const fields = DelegationPolicy.subtask(
+      this.row,
+      this.codeScope,
+      manager,
+      worker,
+      order,
+      tainted,
     );
+    return Task.open(this.row.space_id, this.subtaskRequestId(order.requestId), fields, now);
   }
 
   /**
@@ -629,7 +558,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
       goals.map((g) => g.title),
       roster.members(agent),
       children.map((c) => c.resultView(roster.nameOf(c.row.agent_id))),
-      Math.max(0, Task.ROUNDS_MAX - this.row.rounds),
+      DelegationPolicy.roundsLeft(this.row),
       skill,
     );
   }
@@ -718,10 +647,14 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.forgetSignin();
   }
 
-  /** 끝나거나 대기열로 돌아간 웹 로그인에는 주소도 코드도 남기지 않는다. 어느 도구였는지만 */
+  /** 끝나거나 대기열로 돌아간 웹 로그인에는 주소도 코드도 남기지 않는다 (TaskSignin.forgotten) */
   private forgetSignin(): void {
-    if (this.is(Task.AI_SIGNIN) && Object.keys(this.payload).some((key) => key !== 'tool'))
-      this.put('payload', { tool: this.payload.tool });
+    if (this.is(Task.AI_SIGNIN)) this.putSignin(TaskSignin.forgotten(this.payload));
+  }
+
+  /** 웹 로그인 payload의 다음 모습. null이면 그대로 */
+  private putSignin(next: Readonly<Record<string, unknown>> | null): void {
+    if (next !== null) this.put('payload', next);
   }
 
   private assertWaitingFor(reason: string): void {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseTool } from '../../platform';
 import { CodeScope } from './code-scope';
+import { DelegationPolicy } from './delegation.policy';
 import type { DelegatedView } from './job.view';
 import { Task } from './task';
 import { DelegateTaskInput, SubtaskOrder } from './task.input';
@@ -21,7 +22,7 @@ export class DelegateTaskTool extends BaseTool {
       subtasks: {
         type: 'array',
         minItems: 1,
-        maxItems: Task.DELEGATE_AT_ONCE,
+        maxItems: DelegationPolicy.DELEGATE_AT_ONCE,
         items: {
           type: 'object',
           properties: {

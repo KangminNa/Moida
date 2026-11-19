@@ -10,6 +10,7 @@ export {
   AgentActor,
   ApprovedActor,
   DeviceActor,
+  MemberActor,
   OwnerActor,
   SettingActor,
   SystemActor,
