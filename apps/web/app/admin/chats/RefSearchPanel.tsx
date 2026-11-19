@@ -47,7 +47,14 @@ export function RefSearchPanel({ onPick }: { onPick: (ref: Omit<ChatRef, 'privat
               type="button"
               className="ref-result"
               onClick={() =>
-                onPick({ kind: i.kind, id: i.id, title: i.title, url: null, browser: false })
+                onPick({
+                  kind: i.kind,
+                  id: i.id,
+                  title: i.title,
+                  url: null,
+                  browser: false,
+                  image: false,
+                })
               }
             >
               <span className="pill">{REF_KINDS[i.kind] ?? i.kind}</span>

@@ -55,6 +55,8 @@ function refsOf(raw: unknown) {
     private: r.private === true,
     url: typeof r.url === 'string' ? r.url : null,
     browser: r.browser === true,
+    /** 사진인 결과물 (화면이 작은 사진으로 그린다) */
+    image: r.image === true,
   }));
 }
 
@@ -77,8 +79,7 @@ function tokensOf(rows: readonly ChatTokenRow[]) {
   >();
   for (const r of rows) {
     const one = agents.get(r.agent_id) ?? { agentId: r.agent_id, name: r.agent, tokens: 0 };
-    one.tokens += Number(r.tokens);
-    agents.set(r.agent_id, one);
+    agents.set(r.agent_id, { ...one, tokens: one.tokens + Number(r.tokens) });
   }
   const list = [...agents.values()].sort((a, b) => b.tokens - a.tokens);
   return { tokens: list.reduce((sum, a) => sum + a.tokens, 0), agents: list };

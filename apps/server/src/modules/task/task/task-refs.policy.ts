@@ -3,6 +3,7 @@ import type { Agent } from '../agent/agent';
 
 /**
  * 참조 한 줄 (회차 · 하위 작업의 payload.refs). 보관함의 것은 kind · id · title · private, 주소는 kind url · url · browser.
+ * image: 사진인 결과물 (대화에 사진 넣기, 2026-11-19): 러너가 작업 폴더로 받아 AI CLI가 직접 본다.
  * 서버가 확인해 적은 값이라 러너는 그대로 지시문에 싣는다 (읽는 도구는 종류로 고른다)
  */
 export type TaskRef = {
@@ -12,6 +13,7 @@ export type TaskRef = {
   private: boolean;
   url: string | null;
   browser: boolean;
+  image: boolean;
 };
 
 /** 관리자가 고른 참조 하나 (입력의 모양만 검사한 것) */
@@ -32,6 +34,8 @@ export type RefFound = {
 // 위임하면 거절한다 (조용히 빼지 않는다). 위임은 위 작업의 참조 가운데서만 고른다 (AI가 허락을 만들 수 없다)
 export class TaskRefs {
   static readonly MAX = 10;
+  /** 한 메시지의 사진 (참조 MAX 안에서). 사진은 AI의 토큰을 많이 쓴다 */
+  static readonly PHOTOS_MAX = 4;
   /** 보관함의 종류 (LibraryQuery에 등록된 종류) */
   static readonly KINDS: readonly string[] = ['wiki', 'session', 'post', 'page', 'output', 'link'];
   static readonly URL = 'url';
@@ -48,8 +52,15 @@ export class TaskRefs {
     return new TaskRefs(Array.isArray(refs) ? (refs as TaskRef[]) : []);
   }
 
-  /** 고른 참조를 보관함의 줄로 확인한다. 없거나 휴지통에 있는 것이 있으면 RuleViolation */
-  static resolve(picks: readonly RefPick[], found: readonly RefFound[]): TaskRefs {
+  /**
+   * 고른 참조를 보관함의 줄로 확인한다. 없거나 휴지통에 있는 것이 있으면 RuleViolation.
+   * images: 사진인 결과물의 id (OutputQuery.imageIds). 사진은 PHOTOS_MAX장까지
+   */
+  static resolve(
+    picks: readonly RefPick[],
+    found: readonly RefFound[],
+    images: ReadonlySet<string> = new Set(),
+  ): TaskRefs {
     if (picks.length > TaskRefs.MAX) throw new RuleViolation(`참조는 ${TaskRefs.MAX}개까지예요`);
     const lines = picks.map((p): TaskRef => {
       if (p.kind === TaskRefs.URL)
@@ -60,6 +71,7 @@ export class TaskRefs {
           private: false,
           url: p.url,
           browser: p.browser,
+          image: false,
         };
       const row = found.find((f) => f.id === p.id && f.kind === p.kind);
       if (!row) throw new RuleViolation('없거나 휴지통에 있는 참조예요');
@@ -77,16 +89,25 @@ export class TaskRefs {
         private: hidden,
         url: outside,
         browser: false,
+        image: row.kind === 'output' && images.has(row.id),
       };
     });
-    return new TaskRefs(
-      lines.filter((l, i) => lines.findIndex((o) => TaskRefs.key(o) === TaskRefs.key(l)) === i),
+    const unique = lines.filter(
+      (l, i) => lines.findIndex((o) => TaskRefs.key(o) === TaskRefs.key(l)) === i,
     );
+    if (unique.filter((l) => l.image).length > TaskRefs.PHOTOS_MAX)
+      throw new RuleViolation(`사진은 한 번에 ${TaskRefs.PHOTOS_MAX}장까지예요`);
+    return new TaskRefs(unique);
   }
 
   /** 보관함에서 확인할 id (주소가 아닌 것) */
   static idsOf(picks: readonly RefPick[]): string[] {
     return picks.flatMap((p) => (p.kind === TaskRefs.URL || !p.id ? [] : [p.id]));
+  }
+
+  /** 사진인지 물을 결과물의 id */
+  static outputIdsOf(picks: readonly RefPick[]): string[] {
+    return picks.flatMap((p) => (p.kind === 'output' && p.id ? [p.id] : []));
   }
 
   get empty(): boolean {

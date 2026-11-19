@@ -121,7 +121,14 @@ export function RefPicker({
             className="cta small fit"
             disabled={!goodUrl}
             onClick={() => {
-              onPick({ kind: 'url', id: null, title: url.trim(), url: url.trim(), browser });
+              onPick({
+                kind: 'url',
+                id: null,
+                title: url.trim(),
+                url: url.trim(),
+                browser,
+                image: false,
+              });
               setUrl('');
               setBrowser(false);
             }}

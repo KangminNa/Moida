@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
 import { Database, OutboxWorker } from '../../platform';
@@ -487,6 +487,55 @@ describe('대화 입력창 (2026-11-15 B): 참조 · 모델', () => {
       refs: [{ kind: 'wiki', id: randomUUID() }],
     });
     assert.equal(missing.status, 422, missing.text);
+  });
+
+  test('사진인 결과물은 참조에 image가 붙어 회차에 실리고, 한 번에 5장이면 422 (대화에 사진 넣기)', async () => {
+    const upload = async (name: string, body: Buffer) => {
+      const res = await fetch(`${api.baseUrl}/api/outputs/files?name=${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream', cookie: owner.header },
+        body,
+      });
+      assert.equal(res.status, 201, await res.clone().text());
+      return (await res.json()) as Json;
+    };
+    const png = () =>
+      Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        randomBytes(32),
+      ]);
+    const photo = await upload('사진.png', png());
+    const sheet = await upload('메모.csv', Buffer.from('가,나\n'));
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '이 사진 봐 줘',
+        refs: [
+          { kind: 'output', id: photo.id },
+          { kind: 'output', id: sheet.id },
+        ],
+      }),
+      201,
+    );
+    const turn = (await detail(chat.id)).turns[0];
+    assert.deepEqual(
+      turn.refs.map((r: Json) => [r.title, r.image]),
+      [
+        ['사진.png', true],
+        ['메모.csv', false],
+      ],
+    );
+    assert.equal((await task(turn.taskId)).payload.refs[0].image, true);
+
+    const five = [];
+    for (let n = 1; n <= 5; n++) five.push(await upload(`사진${n}.png`, png()));
+    const many = await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      message: '사진 다섯 장',
+      refs: five.map((p) => ({ kind: 'output', id: p.id })),
+    });
+    assert.equal(many.status, 422, many.text);
+    assert.match(many.text, /사진은 한 번에 4장까지예요/);
   });
 
   test('일하는 중에 보낸 참조는 422 (덧붙인 말은 회차가 아니다)', async () => {

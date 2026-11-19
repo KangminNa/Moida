@@ -31,7 +31,14 @@ export function ChatNewPanel() {
       ),
     );
     if (!reply?.ok) return null;
-    return { kind: 'output', id: reply.data.id, title: file.name, url: null, browser: false };
+    return {
+      kind: 'output',
+      id: reply.data.id,
+      title: file.name,
+      url: null,
+      browser: false,
+      image: reply.data.kind === 'image',
+    };
   }
 
   async function start(body: ChatMessageBody) {

@@ -104,3 +104,55 @@ describe('비공개 참조와 받는 에이전트', () => {
     assert.deepEqual(open.handOn([POST], agent('제작', ['make'])).readIds, [POST], '공개는 넘긴다');
   });
 });
+
+describe('사진 (대화에 사진 넣기, 2026-11-19)', () => {
+  const PHOTOS = [1, 2, 3, 4, 5].map((n) => `0190a000-0000-7000-8000-00000000010${n}`);
+  const found = PHOTOS.map((id, i) => ({
+    kind: 'output',
+    id,
+    title: `사진${i + 1}.png`,
+    visibility: 'private',
+    url: null,
+  }));
+  const all = [...FOUND, ...found];
+
+  test('사진인 결과물에만 image, 위임해도 그대로 간다', () => {
+    const refs = TaskRefs.resolve(
+      [
+        pick('output', PHOTOS[0] ?? ''),
+        pick('output', OUTPUT),
+        pick('url', null, 'https://a.example'),
+      ],
+      all,
+      new Set([PHOTOS[0] ?? '']),
+    );
+    assert.deepEqual(
+      refs.lines.map((l) => [l.title, l.image]),
+      [
+        ['사진1.png', true],
+        ['report.pdf', false],
+        ['https://a.example', false],
+      ],
+    );
+    const handed = TaskRefs.of(refs.payload).handOn([PHOTOS[0] ?? ''], agent('작가', ['write']));
+    assert.equal(handed.lines[0]?.image, true);
+  });
+
+  test('사진은 한 번에 4장까지 (같은 사진을 두 번 골라도 한 장)', () => {
+    const images = new Set(PHOTOS);
+    const four = PHOTOS.slice(0, 4).map((id) => pick('output', id));
+    assert.equal(TaskRefs.resolve(four, all, images).lines.length, 4);
+    assert.doesNotThrow(() =>
+      TaskRefs.resolve([...four, pick('output', PHOTOS[0] ?? '')], all, images),
+    );
+    assert.throws(
+      () =>
+        TaskRefs.resolve(
+          PHOTOS.map((id) => pick('output', id)),
+          all,
+          images,
+        ),
+      /사진은 한 번에 4장까지예요/,
+    );
+  });
+});

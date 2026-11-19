@@ -129,7 +129,14 @@ export function ChatThreadPanel({ id }: { id: string }) {
       ),
     );
     if (!reply?.ok) return null;
-    return { kind: 'output', id: reply.data.id, title: file.name, url: null, browser: false };
+    return {
+      kind: 'output',
+      id: reply.data.id,
+      title: file.name,
+      url: null,
+      browser: false,
+      image: reply.data.kind === 'image',
+    };
   }
 
   const tool = lead.data?.lead?.id === d.chat.agentId ? lead.data.lead.tool : null;
