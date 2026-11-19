@@ -611,6 +611,56 @@ describe('대화에서 맡기기 (스토어 1-6b)', () => {
     assert.deepEqual([(await code(app)).current, (await code(app)).pending], [1, null]);
   });
 
+  test('비공개 앱: 받을 것이 앱 코드인 회차는 make 일이 끝나면 다시 맡기지 않는다 (승인 없이 바로 보인다, 스토어 2-6)', async () => {
+    // 대화로 만든 페이지 앱은 페이지 없이 생기고 화면은 앱 코드다
+    const app = await newApp(`code-private-${mark}`, 'page');
+    const member = ok(
+      await api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: `일정표 화면 ${mark}`,
+        tool: 'claude',
+        scopes: ['make'],
+      }),
+      201,
+    );
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '여행 일정표 화면을 만들어 줘',
+      }),
+      201,
+    );
+    await drain();
+    const turn = await turnOf(chat.id);
+    await mcp(String(turn.run_token), 'set_deliver', { deliver: 'app_code', note: '앱 화면' });
+    const delegated = await mcp(String(turn.run_token), 'delegate_task', {
+      subtasks: [
+        {
+          request_id: randomUUID(),
+          to_agent_id: member.id,
+          kind: 'make',
+          title: '일정표',
+          instruction: '사흘 일정표 화면',
+          app_id: app.id,
+        },
+      ],
+    });
+    const subtaskId = String(((delegated.subtasks as Json[])[0] as Json).task_id);
+    await lease(subtaskId);
+    await deliver(subtaskId, { 'index.html': '<main>{{app.name}} 일정표</main>' });
+    assert.deepEqual(
+      [(await code(app)).current, (await code(app)).pending],
+      [1, null],
+      '비공개 앱의 새 버전은 바로 보인다',
+    );
+
+    await finish(await turnOf(chat.id));
+    await drain();
+    const detail = ok(await api.get(`/api/chats/${chat.id}`, owner));
+    assert.equal((detail.turns as Json[]).length, 1, '받을 것이 있어 다시 맡기지 않는다');
+    assert.equal(detail.card, null, '카드에 실을 승인이 없다');
+  });
+
   test('결과 카드의 공개 승인은 그사이 더 새 버전이 보이면 앞 버전으로 되돌리지 않는다', async () => {
     const app = await publish(await newApp(`code-chat2-${mark}`));
     for (const n of ['1', '2']) {

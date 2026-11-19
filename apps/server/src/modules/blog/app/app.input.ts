@@ -48,7 +48,7 @@ function descriptionOf(f: RequestFields, body: Record<string, unknown>): string 
 
 /**
  * POST /api/apps. 같은 requestId는 처음 만든 앱을 돌려준다.
- * menus: 시작 메뉴(글 목록)의 이름. 보내지 않으면 종류의 기본(블로그: 글, 매거진: 호). 페이지 앱은 pageId가 꼭 있다
+ * menus: 시작 메뉴(글 목록)의 이름. 보내지 않으면 종류의 기본(블로그: 글, 매거진: 호). 페이지 앱의 pageId는 넣을 페이지 (없으면 화면은 앱 코드만, 스토어 2-6)
  */
 export class CreateAppInput extends BaseRequest {
   static readonly MENUS_MAX = 5;

@@ -22,16 +22,28 @@ import { AppRepository } from './app.repository';
 export class AppEdit {
   /**
    * 대화로 바꾸는 앱 (get_settings apps · propose_setting app). 종류 · 시작 메뉴는 만들 때만, 공개 여부 · 첫 화면 고정은 없다.
-   * 운영 팀장 · 편집 방침은 스토어 2단계 (팀장 확인은 AppService가 트랜잭션 전에)
+   * 운영 팀장 · 편집 방침은 스토어 2단계 (팀장 확인은 AppService가 트랜잭션 전에). new_team(true, 만들 때만, 스토어 2-6)은
+   * 승인 뒤 앱 운영 팀을 새로 만들어 운영 팀장으로 넣는다 (AppService가 platform AgentDirectory.teamFor로 부탁한다)
    */
   static readonly SETTING: SettingShape = {
     setting: 'app',
     list: 'apps',
     ops: ['create', 'edit'],
-    fields: ['name', 'slug', 'kind', 'description', 'sort', 'menus', 'agent_id', 'policy'],
+    fields: [
+      'name',
+      'slug',
+      'kind',
+      'description',
+      'sort',
+      'menus',
+      'agent_id',
+      'policy',
+      'new_team',
+    ],
     target: 'id',
     versioned: true,
-    grants: [],
+    // 앱 운영 팀 새로 만들기는 에이전트 넷을 더한다 (스토어 2-6)
+    grants: ['new_team'],
   };
   /** 종류마다 시작 메뉴 (menus를 보내지 않았을 때): 블로그는 글 목록, 매거진은 호 목록 */
   private static readonly BLOG_STARTER = ['글', 'posts', Menu.POSTS] as const;
@@ -54,10 +66,12 @@ export class AppEdit {
     const app = App.open(this.spaceId, req.kind, req.fields, now);
     await this.assertFree(app.slug, null);
     if (app.kind === App.PAGE) {
-      if (req.pageId === null) throw new RuleViolation('페이지 앱은 넣을 페이지가 있어야 해요');
       if (req.menus !== null) throw new RuleViolation('페이지 앱에는 메뉴를 둘 수 없어요');
-      this.page = await new PageRepository(this.tx).lockForApp(this.spaceId, req.pageId);
-      this.page.moveToApp(app.id, now);
+      // 페이지 없이도 만든다: 화면은 앱 코드다 (스토어 2-6). 주면 그 페이지를 앱에 넣는다
+      if (req.pageId !== null) {
+        this.page = await new PageRepository(this.tx).lockForApp(this.spaceId, req.pageId);
+        this.page.moveToApp(app.id, now);
+      }
     } else if (req.pageId !== null) {
       throw new RuleViolation('페이지는 페이지 앱에만 넣어요');
     }
@@ -75,11 +89,27 @@ export class AppEdit {
     return app;
   }
 
-  /** 설정 바꾸기 하나: body는 get_settings와 같은 칸, key는 만들기의 requestId */
-  apply(change: SettingChangeInput, now: Date): Promise<App> {
-    const { kind, menus, agent_id: agentId, ...rest } = change.body;
+  /** 승인한 앱 만들기가 앱 운영 팀을 새로 만들자고 했는가 (스토어 2-6). 모양은 apply가 본다 */
+  static wantsTeam(change: SettingChangeInput): boolean {
+    return change.op === 'create' && change.body.new_team === true;
+  }
+
+  /**
+   * 설정 바꾸기 하나: body는 get_settings와 같은 칸, key는 만들기의 requestId.
+   * leader: 승인 뒤 적용에서 new_team으로 만든 팀의 팀장 (미리 해 보기는 null: 팀장 없이 지나 본다)
+   */
+  apply(change: SettingChangeInput, now: Date, leader: string | null = null): Promise<App> {
+    const { kind, menus, agent_id: chosen, new_team: newTeam, ...rest } = change.body;
     if ('visibility' in rest || 'home' in rest)
       throw new RuleViolation('공개 여부 · 첫 화면은 관리자가 앱 관리에서 바꿔요');
+    if (newTeam !== undefined) {
+      if (change.op !== 'create')
+        throw new RuleViolation('운영 팀 새로 만들기는 앱을 만들 때만 해요');
+      if (newTeam !== true) throw new RuleViolation('new_team은 true만 받아요');
+      if (chosen !== undefined && chosen !== null)
+        throw new RuleViolation('운영 팀장을 고르거나 새로 만들거나 하나만 해요');
+    }
+    const agentId = leader ?? chosen;
     const fields = { ...rest, ...(agentId === undefined ? {} : { agentId }) };
     if (change.op === 'create')
       return this.create(

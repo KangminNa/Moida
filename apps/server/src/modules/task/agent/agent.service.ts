@@ -1,17 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import {
   type Actor,
+  ApprovedActor,
   Database,
   EntityService,
+  Forbidden,
   Idempotency,
   NotFound,
   RuleViolation,
   SettingActor,
   type SettingChangeInput,
+  SettingKinds,
   SettingOutcome,
   type Sql,
   type VersionInput,
 } from '../../platform';
+import { Engines } from '../ai/engines';
+import { ApprovalQuery } from '../approval/approval.query';
 import { SettingChanges } from '../setting-change/setting-change.policy';
 import { Agent } from './agent';
 import type {
@@ -36,6 +41,7 @@ export class AgentService extends EntityService<Agent> {
   constructor(
     db: Database,
     private readonly agents: AgentQuery,
+    private readonly approvals: ApprovalQuery,
   ) {
     super(db);
   }
@@ -108,16 +114,41 @@ export class AgentService extends EntityService<Agent> {
    */
   async createTeam(actor: Actor, req: CreateAgentTeamInput): Promise<readonly Agent[]> {
     actor.assertOwner();
+    return this.build(actor, actor.requireSpace(), req.team, req.tool, req.requestId);
+  }
+
+  /**
+   * 승인한 앱 만들기의 앱 운영 팀 (스토어 2-6, platform AgentDirectory.teamFor ← blog AppService.applySetting).
+   * 그 결재(new_team: true)의 요청자만. requestId가 결재 id라 같은 결재가 다시 와도 팀은 하나. 팀장(맨 위)을 돌려준다
+   */
+  async createAppTeam(actor: Actor): Promise<Agent> {
+    if (!(actor instanceof ApprovedActor) || !(await this.approvals.asksAppTeam(actor)))
+      throw new Forbidden(SettingKinds.ACTION);
     const spaceId = actor.requireSpace();
-    const team = AgentTeams.of(req.team);
+    const team = await this.build(
+      actor,
+      spaceId,
+      AgentTeams.APP,
+      Engines.preferred(),
+      actor.approvalId,
+    );
+    const leader = team.find((a) => a.reportsTo === null);
+    if (!leader) throw new Error('앱 운영 팀 템플릿에 맨 위 구성원이 없어요');
+    return leader;
+  }
+
+  /** 템플릿 key의 팀을 만든다 (관리자의 팀 만들기 · 승인한 앱 만들기). 같은 요청자 · requestId면 처음 만든 팀 */
+  private build(
+    actor: Actor,
+    spaceId: string,
+    key: string,
+    tool: string,
+    requestId: string,
+  ): Promise<readonly Agent[]> {
+    const team = AgentTeams.of(key);
     return this.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      const once = new Idempotency(
-        tx,
-        actor.id ?? spaceId,
-        req.requestId,
-        AgentService.CREATE_TEAM,
-      );
+      const once = new Idempotency(tx, actor.id ?? spaceId, requestId, AgentService.CREATE_TEAM);
       const before = await once.previous();
       if (before)
         return Promise.all((before.agentIds as string[]).map((id) => agents.load(spaceId, id)));
@@ -130,7 +161,7 @@ export class AgentService extends EntityService<Agent> {
           {
             name: m.name,
             role: m.role,
-            tool: req.tool,
+            tool,
             scopes: m.scopes,
             approval_actions: m.approval_actions,
           },

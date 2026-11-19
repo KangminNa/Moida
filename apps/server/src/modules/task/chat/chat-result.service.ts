@@ -71,11 +71,15 @@ export class ChatResultService extends BaseService {
             actions.map((a) => ({ action: a.action, targetId: a.targetId })),
           )
         : [];
+      // 비공개 앱의 앱 코드는 결재 없이 보여서 이번 회차의 끝난 앱 코드 일을 본다 (스토어 2-6)
+      const order = ChatResult.countsMade(deliver);
+      const orders = order !== null && (await chats.madeAppCode(chat)) ? [order] : [];
       const missing =
         ChatResult.missing(
           deliver,
           actions.map((a) => a.action),
           made.map((o) => o.name),
+          orders,
         ) ?? (problems.length > 0 ? deliver : null);
       const review =
         turn.review_status === Task.DONE
