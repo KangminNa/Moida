@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { TooLarge } from '../base/errors';
 import { Trace } from '../base/trace';
+import { HostGate } from './host-gate';
 import type { HttpRequest } from './http-types';
 import { type RequestLogSink, RequestTrace } from './request-trace';
 
@@ -9,6 +10,7 @@ import { type RequestLogSink, RequestTrace } from './request-trace';
 // - 본문을 읽은 뒤 그 번호 안에서 다음 단계를 부른다 (Trace, 리팩토링 R1): 이 요청이 남긴 이벤트가 같은 번호로 일꾼까지 간다.
 //   본문 읽기보다 앞에서 걸면 읽기의 콜백에서 번호가 끊길 수 있어 뒤에 건다.
 // - 리버스 프록시 뒤에서 https·접속 IP를 바르게 읽도록, 같은 컴퓨터·내부망의 프록시만 믿는다.
+// - 앱 도메인으로 온 요청은 본문을 읽기 전에 HostGate가 거른다 (스토어 3-0): 등록한 경로만 지나고 나머지는 404.
 // - 모든 응답은 캐시에 남지 않게(no-store) 하고, 서버 종류를 알리지 않는다.
 //   나중에 캐시해도 되는 공개 응답(글 등)은 그 Response에서만 Cache-Control을 바꾼다.
 // - JSON 본문은 512KB까지 (save_session 한 번의 최대 크기가 들어가게).
@@ -52,6 +54,7 @@ export class HttpSetup {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       next();
     });
+    express.use(app.get(HostGate).middleware() as never);
     // Nest가 기본으로 거는 JSON 읽기 대신 한도를 정한 것을 건다 (Express 어댑터의 메서드)
     const parsers = app as unknown as {
       useBodyParser(

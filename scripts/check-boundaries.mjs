@@ -14,9 +14,16 @@
 //      modules.json의 lookups.provides · asks와 같고, 묻는 종류는 어느 모듈이든 준다 (한 종류는 한 모듈만 준다)
 //   8. 이벤트 목록(리팩토링 R3c): <모듈>.events.json의 주제는 그 모듈 이름으로 시작하고, from은 모듈 이름이나 plugin이다.
 //      플러그인 목록 파일의 event:<무늬>는 어느 모듈의 주제나 플러그인 주제(plugin.*)에 맞아야 한다
+//   9. 등록부로 잇는 모듈 사이 의존 (2026-11-19): platform의 등록부(module-links.mjs의 REGISTRIES)를 받은 모듈이 부르는 메서드로 찾은
+//      주는 것(provides) · 묻는 것(asks)이 modules.json의 registries와 같고, 묻는 것은 어느 모듈이든 준다.
+//      import로는 보이지 않는 실행할 때의 의존이라 지도에 적어 둔다 (--graph로 모듈 사이 의존 전부를 본다)
+//  10. platform Database.MODULE_SCHEMAS(서버 이미지에는 modules.json이 없다)가 modules.json의 schemas와 같다
+//
+//   node scripts/check-boundaries.mjs --graph   모듈 사이 의존 (import · lookups · 등록부)을 적고 끝낸다
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { ModuleLinks } from './module-links.mjs';
 
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const serverSrc = join(root, 'apps/server/src');
@@ -39,8 +46,8 @@ const allSchemas = [
   ...packageSchemas.values(),
 ];
 const problems = [];
-/** 코드에서 찾은 모듈 사이 읽기: 모듈 → { provides, asks } */
-const lookupsFound = new Map();
+/** 모듈 사이 이음 (lookups · 등록부 · 스키마 목록, module-links.mjs) */
+const links = new ModuleLinks(root, map, problems);
 
 if (process.argv.includes('--db')) checkDatabase();
 else checkCode();
@@ -51,6 +58,7 @@ if (problems.length > 0) {
   process.exit(1);
 }
 console.log('모듈 경계 검사 통과');
+if (process.argv.includes('--graph')) links.printGraph();
 
 function checkCode() {
   for (const file of walk(serverSrc)) {
@@ -59,10 +67,10 @@ function checkCode() {
     for (const { spec, line } of imports(text)) checkImport(file, owner, spec, line);
     if (owner) checkSql(file, owner, text);
     if (owner && file.endsWith('.view.ts')) checkView(file, text);
-    if (owner) noteLookups(owner, text);
+    if (owner) links.note(file, owner, text);
   }
   checkPlugins();
-  checkLookups();
+  links.check(modulesDir);
   checkEvents();
 }
 
@@ -97,38 +105,6 @@ function checkEvents() {
         problems.push(`plugins/${name}: ${use}에 맞는 이벤트 주제가 없음 (<모듈>.events.json)`);
     }
   }
-}
-
-function noteLookups(owner, text) {
-  const found = lookupsFound.get(owner) ?? { provides: new Set(), asks: new Set() };
-  for (const m of text.matchAll(/lookups\.provide\(\s*'([\w.-]+)'/g)) found.provides.add(m[1]);
-  for (const m of text.matchAll(/lookups\.(?:visible|assertVisible)\(\s*'([\w.-]+)'/g))
-    found.asks.add(m[1]);
-  lookupsFound.set(owner, found);
-}
-
-function checkLookups() {
-  const givers = new Map();
-  for (const m of moduleNames) {
-    const declared = map.modules[m].lookups ?? {};
-    const found = lookupsFound.get(m) ?? { provides: new Set(), asks: new Set() };
-    for (const key of ['provides', 'asks']) {
-      const want = [...(declared[key] ?? [])].sort().join(', ');
-      const have = [...found[key]].sort().join(', ');
-      if (want !== have)
-        problems.push(
-          `${m}: modules.json의 lookups.${key}(${want || '없음'})와 코드(${have || '없음'})가 다름`,
-        );
-    }
-    for (const kind of declared.provides ?? []) {
-      if (givers.has(kind)) problems.push(`읽기 '${kind}'를 ${givers.get(kind)}와 ${m}이 함께 줌`);
-      givers.set(kind, m);
-    }
-  }
-  for (const m of moduleNames)
-    for (const kind of map.modules[m].lookups?.asks ?? [])
-      if (!givers.has(kind))
-        problems.push(`${m}: 읽기 '${kind}'를 주는 모듈이 없음 (modules.json lookups)`);
 }
 
 function checkView(file, text) {

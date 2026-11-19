@@ -1,6 +1,6 @@
 import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseQuery, Database, NotFound, SecretBox } from '../../platform';
+import { type Actor, BaseQuery, Database, HostGate, NotFound, SecretBox } from '../../platform';
 import { App } from '../app/app';
 import { apps } from '../blog.schema';
 import type { AppRow } from '../blog.tables';
@@ -27,6 +27,9 @@ export class AppFileAnswer {
 // /<앱>/files/<이름>이 파일 하나를 여기서 받는다. 그리기(Mustache)와 격리 머리글은 웹이 한다.
 // 볼 수 있는 앱 = 공개 앱 (방문자 · 관리자 모두 같은 화면), 또는 미리 보기 토큰의 그 앱 하나 (비공개여도 공개된 것처럼).
 // 없는 앱 · 비공개 앱 · 틀린 토큰은 모두 같은 404다: 앱이 있다는 사실도 드러나지 않는다 (원칙 5).
+// 앱마다 도메인 (스토어 3-0): 웹이 방문자가 연 호스트(host)를 함께 넘긴다. 그 앱의 도메인이면 도메인의 뿌리가 앱 주소이고
+// 기본 도메인에 있는 것은 사이트 주소로 적는다 (AppScreenDataView). 다른 호스트(기본 도메인)인데 연결을 확인한 도메인이 있으면
+// 그 도메인의 같은 경로로 보낸다 (308). 미리 보기 토큰은 보내지 않는다 (토큰은 기본 도메인의 관리자 화면에서 연다).
 @Injectable()
 export class AppSiteQuery extends BaseQuery {
   private static readonly MISSING = '없는 앱이에요';
@@ -43,6 +46,7 @@ export class AppSiteQuery extends BaseQuery {
     private readonly box: SecretBox,
     private readonly code: AppCodeQuery,
     private readonly screens: AppScreenQuery,
+    private readonly gate: HostGate,
   ) {
     super(db);
   }
@@ -62,8 +66,13 @@ export class AppSiteQuery extends BaseQuery {
       return new AppScreenRedirectView(rest === '' ? found.url : `${found.url}/${rest}`);
     }
     const { app, ticket } = found;
-    const base = ticket === null ? `/${app.slug}` : `/${app.slug}/${AppTicket.MARK}${req.ticket}`;
-    const data = await this.screens.screen(actor, app, base, req.path, req.cursor);
+    const own = req.host !== null && req.host === app.domain;
+    if (ticket === null && !own && req.host !== null && app.domain && app.domain_checked_at)
+      return AppSiteQuery.toDomain(app.domain, req);
+    const root = own ? '' : `/${app.slug}`;
+    const base = ticket === null ? root : `${root}/${AppTicket.MARK}${req.ticket}`;
+    const site = own ? ((await this.gate.siteOrigin()) ?? '') : null;
+    const data = await this.screens.screen(actor, app, base, site, req.path, req.cursor);
     if (data instanceof AppScreenRedirectView) return data;
     const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);
     const templates = await this.templatesOf(actor, code);
@@ -80,6 +89,13 @@ export class AppSiteQuery extends BaseQuery {
       await this.code.hostsOf(actor, code),
       data,
     );
+  }
+
+  /** 연결을 확인한 도메인의 같은 경로 (· 다음 쪽 커서) */
+  private static toDomain(domain: string, req: AppScreenInput): AppScreenRedirectView {
+    const rest = req.path.map(encodeURIComponent).join('/');
+    const more = req.cursor === null ? '' : `?cursor=${encodeURIComponent(req.cursor)}`;
+    return new AppScreenRedirectView(`https://${domain}/${rest}${more}`, true);
   }
 
   /** 파일 하나 (템플릿은 내보내지 않는다: 채우지 않은 템플릿이 그대로 보이지 않게) */

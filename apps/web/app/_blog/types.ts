@@ -1,4 +1,5 @@
 import type {
+  AppDomainListView,
   AppListView,
   AppView,
   PublicAppListView,
@@ -96,6 +97,8 @@ export type PublicAppList = ReturnType<PublicAppListView['toJSON']>;
 /** 앱 (관리자): 칸 전부 · 든 것의 수(목록) · version. 만들거나 고친 결과는 counts가 null */
 export type AdminApp = ReturnType<AppView['toJSON']>;
 export type AdminAppList = ReturnType<AppListView['toJSON']>;
+/** 도메인으로 여는 공개 앱 (스토어 3-0): 연결을 확인한 도메인 → 앱 주소 */
+export type AppDomainList = ReturnType<AppDomainListView['toJSON']>;
 
 /** 앱 화면 하나 (스토어 1-6, 방문자): 템플릿 · 바깥 주소 · 데이터. 다른 주소로 보낼 때는 redirect만 */
 export type AppScreen = ReturnType<AppScreenView['toJSON']>;

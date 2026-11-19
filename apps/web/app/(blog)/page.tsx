@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AppGrid } from '../_blog/AppGrid';
-import { appPath } from '../_blog/format';
 import { SiteFooter } from '../_blog/SiteFooter';
 import { SiteHeader } from '../_blog/SiteHeader';
 import { siteNow } from '../_blog/site';
@@ -51,9 +50,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   if (!site.space.installed) redirect('/install');
   // 고정한 앱(스토어 2단계)이나 하나뿐인 공개 앱이면 그 앱의 주소로 (307): 앱 화면은 앱 코드가 그린다 (스토어 1-6)
   const pinned = site.apps.find((a) => a.home);
-  if (pinned) redirect(appPath(pinned.slug));
+  if (pinned) redirect(pinned.url);
   const [only] = site.apps;
-  if (only && site.apps.length === 1) redirect(appPath(only.slug));
+  if (only && site.apps.length === 1) redirect(only.url);
   const { space } = site;
   return (
     <>

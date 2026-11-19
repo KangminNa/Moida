@@ -41,6 +41,8 @@ export const apps = blogSchema.table('apps', {
   agent_id: uuid('agent_id'),
   policy: text('policy').notNull(),
   home: boolean('home').notNull(),
+  domain: text('domain'),
+  domain_checked_at: timestamp('domain_checked_at', { withTimezone: true }),
 });
 
 /** blog.assets */

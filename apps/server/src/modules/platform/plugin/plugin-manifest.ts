@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Database } from '../base/database';
 
 // 플러그인 목록 파일(cairn-plugin.json). 플러그인이 무엇을 쓰는지 여기에 적힌 것만 허락된다.
 // 서버를 시작할 때 들어 있는 플러그인을 모두 읽고 검사한다. 틀리면 시작하지 않는다.
@@ -40,8 +41,8 @@ const USES = [
 
 const SETTING_TYPES = ['text', 'secret', 'select', 'boolean'];
 
-/** 코어 모듈의 스키마. 기능 패키지는 이 이름을 쓸 수 없다 (apps/server/modules.json) */
-const CORE_SCHEMAS = ['public', 'platform', 'account', 'vault', 'blog', 'work', 'task', 'mcp'];
+/** 코어 모듈의 스키마와 public. 기능 패키지는 이 이름을 쓸 수 없다 */
+const CORE_SCHEMAS = ['public', ...Database.MODULE_SCHEMAS];
 
 /** 기능 패키지의 MCP 도구 하나 (목록 파일 tools의 한 항목) */
 export interface PackageToolSpec {

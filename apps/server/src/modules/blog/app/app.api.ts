@@ -8,20 +8,35 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { type Actor, CurrentActor, type HttpResponse, VersionInput } from '../../platform';
+import {
+  type Actor,
+  CurrentActor,
+  type HttpRequest,
+  type HttpResponse,
+  VersionInput,
+} from '../../platform';
 import {
   AppSlugInput,
+  CheckDomainInput,
   CreateAppInput,
+  DomainProofInput,
   HomeAppInput,
   UpdateAppInput,
   UploadIconInput,
 } from './app.input';
-import { AppQuery } from './app.query';
+import { type AppDomainProofAnswer, AppQuery } from './app.query';
 import { AppService } from './app.service';
-import type { AppListView, AppView, PublicAppListView, PublicAppView } from './app.view';
+import type {
+  AppDomainListView,
+  AppListView,
+  AppView,
+  PublicAppListView,
+  PublicAppView,
+} from './app.view';
 
 // 앱 API (스토어 1단계). 목록 · 앱 머리 · 아이콘은 누구나(방문자는 공개 앱만), 만들기 · 고치기 · 지우기 · 아이콘 올리기 · 첫 화면 고정(2단계)은 관리자만.
 @Controller('api/apps')
@@ -34,6 +49,12 @@ export class AppController {
   @Get()
   list(@CurrentActor() actor: Actor): Promise<AppListView | PublicAppListView> {
     return this.query.list(actor);
+  }
+
+  /** 도메인으로 여는 공개 앱 (스토어 3-0): 웹이 요청의 Host로 앱을 고른다 */
+  @Get('domains')
+  domains(@CurrentActor() actor: Actor): Promise<AppDomainListView> {
+    return this.query.domains(actor);
   }
 
   @Get('by-slug/:slug')
@@ -83,6 +104,17 @@ export class AppController {
     return (await this.service.update(actor, UpdateAppInput.from(id, body))).view();
   }
 
+  /** 도메인 연결 확인 (스토어 3-0): 관리자의 브라우저가 그 도메인의 /.well-known/cairn-domain에서 읽은 값 */
+  @HttpCode(200)
+  @Post(':id/domain/check')
+  async checkDomain(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AppView> {
+    return (await this.service.checkDomain(actor, CheckDomainInput.from(id, body))).view();
+  }
+
   @HttpCode(204)
   @Post(':id/delete')
   async remove(
@@ -112,5 +144,23 @@ export class AppController {
     @Body() body: unknown,
   ): Promise<AppView> {
     return (await this.service.removeIcon(actor, VersionInput.from(id, body))).view();
+  }
+}
+
+// 도메인 연결 확인 값 (스토어 3-0): 앱 도메인으로 온 요청(HostGate가 적은 appHost)에만 답하고, 기본 도메인 · 모르는 도메인은 404.
+// 관리자의 브라우저가 기본 도메인의 화면에서 읽으므로 그 출처(사이트 주소)만 읽게 한다. 표준 경로라 /api 아래가 아니다 (OAuth와 같다)
+@Controller('.well-known')
+export class AppDomainController {
+  constructor(private readonly query: AppQuery) {}
+
+  @Get('cairn-domain')
+  async proof(
+    @CurrentActor() actor: Actor,
+    @Req() req: HttpRequest,
+    @Res({ passthrough: true }) res: HttpResponse,
+  ): Promise<AppDomainProofAnswer> {
+    const answer = await this.query.domainProof(actor, DomainProofInput.from(req.appHost));
+    if (answer.allowOrigin) res.setHeader('Access-Control-Allow-Origin', answer.allowOrigin);
+    return answer;
   }
 }

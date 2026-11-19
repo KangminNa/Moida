@@ -70,6 +70,7 @@ export { FailedEventQuery } from './failed-event/failed-event.query';
 export { FailedEventService } from './failed-event/failed-event.service';
 export { Cookies } from './http/cookies';
 export { CurrentActor } from './http/current-actor';
+export { HostGate } from './http/host-gate';
 export { HttpSetup } from './http/http-setup';
 export type { HttpRequest, HttpResponse, HttpUpload } from './http/http-types';
 export { type RequestLogSink, RequestTrace } from './http/request-trace';

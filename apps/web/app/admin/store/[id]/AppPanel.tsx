@@ -79,7 +79,7 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
           <p>
             {APP_KIND_LABELS[app.kind]} ·{' '}
             {open ? (
-              <NewTabLink href={appPath(app.slug)}>{appPath(app.slug)}</NewTabLink>
+              <NewTabLink href={app.url}>{app.url}</NewTabLink>
             ) : (
               `${appPath(app.slug)} (비공개: 방문자에게 없는 주소)`
             )}

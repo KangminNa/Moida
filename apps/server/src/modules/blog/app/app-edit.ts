@@ -80,11 +80,17 @@ export class AppEdit {
     return app;
   }
 
-  async update(req: UpdateAppInput, now: Date): Promise<App> {
+  /** siteHost: 기본 도메인의 호스트 (도메인을 바꿀 때만 쓴다, 스토어 3-0) */
+  async update(req: UpdateAppInput, now: Date, siteHost: string | null = null): Promise<App> {
     const app = await this.apps.lock(this.spaceId, req.id);
     app.assertVersion(req.version);
     app.edit(req.changes, now);
     await this.assertFree(app.slug, app.id);
+    if (req.domain !== undefined) {
+      app.setDomain(req.domain, siteHost, now);
+      if (app.domain !== null && (await this.apps.domainTaken(app.domain, app.id)))
+        throw new Conflict('다른 앱이 쓰는 도메인이에요');
+    }
     this.app = app;
     return app;
   }
@@ -100,8 +106,8 @@ export class AppEdit {
    */
   apply(change: SettingChangeInput, now: Date, leader: string | null = null): Promise<App> {
     const { kind, menus, agent_id: chosen, new_team: newTeam, ...rest } = change.body;
-    if ('visibility' in rest || 'home' in rest)
-      throw new RuleViolation('공개 여부 · 첫 화면은 관리자가 앱 관리에서 바꿔요');
+    if ('visibility' in rest || 'home' in rest || 'domain' in rest)
+      throw new RuleViolation('공개 여부 · 첫 화면 · 도메인은 관리자가 앱 관리에서 바꿔요');
     if (newTeam !== undefined) {
       if (change.op !== 'create')
         throw new RuleViolation('운영 팀 새로 만들기는 앱을 만들 때만 해요');

@@ -19,6 +19,8 @@ export class AppRepository extends TableRepository<AppRow, App> {
     } catch (error) {
       if (Database.isUniqueViolation(error, 'apps_space_id_slug_key'))
         throw new Conflict('이미 쓰는 앱 주소예요');
+      if (Database.isUniqueViolation(error, 'apps_domain_key'))
+        throw new Conflict('다른 앱이 쓰는 도메인이에요');
       throw error;
     }
   }
@@ -49,6 +51,13 @@ export class AppRepository extends TableRepository<AppRow, App> {
         SELECT 1 FROM blog.apps WHERE space_id = ${spaceId} AND slug = ${slug}
           ${exceptId === null ? this.sql`` : this.sql`AND id <> ${exceptId}`}
       ) AS taken`;
+    return row?.taken ?? false;
+  }
+
+  /** 다른 앱이 쓰는 도메인인가 (스토어 3-0: 도메인은 모든 공간에서 하나, exceptId: 고치는 앱 자신) */
+  async domainTaken(domain: string, exceptId: string): Promise<boolean> {
+    const [row] = await this.sql<{ taken: boolean }[]>`
+      SELECT EXISTS (SELECT 1 FROM blog.apps WHERE domain = ${domain} AND id <> ${exceptId}) AS taken`;
     return row?.taken ?? false;
   }
 

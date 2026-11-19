@@ -6,15 +6,18 @@ import {
   type Blob,
   BlobStore,
   Database,
+  HostGate,
   NotFound,
+  SecretBox,
   SettingActor,
   type SettingChangeInput,
 } from '../../platform';
 import { apps } from '../blog.schema';
 import type { AppRow } from '../blog.tables';
 import { App } from './app';
-import type { AppSlugInput } from './app.input';
+import type { AppSlugInput, DomainProofInput } from './app.input';
 import {
+  AppDomainListView,
   type AppListRow,
   AppListView,
   AppSettingsView,
@@ -23,6 +26,7 @@ import {
   PublicAppListView,
   PublicAppView,
 } from './app.view';
+import { AppDomainProof } from './app-domain.policy';
 
 /** 앱 아이콘 파일 하나 (공개 앱이면 누구나: 방문자 첫 화면의 앱 목록) */
 export class AppIconFile {
@@ -35,6 +39,19 @@ export class AppIconFile {
   ) {}
 }
 
+/** 도메인 연결 확인 값 (GET /.well-known/cairn-domain). 기본 도메인의 화면만 읽게 그 출처를 함께 준다 (CORS) */
+export class AppDomainProofAnswer {
+  constructor(
+    private readonly token: string,
+    /** 읽어도 되는 출처: 사이트 주소. 정하기 전이면 null (아무 출처도 읽지 못한다) */
+    readonly allowOrigin: string | null,
+  ) {}
+
+  toJSON() {
+    return { token: this.token };
+  }
+}
+
 // 앱 읽기 (스토어 1단계). 관리자는 모든 앱과 든 것의 수, 그 밖에는 공개 앱만 (비공개 앱은 없는 앱과 같은 404).
 // 방문자는 공간을 모른다: MVP는 공간 하나라 방문자 읽기는 공간으로 거르지 않는다 (blog 규칙).
 @Injectable()
@@ -42,6 +59,8 @@ export class AppQuery extends BaseQuery {
   constructor(
     db: Database,
     private readonly blobs: BlobStore,
+    private readonly gate: HostGate,
+    private readonly box: SecretBox,
   ) {
     super(db);
   }
@@ -91,6 +110,40 @@ export class AppQuery extends BaseQuery {
     const rows = await this.sql<Pick<AppRow, 'id' | 'name'>[]>`
       SELECT id, name FROM blog.apps WHERE id = ANY(${ids as string[]}::uuid[]) ${where}`;
     return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
+  /** 모든 앱의 도메인, 확인 전 것까지 (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
+  async hosts(actor: Actor): Promise<readonly string[]> {
+    actor.assertOwnerOrSystem();
+    const rows = await this.sql<{ domain: string }[]>`
+      SELECT domain FROM blog.apps WHERE domain IS NOT NULL`;
+    return rows.map((r) => r.domain);
+  }
+
+  /**
+   * 도메인으로 여는 앱 (누구나, 웹이 Host로 앱을 고른다): 공개 앱 가운데 연결을 확인한 도메인만.
+   * 확인 전 도메인 · 비공개 앱의 도메인은 없다 (그 도메인의 화면은 없는 주소와 같다)
+   */
+  async domains(_actor: Actor): Promise<AppDomainListView> {
+    return new AppDomainListView(
+      await this.sql<Pick<AppRow, 'domain' | 'slug'>[]>`
+        SELECT domain, slug FROM blog.apps
+        WHERE visibility = ${App.PUBLIC} AND domain IS NOT NULL AND domain_checked_at IS NOT NULL
+        ORDER BY domain`,
+    );
+  }
+
+  /**
+   * 도메인 연결 확인 값 (스토어 3-0): 앱 도메인으로 온 요청이면 그 도메인을 가진 앱의 값. 기본 도메인 · 모르는 도메인이면 404.
+   * 비공개 앱의 도메인도 답한다: 공개하기 전에 연결을 확인하게. 값으로는 앱이 무엇인지 알 수 없다 (AppDomainProof)
+   */
+  async domainProof(_actor: Actor, req: DomainProofInput): Promise<AppDomainProofAnswer> {
+    const row = req.host === null ? null : await this.row(apps, { domain: req.host });
+    if (!row?.domain) throw new NotFound('없는 주소예요');
+    return new AppDomainProofAnswer(
+      new AppDomainProof(this.box).tokenOf(row.id, row.domain),
+      await this.gate.siteOrigin(),
+    );
   }
 
   /** 대화로 바꾸는 앱 (get_settings apps). 확인을 거친 제안자만 */

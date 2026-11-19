@@ -7,6 +7,7 @@ import {
   Conflict,
   Database,
   Forbidden,
+  HostGate,
   NotFound,
   SecurityLog,
   SettingActor,
@@ -38,6 +39,7 @@ export class SpaceService extends BaseService {
     private readonly install: InstallPolicy,
     private readonly spaces: SpaceQuery,
     private readonly blobs: BlobStore,
+    private readonly gate: HostGate,
   ) {
     super(db);
   }
@@ -73,11 +75,14 @@ export class SpaceService extends BaseService {
     return this.install.issuePass(space.id);
   }
 
-  rename(actor: Actor, req: RenameSpaceInput): Promise<Space> {
-    return this.change(actor, req.version, (space) => {
+  /** 사이트 주소가 바뀌었을 수 있어 HostGate가 기본 도메인을 다시 읽게 한다 (스토어 3-0) */
+  async rename(actor: Actor, req: RenameSpaceInput): Promise<Space> {
+    const space = await this.change(actor, req.version, (space) => {
       space.edit(req.changes);
       space.describe(req.description, req.siteUrl);
     });
+    this.gate.stale();
+    return space;
   }
 
   /**

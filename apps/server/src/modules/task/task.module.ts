@@ -269,7 +269,7 @@ export class TaskModule implements OnModuleInit {
     this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
     this.workers.on(Task.CHANGED, this.chatContinues);
     this.workers.on(Task.CHANGED, this.follows);
-    this.workers.on('*', this.results);
+    for (const topic of ApprovalResultHandler.TOPICS) this.workers.on(topic, this.results);
     this.workers.due(this.leases, Task.CHANGED);
     this.workers.due(this.schedules);
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
