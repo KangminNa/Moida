@@ -112,7 +112,7 @@ export function AppPanel({ id, tab }: { id: string; tab: AppTab }) {
       {tab === 'team' && <AppTeamTab app={app} onChanged={apps.reload} />}
       {tab === 'menus' &&
         (app.kind === 'page' ? (
-          <p className="rows-empty">페이지 앱에는 메뉴가 없음 · 앱의 페이지가 첫 화면</p>
+          <p className="rows-empty">페이지 앱에는 메뉴가 없음 · 첫 화면은 앱의 페이지나 앱 코드</p>
         ) : (
           <AppMenus app={app} />
         ))}

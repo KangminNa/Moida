@@ -831,6 +831,16 @@ describe('승인 뒤 이어서 (O-2): 대표의 propose_setting continue', () =>
     assert.equal((await room(chat.id)).chat.turns, 2, '두 번 열지 않는다');
   });
 
+  test('받을 것이 아직 없어도 이어서 하자는 설정 바꾸기가 카드에 있으면 "승인하면 이어서"로 보인다 (스토어 2-6)', async () => {
+    const member = await agent({ model: 'sonnet' });
+    const { chat, job } = await chatTurn('조사 팀을 강하게 해서 보고서 파일로 줘');
+    await call(String(job.run_token), 'set_deliver', { deliver: 'file' });
+    await proposeModel(String(job.run_token), member, { continue: true });
+    await drain();
+    const { card } = await room(chat.id);
+    assert.deepEqual([card.deliver, card.passed, card.continues], ['file', false, true]);
+  });
+
   test('적용이 실패하면 열지 않는다. 대표가 아닌 에이전트의 continue는 읽지 않는다', async () => {
     const member = await agent({ model: 'sonnet' });
     const { chat, job } = await chatTurn('모델을 바꿔서 다시 해 줘');

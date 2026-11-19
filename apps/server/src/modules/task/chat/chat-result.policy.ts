@@ -1,4 +1,4 @@
-import { RuleViolation, ValueList } from '../../platform';
+import { RuleViolation, SettingKinds, ValueList } from '../../platform';
 import { Task } from '../task/task';
 import { CHAT_DELIVER, type ChatDeliver, type TaskRow } from '../task.tables';
 import type { ChatReviewVerdict } from './chat.view';
@@ -91,6 +91,18 @@ export class ChatResult {
         : (need.actions ?? []).some((action) => actions.includes(action)) ||
           (need.made !== undefined && made.includes(need.made));
     return has ? null : deliver;
+  }
+
+  /**
+   * 카드에 대표가 이어서 하자고 한 설정 바꾸기(O-2 continue)가 있는가: 받을 것은 승인 뒤 이어서 낸다 (스토어 2-6, 앱 만들기 →
+   * 첫 화면). 그때 카드는 "검사에 떨어짐"이 아니라 "승인하면 이어서"로 보인다
+   */
+  static continuesAfter(actions: readonly { action: string; payload: unknown }[]): boolean {
+    return actions.some(
+      (a) =>
+        a.action === SettingKinds.ACTION &&
+        (a.payload as { continue?: unknown } | null)?.continue === true,
+    );
   }
 
   /** 받을 것이 이번 회차에서 끝난 주문으로도 채워지는가 (그때만 그 일을 찾아본다) */

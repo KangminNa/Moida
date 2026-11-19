@@ -28,7 +28,7 @@ export type CreateAppBody = {
 /** 운영 팀 칸에서 "앱 운영 팀 새로 만들기"의 값 */
 const NEW_TEAM = 'new';
 
-// 앱 만들기 시트 (스토어 1-5, 시안 3번): 아이콘 · 이름 · 주소 · 설명, 블로그는 시작 메뉴, 페이지 앱은 앱이 될 페이지.
+// 앱 만들기 시트 (스토어 1-5, 시안 3번): 아이콘 · 이름 · 주소 · 설명, 블로그는 시작 메뉴, 페이지 앱은 앱이 될 페이지(없어도 됨: 화면은 앱 코드, 스토어 2-6).
 // 비공개로 만들어진다. 운영 팀(스토어 2단계): 나중에 · 있는 팀장 · 앱 운영 팀 새로 만들기.
 // 저장(새 팀 → 만들기 → 아이콘 올리기)은 패널이 한다.
 export function CreateAppForm({
@@ -92,7 +92,7 @@ export function CreateAppForm({
       slug: slug.trim(),
       description: description.trim(),
       ...(kind === 'blog' && names.length > 0 ? { menus: names } : {}),
-      ...(kind === 'page' ? { pageId } : {}),
+      ...(kind === 'page' && pageId ? { pageId } : {}),
       ...(team && team !== NEW_TEAM ? { agentId: team } : {}),
     };
     requestId.current ??= crypto.randomUUID();
@@ -162,17 +162,19 @@ export function CreateAppForm({
             id={`${id}-page`}
             className="input"
             value={pageId}
-            required
             onChange={(e) => edit(() => setPageId(e.target.value))}
           >
-            <option value="">고르기</option>
+            <option value="">없음 · 앱 코드로 화면 만들기</option>
             {pages.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.title} ({p.name})
               </option>
             ))}
           </select>
-          {pages.length === 0 && <small>앱 밖의 페이지 없음 · 대화에서 페이지부터 만들기</small>}
+          <small>
+            {pages.length === 0 ? '앱 밖의 페이지 없음 · ' : ''}없음이면 앱 관리 › 코드나 대화에서
+            화면을 만듦
+          </small>
         </div>
       )}
       <div className="field">
