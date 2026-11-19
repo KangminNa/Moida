@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { type ChildProcess, spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
@@ -141,13 +141,14 @@ class LossyProxy {
       headers: req.headers as Record<string, string>,
       ...(raw.length > 0 ? { body: raw } : {}),
     });
-    const text = await answer.text();
+    // 응답도 바이트 그대로 (내려받는 사진은 글자가 아니다: 글자로 읽으면 sha256이 어긋난다)
+    const answered = Buffer.from(await answer.arrayBuffer());
     if (this.losing(body)) {
       req.socket.destroy();
       return;
     }
     res.writeHead(answer.status, { 'content-type': 'application/json' });
-    res.end(text);
+    res.end(answered);
   }
 
   /** 빈 보고는 토큰이 없어 볼 것이 없다. 기록이 든 보고만 잃는다 */
@@ -198,6 +199,22 @@ const newTask = async (agent: Json, marks: string, more: Json = {}): Promise<Jso
   );
 
 const getTask = async (id: unknown): Promise<Json> => ok(await api.get(`/api/tasks/${id}`, owner));
+
+/** 관리자가 올린 사진 (결과물, 대화에 사진 넣기). PNG 표시 + 아무 바이트 */
+const uploadPhoto = async (name: string): Promise<{ id: string; bytes: Buffer }> => {
+  const bytes = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    randomBytes(64),
+  ]);
+  const res = await fetch(`${api.baseUrl}/api/outputs/files?name=${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', cookie: owner.header },
+    body: bytes,
+  });
+  assert.equal(res.status, 201, await res.clone().text());
+  return { id: String(((await res.json()) as Json).id), bytes };
+};
+const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
 
 const cancelTask = async (task: Json): Promise<void> => {
   const { version } = await getTask(task.id);
@@ -432,9 +449,13 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(args[args.indexOf('--output-format') + 1], 'stream-json');
     assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write,Edit,WebSearch');
 
-    // 세션 키의 고정 자리: 작업 폴더 · 홈 · 작업 토큰은 지우고, 설정 폴더에는 CLI의 세션 파일(projects)만 남는다
+    // 세션 키의 고정 자리: 작업 폴더 · 홈 · 작업 토큰은 지우고, 설정 폴더에는 CLI의 세션 파일(projects)만 남는다.
+    // 비우기(LineagePlace.clear)는 작업 폴더 · 홈 · 작업 토큰 다음에 설정 폴더를 비우므로 끝까지 기다린다
     await until('자리가 지워짐', () =>
-      [seen.cwd, env.HOME, seen.mcpConfigPath].some((p) => existsSync(String(p))) ? null : true,
+      [seen.cwd, env.HOME, seen.mcpConfigPath].some((p) => existsSync(String(p))) ||
+      readdirSync(String(env.CLAUDE_CONFIG_DIR)).length > 1
+        ? null
+        : true,
     );
     assert.deepEqual(readdirSync(String(env.CLAUDE_CONFIG_DIR)), ['projects']);
   });
@@ -696,6 +717,37 @@ describe('러너가 일을 처리한다', () => {
       const room = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { turns: Json[] };
       return room.turns[0]?.status === 'done' ? room : null;
     });
+  });
+
+  test('대화에 넣은 사진은 작업 폴더의 photos/에 받아 두고, 지시문에 그 경로를 적는다 (대화에 사진 넣기)', async () => {
+    const photo = await uploadPhoto('영수증.png');
+    const spy = new Spy();
+    const chat = ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: `이 사진 봐 줘\n${spy.mark}`,
+        refs: [{ kind: 'output', id: photo.id }],
+      }),
+      201,
+    );
+    const seen = await spy.seen();
+    assert.deepEqual(seen.photos, [{ name: 'photo-1.png', sha256: sha256(photo.bytes) }]);
+    const path = join(String(seen.cwd), 'photos', 'photo-1.png');
+    // 결과물은 늘 비공개 참조다
+    assert.ok(
+      String(seen.prompt).includes(`영수증.png (비공개): 사진 · ${path}에 받아 두었습니다`),
+    );
+    assert.equal((seen.argv as string[]).includes('--image'), false, 'Claude는 파일을 읽는다');
+    const room = await until('사진을 본 회차가 끝남', async () => {
+      const room = ok(await api.get(`/api/chats/${chat.id}`, owner)) as { turns: Json[] };
+      return room.turns[0]?.status === 'done' ? room : null;
+    });
+    const task = await getTask(room.turns[0]?.taskId);
+    const notes = events(task).map((e) => e.body);
+    assert.ok(notes.includes('사진 1장을 받았어요'), JSON.stringify(notes));
+    const [made] = await db.sql`
+      SELECT count(*)::int AS n FROM task.outputs WHERE task_id = ${String(task.id)}`;
+    assert.equal(made?.n, 0, '받은 사진은 결과물로 다시 올라가지 않는다 (outputs/와 따로)');
   });
 
   /** 일꾼(outbox)의 일을 다 한다: 결과 카드 · 다시 맡기기 · 설정 적용 (e2e는 일꾼을 따로 돌리지 않는다) */
@@ -1782,6 +1834,50 @@ describe('Codex로 일한다', () => {
     assert.ok(String(seen.config).includes('shell_tool = false'));
     assert.ok(String(seen.config).includes('[mcp_servers.cairn]'));
     assert.ok(String(seen.prompt).includes('# 스킬: cairn-write'), '셸이 없어 스킬은 지시문으로');
+  });
+
+  test('대화의 사진은 codex exec --image로 지시에 붙인다 (대화에 사진 넣기)', async () => {
+    const { lead } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
+    const tool = async (to: string): Promise<void> => {
+      const { lead: now } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
+      ok(
+        await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
+          tool: to,
+          version: now.version,
+        }),
+      );
+    };
+    // 앞 테스트(연결 확인)가 에이전트를 모두 멈춰 둘 수 있다: 대화를 받게 대표를 다시 움직인다
+    if (lead.status === 'paused')
+      ok(
+        await api.request('POST', `/api/agents/${lead.id}/resume`, owner, {
+          version: lead.version,
+        }),
+      );
+    await tool('codex');
+    try {
+      const photo = await uploadPhoto('화이트보드.png');
+      const spy = new Spy();
+      ok(
+        await api.request('POST', '/api/chats', owner, {
+          requestId: randomUUID(),
+          message: `이 사진 정리해 줘\n${spy.mark}`,
+          refs: [{ kind: 'output', id: photo.id }],
+        }),
+        201,
+      );
+      const seen = await spy.seen();
+      assert.deepEqual(seen.images, [{ path: 'photos/photo-1.png', sha256: sha256(photo.bytes) }]);
+      const argv = seen.argv as string[];
+      assert.deepEqual(argv.slice(0, 4), ['exec', '--image', 'photos/photo-1.png', '--json']);
+      assert.ok(
+        String(seen.prompt).includes(
+          '화이트보드.png (비공개): 사진 · 이 지시에 붙인 그림 1번입니다',
+        ),
+      );
+    } finally {
+      await tool(String(lead.tool));
+    }
   });
 
   test('실행 중에 갱신된 auth.json은 서버에 되돌려 쓰고, 다음 실행은 새 자격으로 돈다', async () => {

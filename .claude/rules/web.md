@@ -50,6 +50,11 @@ paths:
 - ★ 새 탭은 늘 `target="_blank" rel="noopener noreferrer"`: 열린 쪽이 연 창(콘솔)을 바꿔치기하지 못하고, 주소가 Referer로 새지 않게. 코드로 열 때는 `window.open(주소, '_blank', 'noopener,noreferrer')`.
 - 글 · AI 답(마크다운)의 http · https 링크는 `renderMarkdown`이 새 탭으로 그린다 (`_lib/markdown.ts`).
 
+## 대화의 사진 (2026-11-19)
+
+- 사진은 따로 올리는 길이 없다: 파일 올리기(`POST /api/outputs/files`)로 결과물이 되고 참조(`image`)로 붙는다. 사진인지는 서버가 앞부분으로 알아본 형식(`chat-photos.ts`의 `PHOTO_TYPES`)으로 정한다.
+- 형식 · 크기 · 장수 규칙은 `admin/chats/chat-photos.ts` 한 곳 (서버 `TaskRefs.PHOTOS_MAX` · 러너 `JobPhotos.MAX_BYTES`와 같은 값). 미리보기는 `PhotoThumbs`(결과물의 `?inline=1`, 누르면 새 탭).
+
 ## 앱 화면 (스토어 1-6)
 
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`).

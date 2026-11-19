@@ -3,23 +3,48 @@
 import { type ChangeEvent, useState } from 'react';
 import { REF_KINDS } from '../../_task/labels';
 import type { ChatRef } from '../../_task/types';
+import { PhotoThumbs } from './PhotoThumbs';
 import { RefSearchPanel } from './RefSearchPanel';
 
 /** 보낼 참조 하나 (서버가 비공개 여부를 정한다) */
 export type RefChoice = Omit<ChatRef, 'private'>;
 
-/** 고른 참조의 칩들. onRemove가 있으면 빼기 단추 (보낸 메시지 아래에서는 없음) */
+/**
+ * 고른 참조의 칩들. onRemove가 있으면 빼기 단추 (보낸 메시지 아래에서는 없음).
+ * 사진(image)은 칩 대신 미리보기로 그린다 (대화에 사진 넣기 ②-c). waiting: 올리는 중인 사진 장수
+ */
 export function RefChips({
   refs,
+  waiting = 0,
   onRemove,
 }: {
   refs: readonly (RefChoice & { private?: boolean })[];
+  waiting?: number;
   onRemove?: (index: number) => void;
 }) {
-  if (refs.length === 0) return null;
+  const photos = refs.flatMap((r, at) =>
+    r.image && r.id ? [{ id: r.id, title: r.title, at }] : [],
+  );
+  const chips = refs.flatMap((r, at) => (r.image && r.id ? [] : [{ r, at }]));
+  return (
+    <>
+      <PhotoThumbs photos={photos} waiting={waiting} onRemove={onRemove} />
+      {chips.length > 0 && <Chips chips={chips} onRemove={onRemove} />}
+    </>
+  );
+}
+
+/** 사진이 아닌 참조의 칩 (at: 참조 목록 안의 자리) */
+function Chips({
+  chips,
+  onRemove,
+}: {
+  chips: readonly { r: RefChoice & { private?: boolean }; at: number }[];
+  onRemove?: (index: number) => void;
+}) {
   return (
     <ul className="picked" aria-label="참조">
-      {refs.map((r, i) => (
+      {chips.map(({ r, at }) => (
         <li key={`${r.kind}:${r.id ?? r.url}`} className="pill chip">
           <span>{REF_KINDS[r.kind] ?? r.kind}</span>
           <span className="clamp-1">{r.title || r.url}</span>
@@ -30,7 +55,7 @@ export function RefChips({
               type="button"
               className="unpick"
               aria-label={`${r.title || r.url} 빼기`}
-              onClick={() => onRemove(i)}
+              onClick={() => onRemove(at)}
             >
               ×
             </button>
@@ -121,7 +146,14 @@ export function RefPicker({
             className="cta small fit"
             disabled={!goodUrl}
             onClick={() => {
-              onPick({ kind: 'url', id: null, title: url.trim(), url: url.trim(), browser });
+              onPick({
+                kind: 'url',
+                id: null,
+                title: url.trim(),
+                url: url.trim(),
+                browser,
+                image: false,
+              });
               setUrl('');
               setBrowser(false);
             }}

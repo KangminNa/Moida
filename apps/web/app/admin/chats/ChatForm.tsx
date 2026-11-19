@@ -1,8 +1,17 @@
 'use client';
 
-import { type FormEvent, type KeyboardEvent, useState } from 'react';
+import {
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '../../_ui/Icon';
 import { RefChips, type RefChoice, RefPicker } from './ChatRefs';
+import { PHOTO_TYPES, pickPhotos } from './chat-photos';
 
 /** 메시지 한 개의 길이 (서버 Chat.MESSAGE_MAX) */
 const MESSAGE_MAX = 8000;
@@ -19,6 +28,8 @@ export type ChatMessageBody = {
 // 일하는 중에도 보낸다: 그 회차에 덧붙인 말이 된다 (2차 1-1). 보낸 뒤 칸을 비우는 것은 패널이 key로 폼을 새로 만들어서.
 // 새 대화(ChatNewPanel)와 대화 하나(ChatThreadPanel)가 함께 쓴다 (2차 1-5: 입력은 하나).
 // 참조 넣기 (2026-11-15 B): + 단추나 @를 치면 고르기 칸이 열린다. 새 회차에만 (일하는 중 · 맡기 전에는 refs가 꺼진다)
+// 사진 (대화에 사진 넣기 ②-c): 사진 단추 · 붙여 넣기 · 끌어다 놓기. 패널이 결과물로 올려(onUpload) 참조로 붙고
+// 미리보기로 보인다. 한 메시지에 4장 · 장당 10MB · PNG · JPEG · WebP · GIF (chat-photos.ts의 pickPhotos)
 export function ChatForm({
   busy,
   problem,
@@ -46,12 +57,19 @@ export function ChatForm({
   const [message, setMessage] = useState('');
   const [refs, setRefs] = useState<RefChoice[]>([]);
   const [picking, setPicking] = useState(false);
+  /** 올리는 중인 사진 장수 (그동안 보내지 않는다: 보내면 사진이 빠진다) */
+  const [waiting, setWaiting] = useState(0);
+  /** 넣지 못한 사진의 까닭 (형식 · 크기 · 장수) */
+  const [photoProblem, setPhotoProblem] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
   const locked = busy || blocked !== null;
+  const photosOn = refsEnabled && onUpload !== null && !locked;
 
   function send(e?: FormEvent) {
     e?.preventDefault();
     const text = message.trim();
-    if (!text || locked) return;
+    if (!text || locked || waiting > 0) return;
     const body: ChatMessageBody['refs'] = refs.map((r) =>
       r.kind === 'url'
         ? { kind: 'url', url: r.url ?? '', browser: r.browser }
@@ -76,6 +94,49 @@ export function ChatForm({
     );
   }
 
+  /** 사진을 하나씩 올려 참조로 붙인다 (올리는 동작 하나씩: 패널의 useAction은 한 번에 하나) */
+  async function addPhotos(files: readonly File[]) {
+    if (files.length === 0 || !onUpload) return;
+    if (!photosOn)
+      return setPhotoProblem('지금은 사진을 넣지 못해요 (일하는 중이면 다음 메시지에)');
+    const already = refs.filter((r) => r.image).length + waiting;
+    const { photos, problem } = pickPhotos(files, already);
+    setPhotoProblem(problem);
+    setWaiting((n) => n + photos.length);
+    for (const file of photos) {
+      const ref = await onUpload(file);
+      setWaiting((n) => n - 1);
+      if (ref) pick(ref);
+    }
+  }
+
+  function choosePhotos(e: ChangeEvent<HTMLInputElement>) {
+    const files = [...(e.target.files ?? [])];
+    e.target.value = '';
+    void addPhotos(files);
+  }
+
+  /** 붙여 넣은 사진 (화면 캡처). 글이 함께 있으면 글은 그대로 붙는다 */
+  function paste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    if (!e.clipboardData.types.includes('text/plain')) e.preventDefault();
+    void addPhotos(files);
+  }
+
+  function dragOver(e: DragEvent<HTMLFieldSetElement>) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    setDragging(true);
+  }
+
+  function drop(e: DragEvent<HTMLFieldSetElement>) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    setDragging(false);
+    void addPhotos([...e.dataTransfer.files]);
+  }
+
   return (
     <form className="chat-compose" onSubmit={send}>
       {blocked ? <p className="note">{blocked}</p> : hint && <p className="note">{hint}</p>}
@@ -84,14 +145,29 @@ export function ChatForm({
           {problem}
         </p>
       )}
+      {photoProblem && (
+        <p className="error" role="alert">
+          {photoProblem}
+        </p>
+      )}
       {refsEnabled && (
-        <RefChips refs={refs} onRemove={(i) => setRefs((r) => r.filter((_, at) => at !== i))} />
+        <RefChips
+          refs={refs}
+          waiting={waiting}
+          onRemove={(i) => setRefs((r) => r.filter((_, at) => at !== i))}
+        />
       )}
       {refsEnabled && picking && (
         <RefPicker onPick={pick} onUpload={onUpload} onClose={() => setPicking(false)} />
       )}
-      {/* 입력 상자: 위는 글, 아래는 도구 줄 (참조 넣기 · 보내기) */}
-      <div className="chat-box">
+      {/* 입력 상자: 위는 글, 아래는 도구 줄 (참조 넣기 · 사진 · 보내기). 사진을 끌어다 놓을 수 있다 */}
+      <fieldset
+        aria-label="메시지 입력"
+        className={dragging ? 'chat-box dropping' : 'chat-box'}
+        onDragOver={dragOver}
+        onDragLeave={() => setDragging(false)}
+        onDrop={drop}
+      >
         <textarea
           className="chat-box-input"
           aria-label="메시지"
@@ -106,6 +182,7 @@ export function ChatForm({
           disabled={blocked !== null}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={keys}
+          onPaste={paste}
         />
         <div className="chat-box-tools">
           {refsEnabled && (
@@ -120,16 +197,35 @@ export function ChatForm({
               <Icon name="plus" />
             </button>
           )}
+          {refsEnabled && onUpload && (
+            <button
+              type="button"
+              className="round-button"
+              aria-label="사진 넣기"
+              disabled={!photosOn}
+              onClick={() => photoInput.current?.click()}
+            >
+              <Icon name="photo" />
+            </button>
+          )}
+          <input
+            ref={photoInput}
+            type="file"
+            accept={PHOTO_TYPES.join(',')}
+            multiple
+            hidden
+            onChange={choosePhotos}
+          />
           <button
             type="submit"
             className="round-button send"
-            aria-label={busy ? '보내는 중' : '보내기'}
-            disabled={locked || !message.trim()}
+            aria-label={busy ? '보내는 중' : waiting > 0 ? '사진 올리는 중' : '보내기'}
+            disabled={locked || waiting > 0 || !message.trim()}
           >
             <Icon name="up" />
           </button>
         </div>
-      </div>
+      </fieldset>
     </form>
   );
 }

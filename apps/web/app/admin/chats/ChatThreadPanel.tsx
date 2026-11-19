@@ -17,6 +17,7 @@ import type { RefChoice } from './ChatRefs';
 import { ChatRuntimeForm } from './ChatRuntimeForm';
 import { ChatTeamPanel } from './ChatTeamPanel';
 import { ChatTurns } from './ChatTurns';
+import { PHOTO_TYPES } from './chat-photos';
 
 /** 도는 상태 (멈추기가 보인다) */
 const RUNNING = ['working'];
@@ -129,7 +130,15 @@ export function ChatThreadPanel({ id }: { id: string }) {
       ),
     );
     if (!reply?.ok) return null;
-    return { kind: 'output', id: reply.data.id, title: file.name, url: null, browser: false };
+    return {
+      kind: 'output',
+      id: reply.data.id,
+      title: file.name,
+      url: null,
+      browser: false,
+      // 사진은 서버가 앞부분으로 알아본 그림만 (이름으로 정한 SVG는 아니다)
+      image: PHOTO_TYPES.includes(reply.data.mime),
+    };
   }
 
   const tool = lead.data?.lead?.id === d.chat.agentId ? lead.data.lead.tool : null;

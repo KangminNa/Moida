@@ -6,6 +6,7 @@ import type { CairnServer } from './cairn-server';
 import { CredentialWriteBack } from './credential-write-back';
 import { EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
+import { JobPhotos } from './job-photos';
 import { JobWorkspace } from './job-workspace';
 import { LineageStore } from './lineage-store';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
@@ -60,6 +61,8 @@ export class JobRun {
   private readonly recorder: RunRecorder;
   /** 일의 엔진으로 만든 실행 어댑터. 토큰이 없거나 모르는 엔진이면 null (perform이 시작 전에 끝낸다) */
   private readonly tool: AiTool | null;
+  /** 대화에 넣은 사진 (대화에 사진 넣기 ②-b): 작업 자리의 photos/에 받아 AI CLI가 직접 본다 */
+  private readonly photos: JobPhotos;
 
   constructor(
     private readonly job: Job,
@@ -74,6 +77,7 @@ export class JobRun {
   ) {
     const engine = EngineAdapters.of(job.tool);
     this.tool = engine && login.token !== null ? engine.tool(login.token, config) : null;
+    this.photos = new JobPhotos(job, server, config.serverUrl, engine?.photos ?? null);
     // 자격 안의 토큰 (Codex auth.json의 access · refresh) · 외부 도구의 머리글 값까지 로그와 기록에서 지운다
     this.redactor = [...(this.tool?.secrets ?? []), ...job.runtime.secrets].reduce(
       (r, secret) => r.with(secret),
@@ -94,22 +98,20 @@ export class JobRun {
       // 토큰이 없는 것은 일의 실패가 아니다. 돌려주고, 주인이 토큰을 넣으면 다시 맡는다
       if (this.tool === null) return await this.conclude(RunEnding.release(this.login.problem));
       const { stage } = this;
-      if (stage) {
-        const ending = await this.during((signal) =>
-          stage.prepare(signal, this.note, this.redactor),
-        );
-        if (ending) return await this.conclude(ending);
-      }
+      const prepared =
+        stage && (await this.during((signal) => stage.prepare(signal, this.note, this.redactor)));
+      if (prepared) return await this.conclude(prepared);
       const prompts = PromptPack.choose(this.job.promptPackage, this.config.skillsDir, this.log);
       // 단계가 더한 것(브라우저 작업이 도는 곳)이 AI CLI의 설정(mcp.json)에 실린다
       const job = await this.recorder.begin(stage?.aiJob(prompts) ?? this.job);
-      workspace = await this.tool.open(job, stage?.workspaceRoom ?? null, this.recorder.kept);
-      await workspace.handOver(this.job.sharedFolders(this.config.folders));
-      const { skill, skillPackage: shipped } = this.job;
-      if (shipped) this.log.info(`스킬 ${shipped.name}: ${shipped.label}`);
-      else if (skill && JobWorkspace.skillText(skill, this.config.skillsDir) === null)
-        this.log.info(`스킬 ${skill}이 없어 지시만으로 해요`);
-      await this.supervise(workspace, this.tool, prompts);
+      const place = await this.tool.open(job, stage?.workspaceRoom ?? null, this.recorder.kept);
+      workspace = place;
+      await place.handOver(this.job.sharedFolders(this.config.folders));
+      JobWorkspace.logSkill(this.job, this.config.skillsDir, this.log);
+      // 사진을 받는 동안에도 보고 고리를 돌린다 (임대 · 취소). 사진은 덤이라 받지 못해도 이어 간다
+      const got = await this.during((signal) => this.photos.receive(place, signal, this.note));
+      if (got instanceof RunEnding) return await this.conclude(got);
+      await this.supervise(place, this.tool, prompts);
     } catch (error) {
       if (!(error instanceof CliUnavailable))
         await this.conclude(RunEnding.release(`러너 오류: ${(error as Error).message}`));
@@ -161,7 +163,7 @@ export class JobRun {
    */
   private async supervise(place: JobWorkspace, tool: AiTool, prompts: PromptPack): Promise<void> {
     const job = this.recorder.onto(
-      this.stage?.aiJob(prompts) ?? place.withShared(this.job, prompts),
+      this.stage?.aiJob(prompts) ?? place.withShared(this.photos.onto(this.job), prompts),
     );
     let run = await this.runAi(job, place, tool, prompts);
     for (let retries = 0; run.ending.succeeded && this.stage !== null; retries++) {

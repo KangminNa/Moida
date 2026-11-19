@@ -229,7 +229,7 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 {{lines}}
 
 <!-- ref -->
-- {{title}}{{#private}} (비공개){{/private}}: {{#wiki}}위키 · get_wiki의 wiki_id {{id}}{{/wiki}}{{#session}}세션 · get_session의 session_id {{id}}{{/session}}{{#post}}블로그 글 · blog_get_post의 post_id {{id}}{{/post}}{{#file}}결과물 파일 · inputs/에 재료로 받아 두었습니다{{/file}}{{#handoff}}결과물 파일 (id {{id}}) · 이 일에서는 열 수 없습니다. 내용이 필요하면 결과에 적어 관리자에게 알립니다{{/handoff}}{{#read}}read_url로 읽기 · {{url}}{{/read}}{{#browser}}서버 브라우저로 열 주소 · {{url}} (브라우저 담당에게 refs로 넘깁니다){{/browser}}
+- {{title}}{{#private}} (비공개){{/private}}: {{#wiki}}위키 · get_wiki의 wiki_id {{id}}{{/wiki}}{{#session}}세션 · get_session의 session_id {{id}}{{/session}}{{#post}}블로그 글 · blog_get_post의 post_id {{id}}{{/post}}{{#file}}결과물 파일 · inputs/에 재료로 받아 두었습니다{{/file}}{{#handoff}}결과물 파일 (id {{id}}) · 이 일에서는 열 수 없습니다. 내용이 필요하면 결과에 적어 관리자에게 알립니다{{/handoff}}{{#photoPath}}사진 · {{photoPath}}에 받아 두었습니다. 그 파일을 읽어 사진을 직접 봅니다{{/photoPath}}{{#photoNumber}}사진 · 이 지시에 붙인 그림 {{photoNumber}}번입니다{{/photoNumber}}{{#photoMissed}}사진 (id {{id}}) · 받지 못해 볼 수 없습니다. 사진의 내용을 짐작하지 말고, 필요하면 결과에 적어 관리자에게 알립니다{{/photoMissed}}{{#read}}read_url로 읽기 · {{url}}{{/read}}{{#browser}}서버 브라우저로 열 주소 · {{url}} (브라우저 담당에게 refs로 넘깁니다){{/browser}}
 
 <!-- resumed -->
 # 이어서 하는 실행

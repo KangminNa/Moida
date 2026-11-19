@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { realpathSync } from 'node:fs';
+import { homedir, tmpdir, userInfo } from 'node:os';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { ConfigProblem, RunnerConfig } from './runner-config';
 
@@ -27,8 +30,11 @@ describe('러너 설정', () => {
     assert.equal(config.skillsDir, '/opt/skills');
   });
 
-  test('세션 키 폴더: 기본은 홈 아래, CAIRN_RUNNER_LINEAGES_DIR로 바꾸고 상대 경로 · /는 막는다', () => {
-    assert.ok(RunnerConfig.fromEnv(env).lineagesDir.endsWith('/.cache/cairn-runner/lineages'));
+  test('세션 키 폴더: 기본은 홈 밖(임시 폴더), CAIRN_RUNNER_LINEAGES_DIR로 바꾸고 상대 경로 · /는 막는다', () => {
+    // 홈 아래면 Claude의 홈 막기(deny)에 작업 폴더가 함께 막힌다 (2026-11-19)
+    const fallback = RunnerConfig.fromEnv(env).lineagesDir;
+    assert.equal(fallback, join(realpathSync(tmpdir()), `cairn-runner-lineages-${userInfo().uid}`));
+    assert.equal(fallback.startsWith(`${homedir()}/`), false);
     const moved = { ...env, CAIRN_RUNNER_LINEAGES_DIR: ' /tmp/cairn-runner/lineages/ ' };
     assert.equal(RunnerConfig.fromEnv(moved).lineagesDir, '/tmp/cairn-runner/lineages');
     assert.equal(

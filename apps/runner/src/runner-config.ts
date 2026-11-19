@@ -1,5 +1,5 @@
-import { statSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { realpathSync, statSync } from 'node:fs';
+import { tmpdir, userInfo } from 'node:os';
 import { basename, isAbsolute, join, resolve, sep } from 'node:path';
 import { AgentUser } from './agent-user';
 import { type EngineAdapter, EngineAdapters } from './engine-adapter';
@@ -14,11 +14,14 @@ export class RunnerConfig {
   private static readonly DEFAULT_SKILLS = resolve(__dirname, '../../../skills');
   private static readonly SLOT = /^[1-9][0-9]?$/;
   private static readonly DEFAULT_WORK_DIR = '/work';
+  /**
+   * 세션 키 폴더의 기본: 이 사용자의 임시 폴더 아래 한 층 (2026-11-19). 홈 아래면 Claude의 홈 막기(설정의 deny)에
+   * 작업 폴더가 함께 막혀 사진 · outputs/ · 인수인계 메모를 읽고 쓰지 못한다. 공유 /tmp라도 LineageStore가
+   * 이 사용자의 폴더(링크 아님, 700)인지 보고 쓴다. 재부팅하면 지워져도 된다: 재개는 될 때만 한다
+   */
   private static readonly DEFAULT_LINEAGES_DIR = join(
-    homedir(),
-    '.cache',
-    'cairn-runner',
-    'lineages',
+    realpathSync(tmpdir()),
+    `cairn-runner-lineages-${userInfo().uid}`,
   );
   /** 동시에 하는 일의 수 (CAIRN_RUNNER_CONCURRENCY). 서버의 next_jobs는 한 번에 10개까지 빌려 준다 */
   private static readonly CONCURRENCY_MAX = 8;
@@ -60,7 +63,7 @@ export class RunnerConfig {
     readonly concurrency = 1,
     /**
      * 세션 키마다 CLI 세션 파일을 24시간 남기는 폴더 (LineageStore, 2026-11-17). 실행 중에는 작업 폴더도 여기 생긴다.
-     * CAIRN_RUNNER_LINEAGES_DIR, 기본은 러너 사용자의 홈 아래. 서버 러너는 홈이 작은 메모리 폴더라 compose가 /tmp 아래로 정한다
+     * CAIRN_RUNNER_LINEAGES_DIR, 기본은 러너 사용자의 임시 폴더 아래(홈 밖: Claude가 홈을 막는다). 서버 러너는 compose가 /tmp 아래로 정한다
      */
     readonly lineagesDir: string = RunnerConfig.DEFAULT_LINEAGES_DIR,
   ) {}

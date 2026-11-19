@@ -73,6 +73,23 @@ describe('재료 받기', () => {
     assert.deepEqual(await readFile(join(dir, '표지.png')), body);
   });
 
+  test('정한 이름이 있으면 서버의 이름 대신 쓰고, 한도보다 큰 파일은 받지 않는다 (사진)', async () => {
+    const body = Buffer.from('그림');
+    const named = new MaterialDownloader(serverWith({ name: '서버.png', body }), url);
+    assert.equal((await named.download(TASK, OUT, dir, undefined, 'photo-1')).name, 'photo-1');
+    const small = new MaterialDownloader(
+      serverWith({ name: '큰.png', body, size: 3 * 1024 * 1024 }),
+      url,
+      2 * 1024 * 1024,
+    );
+    await assert.rejects(small.download(TASK, OUT, dir), (error: Error) => {
+      assert.ok(error instanceof MaterialGone);
+      assert.equal(error.message, '2MB가 넘는 파일이에요');
+      return true;
+    });
+    assert.deepEqual(await readdir(dir), ['photo-1']);
+  });
+
   test('이름에 폴더 · 숨김 · 제어 문자가 있으면 재료-<id>로 받는다', async () => {
     for (const name of ['../밖.txt', '.bashrc', 'a\nb']) {
       const downloader = new MaterialDownloader(serverWith({ name, body: Buffer.from('x') }), url);

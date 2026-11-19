@@ -17,6 +17,7 @@ import { AgentRepository } from '../agent/agent.repository';
 import { AgentEdit } from '../agent/agent-edit';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
+import { OutputQuery } from '../output/output.query';
 import { SkillQuery } from '../skill/skill.query';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
@@ -46,6 +47,7 @@ export class ChatService extends BaseService {
     private readonly skills: SkillQuery,
     private readonly library: LibraryQuery,
     private readonly lookups: Lookups,
+    private readonly outputs: OutputQuery,
   ) {
     super(db);
   }
@@ -295,9 +297,13 @@ export class ChatService extends BaseService {
     return chat;
   }
 
-  /** 고른 참조를 보관함으로 확인한다 (트랜잭션 밖에서, 관리자만). 없으면 빈 참조 */
+  /** 고른 참조를 보관함으로 확인하고 사진인 결과물을 적는다 (트랜잭션 밖에서, 관리자만). 없으면 빈 참조 */
   private async refsOf(actor: Actor, picks: readonly RefPick[]): Promise<TaskRefs> {
     if (picks.length === 0) return TaskRefs.of(null);
-    return TaskRefs.resolve(picks, await this.library.describe(actor, TaskRefs.idsOf(picks)));
+    const [found, images] = await Promise.all([
+      this.library.describe(actor, TaskRefs.idsOf(picks)),
+      this.outputs.imageIds(actor, TaskRefs.outputIdsOf(picks)),
+    ]);
+    return TaskRefs.resolve(picks, found, images);
   }
 }

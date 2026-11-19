@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // 세션 키마다 고정 자리 (CLI 세션 재개, 기획서 결정 2026-11-17). Claude Code는 세션 파일을 설정 폴더의
@@ -12,6 +12,8 @@ import { join } from 'node:path';
 //   그 밖(work · home · mcp.json · 설정 파일)은 실행마다 지운다
 // 24시간이 지났거나 50개를 넘으면 오래된 것부터 지운다: 세션 파일에는 도구의 결과까지 들어 있어 오래 두지 않는다.
 // 세션 파일을 남기는 일만 쓴다 (서버의 run.keep: 브라우저 · 샌드박스 일은 아니다)
+// 기본 자리는 공유될 수 있는 임시 폴더 아래라(RunnerConfig) 쓰기 전에 이 사용자의 폴더인지 본다:
+// 링크거나 다른 사용자의 것이면 쓰지 않는다(이 실행은 임시 자리에서 새로 시작한다), 내 것이면 700으로 좁힌다
 export class LineageStore {
   static readonly KEEP_MS = 24 * 60 * 60_000;
   static readonly MAX = 50;
@@ -21,11 +23,21 @@ export class LineageStore {
   /** 세션 키의 자리를 잡는다. 다른 실행이 쓰는 중이면 null (그 실행은 임시 자리에서 새로 시작한다) */
   async claim(lineage: string, now = new Date()): Promise<LineagePlace | null> {
     await mkdir(this.dir, { recursive: true, mode: 0o700 });
+    await this.assertMine();
     await this.sweep(now);
     const name = createHash('sha256').update(lineage).digest('hex').slice(0, 32);
     const place = new LineagePlace(join(this.dir, name));
     await mkdir(place.root, { recursive: true, mode: 0o700 });
     return (await place.lock()) ? place : null;
+  }
+
+  /** 세션 키 폴더가 이 사용자의 진짜 폴더인지 (링크 아님 · 내 것). 아니면 Error, 내 것이면 다른 사용자의 권한을 뺀다 */
+  private async assertMine(): Promise<void> {
+    const info = await lstat(this.dir);
+    if (!info.isDirectory()) throw new Error(`세션 키 폴더가 폴더가 아니에요 (링크): ${this.dir}`);
+    if (process.getuid && info.uid !== process.getuid())
+      throw new Error(`다른 사용자의 세션 키 폴더예요: ${this.dir}`);
+    if ((info.mode & 0o077) !== 0) await chmod(this.dir, 0o700);
   }
 
   /** 24시간 지났거나 50개를 넘는 자리를 오래된 것부터 지운다. 쓰는 중인 자리는 두고 */

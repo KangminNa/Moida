@@ -180,9 +180,12 @@ export class CodexCli implements AiTool {
     return workspace;
   }
 
-  args(workspace: JobWorkspace): readonly string[] {
+  /** photos: 지시에 붙일 사진 (작업 폴더 안의 경로, 대화에 사진 넣기 ②-b) */
+  args(workspace: JobWorkspace, photos: readonly string[] = []): readonly string[] {
     return [
       'exec',
+      // 값을 여럿 받는 옵션이라 사진마다 하나씩, 다음 옵션 앞에 둔다 (지시문의 - 를 사진으로 읽지 않게)
+      ...photos.flatMap((file) => ['--image', file]),
       '--json',
       '--strict-config',
       '--skip-git-repo-check',
@@ -226,7 +229,7 @@ export class CodexCli implements AiTool {
       (job.skill === null ? null : JobWorkspace.skillText(job.skill, this.skillsDir));
     return new AiProcess(
       this.bin,
-      this.args(workspace),
+      this.args(workspace, job.refs.attachedPhotos),
       workspace.workDir,
       this.env(job, workspace, process.env),
       job.prompt(prompts, false, skill, workspace.outputsDir, workspace.memoPath),
@@ -275,6 +278,8 @@ export class CodexEngine implements EngineAdapter {
   readonly bin = { env: 'CAIRN_RUNNER_CODEX_CLI', fallback: 'codex' };
   readonly ownLogin = null;
   readonly resumes = false;
+  /** 받은 사진을 codex exec --image로 지시에 붙인다 (셸이 없어 파일을 그림으로 읽는 길이 없다) */
+  readonly photos = 'attach';
   readonly signin = new CodexSignin();
 
   tool(credential: string, config: RunnerConfig): AiTool {

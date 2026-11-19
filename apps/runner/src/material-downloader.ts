@@ -8,7 +8,7 @@ import { pause } from './backoff';
 import type { CairnServer } from './cairn-server';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
 
-/** 재료가 그사이 휴지통에 갔거나 없어졌다. 그 파일만 빼고 이어 간다 */
+/** 받지 않고 넘어갈 파일: 그사이 휴지통에 갔거나 없어졌다, 한도보다 크다. 그 파일만 빼고 이어 간다 */
 export class MaterialGone extends Error {}
 
 /** 받은 파일이 표와 다르거나 서버가 재료를 주지 않는다 (재료가 아님 · 임대를 잃음). 일을 실패로 끝낸다 */
@@ -42,19 +42,22 @@ export class MaterialDownloader {
   constructor(
     private readonly server: CairnServer,
     private readonly serverUrl: string,
+    /** 받을 파일 하나의 한도. 표의 크기가 넘으면 받지 않는다 (MaterialGone) */
+    private readonly maxBytes = Number.POSITIVE_INFINITY,
   ) {}
 
-  /** 재료 하나를 dir에 받는다 */
+  /** 재료 하나를 dir에 받는다. name: 서버의 이름 대신 쓸 이름 (사진처럼 러너가 정하는 것) */
   async download(
     taskId: string,
     outputId: string,
     dir: string,
     signal?: AbortSignal,
+    name?: string,
   ): Promise<MaterialFile> {
     let wait = MaterialDownloader.FIRST_WAIT_MS;
     for (let attempt = 1; ; attempt++) {
       try {
-        return await this.once(taskId, outputId, dir, signal);
+        return await this.once(taskId, outputId, dir, signal, name);
       } catch (error) {
         if (error instanceof ToolRefused) {
           if (error.code === 'not_found') throw new MaterialGone(error.message);
@@ -73,8 +76,11 @@ export class MaterialDownloader {
     outputId: string,
     dir: string,
     signal?: AbortSignal,
+    given?: string,
   ): Promise<MaterialFile> {
     const ticket = await this.server.beginDownload(taskId, outputId, signal);
+    if (ticket.size > this.maxBytes)
+      throw new MaterialGone(`${Math.floor(this.maxBytes / 1024 / 1024)}MB가 넘는 파일이에요`);
     let res: Response;
     try {
       res = await fetch(new URL(ticket.path, this.serverUrl), {
@@ -91,7 +97,7 @@ export class MaterialDownloader {
     // 표가 끝났거나(403) 서버가 잠시 답하지 못함: 표를 새로 받아 다시
     if (!res.ok || res.body === null)
       throw new ServerUnreachable(`재료를 받지 못했어요 (${res.status})`);
-    const name = this.nameFor(ticket.name, outputId);
+    const name = this.nameFor(given ?? ticket.name, outputId);
     const path = join(dir, name);
     const hash = createHash('sha256');
     let size = 0;
