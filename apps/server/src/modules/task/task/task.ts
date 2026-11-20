@@ -12,7 +12,6 @@ import {
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
-import { TurnDeliver } from '../chat/turn-deliver.policy';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
 import { TASK_EVENT_KIND } from '../task.tables';
@@ -613,9 +612,12 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return typeof this.payload.tool === 'string' ? this.payload.tool : null;
   }
 
-  /** 대화 회차의 받을 것 (O-3 set_deliver). 회차인지 · 이미 정했는지 · 관리자가 정한 값은 TurnDeliver가 본다 */
-  declareDeliver(deliver: string, note: string | null, fixed: string | null): void {
-    this.put('payload', TurnDeliver.declare(this.payload, deliver, note, fixed));
+  /**
+   * 일이 스스로 정하는 payload의 칸: 대화 회차의 받을 것(O-3 set_deliver, 규칙은 TurnDeliver.declare) · 계획(2026-11-20
+   * set_plan, 규칙은 TaskPlan.declare: 한 번만). 규칙은 정책이 지금 payload를 받아 새 payload를 돌려주며 지킨다
+   */
+  declare(next: (payload: Readonly<Record<string, unknown>>) => Record<string, unknown>): void {
+    this.put('payload', next(this.payload));
   }
 
   private get payload(): Readonly<Record<string, unknown>> {

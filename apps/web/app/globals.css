@@ -2202,6 +2202,13 @@ a.chip {
   line-height: 1.55;
 }
 
+/* 성적표 한 줄 (2026-11-20): 최근 기간의 첫 판정 통과 · 고친 횟수 · 반려 · 토큰 */
+.agent-score {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
 /* 상태: 점 + 말 (일하는 중 · 쉬는 중 · 멈춤 · 쉬기 한도) */
 .state {
   flex: none;

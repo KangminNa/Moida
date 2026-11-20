@@ -11,6 +11,8 @@ export class TaskNotices implements OnModuleInit {
   static readonly APPROVAL = 'task.approval.requested';
   static readonly FAILED = 'task.task.failed';
   static readonly SCHEDULE_SKIPPED = 'task.schedule.skipped';
+  /** 잇달아 실패해 끈 레시피 (2026-11-20 자동화 건강 검사, 바로 알림) */
+  static readonly SCHEDULE_STOPPED = 'task.schedule.stopped';
   static readonly CHAT_ANSWERED = 'task.chat.answered';
   private static readonly APPROVAL_ENDED = [
     'task.approval.granted',
@@ -77,6 +79,9 @@ export class TaskNotices implements OnModuleInit {
     );
     this.catalog.define(
       new NoticeKind(TaskNotices.SCHEDULE_SKIPPED, '스케줄 한도', NoticeKind.LOG),
+    );
+    this.catalog.define(
+      new NoticeKind(TaskNotices.SCHEDULE_STOPPED, '자동화 멈춤', NoticeKind.IMMEDIATE),
     );
   }
 }

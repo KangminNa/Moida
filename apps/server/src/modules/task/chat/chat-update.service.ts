@@ -14,6 +14,7 @@ import { ChatRepository } from './chat.repository';
 import type { PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
 import { DeliverSetView } from './chat-update.view';
+import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화의 소식 쓰기 (task.chat_updates, 2차 1-1). 소식은 대화 엔티티를 거쳐 쌓이고(Chat.note) 변경 신호로 agent_updates를 깨운다.
 //   일꾼: 대화 안의 작업이 끝나면(task.task.changed) 팀원 끝남 · 실패 · 최종 답 · 덧붙인 말의 답 (ChatUpdateHandler)
@@ -75,7 +76,7 @@ export class ChatUpdateService extends BaseService {
       const place = await chats.placeOf(taskId);
       if (!place) throw new Forbidden(Actor.AGENT, '대화 회차를 맡은 대표만 정해요');
       const chat = await chats.load(spaceId, place.chat_id);
-      task.declareDeliver(req.deliver, req.note, chat.deliver);
+      task.declare((p) => TurnDeliver.declare(p, req.deliver, req.note, chat.deliver));
       await tasks.save(task);
       return new DeliverSetView(chat.deliver ?? req.deliver, chat.deliver !== null);
     });

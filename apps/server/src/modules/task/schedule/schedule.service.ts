@@ -30,6 +30,7 @@ import type { ScheduleRow } from '../task.tables';
 import { TaskNotices } from '../task-notices';
 import { Schedule } from './schedule';
 import type { CreateScheduleInput, UpdateScheduleInput } from './schedule.input';
+import { SchedulePolicy } from './schedule.policy';
 import { ScheduleRepository } from './schedule.repository';
 import { ScheduleEdit } from './schedule-edit';
 
@@ -237,7 +238,7 @@ export class ScheduleService extends EntityService<Schedule> {
       const chat = Chat.open(spaceId, requestId, instruction, now);
       const turn = chat.assign(lead, now, schedule.deliver);
       await chats.save(chat);
-      schedule.openedChat(chat.id);
+      schedule.bindChat(chat.id);
       await new ScheduleRepository(tx).save(schedule);
       return (await tasks.insertOnce(turn)) ? turn : null;
     }
@@ -280,6 +281,44 @@ export class ScheduleService extends EntityService<Schedule> {
     const chats = new ChatRepository(tx);
     const chat = await chats.lock(spaceId, chatId);
     return ChatHistory.waiting((await chats.previousTurns(chat, spaceId)).at(-1));
+  }
+
+  /**
+   * 자동화 건강 검사 (2026-11-20, ECC loop-operator): 레시피가 만든 일이 실패로 끝났다. 그 레시피의 최근
+   * FAILING_RUNS번이 모두 실패면 레시피를 끄고 바로 알린다 (사람이 고쳐 다시 켠다). 꺼져 있으면 그대로 (두 번 불려도 같다)
+   */
+  async checkHealth(actor: Actor, spaceId: string, taskId: string): Promise<boolean> {
+    actor.assertOwnerOrSystem();
+    return this.transaction(async (tx) => {
+      const schedules = new ScheduleRepository(tx);
+      const source = Schedule.sourceOf(await schedules.requestOf(spaceId, taskId));
+      const found = source === null ? null : await schedules.lockEnabled(spaceId, source);
+      if (found === null) return false;
+      const recent = await schedules.recentRuns(
+        spaceId,
+        found.requestPrefix,
+        SchedulePolicy.FAILING_RUNS,
+      );
+      if (!SchedulePolicy.failing(recent)) return false;
+      found.stopFailing();
+      await schedules.save(found);
+      await new Notices(tx).post(ScheduleService.stoppedNotice(found, recent.length));
+      return true;
+    });
+  }
+
+  /** 잇달아 실패해 끈 레시피 (바로 알림) */
+  private static stoppedNotice(schedule: Schedule, failed: number) {
+    return {
+      space_id: schedule.spaceId,
+      kind: TaskNotices.SCHEDULE_STOPPED,
+      severity: NoticeKind.IMMEDIATE,
+      title: `${schedule.title}: ${failed}번 잇달아 실패해 껐어요`,
+      body: '실패한 작업의 까닭을 보고 고친 뒤 다시 켜 주세요',
+      link: '/admin/schedules',
+      group_key: `schedule-stopped:${schedule.id}`,
+      data: { scheduleId: schedule.id },
+    };
   }
 
   /** 하루 한도로 건너뛴 기록 (기록만). 스케줄마다 한 줄이라 읽기 전까지 쌓이지 않는다 */

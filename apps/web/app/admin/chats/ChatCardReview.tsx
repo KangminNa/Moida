@@ -2,7 +2,7 @@ import type { ChatCard } from '../../_task/types';
 import { Icon } from '../../_ui/Icon';
 
 // 결과 카드의 검증 (검증 고리 V): 검토자 짝의 판정 · 완료 조건 체크리스트 · 고칠 것, 서버가 다시 맡긴 횟수.
-// 판정을 읽지 못한 답(unknown)은 글 그대로 보인다
+// 판정을 읽지 못한 답(unknown)은 글 그대로 보인다. 완료 조건마다 1~5점이 있으면 함께 (2026-11-20 점수로 판정)
 
 const VERDICT_LABELS: Record<string, string> = {
   pass: '그대로 승인',
@@ -24,6 +24,7 @@ export function ChatCardReview({ card }: { card: ChatCard }) {
       {review && verdict && (
         <p className="result-verdict">
           <b>{verdict}</b>
+          {review.score !== null ? ` · 평균 ${review.score}점` : ''}
           {review.summary ? ` · ${review.summary}` : ''}
         </p>
       )}
@@ -33,6 +34,7 @@ export function ChatCardReview({ card }: { card: ChatCard }) {
           {review.checklist.map((line) => (
             <li key={line.item} className={line.ok ? '' : 'unmet'}>
               <Icon name={line.ok ? 'check' : 'x'} /> {line.item}
+              {line.score !== null ? <small> · {line.score}점</small> : null}
               {line.note ? <small> · {line.note}</small> : null}
             </li>
           ))}

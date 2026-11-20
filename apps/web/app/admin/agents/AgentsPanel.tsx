@@ -193,6 +193,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
                 agent={a}
                 work={workOf(a)}
                 hold={holdLabel(usage.data?.agents.find((u) => u.id === a.id))}
+                score={usage.data?.agents.find((u) => u.id === a.id)?.scorecard ?? null}
                 boss={list.find((b) => b.id === a.reportsTo)?.name ?? ownerName}
                 runner={
                   a.runnerId ? (runners.find((r) => r.runner.id === a.runnerId) ?? null) : undefined

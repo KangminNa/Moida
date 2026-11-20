@@ -169,6 +169,17 @@ describe('GET /api/usage', () => {
       monthlyLimit: 1000,
       planStopPercent: 80,
       holding: false,
+      // 성적표 (2026-11-20): 판정 · 결정 · 끝낸 일이 없는 새 에이전트
+      scorecard: {
+        days: 30,
+        judged: 0,
+        firstPass: 0,
+        avgFixes: null,
+        decided: 0,
+        sentBack: 0,
+        done: 0,
+        tokensPerDone: null,
+      },
     });
   });
 

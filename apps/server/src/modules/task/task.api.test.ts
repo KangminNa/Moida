@@ -875,6 +875,7 @@ describe('작업 토큰', () => {
       'delegate_task',
       'wait_subtasks',
       'ask_help',
+      'set_plan',
       'read_url',
       'report_round',
       'post_update',
@@ -903,6 +904,7 @@ describe('작업 토큰', () => {
       'save_session',
       'save_transcript',
       'set_deliver',
+      'set_plan',
       'wait_subtasks',
     ]);
   });

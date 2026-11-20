@@ -24,6 +24,8 @@ export type LeadBody = Runtime & {
   reviewerId: string | null;
   /** 검수 승인 (2026-11-20): 검토자가 검수해 통과하면 앱 안의 공개(글 · 앱 화면)를 관리자 대신 승인 */
   reviewerApproves: boolean;
+  /** 두 번째 검수자 (2026-11-20, 선택): 검토자와 다른 AI 도구. 둘 다 통과해야 공개 */
+  secondInspectorId: string | null;
 };
 
 // 대표의 설정 (O-2, 설정 › AI): AI 도구 · 모델 · 생각 강도 · 한도 · 검토자 · 검수 승인. 이름 · 역할 · 권한은 서버가 정한다
@@ -47,6 +49,8 @@ export function LeadForm({
   const [runtime, setRuntime] = useState<Runtime>({ model: lead.model, effort: lead.effort });
   const [reviewerId, setReviewerId] = useState(lead.reviewerId ?? '');
   const [approves, setApproves] = useState(lead.reviewerApproves);
+  const [secondId, setSecondId] = useState(lead.secondInspectorId ?? '');
+  const reviewerTool = agents.find((a) => a.id === reviewerId)?.tool ?? '';
   const [limit, setLimit] = useState(lead.monthlyLimit?.toString() ?? '');
   const [fiveHour, setFiveHour] = useState(lead.fiveHourLimit?.toString() ?? '');
   const [planStop, setPlanStop] = useState(lead.planStopPercent?.toString() ?? '');
@@ -73,6 +77,7 @@ export function LeadForm({
       planStopPercent,
       reviewerId: reviewerId || null,
       reviewerApproves: approves && reviewerId !== '',
+      secondInspectorId: approves && reviewerId !== '' && secondId !== '' ? secondId : null,
     });
   }
 
@@ -122,6 +127,18 @@ export function LeadForm({
           플러그인 · 설정 바꾸기는 늘 승인을 받아요
         </small>
       </div>
+      {approves && reviewerId !== '' && (
+        <ReviewerField
+          id={`${id}-second`}
+          label="두 번째 검수자"
+          help="검토자와 다른 AI 도구의 에이전트가 따로 한 번 더 검수해요. 둘 다 통과해야 공개해요 (검수 비용 두 배)"
+          value={secondId}
+          tool={reviewerTool}
+          self={lead.id}
+          agents={agents}
+          onChange={setSecondId}
+        />
+      )}
       <LimitField
         id={`${id}-limit`}
         label="월 한도 (토큰)"

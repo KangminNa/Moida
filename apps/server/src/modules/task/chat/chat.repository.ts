@@ -1,7 +1,7 @@
 import { ChangeSignal, TableRepository } from '../../platform';
 import { Task } from '../task/task';
 import { chats, chatUpdates } from '../task.schema';
-import type { ChatRow } from '../task.tables';
+import type { ChatRow, TaskRow } from '../task.tables';
 import { Chat } from './chat';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatRequest } from './chat-request.policy';
@@ -31,6 +31,19 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
       SELECT id, instruction, result, status, wait_reason, payload FROM task.tasks
       WHERE space_id = ${spaceId} AND request_id = ANY(${ids}::text[])
       ORDER BY created_at, id`;
+  }
+
+  /** 결재 하나의 검수 작업들: 첫 검수자의 것이 먼저, 두 번째 검수자(2026-11-20)의 것이 다음 */
+  inspections(
+    spaceId: string,
+    chatId: string,
+    approvalId: string,
+  ): Promise<Pick<TaskRow, 'id' | 'agent_id' | 'status' | 'result'>[]> {
+    const ids = [false, true].map((second) => ChatRequest.review(chatId, 0, approvalId, second));
+    return this.sql<Pick<TaskRow, 'id' | 'agent_id' | 'status' | 'result'>[]>`
+      SELECT id, agent_id, status, result FROM task.tasks
+      WHERE space_id = ${spaceId} AND request_id = ANY(${ids}::text[])
+      ORDER BY request_id`;
   }
 
   /** 이 회차 작업에 쌓인 그 종류의 소식 수 (덧붙인 말 · post_update의 한도) */

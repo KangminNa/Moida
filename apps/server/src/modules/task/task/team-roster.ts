@@ -11,6 +11,10 @@ import type { JobTeamMemberView, TeamStatRow } from './job.view';
 export class TeamRoster {
   /** 바로 아래 팀원 정보의 최근 기간 */
   static readonly RECENT_DAYS = 7;
+  /** 성적표의 기간 (2026-11-20): 판정 · 관리자 결정은 드물어 일주일로는 비율이 흔들린다 */
+  static readonly SCORE_DAYS = 30;
+  /** 성적표의 관리자 결정에서 빼는 동작: 결과 카드(고르기) · 로그인했어요(품질이 아님) */
+  static readonly SCORE_SKIP: readonly string[] = ['task.chat.result', 'browser.site.login'];
   private static readonly DAY_MS = 86_400_000;
   private readonly stats: ReadonlyMap<string, TeamStatRow>;
 
@@ -25,6 +29,11 @@ export class TeamRoster {
   /** 최근 기간의 시작 (끝냄 · 실패 · 고쳐 달라를 이때부터 센다) */
   static since(now: Date): Date {
     return new Date(now.getTime() - TeamRoster.RECENT_DAYS * TeamRoster.DAY_MS);
+  }
+
+  /** 성적표 기간의 시작 */
+  static scoreSince(now: Date): Date {
+    return new Date(now.getTime() - TeamRoster.SCORE_DAYS * TeamRoster.DAY_MS);
   }
 
   /** 이 에이전트가 맡길 수 있는 바로 아래 팀원. 에이전트 없는 일이면 비어 있다 */

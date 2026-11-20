@@ -12,7 +12,11 @@ export class ScheduleFollowHandler extends BaseHandler {
   }
 
   async handle(event: DomainEvent): Promise<void> {
+    const taskId = String(event.data.taskId);
+    // 자동화 건강 검사 (2026-11-20): 레시피의 일이 실패하면 잇달아 실패했는지 본다
+    if (event.data.status === Task.FAILED)
+      await this.schedules.checkHealth(new SystemActor(), event.spaceId, taskId);
     if (event.data.status !== Task.DONE) return;
-    await this.schedules.follow(new SystemActor(), event.spaceId, String(event.data.taskId));
+    await this.schedules.follow(new SystemActor(), event.spaceId, taskId);
   }
 }

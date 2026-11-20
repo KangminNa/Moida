@@ -2,20 +2,13 @@ import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
 import { JobLineage } from './job-lineage';
+import { JobPlan } from './job-plan';
 import { JobRefs, type RefPhotos } from './job-refs';
+import { JobTarget } from './job-target';
 import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
 import { SubtaskResult } from './subtask-result';
 import { TeamMember } from './team-member';
-
-/** 일의 대상 (글 등) */
-export class JobTarget {
-  constructor(
-    readonly kind: string,
-    readonly id: string,
-    readonly version: number | null,
-  ) {}
-}
 
 /**
  * 서버가 실어 보낸 스킬 한 판 (next_jobs의 skill_package). 러너는 디스크의 skills/ 대신 이것으로 깐다:
@@ -150,6 +143,8 @@ export class Job {
     readonly wake: string | null = null,
     /** 팀장이 맡긴 일인가 (payload.delegatedBy). 아래 팀이 없으면 일이 클 때 ask_help로 도움을 청한다 (2026-11-20) */
     readonly delegated = false,
+    /** 이 일에서 set_plan으로 정한 계획 (payload.plan, 2026-11-20). 정하지 않았으면 null */
+    readonly plan: JobPlan | null = null,
   ) {}
 
   static from(raw: Json): Job {
@@ -163,9 +158,7 @@ export class Job {
       task.text('kind'),
       task.text('title'),
       raw.text('instruction'),
-      target.optionalText('kind') === null
-        ? null
-        : new JobTarget(target.text('kind'), target.text('id'), target.optionalNumber('version')),
+      JobTarget.from(target),
       raw.optionalText('skill'),
       raw.optionalText('revision_note'),
       agent.text('name'),
@@ -197,6 +190,7 @@ export class Job {
       agent.flag('lead'),
       raw.optionalText('wake'),
       Boolean(payload.optionalText('delegatedBy')),
+      JobPlan.from(payload),
     );
   }
 
@@ -266,6 +260,7 @@ export class Job {
       this.lead,
       this.wake,
       this.delegated,
+      this.plan,
     );
   }
 
@@ -346,6 +341,7 @@ export class Job {
     if (this.goalChain.length > 0)
       parts.push(prompts.fill('goal', { chain: this.goalChain.join(' › ') }));
     if (this.revisionNote) parts.push(prompts.fill('revision', { note: this.revisionNote }));
+    if (this.plan) parts.push(this.plan.part(prompts));
     if (this.subtaskResults.length > 0)
       parts.push(SubtaskResult.part(prompts, this.subtaskResults, this.wake, this.roundsLeft));
     if (this.brief) parts.push(this.brief);

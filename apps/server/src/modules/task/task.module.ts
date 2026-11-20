@@ -15,17 +15,14 @@ import { AgentTeamController } from './agent/agent-team.api';
 import { AiLoginController } from './ai/ai-login.api';
 import { AiLoginQuery } from './ai/ai-login.query';
 import { AiLoginService } from './ai/ai-login.service';
-import { AiLoginRefreshTool, AiLoginTool, AiSigninTool } from './ai/ai-login.tool';
 import { ApprovalController } from './approval/approval.api';
 import { ApprovalQuery } from './approval/approval.query';
 import { ApprovalService } from './approval/approval.service';
-import { RequestApprovalTool } from './approval/approval.tool';
 import { ApprovalResultHandler } from './approval/approval-result.handler';
 import { AppCodeCardHandler } from './chat/app-code-card.handler';
 import { ChatController } from './chat/chat.api';
 import { ChatQuery } from './chat/chat.query';
 import { ChatService } from './chat/chat.service';
-import { AskAgentTool } from './chat/chat.tool';
 import { ChatCardHandler } from './chat/chat-card.handler';
 import { ChatContinueHandler } from './chat/chat-continue.handler';
 import { ChatInspectHandler } from './chat/chat-inspect.handler';
@@ -35,11 +32,9 @@ import { ChatResultService } from './chat/chat-result.service';
 import { ChatUpdateHandler } from './chat/chat-update.handler';
 import { ChatUpdateQuery } from './chat/chat-update.query';
 import { ChatUpdateService } from './chat/chat-update.service';
-import { AgentUpdatesTool, PostUpdateTool, SetDeliverTool } from './chat/chat-update.tool';
 import { ExternalToolController } from './external-tool/external-tool.api';
 import { ExternalToolQuery } from './external-tool/external-tool.query';
 import { ExternalToolService } from './external-tool/external-tool.service';
-import { ProposeToolTool } from './external-tool/external-tool.tool';
 import { ExternalToolCheckJob } from './external-tool/external-tool-check.job';
 import { ExternalToolCheckService } from './external-tool/external-tool-check.service';
 import { ExternalToolPlugHandler } from './external-tool/external-tool-plug.handler';
@@ -51,14 +46,11 @@ import { GoalRunController } from './goal-run/goal-run.api';
 import { GoalRunHandler } from './goal-run/goal-run.handler';
 import { GoalRunQuery } from './goal-run/goal-run.query';
 import { GoalRunService } from './goal-run/goal-run.service';
-import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxQuery } from './inbox/inbox.query';
-import { InboxTool } from './inbox/inbox.tool';
 import { OutputController } from './output/output.api';
 import { OutputPolicy } from './output/output.policy';
 import { OutputQuery } from './output/output.query';
 import { OutputService } from './output/output.service';
-import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
 import { OutputPurgeJob } from './output/output-purge.job';
 import { OutputShareController } from './output-share/output-share.api';
 import { OutputShareQuery } from './output-share/output-share.query';
@@ -74,14 +66,12 @@ import { ScheduleFollowHandler } from './schedule/schedule-follow.handler';
 import { SettingApplyHandler } from './setting-change/setting-apply.handler';
 import { SettingQuery } from './setting-change/setting-change.query';
 import { SettingChangeService } from './setting-change/setting-change.service';
-import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
 import { RepoSkillGateway } from './skill/repo-skill.gateway';
 import { SkillController } from './skill/skill.api';
 import { SkillQuery } from './skill/skill.query';
 import { SkillService } from './skill/skill.service';
 import { AgentlessService } from './task/agentless.service';
 import { AgentlessRequestHandler } from './task/agentless-request.handler';
-import { AskHelpTool, DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
 import { JobService } from './task/job.service';
 import { LeaseJob } from './task/lease.job';
 import { LessonHandler } from './task/lesson.handler';
@@ -92,21 +82,18 @@ import { Task } from './task/task';
 import { TaskController } from './task/task.api';
 import { TaskQuery } from './task/task.query';
 import { TaskService } from './task/task.service';
-import {
-  NextJobsTool,
-  ReleaseJobTool,
-  ReportProgressTool,
-  SubmitResultTool,
-} from './task/task.tool';
 import { TaskRequestedHandler } from './task/task-requested.handler';
+import { TeamReviewHandler } from './task/team-review.handler';
+import { TeamReviewQuery } from './task/team-review.query';
 import events from './task.events.json';
 import { TaskNotices } from './task-notices';
 import { TaskSettings } from './task-settings';
 import { TaskTools } from './task-tools';
 import { UsageController } from './usage/usage.api';
 import { UsageQuery } from './usage/usage.query';
+import { VerdictHandler } from './verdict/verdict.handler';
+import { VerdictService } from './verdict/verdict.service';
 import { WebQuery } from './web/web.query';
-import { ReadUrlTool } from './web/web.tool';
 import { WebPageGateway } from './web/web-page.gateway';
 
 // 에이전트가 일하고 주인이 결재하는 구조: 에이전트(조직도 · 하트비트), 목표, 작업(실행 기록 · 위임), 결재. platform에만 의존한다.
@@ -132,23 +119,12 @@ import { WebPageGateway } from './web/web-page.gateway';
     RunnerService,
     AiLoginQuery,
     AiLoginService,
-    AiLoginTool,
-    AiLoginRefreshTool,
-    AiSigninTool,
-    NextJobsTool,
-    ReportProgressTool,
-    SubmitResultTool,
-    ReleaseJobTool,
-    RequestApprovalTool,
-    DelegateTaskTool,
-    WaitSubtasksTool,
-    AskHelpTool,
     TaskTools,
+    ...TaskTools.PROVIDERS,
     TaskRequestedHandler,
     AgentlessRequestHandler,
     AgentlessService,
     InboxQuery,
-    InboxTool,
     SubtaskSettledHandler,
     ApprovalResultHandler,
     LeaseJob,
@@ -163,13 +139,11 @@ import { WebPageGateway } from './web/web-page.gateway';
     OutputService,
     OutputShareQuery,
     OutputShareService,
-    BeginUploadTool,
     // 목표 실행: 회차 루프와 결재 (GoalRunHandler가 회차 끝 · 결재를 받는다)
     GoalRunQuery,
     GoalRunService,
     ChatQuery,
     ChatService,
-    AskAgentTool,
     // 대화의 소식 (2차 1-1): 끝난 작업 → 소식(ChatUpdateHandler), agent_updates · post_update
     ChatUpdateService,
     ChatUpdateQuery,
@@ -181,23 +155,23 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatInspectService,
     ChatInspectHandler,
     ChatCardHandler,
+    // 평가가 남는 팀 (2026-11-20): 끝난 검토 · 검수 작업 → 판정을 점수와 함께 쌓는다 (성적표 · 주간 팀 점검)
+    VerdictService,
+    VerdictHandler,
     // 피드백에서 배우기 (2026-11-20): 관리자의 수정 요청 메모가 쌓이면 대표에게 배우기 일
     LessonQuery,
     LessonHandler,
+    // 주간 팀 점검 (2026-11-20): 7일마다 대표에게 성적표로 팀을 점검하는 일
+    TeamReviewQuery,
+    TeamReviewHandler,
     // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
     AppCodeCardHandler,
     // 승인 뒤 이어서 (O-2): 대표가 continue로 올린 설정 바꾸기가 적용되어 끝난 회차 → 같은 대화의 다음 회차
     ChatContinueHandler,
-    AgentUpdatesTool,
-    PostUpdateTool,
-    SetDeliverTool,
     GoalRunHandler,
-    ReportRoundTool,
     // 주소 읽기 (read_url): 서버가 AI 대신 연다. 목줄은 WebReach
     WebPageGateway,
     WebQuery,
-    ReadUrlTool,
-    BeginDownloadTool,
     OutputPurgeJob,
     // 자동화 레시피 (2차 5단계): 레시피의 일이 끝나면 그 뒤의 레시피 (계기 after)
     ScheduleFollowHandler,
@@ -205,7 +179,6 @@ import { WebPageGateway } from './web/web-page.gateway';
     ExternalToolService,
     ExternalToolQuery,
     ExternalToolPlugHandler,
-    ProposeToolTool,
     // MCP 먼저 1단계 (2026-11-15): 커넥터 확인 · 사용 기록
     ExternalToolCheckService,
     ExternalToolTaskHandler,
@@ -213,8 +186,6 @@ import { WebPageGateway } from './web/web-page.gateway';
     // 설정 바꾸기 제안 (2026-11-15 C · D): 미리 해 보고 결재로, 승인 뒤 그 설정을 가진 모듈이 적용 (platform SettingKinds)
     SettingQuery,
     SettingChangeService,
-    GetSettingsTool,
-    ProposeSettingTool,
     SettingApplyHandler,
   ],
   controllers: [
@@ -258,8 +229,10 @@ export class TaskModule implements OnModuleInit {
     private readonly goalRuns: GoalRunHandler,
     private readonly chatResults: ChatResultHandler,
     private readonly chatInspections: ChatInspectHandler,
+    private readonly verdicts: VerdictHandler,
     private readonly chatCards: ChatCardHandler,
     private readonly lessons: LessonHandler,
+    private readonly teamReviews: TeamReviewHandler,
     private readonly appCodeCards: AppCodeCardHandler,
     private readonly chatContinues: ChatContinueHandler,
     private readonly agentless: AgentlessRequestHandler,
@@ -285,8 +258,10 @@ export class TaskModule implements OnModuleInit {
     for (const topic of GoalRunHandler.DECIDED) this.workers.on(topic, this.goalRuns);
     for (const topic of ChatResultHandler.TOPICS) this.workers.on(topic, this.chatResults);
     this.workers.on(Task.CHANGED, this.chatInspections);
+    this.workers.on(Task.CHANGED, this.verdicts);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
     for (const topic of LessonHandler.TOPICS) this.workers.on(topic, this.lessons);
+    this.workers.on(Task.CHANGED, this.teamReviews);
     this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
     this.workers.on(Task.CHANGED, this.chatContinues);
     this.workers.on(Task.CHANGED, this.follows);

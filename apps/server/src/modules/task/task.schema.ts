@@ -1,8 +1,8 @@
 // 자동으로 만든 파일이라 고치지 않는다. 마이그레이션 뒤 pnpm db:rows로 다시 만든다 (scripts/db-rows.mjs).
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
-import { bigint, boolean, customType, integer, jsonb, pgSchema, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason } from './task.tables';
+import { bigint, boolean, customType, integer, jsonb, pgSchema, real, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const xid8Column = customType<{ data: string }>({ dataType: () => 'xid8' });
@@ -42,6 +42,7 @@ export const agents = taskSchema.table('agents', {
   external_tools: text('external_tools').array().notNull(),
   lead: boolean('lead').notNull(),
   reviewer_approves: boolean('reviewer_approves').notNull(),
+  second_inspector_id: uuid('second_inspector_id'),
 });
 
 /** task.ai_logins */
@@ -365,4 +366,19 @@ export const tasks = taskSchema.table('tasks', {
   wait_reason: text('wait_reason').$type<TaskWaitReason>(),
   rounds: integer('rounds').notNull(),
   wait_until: timestamp('wait_until', { withTimezone: true }),
+});
+
+/** task.verdicts */
+export const verdicts = taskSchema.table('verdicts', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  task_id: uuid('task_id').notNull(),
+  agent_id: uuid('agent_id').notNull(),
+  kind: text('kind').$type<VerdictKind>().notNull(),
+  target: text('target').notNull(),
+  round: integer('round').notNull(),
+  verdict: text('verdict').$type<VerdictVerdict>().notNull(),
+  score: real('score'),
+  low: integer('low'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });

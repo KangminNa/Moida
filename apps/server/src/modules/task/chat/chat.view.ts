@@ -23,13 +23,17 @@ export type ChatOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind'> & { root: st
 export type ChatCardOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind' | 'mime' | 'task_id'>;
 /** 카드 항목을 낸 작업의 결과 (하네스 검사 result.checks, 검증 고리 V) */
 export type ChatCardTaskRow = Pick<TaskRow, 'id' | 'result'>;
-/** 검토자 짝의 판정 (검증 고리 V). 만드는 곳은 ChatReview.parse: 읽지 못한 답은 unknown과 글 그대로 */
+/**
+ * 검토자 짝의 판정 (검증 고리 V). 만드는 곳은 ChatReview.parse: 읽지 못한 답은 unknown과 글 그대로.
+ * 완료 조건마다 1~5점(2026-11-20 점수로 판정): score는 평균 (점수가 없으면 null), 가장 낮은 점수는 ChatReview.lowOf
+ */
 export type ChatReviewVerdict = {
   verdict: 'pass' | 'fix' | 'reject' | 'unknown';
   summary: string;
-  checklist: { item: string; ok: boolean; note: string }[];
+  checklist: { item: string; ok: boolean; note: string; score: number | null }[];
   fixes: string[];
   skip: string[];
+  score: number | null;
 };
 /** 회차(맨 위 작업 root)와 그 아래에서 기다리는 결재 */
 export type ChatApprovalRow = Pick<ApprovalRow, 'id'> & { root: string };
@@ -42,9 +46,8 @@ export type ChatUpdateLine = ChatUpdateRow & { agent: string | null };
 export type ChatBoardRow = ChatRow & { partner: string | null; state: string; active: number };
 /** 이 대화에서 시작해 아직 끝나지 않은 작업 하나 (팀이 동시에 일하는 칸, 2026-11-15) */
 export type ChatTeamRow = Pick<TaskRow, 'id' | 'agent_id' | 'title' | 'status' | 'parent_id'> &
-  Pick<ChatTurnTaskRow, 'wait_reason' | 'wait_until' | 'created_at' | 'last_event'> & {
-    agent: string | null;
-  };
+  Pick<ChatTurnTaskRow, 'wait_reason' | 'wait_until' | 'created_at' | 'last_event'> &
+  Pick<ChatUpdateLine, 'agent'>;
 
 /** 참조의 칸 (payload.refs · chats.pending_refs). 서버가 적은 값이지만 내보낼 칸은 여기서 고른다 */
 function refsOf(raw: unknown) {

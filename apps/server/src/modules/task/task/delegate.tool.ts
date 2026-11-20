@@ -10,6 +10,9 @@ import type { HelpAskedView } from './subtask-wait.view';
 import { Task } from './task';
 import { DelegateTaskInput, SubtaskOrder } from './task.input';
 import { TaskService } from './task.service';
+import { SetPlanInput } from './task-plan.input';
+import { TaskPlan } from './task-plan.policy';
+import type { PlanSetView } from './task-plan.view';
 import { TaskRefs } from './task-refs.policy';
 
 // MCP 도구 delegate_task: 에이전트가 바로 아래 팀에게 하위 작업을 맡긴다 (에이전트 조직, 객체설계 13장).
@@ -121,5 +124,37 @@ export class AskHelpTool extends BaseTool {
 
   handle(actor: Actor, raw: unknown): Promise<HelpAskedView> {
     return this.tasks.askHelp(actor, AskHelpInput.from(raw));
+  }
+}
+
+// MCP 도구 set_plan (2026-11-20 큰 일은 계획 먼저): 맡은 일의 단계 · 완료 조건 · 하지 말 것을 한 번 정한다. 바꿀 수 없다
+@Injectable()
+export class SetPlanTool extends BaseTool {
+  readonly name = 'set_plan';
+  readonly scope = Actor.AGENT;
+  readonly readOnly = false;
+  readonly inputSchema = {
+    properties: {
+      steps: SetPlanTool.list(TaskPlan.STEPS_MAX),
+      criteria: { ...SetPlanTool.list(TaskPlan.CRITERIA_MAX), minItems: 1 },
+      must_not: SetPlanTool.list(TaskPlan.MUST_NOT_MAX),
+    },
+    required: ['criteria'],
+  };
+
+  private static list(max: number) {
+    return {
+      type: 'array',
+      maxItems: max,
+      items: { type: 'string', maxLength: TaskPlan.LINE_MAX },
+    };
+  }
+
+  constructor(private readonly tasks: TaskService) {
+    super();
+  }
+
+  handle(actor: Actor, raw: unknown): Promise<PlanSetView> {
+    return this.tasks.setPlan(actor, SetPlanInput.from(raw));
   }
 }

@@ -8,6 +8,8 @@ import { RuleViolation } from '../../platform';
 // 시간대는 IANA 이름이고, 오프셋은 JavaScript에 들어 있는 Intl로 그때그때 구한다 (서머타임 포함).
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 시각 규칙 한 곳. 설정 저장과 일꾼의 깨우기가 함께 쓴다
 export class SchedulePolicy {
+  /** 자동화 건강 검사 (2026-11-20): 최근 이만큼이 모두 실패면 레시피를 끈다 */
+  static readonly FAILING_RUNS = 3;
   /** N시간마다 · N분마다의 간격 (N분마다는 2026-11-20: 5분 ~ 12시간) */
   static readonly HOURS_MAX = 24;
   static readonly MINUTES_MIN = 5;
@@ -152,5 +154,10 @@ export class SchedulePolicy {
       minute: Number(part('minute')),
       weekday: SchedulePolicy.WEEKDAYS[part('weekday')] ?? 0,
     };
+  }
+
+  /** 잇달아 실패했는가: 최근 끝난 FAILING_RUNS번(최근 것부터)이 모두 실패. 관리자가 멈춘 것(취소)은 실패가 아니다 */
+  static failing(recent: readonly string[]): boolean {
+    return recent.length >= SchedulePolicy.FAILING_RUNS && recent.every((s) => s === 'failed');
   }
 }

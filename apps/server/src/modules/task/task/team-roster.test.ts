@@ -23,11 +23,30 @@ function org() {
   return { lead, mid, writer, one, two, all };
 }
 
+/** 성적표가 없는 팀원 (2026-11-20) */
+const ZERO = { scorecard: null };
+
 describe('팀원 정보 (TeamRoster)', () => {
   test('바로 아래 팀원마다 일 수 · 도구 · 커넥터, 그 아래 팀은 사람 수와 일의 종류별 수만', () => {
     const { lead, mid, writer, all } = org();
     const roster = new TeamRoster(all, [
-      { agent_id: mid.id, open: 2, done: 5, failed: 1, revised: 1, connectors: ['notion'] },
+      {
+        ...ZERO,
+        agent_id: mid.id,
+        open: 2,
+        done: 5,
+        failed: 1,
+        revised: 1,
+        connectors: ['notion'],
+        scorecard: {
+          judged: 4,
+          first_pass: 3,
+          avg_fixes: 0.25,
+          decided: 5,
+          sent_back: 1,
+          tokens_per_done: 1200,
+        },
+      },
     ]);
     const members = roster.members(lead).map((m) => m.toJSON());
     assert.deepEqual(
@@ -37,6 +56,15 @@ describe('팀원 정보 (TeamRoster)', () => {
     const [head, second] = members;
     assert.equal(head?.open, 2);
     assert.deepEqual(head?.recent, { done: 5, failed: 1, revised: 1 });
+    // 성적표 (2026-11-20): 첫 판정 통과 3/4 · 평균 고친 횟수 1/4 · 관리자 반려 1/5 · 일 하나에 1200 토큰
+    assert.deepEqual(head?.scorecard, {
+      judged: 4,
+      first_pass: 3,
+      avg_fixes: 0.25,
+      decided: 5,
+      sent_back: 1,
+      tokens_per_done: 1200,
+    });
     assert.deepEqual(head?.connectors, ['notion']);
     assert.deepEqual(head?.team, {
       members: 2,
@@ -47,6 +75,7 @@ describe('팀원 정보 (TeamRoster)', () => {
     assert.equal(second?.agent_id, writer.id);
     assert.equal(second?.tool, 'codex');
     assert.deepEqual(second?.recent, { done: 0, failed: 0, revised: 0 });
+    assert.equal(second?.scorecard, null);
     assert.equal(second?.team, null);
     // 한 층만: 손자 팀원의 이름은 어디에도 없다
     assert.doesNotMatch(JSON.stringify(members), /조사 1|조사 2/);
@@ -58,8 +87,17 @@ describe('팀원 정보 (TeamRoster)', () => {
     const boss = Agent.openLead('space', 'claude', NOW);
     const everyone = [...all, other, boss];
     const roster = new TeamRoster(everyone, [
-      { agent_id: mid.id, open: 0, done: 0, failed: 0, revised: 0, connectors: ['notion'] },
       {
+        ...ZERO,
+        agent_id: mid.id,
+        open: 0,
+        done: 0,
+        failed: 0,
+        revised: 0,
+        connectors: ['notion'],
+      },
+      {
+        ...ZERO,
         agent_id: one.id,
         open: 0,
         done: 0,

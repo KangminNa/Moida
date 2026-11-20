@@ -39,6 +39,19 @@ export class AgentLead {
     if (!reviewerId) throw new RuleViolation('검토자를 먼저 정해 주세요');
   }
 
+  /**
+   * 두 번째 검수자 (2026-11-20): 대표에게만, 검토자(첫 검수자)가 있어야 하고, 대표 · 검토자가 아닌 살아 있는 에이전트이며
+   * 검토자와 다른 AI 도구 (같은 AI가 두 번 보면 같은 곳에서 놓친다)
+   */
+  static assertSecond(lead: Agent, reviewer: Agent | null, second: Agent): void {
+    if (!lead.lead) throw new RuleViolation('두 번째 검수자는 대표에게만 정해요');
+    if (reviewer === null) throw new RuleViolation('검토자를 먼저 정해 주세요');
+    if (second.id === lead.id || second.id === reviewer.id || second.deleted)
+      throw new RuleViolation('대표 · 검토자가 아닌 다른 에이전트를 골라 주세요');
+    if (second.tool === reviewer.tool)
+      throw new RuleViolation('두 번째 검수자는 검토자와 다른 AI 도구를 쓰는 에이전트예요');
+  }
+
   /** 보고 대상: 대표는 누구에게도 보고하지 않고, 아무도 대표에게 보고하지 않는다 (맨 위 에이전트는 대표가 맡긴다) */
   static assertReport(agent: Agent, manager: Agent | null): void {
     if (agent.lead && manager !== null)

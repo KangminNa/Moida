@@ -11,6 +11,8 @@ export function ReviewerField({
   self,
   agents,
   onChange,
+  label = '검토자',
+  help = '대화의 결과를 승인 전에 다른 AI 도구의 에이전트가 검토해요. 의견은 결과 카드에 실려요',
 }: {
   id: string;
   value: string;
@@ -19,12 +21,15 @@ export function ReviewerField({
   self: string;
   agents: readonly Agent[];
   onChange: (value: string) => void;
+  /** 같은 칸을 두 번째 검수자(2026-11-20)에도 쓴다 */
+  label?: string;
+  help?: string;
 }) {
   const engines = useEngines();
   const choices = agents.filter((a) => a.id !== self && a.tool !== tool);
   return (
     <div className="field">
-      <label htmlFor={id}>검토자</label>
+      <label htmlFor={id}>{label}</label>
       <select
         id={id}
         className="input"
@@ -39,9 +44,7 @@ export function ReviewerField({
           </option>
         ))}
       </select>
-      <small id={`${id}-help`}>
-        대화의 결과를 승인 전에 다른 AI 도구의 에이전트가 검토해요. 의견은 결과 카드에 실려요
-      </small>
+      <small id={`${id}-help`}>{help}</small>
     </div>
   );
 }

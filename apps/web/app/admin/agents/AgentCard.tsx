@@ -9,17 +9,32 @@ import {
 } from '../../_task/labels';
 import { type RunnerChoice, useEngines } from '../../_task/live';
 import { AgentUsage } from '../../_task/parts';
-import type { Agent } from '../../_task/types';
+import type { Agent, UsageAgent } from '../../_task/types';
 import { Icon } from '../../_ui/Icon';
 
 /** 바로 아래가 이보다 많으면 중간 팀장을 두라고 안내한다 (위임 계약 D1: 팀장은 한 층만 보고 고른다) */
 const WIDE_TEAM = 7;
+
+/** 성적표 한 줄 (2026-11-20): 셀 것이 없으면 null */
+function scoreLine(card: UsageAgent['scorecard']): string | null {
+  if (!card) return null;
+  const parts = [
+    card.judged > 0 ? `첫 판정 통과 ${card.firstPass}/${card.judged}` : '',
+    card.avgFixes !== null ? `평균 고친 횟수 ${card.avgFixes}` : '',
+    card.decided > 0 ? `반려 · 수정 요청 ${card.sentBack}/${card.decided}` : '',
+    card.tokensPerDone !== null
+      ? `일 하나에 ${card.tokensPerDone.toLocaleString('ko-KR')} 토큰`
+      : '',
+  ].filter(Boolean);
+  return parts.length > 0 ? `최근 ${card.days}일 · ${parts.join(' · ')}` : null;
+}
 
 // 팀 화면의 에이전트 카드 한 장: 이름 · 도구와 모델 · 지금 상태, 역할, 권한 칩, 사용량, 동작
 export function AgentCard({
   agent,
   work,
   hold,
+  score = null,
   boss,
   runner,
   busy,
@@ -31,6 +46,8 @@ export function AgentCard({
   agent: Agent;
   work: string | null;
   hold: string | null;
+  /** 최근 성적표 (사용량 API, 2026-11-20) */
+  score?: UsageAgent['scorecard'];
   /** 보고 대상의 이름 (없으면 관리자의 이름) */
   boss: string;
   /** 묶인 러너 (undefined: 아무 러너, null: 묶였지만 그 러너의 기기가 끊김) */
@@ -100,6 +117,7 @@ export function AgentCard({
         {agent.scopes.length === 0 && agent.approvalActions.length === 0 && <li>권한 없음</li>}
       </ul>
       <AgentUsage agent={agent} />
+      {scoreLine(score) && <small className="agent-score">{scoreLine(score)}</small>}
       {members > WIDE_TEAM && (
         <p className="note">바로 아래가 {members}명이에요. 중간 팀장을 두면 맡기기가 정확해져요</p>
       )}

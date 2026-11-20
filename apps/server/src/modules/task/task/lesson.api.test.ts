@@ -127,7 +127,17 @@ after(async () => {
 
 describe('피드백에서 배우기', () => {
   test('수정 요청 메모가 3개 쌓이면 대표에게 배우기 일 하나, 열려 있거나 같은 날이면 더 만들지 않는다', async () => {
-    // 같은 공간을 쓰는 다른 테스트 파일의 메모 · 배우기 일과 섞이지 않게, 지금까지의 배우기 일을 지금 끝난 것으로 돌린다
+    // 같은 공간을 쓰는 다른 테스트 파일의 메모 · 배우기 일과 섞이지 않게, 지금까지의 배우기 일을 지금 끝난 것으로 돌린다.
+    // 앞 파일들이 배우기 일 없이 메모만 남겼으면 기준이 없어 그 메모까지 세므로 기준이 될 일 하나를 먼저 둔다
+    ok(
+      await api.request('POST', '/api/tasks', owner, {
+        requestId: `lessons:${spaceId}:base-${randomUUID()}`,
+        agentId: writer.id,
+        title: '기준',
+        instruction: '기준',
+      }),
+      201,
+    );
     await db.sql`
       UPDATE task.tasks SET status = 'cancelled', finished_at = now(), created_at = now(),
         request_id = request_id || ':before'

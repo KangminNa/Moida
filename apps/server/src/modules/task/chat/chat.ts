@@ -244,13 +244,14 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   /**
    * 회차의 결과를 결재 전에 검토자(다른 AI 도구의 에이전트)가 본다 (검토자 짝, 2차 2단계). 회차마다 하나 (request_id).
    * instruction은 지시문 틀 result-review로 채운 글. 답은 소식(review)과 결과 카드에 실린다.
-   * inspect를 주면 그 결재 하나의 검수다 (2026-11-20, 틀 result-inspect, ChatInspect): 결재마다 하나, 무엇을 보는지와 읽기 허락을 싣는다
+   * inspect를 주면 그 결재 하나의 검수다 (2026-11-20, 틀 result-inspect, ChatInspect): 결재마다 하나, 무엇을 보는지와 읽기 허락을 싣는다.
+   * second: 두 번째 검수자의 검수 (2026-11-20, 같은 결재에 하나 더)
    */
-  review(reviewer: Agent, instruction: string, now: Date, inspect: Approval | null = null): Task {
+  review(by: Agent, instruction: string, now: Date, inspect?: Approval, second = false): Task {
     return this.task(
-      ChatRequest.review(this.id, this.row.turns, inspect?.id ?? null),
+      ChatRequest.review(this.id, this.row.turns, inspect?.id ?? null, second),
       {
-        agent_id: reviewer.id,
+        agent_id: by.id,
         title: `${inspect ? '검수' : '검토'} · ${ChatHistory.firstLine(this.row.title, Chat.TASK_TITLE)}`,
         instruction,
         payload: {

@@ -5,6 +5,7 @@ import { agentRevisions, agents } from '../task.schema';
 import type { AgentRow } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { PlanUsageRepository } from '../usage/plan-usage.repository';
+import type { AgentScoreRow } from '../usage/usage.view';
 import { Agent } from './agent';
 import { AgentUsage } from './agent-usage';
 
@@ -32,7 +33,7 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
    */
   async roster(spaceId: string, usage: readonly AgentUsage[], now: Date): Promise<TeamRoster> {
     const since = TeamRoster.since(now);
-    const stats = await this.sql<TeamStatRow[]>`
+    const stats = await this.sql<Omit<TeamStatRow, 'scorecard'>[]>`
       WITH work AS (
         SELECT agent_id,
           count(*) FILTER (WHERE status IN ('queued', 'running', 'waiting'))::int AS open,
@@ -57,10 +58,71 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
       LEFT JOIN work w ON w.agent_id = a.id
       LEFT JOIN sent_back b ON b.agent_id = a.id
       WHERE a.space_id = ${spaceId} AND a.deleted_at IS NULL`;
+    const scores = new Map((await this.scores(spaceId, now)).map((s) => [s.agent_id, s]));
     return new TeamRoster(
       usage.map((u) => u.agent),
-      stats,
+      stats.map((stat) => ({
+        ...stat,
+        scorecard: AgentRepository.cardOf(scores.get(stat.agent_id)),
+      })),
     );
+  }
+
+  /** 성적표 한 줄 → 팀원 정보의 칸 (끝낸 일 수는 팀원 줄의 최근 7일 수와 겹쳐 뺀다) */
+  private static cardOf(row: AgentScoreRow | undefined): TeamStatRow['scorecard'] {
+    if (!row) return null;
+    const { judged, first_pass, avg_fixes, decided, sent_back, tokens_per_done } = row;
+    return { judged, first_pass, avg_fixes, decided, sent_back, tokens_per_done };
+  }
+
+  /**
+   * 성적표 (2026-11-20 평가가 남는 팀, 최근 TeamRoster.SCORE_DAYS일): 판정(task.verdicts)의 첫 판정 · 통과 · 고칠 것 ·
+   * 대상 수, 관리자가 정한 결재(검수자가 정한 것 · 결과 카드 · 로그인했어요는 빼고)와 그중 수정 요청 · 반려,
+   * 끝난 일의 토큰 ÷ 끝낸 일. 팀원 줄(roster)과 팀 화면(UsageQuery)이 함께 읽는다
+   */
+  async scores(spaceId: string, now: Date): Promise<readonly AgentScoreRow[]> {
+    const since = TeamRoster.scoreSince(now);
+    const skipped = [...TeamRoster.SCORE_SKIP];
+    return this.sql<AgentScoreRow[]>`
+      WITH judged AS (
+        SELECT agent_id,
+          count(*) FILTER (WHERE round = 1)::int AS judged,
+          count(*) FILTER (WHERE round = 1 AND verdict = 'pass')::int AS first_pass,
+          round(count(*) FILTER (WHERE verdict = 'fix')::numeric / count(DISTINCT target), 2)::float8
+            AS avg_fixes
+        FROM task.verdicts
+        WHERE space_id = ${spaceId} AND created_at >= ${since}
+        GROUP BY agent_id
+      ), decided AS (
+        SELECT agent_id, count(*)::int AS decided,
+          count(*) FILTER (WHERE status IN ('revision_requested', 'rejected'))::int AS sent_back
+        FROM task.approvals
+        WHERE space_id = ${spaceId} AND decided_at >= ${since} AND agent_id IS NOT NULL
+          AND NOT agent_decided AND status IN ('approved', 'revision_requested', 'rejected')
+          AND action <> ALL(${skipped}::text[])
+        GROUP BY agent_id
+      ), spent AS (
+        SELECT t.agent_id, count(*) FILTER (WHERE t.status = 'done')::int AS done,
+          coalesce(sum(e.tokens), 0)::float8 AS tokens
+        FROM task.tasks t
+        LEFT JOIN LATERAL (
+          SELECT sum(tokens) AS tokens FROM task.task_events WHERE task_id = t.id
+        ) e ON true
+        WHERE t.space_id = ${spaceId} AND t.agent_id IS NOT NULL AND t.finished_at >= ${since}
+        GROUP BY t.agent_id
+      )
+      SELECT a.id AS agent_id,
+        coalesce(j.judged, 0) AS judged, coalesce(j.first_pass, 0) AS first_pass,
+        j.avg_fixes,
+        coalesce(d.decided, 0) AS decided, coalesce(d.sent_back, 0) AS sent_back,
+        coalesce(s.done, 0) AS done,
+        CASE WHEN coalesce(s.done, 0) > 0 THEN round(s.tokens / s.done)::int END AS tokens_per_done
+      FROM task.agents a
+      LEFT JOIN judged j ON j.agent_id = a.id
+      LEFT JOIN decided d ON d.agent_id = a.id
+      LEFT JOIN spent s ON s.agent_id = a.id
+      WHERE a.space_id = ${spaceId} AND a.deleted_at IS NULL
+      ORDER BY a.id`;
   }
 
   /** 공간의 대표 (O-2). 아직 없으면 null */

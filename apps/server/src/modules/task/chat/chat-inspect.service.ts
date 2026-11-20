@@ -6,6 +6,8 @@ import { ApprovalRepository } from '../approval/approval.repository';
 import { SkillQuery } from '../skill/skill.query';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
+import { Verdict } from '../verdict/verdict';
+import { VerdictRepository } from '../verdict/verdict.repository';
 import { ChatRepository } from './chat.repository';
 import { ChatHistory } from './chat-history.policy';
 import { ChatInspect } from './chat-inspect.policy';
@@ -51,17 +53,40 @@ export class ChatInspectService extends BaseService {
       const agents = await new AgentRepository(tx).all(spaceId);
       const lead = agents.find((a) => a.id === chat.agentId && a.reviewerApproves) ?? null;
       const inspector = place.agent_id;
-      const review =
-        place.status === Task.DONE ? ChatReview.parse(ChatResult.textOf(place.result)) : null;
+      // 두 검수자 (2026-11-20): 둘 다 끝나야 정한다. 다른 하나가 아직 돌면 그 작업이 끝날 때 다시 온다.
+      // 두 번째 검수 작업이 없으면(도중에 정했음) 끝내지 못한 것으로 보아 관리자에게
+      const second = lead?.secondInspectorId ?? null;
+      const judged =
+        second === null ? [place] : await chats.inspections(spaceId, chat.id, approvalId);
+      if (judged.some((t) => !ChatInspectService.ENDED.includes(t.status))) return;
+      const reviews = judged.map((t) =>
+        t.status === Task.DONE ? ChatReview.parse(ChatResult.textOf(t.result)) : null,
+      );
+      if (second !== null && reviews.length < 2) reviews.push(null);
+      const review = ChatInspect.combine(reviews);
       const fixes = (await approvals.inspectorFixes(approval)).length;
+      // 같은 검수자가 앞서 준 점수(두 검수자면 낮은 쪽): 고쳐 왔는데 오르지 않았으면 한도 전이라도 관리자에게
+      const target = Verdict.inspectTarget(chat.id, approval.action, approval.targetId);
+      const verdicts = new VerdictRepository(tx);
+      const lastScores = await Promise.all(
+        judged.map((t) =>
+          t.agent_id === null ? null : verdicts.lastScore(spaceId, target, t.agent_id, t.id),
+        ),
+      );
+      const before = lastScores.every((x) => x !== null)
+        ? Math.min(...(lastScores as number[]))
+        : null;
       const previous = await chats.previousTurns(chat, spaceId);
       // 앱 화면은 기다리는 작업이 없어 대표의 새 회차로 고친다: 관리자가 그사이 다음 말을 해 회차가 돌면 관리자에게
       const redo = task !== null || (lead !== null && !ChatHistory.waiting(previous.at(-1)));
-      const on = lead !== null && inspector !== null && lead.reviewerId === inspector;
-      const decided = on ? ChatInspect.outcome(review, fixes) : 'hold';
+      const inspectors = [lead?.reviewerId, second].filter(Boolean);
+      const on = lead !== null && inspector !== null && inspectors.includes(inspector);
+      const decided = on ? ChatInspect.outcome(review, fixes, before) : 'hold';
       const outcome = decided === 'fix' && !redo ? 'hold' : decided;
-      const text = on ? ChatInspect.opinion(review, outcome) : '검수 승인이 꺼져 관리자에게 넘겨요';
-      approval.inspect(outcome, inspector ?? chat.partnerId, text, now);
+      const text = on
+        ? ChatInspect.opinion(review, outcome, before)
+        : '검수 승인이 꺼져 관리자에게 넘겨요';
+      approval.inspect(outcome, lead?.reviewerId ?? inspector ?? chat.partnerId, text, now);
       await approvals.save(approval);
       if (task) {
         approval.applyTo(task, now);
