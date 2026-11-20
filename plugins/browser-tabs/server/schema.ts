@@ -45,6 +45,25 @@ export const clicks = browserTabsSchema.table('clicks', {
   version: integer('version').notNull(),
 });
 
+/** browser_tabs.endpoints */
+export const endpoints = browserTabsSchema.table('endpoints', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  site_id: uuid('site_id').notNull(),
+  method: text('method').notNull(),
+  origin: text('origin').notNull(),
+  path: text('path').notNull(),
+  query: text('query').array().notNull(),
+  body: jsonb('body'),
+  response: jsonb('response'),
+  status: integer('status').notNull(),
+  content_type: text('content_type').notNull(),
+  seen: integer('seen').notNull(),
+  last_task_id: uuid('last_task_id').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
 /** browser_tabs.integration_reviews */
 export const integrationReviews = browserTabsSchema.table('integration_reviews', {
   id: uuid('id').notNull(),
@@ -165,6 +184,7 @@ export const sites = browserTabsSchema.table('sites', {
   login_needed_at: timestamp('login_needed_at', { withTimezone: true }),
   login_form: jsonb('login_form'),
   trusted_at: timestamp('trusted_at', { withTimezone: true }),
+  api_build_at: timestamp('api_build_at', { withTimezone: true }),
 });
 
 /** browser_tabs.suggestions */

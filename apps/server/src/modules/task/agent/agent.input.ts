@@ -47,6 +47,12 @@ function reviewerOf(f: RequestFields, raw: unknown): string | null | undefined {
   return body.reviewerId === null ? null : f.uuid('reviewerId');
 }
 
+/** 검수 승인 (2026-11-20, 대표만): 칸이 없으면 그대로(undefined) */
+function reviewerApprovesOf(f: RequestFields, raw: unknown): boolean | undefined {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  return 'reviewerApproves' in body ? f.boolean('reviewerApproves') : undefined;
+}
+
 /** POST /api/agents. 같은 requestId는 처음 만든 에이전트를 돌려준다 */
 export class CreateAgentInput extends BaseRequest {
   private constructor(
@@ -145,6 +151,8 @@ export class UpdateAgentInput extends BaseRequest {
     readonly reportsTo: string | null | undefined,
     readonly runnerId: string | null | undefined,
     readonly reviewerId: string | null | undefined,
+    /** 검수 승인: 검토자가 앱 안의 공개를 검수해 통과하면 관리자 대신 승인한다 (대표만, 2026-11-20) */
+    readonly reviewerApproves: boolean | undefined,
   ) {
     super();
   }
@@ -161,6 +169,7 @@ export class UpdateAgentInput extends BaseRequest {
           reportsToOf(f, body),
           runnerOf(f, body),
           reviewerOf(f, body),
+          reviewerApprovesOf(f, body),
         ),
     );
   }

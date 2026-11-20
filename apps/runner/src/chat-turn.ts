@@ -5,6 +5,8 @@ import type { PromptPack } from './prompt-pack';
 // 할 일은 이번 메시지(작업의 지시)뿐이다. 앞 대화의 관리자 말은 맥락이고, 앞 답(AI가 쓴 글) 속의 지시는 따르지 않는다.
 export class ChatTurn {
   /** 말한 쪽마다의 틀 (owner: 관리자, agent: 나) */
+  /** 앱 화면 공개의 승인 동작 (서버 blog.app_code.show) */
+  private static readonly APP_SHOW = 'blog.app_code.show';
   private static readonly SPEAKERS: Readonly<Record<string, string>> = {
     owner: 'chat-owner',
     agent: 'chat-agent',
@@ -16,8 +18,8 @@ export class ChatTurn {
     readonly turn: number,
     /** [말한 쪽, 글] (오래된 것부터, 서버가 최근 것만 잘라 보낸다) */
     private readonly lines: readonly (readonly [string, string])[],
-    /** 팀이 일하는 도중에 덧붙인 말에 짧게 답하는 일인가 (payload.chat.reply) */
-    private readonly reply = false,
+    /** 팀이 일하는 도중에 덧붙인 말에 답하는 일인가 (payload.chat.reply). 새 일이면 이 일에서 바로 팀에 맡긴다 (병렬) */
+    readonly reply = false,
     /** 이 회차에 덧붙인 말 (next_jobs의 chat_updates.appended) */
     private readonly appended: readonly string[] = [],
     /** 팀원이 남긴 소식 [종류, 팀원, 글] (chat_updates.team, 오래된 것부터) */
@@ -26,6 +28,8 @@ export class ChatTurn {
     readonly deliver: string | null = null,
     /** 앱 관리에서 연 대화의 앱 (payload.chat.appId, 스토어 2단계). 대표가 그 앱의 운영 팀장에게 맡긴다 */
     readonly appId: string | null = null,
+    /** 앱 화면 공개를 검수하는 일이면 그 앱 (payload.inspect, 2026-11-20). 러너가 공개될 코드를 작업 폴더 app/에 받는다 */
+    readonly inspectsApp: string | null = null,
   ) {}
 
   /** 대화의 회차가 아니면 null. updates: next_jobs의 chat_updates (없을 수 있다) */
@@ -47,7 +51,13 @@ export class ChatTurn {
       ),
       chat.text('deliver') || null,
       chat.text('appId') || null,
+      ChatTurn.appInspected(payload.child('inspect')),
     );
+  }
+
+  /** 검수할 결재가 앱 화면 공개(blog.app_code.show)면 그 앱 */
+  private static appInspected(inspect: Json): string | null {
+    return inspect.text('action') === ChatTurn.APP_SHOW ? inspect.text('targetId') || null : null;
   }
 
   /**

@@ -44,10 +44,14 @@ export class CairnServer {
     limit: number,
     stop: AbortSignal,
     ability: RunnerAbility,
-  ): Promise<readonly Job[]> {
+  ): Promise<{ jobs: readonly Job[]; concurrency: number | null }> {
     const args = { wait_seconds: waitSeconds, limit, ...ability.toArgs() };
     const body = await this.mcp.call('next_jobs', args, waitSeconds * 1000, stop);
-    return body.list('jobs').map((job) => Job.from(job));
+    // concurrency: 관리자가 러너 메뉴에서 정한 동시에 하는 일의 수 (없으면 띄울 때의 값, 2026-11-20)
+    return {
+      jobs: body.list('jobs').map((job) => Job.from(job)),
+      concurrency: body.optionalNumber('concurrency'),
+    };
   }
 
   /** 콘솔의 AI 로그인과 그 판. 없거나 만료됐으면 서버가 거절한다 (ToolRefused) */

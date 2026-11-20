@@ -225,7 +225,7 @@ export class ChatQuery extends BaseQuery {
   /** 이 대화에 회차를 쌓는 자동화 (O-3, 대화 레시피의 chat_id) */
   private automations(spaceId: string, chatId: string): Promise<ChatAutomationRow[]> {
     return this.sql<ChatAutomationRow[]>`
-      SELECT id, title, enabled, trigger, mode, weekdays, every_hours, next_run_at,
+      SELECT id, title, enabled, trigger, mode, weekdays, every_hours, every_minutes, next_run_at,
         CASE WHEN at_minute IS NULL THEN NULL
           ELSE lpad((at_minute / 60)::text, 2, '0') || ':' || lpad((at_minute % 60)::text, 2, '0') END AS at_time
       FROM task.schedules

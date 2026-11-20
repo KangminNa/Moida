@@ -26,7 +26,7 @@ import type { SkillPackage } from '../skill/skill-package';
 import type { RunnerRow } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { PlanUsageRepository } from '../usage/plan-usage.repository';
-import type { JobView, ProgressView } from './job.view';
+import { type JobView, NextJobsView, type ProgressView } from './job.view';
 import { LeasePolicy } from './lease.policy';
 import { RunRecord } from './run-record';
 import type { SubmitResultInput } from './submit-result.input';
@@ -65,7 +65,7 @@ export class JobService extends BaseService {
    * 러너가 일을 빌린다. 없으면 waitSeconds까지 기다리다가 일이 생기면 바로 돌려준다 (트랜잭션 밖에서 기다린다).
    * 물을 때마다 러너가 닿은 때를 남긴다. 주인이 일 받기를 꺼 둔 러너에게는 빈 목록이다 (러너는 켜진 채로 쉰다)
    */
-  async next(actor: Actor, req: NextJobsInput): Promise<readonly JobView[]> {
+  async next(actor: Actor, req: NextJobsInput): Promise<NextJobsView> {
     actor.assertCan(Actor.RUN);
     const [spaceId, runnerId, sandbox] = JobService.runnerAt(actor);
     const deadline = Date.now() + req.waitSeconds * 1000;
@@ -75,7 +75,9 @@ export class JobService extends BaseService {
       );
       const jobs = runner.accepting ? await this.lease(actor, runner, req) : [];
       const left = deadline - Date.now();
-      if (jobs.length > 0 || left <= 0 || this.changes.closed) return jobs;
+      // 러너 메뉴에서 정한 동시 자리도 함께 보낸다: 러너가 다음 빌리기부터 그 수로 바꾼다 (2026-11-20)
+      if (jobs.length > 0 || left <= 0 || this.changes.closed)
+        return new NextJobsView(jobs, runner.concurrency);
       await this.changes.wait(
         (signal) => signal.spaceId === spaceId && signal.topic === Task.CHANGED,
         Math.min(left, JobService.RECHECK_MS),

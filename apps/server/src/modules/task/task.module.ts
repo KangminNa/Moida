@@ -28,6 +28,8 @@ import { ChatService } from './chat/chat.service';
 import { AskAgentTool } from './chat/chat.tool';
 import { ChatCardHandler } from './chat/chat-card.handler';
 import { ChatContinueHandler } from './chat/chat-continue.handler';
+import { ChatInspectHandler } from './chat/chat-inspect.handler';
+import { ChatInspectService } from './chat/chat-inspect.service';
 import { ChatResultHandler } from './chat/chat-result.handler';
 import { ChatResultService } from './chat/chat-result.service';
 import { ChatUpdateHandler } from './chat/chat-update.handler';
@@ -172,6 +174,9 @@ import { WebPageGateway } from './web/web-page.gateway';
     // 결과 결재 (2차 2단계): 가라앉은 회차 → 검사 · 검토 · 결과 카드, 카드의 수정 요청 · 반려 → 멈추고 다음 회차
     ChatResultService,
     ChatResultHandler,
+    // 검수 (2026-11-20): 끝난 검수 작업 → 결재에 검수의 결정 (통과면 검수자가 승인)
+    ChatInspectService,
+    ChatInspectHandler,
     ChatCardHandler,
     // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
     AppCodeCardHandler,
@@ -246,6 +251,7 @@ export class TaskModule implements OnModuleInit {
     private readonly tasks: TaskQuery,
     private readonly goalRuns: GoalRunHandler,
     private readonly chatResults: ChatResultHandler,
+    private readonly chatInspections: ChatInspectHandler,
     private readonly chatCards: ChatCardHandler,
     private readonly appCodeCards: AppCodeCardHandler,
     private readonly chatContinues: ChatContinueHandler,
@@ -271,6 +277,7 @@ export class TaskModule implements OnModuleInit {
     this.workers.on(Task.CHANGED, this.goalRuns);
     for (const topic of GoalRunHandler.DECIDED) this.workers.on(topic, this.goalRuns);
     for (const topic of ChatResultHandler.TOPICS) this.workers.on(topic, this.chatResults);
+    this.workers.on(Task.CHANGED, this.chatInspections);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
     this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
     this.workers.on(Task.CHANGED, this.chatContinues);

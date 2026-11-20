@@ -69,6 +69,8 @@ export class PluginView {
     private readonly summary: PluginSummaryView,
     private readonly enabled: boolean,
     private readonly active: boolean,
+    /** 켰는데 동작하지 못한 이유 (서버 코드를 불러오지 못함 등). 없으면 null */
+    private readonly problem: string | null,
     private readonly uses: readonly string[],
     private readonly useLabels: readonly string[],
     private readonly needsGrant: readonly string[],
@@ -82,6 +84,7 @@ export class PluginView {
       ...this.summary.toJSON(),
       enabled: this.enabled,
       active: this.active,
+      problem: this.problem,
       uses: [...this.uses],
       useLabels: [...this.useLabels],
       needsGrant: [...this.needsGrant],

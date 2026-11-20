@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { type Actor, CurrentActor } from '../../platform';
-import { RunnerAcceptingInput } from './runner.input';
+import { RunnerAcceptingInput, RunnerConcurrencyInput } from './runner.input';
 import { RunnerQuery } from './runner.query';
 import { RunnerService } from './runner.service';
 import type { RunnerListView, RunnerView } from './runner.view';
@@ -28,6 +28,18 @@ export class RunnerController {
     @Body() body: unknown,
   ): Promise<RunnerView> {
     const runner = await this.service.setAccepting(actor, RunnerAcceptingInput.from(id, body));
+    return runner.view(new Date());
+  }
+
+  /** 동시에 하는 일의 수: { concurrency: 1~8 | null, version }. 러너는 다음 next_jobs에서 받는다 */
+  @HttpCode(200)
+  @Post(':id/concurrency')
+  async concurrency(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<RunnerView> {
+    const runner = await this.service.setConcurrency(actor, RunnerConcurrencyInput.from(id, body));
     return runner.view(new Date());
   }
 }

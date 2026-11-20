@@ -22,9 +22,11 @@ export type LeadBody = Runtime & {
   fiveHourLimit: number | null;
   planStopPercent: number | null;
   reviewerId: string | null;
+  /** 검수 승인 (2026-11-20): 검토자가 검수해 통과하면 앱 안의 공개(글 · 앱 화면)를 관리자 대신 승인 */
+  reviewerApproves: boolean;
 };
 
-// 대표의 설정 (O-2, 설정 › AI): AI 도구 · 모델 · 생각 강도 · 한도 · 검토자. 이름 · 역할 · 권한은 서버가 정한다
+// 대표의 설정 (O-2, 설정 › AI): AI 도구 · 모델 · 생각 강도 · 한도 · 검토자 · 검수 승인. 이름 · 역할 · 권한은 서버가 정한다
 export function LeadForm({
   lead,
   agents,
@@ -44,6 +46,7 @@ export function LeadForm({
   const [tool, setTool] = useState<string>(lead.tool);
   const [runtime, setRuntime] = useState<Runtime>({ model: lead.model, effort: lead.effort });
   const [reviewerId, setReviewerId] = useState(lead.reviewerId ?? '');
+  const [approves, setApproves] = useState(lead.reviewerApproves);
   const [limit, setLimit] = useState(lead.monthlyLimit?.toString() ?? '');
   const [fiveHour, setFiveHour] = useState(lead.fiveHourLimit?.toString() ?? '');
   const [planStop, setPlanStop] = useState(lead.planStopPercent?.toString() ?? '');
@@ -69,6 +72,7 @@ export function LeadForm({
       fiveHourLimit,
       planStopPercent,
       reviewerId: reviewerId || null,
+      reviewerApproves: approves && reviewerId !== '',
     });
   }
 
@@ -102,6 +106,22 @@ export function LeadForm({
         agents={agents}
         onChange={setReviewerId}
       />
+      <div className="field">
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={approves && reviewerId !== ''}
+            disabled={reviewerId === ''}
+            onChange={(e) => setApproves(e.target.checked)}
+          />
+          검수 통과면 바로 공개
+        </label>
+        <small>
+          앱의 글 공개 · 앱 화면 공개는 검토자가 시중의 비슷한 결과물 · AI 말투 · 완료 조건으로
+          검수해요. 고칠 것은 팀에게 돌려보내고(3번까지), 통과하면 승인 없이 공개해요. 권한 · 팀 ·
+          플러그인 · 설정 바꾸기는 늘 승인을 받아요
+        </small>
+      </div>
       <LimitField
         id={`${id}-limit`}
         label="월 한도 (토큰)"

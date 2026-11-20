@@ -1,4 +1,5 @@
 import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-api';
+import { SaveRequests } from './api-tools';
 import { ApprovalDecided, TaskSettled } from './approvals';
 import { BrowserJob, LoginNeeded } from './browse';
 import { ClickDetail, HoldClick, ListClicks, ManualClick, NextClick, SaveClick } from './clicks';
@@ -52,6 +53,8 @@ export default class BrowserTabsPlugin extends BasePlugin {
     const logins = new LoginInbox();
     // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 autoRepair, 기본 켬)
     const autoRepair = cairn.settings().get('autoRepair') !== 'false';
+    // 사이트 일에서 기록한 API로 사이트 도구를 저절로 만드는가 (설정 autoApiTools, 기본 켬, 2026-11-19 B3)
+    const autoApiTools = cairn.settings().get('autoApiTools') !== 'false';
     for (const operation of [
       new ListReads(),
       new RequestRead(),
@@ -90,6 +93,7 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new TurnOffIntegration(),
       new DeleteIntegration(),
       new SaveBuild(),
+      new SaveRequests(autoApiTools),
       new SiteTools(),
       new SiteRun(),
       new SiteResult(),

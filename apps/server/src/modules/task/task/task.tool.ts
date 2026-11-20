@@ -3,7 +3,7 @@ import { Actor, BaseTool } from '../../platform';
 import { PLAN_USAGE_STATUS } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { JobService } from './job.service';
-import { type JobStateView, NextJobsView, type ProgressView } from './job.view';
+import type { JobStateView, NextJobsView, ProgressView } from './job.view';
 import { SubmitResultInput } from './submit-result.input';
 import { NextJobsInput, ReleaseJobInput, ReportProgressInput } from './task.input';
 
@@ -64,7 +64,7 @@ export class NextJobsTool extends BaseTool {
   }
 
   async handle(actor: Actor, raw: unknown): Promise<NextJobsView> {
-    return new NextJobsView(await this.tasks.next(actor, NextJobsInput.from(raw)));
+    return this.tasks.next(actor, NextJobsInput.from(raw));
   }
 }
 

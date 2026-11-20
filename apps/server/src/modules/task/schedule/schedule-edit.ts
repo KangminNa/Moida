@@ -32,6 +32,7 @@ export class ScheduleEdit {
       'at_time',
       'weekdays',
       'every_hours',
+      'every_minutes',
       'time_zone',
       'instruction',
       'goal_id',

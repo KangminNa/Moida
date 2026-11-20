@@ -51,6 +51,7 @@ export class ScheduleSettingView {
           : `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`,
       weekdays: r.weekdays,
       every_hours: r.every_hours,
+      every_minutes: r.every_minutes,
       time_zone: r.time_zone,
       instruction: r.instruction,
       goal_id: r.goal_id,

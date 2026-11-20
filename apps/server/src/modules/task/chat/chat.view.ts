@@ -41,11 +41,10 @@ export type ChatUpdateLine = ChatUpdateRow & { agent: string | null };
  */
 export type ChatBoardRow = ChatRow & { partner: string | null; state: string; active: number };
 /** 이 대화에서 시작해 아직 끝나지 않은 작업 하나 (팀이 동시에 일하는 칸, 2026-11-15) */
-export type ChatTeamRow = Pick<
-  TaskRow,
-  'id' | 'agent_id' | 'title' | 'status' | 'wait_reason' | 'created_at' | 'parent_id'
-> &
-  Pick<TaskRow, 'wait_until'> & { agent: string | null; last_event: string | null };
+export type ChatTeamRow = Pick<TaskRow, 'id' | 'agent_id' | 'title' | 'status' | 'parent_id'> &
+  Pick<ChatTurnTaskRow, 'wait_reason' | 'wait_until' | 'created_at' | 'last_event'> & {
+    agent: string | null;
+  };
 
 /** 참조의 칸 (payload.refs · chats.pending_refs). 서버가 적은 값이지만 내보낼 칸은 여기서 고른다 */
 function refsOf(raw: unknown) {
@@ -304,10 +303,10 @@ export class ChatCardView {
 }
 
 /** 이 대화에 회차를 쌓는 자동화 (O-3, 대화 레시피의 chat_id). 매일이면 시각 "HH:MM" (at_time) */
-export type ChatAutomationRow = Pick<
-  ScheduleRow,
-  'id' | 'title' | 'enabled' | 'trigger' | 'mode' | 'weekdays' | 'every_hours' | 'next_run_at'
-> & { at_time: string | null };
+export type ChatAutomationRow = Pick<ScheduleRow, 'id' | 'title' | 'enabled' | 'trigger'> &
+  Pick<ScheduleRow, 'mode' | 'weekdays' | 'every_hours' | 'every_minutes' | 'next_run_at'> & {
+    at_time: string | null;
+  };
 
 /**
  * 대화 하나와 회차들 (오래된 것부터, 최근 ChatQuery.TURNS개), 상태 · 최근 소식(과정), 결과 카드 (2차 2단계),
@@ -354,7 +353,7 @@ export class ChatDetailView {
         taskId: r.task_id,
         createdAt: r.created_at.toISOString(),
       })),
-      /** 이 대화에 회차를 쌓는 자동화 (O-3): 매일 시각(atTime "HH:MM") · 요일(월 1 ~ 일 7) 또는 N시간마다 */
+      /** 이 대화에 회차를 쌓는 자동화 (O-3): 매일 시각(atTime "HH:MM") · 요일(월 1 ~ 일 7) 또는 N시간 · N분마다 */
       automations: this.automations.map((a) => ({
         id: a.id,
         title: a.title,
@@ -364,6 +363,7 @@ export class ChatDetailView {
         atTime: a.at_time,
         weekdays: a.weekdays,
         everyHours: a.every_hours,
+        everyMinutes: a.every_minutes,
         nextRunAt: a.next_run_at?.toISOString() ?? null,
       })),
       /** 기다리는 결과 카드 (없으면 null) */

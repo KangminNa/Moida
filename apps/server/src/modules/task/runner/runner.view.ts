@@ -31,6 +31,8 @@ export class RunnerView {
        * (사이트 일이 도는 동안 러너는 거짓을 알린다)
        */
       browser: r.browser || r.browse_running === true,
+      /** 동시에 하는 일의 수 (러너 메뉴에서 정함). null이면 러너가 띄울 때의 값 */
+      concurrency: r.concurrency,
       online: this.online,
       lastSeenAt: r.last_seen_at.toISOString(),
       task: r.task_id ? { id: r.task_id, title: r.task_title ?? '' } : null,

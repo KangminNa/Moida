@@ -49,6 +49,8 @@ export class AgentSavedView {
       runnerId: r.runner_id ?? null,
       /** 검토자 짝 (다른 AI 도구의 에이전트, 2차 2단계) */
       reviewerId: r.reviewer_id ?? null,
+      /** 검수 승인 (대표만, 2026-11-20): 검토자가 앱 안의 공개를 검수해 통과하면 관리자 대신 승인 */
+      reviewerApproves: r.reviewer_approves === true,
       status: r.status,
       /** 휴지통에 넣은 때. null이면 쓰는 에이전트 */
       deletedAt: r.deleted_at?.toISOString() ?? null,

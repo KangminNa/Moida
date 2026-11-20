@@ -88,6 +88,16 @@ describe('IntegrationExec (실제 Chromium)', { skip: TestChromium.skip }, () =>
             '<button type="button" onclick="fetch(\'/ping\', { method: \'POST\' }).catch(() => {})">미리 보내기</button>',
         );
       if (req.url === '/twice') return res.end('<button>게시</button><button>게시</button>');
+      // API (B3 site.api): 쿠키가 오는지 · JSON 답 · 쿼리
+      if (req.url?.startsWith('/api/quote')) {
+        res.setHeader('content-type', 'application/json');
+        const symbol = new URL(req.url, 'http://x').searchParams.get('symbol');
+        return res.end(JSON.stringify({ symbol, price: 71000, cookie: req.headers.cookie ?? '' }));
+      }
+      if (req.url === '/set-cookie') {
+        res.setHeader('set-cookie', 'sid=api-ok; Path=/');
+        return res.end('<h1>쿠키</h1>');
+      }
       if (req.url?.startsWith('/q/'))
         return res.end(`<h1>${decodeURIComponent(req.url.slice(3))}</h1><p id="price">71000</p>`);
       res.end('<h1>시세</h1>');
@@ -119,6 +129,32 @@ describe('IntegrationExec (실제 Chromium)', { skip: TestChromium.skip }, () =>
     assert.equal(
       (await chromium.openUrls()).some((u) => u.includes('/q/')),
       false,
+    );
+  });
+
+  test('site.api: 화면 없이 허용 출처의 API를 GET으로 부르고, 브라우저의 쿠키가 함께 간다 (B3)', async () => {
+    const code = [
+      "await page.goto(site.origin + '/set-cookie');",
+      "const res = await site.api('/api/quote', { query: { symbol: input.symbol } });",
+      'return { status: res.status, price: res.json.price, symbol: res.json.symbol, cookie: res.json.cookie };',
+    ].join('\n');
+    assert.deepEqual(IntegrationRules.problems(code), []);
+    const result = await exec.run(code, { symbol: '005930' }, site(), 30_000, never);
+    assert.deepEqual(
+      result.ok && result.output,
+      { status: 200, price: 71000, symbol: '005930', cookie: 'sid=api-ok' },
+      JSON.stringify(result),
+    );
+    const outside = await exec.run(
+      "return await site.api('http://127.0.0.2:9/x');",
+      {},
+      site(),
+      30_000,
+      never,
+    );
+    assert.deepEqual(
+      [outside.ok, !outside.ok && outside.error],
+      [false, '허용 출처 밖이에요: http://127.0.0.2:9'],
     );
   });
 

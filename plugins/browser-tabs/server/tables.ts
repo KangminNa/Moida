@@ -43,6 +43,26 @@ export interface ClickRow {
 }
 export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'runner_id' | 'tab_id' | 'page_url' | 'role' | 'name' | 'box' | 'fingerprint'>;
 
+/** browser_tabs.endpoints */
+export interface EndpointRow {
+  id: string;
+  space_id: string;
+  site_id: string;
+  method: string;
+  origin: string;
+  path: string;
+  query: readonly string[];
+  body: unknown | null;
+  response: unknown | null;
+  status: number;
+  content_type: string;
+  seen: number;
+  last_task_id: string;
+  created_at: Date;
+  updated_at: Date;
+}
+export type EndpointNew = Partial<EndpointRow> & Pick<EndpointRow, 'id' | 'space_id' | 'site_id' | 'method' | 'origin' | 'path' | 'last_task_id'>;
+
 /** browser_tabs.integration_reviews.verdict (값 목록 CHECK) */
 export const INTEGRATION_REVIEW_VERDICT = ['pass', 'fix'] as const;
 export type IntegrationReviewVerdict = (typeof INTEGRATION_REVIEW_VERDICT)[number];
@@ -193,6 +213,7 @@ export interface SiteRow {
   login_needed_at: Date | null;
   login_form: unknown | null;
   trusted_at: Date | null;
+  api_build_at: Date | null;
 }
 export type SiteNew = Partial<SiteRow> & Pick<SiteRow, 'id' | 'space_id' | 'name' | 'start_url' | 'origins'>;
 

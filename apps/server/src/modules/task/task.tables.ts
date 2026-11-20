@@ -48,6 +48,7 @@ export interface AgentRow {
   effort: AgentEffort;
   external_tools: readonly string[];
   lead: boolean;
+  reviewer_approves: boolean;
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 
@@ -91,6 +92,8 @@ export interface ApprovalRow {
   chat_id: string | null;
   card_id: string | null;
   payload: unknown | null;
+  inspected_at: Date | null;
+  agent_decided: boolean;
 }
 export type ApprovalNew = Partial<ApprovalRow> & Pick<ApprovalRow, 'id' | 'space_id' | 'action' | 'target_kind' | 'target_id' | 'target_version'>;
 
@@ -299,11 +302,12 @@ export interface RunnerRow {
   created_at: Date;
   sandbox: boolean;
   browser: boolean;
+  concurrency: number | null;
 }
 export type RunnerNew = Partial<RunnerRow> & Pick<RunnerRow, 'id' | 'space_id' | 'device_id'>;
 
 /** task.schedules.mode (값 목록 CHECK) */
-export const SCHEDULE_MODE = ['daily', 'hourly'] as const;
+export const SCHEDULE_MODE = ['daily', 'hourly', 'minutely'] as const;
 export type ScheduleMode = (typeof SCHEDULE_MODE)[number];
 /** task.schedules.destination (값 목록 CHECK) */
 export const SCHEDULE_DESTINATION = ['task', 'chat', 'page'] as const;
@@ -342,6 +346,7 @@ export interface ScheduleRow {
   trigger: ScheduleTrigger;
   after_id: string | null;
   chat_id: string | null;
+  every_minutes: number | null;
 }
 export type ScheduleNew = Partial<ScheduleRow> & Pick<ScheduleRow, 'id' | 'space_id' | 'title' | 'mode' | 'time_zone'>;
 

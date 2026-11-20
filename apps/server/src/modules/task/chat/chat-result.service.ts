@@ -17,6 +17,7 @@ import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
 import type { AppCodeAddedInput } from './chat.input';
 import { ChatRepository } from './chat.repository';
+import { ChatInspect } from './chat-inspect.policy';
 import { ChatResult } from './chat-result.policy';
 import { ChatReview } from './chat-review.policy';
 import { TurnDeliver } from './turn-deliver.policy';
@@ -28,7 +29,9 @@ import { TurnDeliver } from './turn-deliver.policy';
 // 카드에 실을 때 같은 이름의 결과물은 마지막 것만 싣고 앞의 것은 휴지통으로 (다시 맡긴 회차가 고쳐 낸 것, 검증 고리 V).
 // 카드 · 실린 결재 · 결과물은 함께 바뀌어야 해서 같은 트랜잭션에서 여러 묶음을 쓴다 (ApprovalService와 같은 까닭).
 // 대화를 먼저 잠가 같은 대화의 판단은 하나씩 한다. 잠그는 순서: 대화 → 결재 → 결과물.
-// 카드의 결정(고른 것만 남기기)은 ApprovalService.decide, 수정 요청 · 반려 뒤의 정리는 ChatService.closeByCard
+// 카드의 결정(고른 것만 남기기)은 ApprovalService.decide, 수정 요청 · 반려 뒤의 정리는 ChatService.closeByCard.
+// 검수 (2026-11-20, ChatInspect): 대표가 검수 승인을 켰으면 앱 안의 공개는 카드보다 먼저 검수 작업을 연다 (결재마다 하나).
+// 검수가 도는 동안은 대화가 돌고(busy), 검수 반영(ChatInspectService)이 정한 뒤 다시 와서 남은 것만 카드에 싣는다
 @Injectable()
 export class ChatResultService extends BaseService {
   private static readonly APP_CODE = 'app_code_card';
@@ -41,10 +44,20 @@ export class ChatResultService extends BaseService {
     super(db);
   }
 
-  /** 작업 하나가 바뀌었다. 대화의 일이 아니면 아무것도 하지 않는다. 두 번 불려도 같다 (카드는 대화마다 하나, 일은 request_id로 하나) */
-  async settle(actor: Actor, spaceId: string, taskId: string): Promise<void> {
+  /**
+   * 작업 하나가 바뀌었다(taskId), 또는 대화의 결재가 바뀌었다(chatId: 작업에 묶이지 않은 앱 화면 공개 · 검수).
+   * 대화의 일이 아니면 아무것도 하지 않는다. 두 번 불려도 같다 (카드는 대화마다 하나, 일은 request_id로 하나)
+   */
+  async settle(
+    actor: Actor,
+    spaceId: string,
+    taskId: string | null,
+    chatOfEvent: string | null = null,
+  ): Promise<void> {
     if (!(actor instanceof SystemActor)) throw new Forbidden('system');
-    const chatId = await this.transaction((tx) => new TaskRepository(tx).chatOf(taskId));
+    const chatId =
+      chatOfEvent ??
+      (taskId ? await this.transaction((tx) => new TaskRepository(tx).chatOf(taskId)) : null);
     if (chatId === null) return;
     const prompts = await this.skills.prompts(actor, spaceId);
     const now = new Date();
@@ -63,6 +76,18 @@ export class ChatResultService extends BaseService {
       const agents = await new AgentRepository(tx).all(spaceId);
       const partner = agents.find((a) => a.id === chat.agentId);
       const reviewer = agents.find((a) => a.id === partner?.reviewerId && !a.deleted) ?? null;
+      const tasks = new TaskRepository(tx);
+      const inspector = partner?.reviewerApproves ? reviewer : null;
+      const due = inspector ? actions.filter((a) => ChatInspect.due(a, inspector, agents)) : [];
+      if (inspector && due.length > 0) {
+        for (const approval of due) {
+          const fixed = await approvals.inspectorFixes(approval);
+          const fields = ChatInspect.fields(approval, chat.goal, turn.instruction ?? '', fixed);
+          const instruction = prompts.fill('result-inspect', fields);
+          await tasks.insertOnce(chat.review(inspector, instruction, now, approval));
+        }
+        return;
+      }
       // 받을 것: 대표가 회차에 정한 값, 없으면 대화의 값 (O-3, TurnDeliver).
       // 받을 것이 있어도 그 동작의 대상을 가진 모듈이 짚는 빠진 점 (2차 6단계: 메뉴에 올리지 않은 글의 발행)
       const deliver = TurnDeliver.effective(turn.payload, chat.deliver);
@@ -100,7 +125,6 @@ export class ChatResultService extends BaseService {
         reviewed: turn.review_status !== null,
         review,
       });
-      const tasks = new TaskRepository(tx);
       if (step === ChatResult.FIX && partner && missing) {
         const message = prompts.fill('result-check', {
           deliver: missing,

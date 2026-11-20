@@ -1,6 +1,7 @@
 import { BaseRequest, type RequestFields, type Unchecked } from '../../platform';
 import type { ScheduleRow } from '../task.tables';
 import { Schedule } from './schedule';
+import { SchedulePolicy } from './schedule.policy';
 
 // 스케줄 입력의 모양. 뜻(주기, 시간대, 요일 범위, 한도)은 Schedule이 검사한다.
 // 설정을 한 번에 바꾸는 입력이라 만들기 · 고치기 모두 칸을 다 읽는다. 시각은 API에서 atTime("09:30"), 칸은 at_minute(570).
@@ -9,7 +10,7 @@ import { Schedule } from './schedule';
 const VERSION_MAX = 2_147_483_647;
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-/** 만들기 · 고치기의 설정 칸. 매일이면 atTime과 weekdays(월 1 ~ 일 7), N시간마다면 everyHours */
+/** 만들기 · 고치기의 설정 칸. 매일이면 atTime과 weekdays(월 1 ~ 일 7), N시간마다면 everyHours, N분마다면 everyMinutes */
 function settingsOf(
   f: RequestFields,
   body: Record<string, unknown>,
@@ -22,6 +23,11 @@ function settingsOf(
     at_minute: minuteOf(f, body.atTime),
     weekdays: weekdaysOf(f, body.weekdays),
     every_hours: f.optionalInteger('everyHours', 1, 24),
+    every_minutes: f.optionalInteger(
+      'everyMinutes',
+      SchedulePolicy.MINUTES_MIN,
+      SchedulePolicy.MINUTES_MAX,
+    ),
     time_zone: f.text('timeZone', 100),
     instruction: f.optionalText('instruction', Schedule.INSTRUCTION_MAX) ?? '',
     goal_id: body.goalId === undefined || body.goalId === null ? null : f.uuid('goalId'),

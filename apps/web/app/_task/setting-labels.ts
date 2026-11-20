@@ -40,6 +40,7 @@ export const SETTING_FIELDS: Readonly<Record<string, string>> = {
   at_time: '시각',
   weekdays: '요일',
   every_hours: '몇 시간마다',
+  every_minutes: '몇 분마다',
   time_zone: '시간대',
   instruction: '지시',
   goal_id: '목표',

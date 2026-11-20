@@ -35,12 +35,17 @@ export class DevToolsSession {
   private nextId = 1;
   private readonly waiting = new Map<number, (reply: Record<string, unknown> | Error) => void>();
   private readonly listeners = new Map<string, () => void>();
+  /** 이벤트마다 부르는 것 (요청 기록 NetworkTap) */
+  private readonly handlers = new Map<string, (params: Record<string, unknown>) => void>();
 
   private constructor(private readonly socket: WebSocket) {
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(String(event.data)) as Record<string, unknown>;
       if (typeof message.id === 'number') this.settle(message.id, message);
-      else if (typeof message.method === 'string') this.listeners.get(message.method)?.();
+      else if (typeof message.method === 'string') {
+        this.listeners.get(message.method)?.();
+        this.handlers.get(message.method)?.((message.params ?? {}) as Record<string, unknown>);
+      }
     });
     socket.addEventListener('close', () => {
       for (const id of [...this.waiting.keys()])
@@ -86,6 +91,11 @@ export class DevToolsSession {
       });
       this.socket.send(JSON.stringify({ id, method, params }));
     });
+  }
+
+  /** 이벤트마다 handler를 부른다 (같은 이벤트는 마지막 것 하나) */
+  on(method: string, handler: (params: Record<string, unknown>) => void): void {
+    this.handlers.set(method, handler);
   }
 
   /** 이벤트 하나를 기다린다 (보내기 전에 걸어 둔다) */

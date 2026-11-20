@@ -23,6 +23,8 @@ export class SiteBuildPlan {
     /** 앞 버전 (고치기 · 다음 회차의 힌트). 처음이면 null */
     readonly last: string | null,
     readonly errors: readonly string[],
+    /** 그 사이트에서 기록한 API의 모양 (B3, 화면 대신 site.api로 부를 재료). 없으면 null */
+    readonly apis: string | null = null,
   ) {}
 
   /** build 칸이 없거나 비면 null (보통 사이트 일) */
@@ -38,7 +40,21 @@ export class SiteBuildPlan {
       build.text('description'),
       last ? SiteBuildPlan.lastOf(last) : null,
       build.texts('recent_errors').slice(0, 5),
+      SiteBuildPlan.apisOf(build.field('endpoints') ? build.list('endpoints') : []),
     );
+  }
+
+  /** 기록한 API를 지시문에 싣는 글: 줄마다 방법 · 주소(쿼리 이름) · 상태 · 본문 · 답의 모양 (6,000자까지) */
+  private static apisOf(list: readonly Json[]): string | null {
+    const lines = list.map((e) => {
+      const query = e.texts('query');
+      const url = `${e.text('url')}${query.length > 0 ? `?${query.map((q) => `${q}=…`).join('&')}` : ''}`;
+      const body = e.field('body') ? ` 본문 ${JSON.stringify(e.field('body'))}` : '';
+      const answer = e.field('response') ? ` 답 ${JSON.stringify(e.field('response'))}` : '';
+      return `- ${e.text('method')} ${url} → ${e.number('status')}${body}${answer}`;
+    });
+    const text = lines.join('\n').slice(0, 6_000);
+    return text || null;
   }
 
   /** 앞 버전을 지시문에 싣는 글: 형식 · 코드 · 틀린 시험 */
@@ -94,6 +110,7 @@ export class SiteBuild {
       write: plan.mode === 'write',
       last: plan.last,
       errors: plan.errors.map((e) => `- ${e}`).join('\n') || null,
+      apis: plan.apis,
     });
   }
 

@@ -67,11 +67,13 @@ function PluginRow({
 
   const status = !plugin.enabled
     ? '꺼짐'
-    : plugin.needsGrant.length > 0
-      ? '다시 허락 필요'
-      : plugin.missing.length > 0
-        ? `설정 필요: ${plugin.missing.join(', ')}`
-        : '켜짐';
+    : plugin.problem
+      ? '동작하지 못함'
+      : plugin.needsGrant.length > 0
+        ? '다시 허락 필요'
+        : plugin.missing.length > 0
+          ? `설정 필요: ${plugin.missing.join(', ')}`
+          : '켜짐';
 
   return (
     <section className="plugin" aria-label={plugin.name}>
@@ -99,6 +101,9 @@ function PluginRow({
             <li key={label}>{label}</li>
           ))}
         </ul>
+      )}
+      {plugin.enabled && plugin.problem && (
+        <p className="error">동작하지 못해요: {plugin.problem}</p>
       )}
       {action.problem && <p className="error">{action.problem}</p>}
       {plugin.settings.length > 0 && (

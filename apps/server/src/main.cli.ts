@@ -195,9 +195,11 @@ function list(registry: PluginRegistry): void {
     const state = registry.state(m.name);
     const status = !state?.enabled
       ? '꺼짐'
-      : state.isActiveFor(m)
-        ? '켜짐'
-        : '켜짐 (다시 허락 필요)';
+      : !state.isActiveFor(m)
+        ? '켜짐 (다시 허락 필요)'
+        : registry.problem(m.name)
+          ? '켜짐 (동작하지 못함)'
+          : '켜짐';
     console.log(`${m.name} ${m.version} [${status}]  ${m.description}`);
     report(registry, m.name);
   }

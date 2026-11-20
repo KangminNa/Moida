@@ -14,6 +14,7 @@ import { DomainEvent } from '../base/event';
 import { Work } from '../base/operation';
 import { SealedSecret, SecretBox } from '../base/secret-box';
 import { SecretRotation } from '../base/secret-rotation';
+import { PluginQuery } from './plugin.query';
 import { PluginRepository } from './plugin.repository';
 import { PluginService } from './plugin.service';
 import { PluginManifest } from './plugin-manifest';
@@ -211,6 +212,62 @@ describe('PluginRegistry: 운영 이미지', () => {
     await new PluginService(db, registry, box).enable(owner, 'test-compiled');
     assert.equal(registry.problem('test-compiled'), null);
     assert.ok(registry.action('test-compiled', 'hello'));
+  });
+});
+
+describe('PluginRegistry: 불러오기 실패', () => {
+  test('서버 코드를 불러오지 못한 플러그인은 목록에 이유와 함께 동작 안 함으로, 방문자 목록 · 메뉴에서는 빠진다', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const dir = makePlugin(
+      root,
+      'test-broken',
+      {
+        name: 'test-broken',
+        version: '0.1.0',
+        cairn: '>=0.1',
+        description: '깨진 서버 코드',
+        server: 'server/plugin.ts',
+        uses: ['action:hello'],
+        web: { 'post.after': 'web/Box.tsx' },
+      },
+      ['web/Box.tsx'],
+    );
+    mkdirSync(join(dir, 'server'));
+    // 짝이 맞지 않는 괄호 (2026-11-19 browser-tabs의 남은 `};`처럼)
+    writeFileSync(join(dir, 'server', 'plugin.ts'), 'export default class X {\n};\n}\n');
+    const registry = await PluginRegistry.boot(root, db.sql, archive, box, restore);
+    await new PluginService(db, registry, box).enable(owner, 'test-broken');
+
+    const problem = registry.problem('test-broken');
+    assert.ok(problem, '이유가 남는다');
+    assert.doesNotMatch(problem, /Stack backtrace/, '이유는 짧게');
+    const query = new PluginQuery(db, registry);
+    const mine = (await query.list(owner)).toJSON().plugins as Record<string, unknown>[];
+    const shown = mine.find((p) => p.name === 'test-broken');
+    assert.deepEqual([shown?.enabled, shown?.active, shown?.problem], [true, false, problem]);
+    const visitor = (await query.list(new VisitorActor())).toJSON().plugins as { name: string }[];
+    assert.equal(
+      visitor.some((p) => p.name === 'test-broken'),
+      false,
+      '방문자에게는 동작 중인 것만',
+    );
+
+    // 고치고 다시 읽으면 이유가 사라진다 (Node가 찾은 경로(.ts)는 기억되므로 같은 파일을 고친다)
+    writeFileSync(
+      join(dir, 'server', 'plugin.ts'),
+      `import { BasePlugin } from ${JSON.stringify(join(__dirname, '../../../plugin-api'))};
+       export default class Fixed extends BasePlugin { register(cairn) { cairn.addAction('hello', {}); } }`,
+    );
+    await registry.reload();
+    assert.equal(registry.problem('test-broken'), null);
+    const fixed = (await query.list(owner)).toJSON().plugins as Record<string, unknown>[];
+    assert.deepEqual(
+      [
+        fixed.find((p) => p.name === 'test-broken')?.active,
+        fixed.find((p) => p.name === 'test-broken')?.problem,
+      ],
+      [true, null],
+    );
   });
 });
 

@@ -7,6 +7,7 @@ import {
   RuleViolation,
   type Work,
 } from '../../../apps/server/src/plugin-api';
+import { endpointsFor } from './api-tools';
 import { BuildPartView, BuildSavedView } from './integration-views';
 import { INTEGRATION_TARGET, leasedBrowse } from './job';
 import { requestReview } from './reviews';
@@ -182,7 +183,12 @@ export async function buildPartOf(
     { integration_id: row.id, status: 'failed' },
     { order: ['id desc'], limit: ERRORS_FOR_BUILD },
   );
-  return new BuildPartView(row, last, failed.map((r) => r.error ?? '').filter(Boolean));
+  return new BuildPartView(
+    row,
+    last,
+    failed.map((r) => r.error ?? '').filter(Boolean),
+    await endpointsFor(work, row.site_id),
+  );
 }
 
 /** 켜기 결재의 결과를 남긴다 */

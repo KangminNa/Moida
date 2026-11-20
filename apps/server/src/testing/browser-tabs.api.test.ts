@@ -790,6 +790,97 @@ describe('로그인 카드 (2026-11-19)', () => {
   });
 });
 
+describe('API 기록 → API 사이트 도구 (B2 · B3, 2026-11-19)', () => {
+  const call = (method: string, origin: string, path: string, response?: object) => ({
+    method,
+    origin,
+    path,
+    query: ['page'],
+    status: 200,
+    content_type: 'application/json',
+    ...(response ? { response: JSON.stringify(response) } : {}),
+  });
+
+  test('사이트 일의 요청 모양을 남기고(허용 출처만), 처음 읽을 만한 API가 생기면 API 도구를 한 번 굳히기 시작한다', async () => {
+    const site = await newSite();
+    const { taskId } = await siteJob(site);
+    const saved = await tool(runner, 'browser_requests_save', {
+      task_id: taskId,
+      requests: [
+        call('GET', 'https://blog.example', '/api/posts', {
+          items: [{ id: 'number', title: 'string' }],
+        }),
+        call('POST', 'https://blog.example', '/api/posts/{n}/like'),
+        call('GET', 'https://tracker.example', '/collect', { ok: 'boolean' }),
+      ],
+    });
+    assert.equal(saved.ok, true, JSON.stringify(saved.body));
+    assert.deepEqual(saved.body, { saved: 2, building: true });
+    const db = api.service(Database);
+    const rows = await db.sql<{ method: string; path: string; seen: number }[]>`
+      SELECT method, path, seen FROM browser_tabs.endpoints WHERE site_id = ${String(site.id)} ORDER BY method`;
+    assert.deepEqual(
+      rows.map((r) => [r.method, r.path, r.seen]),
+      [
+        ['GET', '/api/posts', 1],
+        ['POST', '/api/posts/{n}/like', 1],
+      ],
+    );
+    const { integrations } = ok(await api.get(`${BASE}/integrations`, owner)) as {
+      integrations: Json[];
+    };
+    const made = integrations.find((i) => i.siteId === site.id) as Json;
+    assert.deepEqual([made.name, made.status, made.mode], ['api_blog_example', 'building', 'read']);
+
+    // 같은 사이트의 다음 일: 횟수만 오르고 다시 만들지 않는다
+    const next = await siteJob(site);
+    const again = await tool(runner, 'browser_requests_save', {
+      task_id: next.taskId,
+      requests: [call('GET', 'https://blog.example', '/api/posts', { items: [] })],
+    });
+    assert.deepEqual(again.body, { saved: 1, building: false });
+
+    // 굳히는 일은 그 기록을 받는다 (화면 대신 site.api로 부를 재료). 다음 일을 빌릴 때 러너가 함께 빌렸다
+    const [build] = await db.sql<{ id: string }[]>`
+      SELECT id FROM task.tasks WHERE request_id = ${`browser-tabs:integration:api:${site.id}`}`;
+    assert.ok(build, '굳히기 작업이 생긴다');
+    const plan = await tool(runner, 'browser_job', { task_id: build.id });
+    const endpoints = (plan.body.build as Json).endpoints as Json[];
+    assert.equal(endpoints[0]?.url, 'https://blog.example/api/posts');
+    assert.equal(endpoints[0]?.seen, 2);
+    assert.deepEqual(endpoints[0]?.response, { items: [] });
+  });
+
+  test('둘러보기 · 쥐지 않은 러너는 남기지 못하고, JSON이 아닌 모양은 받지 않는다', async () => {
+    const mark = randomUUID().slice(0, 8);
+    ok(
+      await api.request('POST', `${BASE}/explore`, owner, {
+        requestId: randomUUID(),
+        instruction: `가격 비교 ${mark}`,
+        agentId,
+      }),
+    );
+    await drain();
+    const job = await leased(mark);
+    const explore = await tool(runner, 'browser_requests_save', {
+      task_id: (job.task as Json).id,
+      requests: [call('GET', 'https://blog.example', '/api/x')],
+    });
+    assert.equal(explore.ok, false);
+    assert.match(JSON.stringify(explore.body), /둘러보기에서는 기록하지 않아요/);
+
+    const site = await newSite();
+    const { taskId } = await siteJob(site);
+    const stranger = await tool(other, 'browser_requests_save', { task_id: taskId, requests: [] });
+    assert.equal(stranger.ok, false, '임대를 쥔 러너만');
+    const broken = await tool(runner, 'browser_requests_save', {
+      task_id: taskId,
+      requests: [{ ...call('GET', 'https://blog.example', '/api/x'), response: '{not json' }],
+    });
+    assert.equal(broken.ok, false);
+  });
+});
+
 describe('브라우저 일의 위임', () => {
   async function leadJob(scopes: string[]): Promise<{ run: string; member: string; site: Json }> {
     const lead = await newAgent(`팀장 ${scopes.join('+')}`, scopes, { approvalActions: [] });

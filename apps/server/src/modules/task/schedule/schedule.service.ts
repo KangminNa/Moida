@@ -122,7 +122,7 @@ export class ScheduleService extends EntityService<Schedule> {
   }
 
   /**
-   * 주인이 누른 "지금 한 번": 하루 한도에 함께 센다. 앞 작업이 안 끝났어도 만든다 (사람이 고른 것이라).
+   * 관리자가 누른 "지금 한 번": 하루 한도에 세지 않고 막지도 않는다 (2026-11-20). 앞 작업이 안 끝났어도 만든다 (사람이 고른 것이라).
    * 같은 순간을 두 번 누르면 시각이 달라 작업 둘이 된다 (version이 막는다)
    */
   async runNow(actor: Actor, req: VersionInput): Promise<Task> {

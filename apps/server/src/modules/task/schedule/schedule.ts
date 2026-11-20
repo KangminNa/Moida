@@ -19,8 +19,9 @@ import { ScheduleView } from './schedule.view';
 //   어디로: task(작업 하나) · chat(담당의 대화 회차 하나: 결과 카드 · 검사를 그대로) · page(페이지의 새 판, payload.page)
 //   계기: time(정한 시각) · manual(손으로만) · after(다른 레시피의 일이 끝나면, after_id)
 // 담당이 정해져 있고 지시가 비어 있으면 "정기 확인"(맡은 목표와 진행 중인 일을 확인)이 된다.
-// 주기는 매일(시각 + 요일) 또는 N시간마다. 켜져 있으면 늘 다음 시각(next_run_at)이 있다 (DB CHECK).
-// 하루 한도(daily_max): 스케줄의 시간대 기준 하루에 만드는 작업 수. 구독 AI를 사람 없이 돌리는 양을 묶는다 (기획서 11장).
+// 주기는 매일(시각 + 요일) · N시간마다 · N분마다(2026-11-20). 켜져 있으면 늘 다음 시각(next_run_at)이 있다 (DB CHECK).
+// 하루 한도(daily_max): 스케줄의 시간대 기준 하루에 저절로 만드는 작업 수. 구독 AI를 사람 없이 돌리는 양을 묶는다 (기획서 11장).
+// 관리자가 누른 "지금 한 번"은 세지 않는다 (2026-11-20: 사람이 보고 누른 것이라).
 // 설정은 configure로 한 번에 바꾸고, 때가 되면 fire가 이번 시각을 돌려주고 다음 시각으로 넘어간다.
 // 작업을 만들 차례인지(하루 한도)는 claimRun이 정한다: 앞 작업이 안 끝났거나 에이전트가 쉬어 건너뛴 것은 세지 않는다.
 export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
@@ -28,10 +29,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   static readonly DUE_JOB = 'task.schedules';
   static readonly DAILY = 'daily';
   static readonly HOURLY = 'hourly';
+  static readonly MINUTELY = 'minutely';
   static readonly TITLE_MAX = 120;
   static readonly INSTRUCTION_MAX = 4000;
-  /** 하루 한도의 끝 (N시간마다 1시간이면 하루 24번) */
-  static readonly DAILY_MAX_LIMIT = 24;
+  /** 하루 한도의 끝 (5분마다 하루 내내면 288번) */
+  static readonly DAILY_MAX_LIMIT = 288;
   static readonly DEFAULT_INSTRUCTION = [
     '정기 확인입니다. 맡은 목표와 진행 중인 일을 확인합니다.',
     '할 일이 있으면 하거나 팀에게 맡기고, 없으면 확인한 것을 짧게 보고하고 끝냅니다.',
@@ -46,7 +48,6 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   /** 스케줄이 만든 작업의 request_id 앞부분 */
   static readonly REQUEST_PREFIX = 'schedule:';
   private static readonly MINUTES_PER_DAY = 1440;
-  private static readonly HOURS_MAX = 24;
   private static readonly ALL_DAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
   /** 새 스케줄. 설정은 configure로 정한다 (만들 때도 같은 규칙) */
@@ -61,6 +62,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
         at_minute: 9 * 60,
         weekdays: Schedule.ALL_DAYS,
         every_hours: null,
+        every_minutes: null,
         time_zone: 'UTC',
         instruction: '',
         goal_id: null,
@@ -127,7 +129,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   }
 
   /**
-   * 설정을 한 번에 바꾼다. 매일이면 at_minute와 요일, N시간마다면 every_hours만 쓴다.
+   * 설정을 한 번에 바꾼다. 매일이면 at_minute와 요일, N시간마다면 every_hours, N분마다면 every_minutes만 쓴다.
    * 켜면 지금 뒤의 첫 시각을 다음 시각으로 정하고, 끄면 지운다. 오늘 센 수(day_runs)는 그대로 둔다
    */
   configure(settings: Partial<Unchecked<ScheduleRow>>, now: Date): void {
@@ -138,6 +140,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
       at_minute: atMinute = null,
       weekdays = [],
       every_hours: everyHours = null,
+      every_minutes: everyMinutes = null,
       time_zone: timeZone = '',
       instruction = '',
       goal_id: goalId = null,
@@ -176,8 +179,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     const days = [...new Set(weekdays)].sort((a, b) => a - b);
     if (daily && (days.length === 0 || days.some((d) => !Schedule.ALL_DAYS.includes(d))))
       throw new RuleViolation('요일을 하나 이상 골라 주세요 (월 1 ~ 일 7)');
-    if (!daily && (everyHours === null || everyHours < 1 || everyHours > Schedule.HOURS_MAX))
-      throw new RuleViolation(`N시간마다면 1~${Schedule.HOURS_MAX}시간이에요`);
+    SchedulePolicy.assertInterval(mode, everyHours, everyMinutes);
     if (!Number.isInteger(dailyMax) || dailyMax < 1 || dailyMax > Schedule.DAILY_MAX_LIMIT)
       throw new RuleViolation(`하루 한도는 1~${Schedule.DAILY_MAX_LIMIT}번이에요`);
     this.put('title', name);
@@ -185,7 +187,8 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('mode', mode);
     this.put('at_minute', daily ? atMinute : null);
     this.put('weekdays', daily ? days : Schedule.ALL_DAYS);
-    this.put('every_hours', daily ? null : everyHours);
+    this.put('every_hours', mode === Schedule.HOURLY ? everyHours : null);
+    this.put('every_minutes', mode === Schedule.MINUTELY ? everyMinutes : null);
     this.put('time_zone', timeZone);
     this.put('instruction', instruction);
     this.put('goal_id', goalId);
@@ -291,10 +294,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     if (chatId !== null && this.row.destination === Schedule.CHAT) this.openedChat(chatId);
   }
 
-  /** 주인이 누른 "지금 한 번". 하루 한도에 함께 센다. 닿았으면 RuleViolation */
+  /**
+   * 관리자가 누른 "지금 한 번"의 시각. 하루 한도에 세지 않고 막지도 않는다 (2026-11-20): 한도는 사람 없이 저절로 도는 양을
+   * 묶는 것이고, 지금 한 번은 사람이 보고 누른 것이다
+   */
   runNow(now: Date): Date {
-    if (!this.claimRun(now))
-      throw new RuleViolation(`오늘 한도(${this.row.daily_max}번)에 닿았어요. 내일 다시 돌아요`);
     return now;
   }
 
@@ -365,6 +369,12 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
 
   private after(now: Date): Date {
     const r = this.row;
+    if (r.mode === Schedule.MINUTELY)
+      return SchedulePolicy.nextMinutely(
+        r.every_minutes ?? SchedulePolicy.MINUTES_MIN,
+        r.time_zone,
+        now,
+      );
     return r.mode === Schedule.DAILY
       ? SchedulePolicy.nextDaily(r.at_minute ?? 0, r.weekdays, r.time_zone, now)
       : SchedulePolicy.nextHourly(r.every_hours ?? 1, r.time_zone, now);

@@ -1,7 +1,7 @@
 // 자동으로 만든 파일이라 고치지 않는다. 마이그레이션 뒤 pnpm db:rows로 다시 만든다 (scripts/db-rows.mjs).
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
-import { bigint, boolean, customType, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, customType, integer, jsonb, pgSchema, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason } from './task.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
@@ -41,6 +41,7 @@ export const agents = taskSchema.table('agents', {
   effort: text('effort').$type<AgentEffort>().notNull(),
   external_tools: text('external_tools').array().notNull(),
   lead: boolean('lead').notNull(),
+  reviewer_approves: boolean('reviewer_approves').notNull(),
 });
 
 /** task.ai_logins */
@@ -76,6 +77,8 @@ export const approvals = taskSchema.table('approvals', {
   chat_id: uuid('chat_id'),
   card_id: uuid('card_id'),
   payload: jsonb('payload'),
+  inspected_at: timestamp('inspected_at', { withTimezone: true }),
+  agent_decided: boolean('agent_decided').notNull(),
 });
 
 /** task.chat_updates */
@@ -241,6 +244,7 @@ export const runners = taskSchema.table('runners', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   sandbox: boolean('sandbox').notNull(),
   browser: boolean('browser').notNull(),
+  concurrency: smallint('concurrency'),
 });
 
 /** task.schedules */
@@ -271,6 +275,7 @@ export const schedules = taskSchema.table('schedules', {
   trigger: text('trigger').$type<ScheduleTrigger>().notNull(),
   after_id: uuid('after_id'),
   chat_id: uuid('chat_id'),
+  every_minutes: integer('every_minutes'),
 });
 
 /** task.skill_revisions */

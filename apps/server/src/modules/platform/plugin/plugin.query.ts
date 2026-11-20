@@ -40,7 +40,7 @@ export class PluginQuery extends BaseQuery {
     const installed = this.registry.installed();
     if (actor.canManage())
       return new PluginListView(installed.map((m) => this.view(m, states.get(m.name) ?? null)));
-    const active = installed.filter((m) => states.get(m.name)?.isActiveFor(m));
+    const active = installed.filter((m) => this.registry.isRunning(m, states.get(m.name) ?? null));
     return new PluginSummaryListView(active.map((m) => PluginQuery.summary(m)));
   }
 
@@ -115,7 +115,8 @@ export class PluginQuery extends BaseQuery {
     return new PluginView(
       PluginQuery.summary(m),
       state?.enabled ?? false,
-      state?.isActiveFor(m) ?? false,
+      this.registry.isRunning(m, state),
+      state?.enabled ? this.registry.problem(m.name) : null,
       [...m.uses],
       [...m.uses].map((u) => PluginManifest.describeUse(u)),
       state?.enabled ? m.needsGrant(new Set(state.grantedUses)) : [],

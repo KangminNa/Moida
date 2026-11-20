@@ -195,13 +195,16 @@ export class Runner {
   private async lease(pool: JobPool): Promise<void> {
     try {
       this.polling = true;
-      const jobs = await this.server.nextJobs(
+      const { jobs, concurrency } = await this.server.nextJobs(
         Runner.WAIT_SECONDS,
         pool.free,
         this.pollCutter.signal,
         pool.browserBusy ? this.ability.withoutBrowser() : this.ability,
       );
       this.backoff.reset();
+      // 러너 메뉴에서 정한 동시 자리 (없으면 띄울 때의 값). 바뀌면 다음 빌리기부터 (2026-11-20)
+      if (pool.resize(concurrency ?? this.config.concurrency))
+        this.log.info(`동시에 하는 일: ${pool.size}개까지`);
       for (const job of jobs)
         pool.add(
           this.perform(job).catch((error: unknown) => this.failed(error)),

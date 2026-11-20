@@ -106,7 +106,7 @@ export class PluginRegistry {
           else logins.push(login);
         }
       } catch (error) {
-        failures.set(state.name, (error as Error).message);
+        failures.set(state.name, PluginRegistry.reasonOf(error));
       }
     }
     this.states = new Map(states.map((s) => [s.name, s]));
@@ -117,6 +117,12 @@ export class PluginRegistry {
     this.loginMethods = logins;
     this.packageOperations = operations;
     this.failures = failures;
+  }
+
+  /** 동작하지 못한 이유를 화면에 보일 만큼만: 컴파일러가 붙이는 스택은 빼고 500자까지 */
+  private static reasonOf(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.split('\nStack backtrace')[0]?.trim().slice(0, 500) || '알 수 없는 오류';
   }
 
   /** 서버 파일을 불러 BasePlugin 하위 클래스인지 확인하고 만든다 */
@@ -148,9 +154,17 @@ export class PluginRegistry {
     return this.states.get(name) ?? null;
   }
 
-  /** 켜졌는데 동작하지 못한 이유 */
+  /** 켜졌는데 동작하지 못한 이유 (서버 코드를 불러오지 못함 · 등록 중 오류 · 겹친 로그인 방법) */
   problem(name: string): string | null {
     return this.failures.get(name) ?? null;
+  }
+
+  /**
+   * 동작 중인가: 켜져 있고 쓰는 권한을 허락했고 서버 코드를 문제없이 등록했다.
+   * 상태는 부르는 쪽이 DB에서 새로 읽은 것을 받는다 (다른 곳에서 바꿔도 바로 보이게)
+   */
+  isRunning(manifest: PluginManifest, state: PluginState | null): boolean {
+    return (state?.isActiveFor(manifest) ?? false) && !this.failures.has(manifest.name);
   }
 
   handlersFor(event: DomainEvent): readonly EventSubscription[] {
@@ -226,8 +240,8 @@ export class PluginRegistry {
   /** 동작 중인 기능 패키지의 콘솔 메뉴 */
   packageMenus(): readonly { plugin: string; menu: NonNullable<PluginManifest['menu']> }[] {
     return [...this.catalog.values()].flatMap((m) => {
-      const state = this.states.get(m.name);
-      return m.menu && state?.isActiveFor(m) ? [{ plugin: m.name, menu: m.menu }] : [];
+      const state = this.states.get(m.name) ?? null;
+      return m.menu && this.isRunning(m, state) ? [{ plugin: m.name, menu: m.menu }] : [];
     });
   }
 }

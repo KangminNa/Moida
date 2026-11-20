@@ -38,6 +38,9 @@ export class ApprovalView {
       status: r.status,
       decidedBy: r.decided_by,
       decidedAt: r.decided_at?.toISOString() ?? null,
+      /** 검수한 때 (2026-11-20). agentDecided면 검수자가 정했다(통과 · 고쳐 달라), 아니면 관리자 또는 검수 의견만 붙음 */
+      inspectedAt: r.inspected_at?.toISOString() ?? null,
+      agentDecided: r.agent_decided,
       note: r.note,
       version: r.version,
       createdAt: r.created_at.toISOString(),

@@ -7,8 +7,8 @@ import type { Agent, Schedule } from '../../_task/types';
 import { type Period, PeriodFields, periodBody, periodOf } from './PeriodFields';
 import { type Recipe, RecipeFields, recipeOf, TriggerFields } from './RecipeFields';
 
-/** 하루 한도의 끝 (서버의 Schedule.DAILY_MAX_LIMIT) */
-const DAILY_MAX_LIMIT = 24;
+/** 하루 한도의 끝 (서버의 Schedule.DAILY_MAX_LIMIT, 5분마다 하루 내내) */
+const DAILY_MAX_LIMIT = 288;
 
 /** 이 브라우저의 시간대 (처음 정할 때의 기본값) */
 function browserZone(): string {
@@ -28,6 +28,7 @@ export type ScheduleBody = {
   atTime?: string;
   weekdays?: readonly number[];
   everyHours?: number;
+  everyMinutes?: number;
   timeZone: string;
   instruction: string;
   goalId: string | null;
@@ -183,7 +184,7 @@ export function ScheduleForm({
           required
           onChange={(e) => edit(() => setDailyMax(Number(e.target.value)))}
         />
-        <small>시간대 기준 하루에 만드는 작업 수. "지금 실행"도 함께 세요</small>
+        <small>시간대 기준 하루에 저절로 만드는 작업 수 (1~288). "지금 실행"은 세지 않아요</small>
       </div>
       <div className="field">
         <label htmlFor={`${id}-zone`}>시간대</label>

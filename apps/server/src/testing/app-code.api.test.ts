@@ -619,6 +619,93 @@ describe('대화에서 맡기기 (스토어 1-6b)', () => {
     assert.deepEqual([(await code(app)).current, (await code(app)).pending], [1, null]);
   });
 
+  test('검수 승인을 켜면 앱 화면 공개는 검수자가 app_code_base로 코드를 읽고, 통과하면 카드 없이 보인다 (2026-11-20)', async () => {
+    const app = await publish(await newApp(`code-inspect-${mark}`));
+    const agent = (name: string, more: Json) =>
+      api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: `${name} ${mark}`,
+        tool: 'claude',
+        ...more,
+      });
+    const member = ok(await agent('앱 화면 검수 대상', { scopes: ['make'] }), 201);
+    const inspector = ok(
+      await agent('앱 화면 검수자', { tool: 'codex', scopes: ['read_public'] }),
+      201,
+    );
+    const lead = async () => ok(await api.get('/api/agents/lead', owner)).lead as Json;
+    const editLead = async (body: Json) =>
+      ok(
+        await api.request('PATCH', `/api/agents/${(await lead()).id}`, owner, {
+          ...body,
+          version: (await lead()).version,
+        }),
+      );
+    await editLead({ reviewerId: inspector.id, reviewerApproves: true });
+    try {
+      const chat = ok(
+        await api.request('POST', '/api/chats', owner, {
+          requestId: randomUUID(),
+          message: '첫 화면을 바꿔 줘',
+        }),
+        201,
+      );
+      await drain();
+      const turn = await turnOf(chat.id);
+      const delegated = await mcp(String(turn.run_token), 'delegate_task', {
+        subtasks: [
+          {
+            request_id: randomUUID(),
+            to_agent_id: member.id,
+            kind: 'make',
+            title: '첫 화면',
+            instruction: '첫 화면을 바꾼다',
+            app_id: app.id,
+          },
+        ],
+      });
+      const subtaskId = String(((delegated.subtasks as Json[])[0] as Json).task_id);
+      await lease(subtaskId);
+      await deliver(subtaskId, { 'index.html': '<main>검수할 화면</main>' });
+      await finish(await turnOf(chat.id));
+      await drain();
+      const { jobs } = (await mcp(runner, 'next_jobs', { limit: 5 })) as {
+        jobs: Json[];
+      };
+      const inspection = jobs.find(
+        (j) =>
+          (((j.task as Json).payload as Json).inspect as Json | undefined)?.action ===
+          'blog.app_code.show',
+      );
+      assert.ok(inspection, '검수 작업이 없어요');
+      assert.equal(
+        ok(await api.get(`/api/chats/${chat.id}`, owner)).card,
+        null,
+        '검수 중에는 카드 없음',
+      );
+      // 러너(빌린 기기)가 검수 일의 앱 코드를 받아 작업 폴더에 둔다 (AI의 실행 토큰은 받지 못한다)
+      const base = await mcp(runner, 'app_code_base', { task_id: (inspection.task as Json).id });
+      assert.equal(base.app_id, app.id, '검수 작업은 그 앱의 코드를 읽는다');
+      const index = (base.files as Json[]).find((f) => f.name === 'index.html');
+      assert.equal(index?.text, '<main>검수할 화면</main>', '확인 대기 버전을 본다');
+      await mcp(runner, 'submit_result', {
+        task_id: (inspection.task as Json).id,
+        request_id: randomUUID(),
+        status: 'done',
+        result: { text: JSON.stringify({ verdict: 'pass', summary: '괜찮아요', fixes: [] }) },
+      });
+      await drain();
+      assert.deepEqual([(await code(app)).current, (await code(app)).pending], [1, null]);
+      assert.equal(
+        ok(await api.get(`/api/chats/${chat.id}`, owner)).card,
+        null,
+        '관리자의 카드 없음',
+      );
+    } finally {
+      await editLead({ reviewerId: null });
+    }
+  });
+
   test('비공개 앱: 받을 것이 앱 코드인 회차는 make 일이 끝나면 다시 맡기지 않는다 (승인 없이 바로 보인다, 스토어 2-6)', async () => {
     // 대화로 만든 페이지 앱은 페이지 없이 생기고 화면은 앱 코드다
     const app = await newApp(`code-private-${mark}`, 'page');

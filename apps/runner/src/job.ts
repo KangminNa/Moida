@@ -363,6 +363,8 @@ export class Job {
           chat: this.chat?.chatId ?? null,
           deliver: this.chat?.deliver ?? null,
           app: this.chat?.appId ?? null,
+          // 덧붙인 말의 답: 받을 것은 회차의 것이라 정하지 않는다 (set_deliver는 회차만)
+          reply: this.chat?.reply ?? false,
         }),
       );
     if (this.skill && skillReady) parts.push(prompts.fill('skill', { name: this.skill }));
