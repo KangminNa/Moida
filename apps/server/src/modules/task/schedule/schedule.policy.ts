@@ -1,17 +1,26 @@
 import { RuleViolation } from '../../platform';
 
-// 스케줄의 다음 시각과 하루. 크론 라이브러리 없이 두 가지 주기만 계산한다 (2026-11-06 하트비트 결정, 7단계에 스케줄로).
+// 스케줄의 다음 시각과 하루. 크론 라이브러리 없이 세 가지 주기만 계산한다 (2026-11-06 하트비트 결정, 7단계에 스케줄로).
 //   매일: 시간대 기준 정한 시각(분), 고른 요일에만
 //   N시간마다: 시간대 기준 정각 중 시가 N으로 나누어떨어질 때 (4시간마다 → 0·4·8·12·16·20시)
+//   N분마다 (2026-11-20): 시간대 기준 자정부터 N분 간격 (15분마다 → :00 · :15 · :30 · :45). 하루를 나누어떨어뜨리지 않는
+//     간격(예: 7분)은 자정에 다시 맞춘다
 // 시간대는 IANA 이름이고, 오프셋은 JavaScript에 들어 있는 Intl로 그때그때 구한다 (서머타임 포함).
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 시각 규칙 한 곳. 설정 저장과 일꾼의 깨우기가 함께 쓴다
 export class SchedulePolicy {
+  /** N시간마다 · N분마다의 간격 (N분마다는 2026-11-20: 5분 ~ 12시간) */
+  static readonly HOURS_MAX = 24;
+  static readonly MINUTES_MIN = 5;
+  static readonly MINUTES_MAX = 720;
   private static readonly MINUTE_MS = 60_000;
   private static readonly HOUR_MS = 3_600_000;
   /** 요일을 몇 개 골랐든 다음 시각은 8일 안에 있다 */
   private static readonly DAYS_AHEAD = 8;
   /** N시간마다는 이틀 안에 있다 (24시간마다 → 0시) */
   private static readonly HOURS_AHEAD = 48;
+  private static readonly MINUTES_PER_DAY = 1440;
+  /** N분마다: 서머타임으로 벽시계가 밀려 계산한 분이 맞지 않으면 이만큼 더 본다 */
+  private static readonly MINUTES_SLACK = 120;
   private static readonly WEEKDAYS: Readonly<Record<string, number>> = {
     Mon: 1,
     Tue: 2,
@@ -29,6 +38,17 @@ export class SchedulePolicy {
     } catch {
       throw new RuleViolation(`알 수 없는 시간대예요: ${timeZone}`);
     }
+  }
+
+  /** 주기의 간격이 맞는가: N시간마다면 1~24시간, N분마다면 5~720분. 아니면 RuleViolation */
+  static assertInterval(mode: string, everyHours: number | null, everyMinutes: number | null) {
+    const within = (v: number | null, min: number, max: number) =>
+      v !== null && v >= min && v <= max;
+    if (mode === 'hourly' && !within(everyHours, 1, SchedulePolicy.HOURS_MAX))
+      throw new RuleViolation(`N시간마다면 1~${SchedulePolicy.HOURS_MAX}시간이에요`);
+    const { MINUTES_MIN: min, MINUTES_MAX: max } = SchedulePolicy;
+    if (mode === 'minutely' && !within(everyMinutes, min, max))
+      throw new RuleViolation(`N분마다면 ${min}~${max}분이에요`);
   }
 
   /** after보다 뒤의 첫 시각: 매일 atMinute(하루 중 분), 고른 ISO 요일(월 1 ~ 일 7)에만 */
@@ -63,6 +83,23 @@ export class SchedulePolicy {
       const local = SchedulePolicy.local(guess, timeZone);
       const at = new Date(guess.getTime() - local.minute * SchedulePolicy.MINUTE_MS);
       if (at.getTime() > after.getTime() && local.hour % everyHours === 0) return at;
+    }
+    throw new RuleViolation('다음 시각을 찾지 못했어요');
+  }
+
+  /** after보다 뒤의 첫 분 중 시간대 기준 하루 중 분(자정부터)이 everyMinutes로 나누어떨어지는 때 */
+  static nextMinutely(everyMinutes: number, timeZone: string, after: Date): Date {
+    const start = Math.floor(after.getTime() / SchedulePolicy.MINUTE_MS) * SchedulePolicy.MINUTE_MS;
+    const now = SchedulePolicy.local(new Date(start), timeZone);
+    const minute = now.hour * 60 + now.minute;
+    const next = Math.min(
+      SchedulePolicy.MINUTES_PER_DAY,
+      (Math.floor(minute / everyMinutes) + 1) * everyMinutes,
+    );
+    for (let step = next - minute; step <= next - minute + SchedulePolicy.MINUTES_SLACK; step++) {
+      const at = new Date(start + step * SchedulePolicy.MINUTE_MS);
+      const local = SchedulePolicy.local(at, timeZone);
+      if ((local.hour * 60 + local.minute) % everyMinutes === 0) return at;
     }
     throw new RuleViolation('다음 시각을 찾지 못했어요');
   }

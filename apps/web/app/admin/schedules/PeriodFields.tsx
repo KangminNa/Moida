@@ -5,14 +5,17 @@ import type { Schedule } from '../../_task/types';
 
 /** N시간마다에서 고를 수 있는 값: 하루를 나누어떨어지게 하는 수 */
 const EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
+/** N분마다에서 고를 수 있는 값 (서버는 5~720분, 2026-11-20). 하루를 나누어떨어지게 하는 수 */
+const EVERY_MINUTES = [5, 10, 15, 20, 30, 45, 90];
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 
-/** 주기 칸의 값: 매일(시각 · 요일) 또는 N시간마다 */
+/** 주기 칸의 값: 매일(시각 · 요일) · N시간마다 · N분마다 */
 export type Period = {
   mode: string;
   atTime: string;
   weekdays: readonly number[];
   everyHours: number;
+  everyMinutes: number;
 };
 
 /** 스케줄에서 주기 칸의 처음 값 */
@@ -22,17 +25,19 @@ export function periodOf(schedule: Schedule | null): Period {
     atTime: schedule?.atTime ?? '09:00',
     weekdays: schedule?.weekdays ?? DAYS,
     everyHours: schedule?.everyHours ?? 4,
+    everyMinutes: schedule?.everyMinutes ?? 30,
   };
 }
 
-/** 보낼 본문의 주기 칸: 매일이면 시각 · 요일, N시간마다면 간격만 */
+/** 보낼 본문의 주기 칸: 매일이면 시각 · 요일, N시간 · N분마다면 간격만 */
 export function periodBody(period: Period) {
+  if (period.mode === 'minutely') return { mode: period.mode, everyMinutes: period.everyMinutes };
   return period.mode === 'daily'
     ? { mode: period.mode, atTime: period.atTime, weekdays: period.weekdays }
     : { mode: period.mode, everyHours: period.everyHours };
 }
 
-// 계기가 "정한 시각"인 레시피의 주기 칸 (매일 정한 시각 · N시간마다). 그리는 조각이라 값은 폼이 든다.
+// 계기가 "정한 시각"인 레시피의 주기 칸 (매일 정한 시각 · N시간마다 · N분마다). 그리는 조각이라 값은 폼이 든다.
 export function PeriodFields({
   id,
   value,
@@ -63,9 +68,31 @@ export function PeriodFields({
         >
           <option value="daily">매일 정한 시각</option>
           <option value="hourly">N시간마다</option>
+          <option value="minutely">N분마다</option>
         </select>
       </div>
-      {value.mode === 'daily' ? (
+      {value.mode === 'minutely' && (
+        <div className="field">
+          <label htmlFor={`${id}-minutes`}>간격</label>
+          <select
+            id={`${id}-minutes`}
+            className="input"
+            value={value.everyMinutes}
+            onChange={(e) => set({ everyMinutes: Number(e.target.value) })}
+          >
+            {EVERY_MINUTES.map((n) => (
+              <option key={n} value={n}>
+                {n}분마다
+              </option>
+            ))}
+          </select>
+          <small>
+            시간대 기준 자정부터 N분 간격 (15분마다 → :00 · :15 · :30 · :45). 하루 한도도 그만큼
+            올려야 하루 내내 돌아요
+          </small>
+        </div>
+      )}
+      {value.mode === 'daily' && (
         <>
           <div className="field">
             <label htmlFor={`${id}-at`}>시각</label>
@@ -92,7 +119,8 @@ export function PeriodFields({
             ))}
           </fieldset>
         </>
-      ) : (
+      )}
+      {value.mode === 'hourly' && (
         <div className="field">
           <label htmlFor={`${id}-every`}>간격</label>
           <select

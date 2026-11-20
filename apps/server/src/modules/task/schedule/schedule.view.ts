@@ -21,6 +21,8 @@ export class ScheduleView {
           : `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`,
       weekdays: r.weekdays,
       everyHours: r.every_hours,
+      /** N분마다의 간격 (2026-11-20). 다른 주기면 null */
+      everyMinutes: r.every_minutes,
       timeZone: r.time_zone,
       instruction: r.instruction,
       goalId: r.goal_id,

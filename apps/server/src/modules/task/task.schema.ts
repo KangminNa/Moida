@@ -275,6 +275,7 @@ export const schedules = taskSchema.table('schedules', {
   trigger: text('trigger').$type<ScheduleTrigger>().notNull(),
   after_id: uuid('after_id'),
   chat_id: uuid('chat_id'),
+  every_minutes: integer('every_minutes'),
 });
 
 /** task.skill_revisions */

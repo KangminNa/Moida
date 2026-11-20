@@ -149,7 +149,7 @@ describe('스케줄 (/api/schedules)', () => {
     const shape = await create({ ...DAILY, atTime: '9시' });
     assert.equal(shape.status, 400, shape.text);
     assert.ok((shape.json().fields as Json).atTime);
-    assert.equal((await create({ ...DAILY, dailyMax: 30 })).status, 400);
+    assert.equal((await create({ ...DAILY, dailyMax: 289 })).status, 400);
     assert.equal((await create({ ...DAILY, timeZone: 'Mars/Base' })).status, 422);
     assert.equal((await create({ ...DAILY, weekdays: [] })).status, 422);
     assert.equal((await create({ ...DAILY, mode: 'hourly' })).status, 422);
@@ -265,34 +265,51 @@ describe('스케줄 (/api/schedules)', () => {
     assert.equal(kept?.dayRuns, 0, '만들지 못한 지금 한 번은 세지 않는다');
   });
 
-  test('하루 한도: 지금 한 번도 함께 세고, 닿으면 일꾼도 건너뛰고 지금 한 번은 422', async () => {
-    const schedule = ok(await create({ ...DAILY, instruction: '한도 시험', dailyMax: 2 }), 201);
+  test('하루 한도: 일꾼은 한도에서 멈추고, 지금 한 번은 세지 않고 한도에 닿아도 만든다 (2026-11-20)', async () => {
+    const schedule = ok(await create({ ...DAILY, instruction: '한도 시험', dailyMax: 1 }), 201);
     const run = (s: Json) =>
       api.request('POST', `/api/schedules/${s.id}/run`, owner, { version: s.version });
-    const task = ok(await run(schedule));
-    assert.match(String(task.title), /^아침 확인 \(/);
-    const [counted] = (await list()).filter((s) => s.id === schedule.id);
-    assert.equal(counted?.dayRuns, 1);
-    // 지금 한 번으로 만든 작업을 끝내 두고 일꾼이 하나를 더 만든다 (둘째)
-    const detail = ok(await api.get(`/api/tasks/${task.id}`, owner));
-    ok(
-      await api.request('POST', `/api/tasks/${task.id}/cancel`, owner, { version: detail.version }),
-    );
+    const cancelQueued = async () => {
+      for (const t of await tasksOf(schedule)) {
+        const d = ok(await api.get(`/api/tasks/${t.id}`, owner));
+        if (d.status === 'queued')
+          ok(await api.request('POST', `/api/tasks/${t.id}/cancel`, owner, { version: d.version }));
+      }
+    };
     await makeDue(schedule);
     await job.run();
-    assert.equal((await tasksOf(schedule)).length, 2);
+    assert.equal((await tasksOf(schedule)).length, 1);
+    await cancelQueued();
+    await makeDue(schedule);
+    await job.run();
+    assert.equal((await tasksOf(schedule)).length, 1, '한도에 닿으면 일꾼은 만들지 않는다');
     const [full] = (await list()).filter((s) => s.id === schedule.id);
-    const refused = await run(full as Json);
-    assert.equal(refused.status, 422, refused.text);
-    assert.match(refused.text, /오늘 한도\(2번\)/);
-    for (const t of await tasksOf(schedule)) {
-      const d = ok(await api.get(`/api/tasks/${t.id}`, owner));
-      if (d.status === 'queued')
-        ok(await api.request('POST', `/api/tasks/${t.id}/cancel`, owner, { version: d.version }));
-    }
-    await makeDue(schedule);
-    await job.run();
-    assert.equal((await tasksOf(schedule)).length, 2, '한도에 닿으면 일꾼도 만들지 않는다');
+    const task = ok(await run(full as Json));
+    assert.match(String(task.title), /^아침 확인 \(/);
+    const [after] = (await list()).filter((s) => s.id === schedule.id);
+    assert.deepEqual(
+      [(await tasksOf(schedule)).length, after?.dayRuns],
+      [2, 1],
+      '지금 한 번은 세지 않는다',
+    );
+    await cancelQueued();
+  });
+
+  test('N분마다 (2026-11-20): 5~720분, 간격만 남고 다음 시각이 생긴다', async () => {
+    const minutely = { ...DAILY, mode: 'minutely', atTime: undefined, weekdays: undefined };
+    const made = ok(await create({ ...minutely, everyMinutes: 10, dailyMax: 144 }), 201);
+    assert.deepEqual(
+      [made.mode, made.everyMinutes, made.everyHours, made.atTime, made.dailyMax],
+      ['minutely', 10, null, null, 144],
+    );
+    assert.ok(made.nextRunAt, '켜면 다음 시각');
+    assert.equal(new Date(String(made.nextRunAt)).getUTCMinutes() % 10, 0);
+    assert.equal((await create({ ...minutely, everyMinutes: 3 })).status, 400);
+    assert.equal((await create({ ...minutely })).status, 422, '간격이 없으면');
+    const removed = await api.request('POST', `/api/schedules/${made.id}/delete`, owner, {
+      version: made.version,
+    });
+    assert.equal(removed.status, 204, removed.text);
   });
 
   describe('자동화 레시피 (2차 5단계)', () => {

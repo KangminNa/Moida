@@ -60,6 +60,48 @@ describe('SchedulePolicy.nextDaily', () => {
   });
 });
 
+describe('SchedulePolicy.nextMinutely (2026-11-20)', () => {
+  test('시간대 기준 자정부터 N분 간격의 다음 분', () => {
+    // 10:20:30 KST → 10:30 KST (15분마다: :00 · :15 · :30 · :45)
+    assert.equal(
+      SchedulePolicy.nextMinutely(15, SEOUL, at('2026-11-06T01:20:30Z')).toISOString(),
+      '2026-11-06T01:30:00.000Z',
+    );
+    assert.equal(
+      SchedulePolicy.nextMinutely(15, SEOUL, at('2026-11-06T01:30:00Z')).toISOString(),
+      '2026-11-06T01:45:00.000Z',
+      '딱 그 분이면 다음 간격',
+    );
+    // 23:58 KST에 7분마다 → 하루를 나누어떨어뜨리지 않아 자정에 다시 맞춘다
+    assert.equal(
+      SchedulePolicy.nextMinutely(7, SEOUL, at('2026-11-06T14:58:00Z')).toISOString(),
+      '2026-11-06T15:00:00.000Z',
+    );
+    // 인도 +05:30: 10:20 IST = 04:50Z → 10:30 IST = 05:00Z
+    assert.equal(
+      SchedulePolicy.nextMinutely(30, 'Asia/Kolkata', at('2026-11-06T04:50:00Z')).toISOString(),
+      '2026-11-06T05:00:00.000Z',
+    );
+  });
+
+  test('서머타임으로 벽시계가 한 시간 건너뛰어도 다음 간격을 찾는다', () => {
+    // 2026-03-08 미국 동부 02:00 → 03:00. 01:50 EST(06:50Z)에 20분마다 → 02:00은 없어 03:00 EDT(07:00Z)
+    assert.equal(
+      SchedulePolicy.nextMinutely(20, 'America/New_York', at('2026-03-08T06:50:00Z')).toISOString(),
+      '2026-03-08T07:00:00.000Z',
+    );
+  });
+
+  test('간격 규칙: N시간마다 1~24, N분마다 5~720', () => {
+    SchedulePolicy.assertInterval('minutely', null, 5);
+    SchedulePolicy.assertInterval('minutely', null, 720);
+    assert.throws(() => SchedulePolicy.assertInterval('minutely', null, 4), /5~720분/);
+    assert.throws(() => SchedulePolicy.assertInterval('minutely', 2, null), /5~720분/);
+    assert.throws(() => SchedulePolicy.assertInterval('hourly', 25, null), /1~24시간/);
+    SchedulePolicy.assertInterval('daily', null, null);
+  });
+});
+
 describe('SchedulePolicy.nextHourly', () => {
   test('시간대 기준 시가 N으로 나누어떨어지는 다음 정각', () => {
     // 10:20 KST → 12:00 KST (4시간마다: 0·4·8·12·16·20시)
@@ -134,6 +176,23 @@ describe('Schedule', () => {
     assert.equal(schedule.unsaved.every_hours, 6);
   });
 
+  test('N분마다 (2026-11-20): 간격만 남기고 다음 시각은 자정부터 N분 간격', () => {
+    const schedule = daily({
+      mode: 'minutely',
+      at_minute: null,
+      every_minutes: 10,
+      daily_max: 144,
+    });
+    assert.deepEqual(
+      [schedule.unsaved.at_minute, schedule.unsaved.every_hours, schedule.unsaved.every_minutes],
+      [null, null, 10],
+    );
+    // 08:00 KST 정각 → 다음은 08:10 KST
+    assert.equal(schedule.unsaved.next_run_at?.toISOString(), '2026-11-05T23:10:00.000Z');
+    schedule.configure(settings(), NOW);
+    assert.equal(schedule.unsaved.every_minutes, null, '다른 주기로 바꾸면 지운다');
+  });
+
   test('맞지 않는 설정은 거절한다', () => {
     const bad = [
       { title: '  ' },
@@ -145,9 +204,11 @@ describe('Schedule', () => {
       { weekdays: [8] },
       { mode: 'hourly', every_hours: 0 },
       { mode: 'hourly', every_hours: 25 },
+      { mode: 'minutely', every_minutes: 4 },
+      { mode: 'minutely', every_minutes: null },
       { time_zone: 'Nowhere/City' },
       { daily_max: 0 },
-      { daily_max: 25 },
+      { daily_max: 289 },
       { agent_id: null, instruction: '' },
     ];
     for (const more of bad) assert.throws(() => daily(more), RuleViolation, JSON.stringify(more));
@@ -167,13 +228,17 @@ describe('Schedule', () => {
     assert.equal(schedule.dueAt(late), false);
   });
 
-  test('하루 한도: 시간대 기준 하루에 정한 수만큼, 날이 바뀌면 다시 센다. 지금 한 번도 함께 센다', () => {
+  test('하루 한도: 시간대 기준 하루에 정한 수만큼, 날이 바뀌면 다시 센다. 지금 한 번은 세지 않고 막지 않는다', () => {
     const schedule = daily({ daily_max: 2 });
     const morning = at('2026-11-06T00:00:00Z'); // 11/6 09:00 KST
     assert.equal(schedule.claimRun(morning), true);
-    assert.equal(schedule.runNow(morning).toISOString(), morning.toISOString());
+    assert.equal(schedule.claimRun(morning), true);
     assert.equal(schedule.claimRun(morning), false, '셋째는 넘는다');
-    assert.throws(() => schedule.runNow(morning), /오늘 한도\(2번\)/);
+    assert.equal(
+      schedule.runNow(morning).toISOString(),
+      morning.toISOString(),
+      '한도에 닿아도 지금 한 번',
+    );
     assert.deepEqual([schedule.unsaved.run_day, schedule.unsaved.day_runs], ['2026-11-06', 2]);
     const nextDay = at('2026-11-06T15:30:00Z'); // 11/7 00:30 KST
     assert.equal(schedule.claimRun(nextDay), true);
