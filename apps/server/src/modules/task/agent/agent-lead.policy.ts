@@ -33,6 +33,12 @@ export class AgentLead {
       );
   }
 
+  /** 검수 승인을 켤 수 있는가 (2026-11-20): 대표이고 검토자 짝이 있다 */
+  static assertInspector(lead: boolean, reviewerId: string | null): void {
+    if (!lead) throw new RuleViolation('검수 승인은 대표에게만 켜요');
+    if (!reviewerId) throw new RuleViolation('검토자를 먼저 정해 주세요');
+  }
+
   /** 보고 대상: 대표는 누구에게도 보고하지 않고, 아무도 대표에게 보고하지 않는다 (맨 위 에이전트는 대표가 맡긴다) */
   static assertReport(agent: Agent, manager: Agent | null): void {
     if (agent.lead && manager !== null)

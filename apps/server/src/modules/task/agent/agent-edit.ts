@@ -79,7 +79,7 @@ export class AgentEdit {
   /** 보고 대상을 바꾸지 않으면 그 에이전트만 잠근다. 러너 · 검토자는 같은 공간의 것만 (없으면 404) */
   async update(req: UpdateAgentInput): Promise<Agent> {
     await this.assertKnownTools(req.changes.external_tools);
-    const { reportsTo, runnerId, reviewerId } = req;
+    const { reportsTo, runnerId, reviewerId, reviewerApproves } = req;
     const agents = new AgentRepository(this.tx);
     const org = reportsTo === undefined ? [] : await agents.lockAll(this.spaceId);
     const agent = org.find((a) => a.id === req.id) ?? (await agents.lock(this.spaceId, req.id));
@@ -88,6 +88,7 @@ export class AgentEdit {
     agent.edit(req.changes, typeof runnerId === 'string' ? await this.runner(runnerId) : runnerId);
     if (reviewerId !== undefined)
       agent.pairReviewer(reviewerId === null ? null : await agents.load(this.spaceId, reviewerId));
+    if (reviewerApproves !== undefined) agent.letReviewerApprove(reviewerApproves);
     return agent;
   }
 

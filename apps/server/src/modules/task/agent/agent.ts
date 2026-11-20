@@ -73,14 +73,8 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
         throw new RuleViolation(`승인 요청으로 맡길 수 없는 동작이에요: ${wrong.join(', ')}`);
       return [...new Set(value)];
     },
-    monthly_limit: (value) => {
-      if (value !== null && value < 1) throw new RuleViolation('한도는 1 이상이에요');
-      return value;
-    },
-    five_hour_limit: (value) => {
-      if (value !== null && value < 1) throw new RuleViolation('5시간 한도는 1 이상이에요');
-      return value;
-    },
+    monthly_limit: (value) => Agent.atLeastOne(value, '한도'),
+    five_hour_limit: (value) => Agent.atLeastOne(value, '5시간 한도'),
     plan_stop_percent: (value) => {
       if (value !== null && (value < 1 || value > Agent.PLAN_PERCENT_MAX))
         throw new RuleViolation(`구독 사용률은 1~${Agent.PLAN_PERCENT_MAX}%예요`);
@@ -137,6 +131,11 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return new Agent(row);
   }
 
+  private static atLeastOne(value: number | null, label: string): number | null {
+    if (value !== null && value < 1) throw new RuleViolation(`${label}는 1 이상이에요`);
+    return value;
+  }
+
   /** 대표인가 (O-2). 새로 연 줄(저장 전)과 시험의 줄에는 칸이 없을 수 있다 */
   get lead(): boolean {
     return this.row.lead === true;
@@ -152,11 +151,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
 
   get role(): string {
     return this.row.role;
-  }
-
-  /** 맡는 일: 역할의 첫 줄. 대화의 배정이 이것으로 고른다 (2차 1-5) */
-  get duty(): string {
-    return this.row.role.trim().split('\n')[0]?.trim() ?? '';
   }
 
   get tool(): AgentRow['tool'] {
@@ -283,6 +277,22 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
         throw new RuleViolation('검토자는 다른 AI 도구를 쓰는 에이전트예요');
     }
     this.put('reviewer_id', reviewer?.id ?? null);
+    // 검토자를 빼면 검수 승인도 끈다 (검수할 에이전트가 없다)
+    if (reviewer === null && this.row.reviewer_approves) this.put('reviewer_approves', false);
+  }
+
+  /** 검수 승인을 켜 두었는가: 검토자가 앱 안의 공개를 검수해 통과하면 관리자 대신 승인한다 (2026-11-20) */
+  get reviewerApproves(): boolean {
+    return this.row.reviewer_approves === true && this.row.reviewer_id !== null;
+  }
+
+  /**
+   * 검수 승인을 켜거나 끈다 (원칙 7, 2026-11-20 사용자 결정): 대표만, 검토자가 있어야 켠다.
+   * 앱 안의 공개(글 · 호 · 앱 화면)만 검수자가 승인하고, 그 밖의 승인은 늘 관리자에게 간다 (ChatInspect)
+   */
+  letReviewerApprove(on: boolean): void {
+    if (on) AgentLead.assertInspector(this.lead, this.row.reviewer_id);
+    this.put('reviewer_approves', on);
   }
 
   /** 정해진 러너에 묶였는가 (그 러너만 일을 빌린다) */
@@ -359,9 +369,8 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
    */
   holds(fiveHourTokens: number, planPercent: number | null): boolean {
     const { five_hour_limit: tokens, plan_stop_percent: percent } = this.row;
-    const tokensFull = tokens !== null && fiveHourTokens >= tokens;
-    const planFull = percent !== null && planPercent !== null && planPercent >= percent;
-    return tokensFull || planFull;
+    if (tokens !== null && fiveHourTokens >= tokens) return true;
+    return percent !== null && planPercent !== null && planPercent >= percent;
   }
 
   /** 한도 올리기 결재가 승인됨: 한도를 두 배로 하고 다시 움직인다 */

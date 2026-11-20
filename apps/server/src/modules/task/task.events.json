@@ -100,6 +100,21 @@
         "payload"
       ]
     },
+    "task.approval.inspected": {
+      "fields": [
+        "approvalId",
+        "taskId",
+        "agentId",
+        "action",
+        "targetKind",
+        "targetId",
+        "targetVersion",
+        "decidedBy",
+        "note",
+        "chatId?",
+        "payload"
+      ]
+    },
     "task.chat.changed": {
       "fields": ["chatId", "title", "turns"]
     },

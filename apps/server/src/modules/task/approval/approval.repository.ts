@@ -68,6 +68,23 @@ export class ApprovalRepository extends TableRepository<ApprovalRow, Approval> {
     );
   }
 
+  /**
+   * 같은 대상에 검수자가 고쳐 달라고 한 앞 결재들 (검수의 회수와 앞 의견, 2026-11-20 ChatInspect). 오래된 것부터.
+   * 같은 대화 · 동작 · 대상이면 같은 일로 본다 (글은 고쳐 다시 올려도 같은 글, 앱 화면은 같은 앱)
+   */
+  inspectorFixes(approval: Approval): Promise<readonly Approval[]> {
+    return this.find(
+      {
+        chat_id: approval.chatId,
+        action: approval.action,
+        target_id: approval.targetId,
+        status: Approval.REVISION_REQUESTED,
+        agent_decided: true,
+      },
+      { order: ['id'] },
+    );
+  }
+
   /** 카드에 실린 기다리는 결재 (읽기만: 작업을 먼저 잠근 뒤 lock으로 다시 잠근다) */
   inCard(cardId: string): Promise<readonly Approval[]> {
     return this.find({ card_id: cardId, status: Approval.PENDING }, { order: ['id'] });

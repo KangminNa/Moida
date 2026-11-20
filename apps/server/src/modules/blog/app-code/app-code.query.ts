@@ -49,6 +49,8 @@ export class AppCodeQuery extends BaseQuery {
   /** app_code_base가 내용까지 주는 글 파일과 그 크기의 합 (페이지의 page_base와 같다) */
   private static readonly TEXT = /\.(html?|css|m?js|json|md|txt|csv|svg|xml)$/i;
   private static readonly BASE_TEXT_MAX = 300 * 1024;
+  /** 앱 화면 공개의 승인 동작 (검수하는 일이 이 동작이면 그 앱을 읽는다) */
+  private static readonly SHOW = 'blog.app_code.show';
 
   constructor(
     db: Database,
@@ -107,14 +109,14 @@ export class AppCodeQuery extends BaseQuery {
 
   /**
    * 러너가 쥔 만들기 일이 고칠 앱 (MCP app_code_base): 가장 새 버전(확인 대기 포함, 없으면 시작 코드)의 파일과 바깥 주소.
+   * 앱 화면 공개를 검수하는 일(task의 payload.inspect, 2026-11-20)도 그 앱의 같은 코드를 읽는다.
    * 글 파일은 내용까지(모두 BASE_TEXT_MAX바이트까지), 그 밖은 이름 · 크기만. 앱 코드 주문이 없는 일이면 app_id null
    */
   async base(actor: Actor, req: AppCodeBaseInput): Promise<AppCodeBaseView> {
     actor.assertCan(Actor.RUN);
     const work = await this.leases.of(actor, req.taskId);
-    const appId = (work.payload as { appCode?: { appId?: unknown } } | null)?.appCode?.appId;
-    if (work.kind !== 'make' || typeof appId !== 'string')
-      return new AppCodeBaseView(null, 0, [], []);
+    const appId = AppCodeQuery.appOfWork(work.kind, work.payload);
+    if (appId === null) return new AppCodeBaseView(null, 0, [], []);
     const app = await this.row(apps, { space_id: actor.requireSpace(), id: appId });
     if (!app) return new AppCodeBaseView(null, 0, [], []);
     const code = await this.filesOf(actor, app, app.code_versions);
@@ -200,6 +202,21 @@ export class AppCodeQuery extends BaseQuery {
   }
 
   /** 관리자의 앱 (같은 공간). 없으면 NotFound */
+  /** 쥔 일이 보는 앱: 만들기 일의 앱 코드 주문(payload.appCode), 또는 앱 화면 공개를 검수하는 일(payload.inspect). 없으면 null */
+  private static appOfWork(kind: string, payload: unknown): string | null {
+    const p = payload as {
+      appCode?: { appId?: unknown };
+      inspect?: { action?: unknown; targetId?: unknown };
+    } | null;
+    const id =
+      kind === 'make'
+        ? p?.appCode?.appId
+        : p?.inspect?.action === AppCodeQuery.SHOW
+          ? p.inspect.targetId
+          : null;
+    return typeof id === 'string' ? id : null;
+  }
+
   private async owned(actor: Actor, id: string): Promise<AppRow> {
     actor.assertOwner();
     const app = await this.row(apps, { space_id: actor.requireSpace(), id });

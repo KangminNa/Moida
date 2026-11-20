@@ -48,6 +48,7 @@ export interface AgentRow {
   effort: AgentEffort;
   external_tools: readonly string[];
   lead: boolean;
+  reviewer_approves: boolean;
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 
@@ -91,6 +92,8 @@ export interface ApprovalRow {
   chat_id: string | null;
   card_id: string | null;
   payload: unknown | null;
+  inspected_at: Date | null;
+  agent_decided: boolean;
 }
 export type ApprovalNew = Partial<ApprovalRow> & Pick<ApprovalRow, 'id' | 'space_id' | 'action' | 'target_kind' | 'target_id' | 'target_version'>;
 

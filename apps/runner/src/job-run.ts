@@ -6,7 +6,7 @@ import type { CairnServer } from './cairn-server';
 import { CredentialWriteBack } from './credential-write-back';
 import { EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
-import { JobPhotos } from './job-photos';
+import { JobInputs } from './job-inputs';
 import { JobWorkspace } from './job-workspace';
 import { LineageStore } from './lineage-store';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
@@ -61,8 +61,8 @@ export class JobRun {
   private readonly recorder: RunRecorder;
   /** 일의 엔진으로 만든 실행 어댑터. 토큰이 없거나 모르는 엔진이면 null (perform이 시작 전에 끝낸다) */
   private readonly tool: AiTool | null;
-  /** 대화에 넣은 사진 (대화에 사진 넣기 ②-b): 작업 자리의 photos/에 받아 AI CLI가 직접 본다 */
-  private readonly photos: JobPhotos;
+  /** 대화에 넣은 사진(photos/, ②-b) · 검수할 앱 코드(app/, 2026-11-20): 작업 자리에 받아 AI CLI가 직접 본다 */
+  private readonly inputs: JobInputs;
 
   constructor(
     private readonly job: Job,
@@ -77,7 +77,7 @@ export class JobRun {
   ) {
     const engine = EngineAdapters.of(job.tool);
     this.tool = engine && login.token !== null ? engine.tool(login.token, config) : null;
-    this.photos = new JobPhotos(job, server, config.serverUrl, engine?.photos ?? null);
+    this.inputs = new JobInputs(job, server, config.serverUrl, engine?.photos ?? null);
     // 자격 안의 토큰 (Codex auth.json의 access · refresh) · 외부 도구의 머리글 값까지 로그와 기록에서 지운다
     this.redactor = [...(this.tool?.secrets ?? []), ...job.runtime.secrets].reduce(
       (r, secret) => r.with(secret),
@@ -109,7 +109,7 @@ export class JobRun {
       await place.handOver(this.job.sharedFolders(this.config.folders));
       JobWorkspace.logSkill(this.job, this.config.skillsDir, this.log);
       // 사진을 받는 동안에도 보고 고리를 돌린다 (임대 · 취소). 사진은 덤이라 받지 못해도 이어 간다
-      const got = await this.during((signal) => this.photos.receive(place, signal, this.note));
+      const got = await this.during((signal) => this.inputs.receive(place, signal, this.note));
       if (got instanceof RunEnding) return await this.conclude(got);
       await this.supervise(place, this.tool, prompts);
     } catch (error) {
@@ -163,7 +163,7 @@ export class JobRun {
    */
   private async supervise(place: JobWorkspace, tool: AiTool, prompts: PromptPack): Promise<void> {
     const job = this.recorder.onto(
-      this.stage?.aiJob(prompts) ?? place.withShared(this.photos.onto(this.job), prompts),
+      this.stage?.aiJob(prompts) ?? place.withShared(this.inputs.onto(this.job), prompts),
     );
     let run = await this.runAi(job, place, tool, prompts);
     for (let retries = 0; run.ending.succeeded && this.stage !== null; retries++) {

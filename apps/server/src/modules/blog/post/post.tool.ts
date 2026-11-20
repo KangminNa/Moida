@@ -26,6 +26,14 @@ export class BlogGetPostTool extends BaseTool {
     super();
   }
 
+  /**
+   * 쓰기 권한이 없어도 이 작업에 읽기를 허락받은 글이 있으면 연다 (대화의 참조 · 검수할 글, 2026-11-20).
+   * 그 글만 읽힌다 (PostQuery.editable이 Actor.mayRead로 본다)
+   */
+  override allows(actor: Actor): boolean {
+    return super.allows(actor) || actor.hasReadGrants();
+  }
+
   async handle(actor: Actor, raw: unknown): Promise<ToolPostView> {
     return this.posts.editable(actor, ReadPostInput.fromTool(raw));
   }

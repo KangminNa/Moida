@@ -8,11 +8,13 @@ import {
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AgentRuntime } from '../agent/agent-runtime.policy';
+import type { Approval } from '../approval/approval';
 import { Task } from '../task/task';
 import { TaskRefs } from '../task/task-refs.policy';
 import type { ChatNew, ChatRow, ChatUpdateKind, ChatUpdateNew, TaskNew } from '../task.tables';
 import { ChatView } from './chat.view';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
+import { ChatInspect } from './chat-inspect.policy';
 import { ChatRequest } from './chat-request.policy';
 import { ChatUpdates } from './chat-update.policy';
 import { TurnDeliver } from './turn-deliver.policy';
@@ -173,8 +175,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
       refs = TaskRefs.of(null),
     }: ChatTurnExtra = {},
   ): Task {
-    if (agent.id !== this.row.agent_id) throw new RuleViolation('이 대화의 상대가 아니에요');
-    Chat.assertPartner(agent);
+    this.assertPartner(agent);
     refs.assertFor(agent);
     if (ChatHistory.waiting(previous.at(-1)))
       throw new Conflict('답을 기다리는 중이에요. 답이 오거나 취소한 뒤에 보내요');
@@ -182,8 +183,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     if (!text) throw new RuleViolation('메시지를 적어요');
     const turn = this.row.turns + 1;
     this.put('turns', turn);
-    this.put('updated_at', now);
-    this.changed();
+    this.touch(now);
     return this.task(
       ChatRequest.turn(this.id, turn),
       {
@@ -243,16 +243,20 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
 
   /**
    * 회차의 결과를 결재 전에 검토자(다른 AI 도구의 에이전트)가 본다 (검토자 짝, 2차 2단계). 회차마다 하나 (request_id).
-   * instruction은 지시문 틀 result-review로 채운 글. 답은 소식(review)과 결과 카드에 실린다
+   * instruction은 지시문 틀 result-review로 채운 글. 답은 소식(review)과 결과 카드에 실린다.
+   * inspect를 주면 그 결재 하나의 검수다 (2026-11-20, 틀 result-inspect, ChatInspect): 결재마다 하나, 무엇을 보는지와 읽기 허락을 싣는다
    */
-  review(reviewer: Agent, instruction: string, now: Date): Task {
+  review(reviewer: Agent, instruction: string, now: Date, inspect: Approval | null = null): Task {
     return this.task(
-      ChatRequest.review(this.id, this.row.turns),
+      ChatRequest.review(this.id, this.row.turns, inspect?.id ?? null),
       {
         agent_id: reviewer.id,
-        title: `검토 · ${ChatHistory.firstLine(this.row.title, Chat.TASK_TITLE)}`,
+        title: `${inspect ? '검수' : '검토'} · ${ChatHistory.firstLine(this.row.title, Chat.TASK_TITLE)}`,
         instruction,
-        payload: { chat: { chatId: this.id, turn: this.row.turns, review: true } },
+        payload: {
+          chat: { chatId: this.id, turn: this.row.turns, review: true },
+          ...(inspect ? ChatInspect.payloadOf(inspect) : {}),
+        },
       },
       now,
     );
@@ -274,16 +278,14 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     now: Date,
     deviceId: string | null = null,
   ): Task | null {
-    if (agent.id !== this.row.agent_id) throw new RuleViolation('이 대화의 상대가 아니에요');
-    Chat.assertPartner(agent);
+    this.assertPartner(agent);
     if (appended >= ChatUpdates.APPEND_MAX)
       throw new RuleViolation(`덧붙인 말은 회차마다 ${ChatUpdates.APPEND_MAX}개까지예요`);
     const text = message.trim();
     if (text.length > ChatUpdates.TEXT_MAX)
       throw new RuleViolation(`덧붙인 말은 ${ChatUpdates.TEXT_MAX}자까지예요`);
     this.note(ChatUpdates.APPENDED, text, current.id, null, now);
-    this.put('updated_at', now);
-    this.changed();
+    this.touch(now);
     if (current.status === Task.QUEUED) return null;
     const turn = this.row.turns;
     return this.task(
@@ -315,7 +317,6 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   assign(lead: Agent, now: Date, deliver: string | null = null): Task {
     const message = this.row.pending;
     if (this.row.agent_id !== null || message === null) throw new Conflict('이미 맡은 대화예요');
-    Chat.assertPartner(lead);
     const refs = this.pendingRefs;
     this.put('agent_id', lead.id);
     this.put('pending', null);
@@ -374,8 +375,9 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     return new ChatView(this.row);
   }
 
-  /** 대화 상대: 공간의 대표, 멈추지 않은 것 (지운 에이전트는 불러올 때 이미 없다) */
-  private static assertPartner(agent: Agent): void {
+  /** 이 대화의 상대: 공간의 대표, 멈추지 않은 것 (지운 에이전트는 불러올 때 이미 없다). 맡기(assign)도 send에서 본다 */
+  private assertPartner(agent: Agent): void {
+    if (agent.id !== this.row.agent_id) throw new RuleViolation('이 대화의 상대가 아니에요');
     if (!agent.lead) throw new RuleViolation(`대표와만 대화해요: ${agent.name}은(는) 팀이에요`);
     if (agent.paused) throw new RuleViolation('대표를 멈췄어요 (설정 › AI에서 다시 시작해요)');
   }

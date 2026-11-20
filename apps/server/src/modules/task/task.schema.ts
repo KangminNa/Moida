@@ -41,6 +41,7 @@ export const agents = taskSchema.table('agents', {
   effort: text('effort').$type<AgentEffort>().notNull(),
   external_tools: text('external_tools').array().notNull(),
   lead: boolean('lead').notNull(),
+  reviewer_approves: boolean('reviewer_approves').notNull(),
 });
 
 /** task.ai_logins */
@@ -76,6 +77,8 @@ export const approvals = taskSchema.table('approvals', {
   chat_id: uuid('chat_id'),
   card_id: uuid('card_id'),
   payload: jsonb('payload'),
+  inspected_at: timestamp('inspected_at', { withTimezone: true }),
+  agent_decided: boolean('agent_decided').notNull(),
 });
 
 /** task.chat_updates */

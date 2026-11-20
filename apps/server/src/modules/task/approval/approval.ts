@@ -79,13 +79,12 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     task.waitFor(now);
     // 주인이 결정하며 남기는 말이 note를 덮으므로, 에이전트의 말은 실행 기록에 남긴다 (원칙 2)
     task.log(Task.LOG_WRITE, `승인 요청: ${action}${note ? ` (${note})` : ''}`, 0, now);
-    approval.announce('task.approval.requested');
     return approval;
   }
 
   /** 에이전트가 한 달 한도를 넘겼다. 작업에 묶이지 않는 결재라 대상은 에이전트 자신이다 */
   static raiseLimit(agent: Agent, usedThisMonth: number, now: Date): Approval {
-    const approval = Approval.pending(
+    return Approval.pending(
       {
         space_id: agent.spaceId,
         task_id: null,
@@ -98,8 +97,6 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       },
       now,
     );
-    approval.announce('task.approval.requested');
-    return approval;
   }
 
   /**
@@ -107,7 +104,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
    * 작업에 묶이지 않는다 (회차 작업은 이미 끝났다). 대상은 실행이고, 결정은 task 모듈의 GoalRunService가 받는다
    */
   static forGoalRun(run: GoalRun, action: string, note: string, now: Date): Approval {
-    const approval = Approval.pending(
+    return Approval.pending(
       {
         space_id: run.spaceId,
         task_id: null,
@@ -120,8 +117,6 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       },
       now,
     );
-    approval.announce('task.approval.requested');
-    return approval;
   }
 
   /** 대화 한 회차의 결과 카드 (서버가 올린다). 작업에 묶이지 않고, 실린 결재 · 결과물은 card_id로 가리킨다 */
@@ -132,7 +127,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     turn: number,
     now: Date,
   ): Approval {
-    const card = Approval.pending(
+    return Approval.pending(
       {
         space_id: spaceId,
         task_id: null,
@@ -145,8 +140,6 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       },
       now,
     );
-    card.announce('task.approval.requested');
-    return card;
   }
 
   /**
@@ -160,7 +153,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     target: { appId: string; name: string; seq: number },
     now: Date,
   ): Approval {
-    const approval = Approval.pending(
+    return Approval.pending(
       {
         space_id: spaceId,
         task_id: null,
@@ -174,17 +167,15 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       },
       now,
     );
-    approval.announce('task.approval.requested');
-    return approval;
   }
 
   static restore(row: ApprovalRow): Approval {
     return new Approval(row);
   }
 
-  /** 아직 아무도 정하지 않은 결재 */
+  /** 아직 아무도 정하지 않은 결재. 요청 이벤트를 함께 남긴다 (알림 · 결과 카드가 받는다) */
   private static pending(fields: Omit<ApprovalNew, 'id'>, now: Date): Approval {
-    return new Approval(
+    const approval = new Approval(
       {
         ...fields,
         id: BaseEntity.newId(),
@@ -194,6 +185,8 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       },
       true,
     );
+    approval.announce('task.approval.requested');
+    return approval;
   }
 
   /** 결과 카드면 실린 마지막 회차 (forChat · grew) */
@@ -229,6 +222,32 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   /** 주인이 정하며 남긴 말 (고쳐 달라면 고칠 내용) */
   get note(): string | null {
     return this.row.note;
+  }
+
+  /** 올린 에이전트 (결과 카드 · 앱 코드 공개는 대화의 대표) */
+  get agentId(): string | null {
+    return this.row.agent_id;
+  }
+
+  /** 검수가 끝났는가 (통과 · 고칠 것 · 넘김 모두, 2026-11-20) */
+  get inspected(): boolean {
+    return this.row.inspected_at !== null;
+  }
+
+  /**
+   * 검수의 결정 (원칙 7, 2026-11-20): pass면 검수자가 관리자 대신 승인(실행은 관리자의 승인과 같다), fix면 올린 팀에게
+   * 고쳐 달라고 돌려준다(고쳐 다시 올리면 다시 검수), hold면 기다린 채 검수 의견을 메모에 붙여 관리자에게 넘긴다(결과 카드).
+   * 앱 안의 공개만 검수한다 (ChatInspect가 고른다)
+   */
+  inspect(outcome: 'pass' | 'fix' | 'hold', inspectorId: string, text: string, now: Date): void {
+    this.assertPending();
+    this.put('inspected_at', now);
+    this.put('agent_decided', outcome !== 'hold');
+    if (outcome === 'pass') this.approve(inspectorId, `검수 통과: ${text}`, now);
+    else if (outcome === 'fix') this.requestRevision(inspectorId, text, now);
+    else
+      this.put('note', Approval.cleanNote(`${this.row.note ?? ''}\n\n검수 의견: ${text}`.trim()));
+    this.announce('task.approval.inspected');
   }
 
   get isCard(): boolean {
@@ -268,19 +287,13 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   /** 승인한 설정 바꾸기이고, 적용되면 대표가 이어서 하기로 한 것인가 (O-2, propose_setting의 continue) */
   get continues(): boolean {
-    const payload = this.row.payload as { continue?: unknown } | null;
-    return (
-      this.approved && this.row.action === Approval.SETTING_CHANGE && payload?.continue === true
-    );
+    const goOn = (this.row.payload as { continue?: unknown } | null)?.continue === true;
+    return goOn && this.approved && this.row.action === Approval.SETTING_CHANGE;
   }
 
   /** 설정 바꾸기 한 줄 (승인 뒤 이어서의 지시문 틀 setting-continue): 설정 · 동작 · 대상 이름 · 관리자에게 보인 까닭 */
   get settingLine(): string {
-    const p = (this.row.payload ?? {}) as {
-      setting?: unknown;
-      op?: unknown;
-      target_name?: unknown;
-    };
+    const p = (this.row.payload ?? {}) as Record<string, unknown>;
     const head = [p.setting, p.op, p.target_name].filter((v) => typeof v === 'string').join(' ');
     return this.row.note ? `${head}: ${this.row.note}` : head;
   }
