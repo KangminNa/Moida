@@ -22,9 +22,15 @@ export class ChatRequest {
    * 회차의 결과를 결재 전에 검토하는 작업 (검토자 짝, 2차 2단계). approvalId를 주면 대화의 일에서 올라온 결재 하나를
    * 검수하는 작업 (2026-11-20, ChatInspect): 결재마다 하나
    */
-  static review(chatId: string, turn: number, approvalId: string | null = null): string {
-    if (approvalId !== null) return `${ChatRequest.TURN_PREFIX}${chatId}:inspect:${approvalId}`;
-    return `${ChatRequest.turn(chatId, turn)}:review`;
+  static review(
+    chatId: string,
+    turn: number,
+    approvalId: string | null = null,
+    second = false,
+  ): string {
+    if (approvalId === null) return `${ChatRequest.turn(chatId, turn)}:review`;
+    // 두 번째 검수자의 검수 (2026-11-20): 같은 결재에 :2를 붙인다
+    return `${ChatRequest.TURN_PREFIX}${chatId}:inspect:${approvalId}${second ? ':2' : ''}`;
   }
 
   /** from회차부터 to회차까지 (작업을 찾는 데 쓴다) */

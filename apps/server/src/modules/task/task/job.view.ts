@@ -38,6 +38,11 @@ export interface TeamStatRow {
   failed: number;
   revised: number;
   connectors: readonly string[];
+  /**
+   * 최근 30일 성적표 (2026-11-20, AgentRepository.scores의 한 줄): judged · first_pass · avg_fixes · decided · sent_back ·
+   * tokens_per_done. 러너가 이름으로 읽는다. 없으면 null
+   */
+  scorecard: Readonly<Record<string, number | null>> | null;
 }
 
 /** 팀원 아래 팀 전체의 요약 (이름 없이, O-2): 사람 수, 맡길 수 있는 일마다 · 켜진 커넥터마다 몇 명 */
@@ -80,6 +85,7 @@ export class JobTeamMemberView {
       tool: r.tool,
       open: s?.open ?? 0,
       recent: { done: s?.done ?? 0, failed: s?.failed ?? 0, revised: s?.revised ?? 0 },
+      scorecard: s?.scorecard ?? null,
       connectors: s?.connectors ?? [],
       team: this.team,
     };
@@ -244,6 +250,14 @@ export class JobView {
     return this;
   }
 
+  /** 끝나지 않은 하위 작업마다 최근 진행 기록 (작업 id → 줄, 2026-11-20). 도움 요청 줄도 여기 있다 */
+  private progress: ReadonlyMap<string, readonly string[]> = new Map();
+
+  withProgress(progress: ReadonlyMap<string, readonly string[]>): this {
+    this.progress = progress;
+    return this;
+  }
+
   /** 이 에이전트에게 허락한 외부 도구 (2차 7단계). 러너가 MCP 설정에 더한다. headers에만 토큰이 있다 */
   private tools: readonly JobToolView[] = [];
 
@@ -304,6 +318,7 @@ export class JobView {
       team: this.team.map((m) => m.toJSON()),
       subtask_results: this.subtaskResults.map((s) => ({
         ...s.toJSON(),
+        progress: [...(this.progress.get(s.taskId) ?? [])],
         outputs: (this.made.get(s.taskId) ?? []).map((o) => ({
           id: o.id,
           name: o.name,

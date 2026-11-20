@@ -344,6 +344,117 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
   });
 });
 
+describe('페이지 앱 (P1, 2026-11-20): 블로그 틀 없는 화면 · 화면마다 템플릿 · 페이지가 화면', () => {
+  test('시작 코드는 블로그 틀 없는 빈 화면이고, /<앱>/<이름>은 앱 코드의 <이름>.html이다', async () => {
+    const app = await newApp(`page-p1-${mark}`, 'page');
+    const starter = ok(await screen(String(app.slug), '', {}, owner));
+    // 비공개 앱은 관리자를 미리 보기 토큰으로 보낸다: 시작 코드는 코드 탭에서 본다
+    assert.ok(String(starter.redirect).includes('/~'));
+    const files = ((await code(app)).files as Json[]).map((f) => f.name).sort();
+    assert.deepEqual(
+      files,
+      ['icon.svg', 'index.html', 'style.css'],
+      '머리 · 메뉴 · 꼬리 · 글 목록 없음',
+    );
+
+    // 비공개 앱의 새 버전은 바로 보인다. 공개한 뒤 방문자가 화면마다 다른 템플릿을 본다
+    const zip = {
+      'index.html': '<a href="{{base}}/about">소개</a>',
+      'about.html': '<h1>{{#isView}}{{view}}{{/isView}}</h1>',
+    };
+    ok(await upload(app, zipOf(zip)), 201);
+    await publish(app);
+    const home = ok(await screen(String(app.slug)));
+    assert.deepEqual([home.status, home.template, home.page], [200, 'index.html', null]);
+    const about = ok(await screen(String(app.slug), 'about'));
+    assert.deepEqual([about.status, about.template], [200, 'about.html']);
+    assert.deepEqual([(about.data as Json).isView, (about.data as Json).view], [true, 'about']);
+    for (const path of ['none', 'posts', 'index', 'a/b']) {
+      const missing = ok(await screen(String(app.slug), path));
+      assert.deepEqual([missing.status, missing.template], [404, null], path);
+    }
+  });
+
+  test('앱 코드를 만든 적이 없는 페이지 앱은 공개 페이지가 화면이다. 페이지가 비공개거나 코드를 공개하면 앱 코드', async () => {
+    const title = `페이지 화면 ${mark}`;
+    const task = ok(
+      await api.request('POST', '/api/tasks', owner, {
+        requestId: randomUUID(),
+        kind: 'make',
+        agentId: maker.id,
+        instruction: '페이지를 만들어 주세요',
+        page: { title },
+      }),
+      201,
+    );
+    await lease(String(task.id));
+    await deliver(String(task.id), { 'index.html': '<p>페이지</p>', 'data.json': '{"n":1}' });
+    const page = (ok(await api.get('/api/pages', owner)).pages as Json[]).find(
+      (p) => p.title === title,
+    ) as Json;
+    ok(
+      await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+        version: page.version,
+        visibility: 'public',
+      }),
+    );
+    const app = ok(
+      await api.request('POST', '/api/apps', owner, {
+        requestId: randomUUID(),
+        kind: 'page',
+        name: `페이지 앱 ${mark}`,
+        slug: `page-shown-${mark}`,
+        pageId: page.id,
+      }),
+      201,
+    );
+    await publish(app);
+    const slug = String(app.slug);
+    const home = ok(await screen(slug));
+    assert.deepEqual(home.page, { name: page.name, file: null, base: `/${slug}` });
+    assert.deepEqual(ok(await screen(slug, 'data.json')).page, {
+      name: page.name,
+      file: 'data.json',
+      base: `/${slug}`,
+    });
+    assert.equal(ok(await screen(slug, 'a/b')).status, 404, '페이지의 파일은 한 칸짜리 주소');
+
+    // 페이지를 비공개로 돌리면 앱 코드(시작 코드)가 화면이다
+    const now = (ok(await api.get('/api/pages', owner)).pages as Json[]).find(
+      (p) => p.id === page.id,
+    ) as Json;
+    ok(
+      await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+        version: now.version,
+        visibility: 'private',
+      }),
+    );
+    assert.deepEqual(
+      [ok(await screen(slug)).page, ok(await screen(slug)).template],
+      [null, 'index.html'],
+    );
+    ok(
+      await api.request('PATCH', `/api/pages/${page.id}`, owner, {
+        version: Number(now.version) + 1,
+        visibility: 'public',
+      }),
+    );
+    assert.notEqual(ok(await screen(slug)).page, null);
+
+    // 앱 코드를 공개하면(보이는 버전이 생기면) 앱 코드가 화면이다. 확인 대기 버전만으로는 그대로
+    ok(await upload(app, zipOf({ 'index.html': '<p>앱 코드</p>' })), 201);
+    assert.notEqual(ok(await screen(slug)).page, null, '확인 대기');
+    ok(
+      await api.request('POST', `/api/apps/${app.id}/code/current`, owner, {
+        version: (await appOf(app.id)).version,
+        seq: 1,
+      }),
+    );
+    const coded = ok(await screen(slug));
+    assert.deepEqual([coded.page, coded.seq, coded.template], [null, 1, 'index.html']);
+  });
+});
+
 describe('앱 코드 (/api/apps/:id/code)', () => {
   test('zip 올리기: 공개 앱의 새 버전은 확인 대기, 관리자가 공개하면 방문자에게 보인다', async () => {
     const app = await publish(await newApp(`code-f-${mark}`));

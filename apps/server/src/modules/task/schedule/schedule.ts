@@ -284,14 +284,18 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     return now;
   }
 
-  /** 대화로 보내는 레시피가 처음 연 대화를 기억한다 (다음 차례부터 그 대화의 회차) */
-  openedChat(chatId: string): void {
-    this.put('chat_id', chatId);
+  /**
+   * 대화로 보내는 레시피가 회차를 쌓을 대화: 처음 돌며 연 대화(다음 차례부터 그 대화의 회차), 대화에서 승인한 대화 레시피는
+   * 그 대화 (O-3, 대화로 자동화). 다른 곳으로 보내는 레시피는 그대로
+   */
+  bindChat(chatId: string | null): void {
+    if (chatId !== null && this.row.destination === Schedule.CHAT) this.put('chat_id', chatId);
   }
 
-  /** 대화에서 승인한 대화 레시피는 그 대화에 회차를 쌓는다 (O-3, 대화로 자동화). 다른 곳으로 보내는 레시피는 그대로 */
-  bindChat(chatId: string | null): void {
-    if (chatId !== null && this.row.destination === Schedule.CHAT) this.openedChat(chatId);
+  /** 자동화 건강 검사 (2026-11-20): 잇달아 실패한 레시피를 끈다. 관리자가 고쳐서 다시 켠다 */
+  stopFailing(): void {
+    this.put('enabled', false);
+    this.put('next_run_at', null);
   }
 
   /**

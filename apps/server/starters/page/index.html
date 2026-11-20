@@ -1,15 +1,19 @@
 <!doctype html>
 <html lang="ko">
 <head>
-{{> head}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<link rel="icon" href="{{#app.iconUrl}}{{app.iconUrl}}{{/app.iconUrl}}{{^app.iconUrl}}{{files}}/icon.svg{{/app.iconUrl}}">
+<link rel="stylesheet" href="{{files}}/style.css">
 </head>
 <body>
-{{> header}}
-<main class="blog-main">
-  {{#app.description}}<p class="blog-intro">{{app.description}}</p>{{/app.description}}
-  {{#pages.length}}{{> page-list}}{{/pages.length}}
-  {{^pages.length}}<p class="blog-empty">준비 중</p>{{/pages.length}}
+{{! 페이지 앱의 시작 코드: 블로그 틀(머리 · 메뉴 · 꼬리) 없는 빈 화면이다. 이 앱이 하는 일에 맞게 처음부터 만든다.
+    다른 화면은 이름.html 파일을 더하면 앱 주소 뒤의 /이름 이 된다 }}
+<main class="screen">
+  <h1>{{app.name}}</h1>
+  {{#app.description}}<p class="lead">{{app.description}}</p>{{/app.description}}
 </main>
-{{> footer}}
+{{#others.length}}<a class="all-apps" href="{{site.home}}">모든 앱</a>{{/others.length}}
 </body>
 </html>

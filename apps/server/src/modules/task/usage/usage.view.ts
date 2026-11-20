@@ -3,6 +3,22 @@ import type { AgentRow, PlanUsageRow } from '../task.tables';
 // 사용량의 읽기 모양. 웹이 `import type`으로 가져온다 (객체설계 6장).
 // 표의 칸 중 무엇을 내보내는지는 여기 한 곳에만 적는다.
 
+/**
+ * 에이전트 하나의 성적표 (2026-11-20 평가가 남는 팀, AgentRepository.scores): 최근 기간의 판정 · 관리자 결정 · 토큰.
+ * judged · first_pass는 같은 대상의 첫 판정 수와 그중 통과, avg_fixes는 판정받은 대상 하나에 고칠 것 판정 수(없으면 null),
+ * decided · sent_back은 관리자가 정한 결재 수와 그중 수정 요청 · 반려, tokens_per_done은 끝낸 일 하나에 든 토큰
+ */
+export interface AgentScoreRow {
+  agent_id: string;
+  judged: number;
+  first_pass: number;
+  avg_fixes: number | null;
+  decided: number;
+  sent_back: number;
+  done: number;
+  tokens_per_done: number | null;
+}
+
 /** 에이전트 하나의 토큰 사용량과 한도 */
 export class AgentUsageView {
   constructor(
@@ -15,6 +31,16 @@ export class AgentUsageView {
     private readonly holding: boolean,
   ) {}
 
+  /** 최근 기간의 성적표 (팀 화면, 2026-11-20). 없으면 null로 내보낸다 */
+  private score: Readonly<AgentScoreRow> | null = null;
+  private scoreDays = 0;
+
+  withScore(score: Readonly<AgentScoreRow> | null, days: number): this {
+    this.score = score;
+    this.scoreDays = days;
+    return this;
+  }
+
   toJSON() {
     const r = this.row;
     return {
@@ -25,6 +51,22 @@ export class AgentUsageView {
       monthlyLimit: r.monthly_limit,
       planStopPercent: r.plan_stop_percent,
       holding: this.holding,
+      scorecard: this.scorecard(),
+    };
+  }
+
+  private scorecard() {
+    const s = this.score;
+    if (s === null) return null;
+    return {
+      days: this.scoreDays,
+      judged: s.judged,
+      firstPass: s.first_pass,
+      avgFixes: s.avg_fixes,
+      decided: s.decided,
+      sentBack: s.sent_back,
+      done: s.done,
+      tokensPerDone: s.tokens_per_done,
     };
   }
 }

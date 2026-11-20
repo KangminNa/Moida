@@ -1,6 +1,7 @@
 import { Actor, Forbidden, RuleViolation } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { ModelTier } from '../agent/model-tier.policy';
+import { TurnBrief } from '../chat/turn-brief.policy';
 import type { TaskNew, TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
 import { SubtaskWait } from './subtask-wait.policy';
@@ -72,6 +73,8 @@ export class DelegationPolicy {
   ): void {
     const P = DelegationPolicy;
     SubtaskWait.assertNotHurried(parent.payload);
+    if (TurnBrief.asked(parent.payload))
+      throw new RuleViolation('목표 확인 질문을 했어요. 관리자의 답이 오는 다음 회차에서 맡겨요');
     if (count < 1 || count > P.DELEGATE_AT_ONCE)
       throw new RuleViolation(`한 번에 1~${P.DELEGATE_AT_ONCE}개를 맡길 수 있어요 (한도)`);
     if (made + count > P.SUBTASKS_MAX)

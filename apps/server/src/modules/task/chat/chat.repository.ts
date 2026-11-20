@@ -1,7 +1,7 @@
 import { ChangeSignal, TableRepository } from '../../platform';
 import { Task } from '../task/task';
 import { chats, chatUpdates } from '../task.schema';
-import type { ChatRow } from '../task.tables';
+import type { ChatRow, TaskRow } from '../task.tables';
 import { Chat } from './chat';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatRequest } from './chat-request.policy';
@@ -31,6 +31,19 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
       SELECT id, instruction, result, status, wait_reason, payload FROM task.tasks
       WHERE space_id = ${spaceId} AND request_id = ANY(${ids}::text[])
       ORDER BY created_at, id`;
+  }
+
+  /** 결재 하나의 검수 작업들: 첫 검수자의 것이 먼저, 두 번째 검수자(2026-11-20)의 것이 다음 */
+  inspections(
+    spaceId: string,
+    chatId: string,
+    approvalId: string,
+  ): Promise<Pick<TaskRow, 'id' | 'agent_id' | 'status' | 'result'>[]> {
+    const ids = [false, true].map((second) => ChatRequest.review(chatId, 0, approvalId, second));
+    return this.sql<Pick<TaskRow, 'id' | 'agent_id' | 'status' | 'result'>[]>`
+      SELECT id, agent_id, status, result FROM task.tasks
+      WHERE space_id = ${spaceId} AND request_id = ANY(${ids}::text[])
+      ORDER BY request_id`;
   }
 
   /** 이 회차 작업에 쌓인 그 종류의 소식 수 (덧붙인 말 · post_update의 한도) */
@@ -65,6 +78,17 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
       JOIN task.tasks root ON root.id = top.id
       WHERE t.id = ${taskId} AND root.payload->'chat'->>'chatId' IS NOT NULL`;
     return row ?? null;
+  }
+
+  /** 이 회차 작업의 바로 앞 회차의 payload (목표 확인 질문을 했는가, TurnBrief). 첫 회차 · 앞 회차가 없으면 null */
+  async previousTurnPayload(spaceId: string, chatId: string, taskId: string): Promise<unknown> {
+    const [row] = await this.sql<Pick<TaskRow, 'payload'>[]>`
+      SELECT prev.payload FROM task.tasks cur
+      JOIN task.tasks prev ON prev.space_id = cur.space_id
+        AND prev.request_id = ${ChatRequest.TURN_PREFIX} || ${chatId} || ':'
+          || ((cur.payload->'chat'->>'turn')::int - 1)::text
+      WHERE cur.id = ${taskId} AND cur.space_id = ${spaceId}`;
+    return row?.payload ?? null;
   }
 
   /**

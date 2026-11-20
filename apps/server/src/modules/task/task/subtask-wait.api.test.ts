@@ -220,6 +220,62 @@ describe('깬 뒤에 정하기', () => {
   });
 });
 
+describe('팀원 돕기 (2026-11-20)', () => {
+  test('ask_help: 팀원이 나눌 부분을 적으면 기다리던 팀장을 먼저 깨우고, 팀장은 끝나지 않은 일의 진행 기록과 도움 요청 줄을 받는다', async () => {
+    const { lead, members, parent, children } = await delegated(30);
+    const [slow, quick] = [0, 1].map(
+      (i) => children.get(String((members[i] as Json).id)) as Json,
+    ) as [Json, Json];
+    const slowId = String((slow.task as Json).id);
+    const progress = await tool(runner, 'report_progress', {
+      task_id: slowId,
+      events: [
+        { kind: 'write', body: '자료 10개 중 4개 읽음' },
+        { kind: 'read', body: '' },
+      ],
+    });
+    assert.equal(progress.ok, true, JSON.stringify(progress.body));
+    const asked = await tool(String(slow.run_token), 'ask_help', { part: '6~10번 자료 요약' });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    assert.deepEqual(asked.body, { asked: true, lead_woken: true });
+    assert.equal((await getTask(parent.id)).status, 'queued', '팀장을 먼저 깨운다');
+    assert.equal((await getTask(slowId)).status, 'running', '요청한 팀원은 계속 일한다');
+
+    const woken = (await take(1)).get(String(lead.id)) as Json;
+    assert.equal(woken.wake, 'help');
+    const results = woken.subtask_results as Json[];
+    const open = results.find((r) => r.task_id === slowId) as Json;
+    assert.deepEqual(open.progress, ['자료 10개 중 4개 읽음', '도움 요청: 6~10번 자료 요약']);
+    const other = results.find((r) => r.task_id === (quick.task as Json).id) as Json;
+    assert.deepEqual(other.progress, [], '기록이 없으면 빈 목록');
+
+    // 팀장이 이미 깼으면 깨우지 않고 기록만 남긴다. 일 하나에 두 번까지
+    const again = await tool(String(slow.run_token), 'ask_help', { part: '그림 고르기' });
+    assert.deepEqual(again.body, { asked: true, lead_woken: false });
+    const third = await tool(String(slow.run_token), 'ask_help', { part: '하나 더' });
+    assert.equal(third.ok, false);
+    assert.match(JSON.stringify(third.body), /2번까지/);
+  });
+
+  test('ask_help는 팀장이 맡긴 일에서만: 맨 위 일은 직접 끝내거나 아래 팀에 맡긴다', async () => {
+    const solo = await newAgent('혼자');
+    ok(
+      await api.request('POST', '/api/tasks', owner, {
+        requestId: randomUUID(),
+        agentId: solo.id,
+        kind: 'general',
+        title: '혼자 하기',
+        instruction: '직접 해 주세요',
+      }),
+      201,
+    );
+    const job = (await take(1)).get(String(solo.id)) as Json;
+    const refused = await tool(String(job.run_token), 'ask_help', { part: '절반' });
+    assert.equal(refused.ok, false);
+    assert.match(JSON.stringify(refused.body), /팀장이 맡긴 일에서만/);
+  });
+});
+
 describe('지금까지로 답하기 (관리자)', () => {
   test('기다리는 작업을 바로 깨우고, 그 뒤로는 더 맡기거나 기다리지 못한다. 방문자는 못 하고, 끝난 작업은 409', async () => {
     const { lead, members, parent } = await delegated(30);

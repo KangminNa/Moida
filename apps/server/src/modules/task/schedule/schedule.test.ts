@@ -309,7 +309,7 @@ describe('Schedule', () => {
   test('대화 레시피: 연 대화를 기억하고, 받을 것을 바꿔도 그 대화에 남는다 (O-4). 대화가 아닌 곳으로 보내면 놓는다', () => {
     const recipe = settings({ destination: 'chat', agent_id: null, instruction: '주간 보고' });
     const chat = daily(recipe);
-    chat.openedChat('chat-1');
+    chat.bindChat('chat-1');
     chat.configure({ ...recipe, title: '이름만 바꿈' }, NOW);
     assert.equal(chat.chatId, 'chat-1');
     chat.configure({ ...recipe, deliver: 'html' }, NOW);
@@ -323,5 +323,14 @@ describe('Schedule', () => {
     assert.equal(Schedule.sourceOf(`schedule:${id}:2026-11-06T00:00:00.000Z`), id);
     assert.equal(Schedule.sourceOf(`chat:${id}:1`), null);
     assert.equal(Schedule.sourceOf(null), null);
+  });
+});
+
+describe('자동화 건강 검사 (2026-11-20)', () => {
+  test('최근 끝난 3번이 모두 실패면 끈다: 사람이 멈춘 것(취소) · 완료가 섞이거나 3번이 안 되면 그대로', () => {
+    assert.equal(SchedulePolicy.failing(['failed', 'failed', 'failed']), true);
+    assert.equal(SchedulePolicy.failing(['failed', 'failed']), false);
+    assert.equal(SchedulePolicy.failing(['failed', 'cancelled', 'failed']), false);
+    assert.equal(SchedulePolicy.failing(['failed', 'failed', 'done']), false);
   });
 });

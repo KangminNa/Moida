@@ -28,7 +28,7 @@ import type {
   AppCodeStateView,
   AppCodeView,
 } from './app-code.view';
-import type { AppScreenRedirectView, AppScreenView } from './app-screen.view';
+import type { AppScreenPageView, AppScreenRedirectView, AppScreenView } from './app-screen.view';
 import { AppSiteQuery } from './app-site.query';
 
 // 앱 코드 (스토어 1-6, docs/스토어.md 9.5). 관리자만: 코드 탭 · 바뀐 점 · zip 받기 · 올리기 · 공개 · 시작 코드로 · 미리 보기 주소.
@@ -126,7 +126,7 @@ export class AppSiteController {
     @CurrentActor() actor: Actor,
     @Param('slug') slug: string,
     @Query() query: unknown,
-  ): Promise<AppScreenView | AppScreenRedirectView> {
+  ): Promise<AppScreenView | AppScreenRedirectView | AppScreenPageView> {
     return this.site.screen(actor, AppScreenInput.from(slug, query), new Date());
   }
 

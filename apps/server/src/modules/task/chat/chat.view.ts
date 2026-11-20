@@ -23,13 +23,17 @@ export type ChatOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind'> & { root: st
 export type ChatCardOutputRow = Pick<OutputRow, 'id' | 'name' | 'kind' | 'mime' | 'task_id'>;
 /** 카드 항목을 낸 작업의 결과 (하네스 검사 result.checks, 검증 고리 V) */
 export type ChatCardTaskRow = Pick<TaskRow, 'id' | 'result'>;
-/** 검토자 짝의 판정 (검증 고리 V). 만드는 곳은 ChatReview.parse: 읽지 못한 답은 unknown과 글 그대로 */
+/**
+ * 검토자 짝의 판정 (검증 고리 V). 만드는 곳은 ChatReview.parse: 읽지 못한 답은 unknown과 글 그대로.
+ * 완료 조건마다 1~5점(2026-11-20 점수로 판정): score는 평균 (점수가 없으면 null), 가장 낮은 점수는 ChatReview.lowOf
+ */
 export type ChatReviewVerdict = {
   verdict: 'pass' | 'fix' | 'reject' | 'unknown';
   summary: string;
-  checklist: { item: string; ok: boolean; note: string }[];
+  checklist: { item: string; ok: boolean; note: string; score: number | null }[];
   fixes: string[];
   skip: string[];
+  score: number | null;
 };
 /** 회차(맨 위 작업 root)와 그 아래에서 기다리는 결재 */
 export type ChatApprovalRow = Pick<ApprovalRow, 'id'> & { root: string };
@@ -42,9 +46,8 @@ export type ChatUpdateLine = ChatUpdateRow & { agent: string | null };
 export type ChatBoardRow = ChatRow & { partner: string | null; state: string; active: number };
 /** 이 대화에서 시작해 아직 끝나지 않은 작업 하나 (팀이 동시에 일하는 칸, 2026-11-15) */
 export type ChatTeamRow = Pick<TaskRow, 'id' | 'agent_id' | 'title' | 'status' | 'parent_id'> &
-  Pick<ChatTurnTaskRow, 'wait_reason' | 'wait_until' | 'created_at' | 'last_event'> & {
-    agent: string | null;
-  };
+  Pick<ChatTurnTaskRow, 'wait_reason' | 'wait_until' | 'created_at' | 'last_event'> &
+  Pick<ChatUpdateLine, 'agent'>;
 
 /** 참조의 칸 (payload.refs · chats.pending_refs). 서버가 적은 값이지만 내보낼 칸은 여기서 고른다 */
 function refsOf(raw: unknown) {
@@ -150,19 +153,8 @@ export class ChatTurnView {
   toJSON() {
     const t = this.t;
     const result = (t.result ?? {}) as { text?: unknown; error?: unknown };
-    const chat = (
-      t.payload as {
-        chat?: {
-          turn?: unknown;
-          via?: unknown;
-          fix?: unknown;
-          fixBy?: unknown;
-          note?: unknown;
-          deliver?: unknown;
-          deliverNote?: unknown;
-        };
-      } | null
-    )?.chat;
+    const chat = (t.payload as { chat?: Record<string, unknown> } | null)?.chat;
+    const text = (v: unknown) => (typeof v === 'string' ? v : null);
     return {
       turn: Number(chat?.turn ?? 0),
       taskId: t.id,
@@ -183,12 +175,14 @@ export class ChatTurnView {
       /** 서버가 다시 맡긴 회차 (메시지는 관리자의 글이 아니라 지시문 틀 result-check · result-fix) */
       fix: chat?.fix === true,
       /** 다시 맡긴 까닭: review(검토 반영, 검증 고리 V) · setting(승인 뒤 이어서, O-2), 받을 것이 빠져서면 null */
-      fixBy: typeof chat?.fixBy === 'string' ? chat.fixBy : null,
+      fixBy: text(chat?.fixBy),
       /** 서버가 연 회차의 화면용 한 줄 (O-3). 관리자의 말이거나 O-3 전 회차면 null */
-      note: typeof chat?.note === 'string' ? chat.note : null,
+      note: text(chat?.note),
       /** 이번 회차의 받을 것 (대표가 set_deliver로 정함 · 레시피, O-3)과 까닭. 정하지 않았으면 null (대화의 받을 것을 본다) */
-      deliver: typeof chat?.deliver === 'string' ? chat.deliver : null,
-      deliverNote: typeof chat?.deliverNote === 'string' ? chat.deliverNote : null,
+      deliver: text(chat?.deliver),
+      deliverNote: text(chat?.deliverNote),
+      /** 대표가 맡기 전에 물은 목표 확인 질문 (2026-11-20, MCP ask_brief). 묻지 않았으면 null. 답은 다음 회차의 메시지다 */
+      brief: briefOf(chat?.brief),
       outputs: this.outputs
         .filter((o) => o.root === t.id)
         .map((o) => ({ id: o.id, name: o.name, kind: o.kind })),
@@ -209,6 +203,16 @@ function changesOf(payload: unknown) {
         grant: boolean;
       }[])
     : null;
+}
+
+/** 목표 확인 질문 (turn-brief.policy.ts의 TurnBriefRow와 같은 모양, view는 표 인터페이스만 가져온다). 없으면 null */
+function briefOf(brief: unknown) {
+  const b = brief as { summary?: unknown; questions?: unknown } | null | undefined;
+  if (typeof b?.summary !== 'string' || !Array.isArray(b.questions)) return null;
+  return {
+    summary: b.summary,
+    questions: b.questions as { text: string; why: string; choices: string[]; suggested: string }[],
+  };
 }
 
 /** 바꾸는 설정 (agent · goal · notice …, 2026-11-15 D). 설정 바꾸기가 아니면 null */

@@ -8,6 +8,7 @@ import {
   Idempotency,
   SystemActor,
 } from '../../platform';
+import type { Agent } from '../agent/agent';
 import { AgentRepository } from '../agent/agent.repository';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
@@ -15,6 +16,7 @@ import { OutputRepository } from '../output/output.repository';
 import { SkillQuery } from '../skill/skill.query';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
+import { TaskPlan } from '../task/task-plan.policy';
 import type { AppCodeAddedInput } from './chat.input';
 import { ChatRepository } from './chat.repository';
 import { ChatInspect } from './chat-inspect.policy';
@@ -78,13 +80,20 @@ export class ChatResultService extends BaseService {
       const reviewer = agents.find((a) => a.id === partner?.reviewerId && !a.deleted) ?? null;
       const tasks = new TaskRepository(tx);
       const inspector = partner?.reviewerApproves ? reviewer : null;
-      const due = inspector ? actions.filter((a) => ChatInspect.due(a, inspector, agents)) : [];
+      // 두 번째 검수자 (2026-11-20, 선택): 있으면 둘 다 따로 검수한다
+      const second = agents.find((a) => a.id === partner?.secondInspectorId && !a.deleted) ?? null;
+      const inspectors = [inspector, second].filter((a): a is Agent => a !== null);
+      const due = inspector ? actions.filter((a) => ChatInspect.due(a, inspectors, agents)) : [];
       if (inspector && due.length > 0) {
         for (const approval of due) {
           const fixed = await approvals.inspectorFixes(approval);
-          const fields = ChatInspect.fields(approval, chat.goal, turn.instruction ?? '', fixed);
+          const fields = {
+            ...ChatInspect.fields(approval, chat.goal, turn.instruction ?? '', fixed),
+            ...TaskPlan.fields(TaskPlan.inTurns(previous)),
+          };
           const instruction = prompts.fill('result-inspect', fields);
           await tasks.insertOnce(chat.review(inspector, instruction, now, approval));
+          if (second) await tasks.insertOnce(chat.review(second, instruction, now, approval, true));
         }
         return;
       }
@@ -151,6 +160,7 @@ export class ChatResultService extends BaseService {
           message: turn.instruction ?? '',
           answer: ChatResult.textOf(turn.result) || '-',
           items: items.map((name) => `- ${name}`).join('\n') || null,
+          ...TaskPlan.fields(TaskPlan.inTurns(previous)),
         });
         await tasks.insertOnce(chat.review(reviewer, instruction, now));
       } else if (step === ChatResult.CARD) {

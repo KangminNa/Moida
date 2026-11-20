@@ -160,11 +160,16 @@ after(async () => {
   await api.close();
 });
 
+const cancelOpen = () => db.sql`
+  UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
+  WHERE status IN ('queued', 'running', 'waiting')`;
+
 beforeEach(async () => {
-  await db.sql`
-    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
-    WHERE status IN ('queued', 'running', 'waiting')`;
+  await cancelOpen();
   ok(await editLead({ reviewerId: inspector.id, reviewerApproves: true }));
+  // 앞 시험의 대화가 검수 승인이 다시 켜져 검수를 열 수 있다: 남은 이벤트를 다 돌린 뒤 한 번 더 비운다
+  await drain();
+  await cancelOpen();
 });
 
 describe('검수', () => {
@@ -288,5 +293,90 @@ describe('검수', () => {
     );
     const row = await approvalRow(approvalId);
     assert.deepEqual([row.status, row.inspected_at], ['pending', null]);
+  });
+
+  test('점수로 판정 (2026-11-20): 고쳐 왔는데 점수가 오르지 않으면 한도 전이라도 관리자에게. 판정은 점수와 함께 쌓인다', async () => {
+    const scored = (score: number) =>
+      JSON.stringify({
+        verdict: 'fix',
+        summary: 'AI 말투',
+        checklist: [{ item: '말투', score, note: '뻔한 첫머리' }],
+        fixes: ['첫 문단을 고친다'],
+      });
+    const chat = await open('글 하나 써서 공개해 줘');
+    const first = await writeAndAsk(chat.id);
+    await drain();
+    await done(await inspectionOf(first.approvalId), scored(2));
+    await drain();
+    assert.equal((await approvalRow(first.approvalId)).status, 'revision_requested');
+    const again = await find((j) => j.task.id === first.job.task.id, '돌려받은 일');
+    const post = ok(await api.get(`/api/posts/${first.postId}`, owner));
+    const saved = await tool(again.run_token, 'blog_save_draft', {
+      request_id: randomUUID(),
+      post_id: first.postId,
+      base_version: post.version,
+      title: post.title,
+      body_md: '조금 고친 본문',
+      menu_id: menuId,
+    });
+    const second = String((await ask(again.run_token, saved)).approval_id);
+    await drain();
+    await done(await inspectionOf(second), scored(2));
+    await drain();
+    const held = await approvalRow(second);
+    assert.deepEqual([held.status, held.agent_decided], ['pending', false], '관리자에게 넘긴다');
+    assert.match(held.note, /고쳐도 점수가 오르지 않음 \(2점 → 2점\)/);
+    const rows = await db.sql`
+      SELECT round, verdict, score, low, kind FROM task.verdicts
+      WHERE agent_id = ${writer.id} AND target LIKE ${`inspect:${chat.id}:%`} ORDER BY round`;
+    assert.deepEqual(
+      rows.map((r) => [r.kind, r.round, r.verdict, r.score, r.low]),
+      [
+        ['inspect', 1, 'fix', 2, 2],
+        ['inspect', 2, 'fix', 2, 2],
+      ],
+    );
+    // 성적표: 팀원 줄(next_jobs)과 팀 화면(api/usage)이 같은 숫자를 본다
+    const usage = ok(await api.get('/api/usage', owner)).agents.find(
+      (a: Json) => a.id === writer.id,
+    );
+    assert.equal(usage.scorecard.days, 30);
+    assert.ok(
+      usage.scorecard.judged >= 1 && usage.scorecard.avgFixes !== null,
+      JSON.stringify(usage),
+    );
+  });
+
+  test('두 검수자 (2026-11-20): 둘 다 통과해야 승인, 하나만 끝나면 기다린다. 두 번째는 검토자와 다른 AI 도구만', async () => {
+    const same = await agent('같은 도구', { tool: 'codex' });
+    assert.equal((await editLead({ secondInspectorId: same.id })).status, 422);
+    const second = await agent('두 번째 검수자');
+    ok(await editLead({ secondInspectorId: second.id }));
+    assert.equal((await lead()).secondInspectorId, second.id);
+    try {
+      const chat = await open('글 하나 써서 공개해 줘');
+      const { postId, approvalId } = await writeAndAsk(chat.id);
+      await drain();
+      const both = (await jobs()).filter((j) => j.task.payload.inspect?.approvalId === approvalId);
+      const by = (id: string) => both.find((j) => (j.task.agent_id ?? j.agent?.id) === id);
+      assert.equal(both.length, 2, '검수자마다 하나');
+      await done(by(second.id) as Json, verdict('pass', '두 번째도 괜찮아요'));
+      await drain();
+      assert.deepEqual(
+        [(await approvalRow(approvalId)).status, (await approvalRow(approvalId)).inspected_at],
+        ['pending', null],
+        '하나만 끝나면 기다린다',
+      );
+      await done(by(inspector.id) as Json, verdict('pass', '첫 검수도 괜찮아요'));
+      await drain();
+      const row = await approvalRow(approvalId);
+      assert.deepEqual([row.status, row.decided_by], ['approved', inspector.id]);
+      assert.match(row.note, /검수 1: 첫 검수도 괜찮아요 \/ 검수 2: 두 번째도 괜찮아요/);
+      assert.equal(ok(await api.get(`/api/posts/${postId}`, owner)).status, 'published');
+    } finally {
+      ok(await editLead({ secondInspectorId: null }));
+      for (const a of [same, second])
+        await db.sql`UPDATE task.agents SET deleted_at = now() WHERE id = ${a.id}`;
+    }
   });
 });

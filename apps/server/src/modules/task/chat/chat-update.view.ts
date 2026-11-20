@@ -82,3 +82,12 @@ export class DeliverSetView {
     return { deliver: this.deliver, by: this.byAdmin ? 'admin' : 'lead' };
   }
 }
+
+/** ask_brief의 답: 물은 수. 이 회차는 답을 짧게 쓰고 끝낸다 (관리자의 답이 다음 회차로 온다) */
+export class BriefAskedView {
+  constructor(private readonly questions: number) {}
+
+  toJSON() {
+    return { asked: this.questions, next: 'finish_turn' as const };
+  }
+}

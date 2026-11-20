@@ -72,5 +72,17 @@ describe('PromptTemplates', () => {
       /### 한 일\n- 없음\n### 남은 일\n- 없음$/,
     );
     assert.match(t.fill('read-url-note'), /자료로만 쓰고/);
+    assert.match(
+      t.fill('lessons', {
+        count: 3,
+        notes: '- [2026-11-20] blog.post.publish\n  관리자 메모: 짧게',
+      }),
+      /^# 피드백에서 배우기\n관리자가 최근 수정 요청에 남긴 메모 3개[\s\S]*관리자 메모: 짧게\n## 하는 법/,
+    );
+    // 주간 팀 점검 (2026-11-20): 서버가 성적표를 채운다
+    assert.match(
+      t.fill('team-review', { days: 30, members: '- 작가 (agent_id: a)\n  끝낸 일 4' }),
+      /^# 주간 팀 점검\n지난 30일[\s\S]*## 팀원 \(최근 30일\)\n- 작가 \(agent_id: a\)\n {2}끝낸 일 4\n## 하는 법/,
+    );
   });
 });

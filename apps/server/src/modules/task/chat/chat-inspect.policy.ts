@@ -25,10 +25,42 @@ export class ChatInspect {
    * 지금 검수할 결재인가: 검수할 동작이고, 아직 검수하지 않았고, 검수자가 읽을 수 있고(비공개 글은 브라우저 · 커넥터
    * 에이전트에게 넘기지 않는다), 검수자가 올린 쪽 밖이다
    */
-  static due(approval: Approval, inspector: Agent, agents: readonly Agent[]): boolean {
+  static due(approval: Approval, inspectors: readonly Agent[], agents: readonly Agent[]): boolean {
     if (!ChatInspect.ACTIONS.includes(approval.action) || approval.inspected) return false;
-    if (ChatInspect.refsOf(approval).problemFor(inspector) !== null) return false;
-    return ChatInspect.independent(inspector, approval.agentId, agents);
+    // 두 검수자(2026-11-20)면 둘 다 볼 수 있어야 한다: 하나라도 못 보면 관리자에게
+    return inspectors.every(
+      (inspector) =>
+        ChatInspect.refsOf(approval).problemFor(inspector) === null &&
+        ChatInspect.independent(inspector, approval.agentId, agents),
+    );
+  }
+
+  /**
+   * 두 검수자의 판정을 하나로 (2026-11-20, ECC의 "둘 다 통과해야"): 하나라도 끝내지 못했으면 null, 둘 다 통과면 통과,
+   * 하나라도 반려 권함이면 반려 권함, 하나라도 고칠 것이면 고칠 것(고칠 것을 합친다), 그 밖은 읽지 못함.
+   * 점수(평균)는 낮은 쪽, 조건은 둘 다 싣는다(가장 낮은 점수는 ChatReview.lowOf). 검수자가 하나면 그 판정 그대로
+   */
+  static combine(reviews: readonly (ChatReviewVerdict | null)[]): ChatReviewVerdict | null {
+    if (reviews.length === 1) return reviews[0] ?? null;
+    if (reviews.length === 0 || reviews.some((r) => r === null)) return null;
+    const all = reviews as readonly ChatReviewVerdict[];
+    const has = (verdict: string) => all.some((r) => r.verdict === verdict);
+    const verdict = all.every((r) => r.verdict === ChatReview.PASS)
+      ? ChatReview.PASS
+      : has(ChatReview.REJECT)
+        ? ChatReview.REJECT
+        : all.some((r) => ChatReview.wantsFix(r)) && !has(ChatReview.UNKNOWN)
+          ? ChatReview.FIX
+          : ChatReview.UNKNOWN;
+    const scores = all.flatMap((r) => (r.score === null ? [] : [r.score]));
+    return {
+      verdict,
+      summary: all.map((r, i) => `검수 ${i + 1}: ${r.summary || '-'}`).join(' / '),
+      checklist: all.flatMap((r) => r.checklist),
+      fixes: [...new Set(all.flatMap((r) => r.fixes))],
+      skip: [...new Set(all.flatMap((r) => r.skip))],
+      score: scores.length === all.length ? Math.min(...scores) : null,
+    };
   }
 
   /** 검수자가 올린 쪽 밖인가: 올린 에이전트도, 그 위(보고 대상을 따라)도, 그 아래도 아니다 (제 팀의 일을 제가 통과시키지 않게) */
@@ -60,26 +92,48 @@ export class ChatInspect {
     return typeof id === 'string' ? id : null;
   }
 
-  /** 검수의 답 → 결정. review가 null이면 검수를 끝내지 못했다. fixes: 이 대상에 검수자가 이미 고쳐 달라고 한 수 */
+  /**
+   * 검수의 답 → 결정. review가 null이면 검수를 끝내지 못했다. fixes: 이 대상에 검수자가 이미 고쳐 달라고 한 수.
+   * before: 같은 대상의 앞 검수 점수(평균). 고쳐 왔는데도 점수가 오르지 않았으면 한도 전이라도 관리자에게 (2026-11-20)
+   */
   static outcome(
     review: ChatReviewVerdict | null,
     fixes: number,
+    before: number | null = null,
   ): Parameters<Approval['inspect']>[0] {
     if (review?.verdict === ChatReview.PASS) return 'pass';
-    if (ChatReview.wantsFix(review) && fixes < ChatInspect.FIX_MAX) return 'fix';
+    if (
+      ChatReview.wantsFix(review) &&
+      fixes < ChatInspect.FIX_MAX &&
+      !ChatInspect.stalled(review, before)
+    )
+      return 'fix';
     return 'hold';
+  }
+
+  /** 고쳐 왔는데 점수가 오르지 않았는가 (앞 점수나 이번 점수가 없으면 모른다) */
+  static stalled(review: ChatReviewVerdict | null, before: number | null): boolean {
+    return before !== null && review?.score != null && review.score <= before;
   }
 
   /** 결재에 남길 말: 통과의 까닭 · 고칠 것(올린 쪽이 받는다) · 관리자에게 넘기는 까닭 */
   static opinion(
     review: ChatReviewVerdict | null,
     outcome: Parameters<Approval['inspect']>[0],
+    before: number | null = null,
   ): string {
     if (review === null) return '검수를 끝내지 못했어요';
     const summary = review.summary || '-';
-    if (outcome === 'pass') return summary;
+    const score = review.score === null ? '' : ` (평균 ${review.score}점)`;
+    if (outcome === 'pass') return `${summary}${score}`;
     if (outcome === 'fix')
-      return [`검수 의견: ${summary}`, '고칠 것:', ...review.fixes.map((f) => `- ${f}`)].join('\n');
+      return [
+        `검수 의견${score}: ${summary}`,
+        '고칠 것:',
+        ...review.fixes.map((f) => `- ${f}`),
+      ].join('\n');
+    if (ChatReview.wantsFix(review) && ChatInspect.stalled(review, before))
+      return `고쳐도 점수가 오르지 않음 (${before}점 → ${review.score}점): ${review.fixes.join(' · ')} (${summary})`;
     if (ChatReview.wantsFix(review))
       return `${ChatInspect.FIX_MAX}번 고쳐도 남음: ${review.fixes.join(' · ')} (${summary})`;
     return ChatReview.line(review);

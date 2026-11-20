@@ -325,6 +325,14 @@ describe('지시문', () => {
           tool: 'codex',
           open: 2,
           recent: { done: 5, failed: 1, revised: 0 },
+          scorecard: {
+            judged: 4,
+            first_pass: 3,
+            avg_fixes: 0.25,
+            decided: 0,
+            sent_back: 0,
+            tokens_per_done: 1200,
+          },
           connectors: ['notion', 'linear'],
           team: { members: 2, kinds: { general: 2, browse: 1 }, connectors: { notion: 1 } },
         },
@@ -337,12 +345,12 @@ describe('지시문', () => {
     }).prompt(REPO_PROMPTS, false);
     assert.ok(
       prompt.includes(
-        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 커넥터: notion, linear · 아래 팀: 2명 (general 2, browse 1 · 커넥터 notion 1)',
+        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 최근 30일 성적: 첫 판정 통과 3/4 · 평균 고친 횟수 0.25 · 일 하나에 토큰 1200 · 커넥터: notion, linear · 아래 팀: 2명 (general 2, browse 1 · 커넥터 notion 1)',
       ),
     );
     // 옛 서버(팀원 정보 없음)면 0으로, 아래 팀 · 커넥터 칸은 없다
     assert.ok(prompt.includes('글쓰기 (agent_id: w1) · 맡길 수 있는 일: general · 쥔 일 0개'));
-    assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|아래 팀)/.test(prompt), false);
+    assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|아래 팀|성적)/.test(prompt), false);
     assert.ok(prompt.includes('## 나누는 법'));
     // 모델은 맡기는 쪽이 일마다 고르고, 상한은 내 모델 (2026-11-19). 정하지 않았으면 CLI 기본(opus)
     assert.ok(prompt.includes('delegate_task의 model로 고릅니다'));
@@ -354,6 +362,22 @@ describe('지시문', () => {
     assert.ok(child.includes('# 돌려줄 결과의 형식'));
     assert.ok(child.includes('후보 3개를 표로'));
     assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('돌려줄 결과의 형식'), false);
+  });
+
+  test('정한 계획(payload.plan)은 단계 · 완료 조건 · 하지 말 것으로 다시 보인다 (2026-11-20)', () => {
+    const plan = { steps: ['조사 → 리서처'], criteria: ['표에 5개'], mustNot: ['메일 보내기'] };
+    const task = { id: 't', title: '비교', payload: { plan } };
+    const prompt = job({ task }).prompt(REPO_PROMPTS, false);
+    assert.ok(prompt.includes('# 내 계획 (set_plan으로 정함, 바꿀 수 없음)'));
+    assert.ok(prompt.includes('## 완료 조건\n- 표에 5개'));
+    assert.ok(prompt.includes('## 하지 말 것\n- 메일 보내기'));
+    assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('내 계획'), false);
+    // 팀이 있으면 큰 일은 맡기기 전에 계획을 정하라고 한다
+    const lead = job({
+      team: [{ agent_id: 'm', name: '팀원', role: '', status: 'active', kinds: [] }],
+      rounds_left: 1,
+    });
+    assert.ok(lead.prompt(REPO_PROMPTS, false).includes('set_plan으로 계획을 한 번 정합니다'));
   });
 
   test('먼저 깬 일 (팀원 기다리기): 깬 까닭, 끝나지 않은 일의 상태 · 몇 분째 · task_id, 고르는 법. 관리자가 재촉했으면 마무리만', () => {
@@ -398,6 +422,49 @@ describe('지시문', () => {
     assert.ok(all.includes('결과를 모아 할 일을 마무리하고'));
     assert.equal(all.includes('아직 끝나지 않은 일'), false);
     assert.equal(all.includes('먼저 깨웠습니다'), false);
+  });
+
+  test('팀원 돕기 (2026-11-20): 끝나지 않은 일의 진행 기록, 나눠 돕기, 도움 요청으로 깬 까닭', () => {
+    const since = new Date(Date.now() - 30 * 60_000).toISOString();
+    const results = [
+      {
+        task_id: 'c2',
+        title: '정리',
+        agent: '정리 팀원',
+        status: 'running',
+        since,
+        progress: ['자료 10개 중 4개 읽음', '도움 요청: 6~10번 자료 요약'],
+      },
+      { task_id: 'c1', title: '조사', agent: '조사 팀원', status: 'done', summary: '표' },
+    ];
+    const woke = job({ subtask_results: results, wake: 'help', rounds_left: 2 }).prompt(
+      REPO_PROMPTS,
+      false,
+    );
+    assert.ok(woke.includes('팀원 하나가 나눌 부분을 적어 도움을 청해 먼저 깨웠습니다'));
+    assert.ok(
+      woke.includes(
+        '## [일하는 중 · 30분째] 정리 (정리 팀원) · task_id: c2\n진행 기록:\n- 자료 10개 중 4개 읽음\n- 도움 요청: 6~10번 자료 요약',
+      ),
+    );
+    assert.ok(woke.includes('나눠 돕기: "일하는 중"인 일이 오래 걸리면'));
+    assert.ok(woke.includes('## [완료] 조사 (조사 팀원)\n표'));
+    assert.equal(woke.includes('- 표\n진행 기록'), false, '끝난 일에는 진행 기록을 싣지 않는다');
+    const deadline = job({ subtask_results: results, wake: 'deadline' }).prompt(
+      REPO_PROMPTS,
+      false,
+    );
+    assert.equal(deadline.includes('도움을 청해'), false);
+  });
+
+  test('도움 요청 (ask_help)은 팀장이 맡긴 일이고 아래 팀이 없을 때만 알린다', () => {
+    const delegated = { id: 't', title: '정리', payload: { delegatedBy: 'boss' } };
+    const member = job({ task: delegated }).prompt(REPO_PROMPTS, false);
+    assert.ok(member.includes('ask_help로 그 부분'));
+    assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('ask_help'), false, '맨 위 일');
+    const team = [{ agent_id: 'h1', name: '조사', role: '', status: 'active', kinds: ['general'] }];
+    const lead = job({ task: delegated, team, rounds_left: 1 }).prompt(REPO_PROMPTS, false);
+    assert.equal(lead.includes('ask_help로 그 부분'), false, '아래 팀이 있으면 그 팀에 나눈다');
   });
 
   test('대표의 일(agent.lead, O-2)에는 lead 단락을 넣는다: 나눠 맡기기 · continue로 팀 바꾸기 제안 · 결과 중심', () => {

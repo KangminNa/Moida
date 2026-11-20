@@ -1,11 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseTool } from '../../platform';
 import { CHAT_DELIVER } from '../task.tables';
-import { AgentUpdatesInput, PostUpdateInput, SetDeliverInput } from './chat-update.input';
+import {
+  AgentUpdatesInput,
+  AskBriefInput,
+  PostUpdateInput,
+  SetDeliverInput,
+} from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
 import { ChatUpdateQuery } from './chat-update.query';
 import { ChatUpdateService } from './chat-update.service';
-import { type AgentUpdatesView, type DeliverSetView, PostedUpdateView } from './chat-update.view';
+import {
+  type AgentUpdatesView,
+  type BriefAskedView,
+  type DeliverSetView,
+  PostedUpdateView,
+} from './chat-update.view';
+import { TurnBrief } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화의 소식 MCP 도구 (2차 1-1, docs/API설계.md 4장). 글은 task.tools.ko.json에.
@@ -79,5 +90,46 @@ export class SetDeliverTool extends BaseTool {
 
   handle(actor: Actor, raw: unknown): Promise<DeliverSetView> {
     return this.updates.setDeliver(actor, SetDeliverInput.from(raw));
+  }
+}
+
+/** 목표 확인 질문 (2026-11-20): 결과물 일을 맡기 전에 대표가 핵심을 묻고 회차를 끝낸다. 관리자의 답이 다음 회차로 온다 */
+@Injectable()
+export class AskBriefTool extends BaseTool {
+  readonly name = 'ask_brief';
+  readonly scope = Actor.AGENT;
+  readonly readOnly = false;
+  readonly inputSchema = {
+    properties: {
+      summary: { type: 'string', maxLength: TurnBrief.SUMMARY_MAX },
+      questions: {
+        type: 'array',
+        minItems: 1,
+        maxItems: TurnBrief.QUESTIONS_MAX,
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', maxLength: TurnBrief.TEXT_MAX },
+            why: { type: 'string', maxLength: TurnBrief.TEXT_MAX },
+            choices: {
+              type: 'array',
+              maxItems: TurnBrief.CHOICES_MAX,
+              items: { type: 'string', maxLength: TurnBrief.CHOICE_MAX },
+            },
+            suggested: { type: 'string', maxLength: TurnBrief.TEXT_MAX },
+          },
+          required: ['text', 'suggested'],
+        },
+      },
+    },
+    required: ['summary', 'questions'],
+  };
+
+  constructor(private readonly updates: ChatUpdateService) {
+    super();
+  }
+
+  handle(actor: Actor, raw: unknown): Promise<BriefAskedView> {
+    return this.updates.askBrief(actor, AskBriefInput.from(raw));
   }
 }

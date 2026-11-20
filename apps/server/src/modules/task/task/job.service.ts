@@ -32,6 +32,7 @@ import { RunRecord } from './run-record';
 import type { SubmitResultInput } from './submit-result.input';
 import { Task } from './task';
 import type { NextJobsInput, ReleaseJobInput, ReportProgressInput } from './task.input';
+import { TaskQuery } from './task.query';
 import { TaskRepository } from './task.repository';
 import type { TeamRoster } from './team-roster';
 
@@ -57,6 +58,7 @@ export class JobService extends BaseService {
     private readonly outputs: OutputQuery,
     private readonly chats: ChatUpdateQuery,
     private readonly tools: ExternalToolQuery,
+    private readonly progress: TaskQuery,
   ) {
     super(db);
   }
@@ -243,8 +245,11 @@ export class JobService extends BaseService {
     const children = await new TaskRepository(tx).children(task.id);
     const ids = children.map((c) => c.id);
     const made = await this.outputs.madeBy(actor, ids);
+    // 끝나지 않은 하위 작업의 최근 진행 기록 (2026-11-20): 깨어난 팀장이 어디까지 됐는지 보고 나눠 맡긴다
+    const open = children.filter((c) => c.open).map((c) => c.id);
     const view = task.jobView(agent, this.box, goals, roster, children, skill?.jobView() ?? null);
-    view.withOutputs(made).withChat(await this.chats.forJob(actor, task.id));
+    view.withOutputs(made).withProgress(await this.progress.progressOf(actor, open));
+    view.withChat(await this.chats.forJob(actor, task.id));
     // 외부 도구 (2차 7단계): 이 에이전트에게 허락한 것만, 토큰은 여기서 풀려 이 일과 함께만 나간다
     const tools = await this.tools.forJob(actor, agent, task.checkedToolId);
     return view.withPrompt(prompt?.jobView() ?? null).withTools(tools);

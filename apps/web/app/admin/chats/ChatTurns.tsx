@@ -11,13 +11,25 @@ import { RefChips } from './ChatRefs';
 
 /** 일하는 중인 회차의 상태 */
 const OPEN = ['queued', 'running', 'waiting'];
-/** 맡기 전의 주고받음 (첫 메시지 바로 아래): 질문 · 맡음, 그리고 회차 작업이 없는 덧붙인 말(질문에 글로 한 답) */
+/**
+ * 맡기 전의 주고받음 (첫 메시지 바로 아래): O-2 전 배정의 질문 · 맡음, 그리고 회차 작업이 없는 덧붙인 말(질문에 글로 한 답).
+ * 회차가 남긴 질문(목표 확인, 2026-11-20)은 회차의 과정에 둔다 (질문 자체는 패널의 카드가 보인다)
+ */
 const BEFORE = ['question', 'routed'];
 /** 회차의 과정 (접어 둔다): 팀이 남긴 소식. 덧붙인 말 · 짧은 답은 말풍선으로, 최종 답 · 실패는 답 자체라 뺀다 */
-const PROCESS = ['progress', 'decision', 'assumption', 'member_done', 'member_failed', 'review'];
+const PROCESS = [
+  'progress',
+  'decision',
+  'assumption',
+  'member_done',
+  'member_failed',
+  'review',
+  'question',
+];
 
-const isBefore = (n: ChatNews) =>
-  BEFORE.includes(n.kind) || (n.kind === 'appended' && n.taskId === null);
+const isBefore = (n: ChatNews, turns: readonly ChatTurn[]) =>
+  (BEFORE.includes(n.kind) && !turns.some((t) => t.taskId === n.taskId)) ||
+  (n.kind === 'appended' && n.taskId === null);
 
 // 대화의 주고받음 (2차 1-5, ChatGPT · Claude 같은 모양): 관리자의 말풍선(오른쪽)과 답(왼쪽).
 // 맡기 전에는 첫 메시지(pending)와 질문 · 답, 맡은 뒤에는 회차마다 메시지 → 덧붙인 말 · 짧은 답 → 받을 것 · 과정(접힘) → 답.
@@ -52,7 +64,7 @@ export function ChatTurns({
   busy: string | null;
   onCancel: (taskId: string, version: number) => void;
 }) {
-  const before = news.filter(isBefore);
+  const before = news.filter((n) => isBefore(n, turns));
   return (
     <ol className="chat-log" aria-label="대화 내용">
       {pending !== null && turns.length === 0 && (
@@ -66,7 +78,9 @@ export function ChatTurns({
         const next = turns[i + 1]?.createdAt ?? null;
         const within = news.filter(
           (n) =>
-            !isBefore(n) && n.createdAt >= t.createdAt && (next === null || n.createdAt < next),
+            !isBefore(n, turns) &&
+            n.createdAt >= t.createdAt &&
+            (next === null || n.createdAt < next),
         );
         const want = t.deliver ?? deliver;
         return (

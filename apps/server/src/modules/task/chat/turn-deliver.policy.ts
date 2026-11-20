@@ -1,6 +1,7 @@
 import { Actor, Forbidden, RuleViolation } from '../../platform';
 import type { ChatDeliver } from '../task.tables';
 import { ChatResult } from './chat-result.policy';
+import { TurnBrief } from './turn-brief.policy';
 
 /** payload.chat의 칸 가운데 받을 것이 보는 것 */
 type TurnChat = {
@@ -73,8 +74,12 @@ export class TurnDeliver {
     return TurnDeliver.LABELS[deliver as ChatDeliver] ?? deliver;
   }
 
-  /** 검사할 받을 것: 이번 회차에 정한 값, 없으면 대화의 값(관리자 · 레시피). 둘 다 없으면 null (짧은 답, 검사 없음) */
+  /**
+   * 검사할 받을 것: 이번 회차에 정한 값, 없으면 대화의 값(관리자 · 레시피). 둘 다 없으면 null (짧은 답, 검사 없음).
+   * 목표 확인 질문을 한 회차는 묻는 것이 결과라 검사하지 않는다 (TurnBrief)
+   */
   static effective(turnPayload: unknown, chatDeliver: string | null): string | null {
+    if (TurnBrief.asked(turnPayload)) return null;
     return TurnDeliver.of(turnPayload) ?? chatDeliver;
   }
 }

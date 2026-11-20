@@ -29,22 +29,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   static readonly PAUSED: AgentRow['status'] = 'paused';
   /** 에이전트에게 줄 수 있는 권한 (AgentScopes) */
   static readonly SCOPES: readonly string[] = AgentScopes.ALL;
-  /** 설정 판에 남기는 칸: 주인이 정하는 것 전부 (상태 · 사용량은 빼고) */
-  private static readonly SETTINGS: readonly (keyof AgentRow)[] = [
-    'name',
-    'role',
-    'tool',
-    'scopes',
-    'approval_actions',
-    'monthly_limit',
-    'five_hour_limit',
-    'plan_stop_percent',
-    'reports_to',
-    'runner_id',
-    'model',
-    'effort',
-    'external_tools',
-  ];
   private static readonly NAME_MAX = 60;
   private static readonly ROLE_MAX = 2000;
   private static readonly PLAN_PERCENT_MAX = 100;
@@ -84,6 +68,12 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     effort: (value) => AgentRuntime.effort(value),
     external_tools: (value) => AgentScopes.tools(value),
   };
+  /** 설정 판에 남기는 칸: 주인이 정하는 것 전부 (규칙의 칸 + 보고 대상 · 러너. 상태 · 사용량 · 검토자는 빼고) */
+  private static readonly SETTINGS: readonly (keyof AgentRow)[] = [
+    ...(Object.keys(Agent.RULES) as (keyof AgentRow)[]),
+    'reports_to',
+    'runner_id',
+  ];
 
   /** 새 에이전트의 빈 칸. 이 순서로 규칙을 지난다 (빈 도구는 규칙이 막는다) */
   private static readonly BLANK: Partial<Unchecked<AgentRow>> = {
@@ -277,8 +267,20 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
         throw new RuleViolation('검토자는 다른 AI 도구를 쓰는 에이전트예요');
     }
     this.put('reviewer_id', reviewer?.id ?? null);
-    // 검토자를 빼면 검수 승인도 끈다 (검수할 에이전트가 없다)
+    // 검토자를 빼면 검수 승인과 두 번째 검수자도 뺀다 (검수할 에이전트가 없다)
     if (reviewer === null && this.row.reviewer_approves) this.put('reviewer_approves', false);
+    if (reviewer === null && this.row.second_inspector_id) this.put('second_inspector_id', null);
+  }
+
+  /** 두 번째 검수자 (2026-11-20, 선택): 검수 승인이 켜졌을 때만 있다. 둘 다 통과해야 관리자 대신 승인한다 (ChatInspect) */
+  get secondInspectorId(): string | null {
+    return this.reviewerApproves ? (this.row.second_inspector_id ?? null) : null;
+  }
+
+  /** 두 번째 검수자를 정한다 (null이면 뺀다). 규칙은 AgentLead.assertSecond: 대표만 · 검토자와 다른 AI 도구 */
+  pairSecondInspector(second: Agent | null, reviewer: Agent | null): void {
+    if (second !== null) AgentLead.assertSecond(this, reviewer, second);
+    this.put('second_inspector_id', second?.id ?? null);
   }
 
   /** 검수 승인을 켜 두었는가: 검토자가 앱 안의 공개를 검수해 통과하면 관리자 대신 승인한다 (2026-11-20) */

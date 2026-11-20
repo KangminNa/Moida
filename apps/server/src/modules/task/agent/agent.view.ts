@@ -51,6 +51,8 @@ export class AgentSavedView {
       reviewerId: r.reviewer_id ?? null,
       /** 검수 승인 (대표만, 2026-11-20): 검토자가 앱 안의 공개를 검수해 통과하면 관리자 대신 승인 */
       reviewerApproves: r.reviewer_approves === true,
+      /** 두 번째 검수자 (대표만, 2026-11-20): 검수 승인이 켜졌을 때 둘 다 통과해야 공개 */
+      secondInspectorId: r.reviewer_approves === true ? (r.second_inspector_id ?? null) : null,
       status: r.status,
       /** 휴지통에 넣은 때. null이면 쓰는 에이전트 */
       deletedAt: r.deleted_at?.toISOString() ?? null,

@@ -12,7 +12,6 @@ import {
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
-import { TurnDeliver } from '../chat/turn-deliver.policy';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
 import { TASK_EVENT_KIND } from '../task.tables';
@@ -418,6 +417,15 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   /**
+   * 팀원이 나눌 부분을 적어 팀장에게 도움을 청한다 (2026-11-20, SubtaskWait.assertHelpable): 맡긴 일 · 살아 있는 임대 ·
+   * 이 에이전트의 일만. 요청은 실행 기록 한 줄로 남아 깨어난 팀장의 진행 기록(subtask_results[].progress)에 보인다
+   */
+  askHelp(agentId: string, part: string, now: Date): void {
+    SubtaskWait.assertHelpable(this.row, agentId, this.leaseAlive(now));
+    this.log(Task.LOG_WRITE, SubtaskWait.helpLine(part), 0, now);
+  }
+
+  /**
    * 관리자가 지금까지의 결과로 답하라고 한다: 하위 작업을 기다리는 중이면 바로 깨우고,
    * 대기 · 실행 중(먼저 깨어난 뒤)이면 더 맡기거나 기다리지 못하게 적어 둔다 (SubtaskWait.assertNotHurried)
    */
@@ -431,20 +439,15 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 결재에서 고쳐 달라고 함: waiting → queued. 에이전트가 말을 받아 다시 하므로 시도 횟수는 새로 센다.
    * 다음 실행은 앞 실행을 기억하지 못하므로 결재의 대상을 작업의 대상으로 넘긴다.
    */
-  returnForRevision(
-    note: string | null,
-    targetKind: string,
-    targetId: string,
-    targetVersion: number,
-  ): void {
+  returnForRevision(note: string | null, kind: string, id: string, version: number): void {
     this.assertWaitingFor(Task.WAIT_APPROVAL);
     this.move([Task.WAITING], Task.QUEUED);
     this.holdLease(null, null);
     this.put('attempts', 0);
     this.put('payload', { ...this.payload, revisionNote: note });
-    this.put('target_kind', targetKind);
-    this.put('target_id', targetId);
-    this.put('base_version', targetVersion);
+    this.put('target_kind', kind);
+    this.put('target_id', id);
+    this.put('base_version', version);
   }
 
   /** 러너가 끝을 알린다. 살아 있는 임대로만 */
@@ -609,9 +612,12 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return typeof this.payload.tool === 'string' ? this.payload.tool : null;
   }
 
-  /** 대화 회차의 받을 것 (O-3 set_deliver). 회차인지 · 이미 정했는지 · 관리자가 정한 값은 TurnDeliver가 본다 */
-  declareDeliver(deliver: string, note: string | null, fixed: string | null): void {
-    this.put('payload', TurnDeliver.declare(this.payload, deliver, note, fixed));
+  /**
+   * 일이 스스로 정하는 payload의 칸: 대화 회차의 받을 것(O-3 set_deliver, 규칙은 TurnDeliver.declare) · 계획(2026-11-20
+   * set_plan, 규칙은 TaskPlan.declare: 한 번만). 규칙은 정책이 지금 payload를 받아 새 payload를 돌려주며 지킨다
+   */
+  declare(next: (payload: Readonly<Record<string, unknown>>) => Record<string, unknown>): void {
+    this.put('payload', next(this.payload));
   }
 
   private get payload(): Readonly<Record<string, unknown>> {

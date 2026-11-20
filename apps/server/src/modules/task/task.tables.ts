@@ -49,6 +49,7 @@ export interface AgentRow {
   external_tools: readonly string[];
   lead: boolean;
   reviewer_approves: boolean;
+  second_inspector_id: string | null;
 }
 export type AgentNew = Partial<AgentRow> & Pick<AgentRow, 'id' | 'space_id' | 'name' | 'tool'>;
 
@@ -458,3 +459,25 @@ export interface TaskRow {
   wait_until: Date | null;
 }
 export type TaskNew = Partial<TaskRow> & Pick<TaskRow, 'id' | 'space_id' | 'kind' | 'title'>;
+
+/** task.verdicts.kind (값 목록 CHECK) */
+export const VERDICT_KIND = ['review', 'inspect'] as const;
+export type VerdictKind = (typeof VERDICT_KIND)[number];
+/** task.verdicts.verdict (값 목록 CHECK) */
+export const VERDICT_VERDICT = ['pass', 'fix', 'reject', 'unknown'] as const;
+export type VerdictVerdict = (typeof VERDICT_VERDICT)[number];
+/** task.verdicts */
+export interface VerdictRow {
+  id: string;
+  space_id: string;
+  task_id: string;
+  agent_id: string;
+  kind: VerdictKind;
+  target: string;
+  round: number;
+  verdict: VerdictVerdict;
+  score: number | null;
+  low: number | null;
+  created_at: Date;
+}
+export type VerdictNew = Partial<VerdictRow> & Pick<VerdictRow, 'id' | 'space_id' | 'task_id' | 'agent_id' | 'kind' | 'target' | 'round' | 'verdict'>;

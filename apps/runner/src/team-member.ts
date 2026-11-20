@@ -25,6 +25,8 @@ export class TeamMember {
     readonly connectors: readonly string[] = [],
     /** 그 아래 팀의 요약 한 줄 (예: "2명 (general 2, browse 1)"). 없으면 null */
     readonly team: string | null = null,
+    /** 최근 30일 성적표 한 줄 (2026-11-20, 예: "첫 판정 통과 3/4 · 평균 고친 횟수 0.25"). 판정 · 결정이 없으면 null */
+    readonly score: string | null = null,
   ) {}
 
   static from(raw: Json): TeamMember {
@@ -43,7 +45,26 @@ export class TeamMember {
       recent.number('revised'),
       raw.texts('connectors'),
       TeamMember.teamLine(raw.child('team')),
+      TeamMember.scoreLine(raw.child('scorecard')),
     );
+  }
+
+  /**
+   * 성적표 한 줄 (서버가 판정 · 관리자 결정 · 토큰으로 계산, 2026-11-20): 첫 판정 통과 · 평균 고친 횟수 · 관리자가 고쳐
+   * 달라거나 반려한 수 · 끝낸 일 하나에 든 토큰. 셀 것이 없으면 null
+   */
+  private static scoreLine(card: Json): string | null {
+    const judged = card.number('judged');
+    const decided = card.number('decided');
+    const fixes = card.optionalNumber('avg_fixes');
+    const tokens = card.optionalNumber('tokens_per_done');
+    const parts = [
+      judged > 0 ? `첫 판정 통과 ${card.number('first_pass')}/${judged}` : '',
+      fixes !== null ? `평균 고친 횟수 ${fixes}` : '',
+      decided > 0 ? `관리자 반려 · 고쳐 달라 ${card.number('sent_back')}/${decided}` : '',
+      tokens !== null ? `일 하나에 토큰 ${tokens}` : '',
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' · ') : null;
   }
 
   /**
@@ -79,6 +100,7 @@ export class TeamMember {
       revised: this.revised,
       connectors: this.connectors.join(', '),
       team: this.team,
+      score: this.score,
       paused: this.status === 'paused',
       bound: this.bound,
     });

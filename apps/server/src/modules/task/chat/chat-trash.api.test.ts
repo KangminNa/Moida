@@ -80,7 +80,7 @@ describe('대화 휴지통', () => {
       }),
       201,
     );
-    // 레시피가 처음 돌며 연 대화를 기억한 것과 같게 (Schedule.openedChat)
+    // 레시피가 처음 돌며 연 대화를 기억한 것과 같게 (Schedule.bindChat)
     await api.service(Database).sql`
       UPDATE task.schedules SET chat_id = ${String(chat.id)} WHERE id = ${String(schedule.id)}`;
     const refused = await api.request('POST', `/api/chats/${chat.id}/trash`, owner, {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { Conflict, RuleViolation } from '../../platform';
+import { Conflict, Forbidden, RuleViolation } from '../../platform';
 import { SubtaskWait } from './subtask-wait.policy';
 
 // 팀원 기다리기의 규칙 (2026-11-19): 기한 · 깨울 까닭 · 재촉
@@ -65,5 +65,29 @@ describe('재촉 · 더 기다리기', () => {
     assert.throws(() => SubtaskWait.assertLeft(0, 2), RuleViolation);
     SubtaskWait.assertLeft(0, 0);
     SubtaskWait.assertLeft(1, 1);
+  });
+});
+
+describe('도움 요청 (ask_help, 2026-11-20)', () => {
+  const row = { agent_id: 'a', status: 'running' as const, parent_id: 'p' };
+  test('팀장이 맡긴, 지금 도는 내 일에서만', () => {
+    SubtaskWait.assertHelpable(row, 'a', true);
+    assert.throws(() => SubtaskWait.assertHelpable(row, 'b', true), Forbidden);
+    assert.throws(() => SubtaskWait.assertHelpable(row, 'a', false), Conflict, '임대가 끝남');
+    assert.throws(
+      () => SubtaskWait.assertHelpable({ ...row, status: 'waiting' }, 'a', true),
+      Conflict,
+    );
+    assert.throws(
+      () => SubtaskWait.assertHelpable({ ...row, parent_id: null }, 'a', true),
+      RuleViolation,
+      '맨 위 일',
+    );
+  });
+
+  test('일 하나에 HELP_MAX번, 기록 줄은 머리말로 알아본다', () => {
+    SubtaskWait.assertHelpLeft(SubtaskWait.HELP_MAX - 1);
+    assert.throws(() => SubtaskWait.assertHelpLeft(SubtaskWait.HELP_MAX), RuleViolation);
+    assert.ok(SubtaskWait.helpLine('  절반  ').startsWith(SubtaskWait.HELP_PREFIX));
   });
 });

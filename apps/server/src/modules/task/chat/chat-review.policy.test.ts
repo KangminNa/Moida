@@ -25,9 +25,10 @@ describe('ChatReview.parse', () => {
     assert.equal(review.verdict, 'fix');
     assert.equal(review.summary, '근거가 약해요');
     assert.deepEqual(review.checklist, [
-      { item: '출처 링크', ok: false, note: '없음' },
-      { item: '표 포함', ok: false, note: '' },
+      { item: '출처 링크', ok: false, note: '없음', score: null },
+      { item: '표 포함', ok: false, note: '', score: null },
     ]);
+    assert.deepEqual([review.score, ChatReview.lowOf(review)], [null, null], '점수가 없으면 null');
     assert.deepEqual(review.fixes, ['출처 링크를 단다', 'x'.repeat(300)]);
     assert.deepEqual(review.skip, ['초안.html']);
   });
@@ -55,6 +56,62 @@ describe('ChatReview.parse', () => {
       fixes: '- 링크를 단다',
       unmet: '- 출처 (없음)',
     });
+  });
+});
+
+describe('점수로 판정 (2026-11-20)', () => {
+  const scored = (verdict: string, scores: unknown[], fixes: string[] = []) =>
+    ChatReview.parse(
+      JSON.stringify({
+        verdict,
+        summary: '봤어요',
+        checklist: scores.map((score, i) => ({
+          item: `조건 ${i + 1}`,
+          score,
+          ok: true,
+          note: `까닭 ${i + 1}`,
+        })),
+        fixes,
+      }),
+    );
+
+  test('조건마다 1~5점(소수는 반올림, 범위 밖은 끝으로): 4점 이상만 채운 조건이고 평균 · 가장 낮은 점수를 남긴다', () => {
+    const review = scored('pass', [5, 4.4, 9]);
+    assert.deepEqual(
+      review.checklist.map((l) => [l.score, l.ok]),
+      [
+        [5, true],
+        [4, true],
+        [5, true],
+      ],
+    );
+    assert.deepEqual([review.verdict, review.score, ChatReview.lowOf(review)], ['pass', 4.67, 4]);
+    assert.equal(ChatReview.line(review), '그대로 승인 (평균 4.67점) · 봤어요');
+  });
+
+  test('4점 아래 조건이 있는 통과는 서버가 고칠 것으로 바꾼다: 고칠 것이 없으면 낮은 조건과 까닭으로', () => {
+    const review = scored('pass', [5, 3, 2]);
+    assert.equal(review.verdict, ChatReview.FIX);
+    assert.match(review.summary, /4점 아래 조건이 있어 고칠 것으로 봄/);
+    assert.deepEqual(review.fixes, ['조건 2: 까닭 2', '조건 3: 까닭 3']);
+    assert.equal(ChatReview.wantsFix(review), true);
+    assert.deepEqual(
+      scored('pass', [3], ['제목을 고친다']).fixes,
+      ['제목을 고친다'],
+      '적은 고칠 것이 먼저',
+    );
+    assert.equal(scored('reject', [1]).verdict, ChatReview.REJECT, '반려는 그대로');
+    assert.equal(
+      ChatReview.fixFields(review).unmet,
+      '- 조건 2 3점 (까닭 2)\n- 조건 3 2점 (까닭 3)',
+    );
+  });
+
+  test('점수가 없는 조건은 지금처럼 ok를 따른다 (콘솔에서 고친 옛 틀)', () => {
+    const review = ChatReview.parse(
+      JSON.stringify({ verdict: 'pass', checklist: [{ item: '옛 조건', ok: true }] }),
+    );
+    assert.deepEqual([review.verdict, review.checklist[0]?.ok, review.score], ['pass', true, null]);
   });
 });
 

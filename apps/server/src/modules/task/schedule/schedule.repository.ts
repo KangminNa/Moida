@@ -54,4 +54,30 @@ export class ScheduleRepository extends TableRepository<ScheduleRow, Schedule> {
   async remove(schedule: Schedule): Promise<void> {
     await this.deleteRows(schedules, { space_id: schedule.spaceId, id: schedule.id });
   }
+
+  /** 켜져 있는 레시피 하나를 잠근다. 없거나 꺼졌으면 null (자동화 건강 검사) */
+  async lockEnabled(spaceId: string, id: string): Promise<Schedule | null> {
+    const [row] = await this.sql<ScheduleRow[]>`
+      SELECT * FROM task.schedules WHERE space_id = ${spaceId} AND id = ${id} AND enabled FOR UPDATE`;
+    return row ? this.toEntity(row) : null;
+  }
+
+  /** 작업을 만든 레시피의 request_id (대화의 회차면 payload.chat.requestId). 상태와 상관없이 (자동화 건강 검사) */
+  async requestOf(spaceId: string, taskId: string): Promise<string | null> {
+    const [row] = await this.sql<{ request: string | null }[]>`
+      SELECT COALESCE(payload->'chat'->>'requestId', request_id) AS request FROM task.tasks
+      WHERE space_id = ${spaceId} AND id = ${taskId}`;
+    return row?.request ?? null;
+  }
+
+  /** 이 레시피가 만든 맨 위 작업 가운데 끝난(완료 · 실패 · 취소) 최근 limit개의 상태 (최근 것부터) */
+  async recentRuns(spaceId: string, prefix: string, limit: number): Promise<readonly string[]> {
+    const rows = await this.sql<{ status: string }[]>`
+      SELECT status FROM task.tasks
+      WHERE space_id = ${spaceId} AND parent_id IS NULL
+        AND COALESCE(payload->'chat'->>'requestId', request_id) LIKE ${`${prefix}%`}
+        AND status IN ('done', 'failed', 'cancelled')
+      ORDER BY created_at DESC, id DESC LIMIT ${limit}`;
+    return rows.map((r) => r.status);
+  }
 }

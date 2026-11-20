@@ -12,6 +12,7 @@ import { scheduleLabel, tokens } from '../../_task/labels';
 import { CHAT_DETAIL_TOPICS, useLead } from '../../_task/live';
 import type { Chat, ChatDetail, OutputSaved } from '../../_task/types';
 import { STORE_HREF } from '../menu';
+import { ChatBriefForm } from './ChatBriefForm';
 import { ChatCardForm } from './ChatCardForm';
 import { ChatForm, type ChatMessageBody } from './ChatForm';
 import type { RefChoice } from './ChatRefs';
@@ -166,6 +167,9 @@ export function ChatThreadPanel({ id }: { id: string }) {
   }
 
   const tool = lead.data?.lead?.id === d.chat.agentId ? lead.data.lead.tool : null;
+  const last = d.turns.at(-1);
+  const asked =
+    last?.brief && last.status === 'done' ? { taskId: last.taskId, brief: last.brief } : null;
   // 참조는 새 회차에만: 앞 회차가 끝나지 않았거나 맡기 전이면 덧붙인 말이라 받지 않는다 (서버 ChatHistory.waiting과 같은 규칙)
   const refsEnabled = !!partner && !TURN_OPEN.includes(d.turns.at(-1)?.status ?? '');
 
@@ -250,6 +254,15 @@ export function ChatThreadPanel({ id }: { id: string }) {
           onCancel={cancel}
         />
         {cancelling.problem && <p className="error">{cancelling.problem}</p>}
+        {/* 목표 확인 질문: 마지막 회차가 묻고 끝났으면 (답하면 다음 회차가 생겨 사라진다) */}
+        {asked && (
+          <ChatBriefForm
+            key={asked.taskId}
+            brief={asked.brief}
+            busy={sending.busy !== null}
+            onAnswer={(message) => send({ message })}
+          />
+        )}
         {d.card && (
           <ChatCardForm
             key={`${d.card.id}:${d.card.version}`}

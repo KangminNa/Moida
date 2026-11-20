@@ -264,5 +264,20 @@ describe('메뉴 (/api/menus)', () => {
       menu_id: menu.id,
     });
     assert.equal(saved.menu_id, menu.id);
+    assert.deepEqual((await call('blog_menus', {})).recent_posts, [], '모든 앱이면 최근 글 없음');
+
+    // 한 앱을 고르면 그 앱의 최근 공개 글 (문체 프로필, 2026-11-20). 초안은 빠진다
+    const recent = async () =>
+      ((await call('blog_menus', { app_id: app })).recent_posts as Json[]).map((p) => p.id);
+    assert.equal((await recent()).includes(saved.post_id), false, '초안은 빠진다');
+    ok(
+      await api.request('POST', `/api/posts/${saved.post_id}/status`, owner, {
+        version: saved.version,
+        status: 'published',
+      }),
+    );
+    const ids = await recent();
+    assert.equal(ids[0], saved.post_id, '가장 새로 공개한 글이 먼저');
+    assert.ok(ids.length <= 10);
   });
 });

@@ -3,13 +3,18 @@ import type { BaseTool, ToolTextBody } from '../platform';
 import { AiLoginRefreshTool, AiLoginTool, AiSigninTool } from './ai/ai-login.tool';
 import { RequestApprovalTool } from './approval/approval.tool';
 import { AskAgentTool } from './chat/chat.tool';
-import { AgentUpdatesTool, PostUpdateTool, SetDeliverTool } from './chat/chat-update.tool';
+import {
+  AgentUpdatesTool,
+  AskBriefTool,
+  PostUpdateTool,
+  SetDeliverTool,
+} from './chat/chat-update.tool';
 import { ProposeToolTool } from './external-tool/external-tool.tool';
 import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxTool } from './inbox/inbox.tool';
 import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
 import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
-import { DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
+import { AskHelpTool, DelegateTaskTool, SetPlanTool, WaitSubtasksTool } from './task/delegate.tool';
 import {
   NextJobsTool,
   ReleaseJobTool,
@@ -22,6 +27,34 @@ import { ReadUrlTool } from './web/web.tool';
 // task가 AI에게 여는 MCP 도구 목록. 새 도구는 여기에만 더한다 (mcp 모듈은 모듈별 목록을 모으기만 한다).
 @Injectable()
 export class TaskTools {
+  /** 모듈의 providers에 펼치는 도구 클래스 (도구를 더하면 여기와 아래 생성자에) */
+  static readonly PROVIDERS = [
+    NextJobsTool,
+    ReportProgressTool,
+    SubmitResultTool,
+    ReleaseJobTool,
+    RequestApprovalTool,
+    DelegateTaskTool,
+    WaitSubtasksTool,
+    AskHelpTool,
+    SetPlanTool,
+    AiLoginTool,
+    AiLoginRefreshTool,
+    AiSigninTool,
+    BeginUploadTool,
+    BeginDownloadTool,
+    ReadUrlTool,
+    ReportRoundTool,
+    AskAgentTool,
+    InboxTool,
+    AgentUpdatesTool,
+    PostUpdateTool,
+    SetDeliverTool,
+    AskBriefTool,
+    ProposeToolTool,
+    GetSettingsTool,
+    ProposeSettingTool,
+  ] as const;
   readonly tools: readonly BaseTool[];
   /** 도구의 설명 · 칸 설명 (AI가 읽는 글). 코드가 아니라 설명서 파일이 기본이다 */
   readonly texts: Readonly<Record<string, ToolTextBody>> = texts;
@@ -34,6 +67,8 @@ export class TaskTools {
     requestApproval: RequestApprovalTool,
     delegateTask: DelegateTaskTool,
     waitSubtasks: WaitSubtasksTool,
+    askHelp: AskHelpTool,
+    setPlan: SetPlanTool,
     aiLogin: AiLoginTool,
     aiLoginRefresh: AiLoginRefreshTool,
     aiSignin: AiSigninTool,
@@ -46,6 +81,7 @@ export class TaskTools {
     agentUpdates: AgentUpdatesTool,
     postUpdate: PostUpdateTool,
     setDeliver: SetDeliverTool,
+    askBrief: AskBriefTool,
     proposeTool: ProposeToolTool,
     getSettings: GetSettingsTool,
     proposeSetting: ProposeSettingTool,
@@ -58,6 +94,8 @@ export class TaskTools {
       requestApproval,
       delegateTask,
       waitSubtasks,
+      askHelp,
+      setPlan,
       aiLogin,
       aiLoginRefresh,
       aiSignin,
@@ -70,6 +108,7 @@ export class TaskTools {
       agentUpdates,
       postUpdate,
       setDeliver,
+      askBrief,
       proposeTool,
       getSettings,
       proposeSetting,

@@ -12,15 +12,27 @@ import {
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
 import { ApprovalRepository } from '../approval/approval.repository';
+import { ChatRepository } from '../chat/chat.repository';
 import { GoalRepository } from '../goal/goal.repository';
 import { OutputQuery } from '../output/output.query';
+import { SkillQuery } from '../skill/skill.query';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
-import type { WaitSubtasksInput } from './subtask-wait.input';
+import { Lessons } from './lesson.policy';
+import { LessonQuery } from './lesson.query';
+import type { AskHelpInput, WaitSubtasksInput } from './subtask-wait.input';
 import { SubtaskWait } from './subtask-wait.policy';
+import { HelpAskedView } from './subtask-wait.view';
 import { Task } from './task';
-import type { CreateTaskInput, DelegateTaskInput, TaskIdInput } from './task.input';
+import { CreateTaskInput, type DelegateTaskInput, type TaskIdInput } from './task.input';
+import { TaskQuery } from './task.query';
 import { TaskRepository } from './task.repository';
+import type { SetPlanInput } from './task-plan.input';
+import { TaskPlan } from './task-plan.policy';
+import { PlanSetView } from './task-plan.view';
+import { TeamReview } from './team-review.policy';
+import { TeamReviewQuery } from './team-review.query';
+import { TeamRoster } from './team-roster';
 
 // 작업 쓰기: 만들기와 취소(주인), 일 요청(이벤트), 위임(에이전트가 작업 토큰으로)과 하위 작업이 끝났을 때 위 작업 깨우기(일꾼).
 // 팀원 기다리기 (2026-11-19, SubtaskWait): 기한 · 실패 · 관리자 재촉으로 먼저 깨우기, 더 기다리기(wait_subtasks).
@@ -31,6 +43,10 @@ export class TaskService extends BaseService {
   constructor(
     db: Database,
     private readonly outputs: OutputQuery,
+    private readonly query: TaskQuery,
+    private readonly lessons: LessonQuery,
+    private readonly skills: SkillQuery,
+    private readonly reviews: TeamReviewQuery,
   ) {
     super(db);
   }
@@ -44,6 +60,59 @@ export class TaskService extends BaseService {
   /** 다른 모듈이 이벤트로 요청한 일 (일꾼이 부른다). 같은 이벤트가 두 번 와도 작업은 하나 */
   async request(actor: Actor, spaceId: string, req: CreateTaskInput): Promise<Task> {
     actor.assertCan(Actor.RUN);
+    return this.open(actor, spaceId, req);
+  }
+
+  /**
+   * 피드백에서 배우기 (2026-11-20, Lessons): 지난 배우기 뒤로 관리자의 수정 요청 메모가 쌓였고 열린 배우기 일이
+   * 없으면 대표에게 일 하나(지시문 틀 lessons)를 맡긴다. 공간 · 날마다 하나, 대표가 없으면(대화를 연 적이 없음) 하지 않는다
+   */
+  async learn(actor: Actor, spaceId: string): Promise<Task | null> {
+    actor.assertCan(Actor.RUN);
+    const leadId = await this.lessons.leadOf(actor, spaceId);
+    if (leadId === null) return null;
+    const last = await this.lessons.last(actor, spaceId);
+    const notes = await this.lessons.notes(actor, spaceId, last?.created_at ?? null);
+    if (!Lessons.due(last, notes.length)) return null;
+    const instruction = (await this.skills.prompts(actor, spaceId)).fill(
+      'lessons',
+      Lessons.fields(notes),
+    );
+    const req = CreateTaskInput.from({
+      requestId: Lessons.requestId(spaceId, new Date()),
+      agentId: leadId,
+      title: Lessons.TITLE,
+      instruction,
+      priority: Lessons.PRIORITY,
+    });
+    return this.open(actor, spaceId, req);
+  }
+
+  /**
+   * 주간 팀 점검 (2026-11-20, TeamReview): 지난 점검 뒤로 7일이 지났고 그동안 끝난 일이 쌓였으면 대표에게 성적표를 실은
+   * 점검 일 하나를 맡긴다. 대표가 없거나 열린 점검이 있으면 아무것도 하지 않는다 (두 번 불려도 날마다 하나)
+   */
+  async reviewTeam(actor: Actor, spaceId: string): Promise<Task | null> {
+    actor.assertCan(Actor.RUN);
+    const now = new Date();
+    const lead = await this.reviews.lead(actor, spaceId);
+    if (lead === null) return null;
+    const last = await this.reviews.last(actor, spaceId);
+    const done = await this.reviews.doneSince(actor, spaceId, TeamReview.since(last, now));
+    if (!TeamReview.due(last, done, now, lead.created_at)) return null;
+    const members = await this.reviews.members(actor, spaceId);
+    const scores = await this.reviews.scores(actor, spaceId, now);
+    const instruction = (await this.skills.prompts(actor, spaceId)).fill(
+      'team-review',
+      TeamReview.fields(members, scores, TeamRoster.SCORE_DAYS),
+    );
+    const req = CreateTaskInput.from({
+      requestId: TeamReview.requestId(spaceId, now),
+      agentId: lead.id,
+      title: TeamReview.TITLE,
+      instruction,
+      priority: TeamReview.PRIORITY,
+    });
     return this.open(actor, spaceId, req);
   }
 
@@ -138,6 +207,59 @@ export class TaskService extends BaseService {
       parent.waitForSubtasks(`하위 작업 ${open.length}개를 더 기다려요`, until, now);
       await tasks.save(parent);
       return open;
+    });
+  }
+
+  /**
+   * 팀원이 나눌 부분을 적어 도움을 청한다 (MCP ask_help, 2026-11-20): 실행 기록 한 줄을 남기고, 팀장(위 작업)이 하위 작업을
+   * 기다리는 중이면 먼저 깨운다 (SubtaskWait.HELP). 일 하나에 HELP_MAX번. 잠그는 순서는 위 작업 → 아래 작업
+   */
+  async askHelp(actor: Actor, req: AskHelpInput): Promise<HelpAskedView> {
+    actor.assertCan(Actor.AGENT);
+    if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
+    const { spaceId, agentId, taskId } = actor;
+    const asked = (await this.query.progressOf(actor, [taskId])).get(taskId) ?? [];
+    SubtaskWait.assertHelpLeft(asked.filter((l) => l.startsWith(SubtaskWait.HELP_PREFIX)).length);
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const parentId = await tasks.parentOf(taskId);
+      const parent = parentId === null ? null : await tasks.lockById(parentId);
+      const task = await tasks.lock(spaceId, taskId);
+      task.askHelp(agentId, req.part, now);
+      await tasks.save(task);
+      if (!parent?.waitingForSubtasks) return new HelpAskedView(false);
+      parent.wakeAfterSubtasks(SubtaskWait.HELP, now);
+      await tasks.save(parent);
+      return new HelpAskedView(true);
+    });
+  }
+
+  /**
+   * 맡은 일의 계획 (MCP set_plan, 2026-11-20 큰 일은 계획 먼저): 끝나기 전에 한 번만 (TaskPlan). 대화의 일이면 그 대화에
+   * 소식(정한 것)으로도 남겨 관리자가 바로 본다. 대화 줄은 잠그지 않는다 (소식은 추가만, ChatUpdateService와 같다)
+   */
+  async setPlan(actor: Actor, req: SetPlanInput): Promise<PlanSetView> {
+    actor.assertCan(Actor.AGENT);
+    if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
+    const { spaceId, agentId, taskId } = actor;
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const task = await tasks.lock(spaceId, taskId);
+      if (task.agentId !== agentId) throw new Forbidden(Actor.AGENT, '맡은 일의 계획만 정해요');
+      if (!task.open) throw new Conflict('끝난 일이에요');
+      task.declare((payload) => TaskPlan.declare(payload, req.plan));
+      await tasks.save(task);
+      const chats = new ChatRepository(tx);
+      const place = await chats.placeOf(taskId);
+      if (place) {
+        const chat = await chats.load(spaceId, place.chat_id);
+        chat.note('decision', TaskPlan.note(req.plan), taskId, agentId, now);
+        await chats.save(chat);
+      }
+      const { steps, criteria, mustNot } = req.plan;
+      return new PlanSetView(steps, criteria, mustNot);
     });
   }
 

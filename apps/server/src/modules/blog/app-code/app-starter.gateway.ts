@@ -4,11 +4,14 @@ import { BaseGateway } from '../../platform';
 import type { AppKind } from '../blog.tables';
 
 // 앱 종류의 시작 코드 (스토어 1-6, docs/스토어.md 9장). 저장소 apps/server/starters/의 파일이고 서버 이미지에 함께 든다:
-// 프로세스가 도는 동안 바뀌지 않아 처음 한 번 읽어 둔다. base/ 위에 종류 폴더(blog · magazine · page)를 얹은 것이 한 벌이다.
+// 프로세스가 도는 동안 바뀌지 않아 처음 한 번 읽어 둔다. base/ 위에 종류 폴더(blog · magazine · community)를 얹은 것이 한 벌이다.
+// 페이지 앱은 블로그 틀(머리 · 메뉴 · 꼬리 · 글 목록) 없이 자기 폴더만이다: 화면 전체를 앱이 정한다 (페이지 앱 P1, 2026-11-20).
 // 코드가 없는 앱은 이 한 벌로 보이고, 처음 고칠 때(AI 작업 · 시작 코드로) 그 앱의 버전 1로 복사된다.
 export class AppStarterGateway extends BaseGateway {
   protected readonly name = '시작 코드';
   private static readonly BASE = 'base';
+  /** base/를 얹지 않는 종류 */
+  private static readonly ALONE: readonly AppKind[] = ['page'];
   /** 폴더 없는 파일 이름만 (PageFiles와 같은 규칙) */
   private static readonly NAME = /^[^/\\.][^/\\]{0,119}$/;
   private readonly cache = new Map<AppKind, ReadonlyMap<string, Buffer>>();
@@ -25,7 +28,8 @@ export class AppStarterGateway extends BaseGateway {
   files(kind: AppKind): ReadonlyMap<string, Buffer> {
     const cached = this.cache.get(kind);
     if (cached) return cached;
-    const merged = new Map([...this.read(AppStarterGateway.BASE), ...this.read(kind)]);
+    const base = AppStarterGateway.ALONE.includes(kind) ? [] : this.read(AppStarterGateway.BASE);
+    const merged = new Map([...base, ...this.read(kind)]);
     const files = new Map([...merged].sort(([a], [b]) => a.localeCompare(b)));
     this.cache.set(kind, files);
     return files;

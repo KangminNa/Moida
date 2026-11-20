@@ -21,6 +21,58 @@ describe('ChatInspect', () => {
     assert.equal(ChatInspect.outcome(null, 0), 'hold', '검수를 끝내지 못함');
   });
 
+  test('고쳐 왔는데 점수가 오르지 않으면 한도 전이라도 관리자에게 (2026-11-20)', () => {
+    const scored = (score: number) =>
+      ChatReview.parse(
+        JSON.stringify({
+          verdict: 'fix',
+          summary: '까닭',
+          checklist: [{ item: '제목', score, note: '흔함' }],
+          fixes: ['제목'],
+        }),
+      );
+    assert.equal(ChatInspect.outcome(scored(3), 1, 2), 'fix', '올랐으면 다시');
+    assert.equal(ChatInspect.outcome(scored(3), 1, 3), 'hold', '같으면 넘김');
+    assert.equal(ChatInspect.outcome(scored(2), 1, 3), 'hold', '내려가도 넘김');
+    assert.equal(ChatInspect.outcome(scored(3), 0, null), 'fix', '앞 점수가 없으면 모른다');
+    assert.equal(
+      ChatInspect.opinion(scored(3), 'hold', 3),
+      '고쳐도 점수가 오르지 않음 (3점 → 3점): 제목 (까닭)',
+    );
+    assert.equal(
+      ChatInspect.opinion(scored(3), 'fix'),
+      '검수 의견 (평균 3점): 까닭\n고칠 것:\n- 제목',
+    );
+  });
+
+  test('두 검수자 (2026-11-20): 둘 다 통과해야 통과, 하나라도 고칠 것이면 고칠 것(합침), 반려가 먼저, 못 끝냈으면 null', () => {
+    const scored = (verdict: string, score: number, fixes: string[] = []) =>
+      ChatReview.parse(
+        JSON.stringify({ verdict, summary: verdict, checklist: [{ item: '조건', score }], fixes }),
+      );
+    const pass = ChatInspect.combine([scored('pass', 5), scored('pass', 4)]);
+    assert.deepEqual(
+      [pass?.verdict, pass?.score, pass?.summary],
+      ['pass', 4, '검수 1: pass / 검수 2: pass'],
+    );
+    const fix = ChatInspect.combine([scored('pass', 5), scored('fix', 3, ['제목'])]);
+    assert.deepEqual([fix?.verdict, fix?.fixes, fix?.score], ['fix', ['제목'], 3]);
+    assert.equal(
+      ChatInspect.combine([scored('fix', 3, ['제목']), scored('reject', 1)])?.verdict,
+      'reject',
+    );
+    assert.equal(ChatInspect.combine([scored('pass', 5), null]), null, '하나가 끝내지 못함');
+    assert.equal(
+      ChatInspect.combine([scored('pass', 5)])?.verdict,
+      'pass',
+      '검수자가 하나면 그대로',
+    );
+    assert.equal(
+      ChatInspect.combine([scored('pass', 5), ChatReview.parse('그냥 글')])?.verdict,
+      'unknown',
+    );
+  });
+
   test('결재에 남길 말', () => {
     assert.equal(ChatInspect.opinion(review('pass'), 'pass'), '까닭');
     assert.equal(

@@ -31,6 +31,8 @@ export class SubtaskResult {
     readonly waiting: string | null = null,
     /** 맡긴 때 (몇 분째인지 센다). 옛 서버면 null */
     readonly since: Date | null = null,
+    /** 끝나지 않은 일의 최근 진행 기록 · 도움 요청 줄 (2026-11-20, 오래된 것부터). 어디까지 됐는지 보고 나눠 맡긴다 */
+    readonly progress: readonly string[] = [],
   ) {}
 
   /** 아직 끝나지 않은 일의 화면 말. 끝났으면 null */
@@ -51,6 +53,7 @@ export class SubtaskResult {
       raw.text('task_id'),
       raw.optionalText('waiting'),
       SubtaskResult.dateOf(raw.optionalText('since')),
+      raw.texts('progress'),
     );
   }
 
@@ -60,7 +63,7 @@ export class SubtaskResult {
   }
 
   /**
-   * 지시문의 "맡긴 하위 작업의 결과" 단락 (틀 subtasks). wake: 깬 까닭 (next_jobs의 wake: all · failed · deadline · owner).
+   * 지시문의 "맡긴 하위 작업의 결과" 단락 (틀 subtasks). wake: 깬 까닭 (next_jobs의 wake: all · failed · deadline · owner · help).
    * 끝나지 않은 일이 있으면 고르는 법(마무리 · 더 기다리기 · 다시 맡기기)을, 관리자가 재촉했으면 마무리만 싣는다
    */
   static part(
@@ -74,6 +77,7 @@ export class SubtaskResult {
       results: results.map((r) => r.line(prompts)).join('\n'),
       failedWake: wake === 'failed',
       deadline: wake === 'deadline',
+      helpWake: wake === 'help',
       owner,
       open: !owner && results.some((r) => r.open !== null),
       rounds: String(rounds),
@@ -97,6 +101,7 @@ export class SubtaskResult {
       body: this.error ?? this.summary,
       outputs: this.outputs.join(', '),
       deliver: this.deliver,
+      progress: open === null ? null : this.progress.map((line) => `- ${line}`).join('\n') || null,
     });
   }
 }
