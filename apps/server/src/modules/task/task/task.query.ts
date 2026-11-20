@@ -12,6 +12,7 @@ import {
 import { taskRuns, tasks } from '../task.schema';
 import type { GoalRow, OutputRow, TaskEventRow, TaskRow, TaskRunRow } from '../task.tables';
 import { RunLineage } from './run-lineage.policy';
+import { SubtaskWait } from './subtask-wait.policy';
 import { Task } from './task';
 import type { ListTasksInput, TaskIdInput } from './task.input';
 import {
@@ -40,6 +41,9 @@ export class TaskQuery extends BaseQuery {
   private static readonly EVENTS = 500;
   /** 목록 카드에 보이는 마지막 기록의 길이 */
   private static readonly LAST_EVENT = 200;
+  /** 깨어난 팀장에게 보이는 하위 작업의 최근 진행 기록 (줄 수 · 한 줄 길이, 2026-11-20) */
+  private static readonly PROGRESS_LINES = 3;
+  private static readonly PROGRESS_TEXT = 300;
 
   /** 진행 중 작업의 임대가 가장 먼저 끝나는 때. 없으면 null (일꾼의 LeaseJob이 그때 깬다) */
   async nextLeaseEnd(actor: Actor): Promise<Date | null> {
@@ -266,6 +270,29 @@ export class TaskQuery extends BaseQuery {
       )
       SELECT * FROM up ORDER BY step DESC`;
     return rows.map((r) => new TaskGoalView(r));
+  }
+
+  /**
+   * 하위 작업마다 최근 진행 기록 (팀원 기다리기, 2026-11-20): 마지막 PROGRESS_LINES줄과 도움 요청 줄(SubtaskWait.HELP_PREFIX) 전부,
+   * 오래된 것부터. 깨어난 팀장이 끝나지 않은 일이 어디까지 됐는지 보고 나눠 맡기고, ask_help가 도움 요청 수를 센다
+   */
+  async progressOf(
+    actor: Actor,
+    taskIds: readonly string[],
+  ): Promise<ReadonlyMap<string, readonly string[]>> {
+    const spaceId = actor.requireSpace();
+    const lines = new Map<string, string[]>();
+    if (taskIds.length === 0) return lines;
+    const rows = await this.sql<{ task_id: string; body: string }[]>`
+      SELECT task_id, left(body, ${TaskQuery.PROGRESS_TEXT}) AS body FROM (
+        SELECT e.task_id, e.body, e.id, row_number() OVER (PARTITION BY e.task_id ORDER BY e.id DESC) AS n
+        FROM task.task_events e JOIN task.tasks t ON t.id = e.task_id
+        WHERE t.space_id = ${spaceId} AND e.task_id = ANY(${taskIds as string[]}::uuid[]) AND e.body <> ''
+      ) recent
+      WHERE n <= ${TaskQuery.PROGRESS_LINES} OR body LIKE ${`${SubtaskWait.HELP_PREFIX}%`}
+      ORDER BY task_id, id`;
+    for (const r of rows) lines.set(r.task_id, [...(lines.get(r.task_id) ?? []), r.body]);
+    return lines;
   }
 
   /**

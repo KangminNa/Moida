@@ -81,7 +81,7 @@ import { SkillQuery } from './skill/skill.query';
 import { SkillService } from './skill/skill.service';
 import { AgentlessService } from './task/agentless.service';
 import { AgentlessRequestHandler } from './task/agentless-request.handler';
-import { DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
+import { AskHelpTool, DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
 import { JobService } from './task/job.service';
 import { LeaseJob } from './task/lease.job';
 import { SubtaskSettledHandler } from './task/subtask-settled.handler';
@@ -140,6 +140,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     RequestApprovalTool,
     DelegateTaskTool,
     WaitSubtasksTool,
+    AskHelpTool,
     TaskTools,
     TaskRequestedHandler,
     AgentlessRequestHandler,

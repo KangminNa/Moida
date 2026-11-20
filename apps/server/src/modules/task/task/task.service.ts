@@ -16,10 +16,12 @@ import { GoalRepository } from '../goal/goal.repository';
 import { OutputQuery } from '../output/output.query';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
-import type { WaitSubtasksInput } from './subtask-wait.input';
+import type { AskHelpInput, WaitSubtasksInput } from './subtask-wait.input';
 import { SubtaskWait } from './subtask-wait.policy';
+import { HelpAskedView } from './subtask-wait.view';
 import { Task } from './task';
 import type { CreateTaskInput, DelegateTaskInput, TaskIdInput } from './task.input';
+import { TaskQuery } from './task.query';
 import { TaskRepository } from './task.repository';
 
 // 작업 쓰기: 만들기와 취소(주인), 일 요청(이벤트), 위임(에이전트가 작업 토큰으로)과 하위 작업이 끝났을 때 위 작업 깨우기(일꾼).
@@ -31,6 +33,7 @@ export class TaskService extends BaseService {
   constructor(
     db: Database,
     private readonly outputs: OutputQuery,
+    private readonly query: TaskQuery,
   ) {
     super(db);
   }
@@ -138,6 +141,31 @@ export class TaskService extends BaseService {
       parent.waitForSubtasks(`하위 작업 ${open.length}개를 더 기다려요`, until, now);
       await tasks.save(parent);
       return open;
+    });
+  }
+
+  /**
+   * 팀원이 나눌 부분을 적어 도움을 청한다 (MCP ask_help, 2026-11-20): 실행 기록 한 줄을 남기고, 팀장(위 작업)이 하위 작업을
+   * 기다리는 중이면 먼저 깨운다 (SubtaskWait.HELP). 일 하나에 HELP_MAX번. 잠그는 순서는 위 작업 → 아래 작업
+   */
+  async askHelp(actor: Actor, req: AskHelpInput): Promise<HelpAskedView> {
+    actor.assertCan(Actor.AGENT);
+    if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
+    const { spaceId, agentId, taskId } = actor;
+    const asked = (await this.query.progressOf(actor, [taskId])).get(taskId) ?? [];
+    SubtaskWait.assertHelpLeft(asked.filter((l) => l.startsWith(SubtaskWait.HELP_PREFIX)).length);
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const parentId = await tasks.parentOf(taskId);
+      const parent = parentId === null ? null : await tasks.lockById(parentId);
+      const task = await tasks.lock(spaceId, taskId);
+      task.askHelp(agentId, req.part, now);
+      await tasks.save(task);
+      if (!parent?.waitingForSubtasks) return new HelpAskedView(false);
+      parent.wakeAfterSubtasks(SubtaskWait.HELP, now);
+      await tasks.save(parent);
+      return new HelpAskedView(true);
     });
   }
 

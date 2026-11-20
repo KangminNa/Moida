@@ -4,8 +4,9 @@ import { ModelTier } from '../agent/model-tier.policy';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import type { DelegatedView } from './job.view';
-import { WaitSubtasksInput } from './subtask-wait.input';
+import { AskHelpInput, WaitSubtasksInput } from './subtask-wait.input';
 import { SubtaskWait } from './subtask-wait.policy';
+import type { HelpAskedView } from './subtask-wait.view';
 import { Task } from './task';
 import { DelegateTaskInput, SubtaskOrder } from './task.input';
 import { TaskService } from './task.service';
@@ -99,5 +100,26 @@ export class WaitSubtasksTool extends BaseTool {
 
   async handle(actor: Actor, raw: unknown): Promise<DelegatedView> {
     return Task.delegatedView(await this.tasks.waitMore(actor, WaitSubtasksInput.from(raw)));
+  }
+}
+
+// MCP 도구 ask_help (2026-11-20): 맡겨진 팀원이 일이 커서 나눌 부분을 적어 팀장에게 도움을 청한다.
+// 실행 기록 한 줄로 남고, 팀장이 하위 작업을 기다리는 중이면 먼저 깨운다. 누가 어느 일에서 청하는지는 토큰에서 나온다
+@Injectable()
+export class AskHelpTool extends BaseTool {
+  readonly name = 'ask_help';
+  readonly scope = Actor.AGENT;
+  readonly readOnly = false;
+  readonly inputSchema = {
+    properties: { part: { type: 'string', maxLength: SubtaskWait.HELP_TEXT_MAX } },
+    required: ['part'],
+  };
+
+  constructor(private readonly tasks: TaskService) {
+    super();
+  }
+
+  handle(actor: Actor, raw: unknown): Promise<HelpAskedView> {
+    return this.tasks.askHelp(actor, AskHelpInput.from(raw));
   }
 }

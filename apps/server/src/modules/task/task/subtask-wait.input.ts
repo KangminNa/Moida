@@ -28,3 +28,17 @@ export class WaitSubtasksInput extends BaseRequest {
     });
   }
 }
+
+/** MCP ask_help (2026-11-20): 나눠 맡길 부분 (무엇을 · 어디까지 · 받을 결과) */
+export class AskHelpInput extends BaseRequest {
+  private constructor(readonly part: string) {
+    super();
+  }
+
+  static from(raw: unknown): AskHelpInput {
+    return BaseRequest.read(
+      raw,
+      (f) => new AskHelpInput(f.text('part', SubtaskWait.HELP_TEXT_MAX)),
+    );
+  }
+}

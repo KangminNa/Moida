@@ -400,6 +400,49 @@ describe('지시문', () => {
     assert.equal(all.includes('먼저 깨웠습니다'), false);
   });
 
+  test('팀원 돕기 (2026-11-20): 끝나지 않은 일의 진행 기록, 나눠 돕기, 도움 요청으로 깬 까닭', () => {
+    const since = new Date(Date.now() - 30 * 60_000).toISOString();
+    const results = [
+      {
+        task_id: 'c2',
+        title: '정리',
+        agent: '정리 팀원',
+        status: 'running',
+        since,
+        progress: ['자료 10개 중 4개 읽음', '도움 요청: 6~10번 자료 요약'],
+      },
+      { task_id: 'c1', title: '조사', agent: '조사 팀원', status: 'done', summary: '표' },
+    ];
+    const woke = job({ subtask_results: results, wake: 'help', rounds_left: 2 }).prompt(
+      REPO_PROMPTS,
+      false,
+    );
+    assert.ok(woke.includes('팀원 하나가 나눌 부분을 적어 도움을 청해 먼저 깨웠습니다'));
+    assert.ok(
+      woke.includes(
+        '## [일하는 중 · 30분째] 정리 (정리 팀원) · task_id: c2\n진행 기록:\n- 자료 10개 중 4개 읽음\n- 도움 요청: 6~10번 자료 요약',
+      ),
+    );
+    assert.ok(woke.includes('나눠 돕기: "일하는 중"인 일이 오래 걸리면'));
+    assert.ok(woke.includes('## [완료] 조사 (조사 팀원)\n표'));
+    assert.equal(woke.includes('- 표\n진행 기록'), false, '끝난 일에는 진행 기록을 싣지 않는다');
+    const deadline = job({ subtask_results: results, wake: 'deadline' }).prompt(
+      REPO_PROMPTS,
+      false,
+    );
+    assert.equal(deadline.includes('도움을 청해'), false);
+  });
+
+  test('도움 요청 (ask_help)은 팀장이 맡긴 일이고 아래 팀이 없을 때만 알린다', () => {
+    const delegated = { id: 't', title: '정리', payload: { delegatedBy: 'boss' } };
+    const member = job({ task: delegated }).prompt(REPO_PROMPTS, false);
+    assert.ok(member.includes('ask_help로 그 부분'));
+    assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('ask_help'), false, '맨 위 일');
+    const team = [{ agent_id: 'h1', name: '조사', role: '', status: 'active', kinds: ['general'] }];
+    const lead = job({ task: delegated, team, rounds_left: 1 }).prompt(REPO_PROMPTS, false);
+    assert.equal(lead.includes('ask_help로 그 부분'), false, '아래 팀이 있으면 그 팀에 나눈다');
+  });
+
   test('대표의 일(agent.lead, O-2)에는 lead 단락을 넣는다: 나눠 맡기기 · continue로 팀 바꾸기 제안 · 결과 중심', () => {
     const team = [
       { agent_id: 'h1', name: '조사 팀장', role: '', status: 'active', kinds: ['general'] },

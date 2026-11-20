@@ -244,6 +244,14 @@ export class JobView {
     return this;
   }
 
+  /** 끝나지 않은 하위 작업마다 최근 진행 기록 (작업 id → 줄, 2026-11-20). 도움 요청 줄도 여기 있다 */
+  private progress: ReadonlyMap<string, readonly string[]> = new Map();
+
+  withProgress(progress: ReadonlyMap<string, readonly string[]>): this {
+    this.progress = progress;
+    return this;
+  }
+
   /** 이 에이전트에게 허락한 외부 도구 (2차 7단계). 러너가 MCP 설정에 더한다. headers에만 토큰이 있다 */
   private tools: readonly JobToolView[] = [];
 
@@ -304,6 +312,7 @@ export class JobView {
       team: this.team.map((m) => m.toJSON()),
       subtask_results: this.subtaskResults.map((s) => ({
         ...s.toJSON(),
+        progress: [...(this.progress.get(s.taskId) ?? [])],
         outputs: (this.made.get(s.taskId) ?? []).map((o) => ({
           id: o.id,
           name: o.name,

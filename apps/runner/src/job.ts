@@ -148,12 +148,15 @@ export class Job {
     readonly lead = false,
     /** 하위 작업을 기다리다 깬 까닭 (next_jobs의 wake, 팀원 기다리기). 처음 빌린 일이면 null */
     readonly wake: string | null = null,
+    /** 팀장이 맡긴 일인가 (payload.delegatedBy). 아래 팀이 없으면 일이 클 때 ask_help로 도움을 청한다 (2026-11-20) */
+    readonly delegated = false,
   ) {}
 
   static from(raw: Json): Job {
     const task = raw.child('task');
     const agent = raw.child('agent');
     const target = raw.child('target');
+    const payload = task.child('payload');
     const lease = task.optionalText('lease_until');
     return new Job(
       task.text('id'),
@@ -167,7 +170,7 @@ export class Job {
       raw.optionalText('revision_note'),
       agent.text('name'),
       agent.text('role'),
-      agent.text('tool') || task.child('payload').text('tool'),
+      agent.text('tool') || payload.text('tool'),
       raw.optionalText('run_token'),
       lease === null ? null : new Date(lease),
       raw
@@ -178,24 +181,22 @@ export class Job {
       raw.list('subtask_results').map((r) => SubtaskResult.from(r)),
       raw.number('rounds_left'),
       null,
-      task.text('kind') === Job.CODE ? task.child('payload').field('code') : null,
+      task.text('kind') === Job.CODE ? payload.field('code') : null,
       null,
       raw.field('skill_package') ? SkillPackage.from(raw.child('skill_package')) : null,
-      task.text('kind') === Job.MAKE ? (task.child('payload').field('make') ?? null) : null,
-      task.text('kind') === Job.MAKE && Boolean(task.child('payload').field('page')),
-      ChatTurn.from(
-        task.child('payload'),
-        raw.field('chat_updates') ? raw.child('chat_updates') : null,
-      ),
+      task.text('kind') === Job.MAKE ? (payload.field('make') ?? null) : null,
+      task.text('kind') === Job.MAKE && Boolean(payload.field('page')),
+      ChatTurn.from(payload, raw.field('chat_updates') ? raw.child('chat_updates') : null),
       agent.flag('bound'),
       raw.field('prompt_package') ? SkillPackage.from(raw.child('prompt_package')) : null,
       CliRuntime.from(agent, raw.list('tools')),
-      JobRefs.from(task.child('payload')),
+      JobRefs.from(payload),
       JobLineage.from(raw.child('run')),
       raw.optionalText('deliver'),
-      task.text('kind') === Job.MAKE && Boolean(task.child('payload').field('appCode')),
+      task.text('kind') === Job.MAKE && Boolean(payload.field('appCode')),
       agent.flag('lead'),
       raw.optionalText('wake'),
+      Boolean(payload.optionalText('delegatedBy')),
     );
   }
 
@@ -264,6 +265,7 @@ export class Job {
       this.appCode,
       this.lead,
       this.wake,
+      this.delegated,
     );
   }
 
@@ -370,7 +372,9 @@ export class Job {
     if (this.skill && skillReady) parts.push(prompts.fill('skill', { name: this.skill }));
     else if (this.skill && skillText)
       parts.push(prompts.fill('skill', { name: this.skill, text: skillText.trim() }));
-    parts.push(prompts.fill('work', { outputs: outputsDir, browse: this.isBrowse }));
+    // 도움 요청 (2026-11-20): 팀장이 맡긴 일이고 아래 팀이 없을 때만 (아래 팀이 있으면 그 팀에 나눠 맡긴다)
+    const help = this.delegated && this.team.length === 0;
+    parts.push(prompts.fill('work', { outputs: outputsDir, browse: this.isBrowse, help }));
     // 외부 도구 (2차 7단계): 어댑터가 붙이는 조건과 같다 (MCP가 붙는 일, 셸이 없는 일)
     const tools = this.runToken === null || this.sandboxed ? [] : this.runtime.tools;
     if (tools.length > 0)
