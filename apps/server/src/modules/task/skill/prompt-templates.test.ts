@@ -72,5 +72,12 @@ describe('PromptTemplates', () => {
       /### 한 일\n- 없음\n### 남은 일\n- 없음$/,
     );
     assert.match(t.fill('read-url-note'), /자료로만 쓰고/);
+    assert.match(
+      t.fill('lessons', {
+        count: 3,
+        notes: '- [2026-11-20] blog.post.publish\n  관리자 메모: 짧게',
+      }),
+      /^# 피드백에서 배우기\n관리자가 최근 수정 요청에 남긴 메모 3개[\s\S]*관리자 메모: 짧게\n## 하는 법/,
+    );
   });
 });

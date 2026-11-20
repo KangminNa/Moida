@@ -10,7 +10,7 @@ import {
 } from '../../platform';
 import { App } from '../app/app';
 import { AppTeam } from '../app/app-team.policy';
-import { issues, menus } from '../blog.schema';
+import { issues, menus, posts } from '../blog.schema';
 import type { AppRow, MenuRow } from '../blog.tables';
 import type { ListMenusInput, ToolMenusInput } from './menu.input';
 import type { MenuListRow, PublicMenuRow } from './menu.view';
@@ -27,6 +27,9 @@ import {
 // 방문자는 공간을 모른다: MVP는 공간 하나라 방문자 읽기는 공간으로 거르지 않는다 (blog 규칙).
 @Injectable()
 export class MenuQuery extends BaseQuery {
+  /** blog_menus의 recent_posts 수 */
+  private static readonly RECENT_POSTS = 10;
+
   constructor(
     db: Database,
     private readonly agents: AgentDirectory,
@@ -78,7 +81,21 @@ export class MenuQuery extends BaseQuery {
       { space_id: spaceId, status: 'draft' },
       { order: ['number'], columns: ['id', 'menu_id', 'number', 'title'] },
     );
-    return new ToolMenuView(apps, rows, drafts, await this.writable(actor, apps, rows));
+    // 한 앱을 고르면 그 앱의 최근 공개 글 (문체 프로필을 만드는 팀이 읽을 글, 2026-11-20 피드백에서 배우기)
+    const recent =
+      req.appId === null
+        ? []
+        : await this.rows(
+            posts,
+            { space_id: spaceId, app_id: req.appId, status: 'published', deleted_at: null },
+            {
+              order: ['published_at desc', 'id desc'],
+              limit: MenuQuery.RECENT_POSTS,
+              columns: ['id', 'title', 'published_at'],
+            },
+          );
+    const writable = await this.writable(actor, apps, rows);
+    return new ToolMenuView(apps, rows, drafts, writable, recent);
   }
 
   /** 이 요청자가 글을 놓을 수 있는 앱 · 메뉴 (메뉴의 운영 팀, 없으면 앱의 운영 팀. AppTeam) */

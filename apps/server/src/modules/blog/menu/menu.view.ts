@@ -1,4 +1,4 @@
-import type { AppRow, IssueRow, MenuRow } from '../blog.tables';
+import type { AppRow, IssueRow, MenuRow, PostRow } from '../blog.tables';
 
 // 메뉴의 읽기 모양 (2차 6단계). 웹이 `import type`으로 가져온다 (객체설계 6장).
 // 보는 사람마다 둘이다: 관리자는 설정 칸 전부와 담긴 수, 방문자는 메뉴 줄에 필요한 이름 · 주소 · 종류만.
@@ -85,6 +85,8 @@ export class ToolMenuView {
     >[],
     /** 이 요청자가 글을 놓을 수 있는 앱 · 메뉴의 id (운영 팀, AppTeam) */
     private readonly writable: ReadonlySet<string>,
+    /** 한 앱을 골랐을 때 그 앱의 최근 공개 글 (문체 프로필, 2026-11-20). 모든 앱이면 빈 목록 */
+    private readonly recent: readonly Pick<PostRow, 'id' | 'title' | 'published_at'>[] = [],
   ) {}
 
   toJSON() {
@@ -109,6 +111,11 @@ export class ToolMenuView {
         issues: this.drafts
           .filter((i) => i.menu_id === r.id)
           .map((i) => ({ id: i.id, number: i.number, title: i.title })),
+      })),
+      recent_posts: this.recent.map((p) => ({
+        id: p.id,
+        title: p.title,
+        published_at: p.published_at,
       })),
     };
   }

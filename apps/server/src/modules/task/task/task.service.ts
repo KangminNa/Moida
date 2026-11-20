@@ -14,13 +14,16 @@ import { AgentRepository } from '../agent/agent.repository';
 import { ApprovalRepository } from '../approval/approval.repository';
 import { GoalRepository } from '../goal/goal.repository';
 import { OutputQuery } from '../output/output.query';
+import { SkillQuery } from '../skill/skill.query';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
+import { Lessons } from './lesson.policy';
+import { LessonQuery } from './lesson.query';
 import type { AskHelpInput, WaitSubtasksInput } from './subtask-wait.input';
 import { SubtaskWait } from './subtask-wait.policy';
 import { HelpAskedView } from './subtask-wait.view';
 import { Task } from './task';
-import type { CreateTaskInput, DelegateTaskInput, TaskIdInput } from './task.input';
+import { CreateTaskInput, type DelegateTaskInput, type TaskIdInput } from './task.input';
 import { TaskQuery } from './task.query';
 import { TaskRepository } from './task.repository';
 
@@ -34,6 +37,8 @@ export class TaskService extends BaseService {
     db: Database,
     private readonly outputs: OutputQuery,
     private readonly query: TaskQuery,
+    private readonly lessons: LessonQuery,
+    private readonly skills: SkillQuery,
   ) {
     super(db);
   }
@@ -47,6 +52,31 @@ export class TaskService extends BaseService {
   /** 다른 모듈이 이벤트로 요청한 일 (일꾼이 부른다). 같은 이벤트가 두 번 와도 작업은 하나 */
   async request(actor: Actor, spaceId: string, req: CreateTaskInput): Promise<Task> {
     actor.assertCan(Actor.RUN);
+    return this.open(actor, spaceId, req);
+  }
+
+  /**
+   * 피드백에서 배우기 (2026-11-20, Lessons): 지난 배우기 뒤로 관리자의 수정 요청 메모가 쌓였고 열린 배우기 일이
+   * 없으면 대표에게 일 하나(지시문 틀 lessons)를 맡긴다. 공간 · 날마다 하나, 대표가 없으면(대화를 연 적이 없음) 하지 않는다
+   */
+  async learn(actor: Actor, spaceId: string): Promise<Task | null> {
+    actor.assertCan(Actor.RUN);
+    const leadId = await this.lessons.leadOf(actor, spaceId);
+    if (leadId === null) return null;
+    const last = await this.lessons.last(actor, spaceId);
+    const notes = await this.lessons.notes(actor, spaceId, last?.created_at ?? null);
+    if (!Lessons.due(last, notes.length)) return null;
+    const instruction = (await this.skills.prompts(actor, spaceId)).fill(
+      'lessons',
+      Lessons.fields(notes),
+    );
+    const req = CreateTaskInput.from({
+      requestId: Lessons.requestId(spaceId, new Date()),
+      agentId: leadId,
+      title: Lessons.TITLE,
+      instruction,
+      priority: Lessons.PRIORITY,
+    });
     return this.open(actor, spaceId, req);
   }
 

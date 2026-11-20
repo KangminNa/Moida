@@ -84,6 +84,8 @@ import { AgentlessRequestHandler } from './task/agentless-request.handler';
 import { AskHelpTool, DelegateTaskTool, WaitSubtasksTool } from './task/delegate.tool';
 import { JobService } from './task/job.service';
 import { LeaseJob } from './task/lease.job';
+import { LessonHandler } from './task/lesson.handler';
+import { LessonQuery } from './task/lesson.query';
 import { SubtaskSettledHandler } from './task/subtask-settled.handler';
 import { SubtaskWaitJob } from './task/subtask-wait.job';
 import { Task } from './task/task';
@@ -179,6 +181,9 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatInspectService,
     ChatInspectHandler,
     ChatCardHandler,
+    // 피드백에서 배우기 (2026-11-20): 관리자의 수정 요청 메모가 쌓이면 대표에게 배우기 일
+    LessonQuery,
+    LessonHandler,
     // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
     AppCodeCardHandler,
     // 승인 뒤 이어서 (O-2): 대표가 continue로 올린 설정 바꾸기가 적용되어 끝난 회차 → 같은 대화의 다음 회차
@@ -254,6 +259,7 @@ export class TaskModule implements OnModuleInit {
     private readonly chatResults: ChatResultHandler,
     private readonly chatInspections: ChatInspectHandler,
     private readonly chatCards: ChatCardHandler,
+    private readonly lessons: LessonHandler,
     private readonly appCodeCards: AppCodeCardHandler,
     private readonly chatContinues: ChatContinueHandler,
     private readonly agentless: AgentlessRequestHandler,
@@ -280,6 +286,7 @@ export class TaskModule implements OnModuleInit {
     for (const topic of ChatResultHandler.TOPICS) this.workers.on(topic, this.chatResults);
     this.workers.on(Task.CHANGED, this.chatInspections);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
+    for (const topic of LessonHandler.TOPICS) this.workers.on(topic, this.lessons);
     this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
     this.workers.on(Task.CHANGED, this.chatContinues);
     this.workers.on(Task.CHANGED, this.follows);
