@@ -317,12 +317,15 @@ export class JobView {
   }
 }
 
-/** next_jobs의 답 */
+/** next_jobs의 답. concurrency: 러너 메뉴에서 정한 동시에 하는 일의 수 (null이면 러너가 띄울 때의 값, 2026-11-20) */
 export class NextJobsView {
-  constructor(private readonly jobs: readonly JobView[]) {}
+  constructor(
+    private readonly jobs: readonly JobView[],
+    private readonly concurrency: number | null = null,
+  ) {}
 
   toJSON() {
-    return { jobs: this.jobs.map((j) => j.toJSON()) };
+    return { jobs: this.jobs.map((j) => j.toJSON()), concurrency: this.concurrency };
   }
 }
 

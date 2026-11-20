@@ -15,11 +15,14 @@ import type { Runner, RunnerList } from '../../_task/types';
 const SERVER_RUNNER = '서버 러너';
 /** 연결 상태는 시간이 지나며 바뀌는데 신호가 없다. 이 간격으로 다시 읽는다 */
 const REREAD_MS = 15_000;
+/** 동시에 하는 일의 상한 (서버 Runner.SLOTS_MAX · 러너 CAIRN_RUNNER_CONCURRENCY) */
+const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /** 러너 하나와 그 기기 (이름·종류는 기기 목록에 있다) */
 type Row = { runner: Runner; device: Device };
 
-// 러너: 연결 상태, 지금 하는 일, 일 받기 켜기·끄기. 웹은 러너 프로세스를 켜지 않고, 서버가 일을 줄지 말지만 정한다.
+// 러너: 연결 상태, 지금 하는 일, 일 받기 켜기·끄기, 동시에 하는 일의 수.
+// 웹은 러너 프로세스를 켜지 않고, 서버가 일을 줄지 말지와 몇 개까지 줄지만 정한다 (러너는 다음 빌리기에서 받는다).
 export function RunnerPanel() {
   const runners = useLiveValue('runners', () => api<RunnerList>('GET', '/api/runners'), []);
   const devices = useDevices();
@@ -68,6 +71,22 @@ export function RunnerPanel() {
       },
     );
 
+  /** 동시에 하는 일의 수 (null은 러너가 띄울 때의 값) */
+  const setSlots = ({ runner, device }: Row, concurrency: number | null) =>
+    action.run(
+      runner.id,
+      () =>
+        api('POST', `/api/runners/${runner.id}/concurrency`, {
+          concurrency,
+          version: runner.version,
+        }),
+      {
+        done: `${device.name} 동시에 하는 일: ${concurrency ?? '기본값'}`,
+        reload,
+        conflict: '이미 바뀐 러너예요. 최신 내용을 다시 읽었어요',
+      },
+    );
+
   return (
     <>
       {error && <p className="error">{error}</p>}
@@ -98,6 +117,7 @@ export function RunnerPanel() {
                   .map((a) => a.name)}
                 busy={action.busy === row.runner.id}
                 onFlip={() => flip(row)}
+                onSlots={(n) => setSlots(row, n)}
               />
             </li>
           ))}
@@ -106,6 +126,11 @@ export function RunnerPanel() {
       <p className="note">
         에이전트의 AI 도구에 로그인이 있어야 그 일을 해요 · <Link href="/admin/ai">AI 메뉴</Link>.
         일 받기를 끄면 하던 일은 끝까지 하고 새 일은 받지 않아요
+      </p>
+      <p className="note">
+        동시에 하는 일: 일 하나에 AI 하나가 떠요. 늘리면 대표 · 팀장 · 팀원이 함께 일하지만 서버
+        메모리와 구독 사용량을 더 써요. 기본값은 배포 서버 안 3 · 내 컴퓨터 1이고, 줄여도 하던 일은
+        끝까지 해요
       </p>
     </>
   );
@@ -116,12 +141,15 @@ function RunnerRow({
   pinned,
   busy,
   onFlip,
+  onSlots,
 }: {
   row: Row;
   /** 이 러너에 묶인 에이전트 (그 일은 이 러너만 한다) */
   pinned: readonly string[];
   busy: boolean;
   onFlip: () => void;
+  /** 동시에 하는 일의 수 (null은 기본값) */
+  onSlots: (concurrency: number | null) => void;
 }) {
   const server = device.client === SERVER_RUNNER;
   return (
@@ -158,6 +186,27 @@ function RunnerRow({
         <button type="button" className="ghost" disabled={busy} onClick={onFlip}>
           {runner.accepting ? '일 받기 끄기' : '일 받기 켜기'}
         </button>
+        {runner.sandbox ? (
+          <small className="note">동시에 하는 일 1 (샌드박스는 늘 하나씩)</small>
+        ) : (
+          <div className="field">
+            <label htmlFor={`${runner.id}-slots`}>동시에 하는 일</label>
+            <select
+              id={`${runner.id}-slots`}
+              className="input"
+              value={runner.concurrency ?? ''}
+              disabled={busy}
+              onChange={(e) => onSlots(e.target.value === '' ? null : Number(e.target.value))}
+            >
+              <option value="">기본값 ({server ? 3 : 1})</option>
+              {SLOTS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
     </article>
   );

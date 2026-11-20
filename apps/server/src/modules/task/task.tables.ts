@@ -299,6 +299,7 @@ export interface RunnerRow {
   created_at: Date;
   sandbox: boolean;
   browser: boolean;
+  concurrency: number | null;
 }
 export type RunnerNew = Partial<RunnerRow> & Pick<RunnerRow, 'id' | 'space_id' | 'device_id'>;
 

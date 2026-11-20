@@ -158,7 +158,7 @@ services:
       CAIRN_RUNNER_URL: http://cairn-server:4000
       CAIRN_RUNNER_PAIRING_FILE: /run/cairn-runner/pairing
       CAIRN_RUNNER_LINEAGES_DIR: /tmp/cairn-runner/lineages   # 세션 키 폴더 (CLI 세션 · 실행 중 작업 폴더). 홈(64MB)이 아니라 /tmp(512MB)에
-      CAIRN_RUNNER_CONCURRENCY: ${CAIRN_RUNNER_CONCURRENCY:-3}   # 동시에 하는 일 (1~8). 일마다 AI CLI 하나
+      CAIRN_RUNNER_CONCURRENCY: ${CAIRN_RUNNER_CONCURRENCY:-3}   # 동시에 하는 일의 기본 (1~8). 일마다 AI CLI 하나. 콘솔의 러너 메뉴에서 정하면 그 값이 먼저
     volumes:
       - runner-pairing:/run/cairn-runner:ro
     depends_on:

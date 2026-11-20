@@ -172,6 +172,58 @@ describe('러너 (/api/runners)', () => {
     assert.equal((await runnerOf(device.id))?.browser, true, '쥔 브라우저 작업');
   });
 
+  test('동시에 하는 일 (2026-11-20): 주인이 1~8로 정하면 next_jobs의 답에 실리고, null이면 러너의 기본. 칸은 정하지 못한다', async () => {
+    const device = await newRunner();
+    assert.equal(
+      (await call(device.token, 'next_jobs')).concurrency,
+      null,
+      '정하기 전은 러너의 기본',
+    );
+    const runner = (await runnerOf(device.id)) as Json;
+    assert.equal(runner.concurrency, null);
+    const set = (body: Json) =>
+      api.request('POST', `/api/runners/${runner.id}/concurrency`, owner, body);
+
+    const five = ok(await set({ concurrency: 5, version: runner.version }));
+    assert.equal(five.concurrency, 5);
+    assert.equal(
+      (await call(device.token, 'next_jobs')).concurrency,
+      5,
+      '러너가 다음 빌리기에서 받는다',
+    );
+    assert.equal(
+      (await set({ concurrency: 4, version: runner.version })).status,
+      409,
+      '본 판이 다르면',
+    );
+    assert.equal((await set({ concurrency: 9, version: five.version })).status, 400, '1~8');
+    assert.equal((await set({ concurrency: 0, version: five.version })).status, 400);
+    const reset = ok(await set({ concurrency: null, version: five.version }));
+    assert.equal(reset.concurrency, null);
+    assert.equal((await call(device.token, 'next_jobs')).concurrency, null);
+
+    for (const headers of [{}, writer]) {
+      const denied = await api.request(
+        'POST',
+        `/api/runners/${runner.id}/concurrency`,
+        TestUser.visitor,
+        { concurrency: 2, version: reset.version },
+        headers,
+      );
+      assert.equal(denied.status, 403, denied.text);
+    }
+
+    const slot = await api.codeRunner('9');
+    await call(slot, 'next_jobs');
+    const { runners } = ok(await api.get('/api/runners', owner)) as { runners: Json[] };
+    const sandbox = runners.find((r) => r.sandbox === true) as Json;
+    const refused = await api.request('POST', `/api/runners/${sandbox.id}/concurrency`, owner, {
+      concurrency: 2,
+      version: sandbox.version,
+    });
+    assert.equal(refused.status, 422, refused.text);
+  });
+
   test('없는 러너는 404, 모양이 틀리면 400', async () => {
     const missing = await api.request('POST', `/api/runners/${randomUUID()}/accepting`, owner, {
       accepting: false,

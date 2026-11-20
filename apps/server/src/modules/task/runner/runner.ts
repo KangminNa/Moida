@@ -1,4 +1,4 @@
-import { TableEntity } from '../../platform';
+import { RuleViolation, TableEntity } from '../../platform';
 import type { RunnerNew, RunnerRow } from '../task.tables';
 import { RunnerView } from './runner.view';
 
@@ -11,6 +11,8 @@ export class Runner extends TableEntity<RunnerRow, RunnerNew> {
    * AI 토큰이 없는 동안은 ai_login으로 길게는 60초마다 닿는다
    */
   static readonly ONLINE_MS = 90_000;
+  /** 동시에 하는 일의 상한 (러너의 CAIRN_RUNNER_CONCURRENCY와 같다). 일 하나가 AI CLI 하나다 */
+  static readonly SLOTS_MAX = 8;
 
   static restore(row: RunnerRow): Runner {
     return new Runner(row);
@@ -30,6 +32,19 @@ export class Runner extends TableEntity<RunnerRow, RunnerNew> {
   setAccepting(on: boolean): void {
     if (on === this.row.accepting) return;
     this.put('accepting', on);
+  }
+
+  /**
+   * 동시에 하는 일의 수 (2026-11-20, 러너 메뉴). null이면 러너가 띄울 때의 값(CAIRN_RUNNER_CONCURRENCY)을 쓴다.
+   * 러너는 next_jobs의 답으로 받아 바로 바꾼다. 코드 러너 칸은 늘 1이라 정하지 않는다 (DB CHECK runners_sandbox_single)
+   */
+  setConcurrency(slots: number | null): void {
+    if (slots !== null && (!Number.isInteger(slots) || slots < 1 || slots > Runner.SLOTS_MAX))
+      throw new RuleViolation(`동시에 하는 일은 1~${Runner.SLOTS_MAX}개예요`);
+    if (slots !== null && this.row.sandbox)
+      throw new RuleViolation('코드 러너 칸은 늘 하나씩 해요');
+    if (slots === this.row.concurrency) return;
+    this.put('concurrency', slots);
   }
 
   /** 바꾼 러너 하나. 지금 하는 일은 목록에서만 (null) */

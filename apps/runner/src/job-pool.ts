@@ -6,7 +6,26 @@ export class JobPool {
   private readonly running = new Set<Promise<void>>();
   private readonly browsing = new Set<Promise<void>>();
 
-  constructor(readonly size: number) {}
+  constructor(private slots: number) {}
+
+  /** 동시에 하는 일의 수 */
+  get size(): number {
+    return this.slots;
+  }
+
+  /**
+   * 자리 수를 바꾼다 (관리자가 러너 메뉴에서 정한 값, next_jobs의 concurrency, 2026-11-20). 바뀌었으면 true.
+   * 줄여도 도는 일은 끝까지 가고, 그만큼 다음 빌리기가 줄어든다
+   */
+  resize(slots: number): boolean {
+    const next = Math.min(Math.max(Math.trunc(slots), 1), JobPool.SLOTS_MAX);
+    if (next === this.slots) return false;
+    this.slots = next;
+    return true;
+  }
+
+  /** 자리 수의 상한 (CAIRN_RUNNER_CONCURRENCY와 같다) */
+  private static readonly SLOTS_MAX = 8;
 
   /** 지금 더 빌릴 수 있는 일의 수 */
   get free(): number {

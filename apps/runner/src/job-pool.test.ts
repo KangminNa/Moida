@@ -63,4 +63,21 @@ describe('러너의 자리', () => {
     plain.finish();
     await pool.drain();
   });
+  test('자리 수를 바꾼다 (러너 메뉴의 값, 2026-11-20): 1~8로 맞추고, 줄여도 도는 일은 그대로', async () => {
+    const pool = new JobPool(3);
+    const [a, b] = [work(), work()];
+    pool.add(a.promise);
+    pool.add(b.promise);
+    assert.equal(pool.resize(3), false, '같으면 그대로');
+    assert.equal(pool.resize(1), true);
+    assert.equal(pool.free, 0, '도는 일 둘은 그대로, 새로 빌리지 않는다');
+    assert.equal(pool.resize(20), true);
+    assert.equal(pool.size, 8, '상한 8');
+    assert.equal(pool.free, 6);
+    pool.resize(0);
+    assert.equal(pool.size, 1, '하한 1');
+    a.finish();
+    b.finish();
+    await pool.drain();
+  });
 });
