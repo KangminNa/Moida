@@ -446,6 +446,24 @@ describe('지시문', () => {
     assert.equal(fixed.includes('set_deliver로 이번 회차의'), false);
   });
 
+  test('덧붙인 말의 답 (병렬, 2026-11-20): 새 일이면 기다리지 않고 바로 맡기고, 받을 것은 정하지 않는다', () => {
+    const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
+    const reply = job({
+      agent: lead,
+      task: {
+        id: 't',
+        title: '대화 · 일정표도',
+        payload: { chat: { chatId: 'chat-3', turn: 1, history: [], reply: true, appId: 'app-1' } },
+      },
+    }).prompt(REPO_PROMPTS, false);
+    assert.ok(reply.includes('# 덧붙인 말에 답하는 법'));
+    assert.ok(reply.includes('지금 일이 끝나기를 기다리지 않습니다'));
+    assert.equal(reply.includes('새로 나눠 맡기거나 큰 일을 하지 않습니다'), false);
+    assert.equal(reply.includes('set_deliver로 이번 회차의'), false, 'set_deliver는 회차만');
+    assert.ok(reply.includes('받을 것(set_deliver)은 회차의 것이라 정하지 않습니다'));
+    assert.ok(reply.includes('이 대화는 앱 하나의 일입니다 (app_id: app-1)'), '앱의 팀에 맡긴다');
+  });
+
   test('대표의 앱 일 (스토어 2단계): 앱의 일은 운영 팀장에게, 앱으로 연 대화면 그 앱 하나만', () => {
     const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
     const turn = (chat: object) =>

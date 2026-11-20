@@ -427,7 +427,7 @@ describe('대화의 앱 (스토어 2단계)', () => {
     assert.equal((await api.get('/api/chats?app=nope', owner)).status, 400);
   });
 
-  test('다음 회차도 앱을 싣고, 덧붙인 말의 답에는 싣지 않는다 (대표의 회차만 앱을 본다)', async () => {
+  test('다음 회차도 앱을 싣고, 덧붙인 말의 답에도 싣는다 (새 일이면 답에서 그 앱의 팀에 맡긴다, 2026-11-20)', async () => {
     const app = await newApp();
     const made = ok(await openIn(app.id, '첫 글'), 201);
     const first = await take();
@@ -436,7 +436,7 @@ describe('대화의 앱 (스토어 2단계)', () => {
       (j) => j.task.payload?.chat?.chatId === made.id && j.task.payload.chat.reply,
     ) as Json;
     assert.ok(reply, '도는 회차에 덧붙인 말은 답하는 작업이 된다');
-    assert.equal('appId' in reply.task.payload.chat, false);
+    assert.equal(reply.task.payload.chat.appId, app.id);
     await tool(runner, 'submit_result', {
       task_id: first.task.id,
       request_id: randomUUID(),
@@ -447,6 +447,35 @@ describe('대화의 앱 (스토어 2단계)', () => {
     ok(await send(now, '하나 더'), 201);
     const second = (await detail(made.id)).turns.at(-1);
     assert.equal((await task(second.taskId)).payload.chat.appId, app.id);
+  });
+
+  test('도는 회차 옆에서 덧붙인 말의 답이 새 일을 팀원에게 바로 맡기고, 두 일이 함께 돈다 (병렬, 2026-11-20)', async () => {
+    const member = await agent('병렬 팀원');
+    const made = ok(await open('시장 조사 보고서'), 201);
+    const first = await take();
+    ok(await send(made, '그리고 이번 주 일정표도 따로 만들어 줘'), 201);
+    const reply = (await jobs()).find(
+      (j) => j.task.payload?.chat?.chatId === made.id && j.task.payload.chat.reply,
+    ) as Json;
+    assert.ok(reply, '도는 회차에 덧붙인 말은 답하는 작업이 된다');
+    await tool(reply.run_token, 'delegate_task', {
+      subtasks: [
+        {
+          request_id: randomUUID(),
+          to_agent_id: member.id,
+          title: '일정표 만들기',
+          instruction: '이번 주 일정표',
+        },
+      ],
+    });
+    const side = (await jobs()).find((j) => j.task.title === '일정표 만들기') as Json;
+    assert.ok(side, '새 일은 회차를 기다리지 않고 바로 빌려 간다');
+    assert.equal((await task(first.task.id)).status, 'running', '회차는 하던 일을 계속한다');
+    const { team } = await detail(made.id);
+    assert.ok(
+      (team as Json[]).some((t) => t.taskId === side.task.id),
+      '대화의 팀 칸에 함께 보인다',
+    );
   });
 
   test('없는 앱 · 모양이 틀린 앱은 대화를 열지 않는다 (404 · 400)', async () => {

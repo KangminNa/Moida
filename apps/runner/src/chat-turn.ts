@@ -16,8 +16,8 @@ export class ChatTurn {
     readonly turn: number,
     /** [말한 쪽, 글] (오래된 것부터, 서버가 최근 것만 잘라 보낸다) */
     private readonly lines: readonly (readonly [string, string])[],
-    /** 팀이 일하는 도중에 덧붙인 말에 짧게 답하는 일인가 (payload.chat.reply) */
-    private readonly reply = false,
+    /** 팀이 일하는 도중에 덧붙인 말에 답하는 일인가 (payload.chat.reply). 새 일이면 이 일에서 바로 팀에 맡긴다 (병렬) */
+    readonly reply = false,
     /** 이 회차에 덧붙인 말 (next_jobs의 chat_updates.appended) */
     private readonly appended: readonly string[] = [],
     /** 팀원이 남긴 소식 [종류, 팀원, 글] (chat_updates.team, 오래된 것부터) */

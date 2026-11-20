@@ -259,8 +259,9 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   }
 
   /**
-   * 끝나지 않은 회차(current)에 덧붙인다: 소식 한 줄, 그리고 회차가 이미 돌고 있으면 대표가 짧게 답하는 작업 하나를 돌려준다
+   * 끝나지 않은 회차(current)에 덧붙인다: 소식 한 줄, 그리고 회차가 이미 돌고 있으면 대표가 답하는 작업 하나를 돌려준다
    * (대기열의 회차는 빌릴 때 덧붙인 말을 함께 받으니 따로 답하지 않는다). 회차는 그대로 두어 팀은 하던 일을 계속한다.
+   * 덧붙인 말이 새 일이면 대표는 그 답 작업에서 바로 팀에 맡긴다 (병렬, 2026-11-20): 그래서 대화의 앱도 싣는다
    * appended: 이 회차에 이미 덧붙인 수 (회차마다 APPEND_MAX개)
    */
   appendTo(
@@ -297,6 +298,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
             turn,
             reply: true,
             requestId,
+            ...(this.row.app_id ? { appId: this.row.app_id } : {}),
             history: ChatHistory.of(previous),
             ...(deviceId === null ? {} : { via: 'device', device: deviceId }),
           },
