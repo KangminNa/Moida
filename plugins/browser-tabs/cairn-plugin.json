@@ -1,6 +1,6 @@
 {
   "name": "browser-tabs",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "cairn": ">=0.7",
   "description": "서버 브라우저로 하는 일: 주소를 탭으로 읽고, 등록한 사이트(로그인된 프로필)나 둘러보기(새 빈 창)에서 AI 에이전트가 일하고, 마지막 버튼은 결재 뒤 러너가 같은 버튼인지 확인하고 누른다. 콘솔에서 화면을 보고 누르고 사이트 세션을 지운다. 되풀이하는 일은 사이트 도구(Playwright 코드)로 굳혀 에이전트가 AI 없이 부른다 (쓰기 도구는 검토자 짝 · 부를 때마다 결재)",
   "settings": {
@@ -9,6 +9,12 @@
       "type": "boolean",
       "default": "true",
       "help": "연속으로 실패해 고장 난 도구를 하루 한 번 처음 굳힌 에이전트에게 다시 굳히게 해요. 고친 버전은 켜기 승인으로 켜요"
+    },
+    "autoApiTools": {
+      "label": "사이트 일에서 API 도구 저절로 만들기",
+      "type": "boolean",
+      "default": "true",
+      "help": "브라우저로 일할 때 기록한 사이트의 API로, 화면 대신 API를 부르는 읽기 도구를 사이트마다 한 번 저절로 만들어요. 시험을 통과하면 바로 켜지고 다음부터는 브라우저 대신 그 도구로 일해요"
     }
   },
   "schema": "browser_tabs",
@@ -238,6 +244,70 @@
           }
         },
         "required": ["site_id", "outcome"]
+      }
+    },
+    "browser_requests_save": {
+      "operation": "saveRequests",
+      "description": "사이트 일에서 러너가 기록한 그 사이트의 API 요청 모양(방법 · 출처 · 경로 틀 · 쿼리 이름 · 본문 · 답의 모양, 값 없음)을 사이트에 남긴다. 사이트의 허용 출처로 간 것만, 같은 모양은 횟수를 올린다. 사이트에 처음 읽을 만한 API(GET · JSON 답)가 생기면 그 기록으로 화면 대신 API를 부르는 읽기 사이트 도구를 저절로 굳히기 시작한다 (설정 autoApiTools, 답의 building). 그 작업의 임대를 쥔 러너만, 사이트 일만.",
+      "input": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "빌린 browse 작업 id"
+          },
+          "requests": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "maxLength": 7
+                },
+                "origin": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "description": "경로의 틀 (숫자 · id 조각은 {n} · {id})"
+                },
+                "query": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                },
+                "body": {
+                  "type": "string",
+                  "maxLength": 4000,
+                  "description": "요청 본문의 모양 (JSON 글자)"
+                },
+                "status": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 999
+                },
+                "content_type": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "response": {
+                  "type": "string",
+                  "maxLength": 4000,
+                  "description": "JSON 답의 모양 (JSON 글자)"
+                }
+              },
+              "required": ["method", "origin", "path"]
+            }
+          }
+        },
+        "required": ["task_id", "requests"]
       }
     },
     "browser_click_hold": {
@@ -574,6 +644,7 @@
     "tool:browser_login_needed",
     "tool:browser_login_next",
     "tool:browser_login_save",
+    "tool:browser_requests_save",
     "tool:browser_click_hold",
     "tool:browser_click_next",
     "tool:browser_click_save",

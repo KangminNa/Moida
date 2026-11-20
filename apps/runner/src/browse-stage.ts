@@ -14,6 +14,7 @@ import { IntegrationExec } from './integration-exec';
 import type { Job } from './job';
 import type { LoginFormRef } from './login-form-ref';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
+import { NetworkTap } from './network-tap';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
@@ -49,6 +50,8 @@ export class BrowseStage implements SandboxStage {
   private free: (() => void) | null = null;
   /** AI가 뜨기 전에 열려 있던 탭: AI가 새로 연 탭을 먼저 본다 */
   private before = new Set<string>();
+  /** 요청 기록 (B2): 사이트 일 동안 그 사이트로 가는 API 요청의 모양 */
+  private tap: NetworkTap | null = null;
   private approval: AskedApproval | null = null;
   private readonly login: BrowseLogin;
 
@@ -99,7 +102,11 @@ export class BrowseStage implements SandboxStage {
     try {
       const tabs = await this.pages.tabs(signal);
       this.before = new Set(tabs.map((t) => t.id));
-      if (!this.plan.loginNeeded) return null;
+      if (!this.plan.loginNeeded) {
+        this.tap = new NetworkTap(this.pages, site.origins);
+        this.tap.start();
+        return null;
+      }
       // 로그인이 풀려 있다고 적혀 있다: AI를 띄우지 않고 로그인 결재를 바로 올린다 (관리자가 로그인할 탭을 열어 둔다)
       const tab = await this.login.tab(site.startUrl, site.origins, signal);
       const url = tab.url || site.startUrl;
@@ -146,6 +153,7 @@ export class BrowseStage implements SandboxStage {
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
     if (this.dir)
       await new StepShots(this.server, this.job.taskId).ship(join(this.dir, 'steps'), signal, note);
+    await this.shipRequests(note);
     // 사이트 도구 굳히기: 남긴 파일로 시험을 돌려 채점받는다. 통과하면 읽기 도구는 서버가 바로 켜고, 그 밖은 켜기 결재 (SiteBuild)
     if (this.plan?.build && this.plan.site) {
       const exec = new IntegrationExec(this.config.browserUrl ?? '');
@@ -252,11 +260,29 @@ export class BrowseStage implements SandboxStage {
   }
 
   async close(): Promise<void> {
+    this.tap?.stop();
+    this.tap = null;
     this.free?.();
     this.free = null;
     await this.proxy?.close();
     this.proxy = null;
     if (this.dir) await rm(this.dir, { recursive: true, force: true });
+  }
+
+  /** 모은 요청 모양을 사이트에 남긴다 (서버가 API 사이트 도구를 만든다, B3). 남기지 못해도 일은 그대로 */
+  private async shipRequests(note: Note): Promise<void> {
+    const calls = this.tap?.stop() ?? [];
+    this.tap = null;
+    if (calls.length === 0) return;
+    try {
+      const saved = await this.server.siteTools.saveRequests(this.job.taskId, calls);
+      const made = saved.building ? ' · API로 하는 사이트 도구를 만들어요' : '';
+      note(new RunEvent(RunEvent.READ, `사이트의 API ${calls.length}개를 기록했어요${made}`, 0));
+    } catch (error) {
+      note(
+        new RunEvent(RunEvent.ERROR, `API 기록을 남기지 못했어요: ${(error as Error).message}`, 0),
+      );
+    }
   }
 
   /** 로그인 화면을 남기고 로그인 결재를 준비한다 (BrowseLogin). 남기지 못하면 실패로 끝낼 그 끝 */

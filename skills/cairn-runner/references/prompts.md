@@ -136,7 +136,8 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 1. playwright MCP로 사이트를 둘러보며 읽을 화면과 요소를 찾습니다. 로케이터는 browser_generate_locator로 역할 · 이름 · 레이블에 기대는 것을 고릅니다 (순서 · 클래스에 기대지 않습니다).
 2. 작업 폴더의 site-tool/ 에 세 파일을 씁니다:
    - tool.json: {"input_schema": {…}, "output_schema": {…}}. 맨 위는 "type": "object"입니다. 쓰는 낱말은 type · properties · required · items · enum · maxLength · maxItems · description · additionalProperties(false)뿐입니다.
-   - code.js: 함수의 본문만 씁니다. page(새 탭) · input(입력) · site({ origin, start_url, loginNeeded(까닭) })를 받고 output_schema 모양의 객체를 return 합니다. 보통 await page.goto(…)로 시작합니다.
+   - code.js: 함수의 본문만 씁니다. page(새 탭) · input(입력) · site({ origin, start_url, loginNeeded(까닭), api(경로, { query }) })를 받고 output_schema 모양의 객체를 return 합니다. 보통 await page.goto(…)로 시작합니다.
+   - 사이트의 API로 되는 일이면 화면 대신 `await site.api('/경로', { query: { … } })`를 씁니다 (GET만, 허용 출처 안, 로그인된 브라우저의 쿠키로). 답은 { status, ok, json, text }입니다. 화면을 읽는 것보다 빠르고 덜 깨집니다. API로 안 되는 것만 page로 읽습니다.
    - tests.json: [{"name": "…", "input": {…}}] 3~10개. 서로 다른 입력으로, 실제로 답이 있는 값을 고릅니다.
 3. 읽기만 합니다: 제출 · 저장 · 전송 · 삭제 버튼을 누르지 않고, 허용 출처 밖으로 가지 않습니다. 로그인 화면이면 site.loginNeeded('까닭')를 부릅니다.
    러너의 규칙 검사가 막는 것: require · import · process · fetch · eval · Function · constructor · context · browser · newPage · request · route · popup · cookies · download 같은 이름, 글자로 칸에 닿기(obj['…']), \u · \x 이스케이프, 비밀값처럼 생긴 글자.
@@ -150,6 +151,12 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 - 시험은 마른 실행입니다: 러너가 commit 앞에서 멈추고 버튼이 하나 · 보임 · 누를 수 있음인지만 봅니다. 답(output)은 채점하지 않습니다.
 - 시험을 통과하면 검토자 짝이 코드를 읽고 판정합니다. 부를 때마다 승인을 받아 한 번만 실행됩니다.
 {{/write}}
+{{#apis}}
+
+## 이 사이트에서 기록한 API (값은 지웠고 모양만)
+브라우저로 일할 때 오간 요청입니다. 할 일에 맞는 GET이 있으면 site.api로 그것을 부르는 코드를 씁니다. 쿼리 · 본문의 값은 input에서 채웁니다.
+{{apis}}
+{{/apis}}
 {{#last}}
 
 ## 앞 버전 (이것을 고칩니다)

@@ -1,4 +1,10 @@
-import type { IntegrationRevisionRow, IntegrationRow, RunRow, SiteRow } from './tables';
+import type {
+  EndpointRow,
+  IntegrationRevisionRow,
+  IntegrationRow,
+  RunRow,
+  SiteRow,
+} from './tables';
 
 // 사이트 도구(2026-11-16 MCP 2단계)가 내보내는 모양. 콘솔(관리자)은 camelCase, 에이전트 · 러너(MCP)는 snake_case.
 // 코드와 시험은 콘솔의 상세와 러너(실행 · 굳히기)에만 싣는다. 에이전트는 이름 · 설명 · 입출력 형식만 본다
@@ -230,6 +236,8 @@ export class BuildPartView {
     private readonly row: Readonly<IntegrationRow>,
     private readonly last: Readonly<IntegrationRevisionRow> | null,
     private readonly errors: readonly string[],
+    /** 그 사이트에서 기록한 API의 모양 (B3, 화면 대신 site.api로 부를 재료) */
+    private readonly apis: readonly Readonly<EndpointRow>[] = [],
   ) {}
 
   toJSON() {
@@ -252,6 +260,27 @@ export class BuildPartView {
           }
         : null,
       recent_errors: this.errors,
+      endpoints: this.apis.map((e) => ({
+        method: e.method,
+        url: `${e.origin}${e.path}`,
+        query: e.query,
+        body: e.body,
+        status: e.status,
+        response: e.response,
+        seen: e.seen,
+      })),
     };
+  }
+}
+
+/** browser_requests_save의 답: 남긴 수, API 도구를 굳히기 시작했는지 */
+export class RequestsSavedView {
+  constructor(
+    private readonly saved: number,
+    private readonly building: boolean,
+  ) {}
+
+  toJSON() {
+    return { saved: this.saved, building: this.building };
   }
 }

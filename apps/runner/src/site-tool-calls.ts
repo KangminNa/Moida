@@ -1,3 +1,4 @@
+import type { ApiCall } from './api-shape';
 import type { ExecOutcome, ExecSite } from './integration-exec';
 import type { Json } from './json';
 import type { McpClient } from './mcp-client';
@@ -61,6 +62,34 @@ export class SiteToolCalls {
         origins: site.texts('origins').filter((o) => SiteToolCalls.ORIGIN.test(o)),
       },
     };
+  }
+
+  /**
+   * 사이트 일에서 기록한 API 요청의 모양을 남긴다 (B2, browser-tabs 0.8). 서버가 API 사이트 도구를 만들기 시작했으면 building.
+   * 그 작업의 임대를 쥔 러너만
+   */
+  async saveRequests(taskId: string, calls: readonly ApiCall[]): Promise<{ building: boolean }> {
+    const body = await this.mcp.call('browser_requests_save', {
+      task_id: taskId,
+      requests: calls.map((c) => ({
+        method: c.method,
+        origin: c.origin,
+        path: c.path,
+        query: c.query,
+        ...SiteToolCalls.shape('body', c.body),
+        status: c.status,
+        content_type: c.contentType,
+        ...SiteToolCalls.shape('response', c.response),
+      })),
+    });
+    return { building: body.flag('building') };
+  }
+
+  /** 모양 칸: JSON 글자 4,000자까지 (넘으면 빼고 보낸다: 자르면 JSON이 아니다) */
+  private static shape(name: string, shape: unknown): Record<string, string> {
+    if (shape === null) return {};
+    const text = JSON.stringify(shape);
+    return text.length <= 4_000 ? { [name]: text } : {};
   }
 
   async saveRun(id: string, outcome: ExecOutcome): Promise<void> {
