@@ -24,6 +24,8 @@ export class TeamReview {
   private static readonly DAY_MS = 86_400_000;
   private static readonly OPEN: readonly string[] = ['queued', 'running', 'waiting'];
   private static readonly ROLE_TEXT = 120;
+  /** 지시문에 싣는 팀원 수 (일이 많은 순). 넘으면 지시문이 작업 지시의 한도(20,000자)를 넘는다 */
+  static readonly MEMBERS_MAX = 30;
 
   /** 그동안의 일을 세기 시작하는 때: 지난 점검과 GAP_DAYS일 전 가운데 늦은 쪽 */
   static since(last: Pick<TaskRow, 'created_at'> | null, now: Date): Date {
@@ -52,14 +54,25 @@ export class TeamReview {
     return `${TeamReview.PREFIX}${spaceId}:${now.toISOString().slice(0, 10)}`;
   }
 
-  /** 지시문 틀 team-review의 자리: 팀원마다 두 줄 (누구 · 성적표). scores는 AgentRepository.scores */
+  /** 지시문 틀 team-review의 자리: 팀원마다 두 줄 (누구 · 성적표), 일이 많은 순으로 MEMBERS_MAX명. scores는 AgentRepository.scores */
   static fields(
     rows: readonly TeamReviewRow[],
     scores: readonly AgentScoreRow[],
     days: number,
   ): Record<string, string | number> {
     const byAgent = new Map(scores.map((s) => [s.agent_id, s]));
-    const lines = rows.map((r) => TeamReview.line(r, byAgent.get(r.id) ?? null));
+    const busy = (r: TeamReviewRow) => {
+      const s = byAgent.get(r.id);
+      return [s?.done ?? 0, s?.judged ?? 0, r.open];
+    };
+    const ranked = [...rows].sort((x, y) => {
+      const [a, b] = [busy(x), busy(y)];
+      return (b[0] ?? 0) - (a[0] ?? 0) || (b[1] ?? 0) - (a[1] ?? 0) || (b[2] ?? 0) - (a[2] ?? 0);
+    });
+    const shown = ranked.slice(0, TeamReview.MEMBERS_MAX);
+    const lines = shown.map((r) => TeamReview.line(r, byAgent.get(r.id) ?? null));
+    const rest = rows.length - shown.length;
+    if (rest > 0) lines.push(`- 그 밖에 ${rest}명 (일이 적어 뺐다. 모두 보려면 get_settings team)`);
     return { days, members: lines.join('\n') || '- 없음' };
   }
 

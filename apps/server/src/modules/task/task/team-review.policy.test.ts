@@ -63,5 +63,15 @@ describe('TeamReview', () => {
       ].join('\n'),
     );
     assert.equal(TeamReview.fields([], [], 30).members, '- 없음');
+
+    // 팀원이 많으면 일이 많은 순으로 MEMBERS_MAX명만 싣고 나머지는 수만 (지시문 한도 20,000자)
+    const many = Array.from({ length: TeamReview.MEMBERS_MAX + 5 }, (_, i) =>
+      row({ id: `m${i}`, name: `팀원${i}`, open: 0 }),
+    );
+    const busiest = { ...score, agent_id: `m${many.length - 1}`, done: 40 };
+    const crowd = String(TeamReview.fields(many, [busiest], 30).members);
+    assert.match(crowd, new RegExp(`^- 팀원${many.length - 1} `), '일이 가장 많은 팀원이 먼저');
+    assert.equal(crowd.match(/^- 팀원/gm)?.length, TeamReview.MEMBERS_MAX);
+    assert.match(crowd, /\n- 그 밖에 5명 \(일이 적어 뺐다/);
   });
 });
