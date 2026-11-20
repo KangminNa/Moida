@@ -880,6 +880,7 @@ describe('작업 토큰', () => {
       'report_round',
       'post_update',
       'set_deliver',
+      'ask_brief',
       'propose_tool',
       'get_settings',
       'propose_setting',
@@ -890,6 +891,7 @@ describe('작업 토큰', () => {
     await newTask(await newAgent({ scopes: ['upload'] }));
     const uploader = await take();
     assert.deepEqual((await toolNames(uploader.run_token)).sort(), [
+      'ask_brief',
       'ask_help',
       'check_session',
       'delegate_task',

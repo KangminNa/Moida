@@ -11,9 +11,10 @@ import {
 import { AgentRepository } from '../agent/agent.repository';
 import { TaskRepository } from '../task/task.repository';
 import { ChatRepository } from './chat.repository';
-import type { PostUpdateInput, SetDeliverInput } from './chat-update.input';
+import type { AskBriefInput, PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
-import { DeliverSetView } from './chat-update.view';
+import { BriefAskedView, DeliverSetView } from './chat-update.view';
+import { TurnBrief } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화의 소식 쓰기 (task.chat_updates, 2차 1-1). 소식은 대화 엔티티를 거쳐 쌓이고(Chat.note) 변경 신호로 agent_updates를 깨운다.
@@ -79,6 +80,36 @@ export class ChatUpdateService extends BaseService {
       task.declare((p) => TurnDeliver.declare(p, req.deliver, req.note, chat.deliver));
       await tasks.save(task);
       return new DeliverSetView(chat.deliver ?? req.deliver, chat.deliver !== null);
+    });
+  }
+
+  /**
+   * 목표 확인 질문 (2026-11-20, MCP ask_brief, 작업 토큰): 대표가 맡은 대화 회차에서 핵심을 묻고 소식(question)을 남긴다.
+   * 물을 수 있는 회차인지는 TurnBrief (바로 앞 회차가 물었으면 이 회차는 그 답이라 묻지 않는다). 잠그는 순서는 작업 → (대화는 쓰기만)
+   */
+  async askBrief(actor: Actor, req: AskBriefInput): Promise<BriefAskedView> {
+    actor.assertCan(Actor.AGENT);
+    if (!(actor instanceof AgentActor) || !actor.spaceId || !actor.id)
+      throw new Forbidden(Actor.AGENT);
+    const { spaceId, id: agentId, taskId } = actor;
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const task = await tasks.lockById(taskId);
+      const lead = await new AgentRepository(tx).findLead(spaceId);
+      if (task?.spaceId !== spaceId || task.agentId !== agentId || lead?.id !== agentId)
+        throw new Forbidden(Actor.AGENT, '대화 회차를 맡은 대표만 물어요');
+      if (!task.open) throw new Conflict('끝난 회차예요');
+      const chats = new ChatRepository(tx);
+      const place = await chats.placeOf(taskId);
+      if (!place) throw new Forbidden(Actor.AGENT, '대화 회차를 맡은 대표만 물어요');
+      const previous = await chats.previousTurnPayload(spaceId, place.chat_id, taskId);
+      task.declare((p) => TurnBrief.declare(p, req.brief, TurnBrief.asked(previous)));
+      await tasks.save(task);
+      const chat = await chats.load(spaceId, place.chat_id);
+      chat.note('question', TurnBrief.news(req.brief), taskId, agentId, now);
+      await chats.save(chat);
+      return new BriefAskedView(req.brief.questions.length);
     });
   }
 }

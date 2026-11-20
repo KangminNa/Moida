@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { AgentRole } from '../agent/agent-role.policy';
 import { TeamReview, type TeamReviewRow } from './team-review.policy';
 
 // 주간 팀 점검 (2026-11-20): 7일 간격 · 끝난 일 10개 · 열린 점검이 없을 때, 팀원마다 두 줄(누구 · 성적표)
@@ -58,8 +59,10 @@ describe('TeamReview', () => {
       [
         '- 작가 (agent_id: a1) · 초안을 쓴다 · AI 도구 claude · 모델 sonnet · 보고: 편집장',
         '  끝낸 일 9 · 쥔 일 1 · 첫 판정 통과 2/5 · 평균 고친 횟수 1.4 · 관리자 반려 · 고쳐 달라 1/4 · 일 하나에 토큰 3000',
+        `  역할 설명에 빠진 것: ${AgentRole.SECTIONS.join(' · ')}`,
         '- 조사 (agent_id: a2) · 초안을 쓴다 · AI 도구 claude · 보고: 관리자 · 멈춤',
         '  끝낸 일 0 · 쥔 일 1 · 판정 없음',
+        `  역할 설명에 빠진 것: ${AgentRole.SECTIONS.join(' · ')}`,
       ].join('\n'),
     );
     assert.equal(TeamReview.fields([], [], 30).members, '- 없음');

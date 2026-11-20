@@ -1,3 +1,4 @@
+import { AgentRole } from '../agent/agent-role.policy';
 import type { AgentRow, TaskRow } from '../task.tables';
 import type { AgentScoreRow } from '../usage/usage.view';
 
@@ -93,6 +94,9 @@ export class TeamReview {
       s && s.decided > 0 ? `관리자 반려 · 고쳐 달라 ${s.sent_back}/${s.decided}` : null,
       s?.tokens_per_done != null ? `일 하나에 토큰 ${s.tokens_per_done}` : null,
     ].filter(Boolean);
-    return `- ${head.join(' · ')}\n  ${score.join(' · ')}`;
+    // 역할 설명이 표준 형식(AgentRole)이 아니면 빠진 것을 실어 대표가 다듬기를 제안하게 한다
+    const gaps = AgentRole.missing(r.role);
+    const fix = gaps.length > 0 ? `\n  역할 설명에 빠진 것: ${gaps.join(' · ')}` : '';
+    return `- ${head.join(' · ')}\n  ${score.join(' · ')}${fix}`;
   }
 }

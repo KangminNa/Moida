@@ -80,6 +80,17 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
     return row ?? null;
   }
 
+  /** 이 회차 작업의 바로 앞 회차의 payload (목표 확인 질문을 했는가, TurnBrief). 첫 회차 · 앞 회차가 없으면 null */
+  async previousTurnPayload(spaceId: string, chatId: string, taskId: string): Promise<unknown> {
+    const [row] = await this.sql<Pick<TaskRow, 'payload'>[]>`
+      SELECT prev.payload FROM task.tasks cur
+      JOIN task.tasks prev ON prev.space_id = cur.space_id
+        AND prev.request_id = ${ChatRequest.TURN_PREFIX} || ${chatId} || ':'
+          || ((cur.payload->'chat'->>'turn')::int - 1)::text
+      WHERE cur.id = ${taskId} AND cur.space_id = ${spaceId}`;
+    return row?.payload ?? null;
+  }
+
   /**
    * 대화의 일이 아직 도는가 (결과 카드 전, 2차 2단계): 대화의 맨 위 작업들(회차 · 덧붙인 말의 답 · 검토)과 그 아래에서
    * 대기 · 실행 중이거나, 카드에 싣지 않는 결재(바로 알리는 동작)를 기다리는 작업이 있으면 돈다.

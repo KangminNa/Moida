@@ -1,5 +1,6 @@
 import { BaseRequest, RuleViolation } from '../../platform';
 import { ChatUpdates } from './chat-update.policy';
+import { TurnBrief, type TurnBriefRow } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
 // 대화의 소식 도구 입력의 모양 (docs/API설계.md 4장). 뜻(대화의 일인지, 한도)은 Chat · Service가 본다.
@@ -81,5 +82,32 @@ export class SetDeliverInput extends BaseRequest {
           f.optionalText('note', TurnDeliver.NOTE_MAX) ?? null,
         ),
     );
+  }
+}
+
+/**
+ * MCP ask_brief { summary, questions: [{ text, why, choices?, suggested }] } (2026-11-20 목표 확인, 작업 토큰):
+ * 대표가 결과물 일을 맡기 전에 핵심을 묻는다. 물을 수 있는 회차인지는 TurnBrief가 본다
+ */
+export class AskBriefInput extends BaseRequest {
+  private constructor(readonly brief: TurnBriefRow) {
+    super();
+  }
+
+  static from(raw: unknown): AskBriefInput {
+    return BaseRequest.read(raw, (f) => {
+      const questions = f.nestedList('questions', TurnBrief.QUESTIONS_MAX).map((q) => ({
+        text: q.text('text', TurnBrief.TEXT_MAX).trim(),
+        why: q.optionalText('why', TurnBrief.TEXT_MAX)?.trim() ?? '',
+        choices: (q.optionalTextList('choices', TurnBrief.CHOICES_MAX, TurnBrief.CHOICE_MAX) ?? [])
+          .map((c) => c.trim())
+          .filter(Boolean),
+        suggested: q.text('suggested', TurnBrief.TEXT_MAX).trim(),
+      }));
+      return new AskBriefInput({
+        summary: f.text('summary', TurnBrief.SUMMARY_MAX).trim(),
+        questions,
+      });
+    });
   }
 }
