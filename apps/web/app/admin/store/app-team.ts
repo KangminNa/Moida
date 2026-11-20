@@ -42,5 +42,5 @@ export function leaderLabel(
   return runs.length > 0 ? `${agent.name} · ${runs.join(', ')} 운영` : agent.name;
 }
 
-/** 앱 운영 팀 템플릿의 키 (서버 writing-teams.ts) */
+/** 앱 운영 팀 템플릿의 키 (서버 agent/teams/app.json) */
 export const APP_TEAM_TEMPLATE = 'app';

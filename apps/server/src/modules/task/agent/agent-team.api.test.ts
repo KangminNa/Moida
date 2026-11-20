@@ -54,6 +54,7 @@ describe('에이전트 팀 템플릿', () => {
     assert.deepEqual(
       teams.map((t) => t.key),
       [
+        'base',
         'contest',
         'briefing',
         'planning',
@@ -66,7 +67,20 @@ describe('에이전트 팀 템플릿', () => {
         'app',
       ],
     );
-    const contest = teams[0] as { needs: string[]; members: Json[] };
+    // 기본 팀 (2026-11-20 ECC형 에이전트 정의): 대표 바로 아래 전문가 여섯
+    const base = teams[0] as { needs: string[]; members: Json[] };
+    assert.deepEqual(
+      base.members.map((m) => [m.name, m.reportsTo]),
+      [
+        ['기획자', null],
+        ['리서처', null],
+        ['초안 작가', null],
+        ['제작자', null],
+        ['검토자', null],
+        ['브라우저 담당', null],
+      ],
+    );
+    const contest = teams[1] as { needs: string[]; members: Json[] };
     assert.deepEqual(contest.needs, ['code-runner', 'browser']);
     assert.deepEqual(
       contest.members.map((m) => [m.name, m.reportsTo]),
