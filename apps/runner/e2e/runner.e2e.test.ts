@@ -2184,7 +2184,8 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
         const t = await getTask(task.id);
         return events(t).some((e) => String(e.body).includes('브라우저에 닿지 못해요')) ? t : null;
       });
-      assert.equal(back.status, 'queued');
+      // 돌려준 뒤 러너가 곧바로 다시 빌릴 수 있어 대기 · 실행 중 어느 쪽이든 된다. 실패로 끝나지 않으면 된다
+      assert.ok(['queued', 'running'].includes(String(back.status)), String(back.status));
       assert.equal(existsSync(spy.path), false, 'AI CLI는 뜨지 않았다');
     } finally {
       await cancelTask(task);
