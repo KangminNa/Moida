@@ -23,13 +23,16 @@ export class AppScreenQuery extends BaseQuery {
   static readonly ISSUE = 'issue';
   /** 커뮤니티 글 하나 (t/<글>, 스토어 3-2). 글은 community에 있어 웹이 회원 API로 채운다 */
   static readonly TOPIC = 'topic';
+  /** 페이지 앱의 다른 화면 (/<앱>/<이름> → <이름>.html, 페이지 앱 P1 2026-11-20) */
+  static readonly VIEW = 'view';
+  private static readonly VIEW_NAME = /^(?!index$|404$)[a-z0-9][a-z0-9-]{0,59}$/;
   static readonly MISSING = 'missing';
   private static readonly PAGE = 20;
   private static readonly NUMBER = /^[1-9]\d{0,8}$/;
   private static readonly ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
   /**
-   * 앱 안 경로의 화면: '' 첫 화면, posts/<글>, m/<메뉴>, m/<메뉴>/<번호>. 그 밖은 missing.
+   * 앱 안 경로의 화면: '' 첫 화면, posts/<글>, m/<메뉴>, m/<메뉴>/<번호>, 페이지 앱은 <이름>. 그 밖은 missing.
    * 다른 공개 앱에 든 글이면 그 앱의 주소로 보낸다 (글은 앱을 옮길 수 있다).
    * base: 이 화면의 앱 주소 앞부분, site: 앱 도메인으로 연 화면이면 기본 도메인의 출처 (AppScreenDataView)
    */
@@ -51,6 +54,11 @@ export class AppScreenQuery extends BaseQuery {
         third === undefined &&
         AppScreenQuery.ID.test(second)
         ? this.frame(actor, AppScreenQuery.TOPIC, app, base, site)
+        : this.frame(actor, AppScreenQuery.MISSING, app, base, site);
+    // 페이지 앱 (P1): 글 · 메뉴가 없고, 한 칸짜리 주소가 그 이름의 템플릿이다
+    if (app.kind === App.PAGE)
+      return second === undefined && AppScreenQuery.VIEW_NAME.test(first)
+        ? (await this.frame(actor, AppScreenQuery.VIEW, app, base, site)).withView(first)
         : this.frame(actor, AppScreenQuery.MISSING, app, base, site);
     if (first === 'posts' && second !== undefined && third === undefined)
       return this.post(actor, app, base, site, second);

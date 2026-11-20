@@ -104,6 +104,7 @@ describe('앱 화면 데이터의 이름 (cairn: 1)', () => {
       view('issue').withMenu(menu).withIssue(issue, [post]),
       view('home').withPages([{ name: 'map', title: '지도', updated_at: NOW }]),
       view('topic'),
+      view('view').withView('about'),
       view('missing'),
     ];
     const used = new Set<string>(WEB_ADDS);

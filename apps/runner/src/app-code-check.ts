@@ -46,7 +46,7 @@ export class AppCodeCheck {
     'site', 'home', 'loginUrl', 'graphUrl', 'name',
     'app', 'description', 'kind', 'url', 'iconUrl', 'rssUrl',
     'apps', 'others', 'current', 'menus', 'active',
-    'menu', 'isPosts', 'isIssues', 'isPages', 'isPage',
+    'menu', 'isPosts', 'isIssues', 'isPages', 'isPage', 'isView', 'view',
     'posts', 'more', 'excerpt', 'date', 'dateText', 'tags',
     'post', 'html', 'center', 'listed', 'back',
     'issues', 'issue', 'number', 'intro', 'pages', 'length',

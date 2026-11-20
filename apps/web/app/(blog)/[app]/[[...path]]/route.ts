@@ -5,7 +5,7 @@ import { appHeaders, renderAppScreen } from '../../../_blog/app-screen';
 import { slugFrom } from '../../../_blog/format';
 import { hostOf, originOf } from '../../../_blog/request-host';
 import { brokenAnswer, missingAnswer, unreachableAnswer } from '../../../_blog/site-answer';
-import type { AppScreen, AppScreenRedirect } from '../../../_blog/types';
+import type { AppScreen, AppScreenPage, AppScreenRedirect } from '../../../_blog/types';
 import { communityScreen } from '../../../_community/app-screen';
 import { serverFetch, serverGet, serverRaw } from '../../../_lib/server-api';
 
@@ -13,6 +13,8 @@ import { serverFetch, serverGet, serverRaw } from '../../../_lib/server-api';
 //   /<앱>/files/<이름>        앱 코드의 파일 (서버가 흘려보낸다)
 //   /<앱>/~<토큰>/…           미리 보기 (그 토큰의 앱 · 버전, 비공개 앱도 공개된 것처럼)
 //   그 밖 (/, posts/<글>, m/<메뉴>, m/<메뉴>/<번호>)  서버가 준 템플릿 · 데이터를 채워 격리 머리글과 함께
+//   페이지 앱 (/, <이름>)       <이름>은 앱 코드의 <이름>.html. 앱 코드를 만든 적이 없고 공개 페이지가 있으면 그 페이지가 화면이다:
+//                              첫 화면은 /index.html로 보내고(페이지 안의 상대 주소가 앱 주소 아래로 풀리게) 페이지의 파일을 그대로 넘긴다
 //   커뮤니티 앱 (/, t/<글>)    + 회원 API로 읽은 글 · 댓글 · 회원 링크 (_community/app-screen.ts, 스토어 3-2).
 //                              쓰기 화면은 템플릿이 아니라 고정 화면 /_/… (%5F/ 폴더, 앱 도메인에서만)
 // 없는 앱 · 비공개 앱 · 틀린 토큰과 웹의 다른 없는 주소는 모두 같은 Cairn 404 (앱이 있다는 사실이 드러나지 않게).
@@ -41,7 +43,11 @@ async function file(app: string, name: string, ticket: string | null): Promise<R
   );
   if (!res) return unreachableAnswer();
   if (!res.ok) return missingAnswer();
-  // 서버가 붙인 형식 · 캐시 · 격리 머리글을 그대로 넘긴다
+  return passOn(res);
+}
+
+/** 서버가 붙인 형식 · 캐시 · 격리 머리글을 그대로 넘긴다 (앱 코드의 파일 · 페이지의 파일) */
+function passOn(res: Response): Response {
   const headers = new Headers();
   for (const key of [
     'content-type',
@@ -58,6 +64,20 @@ async function file(app: string, name: string, ticket: string | null): Promise<R
   return new Response(res.body, { status: 200, headers });
 }
 
+/** 화면이 페이지인 페이지 앱 (페이지 앱 P1 ④): 첫 화면은 <앱>/index.html로, 파일은 페이지의 바깥 주소에서 받아 넘긴다 */
+async function pageScreen(
+  request: NextRequest,
+  { name, file, base }: NonNullable<AppScreenPage['page']>,
+): Promise<Response> {
+  if (file === null) return Response.redirect(new URL(`${base}/index.html`, request.url), 307);
+  const res = await serverRaw(
+    `/api/pages/site/${encodeURIComponent(name)}/${encodeURIComponent(file)}`,
+  );
+  if (!res) return unreachableAnswer();
+  if (!res.ok) return missingAnswer();
+  return passOn(res);
+}
+
 async function screen(
   request: NextRequest,
   app: string,
@@ -71,7 +91,7 @@ async function screen(
   const host = hostOf(request.headers);
   if (host) query.set('host', host);
   // 쿠키를 넘긴다: 관리자가 비공개 앱을 열면 서버가 미리 보기 토큰 주소로 보낸다 (데이터는 누구든 방문자 데이터다)
-  const reply = await serverFetch<AppScreen | AppScreenRedirect>(
+  const reply = await serverFetch<AppScreen | AppScreenRedirect | AppScreenPage>(
     `/api/apps/site/${encodeURIComponent(app)}/screen?${query}`,
   );
   if (reply.status === 0) return unreachableAnswer();
@@ -79,7 +99,8 @@ async function screen(
   const answer = reply.data;
   if (answer.redirect !== null)
     return Response.redirect(new URL(answer.redirect, request.url), answer.permanent ? 308 : 307);
-  const shown = answer as AppScreen;
+  if (answer.page !== null) return pageScreen(request, answer.page);
+  const shown = answer;
   if (shown.template === null) return missingAnswer();
   // 커뮤니티 (스토어 3-2): 글 · 댓글 · 회원 링크는 회원 API로 읽어 더한다. 글이 없으면 그 앱의 404.html
   let [template, status] = [shown.template, shown.status];

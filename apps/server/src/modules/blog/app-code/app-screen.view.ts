@@ -48,6 +48,7 @@ export class AppScreenDataView {
   private issues: readonly IssueRow[] = [];
   private issue: { row: IssueRow; posts: readonly ScreenIssuePostRow[] } | null = null;
   private pages: readonly Pick<PageRow, 'name' | 'title' | 'updated_at'>[] = [];
+  private view: string | null = null;
 
   constructor(
     /** home · post · menu · issue · missing (AppScreenQuery가 정한다) */
@@ -100,6 +101,12 @@ export class AppScreenDataView {
     return this;
   }
 
+  /** 페이지 앱의 다른 화면 이름 (/<앱>/<이름> → <이름>.html, 페이지 앱 P1) */
+  withView(name: string): this {
+    this.view = name;
+    return this;
+  }
+
   toJSON() {
     const app = this.app;
     const here = this.menu?.slug ?? null;
@@ -117,6 +124,8 @@ export class AppScreenDataView {
       isMenu: this.screen === 'menu',
       isIssue: this.screen === 'issue',
       isTopic: this.screen === 'topic',
+      isView: this.screen === 'view',
+      view: this.view,
       title: this.title(),
       base: this.home(),
       files: `${this.base}/files`,
@@ -279,7 +288,26 @@ export class AppScreenView {
       hosts: [...this.hosts],
       data: this.data.toJSON(),
       redirect: null,
+      page: null,
     };
+  }
+}
+
+/**
+ * 화면이 페이지다 (페이지 앱 P1 ④, 2026-11-20): 앱 코드를 만든 적이 없는 페이지 앱에 공개 페이지가 있으면 그 페이지가 앱의 화면이다.
+ * 웹이 첫 화면을 <base>/index.html로 보내(페이지 안의 상대 주소가 앱 주소 아래로 풀리게) 페이지의 파일을 앱 주소 아래로 내보낸다
+ */
+export class AppScreenPageView {
+  constructor(
+    private readonly name: string,
+    /** 연 파일 (/<앱>/<파일>). 첫 화면이면 null */
+    private readonly file: string | null,
+    /** 이 앱의 주소 앞부분 (/<앱>, 앱 도메인이면 ""). 끝에 / 없이 */
+    private readonly base: string,
+  ) {}
+
+  toJSON() {
+    return { redirect: null, page: { name: this.name, file: this.file, base: this.base } };
   }
 }
 

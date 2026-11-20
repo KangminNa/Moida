@@ -39,7 +39,8 @@ describe('템플릿 훑기 (AppCodeCheck.scan)', () => {
   test('시작 코드 셋의 템플릿은 문제도 모르는 이름도 없다', async () => {
     for (const kind of ['blog', 'magazine', 'page', 'community']) {
       const names = new Map<string, string>();
-      for (const dir of ['base', kind])
+      // 페이지 앱은 블로그 틀(base) 없이 자기 셋만 (서버 AppStarterGateway.ALONE, 2026-11-20)
+      for (const dir of kind === 'page' ? [kind] : ['base', kind])
         for (const file of await readdir(join(STARTERS, dir)))
           names.set(file, await readFile(join(STARTERS, dir, file), 'utf8'));
       const partials = [...names.keys()].map((n) => n.replace(/\.html$/, ''));

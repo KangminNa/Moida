@@ -2,15 +2,16 @@ import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
 import { type Actor, BaseQuery, Database, HostGate, NotFound, SecretBox } from '../../platform';
 import { App } from '../app/app';
-import { apps } from '../blog.schema';
+import { apps, pages } from '../blog.schema';
 import type { AppRow } from '../blog.tables';
+import { Page } from '../page/page';
 import { PageFiles } from '../page/page-files';
 import type { AppFileInput, AppScreenInput } from './app-code.input';
 import { AppCodeQuery } from './app-code.query';
 import { AppCodeBundle } from './app-code-bundle';
 import type { AppCodeFiles } from './app-code-files';
 import { AppScreenQuery } from './app-screen.query';
-import { AppScreenRedirectView, AppScreenView } from './app-screen.view';
+import { AppScreenPageView, AppScreenRedirectView, AppScreenView } from './app-screen.view';
 import { AppTicket } from './app-ticket';
 
 /** 앱 코드의 파일 하나 (웹의 /<앱>/files/<이름>) */
@@ -60,7 +61,7 @@ export class AppSiteQuery extends BaseQuery {
     actor: Actor,
     req: AppScreenInput,
     now: Date,
-  ): Promise<AppScreenView | AppScreenRedirectView> {
+  ): Promise<AppScreenView | AppScreenRedirectView | AppScreenPageView> {
     const found = await this.visible(actor, req.slug, req.ticket, now);
     if (found instanceof AppScreenRedirectView) {
       const rest = req.path.map(encodeURIComponent).join('/');
@@ -72,15 +73,23 @@ export class AppSiteQuery extends BaseQuery {
       return AppSiteQuery.toDomain(app.domain, req);
     const root = own ? '' : `/${app.slug}`;
     const base = ticket === null ? root : `${root}/${AppTicket.MARK}${req.ticket}`;
+    // 페이지 앱 P1 ④: 앱 코드를 만든 적이 없는 페이지 앱은 공개 페이지가 있으면 그 페이지가 화면이다 (파일은 한 칸짜리 주소)
+    if (ticket === null && app.kind === App.PAGE && app.code_seq === null && req.path.length <= 1) {
+      const page = await this.shownPage(app.id);
+      if (page !== null) return new AppScreenPageView(page, req.path[0] ?? null, root);
+    }
     const site = own ? ((await this.gate.siteOrigin()) ?? '') : null;
     const data = await this.screens.screen(actor, app, base, site, req.path, req.cursor);
     if (data instanceof AppScreenRedirectView) return data;
     const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);
     const templates = await this.templatesOf(actor, code);
-    const missing = data.screen === AppScreenQuery.MISSING;
+    // 페이지 앱의 다른 화면은 그 이름의 템플릿이고, 없으면 앱 안의 없는 주소다
+    const view = data.screen === AppScreenQuery.VIEW ? `${req.path[0]}.html` : null;
+    const missing =
+      data.screen === AppScreenQuery.MISSING || (view !== null && !templates.has(view));
     const wanted = missing
       ? AppSiteQuery.NOT_FOUND
-      : (AppSiteQuery.TEMPLATES[data.screen] ?? PageFiles.ENTRY);
+      : (view ?? AppSiteQuery.TEMPLATES[data.screen] ?? PageFiles.ENTRY);
     const template = templates.has(wanted) ? wanted : missing ? null : PageFiles.ENTRY;
     return new AppScreenView(
       missing ? 404 : 200,
@@ -90,6 +99,16 @@ export class AppSiteQuery extends BaseQuery {
       await this.code.hostsOf(actor, code),
       data,
     );
+  }
+
+  /** 페이지 앱의 화면이 될 페이지: 그 앱에 든 공개 페이지 중 판이 있는 첫 것 (만든 순서) */
+  private async shownPage(appId: string): Promise<string | null> {
+    const rows = await this.rows(
+      pages,
+      { app_id: appId, visibility: Page.PUBLIC },
+      { order: ['created_at', 'id'], columns: ['name', 'current_seq'] },
+    );
+    return rows.find((p) => p.current_seq > 0)?.name ?? null;
   }
 
   /** 연결을 확인한 도메인의 같은 경로 (· 다음 쪽 커서) */
