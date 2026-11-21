@@ -10,11 +10,15 @@ import { ExternalToolUrl } from './external-tool-url.policy';
 
 // 외부 도구 입력의 모양 (2차 7단계). 뜻(주소 · 머리글 · 이름의 규칙)은 ExternalTool이 검사한다.
 
-/** 주인이 정하는 칸. 칸 하나에 한 줄이다. 보내지 않은 칸은 그대로, 머리글에 null · 빈 글이면 토큰 없는 도구 */
+/**
+ * 주인이 정하는 칸. 칸 하나에 한 줄이다. 보내지 않은 칸은 그대로, 머리글에 null · 빈 글이면 토큰 없는 도구.
+ * auth: 로그인 방식 header(토큰) · oauth(로그인, C1). 보내지 않으면 만들 때 header, 고칠 때 그대로
+ */
 const COLUMNS: ColumnReaders<ExternalToolRow> = {
   title: (f, n) => f.optionalText(n, ExternalTool.TITLE_MAX) ?? undefined,
   url: (f, n) => f.optionalText(n, ExternalToolUrl.MAX) ?? undefined,
   header_name: (f, n) => f.optionalText(n, 40),
+  auth: (f, n) => f.optionalText(n, 10) ?? undefined,
 };
 
 /** 토큰 칸 (만들기 · 토큰 넣기가 함께 쓴다). 줄바꿈 · 길이는 ExternalTool.secretOf가 본다 */
@@ -191,5 +195,29 @@ export class PlugDecisionInput extends BaseRequest {
         typeof body.agentId === 'string' ? f.uuid('agentId') : null,
       );
     });
+  }
+}
+
+/**
+ * GET /api/external-tools/oauth/callback: 로그인 서버가 브라우저를 돌려보낸 곳 (C1). 모양이 틀려도 던지지 않는다:
+ * 브라우저가 연 주소라 실패도 화면으로 돌려보내고(맞지 않는 state), 관리자인지는 Service가 먼저 본다.
+ * code가 없으면 로그인 서버에서 취소 · 거절한 것 (error=access_denied 등)
+ */
+export class OAuthCallbackInput extends BaseRequest {
+  private constructor(
+    readonly state: string,
+    readonly code: string | null,
+    /** RFC 9207: 답한 로그인 서버 (있으면 시작한 서버와 같아야 한다) */
+    readonly iss: string | null,
+  ) {
+    super();
+  }
+
+  static from(query: Readonly<Record<string, unknown>>): OAuthCallbackInput {
+    const text = (key: string, max: number) => {
+      const value = query[key];
+      return typeof value === 'string' && value !== '' && value.length <= max ? value : null;
+    };
+    return new OAuthCallbackInput(text('state', 200) ?? '', text('code', 4000), text('iss', 2000));
   }
 }

@@ -37,8 +37,12 @@ import { ExternalToolQuery } from './external-tool/external-tool.query';
 import { ExternalToolService } from './external-tool/external-tool.service';
 import { ExternalToolCheckJob } from './external-tool/external-tool-check.job';
 import { ExternalToolCheckService } from './external-tool/external-tool-check.service';
+import { ExternalToolOAuthController } from './external-tool/external-tool-oauth.api';
+import { ExternalToolOAuthService } from './external-tool/external-tool-oauth.service';
 import { ExternalToolPlugHandler } from './external-tool/external-tool-plug.handler';
+import { ExternalToolRefreshJob } from './external-tool/external-tool-refresh.job';
 import { ExternalToolTaskHandler } from './external-tool/external-tool-task.handler';
+import { OAuthGateway } from './external-tool/oauth.gateway';
 import { GoalController } from './goal/goal.api';
 import { GoalQuery } from './goal/goal.query';
 import { GoalService } from './goal/goal.service';
@@ -185,6 +189,10 @@ import { WebPageGateway } from './web/web-page.gateway';
     ExternalToolCheckService,
     ExternalToolTaskHandler,
     ExternalToolCheckJob,
+    // C1 OAuth 커넥터 (2026-11-21): 서버가 연 로그인 · 토큰 잠금 · 갱신. 바깥 호출은 OAuthGateway 하나
+    OAuthGateway,
+    ExternalToolOAuthService,
+    ExternalToolRefreshJob,
     // 설정 바꾸기 제안 (2026-11-15 C · D): 미리 해 보고 결재로, 승인 뒤 그 설정을 가진 모듈이 적용 (platform SettingKinds)
     SettingQuery,
     SettingChangeService,
@@ -206,6 +214,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     GoalRunController,
     ChatController,
     ExternalToolController,
+    ExternalToolOAuthController,
   ],
   exports: [TaskTools, TaskQuery],
 })
@@ -248,6 +257,7 @@ export class TaskModule implements OnModuleInit {
     private readonly settingApply: SettingApplyHandler,
     private readonly toolTasks: ExternalToolTaskHandler,
     private readonly toolChecks: ExternalToolCheckJob,
+    private readonly toolRefresh: ExternalToolRefreshJob,
   ) {}
 
   onModuleInit(): void {
@@ -279,6 +289,8 @@ export class TaskModule implements OnModuleInit {
     // MCP 먼저 (2026-11-15): 끝난 작업에서 커넥터 확인 결과 · 사용을 적고, 때가 된 커넥터에 확인을 맡긴다
     this.workers.on(Task.CHANGED, this.toolTasks);
     this.workers.due(this.toolChecks, Task.CHANGED);
+    // C1 OAuth 커넥터: 끝나 가는 토큰을 갱신한다 (로그인 칸의 저장이 깨운다)
+    this.workers.due(this.toolRefresh);
     this.rotation.register('task.external_tools', (actor) =>
       this.externalTools.resealSecrets(actor),
     );

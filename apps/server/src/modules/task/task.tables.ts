@@ -151,6 +151,9 @@ export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'titl
 /** task.external_tools.status (값 목록 CHECK) */
 export const EXTERNAL_TOOL_STATUS = ['proposed', 'active', 'off'] as const;
 export type ExternalToolStatus = (typeof EXTERNAL_TOOL_STATUS)[number];
+/** task.external_tools.auth (값 목록 CHECK) */
+export const EXTERNAL_TOOL_AUTH = ['header', 'oauth'] as const;
+export type ExternalToolAuth = (typeof EXTERNAL_TOOL_AUTH)[number];
 /** task.external_tools */
 export interface ExternalToolRow {
   id: string;
@@ -173,6 +176,14 @@ export interface ExternalToolRow {
   last_used_at: Date | null;
   last_failed_at: Date | null;
   last_error: string | null;
+  auth: ExternalToolAuth;
+  oauth: unknown;
+  oauth_pending: string | null;
+  token: Buffer | null;
+  token_nonce: Buffer | null;
+  token_expires_at: Date | null;
+  token_refresh_at: Date | null;
+  oauth_error: string | null;
 }
 export type ExternalToolNew = Partial<ExternalToolRow> & Pick<ExternalToolRow, 'id' | 'space_id' | 'name' | 'title' | 'url'>;
 

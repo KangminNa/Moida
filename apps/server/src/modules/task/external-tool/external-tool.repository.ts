@@ -1,6 +1,7 @@
 import { Database, type DomainEvent, Outbox, RuleViolation, TableRepository } from '../../platform';
 import { externalTools } from '../task.schema';
 import type { ExternalToolRow } from '../task.tables';
+import { ConnectorLogin } from './connector-login';
 import { ExternalTool } from './external-tool';
 import type { ToolCalls, ToolLine } from './tool-catalog.policy';
 
@@ -70,7 +71,7 @@ export class ExternalToolRepository extends TableRepository<ExternalToolRow, Ext
       WHERE status = ${ExternalTool.ACTIVE}
         AND (checked_at IS NULL OR checked_at < updated_at OR checked_at < ${day})
       ORDER BY checked_at NULLS FIRST, id LIMIT ${limit}`;
-    return rows.map((r) => this.toEntity(r)).filter((t) => t.ready);
+    return rows.map((r) => this.toEntity(r)).filter((t) => t.ready(now));
   }
 
   /**
@@ -93,11 +94,51 @@ export class ExternalToolRepository extends TableRepository<ExternalToolRow, Ext
     return names.filter((n) => !found.has(n));
   }
 
-  /** 서버 키를 바꾼 뒤 다시 잠글 것 (토큰이 있는 도구 전부) */
+  /** 서버 키를 바꾼 뒤 다시 잠글 것 (머리글의 토큰 · OAuth 토큰이 있는 도구 전부) */
   async lockSealed(): Promise<readonly ExternalTool[]> {
     const rows = await this.sql<ExternalToolRow[]>`
-      SELECT * FROM task.external_tools WHERE secret IS NOT NULL ORDER BY id FOR UPDATE`;
+      SELECT * FROM task.external_tools WHERE secret IS NOT NULL OR token IS NOT NULL
+      ORDER BY id FOR UPDATE`;
     return rows.map((r) => this.toEntity(r));
+  }
+
+  /** 커넥터의 OAuth 로그인 (C1). lock이면 줄을 잠근다. 없으면 null */
+  async login(spaceId: string, id: string, lock: boolean): Promise<ConnectorLogin | null> {
+    const [row] = await this.sql<ExternalToolRow[]>`
+      SELECT * FROM task.external_tools WHERE space_id = ${spaceId} AND id = ${id}
+      ${lock ? this.sql`FOR UPDATE` : this.sql``}`;
+    return row ? ConnectorLogin.restore(row) : null;
+  }
+
+  /**
+   * 로그인 칸만 적는다 (C1: 시작 · 돌아옴 · 연결 · 갱신). 버전을 올리지 않는다: 관리자의 고치기와 겨루지 않게
+   * (noteCheck와 같다). 잠근 줄에서 부른다. 연결하면(updated_at) 확인을, 다시 볼 때가 바뀌면 갱신 작업을 깨운다
+   */
+  async saveLogin(login: ConnectorLogin): Promise<void> {
+    const changes = login.unsaved;
+    if (Object.keys(changes).length === 0) return;
+    await this.sql`
+      UPDATE task.external_tools SET ${this.sql(changes as never)}
+      WHERE space_id = ${login.spaceId} AND id = ${login.id}`;
+    if ('updated_at' in changes) await new Outbox(this.sql).wake(ExternalTool.CHECK_JOB);
+    if ('token_refresh_at' in changes) await new Outbox(this.sql).wake(ExternalTool.REFRESH_JOB);
+  }
+
+  /** 다시 볼 때가 된 OAuth 로그인 (모든 공간, 이른 것부터): 갱신 · 다시 해 보기 · 갱신 토큰 없이 끝남 */
+  async refreshDue(now: Date, limit: number): Promise<readonly ConnectorLogin[]> {
+    const rows = await this.sql<ExternalToolRow[]>`
+      SELECT * FROM task.external_tools
+      WHERE auth = ${ExternalTool.OAUTH} AND token IS NOT NULL AND token_refresh_at <= ${now}
+      ORDER BY token_refresh_at, id LIMIT ${limit}`;
+    return rows.map((r) => ConnectorLogin.restore(r));
+  }
+
+  /** 아직 때가 안 된 OAuth 로그인 가운데 가장 이른 다시 볼 때. 없으면 null */
+  async nextRefresh(): Promise<Date | null> {
+    const [row] = await this.sql<Pick<ExternalToolRow, 'token_refresh_at'>[]>`
+      SELECT min(token_refresh_at) AS token_refresh_at FROM task.external_tools
+      WHERE auth = ${ExternalTool.OAUTH} AND token IS NOT NULL`;
+    return row?.token_refresh_at ?? null;
   }
 
   /** 도구 저장과 따로 내는 이벤트 (결재 결과: 도구가 없거나 바뀌지 않았어도 알려야 작업이 끝난다) */

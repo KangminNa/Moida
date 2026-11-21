@@ -2,9 +2,10 @@ import type { LookupAddress } from 'node:dns';
 import { lookup } from 'node:dns/promises';
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { BlockList, isIP } from 'node:net';
+import { isIP } from 'node:net';
 import { BaseGateway, ExternalFailure, RuleViolation } from '../../platform';
 import { HtmlText } from './html-text';
+import { PublicAddress } from './public-address.policy';
 
 /** 받아 온 페이지 한 장 (글자만) */
 export class WebPage {
@@ -33,8 +34,6 @@ export class WebPageGateway extends BaseGateway {
     /^(text\/|application\/(xhtml\+xml|xml|json|ld\+json|rss\+xml|atom\+xml)\b)/i;
   private static readonly HTML_TYPES = /^(text\/html|application\/xhtml\+xml)\b/i;
   private static readonly AGENT = 'Mozilla/5.0 (compatible; CairnReader/1.0; +read_url)';
-  private static readonly BLOCKED = WebPageGateway.blockList();
-  private static readonly LOOPBACK = WebPageGateway.loopbackList();
 
   /** 주소 하나를 연다. allow는 주소마다(리다이렉트 포함) 목줄을 묻는다 (안 되면 던진다) */
   async read(start: URL, allow: (url: URL) => void): Promise<WebPage> {
@@ -69,7 +68,7 @@ export class WebPageGateway extends BaseGateway {
           throw new ExternalFailure(`주소를 찾지 못했어요 (${host})`);
         });
     for (const a of found)
-      if (WebPageGateway.blocked(a.address))
+      if (PublicAddress.blocked(a.address, process.env[WebPageGateway.TEST_LOOPBACK_ENV] === '1'))
         throw new RuleViolation('내부망 · 이 서버의 주소는 열 수 없어요');
     const [first] = found;
     if (!first) throw new ExternalFailure(`주소를 찾지 못했어요 (${host})`);
@@ -148,56 +147,5 @@ export class WebPageGateway extends BaseGateway {
     } catch {
       return new TextDecoder('utf-8').decode(bytes);
     }
-  }
-
-  private static blocked(address: string): boolean {
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address)?.[1];
-    const ip = mapped ?? address;
-    const type = isIP(ip) === 6 ? 'ipv6' : 'ipv4';
-    if (
-      process.env[WebPageGateway.TEST_LOOPBACK_ENV] === '1' &&
-      WebPageGateway.LOOPBACK.check(ip, type)
-    )
-      return false;
-    return WebPageGateway.BLOCKED.check(ip, type);
-  }
-
-  /** 밖의 공개 주소가 아닌 곳: 사설 · 루프백 · 링크 로컬(클라우드 메타데이터) · CGNAT(Tailscale) · 멀티캐스트 · 예약 */
-  private static blockList(): BlockList {
-    const list = new BlockList();
-    for (const [net, bits] of [
-      ['0.0.0.0', 8],
-      ['10.0.0.0', 8],
-      ['100.64.0.0', 10],
-      ['127.0.0.0', 8],
-      ['169.254.0.0', 16],
-      ['172.16.0.0', 12],
-      ['192.0.0.0', 24],
-      ['192.0.2.0', 24],
-      ['192.168.0.0', 16],
-      ['198.18.0.0', 15],
-      ['198.51.100.0', 24],
-      ['203.0.113.0', 24],
-      ['224.0.0.0', 3],
-    ] as const)
-      list.addSubnet(net, bits, 'ipv4');
-    for (const [net, bits] of [
-      ['::', 127],
-      ['64:ff9b::', 96],
-      ['100::', 64],
-      ['2001:db8::', 32],
-      ['fc00::', 7],
-      ['fe80::', 10],
-      ['ff00::', 8],
-    ] as const)
-      list.addSubnet(net, bits, 'ipv6');
-    return list;
-  }
-
-  private static loopbackList(): BlockList {
-    const list = new BlockList();
-    list.addSubnet('127.0.0.0', 8, 'ipv4');
-    list.addAddress('::1', 'ipv6');
-    return list;
   }
 }

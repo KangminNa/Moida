@@ -7,20 +7,30 @@ import {
   type SecretBox,
   TableEntity,
   type Unchecked,
+  ValueList,
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AiTasks } from '../ai/ai-task';
 import { JobToolView } from '../task/job.view';
 import { Task } from '../task/task';
-import type { ExternalToolNew, ExternalToolRow, ExternalToolStatus } from '../task.tables';
+import {
+  EXTERNAL_TOOL_AUTH,
+  type ExternalToolNew,
+  type ExternalToolRow,
+  type ExternalToolStatus,
+} from '../task.tables';
 import { ExternalToolView, ProposedToolView } from './external-tool.view';
 import { ExternalToolUrl } from './external-tool-url.policy';
+import { OAuthGrant } from './oauth-grant.policy';
 import { ToolCatalog } from './tool-catalog.policy';
 
 // 외부 도구 하나 (task.external_tools, 2차 7단계): 바깥 서비스의 원격 MCP 서버. 에이전트마다 허락하면 러너가 그 일에만 붙인다.
 // 붙이는 길은 둘: 관리자가 콘솔에서 더하면 바로 쓴다(active). AI가 제안하면(propose_tool) proposed로 두고,
 // 그 에이전트가 올린 결재(task.tool.plug)가 승인되면 active가 되고 제안한 에이전트에 붙는다.
 // 토큰(머리글의 값)은 서버 키로 잠가 두고 일을 빌려 줄 때만 푼다 (jobView). 머리글이 있는데 토큰이 없으면 붙이지 않는다.
+// 로그인 방식(auth, C1): header는 위의 고정 토큰, oauth는 서버가 연 OAuth 로그인으로 받은 토큰(잠금 · 갱신은 서버, 러너에는 Bearer).
+// 로그인의 흐름(시작 · 돌아옴 · 연결 · 갱신)은 같은 줄의 ConnectorLogin이 버전 없이 적는다 (ExternalToolRepository.saveLogin).
+// 여기서는 주소 · 방식을 바꾸면 로그인을 지우고(signOut), 일을 빌려 줄 때 접근 토큰을 건넨다(jobView)
 export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> {
   /** 제안한 도구를 붙이는 결재 동작 */
   static readonly PLUG = 'task.tool.plug';
@@ -30,6 +40,9 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   static readonly ACTIVE = 'active';
   /** 확인할 때가 된 커넥터에 확인을 맡기는 마감 작업 (ExternalToolCheckJob). 켜기 · 고치기 · 확인 결과가 바뀌면 저장이 깨운다 */
   static readonly CHECK_JOB = 'task.external_tools.check';
+  /** 끝나 가는 OAuth 토큰을 갱신하는 마감 작업 (ExternalToolRefreshJob, C1). 로그인 칸의 저장이 깨운다 */
+  static readonly REFRESH_JOB = 'task.external_tools.refresh';
+  static readonly OAUTH = 'oauth';
   static readonly OFF = 'off';
   static readonly NAME_MAX = 30;
   static readonly TITLE_MAX = 60;
@@ -57,6 +70,11 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
       return title;
     },
     url: (value) => ExternalToolUrl.check(value),
+    auth: (value) => {
+      if (!ValueList.has(EXTERNAL_TOOL_AUTH, value))
+        throw new RuleViolation('로그인 방식은 header(토큰) · oauth(로그인)예요');
+      return value;
+    },
     header_name: (value) => {
       if (value === null || value.trim() === '') return null;
       const header = value.trim();
@@ -122,6 +140,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
       true,
     );
     tool.accept({ title: '', url: '', header_name: null, note: '', ...fields }, ExternalTool.RULES);
+    tool.settle();
     return tool;
   }
 
@@ -156,11 +175,17 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     return this.row.status === ExternalTool.PROPOSED;
   }
 
-  /** 러너에 붙일 수 있는가: 켜져 있고, 머리글이 있으면 토큰도 있다 */
-  get ready(): boolean {
+  /**
+   * 러너에 붙일 수 있는가: 켜져 있고, 머리글이 있으면 토큰도 있다.
+   * OAuth면 로그인했고 접근 토큰이 건넬 만큼(OAuthGrant.HAND_MS) 남았다 (끝난 토큰은 건네지 않는다)
+   */
+  ready(now: Date): boolean {
+    if (this.row.status !== ExternalTool.ACTIVE) return false;
+    if (this.row.auth !== ExternalTool.OAUTH)
+      return this.row.header_name === null || this.row.secret !== null;
+    const until = this.row.token_expires_at ?? null;
     return (
-      this.row.status === ExternalTool.ACTIVE &&
-      (this.row.header_name === null || this.row.secret !== null)
+      !!this.row.token && (until === null || until.getTime() > now.getTime() + OAuthGrant.HAND_MS)
     );
   }
 
@@ -169,7 +194,8 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
    * 결과는 ExternalToolTaskHandler가 이 도구에 적는다. 붙일 수 없는 도구(꺼짐 · 제안 · 토큰 없음)는 확인하지 않는다
    */
   checkTask(now: Date): Task {
-    if (!this.ready) throw new RuleViolation('켜져 있고 토큰이 갖춰진 커넥터만 확인해요');
+    if (!this.ready(now))
+      throw new RuleViolation('켜져 있고 토큰 · 로그인이 갖춰진 커넥터만 확인해요');
     const fields = {
       kind: Task.TOOL_CHECK,
       title: `커넥터 확인: ${this.row.title}`,
@@ -179,10 +205,12 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     return Task.open(this.row.space_id, BaseEntity.newId(), fields, now);
   }
 
-  /** 주인이 고친 칸을 적는다. 머리글을 비우면 토큰도 지운다 */
+  /** 주인이 고친 칸을 적는다. 머리글을 비우면 토큰도 지우고, 주소 · 로그인 방식을 바꾸면 로그인도 지운다 */
   edit(changes: Partial<Unchecked<ExternalToolRow>>, now: Date): void {
+    const { auth, url } = this.row;
     this.accept(changes, ExternalTool.RULES);
-    if (this.row.header_name === null && this.row.secret !== null) this.clearSecret();
+    this.settle();
+    if (this.row.auth !== auth || this.row.url !== url) this.signOut();
     this.put('updated_at', now);
   }
 
@@ -250,14 +278,20 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     return new DomainEvent('task.external_tool.noted', 1, spaceId, data);
   }
 
-  /** 서버 키를 바꾼 뒤 지금 키로 다시 잠근다. 바꿨으면 true */
+  /** 서버 키를 바꾼 뒤 지금 키로 다시 잠근다 (머리글의 토큰 · OAuth 토큰). 바꿨으면 true */
   reseal(box: SecretBox): boolean {
-    if (this.row.secret === null || this.row.nonce === null) return false;
-    const fresh = box.reseal(new SealedSecret(this.row.secret, this.row.nonce));
-    if (!fresh) return false;
-    this.put('secret', fresh.ciphertext);
-    this.put('nonce', fresh.nonce);
-    return true;
+    const { secret, nonce, token, token_nonce: tokenNonce } = this.row;
+    const header = secret && nonce ? box.reseal(new SealedSecret(secret, nonce)) : null;
+    const oauth = token && tokenNonce ? box.reseal(new SealedSecret(token, tokenNonce)) : null;
+    if (header) {
+      this.put('secret', header.ciphertext);
+      this.put('nonce', header.nonce);
+    }
+    if (oauth) {
+      this.put('token', oauth.ciphertext);
+      this.put('token_nonce', oauth.nonce);
+    }
+    return header !== null || oauth !== null;
   }
 
   /** 관리 화면의 한 줄. agents는 이 도구를 허락한 에이전트 (이름) */
@@ -270,12 +304,12 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     return new ProposedToolView(this.row);
   }
 
-  /** 러너에게 가는 모양: 토큰을 여기서만 푼다 (일을 빌려 줄 때). 봉인한 칸을 아는 곳을 이 엔티티 하나로 둔다 */
+  /**
+   * 러너에게 가는 모양: 토큰을 여기서만 푼다 (일을 빌려 줄 때). 봉인한 칸을 아는 곳을 이 엔티티 하나로 둔다.
+   * OAuth면 접근 토큰을 Authorization: Bearer로 (러너는 머리글 하나로 받아 그대로 싣는다)
+   */
   jobView(box: SecretBox): JobToolView {
-    const { secret, nonce, header_name: header } = this.row;
-    const value = secret && nonce && header ? box.open(new SealedSecret(secret, nonce)) : null;
-    const headers = header && value ? { [header]: value } : {};
-    return new JobToolView(this.row, headers, ToolCatalog.jobLines(this.row.catalog));
+    return new JobToolView(this.row, this.headers(box), ToolCatalog.jobLines(this.row.catalog));
   }
 
   private plugProblem(targetVersion: number | null, agent: Agent | null): string | null {
@@ -288,5 +322,44 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   private clearSecret(): void {
     this.put('secret', null);
     this.put('nonce', null);
+  }
+
+  /** 머리글 · 토큰의 짝을 맞춘다: OAuth면 머리글을 쓰지 않고, 머리글이 없으면 토큰도 없다 */
+  private settle(): void {
+    if (this.row.auth === ExternalTool.OAUTH && this.row.header_name !== null)
+      this.put('header_name', null);
+    if (this.row.header_name === null && this.row.secret !== null) this.clearSecret();
+  }
+
+  /** 러너에 싣는 머리글 (푼 값). OAuth면 접근 토큰을 Bearer로 */
+  private headers(box: SecretBox): Record<string, string> {
+    const { secret, nonce, header_name: header } = this.row;
+    if (this.row.auth === ExternalTool.OAUTH) {
+      const bundle = this.tokenBundle(box);
+      return bundle === null ? {} : { Authorization: `Bearer ${OAuthGrant.accessOf(bundle)}` };
+    }
+    const value = secret && nonce && header ? box.open(new SealedSecret(secret, nonce)) : null;
+    return header && value ? { [header]: value } : {};
+  }
+
+  /** 잠근 토큰 묶음을 푼 글 (OAuthGrant가 읽는다). 없으면 null */
+  private tokenBundle(box: SecretBox): string | null {
+    const { token, token_nonce: nonce } = this.row;
+    return token && nonce ? box.open(new SealedSecret(token, nonce)) : null;
+  }
+
+  private dropToken(): void {
+    this.put('token', null);
+    this.put('token_nonce', null);
+    this.put('token_expires_at', null);
+    this.put('token_refresh_at', null);
+  }
+
+  /** 로그인을 모두 지운다 (주소 · 방식을 바꿨을 때): 토큰 · 로그인 서버와 등록 · 기다리는 로그인 · 실패 까닭 (ConnectorLogin의 칸) */
+  private signOut(): void {
+    this.dropToken();
+    this.put('oauth', {});
+    this.put('oauth_pending', null);
+    this.put('oauth_error', null);
   }
 }

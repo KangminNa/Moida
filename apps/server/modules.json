@@ -32,7 +32,7 @@
       "lookups": { "asks": ["app"] },
       "registries": {
         "provides": ["agents", "leases", "run-records", "settings", "teams"],
-        "asks": ["action-checks", "settings"]
+        "asks": ["action-checks", "settings", "site"]
       }
     },
     "community": {
