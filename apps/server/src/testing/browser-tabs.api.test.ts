@@ -654,6 +654,69 @@ describe('누르기 계획: 일 하나에 승인 한 번 (F2, 2026-11-21)', () =
     assert.deepEqual([row?.status, row?.used], ['closed', 2], '작업이 끝나면 계획을 닫는다');
   });
 
+  test('승인한 계획으로 실제로 누른 일에서 쓰기 API가 기록되면 바로 쓰기 도구 제안이 열린다 (되풀이를 기다리지 않음)', async () => {
+    const site = await newSite();
+    const { taskId, run } = await siteJob(site);
+    const held = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://blog.example/place/1',
+      summary: '장소 1곳 저장',
+      count: 1,
+    });
+    const asked = await tool(run, 'request_approval', {
+      request_id: `plan-${held.body.plan_id}`,
+      action: 'browser.site.publish',
+      target_kind: 'browser_click_plan',
+      target_id: held.body.plan_id,
+      target_version: held.body.version,
+      note: '누르기 계획',
+    });
+    await decide(ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)), 'approve');
+    const again = await leased(String((await taskOf(taskId)).title));
+    const next = String(again.run_token);
+    await tool(runner, 'browser_job', { task_id: taskId });
+    const requests = [
+      { method: 'POST', origin: 'https://blog.example', path: '/api/places/{n}/save', status: 201 },
+      { method: 'GET', origin: 'https://blog.example', path: '/api/places', status: 200 },
+      { method: 'POST', origin: 'https://blog.example', path: '/api/log', status: 500 },
+    ];
+    // 아직 누르지 않았으면 제안하지 않는다 (쓰기 API가 기록돼도)
+    const before = await tool(runner, 'browser_requests_save', { task_id: taskId, requests });
+    assert.equal(before.body.suggested, false, JSON.stringify(before.body));
+
+    await press(next);
+    const one = (await tool(runner, 'browser_press_next', { task_id: taskId })).body.click as Json;
+    const clicked = await tool(runner, 'browser_press_save', {
+      task_id: taskId,
+      click_id: one.id,
+      version: one.version,
+      outcome: 'clicked',
+      after_url: 'https://blog.example/place/1?saved=1',
+      tab_id: 'A'.repeat(32),
+      box: { x: 1, y: 2, width: 3, height: 4 },
+      fingerprint: FINGERPRINT,
+      before_image: JPEG,
+      after_image: JPEG,
+    });
+    assert.equal(clicked.ok, true, JSON.stringify(clicked.body));
+    const after = await tool(runner, 'browser_requests_save', { task_id: taskId, requests });
+    assert.equal(after.body.suggested, true, JSON.stringify(after.body));
+    const { suggestions } = ok(await api.get(`${BASE}/suggestions`, owner)) as {
+      suggestions: Json[];
+    };
+    const mine = suggestions.find((s) => s.siteId === site.id) as Json;
+    assert.equal(mine.count, 1, '되풀이 셋을 기다리지 않는다');
+    assert.equal(
+      mine.note,
+      '승인한 누르기 계획 "장소 1곳 저장"에서 기록한 쓰기 API: POST /api/places/{n}/save',
+    );
+    assert.match(String(mine.sample), /글을 채워 주세요/);
+    const twice = await tool(runner, 'browser_requests_save', { task_id: taskId, requests });
+    assert.equal(twice.body.suggested, false, '사이트 · 열쇠마다 하나');
+    const listed = ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] };
+    assert.equal(listed.suggestions.filter((s) => s.siteId === site.id).length, 1);
+  });
+
   test('계획 결재의 수정 요청 · 반려는 계획을 닫고, 다시 빌린 일은 계획 없이 돈다', async () => {
     const { taskId, run } = await siteJob(await newSite());
     const held = await tool(runner, 'browser_click_plan', {
@@ -978,7 +1041,7 @@ describe('API 기록 → API 사이트 도구 (B2 · B3, 2026-11-19)', () => {
       ],
     });
     assert.equal(saved.ok, true, JSON.stringify(saved.body));
-    assert.deepEqual(saved.body, { saved: 2, building: true });
+    assert.deepEqual(saved.body, { saved: 2, building: true, suggested: false });
     const db = api.service(Database);
     const rows = await db.sql<{ method: string; path: string; seen: number }[]>`
       SELECT method, path, seen FROM browser_tabs.endpoints WHERE site_id = ${String(site.id)} ORDER BY method`;
@@ -1001,7 +1064,7 @@ describe('API 기록 → API 사이트 도구 (B2 · B3, 2026-11-19)', () => {
       task_id: next.taskId,
       requests: [call('GET', 'https://blog.example', '/api/posts', { items: [] })],
     });
-    assert.deepEqual(again.body, { saved: 1, building: false });
+    assert.deepEqual(again.body, { saved: 1, building: false, suggested: false });
 
     // 굳히는 일은 그 기록을 받는다 (화면 대신 site.api로 부를 재료). 다음 일을 빌릴 때 러너가 함께 빌렸다
     const [build] = await db.sql<{ id: string }[]>`
@@ -1101,6 +1164,54 @@ describe('브라우저 일의 위임', () => {
     const target = siteJob.target as Json;
     assert.deepEqual([siteJob.kind, target.kind, target.id], ['browse', 'browser_site', site.id]);
     assert.deepEqual([explore.kind, explore.target], ['browse', null], '대상 없으면 둘러보기');
+  });
+
+  test('사이트에 켜진 도구가 있으면 브라우저 위임을 거절한다 (위임 지킴이, 2026-11-21): 지시에 도구 이름을 적거나 도구를 써 봤으면 통과', async () => {
+    const lead = await leadId();
+    const db = api.service(Database);
+    const toolOn = async (site: Json) => {
+      const name = `api_guard_${randomUUID().slice(0, 6)}`;
+      const [row] = await db.sql<{ id: string }[]>`
+        INSERT INTO browser_tabs.integrations
+          (space_id, site_id, name, title, description, hint, mode, status, live_seq)
+        SELECT space_id, id, ${name}, '가격 읽기', '가격을 API로 읽는다', '', 'read', 'on', 1
+        FROM browser_tabs.sites WHERE id = ${String(site.id)} RETURNING id`;
+      return { name, id: String(row?.id) };
+    };
+    const first = await jobOf(lead);
+    const made = await toolOn(first.site);
+    const listed = (await tool(first.run, 'browser_sites')).body.sites as Json[];
+    assert.deepEqual(
+      (listed.find((s) => s.id === first.site.id) as Json).tools,
+      [{ name: made.name, title: '가격 읽기', mode: 'read' }],
+      '사이트 목록에 켜진 도구가 실린다',
+    );
+    const refused = await tool(first.run, 'delegate_task', {
+      subtasks: [subtask(first.member, first.site)],
+    });
+    assert.equal(refused.ok, false, JSON.stringify(refused.body));
+    assert.match(String(refused.body.message), new RegExp(`${made.name}.*site_run`));
+    const named = await tool(first.run, 'delegate_task', {
+      subtasks: [
+        {
+          ...subtask(first.member, first.site),
+          instruction: `${made.name} 도구는 가격만 읽어 주소 바꾸기는 못 해요. 배송 주소를 바꿔 주세요`,
+        },
+      ],
+    });
+    assert.equal(named.ok, true, JSON.stringify(named.body));
+
+    const second = await jobOf(lead);
+    const tried = await toolOn(second.site);
+    await db.sql`
+      INSERT INTO browser_tabs.runs
+        (space_id, integration_id, seq, agent_id, request_id, input, status, output, started_at, finished_at)
+      SELECT space_id, id, 1, ${lead}, ${`guard-${randomUUID()}`}, '{}'::jsonb, 'done', '{}'::jsonb, now(), now()
+      FROM browser_tabs.integrations WHERE id = ${tried.id}`;
+    const after = await tool(second.run, 'delegate_task', {
+      subtasks: [subtask(second.member, second.site)],
+    });
+    assert.equal(after.ok, true, JSON.stringify(after.body));
   });
 
   test('일꾼은 브라우저 일을 맡기지 못한다: 맡기기는 대표만 (forbidden)', async () => {

@@ -17,6 +17,7 @@ export class SuggestionListView {
         siteName: this.siteNames.get(r.site_id) ?? '',
         count: r.count,
         sample: r.sample,
+        note: r.note,
         version: r.version,
         lastSeenAt: r.last_seen_at.toISOString(),
       })),

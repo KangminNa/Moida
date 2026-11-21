@@ -278,9 +278,11 @@ export class RequestsSavedView {
   constructor(
     private readonly saved: number,
     private readonly building: boolean,
+    /** 승인한 누르기 계획의 쓰기 API로 쓰기 도구 제안을 새로 열었는가 (2026-11-21) */
+    private readonly suggested: boolean,
   ) {}
 
   toJSON() {
-    return { saved: this.saved, building: this.building };
+    return { saved: this.saved, building: this.building, suggested: this.suggested };
   }
 }

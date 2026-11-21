@@ -8,6 +8,7 @@ import type { SecretBox } from '../base/secret-box';
 import { BasePlugin } from './base-plugin';
 import { PluginRepository } from './plugin.repository';
 import {
+  DelegateGuard,
   type EventReaction,
   type EventSubscription,
   LoginMethod,
@@ -26,6 +27,7 @@ import type { PluginState } from './plugin-state';
 export class PluginRegistry {
   private subscriptions: readonly EventSubscription[] = [];
   private reactions: readonly EventReaction[] = [];
+  private guards: readonly DelegateGuard[] = [];
   private scheduled: readonly ScheduledJob[] = [];
   private pluginActions: readonly PluginAction[] = [];
   private loginMethods: readonly LoginMethod[] = [];
@@ -75,6 +77,7 @@ export class PluginRegistry {
     const states = await new PluginRepository(this.sql).all();
     const subscriptions: EventSubscription[] = [];
     const reactions: EventReaction[] = [];
+    const guards: DelegateGuard[] = [];
     const scheduled: ScheduledJob[] = [];
     const actions: PluginAction[] = [];
     const logins: LoginMethod[] = [];
@@ -93,6 +96,7 @@ export class PluginRegistry {
         PluginRegistry.instantiate(manifest).register(context);
         subscriptions.push(...context.subscriptions);
         reactions.push(...context.reactions);
+        guards.push(...context.guards);
         scheduled.push(...context.jobs);
         actions.push(...context.actions);
         operations.push(...context.operations);
@@ -112,6 +116,7 @@ export class PluginRegistry {
     this.states = new Map(states.map((s) => [s.name, s]));
     this.subscriptions = subscriptions;
     this.reactions = reactions;
+    this.guards = guards;
     this.scheduled = scheduled;
     this.pluginActions = actions;
     this.loginMethods = logins;
@@ -174,6 +179,11 @@ export class PluginRegistry {
   /** 이 이벤트에 코어가 돌릴 기능 패키지의 동작들 */
   reactionsFor(event: DomainEvent): readonly EventReaction[] {
     return this.reactions.filter((r) => event.matches(r.pattern));
+  }
+
+  /** 이 대상 종류의 위임을 먼저 볼 기능 패키지의 지킴이들 (플러그인 API 0.9) */
+  guardsFor(targetKind: string): readonly DelegateGuard[] {
+    return this.guards.filter((g) => g.targetKind === targetKind);
   }
 
   jobs(): readonly ScheduledJob[] {

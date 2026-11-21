@@ -31,7 +31,7 @@ export function IntegrationForm({
   const [tasks, setTasks] = useState<Finished[]>([]);
   const [agents, setAgents] = useState<AgentLine[]>([]);
   const [siteId, setSiteId] = useState(seed?.siteId ?? '');
-  const [mode, setMode] = useState('read');
+  const [mode, setMode] = useState<string>(seed?.mode ?? 'read');
   const [reviewerId, setReviewerId] = useState('');
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');

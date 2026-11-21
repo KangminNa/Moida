@@ -91,9 +91,18 @@ export type Suggestion = {
   siteName: string;
   count: number;
   sample: string;
+  /** 승인한 누르기 계획에서 기록한 쓰기 API로 바로 낸 제안이면 그 까닭. 되풀이 제안은 빈 글 */
+  note: string;
   version: number;
   lastSeenAt: string;
 };
 
 /** 도구 만들기 폼을 채워 여는 값 (제안에서) */
-export type BuildSeed = { key: string; siteId: string; hint: string; suggestionId: string | null };
+export type BuildSeed = {
+  key: string;
+  siteId: string;
+  hint: string;
+  suggestionId: string | null;
+  /** 폼의 처음 모드. 쓰기 API 제안이면 write */
+  mode?: 'read' | 'write';
+};

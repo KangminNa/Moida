@@ -9,6 +9,7 @@ import {
 import { RequestsSavedView } from './integration-views';
 import { requestBuild } from './integrations';
 import { leasedBrowse, placeOf } from './job';
+import { suggestWriteTool, writeShapes } from './repeats';
 import { integrations } from './schema';
 import type { EndpointRow, SiteRow } from './tables';
 
@@ -17,6 +18,7 @@ import type { EndpointRow, SiteRow } from './tables';
 //   B3 API 도구 만들기: 처음으로 읽을 만한 API(GET · JSON 답)가 기록된 사이트면, 그 기록으로 화면 대신 API를 부르는(site.api)
 //     읽기 사이트 도구를 저절로 굳히기 시작한다 (사이트마다 한 번, 설정 autoApiTools). 시험을 통과하면 바로 켜지고(B0),
 //     다음부터 에이전트는 브라우저 대신 그 도구(site_run)로 일한다. 이번 일은 브라우저로 끝까지 한다 (기다리게 하지 않는다)
+//   승인한 누르기 계획으로 누른 일에서 쓰기 API가 기록되면 바로 쓰기 도구 제안을 연다 (2026-11-21, repeats.suggestWriteTool)
 
 const METHOD = /^[A-Z]{3,7}$/;
 const ORIGIN = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/;
@@ -115,7 +117,8 @@ export class SaveRequests extends Command<SaveInput> {
           status = EXCLUDED.status, content_type = EXCLUDED.content_type,
           seen = browser_tabs.endpoints.seen + 1, last_task_id = EXCLUDED.last_task_id, updated_at = now()`;
     const building = this.autoApiTools && (await this.startBuild(work, space, site, job));
-    return new RequestsSavedView(kept.length, building);
+    const suggested = await suggestWriteTool(work, site, job, writeShapes(kept));
+    return new RequestsSavedView(kept.length, building, suggested);
   }
 
   /**

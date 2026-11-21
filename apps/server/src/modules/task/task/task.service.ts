@@ -6,6 +6,7 @@ import {
   Conflict,
   Database,
   Forbidden,
+  PackageService,
   PluginRegistry,
   RuleViolation,
   type Sql,
@@ -48,6 +49,7 @@ export class TaskService extends BaseService {
     private readonly lessons: LessonQuery,
     private readonly skills: SkillQuery,
     private readonly plugins: PluginRegistry,
+    private readonly packages: PackageService,
   ) {
     super(db);
   }
@@ -114,6 +116,8 @@ export class TaskService extends BaseService {
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
     const { spaceId, agentId, taskId } = actor;
     const now = new Date();
+    // 대상 종류를 등록한 기능 패키지의 위임 지킴이가 먼저 본다 (플러그인 API 0.9: 읽기만, 트랜잭션 밖. 거절은 RuleViolation)
+    await this.guardTargets(actor, req.subtasks);
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const parent = await tasks.lock(spaceId, taskId);
@@ -152,6 +156,25 @@ export class TaskService extends BaseService {
       await tasks.save(parent);
       return made;
     });
+  }
+
+  /** 하위 작업의 대상 종류(target_kind)마다 그 종류를 등록한 패키지의 지킴이를 맡기는 에이전트의 자격으로 돌린다 */
+  private async guardTargets(actor: AgentActor, subtasks: readonly SubtaskOrder[]): Promise<void> {
+    for (const s of subtasks) {
+      const targetKind = s.fields.target_kind ?? null;
+      if (!targetKind) continue;
+      for (const guard of this.plugins.guardsFor(targetKind))
+        await this.packages.run(actor, guard.found, {
+          space_id: actor.spaceId,
+          agent_id: actor.agentId,
+          task_id: actor.taskId,
+          target_kind: targetKind,
+          target_id: s.fields.target_id ?? null,
+          kind: s.fields.kind ?? Task.GENERAL,
+          title: s.fields.title ?? '',
+          instruction: s.fields.instruction ?? '',
+        });
+    }
   }
 
   /**
