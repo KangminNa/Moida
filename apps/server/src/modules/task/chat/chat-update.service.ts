@@ -14,6 +14,7 @@ import { ChatRepository } from './chat.repository';
 import type { AskBriefInput, PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
 import { BriefAskedView, DeliverSetView } from './chat-update.view';
+import { DecisionNote } from './decision-note.policy';
 import { TurnBrief } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
@@ -51,7 +52,8 @@ export class ChatUpdateService extends BaseService {
       if (!place) throw new RuleViolation('대화에서 맡은 일이 아니에요');
       const chat = await chats.load(spaceId, place.chat_id);
       const posted = await chats.countUpdates(taskId, ChatUpdates.POSTED);
-      chat.post(req.kind, req.text, taskId, agentId, posted, now);
+      const data = DecisionNote.dataFor(req.kind, req.decision);
+      chat.post(req.kind, { text: req.text, data }, taskId, agentId, posted, now);
       await chats.save(chat);
       return chats.numberOf(chat.addedUpdates[0]?.id ?? '');
     });

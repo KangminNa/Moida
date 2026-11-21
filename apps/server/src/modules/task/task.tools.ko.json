@@ -115,10 +115,16 @@
     }
   },
   "post_update": {
-    "description": "대화에서 맡은 일을 하는 도중에 소식을 남긴다. 관리자와 관리자의 AI 도구가 바로 본다. progress는 중간 보고(중요한 발견 · 끝낸 단계), decision은 정한 것(고른 안과 이유), assumption은 확인하지 못해 짐작한 것(틀리면 바로잡을 수 있게 짧게). 묻고 멈추지 말고 가정을 남기고 계속한다. 작업마다 20개까지.",
+    "description": "대화에서 맡은 일을 하는 도중에 소식을 남긴다. 관리자와 관리자의 AI 도구가 바로 본다. progress는 중간 보고(중요한 발견 · 끝낸 단계), decision은 정한 것, assumption은 확인하지 못해 짐작한 것(틀리면 바로잡을 수 있게 짧게). 결과를 바꾸는 판단(대상 · 범위 · 방법 · 형식을 고름)은 decision으로 남기고 decision 칸에 고른 안 · 다른 안 · 까닭 · 무게를 적는다: 관리자가 대화에서 바로 보고 \"바꾸기\"를 누를 수 있다. 묻고 멈추지 말고 가정을 남기고 계속한다. 다만 되돌리기 어려운 일(예약 · 결제 · 발행 · 전송)의 빈 정보는 가정하지 않는다. 작업마다 20개까지.",
     "input": {
       "kind": "progress · decision · assumption",
-      "text": "남길 글 (2,000자까지)"
+      "text": "남길 글 (2,000자까지). decision이면 무엇을 정했는지 한 줄",
+      "decision": "판단의 모양 (kind decision에만)",
+      "decision.chosen": "고른 안 (300자)",
+      "decision.alternatives": "고르지 않은 다른 안 (3개까지, 한 줄 200자)",
+      "decision.why": "고른 까닭 (500자)",
+      "decision.weight": "low(알림만) · medium · high(결과를 크게 바꿈). 기본 medium",
+      "decision.step": "어느 단계의 판단인지 (계획의 단계 이름, 100자)"
     }
   },
   "set_deliver": {

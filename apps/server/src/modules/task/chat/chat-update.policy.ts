@@ -1,4 +1,4 @@
-import { RuleViolation, ValueList } from '../../platform';
+import { BaseEntity, RuleViolation, ValueList } from '../../platform';
 import { Task } from '../task/task';
 import type { ChatUpdateKind, ChatUpdateNew, TaskRow } from '../task.tables';
 import { ChatInspect } from './chat-inspect.policy';
@@ -9,6 +9,12 @@ export type ChatPlaceRow = Pick<
   TaskRow,
   'id' | 'status' | 'result' | 'title' | 'agent_id' | 'payload' | 'space_id'
 > & { chat_id: string; root_id: string };
+
+/** 에이전트가 남기는 소식 (MCP post_update): 글과, 판단이면 그 모양 (DecisionNote, 다른 종류는 null) */
+export interface ChatSaid {
+  text: string;
+  data: Record<string, unknown> | null;
+}
 
 // 대화의 소식 (task.chat_updates, 2차 1-1 · docs/API설계.md 4장 agent_updates). 무엇이 소식이 되는지 한 곳에서 정한다.
 //   팀원(하위 작업)이 끝남 · 실패 → member_done · member_failed, 회차가 끝남 · 실패 → final · failed,
@@ -38,16 +44,16 @@ export class ChatUpdates {
 
   /** 소식 한 줄 (Chat.note가 쌓고 ChatRepository.saveParts가 넣는다) */
   static line(
-    id: string,
     chat: { spaceId: string; id: string },
     kind: ChatUpdateKind,
     text: string,
     taskId: string | null,
     agentId: string | null,
     now: Date,
+    data: Record<string, unknown> | null = null,
   ): ChatUpdateNew {
     return {
-      id,
+      id: BaseEntity.newId(),
       space_id: chat.spaceId,
       chat_id: chat.id,
       kind,
@@ -55,6 +61,7 @@ export class ChatUpdates {
       task_id: taskId,
       agent_id: agentId,
       created_at: now,
+      data,
     };
   }
 

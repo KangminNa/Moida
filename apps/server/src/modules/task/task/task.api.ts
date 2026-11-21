@@ -38,6 +38,13 @@ export class TaskController {
     return (await this.service.hurry(actor, TaskIdInput.from(id))).view();
   }
 
+  /** 판단 바꾸기 (L1): 팀원을 기다리는 회차를 바로 깨운다 (재촉과 달리 다시 맡길 수 있다) */
+  @HttpCode(200)
+  @Post(':id/wake')
+  async wake(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<TaskView> {
+    return (await this.service.wake(actor, TaskIdInput.from(id))).view();
+  }
+
   @HttpCode(200)
   @Post(':id/cancel')
   async cancel(

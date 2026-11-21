@@ -95,6 +95,7 @@ export const chatUpdates = taskSchema.table('chat_updates', {
   text: text('text').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   choices: uuid('choices').array(),
+  data: jsonb('data'),
 });
 
 /** task.chats */

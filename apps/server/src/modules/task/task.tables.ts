@@ -114,6 +114,7 @@ export interface ChatUpdateRow {
   text: string;
   created_at: Date;
   choices: readonly string[] | null;
+  data: unknown | null;
 }
 export type ChatUpdateNew = Partial<ChatUpdateRow> & Pick<ChatUpdateRow, 'id' | 'space_id' | 'chat_id' | 'kind' | 'text'>;
 

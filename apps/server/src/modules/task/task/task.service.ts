@@ -276,6 +276,23 @@ export class TaskService extends BaseService {
     });
   }
 
+  /**
+   * 판단 바꾸기 (L1 중간 판단 알림, POST api/tasks/:id/wake): 관리자가 팀의 판단을 바꾸는 덧붙인 말을 보낸 뒤, 팀원을 기다리는
+   * 회차를 먼저 깨운다. 재촉(hurry)과 달리 다시 맡기기 · 기다리기를 막지 않는다 (바뀐 판단의 단계부터 다시 맡겨야 해서)
+   */
+  async wake(actor: Actor, req: TaskIdInput): Promise<Task> {
+    actor.assertOwner();
+    const spaceId = TaskService.spaceOf(actor);
+    return this.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx);
+      const task = await tasks.lock(spaceId, req.id);
+      if (!task.waitingForSubtasks) throw new Conflict('팀원을 기다리는 일이 아니에요');
+      task.wakeAfterSubtasks(SubtaskWait.CHANGE, new Date());
+      await tasks.save(task);
+      return task;
+    });
+  }
+
   /** 기다리는 기한이 지난 위 작업을 깨운다 (마감 작업 SubtaskWaitJob). 하나씩 잠가 기한을 다시 본다 */
   async wakeOverdue(actor: Actor, ids: readonly string[], now: Date): Promise<void> {
     actor.assertCan(Actor.RUN);

@@ -16,7 +16,7 @@ import { ChatView } from './chat.view';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatInspect } from './chat-inspect.policy';
 import { ChatRequest } from './chat-request.policy';
-import { ChatUpdates } from './chat-update.policy';
+import { type ChatSaid, ChatUpdates } from './chat-update.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
 /** 회차 하나에 더 실을 것 (Chat.send) */
@@ -358,13 +358,13 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     agentId: string | null,
     now: Date,
   ): void {
-    this.added.push(ChatUpdates.line(BaseEntity.newId(), this, kind, text, taskId, agentId, now));
+    this.added.push(ChatUpdates.line(this, kind, text, taskId, agentId, now));
   }
 
   /** 에이전트가 일하는 도중에 남기는 소식 (MCP post_update). posted: 그 작업이 이미 남긴 수 */
-  post(kind: string, text: string, taskId: string, agentId: string, posted: number, now: Date) {
+  post(kind: string, said: ChatSaid, taskId: string, agentId: string, posted: number, now: Date) {
     ChatUpdates.assertPostable(kind, posted);
-    this.note(kind, text, taskId, agentId, now);
+    this.added.push(ChatUpdates.line(this, kind, said.text, taskId, agentId, now, said.data));
   }
 
   /** 저장할 새 소식 (Repository가 부른다) */
