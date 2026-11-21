@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
+import { deflateRawSync } from 'node:zlib';
 import { AgentUser } from './agent-user';
 import { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
@@ -14,6 +15,7 @@ import { PromptPack } from './prompt-pack';
 import { Redactor, RunLog } from './redactor';
 import { RunnerConfig } from './runner-config';
 import type { StageCheck } from './stage-check';
+import { ZipIndex } from './zip-index';
 
 // 앱 코드를 고치는 만들기 일 (스토어 1-6c): 지금 코드 받기(app_code_base) · 지시 단락 · 묶음과 템플릿 검사.
 
@@ -34,6 +36,42 @@ const codeOf = (files: object[], hosts: string[] = []) =>
     }),
   ) as AppCodeBase;
 const short = (checks: readonly StageCheck[]) => checks.map((c) => [c.name, c.ok, c.how]);
+
+/** 테스트용 zip 만들기: 파일마다 deflate (packed가 false면 그대로 담는다). 러너에는 zip을 쓰는 코드가 없다 */
+function zipOf(files: Readonly<Record<string, string>>, packed = true): Buffer {
+  const locals: Buffer[] = [];
+  const central: Buffer[] = [];
+  let at = 0;
+  for (const [path, text] of Object.entries(files)) {
+    const name = Buffer.from(path);
+    const data = Buffer.from(text);
+    const body = packed ? deflateRawSync(data) : data;
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0);
+    head.writeUInt16LE(packed ? 8 : 0, 8);
+    head.writeUInt32LE(body.length, 18);
+    head.writeUInt32LE(data.length, 22);
+    head.writeUInt16LE(name.length, 26);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(packed ? 8 : 0, 10);
+    entry.writeUInt32LE(body.length, 20);
+    entry.writeUInt32LE(data.length, 24);
+    entry.writeUInt16LE(name.length, 28);
+    entry.writeUInt32LE(at, 42);
+    locals.push(head, name, body);
+    central.push(entry, name);
+    at += 30 + name.length + body.length;
+  }
+  const list = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(files).length, 8);
+  end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(list.length, 12);
+  end.writeUInt32LE(at, 16);
+  return Buffer.concat([...locals, list, end]);
+}
 
 describe('템플릿 훑기 (AppCodeCheck.scan)', () => {
   test('시작 코드 셋의 템플릿은 문제도 모르는 이름도 없다', async () => {
@@ -127,7 +165,7 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
     const many = Array.from({ length: 101 }, (_, i) => new AppCodeEntry(`f${i}.css`, 1, null));
     const big = new AppCodeEntry('index.html', 2 * 1024 * 1024, null);
     const tail = AppCodeCheck.checks(empty, [...many, big])[0]?.tail ?? '';
-    assert.match(tail, /100개까지예요 \(얹으면 102개\)/);
+    assert.match(tail, /100개까지예요 \(모두 102개\)/);
     assert.match(tail, /템플릿\(\.html\)은 합쳐 1MB까지/);
 
     const manifest = (text: string | null) =>
@@ -152,6 +190,141 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
     const broken = AppCodeCheck.checks(starter, [new AppCodeEntry('list.html', 20, '{{#posts}}')]);
     assert.equal(AppCodeCheck.fatal(broken)?.name, AppCodeCheck.SYNTAX);
     assert.equal(AppCodeCheck.fatal(noEntry)?.name, AppCodeCheck.BUNDLE);
+  });
+});
+
+// 정적 앱 (스토어 9.13): cairn.json에 "render": "static"이면 HTML이 템플릿이 아니라 그대로 나간다. 폴더가 든 결과는 app.zip 하나로 낸다
+describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
+  const STATIC = '{"cairn":1,"render":"static"}';
+  const page = (files: object[]) =>
+    AppCodeBase.from(
+      Json.of({
+        app_id: id(2),
+        name: '동네 지도',
+        kind: 'page',
+        slug: 'map',
+        seq: 1,
+        files,
+        hosts: [],
+      }),
+    ) as AppCodeBase;
+  const tail = (checks: readonly StageCheck[]) => checks[0]?.tail ?? '';
+
+  test('정적 앱의 HTML은 템플릿으로 보지 않는다. 페이지 앱에서만, 폴더는 정적 앱만', () => {
+    const empty = page([]);
+    const made = [
+      new AppCodeEntry('index.html', 200, '<div id="app">{{ count }}</div>{{#broken'),
+      new AppCodeEntry('app.js', 900, null),
+      new AppCodeEntry('cairn.json', 30, STATIC),
+    ];
+    assert.deepEqual(short(AppCodeCheck.checks(empty, made)), [
+      [AppCodeCheck.BUNDLE, true, '3개 · 1KB'],
+    ]);
+    // 앞 버전이 정적 앱이면 cairn.json을 다시 내지 않아도 정적 앱이다
+    const before = page([{ name: 'cairn.json', size: 30, text: STATIC }]);
+    const again = AppCodeCheck.checks(before, [new AppCodeEntry('index.html', 10, '{{#x')]);
+    assert.deepEqual(short(again), [[AppCodeCheck.BUNDLE, true, '2개 · 40B']]);
+
+    assert.match(tail(AppCodeCheck.checks(codeOf([]), made)), /페이지 앱에서만/);
+    assert.match(
+      tail(AppCodeCheck.checks(empty, [new AppCodeEntry('cairn.json', 20, '{"render":"server"}')])),
+      /render\)은 template · static/,
+    );
+  });
+
+  test('app.zip은 묶음 전체다: 정적 앱이어야 하고, 폴더 · 이름 · 개수 규칙을 본다. 받지 못한 파일은 남는다', () => {
+    const before = page([
+      { name: 'index.html', size: 100, text: '<p>옛 화면</p>' },
+      { name: 'assets/photo.png', size: 4000, text: null },
+      { name: 'old.js', size: 50, text: 'x' },
+      { name: 'cairn.json', size: 30, text: STATIC },
+    ]);
+    const inside = [
+      new AppCodeEntry('index.html', 300, null),
+      new AppCodeEntry('assets/app.js', 2000, null),
+      new AppCodeEntry('about/index.html', 100, null),
+      new AppCodeEntry('cairn.json', 30, STATIC),
+    ];
+    // zip의 4개 + 내용을 받지 못한 그림 1개 (글로 받은 old.js는 zip에 없으면 사라진다)
+    assert.deepEqual(short(AppCodeCheck.packed(before, inside)), [
+      [AppCodeCheck.BUNDLE, true, '5개 · 6KB'],
+    ]);
+
+    const plain = AppCodeCheck.packed(before, [new AppCodeEntry('index.html', 10, null)]);
+    assert.match(tail(plain), /zip 안의 cairn\.json에 "render": "static"/);
+    assert.equal(AppCodeCheck.fatal(plain)?.name, AppCodeCheck.BUNDLE);
+    assert.match(tail(AppCodeCheck.packed(before, null)), /app\.zip을 읽지 못했어요/);
+    const deep = new AppCodeEntry('a/b/c/d/e/f/g.js', 1, null);
+    assert.match(
+      tail(AppCodeCheck.packed(before, [...inside, deep])),
+      /쓸 수 없는 이름이에요: a\/b/,
+    );
+    const hidden = new AppCodeEntry('assets/.env', 1, null);
+    assert.match(tail(AppCodeCheck.packed(before, [...inside, hidden])), /assets\/\.env/);
+    const noEntry = inside.filter((f) => f.name !== 'index.html');
+    assert.match(
+      tail(AppCodeCheck.packed(before, noEntry)),
+      /index\.html가 없어요 \(앱의 첫 화면\)/,
+    );
+    const many = Array.from({ length: 500 }, (_, i) => new AppCodeEntry(`f/${i}.js`, 1, null));
+    assert.match(tail(AppCodeCheck.packed(before, [...inside, ...many])), /500개까지예요/);
+    // 템플릿 앱에 폴더를 내면 정적 앱으로 만들라고 알린다
+    const nested = AppCodeCheck.checks(codeOf([{ name: 'index.html', size: 1, text: 'x' }]), [
+      new AppCodeEntry('assets/app.js', 1, null),
+    ]);
+    assert.match(tail(nested), /폴더는 정적 앱만 써요: assets\/app\.js/);
+  });
+
+  test('zip의 목록 읽기 (ZipIndex): 감싼 폴더를 벗기고, 운영체제 파일은 건너뛰고, cairn.json은 내용까지', () => {
+    const files = {
+      'dist/index.html': '<p>지도</p>',
+      'dist/assets/app.js': 'console.log(1)'.repeat(200),
+      'dist/cairn.json': STATIC,
+      'dist/.DS_Store': 'x',
+    };
+    const index = ZipIndex.read(zipOf(files));
+    assert.equal(
+      ZipIndex.read(zipOf(files, false))?.text('cairn.json', 100),
+      STATIC,
+      '줄이지 않은 zip',
+    );
+    assert.ok(index);
+    assert.deepEqual(
+      index.entries.map((e) => [e.name, e.size]),
+      [
+        ['index.html', 13],
+        ['assets/app.js', 2800],
+        ['cairn.json', STATIC.length],
+      ],
+    );
+    assert.equal(index.text('cairn.json', 16 * 1024), STATIC);
+    assert.equal(index.text('assets/app.js', 100), null, '한도를 넘으면 풀지 않는다');
+    assert.equal(index.text('none.txt', 100), null);
+    assert.equal(ZipIndex.read(Buffer.from('zip이 아닌 글')), null);
+    assert.equal(ZipIndex.read(Buffer.alloc(0)), null);
+  });
+
+  test('폴더가 든 앞 코드는 폴더째 inputs/app/에 둔다. 바깥을 가리키는 이름은 버린다', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cairn-app-static-'));
+    try {
+      const code = page([
+        { name: 'index.html', size: 10, text: '<p>지도</p>' },
+        { name: 'assets/lib/util.js', size: 10, text: 'export {}' },
+        { name: 'assets/photo.png', size: 4000, text: null },
+        { name: '../outside.js', size: 1, text: 'x' },
+        { name: 'assets/../../up.js', size: 1, text: 'x' },
+        { name: '/abs.js', size: 1, text: 'x' },
+      ]);
+      assert.deepEqual(
+        code.files.map((f) => f.name),
+        ['index.html', 'assets/lib/util.js', 'assets/photo.png'],
+      );
+      const into = await code.writeTo(dir);
+      assert.equal(await readFile(join(into, 'assets/lib/util.js'), 'utf8'), 'export {}');
+      assert.deepEqual((await readdir(dir)).sort(), ['app']);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -261,6 +434,19 @@ describe('앱 코드 일 (MakeStage)', () => {
         redactor,
       );
       assert.equal(done.note, '만들었어요');
+
+      // app.zip을 내면 zip 안을 묶음 전체로 본다 (블로그 앱에는 정적 앱을 둘 수 없다)
+      const zip = zipOf({
+        'index.html': '<p>지도</p>',
+        'assets/app.js': 'console.log(1)',
+        'cairn.json': '{"cairn":1,"render":"static"}',
+      });
+      await writeFile(join(room.outputsDir, 'app.zip'), zip);
+      const packed = await stage.check();
+      assert.deepEqual(short(packed).at(-1), [AppCodeCheck.BUNDLE, false, '문제 1개']);
+      assert.match(packed.at(-1)?.tail ?? '', /페이지 앱에서만/);
+      await writeFile(join(room.outputsDir, 'app.zip'), 'zip이 아닌 글');
+      assert.match((await stage.check()).at(-1)?.tail ?? '', /app\.zip을 읽지 못했어요/);
     } finally {
       await stage.close();
       await rm(work, { recursive: true, force: true });

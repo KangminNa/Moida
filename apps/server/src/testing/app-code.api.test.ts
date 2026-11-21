@@ -130,7 +130,10 @@ async function lease(taskId: string): Promise<void> {
 }
 
 /** 빌린 만들기 일이 바꾼 파일을 올리고 끝낸다 (러너가 하는 것: begin_upload → PUT → submit_result) */
-async function deliver(taskId: string, files: Readonly<Record<string, string>>): Promise<void> {
+async function deliver(
+  taskId: string,
+  files: Readonly<Record<string, string | Buffer>>,
+): Promise<void> {
   for (const [name, text] of Object.entries(files)) {
     const bytes = Buffer.from(text);
     const ticket = await mcp(slot, 'begin_upload', {
@@ -161,7 +164,7 @@ async function deliver(taskId: string, files: Readonly<Record<string, string>>):
 /** 앱 코드를 고치는 만들기 작업 하나: 맡기기 → 빌리기 → app_code_base → 바꾼 파일 올리기 → 끝내기 → 일꾼 */
 async function build(
   app: Json,
-  files: Readonly<Record<string, string>>,
+  files: Readonly<Record<string, string | Buffer>>,
 ): Promise<{ taskId: string; base: Json }> {
   const task = ok(
     await api.request('POST', '/api/tasks', owner, {
@@ -572,6 +575,121 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
       writer,
     );
     assert.equal(show.status, 403);
+  });
+});
+
+// 정적 앱 (스토어 9.13, 2026-11-21 "템플릿 없는 자유로운 앱"): cairn.json에 "render": "static"이면 템플릿을 거치지 않고
+// 묶음의 파일을 그대로 내보낸다. 폴더가 든 이름 · 앱 안의 화면 전환(없는 주소 → index.html), 페이지 앱에서만
+describe('정적 앱 ("render": "static")', () => {
+  const STATIC = JSON.stringify({ cairn: 1, render: 'static' });
+  const site = {
+    'index.html': '<html><head><title>지도</title></head><body><div id="app"></div></body></html>',
+    'assets/app.js': 'console.log("app")',
+    'assets/img/pin.svg': '<svg xmlns="http://www.w3.org/2000/svg"/>',
+    'about/index.html': '<html><head></head><body>소개</body></html>',
+    'cairn.json': STATIC,
+  };
+
+  test('폴더가 든 묶음을 그대로 내보낸다: 주소 → 파일, 폴더는 그 안의 index.html, 없는 화면 주소는 첫 화면', async () => {
+    const app = await newApp(`static-a-${mark}`, 'page');
+    const made = ok(await upload(app, zipOf(site)), 201);
+    assert.equal(made.latest, 1);
+    await publish(app);
+    const slug = `static-a-${mark}`;
+    const at = async (path: string) => ok(await screen(slug, path)) as Json;
+
+    const home = await at('');
+    assert.deepEqual([home.status, home.seq, home.redirect, home.page], [200, 1, null, null]);
+    assert.deepEqual(home.static, { file: 'index.html', text: site['index.html'] });
+    assert.equal(((home.data as Json).app as Json).kind, 'page');
+    assert.equal((home.data as Json).base, `/${slug}`);
+    assert.equal(home.templates, undefined, '템플릿을 싣지 않는다');
+
+    assert.deepEqual((await at('assets/app.js')).static, { file: 'assets/app.js', text: null });
+    assert.deepEqual((await at('about')).static, {
+      file: 'about/index.html',
+      text: site['about/index.html'],
+    });
+    assert.deepEqual(
+      ((await at('places/3')).static as Json).file,
+      'index.html',
+      '확장자 없는 없는 주소는 첫 화면 (앱 안의 화면 전환)',
+    );
+    const missing = await at('assets/none.png');
+    assert.deepEqual([missing.status, (missing.static as Json).file], [404, null]);
+
+    const js = await api.get(`/api/apps/site/${slug}/files/assets/app.js`);
+    assert.equal(js.status, 200, js.text);
+    assert.equal(js.text, site['assets/app.js']);
+    assert.match(js.header('content-type') ?? '', /javascript/);
+    assert.equal(
+      js.header('access-control-allow-origin'),
+      '*',
+      '격리된 화면이 모듈 스크립트로 읽는다',
+    );
+    assert.match(js.header('content-security-policy') ?? '', /sandbox/);
+    assert.equal((await api.get(`/api/apps/site/${slug}/files/assets/img/pin.svg`)).status, 200);
+    for (const path of ['index.html', 'about/index.html', 'assets/.env', 'assets/none.js'])
+      assert.equal((await api.get(`/api/apps/site/${slug}/files/${path}`)).status, 404, path);
+
+    const detail = await code(app);
+    assert.deepEqual((detail.files as Json[]).map((f) => f.name).sort(), Object.keys(site).sort());
+    const zip = await fetch(`${api.baseUrl}/api/apps/${app.id}/code/versions/1/zip`, {
+      headers: { cookie: owner.header ?? '' },
+    });
+    const names = [...ZipReader.read(Buffer.from(await zip.arrayBuffer()))].map(([name]) => name);
+    assert.ok(names.includes('assets/img/pin.svg'), names.join());
+  });
+
+  test('규칙: 페이지 앱에서만, 폴더는 정적 앱만, 모르는 render · 너무 깊은 폴더 · 숨김 파일은 422', async () => {
+    const blog = await newApp(`static-b-${mark}`);
+    const onBlog = await upload(blog, zipOf({ 'index.html': 'x', 'cairn.json': STATIC }));
+    assert.equal(onBlog.status, 422, onBlog.text);
+    assert.match(onBlog.text, /페이지 앱에서만/);
+    const page = await newApp(`static-c-${mark}`, 'page');
+    const folders = await upload(
+      page,
+      zipOf({ 'index.html': 'x', 'assets/app.js': 'y', 'z.css': '' }),
+    );
+    assert.equal(folders.status, 422, folders.text);
+    assert.match(folders.text, /render/);
+    const bad: Record<string, string>[] = [
+      { 'index.html': 'x', 'cairn.json': JSON.stringify({ render: 'server' }) },
+      { 'index.html': 'x', 'a/b/c/d/e/f/g.js': 'y', 'cairn.json': STATIC },
+      { 'index.html': 'x', 'assets/.secret': 'y', 'cairn.json': STATIC },
+    ];
+    for (const files of bad) {
+      const res = await upload(page, zipOf(files));
+      assert.equal(res.status, 422, `${Object.keys(files).join()} ${res.text}`);
+    }
+    assert.equal((await code(page)).latest, 0, '거절한 묶음은 버전이 되지 않는다');
+  });
+
+  test('AI의 결과물에 app.zip이 있으면 그 안이 묶음 전체다 (폴더가 있는 빌드 결과)', async () => {
+    const app = await newApp(`static-d-${mark}`, 'page');
+    const { taskId } = await build(app, { 'app.zip': zipOf({ ...site, 'dist.txt': 'built' }) });
+    const detail = await code(app);
+    assert.deepEqual([detail.current, detail.latest], [1, 1]);
+    const [version] = detail.versions as Json[];
+    assert.deepEqual([version?.source, version?.taskId], ['task', taskId]);
+    const names = (detail.files as Json[]).map((f) => f.name);
+    assert.ok(names.includes('assets/app.js') && names.includes('dist.txt'), names.join());
+    assert.ok(
+      !names.includes('app.zip') && !names.includes('style.css'),
+      '시작 코드 위에 얹지 않는다',
+    );
+
+    // 다음 버전: zip에 없는 글 파일은 사라지고, AI가 내용을 받지 못한 파일(그림)은 남는다
+    ok(await upload(app, zipOf({ ...site, 'dist.txt': 'built', 'assets/photo.png': 'PNG' })), 201);
+    await build(app, { 'app.zip': zipOf({ ...site, 'assets/app.js': 'console.log(2)' }) });
+    const next = ((await code(app)).files as Json[]).map((f) => f.name);
+    assert.ok(next.includes('assets/photo.png'), `받지 못한 파일은 남는다: ${next.join()}`);
+    assert.ok(!next.includes('dist.txt'), `zip에 없는 글 파일은 사라진다: ${next.join()}`);
+
+    // 블로그 앱에 정적 묶음을 내면 버전을 만들지 않고 알린다
+    const blog = await newApp(`static-e-${mark}`);
+    await build(blog, { 'app.zip': zipOf(site) });
+    assert.equal((await code(blog)).latest, 0);
   });
 });
 

@@ -1,8 +1,9 @@
 import { TableRepository } from '../../platform';
 import { appCodeVersions, apps } from '../blog.schema';
 import type { AppRow } from '../blog.tables';
-import { PageFiles } from '../page/page-files';
+import type { PageFiles } from '../page/page-files';
 import { AppCode } from './app-code';
+import { AppCodeBundle } from './app-code-bundle';
 
 // blog.apps 한 줄의 코드 칸 ↔ AppCode. 버전(blog.app_code_versions)은 saveParts로 함께 넣는다 (추가만).
 export class AppCodeRepository extends TableRepository<AppRow, AppCode> {
@@ -21,7 +22,7 @@ export class AppCodeRepository extends TableRepository<AppRow, AppCode> {
   /** 버전 하나의 파일 목록. 버전이 없으면 null */
   async filesOf(appId: string, seq: number): Promise<PageFiles | null> {
     const row = await this.row(appCodeVersions, { app_id: appId, seq }, { columns: ['files'] });
-    return row ? PageFiles.of(row.files) : null;
+    return row ? AppCodeBundle.files(row.files) : null;
   }
 
   protected override async saveParts(code: AppCode): Promise<void> {

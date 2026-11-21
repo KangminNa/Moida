@@ -195,7 +195,7 @@ export class AppScreenInput extends BaseRequest {
   }
 }
 
-/** GET /api/apps/site/:slug/files/:name?ticket=: 앱 코드의 파일 하나 (웹의 /<앱>/files/<이름>) */
+/** GET /api/apps/site/:slug/files/*path?ticket=: 앱 코드의 파일 하나 (웹의 /<앱>/files/<이름>, 정적 앱은 /<앱>/<경로>) */
 export class AppFileInput extends BaseRequest {
   private constructor(
     readonly slug: string,
@@ -205,16 +205,18 @@ export class AppFileInput extends BaseRequest {
     super();
   }
 
-  static from(slug: string, name: string, query: unknown): AppFileInput {
+  static from(slug: string, path: string | readonly string[], query: unknown): AppFileInput {
     const ticket = (query as { ticket?: unknown } | null)?.ticket ?? null;
-    if (name.includes('/') || name.startsWith('.') || name === '')
+    // 폴더가 든 이름(정적 앱의 assets/app.js)도 받는다. 묶음의 파일 목록과 글자 그대로 맞는 것만 나간다
+    const parts = typeof path === 'string' ? path.split('/') : [...path];
+    if (parts.length === 0 || parts.some((part) => part === '' || part.startsWith('.')))
       throw new NotFound('없는 파일이에요');
     return BaseRequest.read(
-      { slug, name, ticket },
+      { slug, name: parts.join('/'), ticket },
       (f) =>
         new AppFileInput(
           f.text('slug', 200),
-          f.text('name', 120),
+          f.text('name', 300),
           AppScreenInput.ticketOf(f.optionalText('ticket', 2000)),
         ),
     );

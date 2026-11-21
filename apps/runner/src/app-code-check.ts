@@ -20,13 +20,23 @@ class TemplateScan {
 //   묶음 규칙 (서버의 AppCodeBundle과 같은 한도: 100개 · 합 20MB · 템플릿 합 1MB · index.html) · cairn.json
 //   템플릿 문법 (Mustache: 여닫는 짝 · 없는 조각 · {{{ }}}는 html 값에만 · 구분자 바꾸기 금지)
 //   데이터 이름 (약속 cairn: 1에 없는 이름은 빈 칸으로 그려진다)
+// 정적 앱 (cairn.json의 "render": "static", 스토어 9.13)은 템플릿이 아니라 파일 그대로 나가므로 묶음 규칙만 본다
+// (500개 · 경로 여섯 마디 · HTML 하나 1MB · 페이지 앱에서만). 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
 // 떨어지면 JobRun이 AI에게 한 번 더 맡긴다 (검증 고리 V). 그래도 묶음 · 문법이 틀리면 MakeStage가 일을 실패로 끝낸다:
 // 서버는 Mustache를 읽지 않아 틀린 템플릿도 버전이 되고, 비공개 앱은 바로 방문자(관리자)에게 보이기 때문이다.
 // 러너에는 런타임 의존 패키지가 없어 Mustache 라이브러리 대신 태그만 훑는다 (웹은 mustache 4로 그린다).
 export class AppCodeCheck {
   static readonly ENTRY = 'index.html';
   static readonly MANIFEST = 'cairn.json';
+  /** 폴더가 든 묶음 전체를 내는 zip의 이름 (서버의 AppCodeService.BUILD_ZIP) */
+  static readonly PACKED = 'app.zip';
   static readonly FILES_MAX = 100;
+  /** 정적 앱의 한도 (서버의 PageFiles.NESTED_MAX · DEPTH_MAX · PATH_MAX) */
+  static readonly STATIC_FILES_MAX = 500;
+  static readonly DEPTH_MAX = 6;
+  static readonly PATH_MAX = 300;
+  private static readonly STATIC = 'static';
+  private static readonly STATIC_KIND = 'page';
   static readonly BYTES_MAX = 20 * 1024 * 1024;
   static readonly TEMPLATE_BYTES_MAX = 1024 * 1024;
   static readonly HOSTS_MAX = 10;
@@ -70,8 +80,10 @@ export class AppCodeCheck {
     const all = new Map<string, AppCodeEntry>();
     for (const f of base.files) all.set(f.name, new AppCodeEntry(f.name, f.size, f.text));
     for (const f of made) all.set(f.name, f);
-    const checks = [AppCodeCheck.bundle([...all.values()], made)];
-    const templates = made.filter((f) => AppCodeCheck.isTemplate(f.name));
+    const fixed = AppCodeCheck.isStatic(all.get(AppCodeCheck.MANIFEST)?.text ?? null);
+    const checks = [AppCodeCheck.bundle([...all.values()], made, fixed, base.kind)];
+    // 정적 앱의 HTML은 템플릿이 아니다: 문법 · 데이터 이름을 보지 않는다
+    const templates = fixed ? [] : made.filter((f) => AppCodeCheck.isTemplate(f.name));
     if (templates.length === 0) return checks;
     const syntax: string[] = [];
     const unknown: string[] = [];
@@ -102,32 +114,113 @@ export class AppCodeCheck {
     return checks;
   }
 
+  /**
+   * app.zip을 낸 일: zip 안이 묶음 전체다 (스토어 9.13). 앞 코드에서 내용을 받지 못한 파일(그림 · 큰 파일)은 zip에 없어도
+   * 서버가 남긴다. entries: zip 안의 파일 (cairn.json만 글까지). 읽지 못한 zip이면 null
+   */
+  static packed(base: AppCodeBase, entries: readonly AppCodeEntry[] | null): StageCheck[] {
+    const zip = AppCodeCheck.PACKED;
+    if (entries === null)
+      return [
+        AppCodeCheck.seen(
+          AppCodeCheck.BUNDLE,
+          [`${zip}을 읽지 못했어요 (20MB까지의 보통 zip으로, 암호 없이)`],
+          '',
+          '',
+        ),
+      ];
+    const inside = new Set(entries.map((f) => f.name));
+    const kept = base.files
+      .filter((f) => f.text === null && !inside.has(f.name))
+      .map((f) => new AppCodeEntry(f.name, f.size, null));
+    const manifest = entries.find((f) => f.name === AppCodeCheck.MANIFEST);
+    const fixed = AppCodeCheck.isStatic(manifest?.text ?? null);
+    const extra = fixed
+      ? []
+      : [
+          `${zip}은 정적 앱의 묶음 전체예요. zip 안의 cairn.json에 "render": "static"을 넣어요 (템플릿 앱은 바뀐 파일만 그대로 내요)`,
+        ];
+    return [AppCodeCheck.bundle([...kept, ...entries], entries, fixed, base.kind, extra)];
+  }
+
   /** 일을 실패로 끝낼 검사(묶음 · 문법)가 떨어졌는가 */
   static fatal(checks: readonly StageCheck[]): StageCheck | null {
     const names = [AppCodeCheck.BUNDLE, AppCodeCheck.SYNTAX];
     return checks.find((c) => !c.ok && names.includes(c.name)) ?? null;
   }
 
-  private static bundle(all: readonly AppCodeEntry[], made: readonly AppCodeEntry[]): StageCheck {
-    const problems: string[] = [];
+  /** fixed: 정적 앱의 묶음인가. kind: 앱의 종류. extra: 먼저 적을 문제 */
+  private static bundle(
+    all: readonly AppCodeEntry[],
+    made: readonly AppCodeEntry[],
+    fixed: boolean,
+    kind: string,
+    extra: readonly string[] = [],
+  ): StageCheck {
+    const problems: string[] = [...extra];
     const bytes = all.reduce((sum, f) => sum + f.size, 0);
-    const templates = all
-      .filter((f) => AppCodeCheck.isTemplate(f.name))
-      .reduce((sum, f) => sum + f.size, 0);
-    if (all.length > AppCodeCheck.FILES_MAX)
-      problems.push(`파일은 ${AppCodeCheck.FILES_MAX}개까지예요 (얹으면 ${all.length}개)`);
+    const pages = all.filter((f) => AppCodeCheck.isTemplate(f.name));
+    const max = fixed ? AppCodeCheck.STATIC_FILES_MAX : AppCodeCheck.FILES_MAX;
+    if (all.length > max) problems.push(`파일은 ${max}개까지예요 (모두 ${all.length}개)`);
     if (bytes > AppCodeCheck.BYTES_MAX) problems.push('파일은 합쳐 20MB까지예요');
-    if (templates > AppCodeCheck.TEMPLATE_BYTES_MAX)
-      problems.push('템플릿(.html)은 합쳐 1MB까지예요');
+    if (fixed) problems.push(...AppCodeCheck.staticProblems(all, pages, kind));
+    else {
+      if (pages.reduce((sum, f) => sum + f.size, 0) > AppCodeCheck.TEMPLATE_BYTES_MAX)
+        problems.push('템플릿(.html)은 합쳐 1MB까지예요');
+      const nested = all.find((f) => f.name.includes('/'));
+      if (nested)
+        problems.push(
+          `폴더는 정적 앱만 써요: ${nested.name} (cairn.json에 "render": "static", 페이지 앱에서만)`,
+        );
+    }
     if (!all.some((f) => f.name === AppCodeCheck.ENTRY))
-      problems.push(`${AppCodeCheck.ENTRY}가 없어요 (모든 화면의 기본 템플릿)`);
+      problems.push(
+        `${AppCodeCheck.ENTRY}가 없어요 (${fixed ? '앱의 첫 화면' : '모든 화면의 기본 템플릿'})`,
+      );
     const manifest = made.find((f) => f.name === AppCodeCheck.MANIFEST);
     if (manifest) problems.push(...AppCodeCheck.manifestProblems(manifest.text));
     const size = bytes < 1024 ? `${bytes}B` : `${Math.round(bytes / 1024)}KB`;
     return AppCodeCheck.seen(AppCodeCheck.BUNDLE, problems, `${all.length}개 · ${size}`, '');
   }
 
-  /** cairn.json의 모양 (서버의 AppCodeBundle.hostsOf와 같은 규칙) */
+  /** 정적 앱의 묶음 규칙 (서버의 AppCodeBundle · PageFiles와 같다) */
+  private static staticProblems(
+    all: readonly AppCodeEntry[],
+    pages: readonly AppCodeEntry[],
+    kind: string,
+  ): string[] {
+    const problems: string[] = [];
+    if (kind !== AppCodeCheck.STATIC_KIND)
+      problems.push('정적 앱("render": "static")은 페이지 앱에서만 돼요');
+    const big = pages.find((f) => f.size > AppCodeCheck.TEMPLATE_BYTES_MAX);
+    if (big) problems.push(`HTML 파일 하나는 1MB까지예요: ${big.name}`);
+    const bad = all.find((f) => {
+      const parts = f.name.split('/');
+      return (
+        f.name.length > AppCodeCheck.PATH_MAX ||
+        parts.length > AppCodeCheck.DEPTH_MAX ||
+        parts.some((part) => part === '' || part.startsWith('.') || part.length > 120)
+      );
+    });
+    if (bad)
+      problems.push(
+        `쓸 수 없는 이름이에요: ${bad.name} (경로는 파일까지 ${AppCodeCheck.DEPTH_MAX}마디, ${AppCodeCheck.PATH_MAX}자까지, 숨김 파일 없이)`,
+      );
+    return problems;
+  }
+
+  /** cairn.json이 정적 앱이라고 하는가 ("render": "static"). 읽을 수 없으면 템플릿 앱으로 본다 */
+  private static isStatic(manifest: string | null): boolean {
+    if (manifest === null) return false;
+    try {
+      const parsed = JSON.parse(manifest) as { render?: unknown } | null;
+      return parsed?.render === AppCodeCheck.STATIC;
+    } catch {
+      return false;
+    }
+  }
+
+  /** cairn.json의 모양 (서버의 AppCodeBundle.manifestOf와 같은 규칙) */
   private static manifestProblems(text: string | null): string[] {
     const name = AppCodeCheck.MANIFEST;
     if (text === null) return [`${name}을 읽지 못했어요 (16KB까지)`];
@@ -139,8 +232,14 @@ export class AppCodeCheck {
     }
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
       return [`${name}은 객체여야 해요`];
-    const { cairn, hosts = [] } = parsed as { cairn?: unknown; hosts?: unknown };
+    const {
+      cairn,
+      hosts = [],
+      render = 'template',
+    } = parsed as { cairn?: unknown; hosts?: unknown; render?: unknown };
     if (cairn !== undefined && cairn !== 1) return ['데이터 약속(cairn)은 1이에요'];
+    if (render !== 'template' && render !== AppCodeCheck.STATIC)
+      return ['그리는 법(render)은 template · static 중 하나예요'];
     if (!Array.isArray(hosts) || hosts.length > AppCodeCheck.HOSTS_MAX)
       return ['바깥 주소(hosts)는 10개까지의 목록이에요'];
     return hosts

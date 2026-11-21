@@ -9,10 +9,15 @@ export interface PageFileEntry {
 }
 
 // 판 하나의 파일 묶음. 한 폴더에 나란히 있는 파일들이고(이름에 경로가 없다), 들어가는 문은 index.html이다.
+// 앱 코드는 같은 모양에 폴더가 든 이름까지 받는다 (nested: 정적 앱 `assets/app.js`, 스토어 9.13. 템플릿 앱인지는 AppCodeBundle이 본다).
 // 보낼 때의 형식은 이름의 확장자로 정한다: 만든 쪽이 적은 형식을 믿지 않고, 모르는 확장자는 내려받는 파일로 둔다.
 export class PageFiles {
   static readonly ENTRY = 'index.html';
   static readonly MAX = 100;
+  /** 폴더가 있는 묶음(정적 앱 코드, 스토어 9.13)의 한도: 파일 수 · 폴더 깊이 · 경로 길이 */
+  static readonly NESTED_MAX = 500;
+  private static readonly DEPTH_MAX = 6;
+  private static readonly PATH_MAX = 300;
   /** 경로 없는 이름 (제어 문자 같은 것은 결과물을 받을 때 task가 이미 걸렀다) */
   private static readonly NAME = /^[^/\\]{1,120}$/;
   private static readonly HASH = /^[0-9a-f]{64}$/;
@@ -47,12 +52,15 @@ export class PageFiles {
 
   private constructor(private readonly entries: readonly PageFileEntry[]) {}
 
-  /** 받은 목록(이벤트나 표의 files)에서. 모양이 틀리거나 index.html이 없으면 RuleViolation */
-  static of(raw: unknown): PageFiles {
+  /**
+   * 받은 목록(이벤트나 표의 files)에서. 모양이 틀리거나 index.html이 없으면 RuleViolation.
+   * nested: 폴더가 있는 이름(`assets/app.js`)도 받는다 (앱 코드. 페이지는 늘 한 폴더다)
+   */
+  static of(raw: unknown, nested = false): PageFiles {
     if (!Array.isArray(raw) || raw.length === 0) throw new RuleViolation('페이지에 파일이 없어요');
-    if (raw.length > PageFiles.MAX)
-      throw new RuleViolation(`페이지의 파일은 ${PageFiles.MAX}개까지예요`);
-    const entries = raw.map((item) => PageFiles.entry(item));
+    const max = nested ? PageFiles.NESTED_MAX : PageFiles.MAX;
+    if (raw.length > max) throw new RuleViolation(`페이지의 파일은 ${max}개까지예요`);
+    const entries = raw.map((item) => PageFiles.entry(item, nested));
     const names = new Set(entries.map((e) => e.name));
     if (names.size !== entries.length) throw new RuleViolation('이름이 같은 파일이 있어요');
     if (!names.has(PageFiles.ENTRY)) throw new RuleViolation(`${PageFiles.ENTRY}이 없어요`);
@@ -83,9 +91,22 @@ export class PageFiles {
     return this.entries;
   }
 
-  private static entry(raw: unknown): PageFileEntry {
+  /** 폴더가 든 이름인가 */
+  static isNested(name: string): boolean {
+    return name.includes('/');
+  }
+
+  /** 이름 규칙: 마디마다 경로 없는 이름이고 숨김(.)이 아니다. nested가 아니면 마디는 하나 */
+  private static named(name: unknown, nested: boolean): name is string {
+    if (typeof name !== 'string' || name.length > PageFiles.PATH_MAX) return false;
+    const parts = name.split('/');
+    if (parts.length > (nested ? PageFiles.DEPTH_MAX : 1)) return false;
+    return parts.every((part) => PageFiles.NAME.test(part) && !part.startsWith('.'));
+  }
+
+  private static entry(raw: unknown, nested: boolean): PageFileEntry {
     const { name, blobHash, mime, sizeBytes } = (raw ?? {}) as Partial<PageFileEntry>;
-    if (typeof name !== 'string' || !PageFiles.NAME.test(name) || name.startsWith('.'))
+    if (!PageFiles.named(name, nested))
       throw new RuleViolation(`페이지 파일의 이름이 맞지 않아요: ${String(name)}`);
     if (typeof blobHash !== 'string' || !PageFiles.HASH.test(blobHash))
       throw new RuleViolation(`${name}: 파일 해시가 맞지 않아요`);

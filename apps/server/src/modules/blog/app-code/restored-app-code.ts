@@ -8,7 +8,7 @@ import { AppCodeBundle } from './app-code-bundle';
 // 복원하면 그 앱의 버전 1(source restore)이 되어 바로 보인다. 버전 기록과 확인 대기 버전은 싣지 않는다 (코드는 지금 모양이 곧 앱이다).
 // 파일은 사람이 올리거나 AI가 만든 것이라 믿지 않는다: 저장할 때와 같은 묶음 규칙(AppCodeBundle)을 지나야 들어온다.
 export class RestoredAppCode {
-  static readonly PATH = /^blog\/apps\/([^/]+)\/code\/([^/]+)$/;
+  static readonly PATH = /^blog\/apps\/([^/]+)\/code\/(.+)$/;
   /** 복원한 코드의 버전 번호 · 출처 */
   private static readonly SEQ = 1;
   private static readonly SOURCE = 'restore';
@@ -47,7 +47,7 @@ export class RestoredAppCode {
         manifest = file.body.toString('utf8');
     }
     try {
-      const files = PageFiles.of(entries.sort((a, b) => (a.name < b.name ? -1 : 1)));
+      const files = AppCodeBundle.files(entries.sort((a, b) => (a.name < b.name ? -1 : 1)));
       AppCodeBundle.of(files, manifest);
       return new RestoredAppCode(slug, files, blobs);
     } catch (error) {

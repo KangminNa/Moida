@@ -21,6 +21,7 @@ import type { RunnerConfig } from './runner-config';
 import { SandboxRoom } from './sandbox-room';
 import type { SandboxStage } from './sandbox-stage';
 import { StageCheck } from './stage-check';
+import { ZipIndex } from './zip-index';
 
 /** 만들기 작업의 재료 id (payload.make). 서버가 이미 걸렀지만 지시문 · 도구 입력에 쓰기 전에 모양을 다시 본다 */
 export class MakeMaterials {
@@ -244,12 +245,43 @@ export class MakeStage implements SandboxStage {
       StageCheck.seen('결과물 파일', made, made ? `${names.length}개` : '없음', none),
     ];
     if (this.app !== null)
-      return [...checks, ...AppCodeCheck.checks(this.app.code, await this.madeCode(dir, files))];
+      return [...checks, ...(await this.codeChecks(this.app.code, dir, files))];
     if (!this.job.page || this.base !== null) return checks;
     const entry = names.includes(MakeStage.ENTRY);
     const why = `새 페이지는 ${dir}/${MakeStage.ENTRY}가 문이에요. 없으면 페이지가 되지 않아요`;
     checks.push(StageCheck.seen(MakeStage.ENTRY, entry, entry ? '있음' : '없음', why));
     return checks;
+  }
+
+  /**
+   * 앱 코드 일의 검사. app.zip을 냈으면 그 안이 묶음 전체다 (폴더가 든 정적 앱, 스토어 9.13): zip의 파일 목록과 cairn.json을 본다.
+   * 그 밖에는 받은 코드 위에 낸 파일을 얹은 모양을 본다
+   */
+  private async codeChecks(
+    code: AppCodeBase,
+    dir: string,
+    files: readonly FolderEntry[],
+  ): Promise<StageCheck[]> {
+    if (!files.some((f) => f.name === AppCodeCheck.PACKED))
+      return AppCodeCheck.checks(code, await this.madeCode(dir, files));
+    const bytes = await this.agent.readBytes(
+      join(dir, AppCodeCheck.PACKED),
+      AppCodeCheck.BYTES_MAX,
+    );
+    const zip = bytes === null ? null : ZipIndex.read(bytes);
+    if (zip === null) return AppCodeCheck.packed(code, null);
+    const manifest = AppCodeCheck.MANIFEST;
+    return AppCodeCheck.packed(
+      code,
+      zip.entries.map(
+        (e) =>
+          new AppCodeEntry(
+            e.name,
+            e.size,
+            e.name === manifest ? zip.text(manifest, MakeStage.MANIFEST_MAX) : null,
+          ),
+      ),
+    );
   }
 
   /**

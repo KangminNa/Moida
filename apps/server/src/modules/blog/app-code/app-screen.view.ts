@@ -294,6 +294,35 @@ export class AppScreenView {
 }
 
 /**
+ * 정적 앱의 화면 (스토어 9.13, cairn.json의 "render": "static"): 템플릿을 채우지 않고 묶음의 파일을 그대로 내보낸다.
+ * file은 이 주소가 가리키는 파일 (없는 주소 중 확장자가 없는 것은 index.html: 앱 안의 화면 전환), 없는 파일이면 null(404).
+ * HTML이면 글(text)을 함께 준다: 웹이 주소 기준(<base>)과 데이터 블록을 넣어 격리 머리글과 함께 보낸다.
+ * 그 밖의 파일은 웹이 파일 주소(files/<경로>)에서 받아 넘긴다
+ */
+export class AppScreenStaticView {
+  constructor(
+    private readonly seq: number,
+    private readonly file: string | null,
+    private readonly text: string | null,
+    private readonly hosts: readonly string[],
+    /** HTML로 나가는 화면에만 싣는다 (그 밖의 파일은 웹이 파일 주소에서 받아 넘길 뿐이다) */
+    private readonly data: AppScreenDataView | null,
+  ) {}
+
+  toJSON() {
+    return {
+      status: this.file === null ? 404 : 200,
+      seq: this.seq,
+      static: { file: this.file, text: this.text },
+      hosts: [...this.hosts],
+      data: this.data === null ? null : this.data.toJSON(),
+      redirect: null,
+      page: null,
+    };
+  }
+}
+
+/**
  * 화면이 페이지다 (페이지 앱 P1 ④, 2026-11-20): 앱 코드를 만든 적이 없는 페이지 앱에 공개 페이지가 있으면 그 페이지가 앱의 화면이다.
  * 웹이 첫 화면을 <base>/index.html로 보내(페이지 안의 상대 주소가 앱 주소 아래로 풀리게) 페이지의 파일을 앱 주소 아래로 내보낸다
  */

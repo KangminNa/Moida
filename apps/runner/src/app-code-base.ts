@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Json } from './json';
 
 /** 앱 코드의 파일 하나. 글 파일이면 내용(text)이 오고, 그림 같은 파일은 이름 · 크기만 온다 */
@@ -16,8 +16,11 @@ export class AppCodeFile {
 // AI는 바뀐 파일만 내면 된다: 서버가 이 코드 위에 같은 이름을 덮어 새 버전을 만든다 (내지 않은 파일은 그대로 남는다).
 // 검사(AppCodeCheck)도 이 코드 위에 낸 파일을 얹은 모양을 본다.
 export class AppCodeBase {
-  /** 서버가 이미 걸렀지만 디스크에 쓰기 전에 다시 본다: 폴더 구분 · 숨김 · 제어 문자 없는 120자까지 */
-  private static readonly NAME = /^(?!\.)[^/\\\p{Cc}]{1,120}$/u;
+  /**
+   * 서버가 이미 걸렀지만 디스크에 쓰기 전에 다시 본다: 마디마다 숨김 · 제어 문자 · 역슬래시 없는 120자까지,
+   * 폴더는 정적 앱의 것이고 경로는 파일까지 여섯 마디 (스토어 9.13, 서버의 PageFiles와 같다). ".." 마디는 숨김이라 걸린다
+   */
+  private static readonly NAME = /^(?:(?!\.)[^/\\\p{Cc}]{1,120}\/){0,5}(?!\.)[^/\\\p{Cc}]{1,120}$/u;
   static readonly DIR = 'app';
 
   private constructor(
@@ -56,8 +59,12 @@ export class AppCodeBase {
   async writeTo(dir: string): Promise<string> {
     const into = join(dir, AppCodeBase.DIR);
     await mkdir(into, { mode: 0o700 });
-    for (const f of this.files)
-      if (f.text !== null) await writeFile(join(into, f.name), f.text, { flag: 'wx', mode: 0o600 });
+    for (const f of this.files) {
+      if (f.text === null) continue;
+      const path = join(into, f.name);
+      if (f.name.includes('/')) await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+      await writeFile(path, f.text, { flag: 'wx', mode: 0o600 });
+    }
     return into;
   }
 
