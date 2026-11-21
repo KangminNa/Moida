@@ -44,7 +44,7 @@ export class SubtaskWait {
     failed: '하위 작업 하나가 실패해 먼저 깨웠어요 (나머지는 계속 돌아요)',
     deadline: '기다리는 기한이 지나 지금까지의 결과로 깨웠어요',
     owner: '관리자가 지금까지의 결과로 답해 달라고 했어요',
-    help: '팀원이 나눌 부분을 적어 도움을 청해 먼저 깨웠어요 (나머지는 계속 돌아요)',
+    help: '일꾼이 나눌 부분을 적어 도움을 청해 먼저 깨웠어요 (나머지는 계속 돌아요)',
     change: '관리자가 팀의 판단을 바꿔 먼저 깨웠어요 (나머지는 계속 돌아요)',
   };
 
@@ -113,7 +113,7 @@ export class SubtaskWait {
     if (row.status !== 'running' || !leaseAlive)
       throw new Conflict(`실행 중인 작업이 아니에요 (${row.status})`);
     if (row.parent_id === null)
-      throw new RuleViolation('팀장이 맡긴 일에서만 도움을 청해요. 직접 끝내거나 아래 팀에 맡겨요');
+      throw new RuleViolation('대표가 맡긴 일에서만 도움을 청해요. 맨 위 일은 직접 나눠 맡겨요');
   }
 
   /** 이미 청한 수가 한도면 RuleViolation */

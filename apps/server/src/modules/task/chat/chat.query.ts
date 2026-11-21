@@ -81,7 +81,7 @@ export class ChatQuery extends BaseQuery {
       SELECT * FROM task.chats WHERE space_id = ${spaceId} AND id = ${req.id} AND deleted_at IS NULL`;
     if (!chat) throw new NotFound('대화를 찾을 수 없어요');
     const [partner] = await this.sql<ChatPartnerRow[]>`
-      SELECT name, status, reports_to, deleted_at FROM task.agents WHERE id = ${chat.agent_id}`;
+      SELECT name, status, deleted_at FROM task.agents WHERE id = ${chat.agent_id}`;
     const ids = ChatRequest.turns(chat.id, chat.turns - ChatQuery.TURNS + 1, chat.turns);
     const turns = await this.turns(spaceId, ids);
     const [board] = await this.updates.ownerBoard(actor, chat.id);

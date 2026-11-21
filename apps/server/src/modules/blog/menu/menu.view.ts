@@ -34,8 +34,6 @@ export class MenuView {
       kind: r.kind,
       /** 편집 방침 (이 메뉴에 쓰는 AI가 읽는다) */
       policy: r.policy,
-      /** 운영 팀 (에이전트 id) */
-      agentId: r.agent_id,
       rss: r.rss,
       sort: r.sort,
       items: this.items,
@@ -74,7 +72,7 @@ export class PublicMenuListView {
 
 /**
  * blog_menus의 답: 글을 쓸 AI가 고를 앱 · 메뉴와 편집 방침, 호 목록 메뉴에는 만드는 중인 호. MCP는 snake_case.
- * 앱 · 운영 팀 · can_write는 스토어 2단계에서 더했다 (MCP는 칸을 더하기만 한다)
+ * 앱 · can_write는 스토어 2단계에서 더했다 (MCP는 칸을 더하기만 한다). 운영 팀은 없앴다 (2026-11-21): can_write는 늘 true
  */
 export class ToolMenuView {
   constructor(
@@ -83,8 +81,6 @@ export class ToolMenuView {
     private readonly drafts: readonly Readonly<
       Pick<IssueRow, 'id' | 'menu_id' | 'number' | 'title'>
     >[],
-    /** 이 요청자가 글을 놓을 수 있는 앱 · 메뉴의 id (운영 팀, AppTeam) */
-    private readonly writable: ReadonlySet<string>,
     /** 한 앱을 골랐을 때 그 앱의 최근 공개 글 (문체 프로필, 2026-11-20). 모든 앱이면 빈 목록 */
     private readonly recent: readonly Pick<PostRow, 'id' | 'title' | 'published_at'>[] = [],
   ) {}
@@ -97,8 +93,7 @@ export class ToolMenuView {
         slug: a.slug,
         kind: a.kind,
         policy: a.policy,
-        agent_id: a.agent_id,
-        can_write: this.writable.has(a.id),
+        can_write: true,
       })),
       menus: this.rows.map((r) => ({
         id: r.id,
@@ -106,8 +101,7 @@ export class ToolMenuView {
         name: r.name,
         kind: r.kind,
         policy: r.policy,
-        agent_id: r.agent_id,
-        can_write: this.writable.has(r.id),
+        can_write: true,
         issues: this.drafts
           .filter((i) => i.menu_id === r.id)
           .map((i) => ({ id: i.id, number: i.number, title: i.title })),
@@ -135,7 +129,6 @@ export class MenuSettingView {
       slug: r.slug,
       kind: r.kind,
       policy: r.policy,
-      agent_id: r.agent_id,
       rss: r.rss,
       sort: r.sort,
     };

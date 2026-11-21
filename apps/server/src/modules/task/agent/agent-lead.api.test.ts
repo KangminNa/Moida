@@ -63,11 +63,11 @@ describe('대표 (O-2)', () => {
     }
     const boss = await lead();
     assert.deepEqual(
-      [boss.name, boss.scopes, boss.reportsTo, boss.approvalActions],
-      ['대표', ['read_public'], null, []],
+      [boss.name, 'scopes' in boss, 'reportsTo' in boss, boss.approvalActions],
+      ['대표', false, false, ['browser.site.publish', 'browser.site.login']],
     );
     const listed = ok(await api.get('/api/agents', owner)).agents as Json[];
-    assert.ok(!listed.some((a) => a.id === boss.id), '목록 · 조직도에 보이지 않는다');
+    assert.ok(!listed.some((a) => a.id === boss.id), '일꾼 목록에 보이지 않는다');
     const again = ok(
       await api.request('POST', '/api/chats', owner, { requestId: randomUUID(), message: '또' }),
       201,
@@ -82,7 +82,7 @@ describe('대표 (O-2)', () => {
     );
   });
 
-  test('관리자는 AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만 바꾼다. 이름 · 역할 · 권한 · 승인 동작 · 러너는 422', async () => {
+  test('관리자는 AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만 바꾼다. 이름 · 역할 · 승인 동작 · 러너는 422', async () => {
     const changed = ok(
       await patch({ model: 'opus', effort: 'high', monthlyLimit: 500000, fiveHourLimit: 100000 }),
     );
@@ -93,10 +93,8 @@ describe('대표 (O-2)', () => {
     for (const body of [
       { name: '사장' },
       { role: '다른 일' },
-      { scopes: ['read_public', 'read_all'] },
       { approvalActions: ['blog.post.publish'] },
       { runnerId: null },
-      { reportsTo: (await agent('윗사람')).id },
     ]) {
       const res = await patch(body);
       assert.equal(res.status, 422, `${JSON.stringify(body)} ${res.text}`);
@@ -106,23 +104,8 @@ describe('대표 (O-2)', () => {
     ok(await patch({ reviewerId: null }));
   });
 
-  test('아무도 대표에게 보고하지 않고, 대표는 지우지 못한다 (422)', async () => {
+  test('대표는 지우지 못한다 (422)', async () => {
     const boss = await lead();
-    const res = await api.request('POST', '/api/agents', owner, {
-      requestId: randomUUID(),
-      name: '대표 밑',
-      tool: 'claude',
-      scopes: ['read_public'],
-      reportsTo: boss.id,
-    });
-    assert.equal(res.status, 422, res.text);
-    assert.match(res.text, /대표에게는 보고하지 않아요/);
-    const head = await agent('팀장');
-    const moved = await api.request('PATCH', `/api/agents/${head.id}`, owner, {
-      version: head.version,
-      reportsTo: boss.id,
-    });
-    assert.equal(moved.status, 422, moved.text);
     const gone = await api.request('POST', `/api/agents/${boss.id}/delete`, owner, {
       version: boss.version,
     });

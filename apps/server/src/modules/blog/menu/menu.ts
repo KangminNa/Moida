@@ -11,8 +11,7 @@ import { MenuView } from './menu.view';
 
 // 메뉴 하나 (blog.menus, 2차 6단계). 앱 첫 화면 위쪽 메뉴 줄의 한 칸이고 주소는 /<앱>/m/<주소>다 (스토어 1단계: 메뉴는 앱 하나에 든다).
 // 종류는 만들 때만 정한다: posts(글 목록) · issues(호 목록, 매거진) · pages(페이지 모음) · page(페이지 하나).
-// 편집 방침(policy)은 이 메뉴에 쓰는 AI가 읽고, 운영 팀장(agent_id)과 그 아래 팀이 이 메뉴에 올린다 (스토어 2단계, AppTeam:
-// 메뉴에 운영 팀이 있으면 앱의 팀보다 먼저. task의 값이라 외래키 없음. 고를 수 있는 에이전트인지는 Service가 platform AgentDirectory로 본다).
+// 편집 방침(policy)은 이 메뉴에 쓰는 AI가 읽는다. 운영 팀은 없앴다 (2026-11-21 팀 없는 에이전트: 어느 에이전트나 올린다).
 // 메뉴는 설정이라 판을 남기지 않는다. 안이 비어야 지운다 (MenuService.remove).
 export class Menu extends TableEntity<MenuRow, MenuNew> {
   static readonly POSTS = 'posts';
@@ -48,7 +47,6 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
         throw new RuleViolation(`편집 방침은 ${Menu.POLICY_MAX}자까지예요`);
       return value.trim();
     },
-    agent_id: (value) => value,
     rss: (value) => value,
   };
 
@@ -77,10 +75,7 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
       },
       true,
     );
-    menu.accept(
-      { sort: 0, policy: '', agent_id: null, rss: true, ...fields, name, slug },
-      Menu.RULES,
-    );
+    menu.accept({ sort: 0, policy: '', rss: true, ...fields, name, slug }, Menu.RULES);
     return menu;
   }
 
@@ -99,11 +94,6 @@ export class Menu extends TableEntity<MenuRow, MenuNew> {
   /** 든 앱 (스토어 1단계). 메뉴에 올린 글 · 페이지도 이 앱에 든다 */
   get appId(): string {
     return this.row.app_id;
-  }
-
-  /** 운영 팀장 (에이전트 id). 운영 팀은 그 에이전트와 그 아래 팀 전체 (AppTeam). 없으면 null */
-  get agentId(): string | null {
-    return this.row.agent_id;
   }
 
   get name(): string {

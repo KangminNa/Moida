@@ -15,7 +15,7 @@ import {
   PostTarget,
   PullTarget,
 } from './ApprovalTargets';
-import { ClickTarget, LoginDecide, LoginTarget } from './BrowserApproval';
+import { ClickTarget, LoginDecide, LoginTarget, PlanTarget } from './BrowserApproval';
 import {
   APPROVE_LABELS,
   actionLabel,
@@ -142,6 +142,8 @@ function Loaded({
         <PullTarget approval={a} />
       ) : a.action === START_CODE ? (
         <AskTarget approval={a} />
+      ) : a.action === PUBLISH_SITE && a.target.kind === 'browser_click_plan' ? (
+        <PlanTarget approval={a} />
       ) : a.action === PUBLISH_SITE ? (
         <ClickTarget approval={a} />
       ) : a.action === LOGIN_SITE ? (

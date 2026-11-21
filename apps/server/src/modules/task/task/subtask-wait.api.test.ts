@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { after, before, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, type TestUser } from '../../../testing/api-client';
 import { Database, OutboxWorker } from '../../platform';
 import { SubtaskWaitJob } from './subtask-wait.job';
@@ -8,6 +8,7 @@ import { SubtaskWaitJob } from './subtask-wait.job';
 // 팀원 기다리기 (2026-11-19 사용자 요청 "팀원 기다리는 게 너무 오래 걸린다"): 위 작업은 하위 작업을 모두 기다리지 않는다.
 // 실패 · 기한 · 관리자 재촉으로 먼저 깨고, 깬 일에는 끝나지 않은 일이 상태 · 맡긴 때와 함께 온다. 더 기다리기(wait_subtasks),
 // 마무리하면 끝나지 않은 하위 작업은 취소(승인을 기다리는 일은 그대로), 대화의 일은 대기열에서 먼저.
+// 맡기는 쪽은 대표 하나다 (2026-11-21 팀 없는 같은 일꾼): 대표가 일꾼에게 맡기고, 일꾼은 ask_help로 나눌 부분을 알린다.
 
 type Json = Record<string, unknown>;
 
@@ -45,12 +46,33 @@ const newAgent = async (name: string, more: Json = {}) =>
       requestId: randomUUID(),
       name: `${name} ${randomUUID().slice(0, 6)}`,
       tool: 'claude',
-      scopes: ['read_public', 'write'],
       approvalActions: [],
       ...more,
     }),
     201,
   );
+
+/** 끝나지 않은 일을 모두 닫는다 (앞 테스트 · 앞 파일이 남긴 일, 대표를 만든 첫 대화의 회차) */
+const closeOpen = async () => {
+  await db.sql`
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
+    WHERE status IN ('queued', 'running', 'waiting')`;
+};
+
+/** 대표 (O-2): 첫 대화에서 생긴다. 같은 DB를 쓰는 앞 파일이 이미 만들었을 수 있다 */
+async function leadAgent(): Promise<Json> {
+  const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+  if (found) return found;
+  ok(
+    await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      message: '대표를 만드는 첫 대화',
+    }),
+    201,
+  );
+  await closeOpen();
+  return ok(await api.get('/api/agents/lead', owner)).lead as Json;
+}
 
 const getTask = async (id: unknown) => ok(await api.get(`/api/tasks/${id}`, owner));
 
@@ -72,19 +94,18 @@ const order = (agent: Json) => ({
   instruction: '맡은 부분을 해 주세요',
 });
 
-/** 팀장과 팀원 셋, 팀장의 일 하나를 빌려 둘에게 맡긴다 (기한 minutes) */
+/** 대표와 일꾼 셋, 대표의 일 하나를 빌려 둘에게 맡긴다 (기한 minutes) */
 async function delegated(minutes?: number) {
-  const lead = await newAgent('팀장');
+  const lead = await leadAgent();
   const members = [];
-  for (const name of ['조사', '정리', '그림'])
-    members.push(await newAgent(name, { reportsTo: lead.id }));
+  for (const name of ['조사', '정리', '그림']) members.push(await newAgent(name));
   const parent = ok(
     await api.request('POST', '/api/tasks', owner, {
       requestId: randomUUID(),
       agentId: lead.id,
       kind: 'general',
       title: '나눠서 하기',
-      instruction: '팀에 나눠 맡겨 주세요',
+      instruction: '일꾼에게 나눠 맡겨 주세요',
     }),
     201,
   );
@@ -121,7 +142,13 @@ before(async () => {
     }),
   );
 });
-after(() => api.close());
+after(async () => {
+  await closeOpen(); // 뒤의 테스트 파일이 이 파일의 일(대화 회차 포함)을 빌리지 않게
+  await api.close();
+});
+
+/** 이 테스트의 일만 빌려 가게 앞 테스트가 남긴 일을 치운다 */
+beforeEach(closeOpen);
 
 describe('먼저 깨우기', () => {
   test('하위 작업 하나가 실패하면 형제를 기다리지 않고 깨우고, 끝나지 않은 일은 상태 · 맡긴 때와 함께 온다', async () => {
@@ -204,7 +231,7 @@ describe('깬 뒤에 정하기', () => {
     const [first, second] = [0, 1].map(
       (i) => ((children.get(String((members[i] as Json).id)) as Json).task as Json).id,
     );
-    // 둘째 팀원은 승인을 기다리는 중 (결재를 올린 뒤의 상태)
+    // 둘째 일꾼은 승인을 기다리는 중 (결재를 올린 뒤의 상태)
     await db.sql`UPDATE task.tasks SET status = 'waiting', wait_reason = 'approval' WHERE id = ${String(second)}`;
     await api.service(SubtaskWaitJob).run(new Date(Date.now() + 2 * 60_000));
     (await take(1)).get(String(lead.id));
@@ -220,8 +247,8 @@ describe('깬 뒤에 정하기', () => {
   });
 });
 
-describe('팀원 돕기 (2026-11-20)', () => {
-  test('ask_help: 팀원이 나눌 부분을 적으면 기다리던 팀장을 먼저 깨우고, 팀장은 끝나지 않은 일의 진행 기록과 도움 요청 줄을 받는다', async () => {
+describe('일꾼 돕기 (2026-11-20)', () => {
+  test('ask_help: 일꾼이 나눌 부분을 적으면 기다리던 대표를 먼저 깨우고, 대표는 끝나지 않은 일의 진행 기록과 도움 요청 줄을 받는다', async () => {
     const { lead, members, parent, children } = await delegated(30);
     const [slow, quick] = [0, 1].map(
       (i) => children.get(String((members[i] as Json).id)) as Json,
@@ -238,8 +265,8 @@ describe('팀원 돕기 (2026-11-20)', () => {
     const asked = await tool(String(slow.run_token), 'ask_help', { part: '6~10번 자료 요약' });
     assert.equal(asked.ok, true, JSON.stringify(asked.body));
     assert.deepEqual(asked.body, { asked: true, lead_woken: true });
-    assert.equal((await getTask(parent.id)).status, 'queued', '팀장을 먼저 깨운다');
-    assert.equal((await getTask(slowId)).status, 'running', '요청한 팀원은 계속 일한다');
+    assert.equal((await getTask(parent.id)).status, 'queued', '대표를 먼저 깨운다');
+    assert.equal((await getTask(slowId)).status, 'running', '요청한 일꾼은 계속 일한다');
 
     const woken = (await take(1)).get(String(lead.id)) as Json;
     assert.equal(woken.wake, 'help');
@@ -249,7 +276,7 @@ describe('팀원 돕기 (2026-11-20)', () => {
     const other = results.find((r) => r.task_id === (quick.task as Json).id) as Json;
     assert.deepEqual(other.progress, [], '기록이 없으면 빈 목록');
 
-    // 팀장이 이미 깼으면 깨우지 않고 기록만 남긴다. 일 하나에 두 번까지
+    // 대표가 이미 깼으면 깨우지 않고 기록만 남긴다. 일 하나에 두 번까지
     const again = await tool(String(slow.run_token), 'ask_help', { part: '그림 고르기' });
     assert.deepEqual(again.body, { asked: true, lead_woken: false });
     const third = await tool(String(slow.run_token), 'ask_help', { part: '하나 더' });
@@ -257,7 +284,7 @@ describe('팀원 돕기 (2026-11-20)', () => {
     assert.match(JSON.stringify(third.body), /2번까지/);
   });
 
-  test('ask_help는 팀장이 맡긴 일에서만: 맨 위 일은 직접 끝내거나 아래 팀에 맡긴다', async () => {
+  test('ask_help는 대표가 맡긴 일에서만: 맨 위 일은 직접 끝낸다', async () => {
     const solo = await newAgent('혼자');
     ok(
       await api.request('POST', '/api/tasks', owner, {
@@ -272,7 +299,7 @@ describe('팀원 돕기 (2026-11-20)', () => {
     const job = (await take(1)).get(String(solo.id)) as Json;
     const refused = await tool(String(job.run_token), 'ask_help', { part: '절반' });
     assert.equal(refused.ok, false);
-    assert.match(JSON.stringify(refused.body), /팀장이 맡긴 일에서만/);
+    assert.match(JSON.stringify(refused.body), /대표가 맡긴 일에서만/);
   });
 });
 

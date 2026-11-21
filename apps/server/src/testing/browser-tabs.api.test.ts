@@ -6,7 +6,7 @@ import { ApiClient, TestUser } from './api-client';
 
 // 기능 패키지 browser-tabs의 브라우저 에이전트 (2차 3단계 서버 브라우저 목표, 2026-11-14).
 // 사이트 일 · 둘러보기 맡기기, 러너의 browser_job · 단계 화면 · 로그인 필요 · 결재된 클릭(붙잡기 → 승인 → 누르기 · 바뀜),
-// 세션 지우기, 브라우저 일의 위임 규칙. 보는 사람별: 방문자 · write 기기 · 러너(쥔 · 쥐지 않은) · 에이전트 · 관리자.
+// 세션 지우기, 브라우저 일의 위임 규칙(대표만 맡긴다). 보는 사람별: 방문자 · write 기기 · 러너(쥔 · 쥐지 않은) · 에이전트 · 관리자.
 // 브라우저는 없다 (러너 쪽은 apps/runner의 단위 · 통합 테스트가 진짜 Chromium으로 본다).
 
 type Json = Record<string, unknown>;
@@ -61,12 +61,11 @@ async function newRunner(name: string): Promise<string> {
   return String(ok(made, 201).token);
 }
 
-async function newAgent(name: string, scopes: string[], more: Json = {}): Promise<string> {
+async function newAgent(name: string, more: Json = {}): Promise<string> {
   const made = await api.request('POST', '/api/agents', owner, {
     requestId: randomUUID(),
     name,
     tool: 'claude',
-    scopes,
     approvalActions: ['browser.site.publish', 'browser.site.login'],
     ...more,
   });
@@ -171,7 +170,7 @@ before(async () => {
     }),
   );
   ok(await api.request('POST', '/api/plugins/browser-tabs/enable', owner));
-  agentId = await newAgent('브라우저 담당', ['read_public', 'browse']);
+  agentId = await newAgent('브라우저 담당');
 });
 after(async () => {
   // 다음 시험 파일이 보는 도구 목록이 패키지 상태에 흔들리지 않게 끄고 끝낸다
@@ -261,6 +260,7 @@ describe('브라우저 에이전트: 관리자 입구', () => {
       login_needed: false,
       held: null,
       build: null,
+      click_plan: null,
     });
     const held = await hold(String(task.id));
     assert.equal(held.ok, false);
@@ -355,6 +355,7 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
       login_needed: false,
       held: null,
       build: null,
+      click_plan: null,
     });
     const step = await tool(runner, 'browser_shot_save', {
       task_id: taskId,
@@ -522,6 +523,168 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
     await drain();
     assert.equal((await clickOf(clickId)).status, 'dropped');
     assert.deepEqual((await tool(runner, 'browser_click_next')).body, { click: null });
+  });
+});
+
+describe('누르기 계획: 일 하나에 승인 한 번 (F2, 2026-11-21)', () => {
+  const press = (token: string, more: Json = {}) =>
+    tool(token, 'browser_press', {
+      page_url: 'https://blog.example/place/1',
+      role: 'button',
+      name: '저장',
+      ...more,
+    });
+
+  test('계획 붙잡기 → 한 번 승인 → 같은 일이 다시 돌고, AI가 요청한 버튼을 러너가 누른다. 횟수 · 사이트는 서버가 지킨다', async () => {
+    const site = await newSite();
+    const { taskId, run } = await siteJob(site);
+    const early = await press(run);
+    assert.equal(early.ok, false);
+    assert.match(JSON.stringify(early.body), /승인된 누르기 계획이 없어요/);
+    const away = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://evil.example/x',
+      summary: '저장',
+      count: 2,
+    });
+    assert.equal(away.ok, false, '허용 출처 밖');
+    const held = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://blog.example/place/1',
+      summary: '목록에 2곳 저장',
+      count: 2,
+    });
+    assert.equal(held.ok, true, JSON.stringify(held.body));
+    const asked = await tool(run, 'request_approval', {
+      request_id: `plan-${held.body.plan_id}`,
+      action: 'browser.site.publish',
+      target_kind: 'browser_click_plan',
+      target_id: held.body.plan_id,
+      target_version: held.body.version,
+      note: '누르기 계획: 목록에 2곳 저장 (2번)',
+    });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    assert.equal((await taskOf(taskId)).status, 'waiting');
+    await decide(ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)), 'approve');
+    const resumed = await taskOf(taskId);
+    assert.equal(resumed.status, 'queued', '승인하면 같은 일이 다시 대기열로');
+
+    const again = await leased(String(resumed.title));
+    assert.equal((again.task as Json).id, taskId);
+    const next = String(again.run_token);
+    const job = await tool(runner, 'browser_job', { task_id: taskId });
+    assert.deepEqual(job.body.click_plan, {
+      id: held.body.plan_id,
+      summary: '목록에 2곳 저장',
+      max_clicks: 2,
+      used: 0,
+      left: 2,
+    });
+    const elsewhere = await press(next, { page_url: 'https://evil.example/place/1' });
+    assert.match(JSON.stringify(elsewhere.body), /계획한 사이트/);
+
+    const first = await press(next, { note: '1/2 저장' });
+    assert.equal(first.ok, true, JSON.stringify(first.body));
+    assert.deepEqual([first.body.status, first.body.left], ['requested', 2]);
+    const busy = await press(next);
+    assert.match(JSON.stringify(busy.body), /앞 누르기가 끝난 뒤에/);
+    assert.equal(
+      (await tool(other, 'browser_press_next', { task_id: taskId })).ok,
+      false,
+      '쥐지 않은 러너',
+    );
+    const one = (await tool(runner, 'browser_press_next', { task_id: taskId })).body.click as Json;
+    assert.deepEqual(
+      [one.id, one.role, one.name, one.nth, one.note],
+      [first.body.click_id, 'button', '저장', 0, '1/2 저장'],
+    );
+    const clicked = await tool(runner, 'browser_press_save', {
+      task_id: taskId,
+      click_id: one.id,
+      version: one.version,
+      outcome: 'clicked',
+      after_url: 'https://blog.example/place/1?saved=1',
+      tab_id: 'A'.repeat(32),
+      box: { x: 1, y: 2, width: 3, height: 4 },
+      fingerprint: FINGERPRINT,
+      before_image: JPEG,
+      after_image: JPEG,
+    });
+    assert.equal(clicked.ok, true, JSON.stringify(clicked.body));
+    const seen = await tool(next, 'browser_press_result', {
+      click_id: first.body.click_id,
+      wait_seconds: 0,
+    });
+    assert.deepEqual([seen.body.status, seen.body.left], ['clicked', 1]);
+    const detail = await clickOf(String(first.body.click_id));
+    assert.deepEqual(
+      [detail.status, detail.beforeImage, detail.afterImage],
+      ['clicked', JPEG, JPEG],
+    );
+
+    const second = await press(next, { page_url: 'https://blog.example/place/2' });
+    const two = (await tool(runner, 'browser_press_next', { task_id: taskId })).body.click as Json;
+    const missed = await tool(runner, 'browser_press_save', {
+      task_id: taskId,
+      click_id: two.id,
+      version: two.version,
+      outcome: 'changed',
+      reason: '버튼이 없어요: button "저장"',
+    });
+    assert.equal(missed.ok, true, JSON.stringify(missed.body));
+    const late = await tool(next, 'browser_press_result', { click_id: second.body.click_id });
+    assert.deepEqual(
+      [late.body.status, late.body.reason, late.body.left],
+      ['changed', '버튼이 없어요: button "저장"', 0],
+      '가져갈 때 세므로 누르지 못한 것도 센다',
+    );
+    const over = await press(next);
+    assert.match(JSON.stringify(over.body), /계획한 2번을 다 눌렀어요/);
+
+    const submitted = await tool(runner, 'submit_result', {
+      task_id: taskId,
+      request_id: randomUUID(),
+      status: 'done',
+      result: { summary: '1곳 저장, 1곳은 버튼이 없음' },
+    });
+    assert.equal(submitted.ok, true, JSON.stringify(submitted.body));
+    await drain();
+    const [row] = await api.service(Database).sql`
+      SELECT status, used FROM browser_tabs.click_plans WHERE id = ${String(held.body.plan_id)}`;
+    assert.deepEqual([row?.status, row?.used], ['closed', 2], '작업이 끝나면 계획을 닫는다');
+  });
+
+  test('계획 결재의 수정 요청 · 반려는 계획을 닫고, 다시 빌린 일은 계획 없이 돈다', async () => {
+    const { taskId, run } = await siteJob(await newSite());
+    const held = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://blog.example/write',
+      summary: '글 3개 올리기',
+      count: 3,
+    });
+    const asked = await tool(run, 'request_approval', {
+      request_id: `plan-${held.body.plan_id}`,
+      action: 'browser.site.publish',
+      target_kind: 'browser_click_plan',
+      target_id: held.body.plan_id,
+      target_version: held.body.version,
+      note: '누르기 계획',
+    });
+    await decide(
+      ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)),
+      'revise',
+      '두 개만',
+    );
+    const back = await taskOf(taskId);
+    assert.equal(back.status, 'queued');
+    await leased(String(back.title));
+    const job = await tool(runner, 'browser_job', { task_id: taskId });
+    assert.equal(job.ok, true, JSON.stringify(job.body));
+    assert.equal(job.body.click_plan, null);
+    assert.equal((job.body.site as Json).origins !== undefined, true, '계획의 사이트로 돈다');
+    const [row] = await api.service(Database).sql`
+      SELECT status FROM browser_tabs.click_plans WHERE id = ${String(held.body.plan_id)}`;
+    assert.equal(row?.status, 'dropped');
   });
 });
 
@@ -882,16 +1045,27 @@ describe('API 기록 → API 사이트 도구 (B2 · B3, 2026-11-19)', () => {
 });
 
 describe('브라우저 일의 위임', () => {
-  async function leadJob(scopes: string[]): Promise<{ run: string; member: string; site: Json }> {
-    const lead = await newAgent(`팀장 ${scopes.join('+')}`, scopes, { approvalActions: [] });
-    const member = await newAgent('팀 브라우저 담당', ['read_public', 'browse'], {
-      reportsTo: lead,
-    });
+  /** 대표 (O-2). 없으면 첫 대화를 열어 만든다 */
+  async function leadId(): Promise<string> {
+    const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+    if (found) return String(found.id);
+    ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '대표를 만드는 첫 대화',
+      }),
+      201,
+    );
+    return String((ok(await api.get('/api/agents/lead', owner)).lead as Json).id);
+  }
+  /** 맡기는 쪽(agent)의 일을 러너가 빌린 작업 토큰, 맡을 일꾼, 사이트 */
+  async function jobOf(agent: string): Promise<{ run: string; member: string; site: Json }> {
+    const member = await newAgent('브라우저 일꾼');
     const mark = randomUUID().slice(0, 8);
     ok(
       await api.request('POST', '/api/tasks', owner, {
         requestId: randomUUID(),
-        agentId: lead,
+        agentId: agent,
         title: `조사 ${mark}`,
         instruction: '가입 양식을 채워 주세요',
       }),
@@ -900,42 +1074,40 @@ describe('브라우저 일의 위임', () => {
     const job = await leased(mark);
     return { run: String(job.run_token), member, site: await newSite() };
   }
-  const order = (member: string, site: Json | null) => ({
-    subtasks: [
-      {
-        request_id: randomUUID(),
-        to_agent_id: member,
-        kind: 'browse',
-        title: '양식 채우기',
-        instruction: '이름 칸에 홍길동',
-        ...(site
-          ? { target_kind: 'browser_site', target_id: site.id, target_version: site.version }
-          : {}),
-      },
-    ],
+  const subtask = (member: string, site: Json | null) => ({
+    request_id: randomUUID(),
+    to_agent_id: member,
+    kind: 'browse',
+    title: site ? '양식 채우기' : '둘러보기',
+    instruction: '이름 칸에 홍길동',
+    ...(site
+      ? { target_kind: 'browser_site', target_id: site.id, target_version: site.version }
+      : {}),
   });
 
-  test('공개 읽기만 가진 팀장은 사이트 일 · 둘러보기를 맡긴다. 브라우저 담당은 browser_sites로 사이트를 고른다', async () => {
-    const { run, member, site } = await leadJob(['read_public']);
+  test('대표는 비공개를 읽어도 일꾼에게 사이트 일 · 둘러보기를 맡긴다 (2026-11-21). 사이트는 browser_sites로 고른다', async () => {
+    const { run, member, site } = await jobOf(await leadId());
     const sites = await tool(run, 'browser_sites');
     assert.ok(
       (sites.body.sites as Json[]).some((s) => s.id === site.id && s.start_url === SITE.startUrl),
     );
-    const done = await tool(run, 'delegate_task', order(member, site));
+    const done = await tool(run, 'delegate_task', {
+      subtasks: [subtask(member, site), subtask(member, null)],
+    });
     assert.equal(done.ok, true, JSON.stringify(done.body));
-    const child = await taskOf(String(((done.body.subtasks as Json[])[0] as Json).task_id));
-    assert.deepEqual(
-      [child.kind, (child.target as Json).kind, (child.target as Json).id],
-      ['browse', 'browser_site', site.id],
-    );
+    const [siteJob, explore] = (await Promise.all(
+      (done.body.subtasks as Json[]).map((s) => taskOf(String(s.task_id))),
+    )) as [Json, Json];
+    const target = siteJob.target as Json;
+    assert.deepEqual([siteJob.kind, target.kind, target.id], ['browse', 'browser_site', site.id]);
+    assert.deepEqual([explore.kind, explore.target], ['browse', null], '대상 없으면 둘러보기');
   });
 
-  test('전체 읽기 · 초안 작성 권한이 있는 팀장은 브라우저 일을 맡기지 못한다', async () => {
-    for (const scopes of [['read_all'], ['read_public', 'write']]) {
-      const { run, member } = await leadJob(scopes);
-      const refused = await tool(run, 'delegate_task', order(member, null));
-      assert.equal(refused.ok, false, scopes.join());
-      assert.match(JSON.stringify(refused.body), /브라우저 일을 맡기지 못해요/);
-    }
+  test('일꾼은 브라우저 일을 맡기지 못한다: 맡기기는 대표만 (forbidden)', async () => {
+    const { run, member, site } = await jobOf(await newAgent('맡기려는 일꾼'));
+    const refused = await tool(run, 'delegate_task', { subtasks: [subtask(member, site)] });
+    assert.equal(refused.ok, false, JSON.stringify(refused.body));
+    assert.equal(refused.body.code, 'forbidden');
+    assert.match(String(refused.body.message), /대표만 일꾼에게 맡길 수 있어요/);
   });
 });

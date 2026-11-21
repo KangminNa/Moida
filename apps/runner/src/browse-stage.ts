@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import type { BrowseJob } from './browse-job';
 import { type AskedApproval, BrowseLogin } from './browse-login';
 import { BrowsePlan } from './browser-mcp';
-import { BrowserPages, type BrowserTab, ButtonProblem, type HeldButton } from './browser-page';
+import { BrowserPages, type BrowserTab } from './browser-page';
 import type { BrowserSlot } from './browser-slot';
 import { BrowserStop, BrowserStopProblem } from './browser-stop';
-import { BrowserUnavailable, TabUnreadable } from './browser-tabs';
+import { BrowserUnavailable } from './browser-tabs';
 import { CairnServer } from './cairn-server';
 import { ExploreProxy } from './explore-proxy';
 import { IntegrationExec } from './integration-exec';
@@ -15,6 +15,7 @@ import type { Job } from './job';
 import type { LoginFormRef } from './login-form-ref';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
 import { NetworkTap } from './network-tap';
+import { PressLoop } from './press-loop';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor } from './redactor';
@@ -24,6 +25,7 @@ import type { SandboxStage } from './sandbox-stage';
 import { SiteBuild } from './site-build';
 import type { StageCheck } from './stage-check';
 import { StepShots } from './step-shots';
+import { StopHold } from './stop-hold';
 
 type Note = (event: RunEvent) => void;
 
@@ -34,9 +36,10 @@ type Note = (event: RunEvent) => void;
 //   뒤: AI가 단계마다 찍은 화면을 올린다(browser_shot_save). browser-stop.json이 있으면
 //       final_click → 그 탭에서 버튼을 다시 찾아 지문 · 화면과 함께 붙잡고(browser_click_hold) 클릭 결재를 올린다
 //       login → 로그인 화면을 남기고(browser_login_needed) 로그인 결재를 올린다 ("로그인했어요"면 같은 작업이 처음부터 이어서)
+//       click_plan → 누르기 계획을 붙잡고(browser_click_plan) 계획 결재를 올린다. 승인되면 같은 작업이 이어서 돌고, 그 실행에서는
+//       AI가 browser_press로 요청한 버튼을 PressLoop가 다시 찾아 누른다 (F2, 2026-11-21)
 // 결재는 AI가 아니라 러너가 올린다: 지문과 화면이 있어야 승인 뒤에 "같은 버튼"을 확인할 수 있다 (ClickRunner가 누른다).
 export class BrowseStage implements SandboxStage {
-  static readonly PUBLISH_ACTION = 'browser.site.publish';
   private static readonly STOPPING = '러너가 멈춰요';
 
   readonly workspaceRoom = null;
@@ -52,6 +55,8 @@ export class BrowseStage implements SandboxStage {
   private before = new Set<string>();
   /** 요청 기록 (B2): 사이트 일 동안 그 사이트로 가는 API 요청의 모양 */
   private tap: NetworkTap | null = null;
+  /** 승인된 누르기 계획이 있는 실행에서 AI가 요청한 버튼을 누르는 고리 */
+  private presses: PressLoop | null = null;
   private approval: AskedApproval | null = null;
   private readonly login: BrowseLogin;
 
@@ -108,6 +113,17 @@ export class BrowseStage implements SandboxStage {
       if (!this.plan.loginNeeded) {
         this.tap = new NetworkTap(this.pages, site.origins);
         this.tap.start();
+        if (this.plan.clickPlan) {
+          const tabOf = (url: string, s: AbortSignal) => this.tabOf(url, s);
+          this.presses = new PressLoop(
+            this.server.presses,
+            this.pages,
+            this.job.taskId,
+            tabOf,
+            note,
+          );
+          this.presses.start(signal);
+        }
         return null;
       }
       // 로그인이 풀려 있다고 적혀 있다: AI를 띄우지 않고 로그인 결재를 바로 올린다 (관리자가 로그인할 탭을 열어 둔다)
@@ -134,6 +150,8 @@ export class BrowseStage implements SandboxStage {
       start: site?.startUrl ?? null,
       origins: site?.origins.join(', ') ?? null,
       held: plan.held?.pageUrl ?? null,
+      plan: plan.clickPlan?.summary ?? null,
+      left: plan.clickPlan?.left ?? null,
     });
     const browse = new BrowsePlan(site?.origins ?? [], join(dir, 'steps'), this.proxy?.url ?? null);
     const build = plan.build ? `\n\n${SiteBuild.part(prompts, plan.build)}` : '';
@@ -154,6 +172,8 @@ export class BrowseStage implements SandboxStage {
     workDir = '',
   ): Promise<RunEnding> {
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
+    await this.presses?.stop();
+    this.presses = null;
     if (this.dir)
       await new StepShots(this.server, this.job.taskId).ship(join(this.dir, 'steps'), signal, note);
     await this.shipRequests(note);
@@ -206,39 +226,14 @@ export class BrowseStage implements SandboxStage {
       );
       return done;
     }
-    const tab = await this.tabOf(stop.pageUrl, signal);
-    if (tab === null) return failed('멈춘 페이지의 탭을 찾지 못했어요');
-    let held: HeldButton;
-    try {
-      held = await this.pages.hold(tab, stop.button as NonNullable<BrowserStop['button']>, signal);
-    } catch (error) {
-      const known = [ButtonProblem, TabUnreadable, BrowserUnavailable].some(
-        (t) => error instanceof t,
-      );
-      if (!known) throw error;
-      return failed(`멈춘 버튼을 붙잡지 못했어요: ${(error as Error).message}`);
-    }
-    try {
-      const click = await this.server.holdClick(this.job.taskId, held, stop.note);
-      this.approval = {
-        requestId: `browser-click:${click.clickId}`,
-        action: BrowseStage.PUBLISH_ACTION,
-        targetKind: 'browser_click',
-        targetId: click.clickId,
-        targetVersion: click.version,
-        note: stop.note ?? `${held.button.role} "${held.button.name}" 앞에서 멈췄어요`,
-      };
-    } catch (error) {
-      if (!(error instanceof ToolRefused || error instanceof ServerUnreachable)) throw error;
-      return failed(`버튼을 붙잡지 못했어요: ${error.message}`);
-    }
-    note(
-      new RunEvent(
-        RunEvent.WRITE,
-        `마지막 버튼 앞에서 멈췄어요: ${held.button.name} (${BrowseStage.host(held.pageUrl)})`,
-        0,
-      ),
-    );
+    const hold = new StopHold(this.server, this.pages, this.job.taskId);
+    const held =
+      stop.kind === 'click_plan'
+        ? await hold.plan(stop)
+        : await hold.finalClick(await this.tabOf(stop.pageUrl, signal), stop, signal);
+    if ('error' in held) return failed(held.error);
+    this.approval = held.approval;
+    note(new RunEvent(RunEvent.WRITE, held.line, 0));
     return done;
   }
 
@@ -263,6 +258,8 @@ export class BrowseStage implements SandboxStage {
   }
 
   async close(): Promise<void> {
+    await this.presses?.stop();
+    this.presses = null;
     this.tap?.stop();
     this.tap = null;
     this.free?.();
@@ -323,9 +320,5 @@ export class BrowseStage implements SandboxStage {
     const same = (t: BrowserTab) => BrowserPages.withoutHash(t.url) === want;
     const fresh = tabs.filter((t) => !this.before.has(t.id));
     return fresh.find(same) ?? tabs.find(same) ?? (fresh.length === 1 ? (fresh[0] ?? null) : null);
-  }
-
-  private static host(url: string): string {
-    return URL.canParse(url) ? new URL(url).host : '';
   }
 }

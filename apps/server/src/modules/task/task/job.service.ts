@@ -177,9 +177,9 @@ export class JobService extends BaseService {
       const workTools = LeasePolicy.workTools(req.tools, req.ownLogins, usable, running);
       // 쉬는지는 작업을 잠그기 전에 따진다: 쉬는 에이전트의 일은 빌렸다가 돌려주지 않고 처음부터 건너뛴다
       const usage = await agents.usage(spaceId, now);
-      // 다른 러너에 묶인 에이전트의 일은 이 러너가 빌리지 않는다 (자동 배정도 그 에이전트를 고르지 않는다)
+      // 다른 러너에 묶인 에이전트의 일은 이 러너가 빌리지 않는다 (자동 배정도 그 에이전트를 고르지 않는다). 칸은 칸의 일만이라 묶임을 보지 않는다
       const ready = usage
-        .filter((u) => u.ready && u.agent.runsOn(runner.id))
+        .filter((u) => u.ready && u.agent.runsOn(runner.id, sandbox))
         .filter((u) => workTools === null || workTools.includes(u.agent.tool))
         .map((u) => u.agent);
       const roster = await agents.roster(spaceId, usage, now);

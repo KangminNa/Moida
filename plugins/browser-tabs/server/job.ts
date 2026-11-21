@@ -7,7 +7,7 @@ import {
   RuleViolation,
   type Work,
 } from '../../../apps/server/src/plugin-api';
-import { clicks, integrations, sites } from './schema';
+import { clickPlans, clicks, integrations, sites } from './schema';
 import type { ClickRow, ClickStatus, IntegrationRow, SiteRow } from './tables';
 
 // 브라우저 작업(browse) 하나가 어디서 도는지: 작업의 대상이 사이트(browser_site)면 그 사이트, 클릭(browser_click, 클릭 결재에서
@@ -22,6 +22,8 @@ export const PUBLISH_ACTION = 'browser.site.publish';
 export const LOGIN_ACTION = 'browser.site.login';
 export const SITE_TARGET = 'browser_site';
 export const CLICK_TARGET = 'browser_click';
+/** 누르기 계획 (F2, 2026-11-21): 결재의 대상. 계획 결재에서 고쳐 달라로 다시 온 일의 대상이기도 하다 */
+export const PLAN_TARGET = 'browser_click_plan';
 /** 사이트 도구 (2026-11-16 MCP 2단계): 굳히기 작업의 대상이자 켜기 결재의 대상 */
 export const INTEGRATION_TARGET = 'browser_integration';
 /** 시험을 통과한 사이트 도구를 켜는 결재 동작 */
@@ -59,6 +61,9 @@ export async function placeOf(work: Work, actor: Actor, job: LeasedWork): Promis
   else if (job.targetKind === CLICK_TARGET && job.targetId) {
     held = await work.row(clicks, { id: job.targetId, space_id: space });
     siteId = held?.site_id ?? null;
+  } else if (job.targetKind === PLAN_TARGET && job.targetId) {
+    const plan = await work.row(clickPlans, { id: job.targetId, space_id: space });
+    siteId = plan?.site_id ?? null;
   } else if (job.targetKind === INTEGRATION_TARGET && job.targetId) {
     integration = await work.row(integrations, { id: job.targetId, space_id: space });
     if (!integration) throw new NotFound('없는 사이트 도구예요');
@@ -81,6 +86,11 @@ export function pageUrlOf(f: RequestFields, name: string): string {
   const url = f.text(name, 2000);
   if (url && !/^https?:\/\//i.test(url)) f.reject(name, 'http · https 주소여야 해요');
   return url;
+}
+
+/** 누르기 계획을 승인했다: 같은 작업을 다시 대기열로 (코어의 결과 처리가 outcome continue를 본다, 플러그인 API 0.8) */
+export function planContinues(work: Work, spaceId: string, approvalId: string): void {
+  work.record(new DomainEvent(CLICK_DONE, 1, spaceId, { approvalId, outcome: 'continue' }));
 }
 
 /** 결재 뒤 실행의 결과를 남긴다: 실패면 이유와 함께 */

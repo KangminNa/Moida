@@ -14,7 +14,7 @@ import { type AppSettingsBody, AppSettingsForm } from './AppSettingsForm';
 const ICON_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어요';
 
-// 앱 관리 › 설정 (스토어 1-5): 이름 · 주소 · 설명 · 순서, 도메인(스토어 3-0), 아이콘, 삭제(글 · 페이지 · 호가 없을 때만, 빈 메뉴는 함께).
+// 앱 관리 › 설정 (스토어 1-5): 이름 · 주소 · 설명 · 순서 · 편집 방침, 도메인(스토어 3-0), 아이콘, 삭제(글 · 페이지 · 호가 없을 때만, 빈 메뉴는 함께).
 // 아이콘 · 저장은 앱 version이 오르므로 저장 뒤 목록을 다시 읽고 폼을 새로 만든다 (key)
 export function AppSettings({
   app,

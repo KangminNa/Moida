@@ -183,7 +183,7 @@ describe('목표 실행', () => {
     assert.equal(waiting.status, 'waiting');
     const approval = await approvalOf(waiting.pendingApprovalId);
     assert.equal(approval.action, 'task.goal.complete');
-    assert.match(String(approval.note), /2회차 · 팀장이 완료 조건을 다 채웠다고/);
+    assert.match(String(approval.note), /2회차 · 맡은 에이전트가 완료 조건을 다 채웠다고/);
     assert.equal((waiting.rounds as Json[]).length, 2, '결재문의 본문: 회차 보고 전부');
 
     await decide(waiting.pendingApprovalId, 'approve');

@@ -14,7 +14,7 @@ export function useDevices() {
   return useLiveValue('devices', () => api<DeviceList>('GET', '/api/devices'), DEVICE_TOPICS);
 }
 
-/** 로그인한 관리자와 화면에 보일 이름 (조직도 · 승인 도장). 신호가 없어 처음과 다시 연결될 때만 읽는다 */
+/** 로그인한 관리자와 화면에 보일 이름 (승인 도장 · 대화). 신호가 없어 처음과 다시 연결될 때만 읽는다 */
 export function useMe() {
   return useLiveValue('me', () => api<Owner>('GET', '/api/auth/me'), []);
 }

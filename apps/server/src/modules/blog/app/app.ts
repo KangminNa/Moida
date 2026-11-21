@@ -92,8 +92,6 @@ export class App extends TableEntity<AppRow, AppNew> {
         throw new RuleViolation(`편집 방침은 ${App.POLICY_MAX}자까지예요`);
       return value;
     },
-    // 운영 팀장이 맨 위의, 비공개를 읽지 않는 에이전트인지는 Service가 트랜잭션 전에 본다 (AppTeam.assertLeader)
-    agent_id: (value) => value,
   };
 
   /** 주소 규칙: 영어 소문자 · 숫자 · 하이픈, 못 쓰는 이름 제외 (겹침은 DB의 UNIQUE가 본다) */
@@ -179,11 +177,6 @@ export class App extends TableEntity<AppRow, AppNew> {
 
   get slug(): string {
     return this.row.slug;
-  }
-
-  /** 운영 팀장 (task의 에이전트 id). 없으면 null */
-  get agentId(): string | null {
-    return this.row.agent_id;
   }
 
   get name(): string {

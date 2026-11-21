@@ -3,7 +3,7 @@ import type { MenuRow } from '../blog.tables';
 import { Menu } from './menu';
 
 // 메뉴 입력의 모양. 뜻(이름 길이 · 주소 모양 · 순서 범위)은 Menu의 RULES가 검사한다.
-// 보내지 않은 칸은 그대로, 운영 팀 null은 비우기, 편집 방침 ""은 지우기다.
+// 보내지 않은 칸은 그대로, 편집 방침 ""은 지우기다.
 
 /** 만들기 · 고치기의 칸 */
 function fieldsOf(f: RequestFields, body: Record<string, unknown>): Partial<MenuRow> {
@@ -17,7 +17,6 @@ function fieldsOf(f: RequestFields, body: Record<string, unknown>): Partial<Menu
       : body.policy === ''
         ? ''
         : f.text('policy', Menu.POLICY_MAX),
-    agent_id: !has('agentId') ? undefined : body.agentId === null ? null : f.uuid('agentId'),
     rss: has('rss') ? f.boolean('rss') : undefined,
   };
 }

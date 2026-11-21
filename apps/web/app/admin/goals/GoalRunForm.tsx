@@ -19,8 +19,10 @@ const ROUNDS_LIMIT = 20;
 const CRITERIA_MAX = 20;
 
 // 목표 달성까지 맡기기: 칸과 보낼 본문만 가진다 (시작은 패널).
+// 맡을 에이전트는 누구든 된다 (2026-11-21 팀 없는 에이전트). 대표가 있으면 맨 앞이고 처음 값이다
 export function GoalRunForm({
   goals,
+  lead,
   agents,
   busy,
   problem,
@@ -28,6 +30,9 @@ export function GoalRunForm({
   onClose,
 }: {
   goals: readonly Goal[];
+  /** 대표 (멈췄거나 아직 없으면 null) */
+  lead: Agent | null;
+  /** 멈추지 않은 일꾼 */
   agents: readonly Agent[];
   busy: boolean;
   problem: string | null;
@@ -36,7 +41,7 @@ export function GoalRunForm({
 }) {
   const id = useId();
   const [goal, setGoal] = useState(goals[0]?.id ?? '');
-  const [agent, setAgent] = useState(agents[0]?.id ?? '');
+  const [agent, setAgent] = useState(lead?.id ?? agents[0]?.id ?? '');
   const [instruction, setInstruction] = useState('');
   const [criteria, setCriteria] = useState('');
   const [checkpoint, setCheckpoint] = useState('milestone');
@@ -74,7 +79,7 @@ export function GoalRunForm({
     <form className="panel" onSubmit={submit} aria-label="목표 달성까지 맡기기">
       <b>목표 달성까지 맡기기</b>
       <p className="note">
-        팀장 에이전트가 회차를 이어 돌며 하위 에이전트에게 나눠 맡겨요. 승인은 정한 때와 끝에만 와요
+        맡을 에이전트가 목표를 이룰 때까지 회차를 이어 돌아요. 승인은 정한 때와 끝에만 와요
       </p>
       <div className="field">
         <label htmlFor={`${id}-goal`}>목표</label>
@@ -93,7 +98,7 @@ export function GoalRunForm({
         </select>
       </div>
       <div className="field">
-        <label htmlFor={`${id}-agent`}>팀장</label>
+        <label htmlFor={`${id}-agent`}>맡을 에이전트</label>
         <select
           id={`${id}-agent`}
           className="input"
@@ -101,13 +106,14 @@ export function GoalRunForm({
           required
           onChange={(e) => change(() => setAgent(e.target.value))}
         >
+          {lead && <option value={lead.id}>대표</option>}
           {agents.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
             </option>
           ))}
         </select>
-        <small>나눠 맡길 에이전트는 조직도에서 이 팀장에게 보고하는 에이전트예요</small>
+        <small>대표는 일꾼에게 나눠 맡겨요</small>
       </div>
       <div className="field">
         <label htmlFor={`${id}-instruction`}>지시</label>
@@ -135,9 +141,7 @@ export function GoalRunForm({
           aria-invalid={lines.length > CRITERIA_MAX}
           onChange={(e) => change(() => setCriteria(e.target.value))}
         />
-        <small>
-          한 줄에 하나, {CRITERIA_MAX}개까지. 팀장은 모두 채웠을 때만 다 됐다고 보고해요
-        </small>
+        <small>한 줄에 하나, {CRITERIA_MAX}개까지. 모두 채웠을 때만 다 됐다고 보고해요</small>
       </div>
       <div className="field">
         <fieldset className="checks">

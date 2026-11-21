@@ -881,41 +881,21 @@ describe('웹 로그인 (러너가 로그인 명령을 대신 돌린다)', () =>
     assert.deepEqual(idsOf(await leaseAs({ ...NOTHING, tools: ['claude'] })), [taskId]);
   });
 
-  test('브라우저 작업(browse)은 browser를 알린 러너에게만, browse 권한이 있는 에이전트에게만 준다', async () => {
+  test('브라우저 작업(browse)은 browser를 알린 러너에게만 준다. 에이전트는 비공개 읽기 · 초안과 함께 브라우저를 쓴다 (2026-11-21)', async () => {
     await saveToken(newToken());
-    const both = await api.request('POST', '/api/agents', owner, {
-      requestId: randomUUID(),
-      name: '브라우저와 비공개',
-      tool: 'claude',
-      scopes: ['browse', 'read_all'],
-    });
-    assert.equal(both.status, 422, both.text);
-    // write도 임시 글 · 소재를 열어 함께 줄 수 없다
-    const withWrite = await api.request('POST', '/api/agents', owner, {
-      requestId: randomUUID(),
-      name: '브라우저와 초안',
-      tool: 'claude',
-      scopes: ['browse', 'write'],
-    });
-    assert.equal(withWrite.status, 422, withWrite.text);
     const agent = ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
-        name: '브라우저 담당',
+        name: '브라우저와 비공개',
         tool: 'claude',
-        scopes: ['read_public', 'browse'],
       }),
       201,
     );
-    // 규칙을 거치지 않는 쓰기도 DB가 막는다 (CHECK agents_browse_not_private)
-    for (const scopes of [
-      ['browse', 'read_all'],
-      ['browse', 'write'],
-    ])
-      await assert.rejects(
-        db.sql`UPDATE task.agents SET scopes = ${scopes} WHERE id = ${String(agent.id)}`,
-        /agents_browse_not_private/,
-      );
+    // 모든 에이전트가 같은 권한이다: 권한끼리 섞지 못하게 막던 규칙(CHECK agents_browse_not_private)은 없다
+    const [row] = await db.sql<{ scopes: string[] }[]>`
+      SELECT scopes FROM task.agents WHERE id = ${String(agent.id)}`;
+    for (const scope of ['browse', 'read_all', 'write'])
+      assert.ok(row?.scopes.includes(scope), `${scope} 권한이 있다`);
     const browse = await newTask(agent);
     await db.sql`UPDATE task.tasks SET kind = 'browse' WHERE id = ${String(browse.id)}`;
     const ability = { ...NOTHING, tools: ['claude'] };
@@ -926,31 +906,14 @@ describe('웹 로그인 (러너가 로그인 명령을 대신 돌린다)', () =>
 
   test('코드 작업(code)은 코드 러너 칸(sandbox 기기)에게만, 칸은 code만 받는다', async () => {
     await saveToken(newToken());
-    for (const scopes of [
-      ['code', 'read_all'],
-      ['code', 'write'],
-    ]) {
-      const mixed = await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: '코드와 비공개',
-        tool: 'claude',
-        scopes,
-      });
-      assert.equal(mixed.status, 422, mixed.text);
-    }
+    // 비공개를 읽는 에이전트도 코드 일을 한다 (2026-11-21, 같은 일꾼)
     const coder = ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
-        name: '코드 담당',
+        name: '코드와 비공개',
         tool: 'claude',
-        scopes: ['read_public', 'code'],
       }),
       201,
-    );
-    // 규칙을 거치지 않는 쓰기도 DB가 막는다 (CHECK agents_code_not_private)
-    await assert.rejects(
-      db.sql`UPDATE task.agents SET scopes = ${['code', 'read_all']} WHERE id = ${String(coder.id)}`,
-      /agents_code_not_private/,
     );
     const codeTask = async (): Promise<unknown> => {
       const task = await newTask(coder);

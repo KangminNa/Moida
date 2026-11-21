@@ -9,11 +9,8 @@ import { useApps, usePages } from '../../../_blog/live';
 import type { AdminApp } from '../../../_blog/types';
 import { api, uploadFile } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
-import { useAgents } from '../../../_task/live';
-import type { AgentTeamSaved } from '../../../_task/types';
 import { Icon } from '../../../_ui/Icon';
 import { CHAT_HREF, STORE_HREF } from '../../menu';
-import { APP_TEAM_TEMPLATE, teamLeaders } from '../app-team';
 import { type CreateAppBody, CreateAppForm } from './CreateAppForm';
 
 /** 스토어(앱 종류) 화면의 주소 */
@@ -35,7 +32,6 @@ export function StorePanel({ make }: { make: string | null }) {
   const router = useRouter();
   const apps = useApps();
   const pages = usePages();
-  const agents = useAgents();
   const save = useAction();
   const kind = KINDS.find(([value]) => value === make)?.[0] ?? null;
   /** 이 화면에서 시트를 열었는가 (닫을 때 뒤로 갈 수 있는지) */
@@ -45,23 +41,10 @@ export function StorePanel({ make }: { make: string | null }) {
   /** 공개 주소 앞부분: 사이트 주소에서 https:// 와 끝 / 를 뺀 것 */
   const origin = (space.data?.siteUrl ?? '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
-  /** 새 팀이면 앱 운영 팀을 먼저 만들고(같은 requestId: 다시 눌러도 팀은 하나) 편집장을 운영 팀장으로 */
-  async function create(
-    body: CreateAppBody,
-    icon: File | null,
-    requestId: string,
-    newTeam: boolean,
-  ) {
-    let agentId = body.agentId;
-    if (newTeam) {
-      const team = await save.run('team', () =>
-        api<AgentTeamSaved>('POST', '/api/agent-teams', { requestId, team: APP_TEAM_TEMPLATE }),
-      );
-      agentId = team?.ok ? team.data.agents[0]?.id : undefined;
-      if (!agentId) return false;
-    }
+  /** 만들고 아이콘을 올린 뒤 앱 관리로 (바꿔치기) */
+  async function create(body: CreateAppBody, icon: File | null, requestId: string) {
     const made = await save.run('create', () =>
-      api<AdminApp>('POST', '/api/apps', { ...body, ...(agentId ? { agentId } : {}), requestId }),
+      api<AdminApp>('POST', '/api/apps', { ...body, requestId }),
     );
     if (!made?.ok) return false;
     const app = made.data;
@@ -105,8 +88,6 @@ export function StorePanel({ make }: { make: string | null }) {
           kind={kind}
           origin={origin}
           pages={(pages.data?.pages ?? []).filter((p) => p.appId === null)}
-          leaders={teamLeaders(agents.data?.agents ?? [])}
-          apps={list}
           busy={save.busy !== null}
           problem={save.problem}
           onSubmit={create}

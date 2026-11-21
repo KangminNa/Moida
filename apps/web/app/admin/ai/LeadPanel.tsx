@@ -6,8 +6,8 @@ import { tokens } from '../../_task/labels';
 import { useAgents, useLead } from '../../_task/live';
 import { type LeadBody, LeadForm } from './LeadForm';
 
-// 대표 (O-2): 모든 대화를 받아 맨 위 팀장들에게 나눠 맡기는 숨은 에이전트. 첫 대화에서 생긴다.
-// 조직도 · 팀 화면에는 없고 여기서만 바꾼다 (AI 도구 · 모델 · 생각 강도 · 한도 · 검토자)
+// 대표 (O-2): 모든 대화를 받아 일꾼에게 나눠 맡기는 에이전트. 첫 대화에서 생긴다 (2026-11-21 팀 없는 에이전트).
+// 에이전트 화면에는 맨 앞에 보이기만 하고 여기서 바꾼다 (AI 도구 · 모델 · 생각 강도 · 한도 · 검토자)
 export function LeadPanel() {
   const lead = useLead();
   const agents = useAgents();
@@ -35,7 +35,7 @@ export function LeadPanel() {
           <small className="label-mono">이번 달 토큰 {tokens(boss.usedThisMonth)}</small>
         )}
       </header>
-      <p className="note">모든 대화를 받아 팀에 나눠 맡기고 결과를 모아 답해요</p>
+      <p className="note">모든 대화를 받아 일꾼에게 나눠 맡기고 결과를 모아 답해요</p>
       {lead.error && <p className="error">{lead.error}</p>}
       {boss ? (
         <LeadForm

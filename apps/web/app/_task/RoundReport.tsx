@@ -7,7 +7,7 @@ import type { GoalRound } from './types';
 const WEB_LINK = /^https?:\/\//i;
 
 // 목표 실행의 회차 보고 하나: 승인 요청서(승인 화면)과 목표 실행 화면이 함께 쓴다.
-// 보고는 팀장(AI)이 쓴 글이다. 판단은 주인이 하고, 링크는 새 탭에서 연다.
+// 보고는 맡은 에이전트(AI)가 쓴 글이다. 판단은 주인이 하고, 링크는 새 탭에서 연다.
 export function RoundReport({ round }: { round: GoalRound }) {
   return (
     <div className="stack">

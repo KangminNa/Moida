@@ -32,7 +32,6 @@ export const agents = taskSchema.table('agents', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   five_hour_limit: bigint('five_hour_limit', { mode: 'number' }),
   plan_stop_percent: integer('plan_stop_percent'),
-  reports_to: uuid('reports_to'),
   settings_revision: integer('settings_revision').notNull(),
   deleted_at: timestamp('deleted_at', { withTimezone: true }),
   runner_id: uuid('runner_id'),

@@ -13,8 +13,29 @@ export interface BrowseSeenRow {
 }
 export type BrowseSeenNew = Partial<BrowseSeenRow> & Pick<BrowseSeenRow, 'id' | 'space_id' | 'site_id' | 'task_id' | 'key'>;
 
+/** browser_tabs.click_plans.status (값 목록 CHECK) */
+export const CLICK_PLAN_STATUS = ['held', 'approved', 'closed', 'dropped'] as const;
+export type ClickPlanStatus = (typeof CLICK_PLAN_STATUS)[number];
+/** browser_tabs.click_plans */
+export interface ClickPlanRow {
+  id: string;
+  space_id: string;
+  task_id: string;
+  site_id: string;
+  page_url: string;
+  summary: string;
+  max_clicks: number;
+  used: number;
+  status: ClickPlanStatus;
+  approval_id: string | null;
+  created_at: Date;
+  decided_at: Date | null;
+  version: number;
+}
+export type ClickPlanNew = Partial<ClickPlanRow> & Pick<ClickPlanRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'page_url' | 'summary' | 'max_clicks'>;
+
 /** browser_tabs.clicks.status (값 목록 CHECK) */
-export const CLICK_STATUS = ['held', 'approved', 'clicking', 'clicked', 'changed', 'unknown', 'dropped', 'manual'] as const;
+export const CLICK_STATUS = ['requested', 'held', 'approved', 'clicking', 'clicked', 'changed', 'unknown', 'dropped', 'manual'] as const;
 export type ClickStatus = (typeof CLICK_STATUS)[number];
 /** browser_tabs.clicks */
 export interface ClickRow {
@@ -22,15 +43,15 @@ export interface ClickRow {
   space_id: string;
   task_id: string;
   site_id: string;
-  runner_id: string;
-  tab_id: string;
+  runner_id: string | null;
+  tab_id: string | null;
   page_url: string;
   page_title: string;
   role: string;
   name: string;
   nth: number;
-  box: unknown;
-  fingerprint: string;
+  box: unknown | null;
+  fingerprint: string | null;
   note: string | null;
   status: ClickStatus;
   approval_id: string | null;
@@ -40,8 +61,9 @@ export interface ClickRow {
   decided_at: Date | null;
   clicked_at: Date | null;
   version: number;
+  plan_id: string | null;
 }
-export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'runner_id' | 'tab_id' | 'page_url' | 'role' | 'name' | 'box' | 'fingerprint'>;
+export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'page_url' | 'role' | 'name'>;
 
 /** browser_tabs.endpoints */
 export interface EndpointRow {

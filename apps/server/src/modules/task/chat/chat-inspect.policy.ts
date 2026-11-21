@@ -21,18 +21,11 @@ export class ChatInspect {
     'blog.app_code.show': '앱 화면 공개',
   };
 
-  /**
-   * 지금 검수할 결재인가: 검수할 동작이고, 아직 검수하지 않았고, 검수자가 읽을 수 있고(비공개 글은 브라우저 · 커넥터
-   * 에이전트에게 넘기지 않는다), 검수자가 올린 쪽 밖이다
-   */
-  static due(approval: Approval, inspectors: readonly Agent[], agents: readonly Agent[]): boolean {
+  /** 지금 검수할 결재인가: 검수할 동작이고, 아직 검수하지 않았고, 검수자가 올린 쪽 밖이다 (independent) */
+  static due(approval: Approval, inspectors: readonly Agent[]): boolean {
     if (!ChatInspect.ACTIONS.includes(approval.action) || approval.inspected) return false;
-    // 두 검수자(2026-11-20)면 둘 다 볼 수 있어야 한다: 하나라도 못 보면 관리자에게
-    return inspectors.every(
-      (inspector) =>
-        ChatInspect.refsOf(approval).problemFor(inspector) === null &&
-        ChatInspect.independent(inspector, approval.agentId, agents),
-    );
+    // 두 검수자(2026-11-20)면 둘 다 올린 쪽 밖이어야 한다: 하나라도 아니면 관리자에게
+    return inspectors.every((inspector) => ChatInspect.independent(inspector, approval.agentId));
   }
 
   /**
@@ -63,18 +56,12 @@ export class ChatInspect {
     };
   }
 
-  /** 검수자가 올린 쪽 밖인가: 올린 에이전트도, 그 위(보고 대상을 따라)도, 그 아래도 아니다 (제 팀의 일을 제가 통과시키지 않게) */
-  static independent(
-    inspector: Agent,
-    requesterId: string | null,
-    agents: readonly Agent[],
-  ): boolean {
-    if (requesterId === null || requesterId === inspector.id) return false;
-    const above = ChatInspect.above(requesterId, agents);
-    return (
-      !above.includes(inspector.id) &&
-      !ChatInspect.above(inspector.id, agents).includes(requesterId)
-    );
+  /**
+   * 검수자가 올린 쪽 밖인가: 결재를 올린 에이전트가 아니다 (제 일을 제가 통과시키지 않게). 팀이 없어진 뒤(2026-11-21)
+   * 보고 라인으로 가르지 않는다. AI 도구로도 가르지 않는다: 두 검수자는 서로 다른 도구라 둘 다 올린 쪽과 다를 수 없다
+   */
+  static independent(inspector: Agent, requesterId: string | null): boolean {
+    return requesterId !== null && requesterId !== inspector.id;
   }
 
   /** 검수 작업에 실을 것: 무엇을 보는지(inspect, 앱이면 blog의 app_code_base가 읽는다)와 글이면 이 작업에서만의 읽기 허락 */
@@ -174,17 +161,5 @@ export class ChatInspect {
       image: false,
     };
     return TaskRefs.of({ refs: [line] });
-  }
-
-  /** 보고 대상을 따라 올라간 에이전트들 (맨 위까지, 고리가 있어도 멈춘다) */
-  private static above(id: string, agents: readonly Agent[]): string[] {
-    const ids: string[] = [];
-    let boss = agents.find((a) => a.id === id)?.reportsTo ?? null;
-    while (boss !== null && !ids.includes(boss)) {
-      ids.push(boss);
-      const at = boss;
-      boss = agents.find((a) => a.id === at)?.reportsTo ?? null;
-    }
-    return ids;
   }
 }

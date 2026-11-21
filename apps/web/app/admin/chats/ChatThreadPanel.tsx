@@ -28,8 +28,8 @@ const RUNNING = ['working'];
 const TURN_OPEN = ['queued', 'running', 'waiting'];
 
 // 대화 하나 (2차 1-5, ChatGPT · Claude 같은 모양): 가운데 주고받음, 아래 입력 칸 하나.
-// 팀이 일하는 동안에는 오른쪽에 "팀이 동시에 일하는 중" 칸이 붙는다 (ChatTeamPanel, 좁은 화면에서는 숨긴다).
-// 상대는 늘 대표 (O-2): 대표가 팀에 나눠 맡기고, 승인은 결과 카드 하나로 정한다 (2차 2단계).
+// 일꾼이 일하는 동안에는 오른쪽에 "일꾼이 동시에 일하는 중" 칸이 붙는다 (ChatTeamPanel, 좁은 화면에서는 숨긴다).
+// 상대는 늘 대표 (O-2): 대표가 일꾼에게 나눠 맡기고, 승인은 결과 카드 하나로 정한다 (2차 2단계).
 // 일하는 중에도 보낸다: 덧붙인 말이 되고 대표가 짧게 답한다 (2차 1-1). 신호가 오면 다시 읽는다
 export function ChatThreadPanel({ id }: { id: string }) {
   // 대상(id)으로 거르지 않는다: 신호의 대상은 회차 작업 · 승인이라 대화 id가 아니다
@@ -96,7 +96,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
     setSent((n) => n + 1);
     return true;
   }
-  /** 판단 바꾸기 (L1): 덧붙인 말로 보내고, 회차가 팀원을 기다리는 중이면 먼저 깨워 대표가 그 단계부터 다시 맡기게 한다 */
+  /** 판단 바꾸기 (L1): 덧붙인 말로 보내고, 회차가 일꾼을 기다리는 중이면 먼저 깨워 대표가 그 단계부터 다시 맡기게 한다 */
   async function changeDecision(news: ChatNews, decision: Decision, change: string) {
     const turn = d?.turns.at(-1);
     if (!(await send({ message: changeMessage(news, decision, change) }))) return;
@@ -140,7 +140,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
     if (reply?.ok) router.replace('/admin');
   };
 
-  /** 팀원을 기다리는 작업을 지금까지의 결과로 마무리하게 깨운다 (팀원 기다리기) */
+  /** 일꾼을 기다리는 작업을 지금까지의 결과로 마무리하게 깨운다 (일꾼 기다리기) */
   const hurry = (taskId: string) =>
     hurrying.run(`hurry:${taskId}`, () => api('POST', `/api/tasks/${taskId}/hurry`), {
       done: '지금까지의 결과로 답하게 했어요',

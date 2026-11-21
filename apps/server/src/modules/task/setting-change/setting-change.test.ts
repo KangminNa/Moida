@@ -61,7 +61,7 @@ for (const shape of [AgentEdit.SETTING, ScheduleEdit.SETTING, GoalEdit.SETTING, 
 const propose = (raw: Record<string, unknown>) =>
   ProposeSettingInput.from({ request_id: REQUEST, note: '왜', ...raw }, kinds);
 
-function agent(reportsTo: string | null, actions: readonly string[] = [], lead = false): Agent {
+function agent(actions: readonly string[] = [], lead = false): Agent {
   return Agent.restore({
     lead,
     id: 'agent-1',
@@ -72,7 +72,6 @@ function agent(reportsTo: string | null, actions: readonly string[] = [], lead =
     scopes: [],
     approval_actions: actions,
     external_tools: [],
-    reports_to: reportsTo,
     status: Agent.ACTIVE,
   } as unknown as AgentRow);
 }
@@ -98,12 +97,12 @@ describe('SettingChanges.diff', () => {
     assert.deepEqual(lines, [{ field: 'model', before: 'sonnet', after: 'opus', grant: false }]);
   });
 
-  test('권한 · 승인 동작 · 커넥터를 더하면 grant, 빼면 아니다', () => {
-    const before = { scopes: ['read_public', 'draft'], external_tools: ['linear'] };
+  test('승인 동작 · 커넥터를 더하면 grant, 빼면 아니다', () => {
+    const before = { approval_actions: ['blog.post.publish'], external_tools: ['linear'] };
     const [more] = SettingChanges.diff(AgentEdit.SETTING, before, {
-      scopes: ['read_public', 'draft', 'read_all'],
+      approval_actions: ['blog.post.publish', 'browser.site.publish'],
     });
-    const [less] = SettingChanges.diff(AgentEdit.SETTING, before, { scopes: ['read_public'] });
+    const [less] = SettingChanges.diff(AgentEdit.SETTING, before, { approval_actions: [] });
     const [tools] = SettingChanges.diff(AgentEdit.SETTING, before, {
       external_tools: ['linear', 'notion'],
     });
@@ -112,13 +111,16 @@ describe('SettingChanges.diff', () => {
     assert.equal(tools?.grant, true);
   });
 
-  test('만들기는 지금 값이 없다 (권한이 있으면 grant)', () => {
-    const lines = SettingChanges.diff(AgentEdit.SETTING, null, { name: '코더', scopes: ['code'] });
+  test('만들기는 지금 값이 없다 (승인 동작이 있으면 grant)', () => {
+    const lines = SettingChanges.diff(AgentEdit.SETTING, null, {
+      name: '코더',
+      approval_actions: ['blog.post.publish'],
+    });
     assert.deepEqual(
       lines.map((l) => [l.field, l.before, l.grant]),
       [
         ['name', null, false],
-        ['scopes', null, true],
+        ['approval_actions', null, true],
       ],
     );
   });
@@ -169,12 +171,6 @@ describe('SettingChanges.diff', () => {
       { field: 'status', before: 'active', after: 'paused', grant: false },
     ]);
     assert.deepEqual(SettingChanges.switched({ status: 'paused' }, 'pause'), []);
-  });
-
-  test('브라우저 · 커넥터 에이전트는 설정을 읽거나 제안하지 못한다', () => {
-    assert.throws(() => SettingChanges.assertInside(['browse'], []), Forbidden);
-    assert.throws(() => SettingChanges.assertInside([], ['notion']), Forbidden);
-    assert.doesNotThrow(() => SettingChanges.assertInside(['read_all', 'draft'], []));
   });
 });
 
@@ -234,10 +230,10 @@ describe('ProposeSettingInput', () => {
       op: 'edit',
       target_id: TARGET,
       version: 1,
-      fields: { reports_to: null, approval_actions: ['blog.post.publish'] },
+      fields: { reviewer_id: null, approval_actions: ['blog.post.publish'] },
     });
     assert.deepEqual(SettingChanges.restBody(agentEdit.fields), {
-      reportsTo: null,
+      reviewerId: null,
       approvalActions: ['blog.post.publish'],
     });
     const scheduleEdit = propose({
@@ -406,30 +402,25 @@ describe('대화 상대의 기본 동작', () => {
   };
   const payload = { setting: 'agent', op: 'edit', body: {}, changes: [] };
 
-  test('대표(O-2)는 승인 동작에 넣지 않아도 올리고, 팀장 · 팀원은 넣어 준 경우만', () => {
-    const partner = agent(null, [], true);
+  test('대표(O-2)는 승인 동작에 넣지 않아도 올리고, 일꾼은 넣어 준 경우만', () => {
+    const partner = agent([], true);
     assert.equal(
       Approval.request(running(partner), partner, fields, NOW, null, payload).unsaved.status,
       'pending',
     );
-    const head = agent(null);
+    const worker = agent();
     assert.throws(
-      () => Approval.request(running(head), head, fields, NOW, null, payload),
+      () => Approval.request(running(worker), worker, fields, NOW, null, payload),
       Forbidden,
     );
-    const member = agent(TARGET);
-    assert.throws(
-      () => Approval.request(running(member), member, fields, NOW, null, payload),
-      Forbidden,
-    );
-    const allowed = agent(TARGET, [Approval.SETTING_CHANGE]);
+    const allowed = agent([Approval.SETTING_CHANGE]);
     assert.doesNotThrow(() =>
       Approval.request(running(allowed), allowed, fields, NOW, null, payload),
     );
   });
 
   test('바뀔 값 없이 request_approval로 올린 설정 바꾸기는 막는다', () => {
-    const partner = agent(null);
+    const partner = agent();
     assert.throws(
       () => Approval.request(running(partner), partner, fields, NOW, null),
       RuleViolation,
@@ -437,7 +428,7 @@ describe('대화 상대의 기본 동작', () => {
   });
 
   test('승인 이벤트에 바뀔 값이 실린다 (다른 모듈 · 패키지가 읽는다)', () => {
-    const partner = agent(null, [], true);
+    const partner = agent([], true);
     const approval = Approval.request(running(partner), partner, fields, NOW, null, payload);
     const event = approval.pullEvents().at(-1);
     assert.deepEqual(event?.data.payload, payload);

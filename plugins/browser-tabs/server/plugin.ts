@@ -15,6 +15,8 @@ import {
 } from './integrations';
 import { LoginCard, NextLogin, SaveLogin, SendLogin } from './login-card';
 import { LoginInbox } from './login-inbox';
+import { HoldPlan } from './plans';
+import { NextPress, PressResult, RequestPress, SavePress } from './presses';
 import { ListReads, PendingReads, RequestRead, SaveRead } from './reads';
 import { DismissSuggestion, ListSuggestions } from './repeats';
 import { ReviewMaterial, SaveReview } from './reviews';
@@ -77,6 +79,11 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new HoldClick(),
       new NextClick(),
       new SaveClick(),
+      new HoldPlan(),
+      new RequestPress(),
+      new PressResult(),
+      new NextPress(),
+      new SavePress(),
       new ManualClick(),
       new ListClicks(),
       new ClickDetail(),

@@ -5,7 +5,8 @@ import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client
 import { Database } from '../../platform';
 
 // 에이전트를 러너에 묶기 (2026-11-14): 묶인 에이전트의 일은 그 러너만 빌린다 (꺼져 있으면 기다린다).
-// 코드 러너 칸에는 묶지 않고, 칸에서만 도는 권한(code · make)이 있는 에이전트는 묶지 않는다. 팀장은 묶인 팀원을 안다 (bound).
+// 코드 러너 칸에는 묶지 않는다. 칸의 일(make · code)은 묶임과 상관없이 칸 러너가 빌린다 (2026-11-21, 같은 일꾼).
+// 대표는 묶인 일꾼을 안다 (bound).
 
 // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 시험 (모양은 assert가 본다)
 type Json = Record<string, any>;
@@ -35,7 +36,6 @@ const agent = async (name: string, more: Json = {}) =>
       requestId: randomUUID(),
       name: `${name} ${randomUUID().slice(0, 6)}`,
       tool: 'claude',
-      scopes: ['read_public'],
       ...more,
     }),
     201,
@@ -47,12 +47,13 @@ const patch = async (id: unknown, body: Json) =>
     version: (await current(id)).version,
     ...body,
   });
-const task = async (agentId: unknown) =>
+const task = async (agentId: unknown, more: Json = {}) =>
   ok(
     await api.request('POST', '/api/tasks', owner, {
       requestId: randomUUID(),
       agentId,
       instruction: '일',
+      ...more,
     }),
     201,
   );
@@ -89,6 +90,15 @@ before(async () => {
     tokens[name] = await runner(`pin-${name}`);
     runnerIds[name] = await rowOf(tokens[name] as string, `pin-${name}`);
   }
+  // 대표는 첫 대화에서 생긴다 (같은 DB를 쓰는 앞 파일이 이미 만들었을 수 있다). 그 회차는 beforeEach가 치운다
+  if (!ok(await api.get('/api/agents/lead', owner)).lead)
+    ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '대표를 만드는 첫 대화',
+      }),
+      201,
+    );
 });
 after(() => api.close());
 
@@ -143,27 +153,18 @@ describe('에이전트를 러너에 묶기', () => {
     assert.equal(server[0]?.agent.bound, false);
   });
 
-  test('만들 때 묶을 수 있고, 팀장은 묶인 팀원을 안다 (bound)', async () => {
-    const lead = await agent('팀장');
-    const member = ok(
-      await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: `내 폴더 ${randomUUID().slice(0, 6)}`,
-        tool: 'claude',
-        scopes: ['read_public'],
-        reportsTo: lead.id,
-        runnerId: runnerIds.mine,
-      }),
-      201,
-    );
+  test('만들 때 묶을 수 있고, 대표는 묶인 일꾼을 안다 (bound)', async () => {
+    const lead = ok(await api.get('/api/agents/lead', owner)).lead as Json;
+    const member = await agent('내 폴더', { runnerId: runnerIds.mine });
     assert.equal(member.runnerId, runnerIds.mine);
     await task(lead.id);
     const [job] = await jobs(tokens.server as string);
+    assert.equal(job?.agent.id, lead.id, '대표의 일');
     const seen = ((job?.team ?? []) as Json[]).find((m) => m.agent_id === member.id);
     assert.equal(seen?.bound, true);
   });
 
-  test('칸에는 묶지 않고, code · make가 있으면 묶지 않는다 (422). 없는 러너는 404', async () => {
+  test('칸에는 묶지 않는다 (422). 없는 러너는 404', async () => {
     const slot = await api.codeRunner('7');
     await jobs(slot);
     const { runners } = ok(await api.get('/api/runners', owner));
@@ -173,14 +174,36 @@ describe('에이전트를 러너에 묶기', () => {
 
     const a = await agent('일반');
     assert.equal((await patch(a.id, { runnerId: sandbox.id })).status, 422);
-    const maker = await agent('제작', { scopes: ['make'] });
-    assert.equal((await patch(maker.id, { runnerId: runnerIds.mine })).status, 422);
     assert.equal((await patch(a.id, { runnerId: randomUUID() })).status, 404);
+    const bound = ok(await patch(a.id, { runnerId: runnerIds.mine }));
+    assert.equal(
+      bound.runnerId,
+      runnerIds.mine,
+      'make · code 권한이 있어도 묶인다 (모든 에이전트가 같은 권한)',
+    );
+  });
 
-    ok(await patch(a.id, { runnerId: runnerIds.mine }));
-    assert.equal((await patch(a.id, { scopes: ['make'] })).status, 422, '묶인 채로 make');
-    const both = ok(await patch(a.id, { scopes: ['make'], runnerId: null }));
-    assert.deepEqual([both.scopes, both.runnerId], [['make'], null], '풀면서 make는 된다');
+  test('묶인 에이전트의 만들기(make) 일은 칸 러너가 빌리고, 다른 일은 묶인 러너만 빌린다 (2026-11-21)', async () => {
+    const slot = await api.codeRunner('7');
+    const a = await agent('묶인 일꾼', { runnerId: runnerIds.mine });
+    const general = await task(a.id);
+    const made = await task(a.id, { kind: 'make', instruction: '발표 슬라이드 세 장' });
+
+    assert.deepEqual(
+      await jobs(tokens.server as string),
+      [],
+      '다른 러너는 어느 일도 빌리지 않는다',
+    );
+    assert.deepEqual(
+      (await jobs(slot)).map((j) => j.task.id),
+      [made.id],
+      '칸은 묶임과 상관없이 칸의 일만',
+    );
+    assert.deepEqual(
+      (await jobs(tokens.mine as string)).map((j) => j.task.id),
+      [general.id],
+      '묶인 러너는 칸의 일을 빌리지 않는다',
+    );
   });
 });
 

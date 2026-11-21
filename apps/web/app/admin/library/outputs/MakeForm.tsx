@@ -48,7 +48,8 @@ export function MakeForm({
 }) {
   const id = useId();
   const agents = useAgents();
-  const makers = (agents.data?.agents ?? []).filter((a) => a.scopes.includes('make'));
+  // 모든 일꾼이 파일을 만들 수 있다 (2026-11-21 팀 없는 에이전트)
+  const makers = agents.data?.agents ?? [];
   const [instruction, setInstruction] = useState('');
   const [agentId, setAgentId] = useState('');
   const [wikis, setWikis] = useState<readonly WikiSummary[]>([]);
@@ -138,7 +139,7 @@ export function MakeForm({
           value={agentId}
           onChange={(e) => edit(() => setAgentId(e.target.value))}
         >
-          <option value="">자동 배정 (파일 만들기 권한)</option>
+          <option value="">자동 배정</option>
           {makers.map((a) => (
             <option key={a.id} value={a.id}>
               {a.status === 'paused' ? `${a.name} (중지)` : a.name}
@@ -147,8 +148,7 @@ export function MakeForm({
         </select>
         {agents.data && makers.length === 0 && (
           <small className="warn">
-            파일 만들기 권한이 있는 에이전트가 없어요. <Link href="/admin/agents">에이전트</Link>
-            에서 권한을 주세요
+            에이전트 없음 · <Link href="/admin/agents">에이전트</Link>에서 추가
           </small>
         )}
       </div>

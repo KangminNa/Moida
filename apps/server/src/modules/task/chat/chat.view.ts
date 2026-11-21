@@ -14,7 +14,7 @@ import type {
 // 회차 하나 = 관리자의 메시지(작업의 지시)와 상대의 답(작업의 결과). 결과물 · 기다리는 결재는 그 회차의 작업과 하위 작업의 것.
 
 /** 대화 상대 (말을 걸 수 있는지 화면이 알린다. 막는 것은 서버의 Chat) */
-export type ChatPartnerRow = Pick<AgentRow, 'name' | 'status' | 'reports_to' | 'deleted_at'>;
+export type ChatPartnerRow = Pick<AgentRow, 'name' | 'status' | 'deleted_at'>;
 /** 회차 작업 한 줄 + 마지막 진행 기록과 끝나지 않은 하위 작업 수 */
 export type ChatTurnTaskRow = TaskRow & { last_event: string | null; open_subtasks: number };
 /** 회차(맨 위 작업 root)와 그 아래에서 만든 결과물 */
@@ -340,7 +340,6 @@ export class ChatDetailView {
         ? {
             name: p.name,
             paused: p.status === 'paused',
-            topLevel: p.reports_to === null,
             deleted: p.deleted_at !== null,
           }
         : null,

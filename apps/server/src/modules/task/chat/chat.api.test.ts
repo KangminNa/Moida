@@ -42,7 +42,6 @@ const agent = async (name: string, more: Json = {}) =>
       requestId: randomUUID(),
       name: `${name} ${randomUUID().slice(0, 6)}`,
       tool: 'claude',
-      scopes: ['read_public'],
       ...more,
     }),
     201,
@@ -202,8 +201,7 @@ describe('대화', () => {
   });
 
   test('상대는 늘 대표 (O-2): 예전 화면이 보내는 agentId는 읽지 않는다. 대표를 멈추면 열지도 보내지도 못한다 (422)', async () => {
-    const head = await agent('팀장');
-    const member = await agent('팀원', { reportsTo: head.id });
+    const member = await agent('일꾼');
     const boss = await lead();
     const chat = ok(
       await api.request('POST', '/api/chats', owner, {
@@ -250,10 +248,7 @@ describe('대화', () => {
   });
 
   test('회차 아래에서 만든 결과물은 그 회차에, 올린 결재는 결과 카드에 실린다 (2차 2단계)', async () => {
-    const writer = await agent('발행', {
-      scopes: ['read_public', 'write'],
-      approvalActions: ['blog.post.publish'],
-    });
+    const writer = await agent('발행', { approvalActions: ['blog.post.publish'] });
     const chat = ok(await open('글 올려 줘'), 201);
     const turnJob = await take();
     await tool(turnJob.run_token, 'delegate_task', {
@@ -854,8 +849,7 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
     );
   });
 
-  test('다른 기기 · 관리자의 대화는 없는 것처럼 (404). 기기의 메시지는 read_url의 기준이 아니다', async () => {
-    const reader = await agent('비공개 팀장', { scopes: ['read_all'] });
+  test('다른 기기 · 관리자의 대화는 없는 것처럼 (404)', async () => {
     const mine = await device(`a-${randomUUID().slice(0, 6)}`, ['delegate']);
     const other = await device(`b-${randomUUID().slice(0, 6)}`, ['delegate']);
     const sent = await call(mine, 'ask_agent', {
@@ -878,27 +872,6 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
       chat_id: ownerChat.id,
     });
     assert.deepEqual([into.ok, into.body.code], [false, 'not_found']);
-
-    // 비공개를 읽는 에이전트(대표가 맡긴 팀장)는 관리자의 지시(맨 위 일)에 적힌 사이트만 연다.
-    // 기기의 메시지에 적힌 주소는 그 기준이 아니다
-    const turn = (await jobs()).find((j) => j.task.payload.chat?.chatId === chatId) as Json;
-    await tool(turn.run_token, 'delegate_task', {
-      subtasks: [
-        { request_id: randomUUID(), to_agent_id: reader.id, title: '읽기', instruction: '읽어' },
-      ],
-    });
-    const job = (await jobs()).find((j) => j.task.title === '읽기') as Json;
-    const read = await api.mcp(job.run_token, 'tools/call', {
-      name: 'read_url',
-      arguments: { url: 'https://example.com/brief' },
-    });
-    const result = read.json().result as Json;
-    assert.equal(result.isError, true, JSON.stringify(result));
-    assert.match(
-      result.content[0]?.text ?? '',
-      /지시에 주소가 없어요/,
-      '기기의 메시지는 관리자의 지시가 아니다',
-    );
   });
 });
 
@@ -912,34 +885,38 @@ describe('대표 (O-2): 나눠 맡기기 · 브라우저 규칙', () => {
   const turnOf = async (chatId: unknown) =>
     (await jobs()).find((j) => j.task.payload?.chat?.chatId === chatId) as Json;
 
-  test('대표는 맨 위 에이전트 누구에게나 맡긴다. 팀 목록에는 맨 위 팀장과 그 아래 팀 전체의 요약(사람 · 일 · 커넥터 수)만, 이름은 없다', async () => {
-    const head = await agent('조사 팀장');
-    const sub = await agent('조사원', { reportsTo: head.id, scopes: ['read_public', 'browse'] });
-    await agent('깊은 조사원', { reportsTo: sub.id });
+  test('대표는 지우지 않은 일꾼 누구에게나 맡긴다. 일꾼 목록에는 일꾼마다 한 줄, 팀 요약은 없다. 일꾼은 맡기지 못한다 (2026-11-21)', async () => {
+    const first = await agent('조사원');
+    const second = await agent('정리원');
+    const gone = await agent('지운 일꾼');
+    ok(
+      await api.request('POST', `/api/agents/${gone.id}/delete`, owner, { version: gone.version }),
+    );
     const chat = ok(await open('시장 조사해 줘'), 201);
     const job = await turnOf(chat.id);
     assert.equal(job.agent.lead, true, '러너가 지시문 틀의 lead 단락을 넣는다');
-    const listed = (job.team as Json[]).find((m) => m.agent_id === head.id) as Json;
-    assert.deepEqual(listed.team, {
-      members: 2,
-      kinds: { general: 2, draft_post: 2, browse: 1 },
-      connectors: {},
-    });
-    assert.ok(!(job.team as Json[]).some((m) => m.agent_id === sub.id), '팀원은 팀장 아래에만');
-    assert.doesNotMatch(JSON.stringify(job.team), /조사원/);
-    const below = await delegate(job, sub.id, '바로 맡기기');
-    assert.deepEqual(
-      [below.ok, below.body.code],
-      [false, 'forbidden'],
-      '팀장의 팀원에게는 직접 맡기지 못한다',
-    );
-    const ok1 = await delegate(job, head.id, '팀장에게');
-    assert.equal(ok1.ok, true, JSON.stringify(ok1.body));
+    const team = job.team as Json[];
+    for (const a of [first, second]) {
+      const listed = team.find((m) => m.agent_id === a.id) as Json;
+      assert.equal(listed?.name, a.name);
+      assert.equal(listed.team, undefined, '팀 요약 칸은 없다');
+    }
+    assert.ok(!team.some((m) => m.agent_id === gone.id), '지운 일꾼은 없다');
+    assert.ok(!team.some((m) => m.agent_id === job.agent.id), '대표 자신은 없다');
+    const toGone = await delegate(job, gone.id, '지운 일꾼에게');
+    assert.deepEqual([toGone.ok, toGone.body.code], [false, 'forbidden']);
+
+    const sent = await delegate(job, second.id, '정리원에게');
+    assert.equal(sent.ok, true, JSON.stringify(sent.body));
+    const sub = (await jobs()).find((j) => j.task.title === '정리원에게') as Json;
+    assert.deepEqual(sub.team, [], '일꾼의 일에는 일꾼 목록이 없다');
+    const nested = await delegate(sub, first.id, '일꾼이 맡기기');
+    assert.deepEqual([nested.ok, nested.body.code], [false, 'forbidden'], '일꾼은 맡기지 못한다');
   });
 
-  test('비공개를 읽은 대화에서는 브라우저 일을 맡기지 못한다: 비공개를 읽는 팀이 일한 회차 뒤 · 다음 회차에서도, 비공개 참조가 있어도', async (t) => {
-    const browser = await agent('브라우저 담당', { scopes: ['read_public', 'browse'] });
-    const reader = await agent('비공개 담당', { scopes: ['read_public', 'read_all'] });
+  test('브라우저 일은 browser-tabs가 동작해야 맡긴다. 비공개를 읽은 대화 · 비공개 참조가 있어도 맡긴다 (2026-11-21)', async (t) => {
+    const browser = await agent('브라우저 담당');
+    const reader = await agent('비공개 담당');
     const clean = ok(await open('사이트 둘러봐 줘'), 201);
     const cleanTurn = await turnOf(clean.id);
     // 브라우저 일은 browser-tabs가 동작해야 맡긴다 (러너가 browser_job이 없어 실패하기 전에, 2026-11-21)
@@ -951,6 +928,7 @@ describe('대표 (O-2): 나눠 맡기기 · 브라우저 규칙', () => {
     const fine = await delegate(cleanTurn, browser.id, '둘러보기', 'browse');
     assert.equal(fine.ok, true, JSON.stringify(fine.body));
 
+    // 비공개를 읽는 일꾼이 일한 회차 뒤에도 브라우저 일을 맡긴다 (바깥을 바꾸는 클릭은 원칙 7대로 승인 뒤)
     const chat = ok(await open('내 메모를 보고 사이트에 올려 줘'), 201);
     const turn = await turnOf(chat.id);
     assert.equal((await delegate(turn, reader.id, '메모 읽기')).ok, true);
@@ -963,21 +941,8 @@ describe('대표 (O-2): 나눠 맡기기 · 브라우저 규칙', () => {
     });
     await drain();
     const woken = (await jobs()).find((j) => j.task.id === turn.task.id) as Json;
-    const refused = await delegate(woken, browser.id, '올리기', 'browse');
-    assert.deepEqual([refused.ok, refused.body.code], [false, 'rule_violation']);
-    assert.match(refused.body.message, /비공개를 읽은 대화에서는 브라우저 일을 맡기지 못해요/);
-    await tool(runner, 'submit_result', {
-      task_id: woken.task.id,
-      request_id: randomUUID(),
-      status: 'done',
-      result: { text: '못 올렸어요' },
-    });
-    await drain();
-    ok(await send((await detail(chat.id)).chat, '그래도 올려 줘'), 201);
-    const second = await turnOf(chat.id);
-    assert.equal(second.task.payload.chat.turn, 2);
-    const again = await delegate(second, browser.id, '올리기', 'browse');
-    assert.deepEqual([again.ok, again.body.code], [false, 'rule_violation'], '대화 단위로 본다');
+    const upload = await delegate(woken, browser.id, '올리기', 'browse');
+    assert.equal(upload.ok, true, JSON.stringify(upload.body));
 
     const referred = ok(await open('이 위키로 사이트 채워 줘'), 201);
     const withRef = await turnOf(referred.id);
@@ -986,6 +951,6 @@ describe('대표 (O-2): 나눠 맡기기 · 브라우저 규칙', () => {
       SET payload = payload || ${db.sql.json({ refs: [{ kind: 'wiki', id: randomUUID(), title: '메모', private: true, url: null, browser: false }] })}::jsonb
       WHERE id = ${withRef.task.id}`;
     const byRef = await delegate(withRef, browser.id, '채우기', 'browse');
-    assert.deepEqual([byRef.ok, byRef.body.code], [false, 'rule_violation'], '비공개 참조');
+    assert.equal(byRef.ok, true, JSON.stringify(byRef.body));
   });
 });

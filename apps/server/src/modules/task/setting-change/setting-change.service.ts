@@ -66,7 +66,6 @@ export class SettingChangeService extends BaseService {
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, taskId);
       const proposer = await new AgentRepository(tx).load(spaceId, agentId);
-      SettingChanges.assertInside(proposer.scopes, proposer.externalTools);
       const approval = Approval.request(
         task,
         proposer,

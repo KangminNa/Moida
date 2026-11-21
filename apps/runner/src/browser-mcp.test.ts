@@ -64,6 +64,24 @@ describe('브라우저 작업의 설정 (러너)', () => {
     assert.equal(site.held?.pageUrl, 'https://blog.example/write?d=1');
     const explore = BrowseJob.from(Json.of({ mode: 'explore', site: null, held: null }));
     assert.deepEqual([explore.explore, explore.site, explore.held], [true, null, null]);
+    assert.equal(site.clickPlan, null, '옛 서버 · 계획 없음');
+    const planned = BrowseJob.from(
+      Json.of({
+        mode: 'site',
+        site: {
+          id: 's1',
+          version: 1,
+          name: '지도',
+          start_url: 'https://map.example',
+          origins: ['https://map.example'],
+        },
+        click_plan: { id: 'p1', summary: '12곳 저장', max_clicks: 12, used: 2, left: 10 },
+      }),
+    );
+    assert.deepEqual(
+      [planned.clickPlan?.id, planned.clickPlan?.summary, planned.clickPlan?.left],
+      ['p1', '12곳 저장', 10],
+    );
   });
 
   test('지시문 틀 site: 사이트 일 · 붙잡은 페이지 · 둘러보기', () => {
@@ -77,6 +95,18 @@ describe('브라우저 작업의 설정 (러너)', () => {
     assert.match(site, /# 사이트: 블로그[\s\S]*갈 수 있는 출처: https:\/\/blog\.example/);
     assert.match(site, /browser-stop\.json/);
     assert.match(site, /붙잡아 두었던 페이지: https:\/\/blog\.example\/write\?d=1/);
+    assert.match(site, /"stop": "click_plan"/, '여러 번 누르는 일은 계획으로 멈춘다');
+    assert.doesNotMatch(site, /승인된 누르기 계획/);
+    const planned = REPO_PROMPTS.fill('site', {
+      explore: false,
+      name: '지도',
+      start: 'https://map.example',
+      origins: 'https://map.example',
+      plan: "'대구 여행' 목록에 12곳 저장",
+      left: 10,
+    });
+    assert.match(planned, /승인된 누르기 계획: '대구 여행' 목록에 12곳 저장 \(남은 횟수 10번\)/);
+    assert.match(planned, /browser_press \{[\s\S]*browser_press_result/);
     const explore = REPO_PROMPTS.fill('site', { explore: true });
     assert.match(explore, /# 둘러보기/);
     assert.doesNotMatch(explore, /# 사이트/);

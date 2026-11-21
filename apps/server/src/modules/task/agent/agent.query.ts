@@ -1,23 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import {
-  type Actor,
-  AgentCard,
-  ApprovedActor,
-  BaseQuery,
-  NotFound,
-  SettingActor,
-} from '../../platform';
+import { type Actor, BaseQuery, NotFound } from '../../platform';
 import { agentRevisions, agents } from '../task.schema';
 import type { AgentRow } from '../task.tables';
 import type { ListAgentsInput } from './agent.input';
-import {
-  AgentLeadView,
-  AgentListView,
-  AgentRevisionListView,
-  AgentTeamListView,
-  AgentView,
-} from './agent.view';
-import { AgentTeams } from './agent-team.policy';
+import { AgentLeadView, AgentListView, AgentRevisionListView, AgentView } from './agent.view';
 
 // 에이전트 읽기. 주인만. 이번 달 사용량은 실행 기록에서 더하고, 하트비트를 함께 싣는다.
 // 대표(O-2)는 목록 · 다른 모듈의 카드에 보이지 않고 lead로만 읽는다
@@ -31,39 +17,6 @@ export class AgentQuery extends BaseQuery {
     return new AgentRevisionListView(
       await this.rows(agentRevisions, { agent_id: id }, { order: ['revision desc'] }),
     );
-  }
-
-  /**
-   * 다른 모듈이 platform AgentDirectory로 묻는 에이전트 하나와 그 위 보고 대상 (예: blog 앱 · 메뉴의 운영 팀). 지운 에이전트 · 대표는 없다.
-   * 관리자, 관리자가 확인한 길로 오는 설정 바꾸기(제안의 미리 해 보기 · 승인 뒤 적용, 2026-11-15 D),
-   * 에이전트 자신(글을 놓을 때 자기가 운영 팀 안인지, 스토어 2단계)이 읽는다
-   */
-  async card(actor: Actor, id: string): Promise<AgentCard | null> {
-    const self = actor.kind === 'agent' && actor.id === id;
-    if (!(self || actor instanceof SettingActor || actor instanceof ApprovedActor))
-      actor.assertOwner();
-    const spaceId = actor.requireSpace();
-    const [row] = await this.sql<
-      (Pick<AgentRow, 'id' | 'name' | 'scopes'> & { chain: string[] })[]
-    >`
-      WITH RECURSIVE up AS (
-        SELECT reports_to AS id, 1 AS depth FROM task.agents
-        WHERE space_id = ${spaceId} AND id = ${id} AND deleted_at IS NULL AND NOT lead
-        UNION ALL
-        SELECT a.reports_to, up.depth + 1 FROM up JOIN task.agents a ON a.id = up.id
-        WHERE up.depth < 10
-      )
-      SELECT a.id, a.name, a.scopes,
-        coalesce((SELECT array_agg(up.id::text ORDER BY up.depth) FROM up WHERE up.id IS NOT NULL), '{}') AS chain
-      FROM task.agents a
-      WHERE a.space_id = ${spaceId} AND a.id = ${id} AND a.deleted_at IS NULL AND NOT a.lead`;
-    return row ? new AgentCard(row.id, row.name, row.scopes, row.chain) : null;
-  }
-
-  /** 팀 템플릿 목록 (코드에 둔 것, AgentTeams) */
-  teams(actor: Actor): AgentTeamListView {
-    actor.assertOwner();
-    return new AgentTeamListView(AgentTeams.ALL);
   }
 
   /**

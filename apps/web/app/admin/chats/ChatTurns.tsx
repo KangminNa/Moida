@@ -143,6 +143,7 @@ export function ChatTurns({
                 {partner ?? '에이전트'}
                 {t.finishedAt ? ` · ${clock(t.finishedAt)}` : ''}
               </span>
+              <Status turn={t} news={within} />
               <Reply turn={t} fold={(want !== null && want !== 'answer') || t.outputs.length > 0} />
               {t.outputs.length > 0 && (
                 <ul className="list" aria-label="결과물">
@@ -170,15 +171,45 @@ export function ChatTurns({
                 </div>
               )}
             </div>
-            {t.approvalIds.map((id) => (
-              <div key={id} className="chat-approval">
-                <ApprovalDetail id={id} />
+            {/* 결과 카드에 싣지 않는 승인(사이트 로그인 등)도 대표의 말로 보인다 (F2, 2026-11-21: 대화에는 AI 하나) */}
+            {t.approvalIds.length > 0 && (
+              <div className="bubble theirs">
+                <span className="bubble-meta">{partner ?? '에이전트'} · 승인 필요</span>
+                {t.approvalIds.map((id) => (
+                  <div key={id} className="chat-approval">
+                    <ApprovalDetail id={id} />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * 답 칸의 상태 한 줄 (F2, 2026-11-21 "대화에는 AI 하나"): 회차가 도는 동안 대표가 지금 하는 일을 접지 않고 보인다.
+ * 가장 새 진행 소식(대표 · 일꾼이 post_update progress로 남긴 "웹 둘러보는 중 · 네이버 지도"), 없으면 회차의 마지막 기록,
+ * 그것도 없으면 상태로 정한 말. 일꾼의 이름은 보이지 않는다 (과정을 펼치면 보인다)
+ */
+function Status({ turn: t, news }: { turn: ChatTurn; news: readonly ChatNews[] }) {
+  if (!OPEN.includes(t.status)) return null;
+  const latest = news.filter((n) => n.kind === 'progress').at(-1)?.text ?? null;
+  const line =
+    t.status === 'queued'
+      ? '차례 기다리는 중'
+      : t.status === 'waiting' && t.approvalIds.length > 0
+        ? '승인 기다리는 중'
+        : (latest ??
+          t.progress ??
+          (t.openSubtasks > 0 ? `일꾼 ${t.openSubtasks}명이 일하는 중` : '생각하는 중'));
+  return (
+    <p className="chat-status">
+      <span className="dot run" aria-hidden="true" />
+      {line}
+    </p>
   );
 }
 
@@ -228,17 +259,12 @@ function Process({
 }) {
   const open = OPEN.includes(t.status);
   if (!open && items.length === 0 && usage === null) return null;
-  // 지금 하는 일 한 줄은 도는 동안만 (승인을 기다리는 동안의 기록은 승인 요청이라 카드가 대신 보인다)
-  const doing =
-    t.status === 'running'
-      ? (t.progress ?? (t.openSubtasks > 0 ? `팀원 ${t.openSubtasks}명이 일하는 중` : null))
-      : null;
+  // 지금 하는 일 한 줄은 답 칸의 상태 줄(Status)이 보인다 (F2, 2026-11-21: 대화에는 AI 하나)
   return (
     <details className="chat-process">
       <summary>
         {open ? '일하는 중' : '과정'}
         {items.length > 0 ? ` · 소식 ${items.length}개` : ''}
-        {doing ? ` · ${doing}` : ''}
         {usage ? ` · ${tokens(usage.tokens)} 토큰` : ''}
       </summary>
       {usage && (

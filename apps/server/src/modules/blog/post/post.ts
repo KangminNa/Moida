@@ -207,7 +207,6 @@ export class Post extends TableEntity<PostRow, PostNew> {
    * 앱 · 메뉴에 놓기 (2차 6단계, 스토어 1단계): 메뉴를 주면 앱은 그 메뉴의 앱, 메뉴가 null이면 메뉴에서 빼고 appId의 앱에
    * (null이면 앱에서도 뺀다. 공개된 글은 앱에서 뺄 수 없다). 올린 글은 공개 대기이고, 공개는 공개 범위로 정한다.
    * 공개된 글은 관리자만 옮긴다. 메뉴가 받는 종류인지는 메뉴가 본다. 호에서는 빠진다.
-   * 이 요청자가 놓을 수 있는지(운영 팀, 스토어 2단계)는 PostService가 AppTeam으로 먼저 본다 (요청자의 보고 대상을 트랜잭션 전에 읽어서)
    */
   placeIn(appId: string | null, menu: Menu | null, by: Actor, now: Date): void {
     this.assertLive();

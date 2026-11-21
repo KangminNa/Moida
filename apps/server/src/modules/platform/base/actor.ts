@@ -40,17 +40,11 @@ export abstract class Actor {
   /** 작업 토큰을 가진 에이전트만의 자격 (request_approval). 기기에 줄 수 있는 권한이 아니다 */
   static readonly AGENT = 'agent';
   /**
-   * 바깥으로 보내도 되는 작업 토큰 (2026-11-16 사이트 도구 site_run): 비공개를 읽거나 쓰는 권한(KEEPS_PRIVATE)이 없는 에이전트.
-   * 입력이 바깥 사이트로 나가는 도구가 쓴다. 기기에 줄 수 있는 권한이 아니다
+   * 바깥으로 보내는 도구의 자격 (2026-11-16 사이트 도구 site_run): 작업 토큰을 가진 에이전트. 기기에 줄 수 있는 권한이 아니다.
+   * 예전에는 비공개를 읽는 에이전트를 뺐지만, 2026-11-21부터 모든 에이전트가 같은 일꾼이라 비공개도 읽고 바깥 도구도 쓴다
+   * (바깥으로 바뀌는 동작은 원칙 7대로 승인 뒤: 사이트 쓰기 도구는 맡기면 결재를 기다린다)
    */
   static readonly AGENT_OUT = 'agent_out';
-  /** 바깥으로 보내는 도구(커넥터 · 사이트 도구)와 함께 두지 않는 권한: 비공개가 지시 · 입력을 타고 나가지 않게 */
-  static readonly KEEPS_PRIVATE: readonly string[] = [
-    Actor.READ_ALL,
-    Actor.WRITE,
-    Actor.CODE,
-    Actor.MAKE,
-  ];
 
   abstract readonly kind: string;
 
@@ -116,6 +110,14 @@ export abstract class Actor {
   /** 따로 읽기를 허락받은 것이 하나라도 있는가 (id로 읽는 도구를 열지 정할 때) */
   hasReadGrants(): boolean {
     return false;
+  }
+
+  /**
+   * 작업 토큰이면 그 작업의 id (플러그인 API 0.8, 2026-11-21): 에이전트가 부른 도구를 지금 하는 일에 묶는다
+   * (browser-tabs의 계획 안 누르기). 작업 토큰이 살아 있는지는 MCP 입구가 호출마다 본다. 그 밖의 요청자는 null
+   */
+  runTask(): string | null {
+    return null;
   }
 
   toJSON(): object {
@@ -214,9 +216,7 @@ export class AgentActor extends Actor {
   }
 
   can(scope: string): boolean {
-    if (scope === Actor.AGENT_OUT)
-      return ![...this.scopes].some((s) => Actor.KEEPS_PRIVATE.includes(s));
-    return scope === Actor.AGENT || this.scopes.has(scope);
+    return scope === Actor.AGENT || scope === Actor.AGENT_OUT || this.scopes.has(scope);
   }
 
   override mayRead(id: string): boolean {
@@ -225,6 +225,9 @@ export class AgentActor extends Actor {
 
   override hasReadGrants(): boolean {
     return this.reads.size > 0;
+  }
+  override runTask(): string {
+    return this.taskId;
   }
 
   override toJSON(): object {

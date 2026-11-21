@@ -59,7 +59,7 @@ export function useChats() {
   return useLiveValue('chats', () => api<ChatList>('GET', '/api/chats'), CHAT_LIST_TOPICS);
 }
 
-/** 한 앱의 대화 (스토어 2단계: 앱 관리의 개요 · 운영 팀) */
+/** 한 앱의 대화 (스토어 2단계: 앱 관리의 개요) */
 export function useAppChats(appId: string) {
   return useLiveValue(
     `chats:app:${appId}`,

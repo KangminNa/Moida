@@ -1,13 +1,13 @@
 // 콘솔 메뉴. 메뉴 하나 = app/admin/<주소>/ 폴더 하나 + 여기 한 줄. 기능이 생길 때 더한다.
-// 왼쪽에 떠 있는 독(DOCK)이 보는 화면 여섯(대화 · 팀 · 스토어 · 오피스 · 승인 · 보관함)이고, 대화가 처음 화면이다 (2026-11-16 떠 있는 화면, 스토어 1-5).
+// 왼쪽에 떠 있는 독(DOCK)이 보는 화면 여섯(대화 · 에이전트 · 스토어 · 오피스 · 승인 · 보관함)이고, 대화가 처음 화면이다 (2026-11-16 떠 있는 화면, 스토어 1-5).
 // 설정에는 바꾸는 것만 둔다: 설정 묶음과 접어 둔 "고급" (MENU, 2026-11-15 화면 정리: 설정은 대화에서 하고 화면은 덜어 둔다).
 // 아이콘 이름은 _ui/Icon.tsx의 선 아이콘이다 (2026-11-16 테마 B).
 
 export const CHAT_HREF = '/admin';
 export const CHATS_HREF = '/admin/chats';
 export const APPROVALS_HREF = '/admin/approvals';
-/** 팀: 에이전트 · 조직도 · 팀 템플릿. 이 제품의 핵심 설정 */
-export const TEAM_HREF = '/admin/agents';
+/** 에이전트: 대표와 일꾼 (2026-11-21 팀 없는 에이전트). 이 제품의 핵심 설정 */
+const AGENTS_HREF = '/admin/agents';
 /** 스토어 (스토어 1-5): 내 앱 · 앱 종류 고르기 · 앱 관리(/admin/store/<앱 id>) */
 export const STORE_HREF = '/admin/store';
 /** 보관함 (2차 5단계): 결과물 · 페이지 · 읽은 글 · 세션 · 위키 · 글을 한 목록으로. 결과물 · 페이지 · 스크랩 관리는 그 아래 */
@@ -37,14 +37,14 @@ export const DOCK = [
     pages: [NEW_CHAT, { href: CHATS_HREF, name: '대화' }],
   },
   {
-    key: 'team',
-    href: TEAM_HREF,
-    name: '팀',
+    key: 'agents',
+    href: AGENTS_HREF,
+    name: '에이전트',
     icon: 'team',
     side: false,
     tabs: true,
     pages: [
-      { href: TEAM_HREF, name: '팀' },
+      { href: AGENTS_HREF, name: '에이전트' },
       { href: '/admin/tasks', name: '작업 기록' },
     ],
   },

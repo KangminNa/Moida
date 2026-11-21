@@ -5,6 +5,9 @@
 // 0.4 (2026-11-14): LeasedWork의 대상(targetKind · targetId · targetVersion) — 작업이 가리키는 패키지의 줄 (browser-tabs의 사이트 · 클릭)
 // 0.5 (2026-11-16): LeasedWork의 지시(instruction) — 되풀이되는 일 알아채기 (browser-tabs의 사이트 도구 제안)
 // 0.6 (리팩토링 R2): ValueList — 생성된 값 목록(tables.ts의 `as const`)으로 글자를 좁힌다
+// 0.7 (2026-11-19): LeasedWork의 관리자가 쓴 지시(ownerText) — browser-tabs의 로그인 카드가 믿는 주소인지 본다
+// 0.8 (2026-11-21): actor.runTask() — 에이전트(작업 토큰)가 부른 도구를 지금 하는 일에 묶는다. 결과 이벤트의 outcome continue —
+//     결재를 기다리던 작업을 다시 대기열로 (browser-tabs의 누르기 계획: 계획을 승인하면 같은 일이 이어서 누른다)
 export {
   ActionResult,
   Actor,

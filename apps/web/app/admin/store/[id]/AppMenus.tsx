@@ -8,7 +8,6 @@ import { useMenus } from '../../../_blog/live';
 import type { AdminApp, Menu } from '../../../_blog/types';
 import { api } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
-import { useAgents } from '../../../_task/live';
 import { NewTabLink } from '../../../_ui/NewTabLink';
 import { STORE_HREF } from '../../menu';
 import { type MenuBody, MenuForm } from './MenuForm';
@@ -20,12 +19,10 @@ const CONFLICT = '이미 바뀐 메뉴예요. 최신 내용을 다시 읽었어�
 // 메뉴는 이 앱에 만들어진다 (appId). 글 · 페이지는 보관함에서 "메뉴에 올리기"로 담는다.
 export function AppMenus({ app }: { app: AdminApp }) {
   const menus = useMenus(app.slug);
-  const agents = useAgents();
   const action = useAction();
   const save = useAction();
   const [open, setOpen] = useState<string | null>(null);
   const list = menus.data?.menus ?? null;
-  const agentList = agents.data?.agents ?? [];
   const problem = action.problem ?? menus.error;
 
   function close() {
@@ -59,7 +56,6 @@ export function AppMenus({ app }: { app: AdminApp }) {
     <MenuForm
       key={menu?.version ?? NEW}
       menu={menu}
-      agents={agentList}
       busy={save.busy !== null}
       problem={save.problem}
       onSubmit={(body, requestId) => submit(menu, body, requestId)}
@@ -104,9 +100,7 @@ export function AppMenus({ app }: { app: AdminApp }) {
                     <NewTabLink href={menuPath(m.slug, app.slug)}>
                       /{app.slug}/m/{m.slug}
                     </NewTabLink>{' '}
-                    · {m.items ?? 0}개 · 운영 팀{' '}
-                    {agentList.find((a) => a.id === m.agentId)?.name ?? '없음'}
-                    {m.rss && m.kind === 'posts' ? ' · RSS' : ''}
+                    · {m.items ?? 0}개{m.rss && m.kind === 'posts' ? ' · RSS' : ''}
                   </small>
                   {m.policy && <small className="clamp">{m.policy}</small>}
                 </div>

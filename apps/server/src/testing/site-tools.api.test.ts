@@ -6,7 +6,7 @@ import { ApiClient, TestUser } from './api-client';
 
 // 기능 패키지 browser-tabs의 사이트 도구 (2026-11-16 MCP 2단계, docs/MCP.md 6장).
 // 굳히기(도구로 만들기 → browse 작업 → site_build_save 채점 → 켜기 결재), 실행(site_run → site_run_next → site_run_save →
-// site_result), 고장(연속 실패), 보는 사람별: 방문자 · write 기기 · 러너 · 바깥으로 보내는 에이전트 · 비공개를 읽는 에이전트 · 관리자.
+// site_result), 고장(연속 실패), 보는 사람별: 방문자 · write 기기 · 러너 · 에이전트(모두 같은 권한, 2026-11-21) · 관리자.
 // 코드는 돌리지 않는다 (러너 쪽은 apps/runner의 시험이 본다)
 
 type Json = Record<string, unknown>;
@@ -62,12 +62,11 @@ async function toolNames(token: string): Promise<string[]> {
   return (res.json().result as { tools: { name: string }[] }).tools.map((t) => t.name);
 }
 
-async function newAgent(name: string, scopes: string[], actions: string[] = []): Promise<string> {
+async function newAgent(name: string, actions: string[] = []): Promise<string> {
   const made = await api.request('POST', '/api/agents', owner, {
     requestId: randomUUID(),
     name,
     tool: 'claude',
-    scopes,
     approvalActions: actions,
   });
   return String(ok(made, 201).id);
@@ -184,11 +183,7 @@ before(async () => {
     }),
   );
   ok(await api.request('POST', '/api/plugins/browser-tabs/enable', owner));
-  builder = await newAgent(
-    '도구 굳히는 브라우저 담당',
-    ['read_public', 'browse'],
-    ['browser.integration.enable'],
-  );
+  builder = await newAgent('도구 굳히는 브라우저 담당', ['browser.integration.enable']);
 });
 after(async () => {
   await api.request('POST', '/api/plugins/browser-tabs/disable', owner);
@@ -257,12 +252,12 @@ describe('사이트 도구: 굳히기', () => {
 });
 
 describe('사이트 도구: 실행', () => {
-  test('비공개를 읽는 에이전트에게는 도구가 보이지 않고, 바깥으로 보내는 에이전트는 목록 · 맡기기 · 결과를 쓴다', async () => {
+  test('모든 에이전트에게 도구가 보인다 (비공개를 읽어도, 2026-11-21). 맡긴 에이전트가 목록 · 맡기기 · 결과를 쓰고, 결과는 그 에이전트만 본다', async () => {
     await liveTool('quote_run');
-    const outbound = await runTokenOf(await newAgent('시세 담당', ['read_public']));
-    const keeper = await runTokenOf(await newAgent('비공개 담당', ['read_public', 'read_all']));
-    assert.ok((await toolNames(outbound)).includes('site_run'));
-    assert.equal((await toolNames(keeper)).includes('site_run'), false);
+    const outbound = await runTokenOf(await newAgent('시세 담당'));
+    const other = await runTokenOf(await newAgent('다른 담당'));
+    for (const token of [outbound, other])
+      assert.ok((await toolNames(token)).includes('site_run'), '모든 에이전트에게 보인다');
     const listedTools = await tool(outbound, 'site_tools');
     const mine = (listedTools.body.tools as Json[]).find((t) => t.name === 'quote_run');
     assert.deepEqual(mine?.input_schema, INPUT);
@@ -302,20 +297,16 @@ describe('사이트 도구: 실행', () => {
       wait_seconds: 0,
     });
     assert.deepEqual([result.body.status, result.body.output], ['done', { price: 71000 }]);
-    const other = await tool(
-      await runTokenOf(await newAgent('다른 담당', ['read_public'])),
-      'site_result',
-      {
-        run_id: asked.body.run_id,
-        wait_seconds: 0,
-      },
-    );
-    assert.equal(other.ok, false, '맡긴 에이전트만 결과를 본다');
+    const notMine = await tool(other, 'site_result', {
+      run_id: asked.body.run_id,
+      wait_seconds: 0,
+    });
+    assert.equal(notMine.ok, false, '맡긴 에이전트만 결과를 본다');
   });
 
   test('형식과 다른 답은 shape 실패, 세 번 연속 실패면 고장 → 저절로 다시 굳힌다(autoRepair). 그동안 맡기기는 거절 (대신할 길과 함께)', async () => {
     await liveTool('quote_flaky');
-    const outbound = await runTokenOf(await newAgent('시세 담당 2', ['read_public']));
+    const outbound = await runTokenOf(await newAgent('시세 담당 2'));
     for (const i of [1, 2, 3]) {
       const asked = await tool(outbound, 'site_run', {
         request_id: `f${i}`,
@@ -357,7 +348,7 @@ describe('사이트 도구: 실행', () => {
 
 describe('사이트 도구: 되풀이되는 일 (MCP 3단계)', () => {
   test('같은 사이트에서 숫자만 다른 일이 세 번이면 제안, 그만 보기 · 만들기로 닫힌다', async () => {
-    const browseAgent = await newAgent('되풀이 브라우저 담당', ['read_public', 'browse']);
+    const browseAgent = await newAgent('되풀이 브라우저 담당');
     const site = ok(
       await api.request('POST', `${BASE}/sites`, owner, { ...SITE, name: '되풀이 시세' }),
     );
@@ -382,7 +373,7 @@ describe('사이트 도구: 되풀이되는 일 (MCP 3단계)', () => {
   });
 
   test('지시가 같은 모양이면 세 번째에 제안이 열리고, 만들기에 제안을 넘기면 닫힌다', async () => {
-    const browseAgent = await newAgent('되풀이 담당 2', ['read_public', 'browse']);
+    const browseAgent = await newAgent('되풀이 담당 2');
     const site = ok(
       await api.request('POST', `${BASE}/sites`, owner, { ...SITE, name: '되풀이 2' }),
     );
@@ -448,11 +439,7 @@ describe('사이트 도구: 쓰기 도구 · 검토자 짝 (MCP 3단계)', () =>
   });
 
   test('마른 실행 시험 → 검토 → 고칠 점이면 다시 굳히고, 통과면 검토자가 켜기 결재 → 부를 때마다 결재 → 한 번 실행', async () => {
-    const reviewer = await newAgent(
-      '사이트 도구 검토자',
-      ['read_public'],
-      ['browser.integration.enable'],
-    );
+    const reviewer = await newAgent('사이트 도구 검토자', ['browser.integration.enable']);
     const { taskId } = await building('post_write', { mode: 'write', reviewerId: reviewer });
     const dry = await save(taskId, [{}, {}, {}]);
     assert.deepEqual([dry.body.accepted, dry.body.review], [true, true], JSON.stringify(dry.body));
@@ -463,7 +450,7 @@ describe('사이트 도구: 쓰기 도구 · 검토자 짝 (MCP 3단계)', () =>
     const reviewRun = String(reviewJob.run_token);
     const material = await tool(reviewRun, 'site_review_get', { integration_id: tool1.id });
     assert.equal(material.body.mode, 'write');
-    const stranger = await runTokenOf(await newAgent('검토자 아님', ['read_public']));
+    const stranger = await runTokenOf(await newAgent('검토자 아님'));
     assert.equal((await tool(stranger, 'site_review_get', { integration_id: tool1.id })).ok, false);
 
     const fix = await tool(reviewRun, 'site_review', {
@@ -506,11 +493,7 @@ describe('사이트 도구: 쓰기 도구 · 검토자 짝 (MCP 3단계)', () =>
     await drain();
     assert.equal((await listed('post_write')).status, 'on');
 
-    const writerAgent = await newAgent(
-      '글 올리는 담당',
-      ['read_public'],
-      ['browser.integration.write'],
-    );
+    const writerAgent = await newAgent('글 올리는 담당', ['browser.integration.write']);
     const caller = await runTokenOf(writerAgent);
     const held = await tool(caller, 'site_run', {
       request_id: 'w1',

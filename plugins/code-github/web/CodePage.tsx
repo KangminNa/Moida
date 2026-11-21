@@ -3,7 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react';
 // code-github의 콘솔 화면 (운영 › 코드). 코드 작업을 GitHub와 잇는다.
 //   저장소: 등록 · 고치기 · 보관. 칸이 돌리는 명령(setup · checks)은 여기 적은 것만 쓴다
 //   일 맡기기: 저장소 · 고칠 곳(paths) · 지시 · 담당. 코드 러너 칸이 고쳐 draft PR을 열고 승인을 올린다.
-//     팀원이 있는 담당(팀장)은 경로로 나눠 팀원들에게 맡기고, 칸 수만큼 함께 돈다 (코드 작업 5단계)
+//     담당은 어느 에이전트든 된다 (모든 일꾼이 같은 권한, 2026-11-21 팀 없는 에이전트)
 //   PR: 러너가 연 PR. 주인이 GitHub에서 머지한 뒤 승인하면 작업이 끝난다
 // 화면은 react와 이 폴더만 가져온다: 서버 호출(call)과 알림(notify)은 콘솔이 넘겨 준다.
 
@@ -22,7 +22,7 @@ type Repo = {
   version: number;
 };
 /** 코어의 에이전트 (GET /api/agents, 코어 읽기). 담당 고르기에 쓰는 칸만 */
-type Agent = { id: string; name: string; scopes: string[]; reportsTo: string | null };
+type Agent = { id: string; name: string };
 type Pull = {
   id: string;
   repoName: string;
@@ -59,9 +59,7 @@ export default function CodePage({ call, notify }: Props) {
     else notify(r.message);
     if (p.ok) setPulls((p.data as { pulls: Pull[] }).pulls);
     else notify(p.message);
-    // 코드 권한이 있는 에이전트만 담당이 될 수 있다
-    if (a.ok)
-      setCoders((a.data as { agents: Agent[] }).agents.filter((x) => x.scopes.includes('code')));
+    if (a.ok) setCoders((a.data as { agents: Agent[] }).agents);
   }, [call, notify]);
 
   useEffect(() => {
@@ -181,7 +179,6 @@ function RepoItem({
   const [paths, setPaths] = useState('');
   const [agentId, setAgentId] = useState('');
   const [busy, setBusy] = useState(false);
-  const teamOf = (id: string) => coders.filter((c) => c.reportsTo === id).length;
 
   async function ask(event: FormEvent) {
     event.preventDefault();
@@ -237,10 +234,10 @@ function RepoItem({
         <label className="field">
           <span>담당</span>
           <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            <option value="">자동 배정 (코드 권한이 있는 에이전트)</option>
+            <option value="">자동 배정</option>
             {coders.map((c) => (
               <option key={c.id} value={c.id}>
-                {teamOf(c.id) > 0 ? `${c.name} (팀원 ${teamOf(c.id)}명: 나눠 맡김)` : c.name}
+                {c.name}
               </option>
             ))}
           </select>

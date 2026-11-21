@@ -226,7 +226,7 @@ export function ScheduleForm({
           maxLength={4000}
           placeholder={
             agentId
-              ? '비우면 정기 확인: 맡은 목표와 진행 중인 일을 확인하고, 할 일이 있으면 하거나 팀에게 맡겨요'
+              ? '비우면 정기 확인: 맡은 목표와 진행 중인 일을 확인하고, 할 일이 있으면 하거나 일꾼에게 맡겨요'
               : '자동 배정이면 지시가 있어야 해요'
           }
           onChange={(e) => edit(() => setInstruction(e.target.value))}

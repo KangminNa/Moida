@@ -4,8 +4,9 @@ import { buildPartOf } from './integration-build';
 import { leasedBrowse, pageUrlOf, placeOf } from './job';
 import { loginFormOf, savedForm } from './login-card';
 import { type LoginForm, LoginTrust } from './login-inbox';
+import { settlePlans } from './plans';
 import { noteBrowse } from './repeats';
-import { sites } from './schema';
+import { clickPlans, sites } from './schema';
 import { addShot, decodeImage, imageOf } from './shots';
 import { siteForPage } from './sites';
 
@@ -14,7 +15,7 @@ import { siteForPage } from './sites';
 
 /**
  * MCP browser_job: 러너가 빌린 browse 작업이 어디서 도는지 (사이트 · 둘러보기, 로그인 필요, 앞에서 붙잡은 페이지,
- * 사이트 도구를 굳히는 일이면 그 몫). 굳히기면 그 작업을 쥔 것을 도구에 적어서 쓰기 동작이다
+ * 사이트 도구를 굳히는 일이면 그 몫, 승인된 누르기 계획). 굳히기면 그 작업을 쥔 것을 도구에 적어서 쓰기 동작이다
  */
 export class BrowserJob extends Command<{ taskId: string }> {
   readonly name = 'job';
@@ -33,7 +34,10 @@ export class BrowserJob extends Command<{ taskId: string }> {
     const build = place.integration
       ? await buildPartOf(work, place.integration, input.taskId)
       : null;
-    return new JobView(place.site, place.held, build);
+    // 앞 실행에서 요청만 하고 가져가지 않은 누르기는 닫는다 (그 AI는 이제 기다리지 않는다). 승인된 계획이 있으면 함께 (F2)
+    await settlePlans(work, input.taskId, false);
+    const plan = await work.row(clickPlans, { task_id: input.taskId, status: 'approved' });
+    return new JobView(place.site, place.held, build, plan);
   }
 }
 

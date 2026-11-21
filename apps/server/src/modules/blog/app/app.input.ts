@@ -22,17 +22,16 @@ function changesOf(f: RequestFields, body: Record<string, unknown>): Partial<Unc
     description: has('description') ? descriptionOf(f, body) : undefined,
     sort: has('sort') ? f.integer('sort', 0, App.SORT_MAX) : undefined,
     visibility: has('visibility') ? f.text('visibility', 20) : undefined,
-    ...teamOf(f, body),
+    ...policyOf(f, body),
   };
 }
 
-/** 운영 팀장 · 편집 방침 (스토어 2단계). 팀장 null은 비우기, 방침 ""은 지우기. 보내지 않으면 그대로 */
-function teamOf(
+/** 편집 방침 (스토어 2단계). ""은 지우기, 보내지 않으면 그대로 */
+function policyOf(
   f: RequestFields,
   body: Record<string, unknown>,
-): Pick<Partial<Unchecked<AppRow>>, 'agent_id' | 'policy'> {
+): Pick<Partial<Unchecked<AppRow>>, 'policy'> {
   return {
-    agent_id: !('agentId' in body) ? undefined : body.agentId === null ? null : f.uuid('agentId'),
     policy: !('policy' in body)
       ? undefined
       : body.policy === ''
@@ -76,7 +75,7 @@ export class CreateAppInput extends BaseRequest {
             slug: f.text('slug', App.SLUG_MAX * 2),
             description: 'description' in body ? descriptionOf(f, body) : undefined,
             sort: 'sort' in body ? f.integer('sort', 0, App.SORT_MAX) : undefined,
-            ...teamOf(f, body),
+            ...policyOf(f, body),
           },
           f.optionalTextList('menus', CreateAppInput.MENUS_MAX, Menu.NAME_MAX * 2),
           body.pageId === undefined || body.pageId === null ? null : f.uuid('pageId'),

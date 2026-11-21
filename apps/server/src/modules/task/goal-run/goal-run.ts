@@ -186,9 +186,10 @@ export class GoalRun extends TableEntity<GoalRunRow, GoalRunNew> {
     if (task.cancelled) return ask(Approval.GOAL_CONTINUE, '회차 작업이 취소됐어요');
     if (task.failure !== null)
       return ask(Approval.GOAL_CONTINUE, `회차 작업이 실패했어요: ${task.failure}`);
-    if (report === null) return ask(Approval.GOAL_CONTINUE, '팀장이 보고 없이 회차를 끝냈어요');
+    if (report === null)
+      return ask(Approval.GOAL_CONTINUE, '맡은 에이전트가 보고 없이 회차를 끝냈어요');
     if (report.done)
-      return ask(Approval.GOAL_COMPLETE, '팀장이 완료 조건을 다 채웠다고 보고했어요');
+      return ask(Approval.GOAL_COMPLETE, '맡은 에이전트가 완료 조건을 다 채웠다고 보고했어요');
     if (this.row.round >= this.row.max_rounds)
       return ask(
         Approval.GOAL_CONTINUE,

@@ -354,6 +354,7 @@ describe('검수', () => {
     ok(await editLead({ secondInspectorId: second.id }));
     assert.equal((await lead()).secondInspectorId, second.id);
     try {
+      // 검수자는 올린 에이전트만 아니면 된다 (2026-11-21): 둘 중 하나가 올린 쪽과 같은 AI 도구여도 검수한다
       const chat = await open('글 하나 써서 공개해 줘');
       const { postId, approvalId } = await writeAndAsk(chat.id);
       await drain();

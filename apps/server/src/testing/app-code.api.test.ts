@@ -210,7 +210,6 @@ before(async () => {
       requestId: randomUUID(),
       name: `앱 코드 담당 ${mark}`,
       tool: 'claude',
-      scopes: ['make'],
     }),
     201,
   );
@@ -644,15 +643,14 @@ describe('대화에서 맡기기 (스토어 1-6b)', () => {
     for (let i = 0; i < 200 && (await worker.tick()) > 0; i++);
   };
 
-  test('대표가 make 팀원에게 app_id로 맡기면 새 버전이 되고, 공개 앱이면 결과 카드에서 공개를 고른다', async () => {
+  test('대표가 일꾼에게 make 일을 app_id로 맡기면 새 버전이 되고, 공개 앱이면 결과 카드에서 공개를 고른다', async () => {
     const app = await publish(await newApp(`code-chat-${mark}`));
-    // 대화는 대표가 맡고(O-2), 대표는 맨 위의 make 팀장에게 맡긴다
+    // 대화는 대표가 맡고(O-2), 대표는 일꾼 누구에게나 맡긴다 (2026-11-21)
     const member = ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
         name: `앱 꾸미기 ${mark}`,
         tool: 'claude',
-        scopes: ['make'],
       }),
       201,
     );
@@ -739,11 +737,8 @@ describe('대화에서 맡기기 (스토어 1-6b)', () => {
         tool: 'claude',
         ...more,
       });
-    const member = ok(await agent('앱 화면 검수 대상', { scopes: ['make'] }), 201);
-    const inspector = ok(
-      await agent('앱 화면 검수자', { tool: 'codex', scopes: ['read_public'] }),
-      201,
-    );
+    const member = ok(await agent('앱 화면 검수 대상', {}), 201);
+    const inspector = ok(await agent('앱 화면 검수자', { tool: 'codex' }), 201);
     const lead = async () => ok(await api.get('/api/agents/lead', owner)).lead as Json;
     const editLead = async (body: Json) =>
       ok(
@@ -825,7 +820,6 @@ describe('대화에서 맡기기 (스토어 1-6b)', () => {
         requestId: randomUUID(),
         name: `일정표 화면 ${mark}`,
         tool: 'claude',
-        scopes: ['make'],
       }),
       201,
     );

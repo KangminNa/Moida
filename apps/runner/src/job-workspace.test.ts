@@ -313,7 +313,7 @@ describe('지시문', () => {
     assert.ok(prompt.includes('## [실패] 정리 (정리 팀원)\n세션이 없어요'));
   });
 
-  test('팀원 정보(일 수 · 최근 결과 · 도구 · 커넥터 · 아래 팀)와 나누는 법, 결과 형식을 담는다', () => {
+  test('일꾼 정보(일 수 · 최근 결과 · 도구 · 커넥터)와 나누는 법, 결과 형식을 담는다', () => {
     const prompt = job({
       team: [
         {
@@ -334,7 +334,6 @@ describe('지시문', () => {
             tokens_per_done: 1200,
           },
           connectors: ['notion', 'linear'],
-          team: { members: 2, kinds: { general: 2, browse: 1 }, connectors: { notion: 1 } },
         },
         { agent_id: 'w1', name: '글쓰기', role: '', status: 'active', kinds: ['general'] },
       ],
@@ -345,17 +344,17 @@ describe('지시문', () => {
     }).prompt(REPO_PROMPTS, false);
     assert.ok(
       prompt.includes(
-        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 최근 30일 성적: 첫 판정 통과 3/4 · 평균 고친 횟수 0.25 · 일 하나에 토큰 1200 · 커넥터: notion, linear · 아래 팀: 2명 (general 2, browse 1 · 커넥터 notion 1)',
+        '조사 팀장 (agent_id: m1) · 맡길 수 있는 일: general · AI 도구: codex · 쥔 일 2개 · 최근 7일 끝냄 5 · 실패 1 · 고쳐 달라 · 반려 0 · 최근 30일 성적: 첫 판정 통과 3/4 · 평균 고친 횟수 0.25 · 일 하나에 토큰 1200 · 커넥터: notion, linear',
       ),
     );
-    // 옛 서버(팀원 정보 없음)면 0으로, 아래 팀 · 커넥터 칸은 없다
+    // 옛 서버(일꾼 정보 없음)면 0으로, 커넥터 · 성적 칸은 없다
     assert.ok(prompt.includes('글쓰기 (agent_id: w1) · 맡길 수 있는 일: general · 쥔 일 0개'));
-    assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|아래 팀|성적)/.test(prompt), false);
+    assert.equal(/글쓰기 \(agent_id: w1\)[^\n]*(커넥터|성적)/.test(prompt), false);
     assert.ok(prompt.includes('## 나누는 법'));
     // 모델은 맡기는 쪽이 일마다 고르고, 상한은 내 모델 (2026-11-19). 정하지 않았으면 CLI 기본(opus)
     assert.ok(prompt.includes('delegate_task의 model로 고릅니다'));
     assert.ok(prompt.includes('내 모델(opus)보다 높게 고를 수 없습니다'));
-    assert.ok(prompt.includes('propose_setting'), '맞는 담당이 없으면 팀 바꾸기를 제안한다');
+    assert.ok(prompt.includes('propose_setting'), '맡을 일꾼이 없으면 일꾼 더하기를 제안한다');
     assert.ok(prompt.includes('## [완료] 조사 (조사 팀장)\n요청한 형식: 표 하나\n표'));
 
     const child = job({ deliver: '후보 3개를 표로' }).prompt(REPO_PROMPTS, false);
@@ -399,7 +398,7 @@ describe('지시문', () => {
       REPO_PROMPTS,
       false,
     );
-    assert.ok(woke.includes('하위 작업 하나가 실패해 다른 팀원을 기다리지 않고 먼저 깨웠습니다'));
+    assert.ok(woke.includes('하위 작업 하나가 실패해 다른 일꾼을 기다리지 않고 먼저 깨웠습니다'));
     assert.ok(woke.includes('## [실패] 조사 (조사 팀원)\n자료 없음'));
     assert.ok(woke.includes('## [일하는 중 · 7분째] 정리 (정리 팀원) · task_id: c2'));
     assert.ok(woke.includes('## [승인 기다림 · 7분째] 공개 (글쓰기) · task_id: c3'));
@@ -441,7 +440,7 @@ describe('지시문', () => {
       REPO_PROMPTS,
       false,
     );
-    assert.ok(woke.includes('팀원 하나가 나눌 부분을 적어 도움을 청해 먼저 깨웠습니다'));
+    assert.ok(woke.includes('일꾼 하나가 나눌 부분을 적어 도움을 청해 먼저 깨웠습니다'));
     assert.ok(
       woke.includes(
         '## [일하는 중 · 30분째] 정리 (정리 팀원) · task_id: c2\n진행 기록:\n- 자료 10개 중 4개 읽음\n- 도움 요청: 6~10번 자료 요약',
@@ -457,25 +456,20 @@ describe('지시문', () => {
     assert.equal(deadline.includes('도움을 청해'), false);
   });
 
-  test('도움 요청 (ask_help)은 팀장이 맡긴 일이고 아래 팀이 없을 때만 알린다', () => {
+  test('도움 요청 (ask_help)은 대표가 맡긴 일에서만 알린다', () => {
     const delegated = { id: 't', title: '정리', payload: { delegatedBy: 'boss' } };
     const member = job({ task: delegated }).prompt(REPO_PROMPTS, false);
     assert.ok(member.includes('ask_help로 그 부분'));
     assert.equal(job({}).prompt(REPO_PROMPTS, false).includes('ask_help'), false, '맨 위 일');
-    const team = [{ agent_id: 'h1', name: '조사', role: '', status: 'active', kinds: ['general'] }];
-    const lead = job({ task: delegated, team, rounds_left: 1 }).prompt(REPO_PROMPTS, false);
-    assert.equal(lead.includes('ask_help로 그 부분'), false, '아래 팀이 있으면 그 팀에 나눈다');
   });
 
-  test('대표의 일(agent.lead, O-2)에는 lead 단락을 넣는다: 나눠 맡기기 · continue로 팀 바꾸기 제안 · 결과 중심', () => {
-    const team = [
-      { agent_id: 'h1', name: '조사 팀장', role: '', status: 'active', kinds: ['general'] },
-    ];
+  test('대표의 일(agent.lead, O-2)에는 lead 단락을 넣는다: 직접 할 일 · 나눠 맡기기 · continue로 일꾼 더하기 제안 · 결과 중심', () => {
+    const team = [{ agent_id: 'h1', name: '조사', role: '', status: 'active', kinds: ['general'] }];
     const lead = job({
       agent: {
         id: 'l',
         name: '대표',
-        role: '대화를 받아 팀에 나눠 맡긴다',
+        role: '대화를 받아 일꾼에게 나눠 맡긴다',
         tool: 'claude',
         lead: true,
       },
@@ -484,9 +478,10 @@ describe('지시문', () => {
     }).prompt(REPO_PROMPTS, false);
     assert.ok(lead.includes('# 대표로 일하는 법'));
     assert.ok(lead.includes('continue: true'));
-    assert.ok(lead.indexOf('# 내 팀') < lead.indexOf('# 대표로 일하는 법'), '팀 목록 뒤에');
-    const head = job({ team, rounds_left: 2 }).prompt(REPO_PROMPTS, false);
-    assert.equal(head.includes('대표로 일하는 법'), false, '팀장의 일에는 없다');
+    assert.ok(lead.includes('바로 할 수 있는 일은 직접 하고'), '작은 일은 대표가 직접');
+    assert.ok(lead.indexOf('# 일꾼') < lead.indexOf('# 대표로 일하는 법'), '일꾼 목록 뒤에');
+    const worker = job({}).prompt(REPO_PROMPTS, false);
+    assert.equal(worker.includes('대표로 일하는 법'), false, '일꾼의 일에는 없다');
   });
 
   test('대표의 대화 회차 (O-3): 받을 것을 set_deliver로 정하고, 자동화는 이 대화 id로 찾는다. 정해진 받을 것이면 그것을 낸다', () => {
@@ -528,10 +523,10 @@ describe('지시문', () => {
     assert.equal(reply.includes('새로 나눠 맡기거나 큰 일을 하지 않습니다'), false);
     assert.equal(reply.includes('set_deliver로 이번 회차의'), false, 'set_deliver는 회차만');
     assert.ok(reply.includes('받을 것(set_deliver)은 회차의 것이라 정하지 않습니다'));
-    assert.ok(reply.includes('이 대화는 앱 하나의 일입니다 (app_id: app-1)'), '앱의 팀에 맡긴다');
+    assert.ok(reply.includes('이 대화는 앱 하나의 일입니다 (app_id: app-1)'), '그 앱의 일만');
   });
 
-  test('대표의 앱 일 (스토어 2단계): 앱의 일은 운영 팀장에게, 앱으로 연 대화면 그 앱 하나만', () => {
+  test('대표의 앱 일 (스토어 2단계): 앱의 편집 방침을 지시에 적고, 앱으로 연 대화면 그 앱 하나만', () => {
     const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
     const turn = (chat: object) =>
       job({
@@ -539,14 +534,14 @@ describe('지시문', () => {
         task: { id: 't', title: '대화 · 글', payload: { chat: { turn: 1, history: [], ...chat } } },
       }).prompt(REPO_PROMPTS, false);
     const plain = turn({ chatId: 'chat-1' });
-    assert.ok(plain.includes('get_settings kind: apps'), '앱의 일은 운영 팀장에게 (늘 있는 줄)');
-    assert.ok(plain.includes('setting: app, op: edit, fields: { agent_id }'));
+    assert.ok(plain.includes('get_settings kind: apps'), '앱의 편집 방침을 읽는다 (늘 있는 줄)');
+    assert.equal(plain.includes('agent_id }'), false, '운영 팀장은 없다 (2026-11-21)');
     assert.equal(plain.includes('이 대화는 앱 하나의 일입니다'), false);
     const inApp = turn({ chatId: 'chat-2', appId: 'app-9' });
     assert.ok(inApp.includes('이 대화는 앱 하나의 일입니다 (app_id: app-9)'));
   });
 
-  test('대표의 새 앱 만들기 (스토어 2-6): 방문자가 하는 일로 종류를 고르고, 운영 팀까지 승인 한 번에', () => {
+  test('대표의 새 앱 만들기 (스토어 2-6): 방문자가 하는 일로 종류를 고르고 승인 한 번에', () => {
     const lead = { id: 'l', name: '대표', role: '', tool: 'claude', lead: true };
     const prompt = job({
       agent: lead,
@@ -559,10 +554,10 @@ describe('지시문', () => {
     assert.ok(prompt.includes('방문자가 무엇을 하는지로 종류를 고릅니다'), '늘 있는 줄');
     assert.ok(prompt.includes('kind: page (페이지 없이 만들고 화면은 앱 코드로'));
     assert.ok(prompt.includes('page면 app_code(첫 화면)'), '받을 것은 앱의 첫 결과');
-    assert.ok(prompt.includes('없으면 new_team: true'));
+    assert.equal(prompt.includes('new_team'), false, '앱 운영 팀은 없다 (2026-11-21)');
   });
 
-  test('묶인 팀원은 정해진 컴퓨터에서 일한다고 팀장에게 알린다', () => {
+  test('묶인 일꾼은 정해진 컴퓨터에서 일한다고 대표에게 알린다', () => {
     const prompt = job({
       team: [
         {
@@ -622,7 +617,7 @@ describe('지시문', () => {
     }).prompt(REPO_PROMPTS, false);
     assert.ok(turn.includes('# 덧붙인 말\n관리자가 이 회차에 덧붙인 말입니다'));
     assert.ok(turn.includes('- 마감일만 먼저 알려 줘'));
-    assert.ok(turn.includes('# 팀 소식 (자료)'));
+    assert.ok(turn.includes('# 일꾼 소식 (자료)'));
     assert.ok(turn.includes('- [assumption] 리서처: 본선은 오프라인이라고 가정'));
     assert.ok(turn.includes('post_update'), '대표에게 가정을 남기는 법');
     const reply = job({
@@ -634,7 +629,7 @@ describe('지시문', () => {
     }).prompt(REPO_PROMPTS, false);
     assert.ok(reply.includes('# 덧붙인 말에 답하는 법'));
     assert.equal(reply.includes('# 대화로 답하는 법'), false);
-    assert.equal(reply.includes('# 팀 소식'), false, '소식이 없으면 단락도 없다');
+    assert.equal(reply.includes('# 일꾼 소식'), false, '소식이 없으면 단락도 없다');
   });
 
   test('팀이 없으면 위임을 말하지 않고, 횟수를 다 쓰면 직접 마무리한다', () => {

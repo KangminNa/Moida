@@ -26,7 +26,8 @@ export function TidyPanel() {
   const on = settings.data?.autoTidy ?? false;
   const cadence = settings.data?.cadence ?? 'daily';
   const tasks = queued.data?.tasks.filter((t) => t.kind === 'tidy_session');
-  const able = agents.data?.agents.some((a) => a.status === 'active' && a.scopes.includes('tidy'));
+  // 모든 일꾼이 정리할 수 있다 (2026-11-21 팀 없는 에이전트): 멈추지 않은 일꾼이 있으면 된다
+  const able = agents.data?.agents.some((a) => a.status === 'active');
   const stuck = able === false && (on || (tasks?.length ?? 0) > 0);
 
   /** 켜기 · 끄기와 언제(저장할 때마다 · 하루 한 번)를 함께 보낸다 */
@@ -89,8 +90,8 @@ export function TidyPanel() {
       </div>
       {stuck && (
         <p className="warn">
-          tidy 권한이 있는 에이전트 없음 · 대기 {countOf(tasks, queued.data?.next)}건.{' '}
-          <Link href="/admin/agents">에이전트</Link>에 tidy와 read_all을 주면 정리가 시작돼요
+          일할 에이전트 없음 · 대기 {countOf(tasks, queued.data?.next)}건.{' '}
+          <Link href="/admin/agents">에이전트</Link>를 추가하거나 다시 시작하면 정리가 시작돼요
         </p>
       )}
       {problem && <p className="error">{problem}</p>}

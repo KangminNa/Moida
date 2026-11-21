@@ -28,12 +28,12 @@ export function decisionOf(raw: unknown): Decision | null {
 
 /** 판단 바꾸기로 보내는 말 (관리자의 말이라 대표가 그대로 받는다, 지시문 틀의 "판단 바꾸기") */
 export function changeMessage(news: ChatNews, decision: Decision, change: string): string {
-  const who = news.agent ?? '팀원';
+  const who = news.agent ?? '일꾼';
   return `판단 바꾸기 — ${who}: ${news.text} (고른 안: ${decision.chosen})\n→ ${change.trim()}`;
 }
 
-// 중간 판단 알림 (L1, 2026-11-21): 팀이 일하는 도중에 정한 것을 접지 않고 회차 아래에 보인다. 멈추지 않는 알림이고,
-// "바꾸기"로 고쳐 말하면 회차의 덧붙인 말이 되어 대표의 다음 실행에 들어간다 (팀원을 기다리는 중이면 패널이 먼저 깨운다).
+// 중간 판단 알림 (L1, 2026-11-21): 일꾼이 일하는 도중에 정한 것을 접지 않고 회차 아래에 보인다. 멈추지 않는 알림이고,
+// "바꾸기"로 고쳐 말하면 회차의 덧붙인 말이 되어 대표의 다음 실행에 들어간다 (일꾼을 기다리는 중이면 패널이 먼저 깨운다).
 // 고쳐 쓰는 칸은 이 조각의 상태다. 보내기는 패널이 한다
 export function ChatDecisions({
   items,
@@ -52,11 +52,11 @@ export function ChatDecisions({
   });
   if (shown.length === 0) return null;
   return (
-    <ul className="decisions" aria-label="팀의 판단">
+    <ul className="decisions" aria-label="일꾼의 판단">
       {shown.map(({ n, d }) => (
         <li key={n.n} className="decision" data-weight={d.weight}>
           <span className="bubble-meta">
-            {n.agent ?? '팀원'} · 판단{d.step ? ` · ${d.step}` : ''} · {clock(n.createdAt)}
+            {n.agent ?? '일꾼'} · 판단{d.step ? ` · ${d.step}` : ''} · {clock(n.createdAt)}
           </span>
           <p className="text">
             <b>{n.text}</b>

@@ -15,7 +15,6 @@ import {
 import { Approval } from '../approval/approval';
 import { agents, schedules } from '../task.schema';
 import type { GetSettingsInput } from './setting-change.input';
-import { SettingChanges } from './setting-change.policy';
 import {
   AgentSettingView,
   ScheduleSettingsView,
@@ -48,7 +47,6 @@ export class SettingQuery extends BaseQuery {
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
     const me = await this.row(agents, { space_id: actor.spaceId, id: actor.agentId });
     if (!me) throw new Forbidden(Actor.AGENT);
-    SettingChanges.assertInside(me.scopes, me.external_tools);
     if (!me.lead && !me.approval_actions.includes(Approval.SETTING_CHANGE))
       throw new Forbidden(
         Approval.SETTING_CHANGE,

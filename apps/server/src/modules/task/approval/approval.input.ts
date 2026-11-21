@@ -103,11 +103,19 @@ export class DecideApprovalInput extends BaseRequest {
 export class ApprovalResultInput extends BaseRequest {
   private static readonly DONE = 'done';
   private static readonly FAILED = 'failed';
+  /** 승인한 것을 같은 작업이 이어서 한다 (플러그인 API 0.8, browser-tabs의 누르기 계획): 작업을 다시 대기열로 */
+  private static readonly CONTINUE = 'continue';
+  private static readonly OUTCOMES: readonly unknown[] = [
+    ApprovalResultInput.DONE,
+    ApprovalResultInput.FAILED,
+    ApprovalResultInput.CONTINUE,
+  ];
 
   private constructor(
     readonly approvalId: string,
     readonly succeeded: boolean,
     readonly error: string | null,
+    readonly continues: boolean,
   ) {
     super();
   }
@@ -115,8 +123,7 @@ export class ApprovalResultInput extends BaseRequest {
   /** 결과를 담은 이벤트인가 (task.approval.granted처럼 approvalId만 있는 것은 아니다) */
   static carriedBy(data: Readonly<Record<string, unknown>>): boolean {
     return (
-      typeof data.approvalId === 'string' &&
-      (data.outcome === ApprovalResultInput.DONE || data.outcome === ApprovalResultInput.FAILED)
+      typeof data.approvalId === 'string' && ApprovalResultInput.OUTCOMES.includes(data.outcome)
     );
   }
 
@@ -128,6 +135,7 @@ export class ApprovalResultInput extends BaseRequest {
           f.uuid('approvalId'),
           data.outcome === ApprovalResultInput.DONE,
           f.optionalText('error', 4000),
+          data.outcome === ApprovalResultInput.CONTINUE,
         ),
     );
   }

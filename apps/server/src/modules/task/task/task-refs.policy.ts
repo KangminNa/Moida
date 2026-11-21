@@ -1,5 +1,4 @@
-import { Actor, RuleViolation } from '../../platform';
-import type { Agent } from '../agent/agent';
+import { RuleViolation } from '../../platform';
 
 /**
  * 참조 한 줄 (회차 · 하위 작업의 payload.refs). 보관함의 것은 kind · id · title · private, 주소는 kind url · url · browser.
@@ -30,8 +29,8 @@ export type RefFound = {
 
 // 대화에 넣은 참조 (2026-11-15 B, 기획서 결정): 위키 · 세션 · 글 · 페이지 · 결과물 · 스크랩, 그리고 주소.
 // 회차마다 고른 것만 그 작업의 토큰에 읽기 허락(Actor.mayRead)으로 봉인한다 (만들기 재료와 같은 길). 내용을 지시문에 복사하지 않는다.
-// 비공개 참조는 바깥으로 나가는 길이 있는 에이전트(브라우저 · 커넥터)에게 주지 않는다: 그런 에이전트는 배정 후보에서 빠지고,
-// 위임하면 거절한다 (조용히 빼지 않는다). 위임은 위 작업의 참조 가운데서만 고른다 (AI가 허락을 만들 수 없다)
+// 비공개 참조도 어느 일꾼에게나 넘긴다 (2026-11-21, 사용자 결정 "비공개도 그냥 읽어": 모두 같은 일꾼).
+// 위임은 위 작업의 참조 가운데서만 고른다 (AI가 허락을 만들 수 없다)
 export class TaskRefs {
   static readonly MAX = 10;
   /** 한 메시지의 사진 (참조 MAX 안에서). 사진은 AI의 토큰을 많이 쓴다 */
@@ -41,8 +40,6 @@ export class TaskRefs {
   static readonly URL = 'url';
   /** 공개로 보는 값 (보관함 줄의 visibility: 위키 · 세션 · 페이지는 public, 글은 published) */
   private static readonly PUBLIC: readonly string[] = ['public', 'published'];
-  /** 셸이 있는 일의 권한 (위임으로 비공개 참조를 받지 못한다) */
-  private static readonly SHELL: readonly string[] = [Actor.CODE, Actor.MAKE];
 
   private constructor(readonly lines: readonly TaskRef[]) {}
 
@@ -124,42 +121,17 @@ export class TaskRefs {
     return this.lines.flatMap((l) => (l.kind === 'output' && l.id ? [l.id] : []));
   }
 
-  get hasPrivate(): boolean {
-    return this.lines.some((l) => l.private);
-  }
-
-  /** 이 에이전트가 받을 수 없는 까닭. 받을 수 있으면 null */
-  problemFor(agent: Agent): string | null {
-    if (!this.hasPrivate) return null;
-    if (agent.scopes.includes(Actor.BROWSE) || agent.externalTools.length > 0)
-      return `비공개 참조는 브라우저 · 커넥터 에이전트(${agent.name})에게 넘기지 못해요`;
-    return null;
-  }
-
-  assertFor(agent: Agent): void {
-    const problem = this.problemFor(agent);
-    if (problem) throw new RuleViolation(problem);
-  }
-
   /**
-   * 위임: 위 작업의 참조 가운데 고른 것 (id나 주소). 위 작업에 없는 것은 RuleViolation. 고르지 않으면 넘기지 않는다.
-   * 비공개 참조는 셸이 있는 담당(만들기 · 코드)에게도 넘기지 않는다: 만들기 재료를 위임에 물려주지 않는 것과 같은 까닭
-   * (AI가 쓴 지시를 따라 비공개가 칸의 허용 호스트로 나갈 수 있다). 관리자가 그 담당과 대화에서 직접 넣는다
+   * 위임: 위 작업의 참조 가운데 고른 것 (id나 주소). 위 작업에 없는 것은 RuleViolation. 고르지 않으면 넘기지 않는다
    */
-  handOn(chosen: readonly string[] | null, worker: Agent): TaskRefs {
+  handOn(chosen: readonly string[] | null): TaskRefs {
     if (!chosen || chosen.length === 0) return new TaskRefs([]);
     const picked = chosen.map((c) => {
       const line = this.lines.find((l) => l.id === c || l.url === c);
       if (!line) throw new RuleViolation(`이 작업에 없는 참조예요: ${c}`);
       return line;
     });
-    const refs = new TaskRefs([...new Set(picked)]);
-    refs.assertFor(worker);
-    if (refs.hasPrivate && TaskRefs.SHELL.some((s) => worker.scopes.includes(s)))
-      throw new RuleViolation(
-        `비공개 참조는 만들기 · 코드 담당(${worker.name})에게 넘기지 못해요. 관리자가 그 담당과의 대화에서 넣어요`,
-      );
-    return refs;
+    return new TaskRefs([...new Set(picked)]);
   }
 
   /** 작업의 payload에 펼칠 칸 (없으면 빈 객체) */

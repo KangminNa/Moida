@@ -13,15 +13,14 @@ import { AGENT_TOOL, type AgentNew, type AgentRevisionNew, type AgentRow } from 
 import { AgentUsageView } from '../usage/usage.view';
 import { AgentSavedView } from './agent.view';
 import { AgentLead } from './agent-lead.policy';
-import { AgentOrg } from './agent-org.policy';
 import { AgentRuntime } from './agent-runtime.policy';
 import { AgentScopes } from './agent-scopes.policy';
 
 // 일을 맡는 에이전트. 할 수 있는 일(scopes)과 결재를 올려 할 수 있는 동작(approval_actions), 토큰 한도를 가진다.
 // 주인이 정하는 칸은 RULES를 지나서만 바뀌고, 멈춤·다시 시작은 메서드로만 바뀐다.
 // 한 달 한도는 넘기면 멈추고 결재를 받는다. 5시간 한도와 구독 사용률은 닿으면 새 일만 쉬고 시간이 지나면 저절로 돌아온다 (holds).
-// 조직도: 보고 대상(reports_to)이 없으면 주인에게 보고한다. 보고 대상은 reportTo로만 바꾼다 (순환 · 깊이 검사).
-// 대표(lead, O-2): 공간마다 숨은 하나. 모든 대화를 받아 맨 위 에이전트 누구에게나 맡긴다 (AgentLead)
+// 팀 없는 같은 일꾼 (2026-11-21): 보고 라인이 없고 권한은 모두 같다 (AgentScopes). 일꾼끼리는 맡기지 않는다.
+// 대표(lead, O-2): 공간마다 숨은 하나. 모든 대화를 받아 일꾼 누구에게나 맡긴다 (AgentLead)
 export class Agent extends TableEntity<AgentRow, AgentNew> {
   /** 이번 저장에서 쌓을 설정 판 */
   private pendingRevision: AgentRevisionNew | null = null;
@@ -35,6 +34,11 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   private static readonly ACTION = /^[a-z]+\.[a-z_]+\.[a-z_]+$/;
   /** 이 동작은 서버가 한도를 넘었을 때만 올린다 */
   private static readonly SERVER_ACTION = 'task.agent.raise_limit';
+  /** 새 에이전트의 처음 승인 동작: 모든 일꾼이 브라우저를 써서 사이트 클릭 · 로그인 승인을 올린다 (2026-11-21) */
+  private static readonly BROWSE_ACTIONS: readonly string[] = [
+    'browser.site.publish',
+    'browser.site.login',
+  ];
 
   /** 주인이 정하는 칸과 그 규칙 */
   private static readonly RULES: ColumnRules<AgentRow> = {
@@ -68,10 +72,9 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     effort: (value) => AgentRuntime.effort(value),
     external_tools: (value) => AgentScopes.tools(value),
   };
-  /** 설정 판에 남기는 칸: 주인이 정하는 것 전부 (규칙의 칸 + 보고 대상 · 러너. 상태 · 사용량 · 검토자는 빼고) */
+  /** 설정 판에 남기는 칸: 주인이 정하는 것 전부 (규칙의 칸 + 러너. 상태 · 사용량 · 검토자는 빼고) */
   private static readonly SETTINGS: readonly (keyof AgentRow)[] = [
     ...(Object.keys(Agent.RULES) as (keyof AgentRow)[]),
-    'reports_to',
     'runner_id',
   ];
 
@@ -81,7 +84,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     role: '',
     tool: '',
     scopes: [],
-    approval_actions: [],
+    approval_actions: Agent.BROWSE_ACTIONS,
     monthly_limit: null,
     five_hour_limit: null,
     plan_stop_percent: null,
@@ -89,7 +92,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     effort: '',
   };
 
-  /** 새 에이전트. fields는 주인이 정한 칸이고, 보고 대상은 reportTo로 정한다 */
+  /** 새 에이전트. fields는 주인이 정한 칸이다 (권한은 늘 전부, AgentScopes) */
   static open(spaceId: string, fields: Partial<Unchecked<AgentRow>>, now: Date): Agent {
     const agent = new Agent(
       {
@@ -98,7 +101,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
         name: '',
         // 자리만: 바로 아래 edit이 BLANK의 도구 칸부터 규칙으로 덮는다 (틀리면 저장 전에 RuleViolation)
         tool: AGENT_TOOL[0],
-        reports_to: null,
         status: Agent.ACTIVE,
         created_at: now,
         deleted_at: null,
@@ -169,7 +171,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   /** 외부 도구 하나를 더 붙일 수 없는 까닭 (제안의 결재를 실행하기 전에 본다). 붙일 수 있으면 null */
   toolProblem(name: string): string | null {
     if (this.deleted) return '제안한 에이전트를 지웠어요';
-    return AgentScopes.toolProblem(this.scopes, this.externalTools, name);
+    return AgentScopes.toolProblem(this.externalTools, name);
   }
 
   /** 외부 도구 하나를 더 허락한다 (제안을 승인했을 때). 권한 조합 · 개수는 고치기와 같은 규칙 */
@@ -187,16 +189,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return this.row.monthly_limit;
   }
 
-  /** 보고 대상 에이전트. null이면 관리자에게 보고한다 */
-  get reportsTo(): string | null {
-    return this.row.reports_to ?? null;
-  }
-
-  /** 관리자 바로 아래 (보고 대상이 없다). 대화 상대가 될 수 있다 */
-  get topLevel(): boolean {
-    return this.row.reports_to === null;
-  }
-
   get paused(): boolean {
     return this.row.status === Agent.PAUSED;
   }
@@ -208,32 +200,26 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
 
   /**
    * 휴지통으로 (행은 지우지 않는다: 작업 · 결재 · 설정 판이 이 에이전트를 가리킨다).
-   * 바로 아래 팀원은 이 에이전트의 보고 대상(없으면 주인)에게 올리고, 올린 팀원을 돌려준다 (부른 쪽이 저장한다).
    * 진행 중인 작업 · 스케줄 · 목표 실행은 Service가 먼저 본다
    */
-  delete(org: readonly Agent[], now: Date): readonly Agent[] {
+  delete(now: Date): void {
     if (this.lead) throw new RuleViolation('대표는 지울 수 없어요');
     if (this.deleted) throw new RuleViolation('이미 삭제한 에이전트예요');
-    const team = org.filter((a) => this.manages(a));
-    for (const member of team) member.reportTo(this.row.reports_to, org);
     this.put('deleted_at', now);
     this.announce();
-    return team;
   }
 
-  /** 휴지통에서 되돌린다. 보고 대상이 그사이 삭제됐으면 주인에게 보고한다 */
-  restore(org: readonly Agent[]): void {
+  /** 휴지통에서 되돌린다 */
+  restore(): void {
     if (!this.deleted) throw new RuleViolation('삭제하지 않은 에이전트예요');
-    const boss = org.find((a) => a.id === this.row.reports_to);
     this.put('deleted_at', null);
-    if (!boss || boss.deleted) this.reportTo(null, org);
     this.announce();
   }
 
   /**
    * 주인이 고친 칸을 적는다. runner를 주면 일을 맡을 러너도 정한다 (null이면 아무 러너). 설정이 바뀌면 설정 판을 하나 올린다.
-   * 묶이면 그 러너만 이 에이전트의 일을 빌리고, 꺼져 있으면 일이 기다린다. 코드 러너 칸에는 묶지 않고,
-   * 칸에서만 도는 권한(code · make)이 있으면 묶지 않는다: 묶인 러너가 그 일을 영영 받지 못한다. 다 바꾼 뒤에 한 번 본다
+   * 묶이면 그 러너만 이 에이전트의 일을 빌리고(칸에서 도는 code · make 일은 칸 러너가 빌린다), 꺼져 있으면 일이 기다린다.
+   * 코드 러너 칸에는 묶지 않는다
    */
   edit(changes: Partial<Unchecked<AgentRow>>, runner?: Runner | null): void {
     const before = this.settingsSnapshot();
@@ -242,11 +228,6 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     if (runner !== undefined) this.put('runner_id', runner?.id ?? null);
     this.accept(changes, Agent.RULES);
     AgentRuntime.assertFits(this.row.tool, this.row.effort ?? '');
-    AgentScopes.assertTools(this.row.scopes ?? [], this.externalTools);
-    if (this.row.runner_id && AgentScopes.sandboxed(this.row.scopes ?? []))
-      throw new RuleViolation(
-        '코드 · 만들기 권한이 있는 에이전트는 샌드박스에서만 돌아 러너에 묶을 수 없어요',
-      );
     this.noteSettings(before);
   }
 
@@ -302,9 +283,12 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     return Boolean(this.row.runner_id);
   }
 
-  /** 이 러너(task.runners의 id)가 이 에이전트의 일을 빌릴 수 있는가: 묶이지 않았거나 이 러너에 묶였다 */
-  runsOn(runnerId: string): boolean {
-    return !this.row.runner_id || this.row.runner_id === runnerId;
+  /**
+   * 이 러너(task.runners의 id)가 이 에이전트의 일을 빌릴 수 있는가: 묶이지 않았거나 이 러너에 묶였다.
+   * 칸(sandbox)은 묶임과 상관없이 빌린다: 칸은 칸의 일(만들기 · 코드)만 빌리고 묶인 러너는 그 일을 빌리지 않아서다 (2026-11-21, 같은 일꾼)
+   */
+  runsOn(runnerId: string, sandbox = false): boolean {
+    return sandbox || !this.row.runner_id || this.row.runner_id === runnerId;
   }
 
   /** 지금 설정 판 (실행 기록에 남긴다) */
@@ -334,19 +318,9 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     this.pendingRevision = { id: BaseEntity.newId(), agent_id: this.id, revision, settings: after };
   }
 
-  /** 보고 대상을 바꾼다. null이면 주인에게 보고한다. 조직도의 규칙(순환 · 깊이 · 대표)은 AgentOrg.assertPlace */
-  reportTo(managerId: string | null, org: readonly Agent[]): void {
-    AgentOrg.assertPlace(this, managerId, org);
-    if (managerId === this.row.reports_to) return;
-    const before = this.settingsSnapshot();
-    this.put('reports_to', managerId);
-    this.noteSettings(before);
-  }
-
-  /** 이 에이전트의 바로 아래 팀원인가 (위임은 바로 아래에게만). 삭제한 에이전트는 팀원이 아니다. 대표는 맨 위 에이전트 전부 */
+  /** 이 에이전트가 other에게 맡길 수 있는가: 대표만, 지우지 않은 일꾼 누구에게나 (일꾼끼리는 맡기지 않는다) */
   manages(other: Agent): boolean {
-    if (this.lead) return AgentLead.leads(other);
-    return other.row.reports_to === this.id && !other.deleted;
+    return this.lead && AgentLead.leads(other);
   }
 
   /** 멈춘다. 새 일을 빌려주지 않는다. 이미 멈췄으면 그대로 */

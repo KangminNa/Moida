@@ -1,4 +1,4 @@
-import { Actor, Forbidden, type SettingChangeLine, type SettingShape } from '../../platform';
+import type { SettingChangeLine, SettingShape } from '../../platform';
 
 type Values = Readonly<Record<string, unknown>>;
 
@@ -67,15 +67,6 @@ export class SettingChanges {
   static restBodyOver(names: readonly string[], fields: Values, now: Values | null) {
     const base = now ? Object.fromEntries(names.map((k) => [k, now[k] ?? null] as const)) : {};
     return SettingChanges.restBody({ ...base, ...fields });
-  }
-
-  /** 바깥으로 나가는 길(브라우저 · 커넥터)이 있는 에이전트는 설정을 읽거나 제안하지 못한다: 지시 · 레시피 글에 비공개가 섞인다 */
-  static assertInside(scopes: readonly string[], externalTools: readonly string[]): void {
-    if (scopes.includes(Actor.BROWSE) || externalTools.length > 0)
-      throw new Forbidden(
-        Actor.BROWSE,
-        '브라우저 · 커넥터 에이전트는 설정을 읽거나 바꾸자고 하지 못해요',
-      );
   }
 
   /** 굵게 보일 줄: 권한을 더하는 칸이 새 값을 얻거나(목록은 새 항목), 모든 줄이 굵은 설정(플러그인)에서 바뀐 줄 */

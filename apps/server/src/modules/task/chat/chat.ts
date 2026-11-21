@@ -176,7 +176,6 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     }: ChatTurnExtra = {},
   ): Task {
     this.assertPartner(agent);
-    refs.assertFor(agent);
     if (ChatHistory.waiting(previous.at(-1)))
       throw new Conflict('답을 기다리는 중이에요. 답이 오거나 취소한 뒤에 보내요');
     const text = message.trim();

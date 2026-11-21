@@ -2,14 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
-import {
-  AgentDirectory,
-  ApprovedActor,
-  Database,
-  Forbidden,
-  OutboxWorker,
-  SettingKinds,
-} from '../../platform';
+import { Database, OutboxWorker } from '../../platform';
 
 // 설정 바꾸기 제안 (2026-11-15 C · D): get_settings → propose_setting(미리 해 보기 + 결재 task.setting.change) → 승인 → 적용.
 // 러너는 MCP로, 관리자는 REST로 들어오고 승인 뒤 적용은 outbox와 일꾼을 실제로 거친다. AI는 띄우지 않는다.
@@ -52,7 +45,6 @@ const agent = async (more: Json = {}) =>
       requestId: randomUUID(),
       name: `설정 ${randomUUID().slice(0, 6)}`,
       tool: 'claude',
-      scopes: ['read_public'],
       ...more,
     }),
     201,
@@ -86,13 +78,12 @@ async function drain(): Promise<void> {
 /** 공간의 대표 (O-2). before에서 첫 대화를 열어 만들어 둔다 */
 const lead = async (): Promise<Json> => ok(await api.get('/api/agents/lead', owner)).lead;
 
-/** 대표와 팀장 아래 팀원 하나. 대표의 일을 러너가 빌린 토큰 */
+/** 대표와 일꾼 하나 (팀은 2026-11-21에 없앴다). 대표의 일을 러너가 빌린 토큰 */
 async function partner() {
   const boss = await lead();
-  const head = await agent();
-  const member = await agent({ reportsTo: head.id, model: 'sonnet' });
+  const member = await agent({ model: 'sonnet' });
   const job = await take(boss.id);
-  return { lead: boss, head, member, job, token: String(job.run_token) };
+  return { lead: boss, member, job, token: String(job.run_token) };
 }
 
 async function decide(approvalId: unknown, decision = 'approve') {
@@ -147,7 +138,7 @@ describe('설정 바꾸기: 읽기와 제안', () => {
     const team = await call(token, 'get_settings', { kind: 'team' });
     const seen = (team.agents as Json[]).find((a) => a.id === member.id) as Json;
     assert.equal(seen.model, 'sonnet');
-    assert.equal(seen.reports_to !== null, true);
+    assert.equal('reports_to' in seen, false, '보고 라인은 없다');
     assert.ok(!(team.agents as Json[]).some((a) => a.id === boss.id), '팀 목록에 대표는 없다');
     const self = await tool(token, 'propose_setting', {
       request_id: randomUUID(),
@@ -169,15 +160,20 @@ describe('설정 바꾸기: 읽기와 제안', () => {
       op: 'edit',
       target_id: member.id,
       version: seen.version,
-      fields: { model: 'opus', scopes: ['read_public', 'write'] },
-      note: '글을 쓰게 하려고',
+      fields: { model: 'opus', approval_actions: [...seen.approval_actions, 'blog.post.publish'] },
+      note: '글 공개를 올리게 하려고',
     });
     assert.equal(proposed.status, 'pending');
     assert.deepEqual(
       (proposed.changes as Json[]).map((c) => [c.field, c.before, c.after, c.grant]),
       [
         ['model', 'sonnet', 'opus', false],
-        ['scopes', ['read_public'], ['read_public', 'write'], true],
+        [
+          'approval_actions',
+          seen.approval_actions,
+          [...seen.approval_actions, 'blog.post.publish'],
+          true,
+        ],
       ],
     );
     const approval = ok(await api.get(`/api/approvals/${proposed.approval_id}`, owner));
@@ -189,12 +185,12 @@ describe('설정 바꾸기: 읽기와 제안', () => {
     await decide(proposed.approval_id);
     const changed = await current(member.id);
     assert.equal(changed.model, 'opus');
-    assert.deepEqual(changed.scopes, ['read_public', 'write']);
+    assert.deepEqual(changed.approvalActions, [...seen.approval_actions, 'blog.post.publish']);
     // 승인한 동작을 실행하면 기다리던 작업이 끝난다 (다른 결재와 같다, ApprovalResultHandler)
     assert.equal(ok(await api.get(`/api/tasks/${job.task.id}`, owner)).status, 'done');
   });
 
-  test('규칙에 어긋나면 제안하는 자리에서 막힌다 (브라우저 + 전체 읽기)', async () => {
+  test('규칙에 어긋나면 제안하는 자리에서 막힌다 (서버만 올리는 승인 동작)', async () => {
     const { member, token } = await partner();
     const res = await tool(token, 'propose_setting', {
       request_id: randomUUID(),
@@ -202,8 +198,8 @@ describe('설정 바꾸기: 읽기와 제안', () => {
       op: 'edit',
       target_id: member.id,
       version: (await current(member.id)).version,
-      fields: { scopes: ['browse', 'read_all'] },
-      note: '둘 다',
+      fields: { approval_actions: ['task.agent.raise_limit'] },
+      note: '한도 올리기',
     });
     assert.equal(res.ok, false);
     assert.equal(res.body.code, 'rule_violation');
@@ -566,14 +562,14 @@ describe('설정 바꾸기: 스토어의 앱 (스토어 1단계)', () => {
     assert.equal(kind.body.code, 'rule_violation', '종류는 만들 때만');
   });
 
-  test('운영 팀장 · 편집 방침도 제안 → 승인 (스토어 2단계). 팀장은 맨 위 에이전트만, 첫 화면 고정은 제안하지 못한다', async () => {
-    const { token, head, member } = await partner();
-    const slug = `team-${randomUUID().slice(0, 6)}`;
+  test('편집 방침은 제안 → 승인. 운영 팀 칸(agent_id · new_team)은 없고 첫 화면 고정은 제안하지 못한다', async () => {
+    const { token } = await partner();
+    const slug = `policy-${randomUUID().slice(0, 6)}`;
     const made = ok(
       await api.request('POST', '/api/apps', owner, {
         requestId: randomUUID(),
         kind: 'blog',
-        name: '운영 팀 앱',
+        name: '방침 앱',
         slug,
       }),
       201,
@@ -588,83 +584,33 @@ describe('설정 바꾸기: 스토어의 앱 (스토어 1단계)', () => {
         fields,
         note: '왜',
       });
-    const deep = await edit({ agent_id: member.id });
-    assert.equal(deep.body.code, 'rule_violation', '팀장 아래 팀원은 앱의 운영 팀장이 아니다');
-    const home = await edit({ home: true });
-    assert.equal(home.body.code, 'invalid_request', '첫 화면은 관리자가 앱 관리에서');
-    const proposed = await edit({ agent_id: head.id, policy: '사진 한 장 이상' });
+    for (const fields of [{ agent_id: randomUUID() }, { new_team: true }, { home: true }])
+      assert.equal((await edit(fields)).body.code, 'invalid_request', JSON.stringify(fields));
+    const proposed = await edit({ policy: '사진 한 장 이상' });
     assert.equal(proposed.ok, true, JSON.stringify(proposed.body));
     await decide(proposed.body.approval_id);
     const { token: next } = await partner();
     const { apps } = await call(next, 'get_settings', { kind: 'apps' });
     const app = (apps as Json[]).find((a) => a.slug === slug) as Json;
-    assert.deepEqual([app.agent_id, app.policy, app.home], [head.id, '사진 한 장 이상', false]);
+    assert.deepEqual([app.policy, app.home, 'agent_id' in app], ['사진 한 장 이상', false, false]);
   });
 
-  test('운영 팀 새로 만들기(new_team): 승인 한 번에 앱 운영 팀과 페이지 없는 페이지 앱이 함께 생긴다 (스토어 2-6)', async () => {
-    const { token, head } = await partner();
+  test('페이지 앱은 승인 한 번에 페이지 없이 생긴다. 에이전트는 늘지 않는다 (2026-11-21)', async () => {
+    const { token } = await partner();
     const slug = `trip-${randomUUID().slice(0, 6)}`;
-    const fields = { name: '여행 계획', slug, kind: 'page', new_team: true };
-    const both = await tool(token, 'propose_setting', {
-      request_id: randomUUID(),
-      setting: 'app',
-      op: 'create',
-      fields: { ...fields, agent_id: head.id },
-      note: '왜',
-    });
-    assert.equal(both.body.code, 'rule_violation', '팀장을 고르거나 새로 만들거나 하나만');
-    const made = await propose(token, { setting: 'app', op: 'create', fields });
-    const approval = ok(await api.get(`/api/approvals/${made.approval_id}`, owner));
-    const line = (approval.changes as Json[]).find((c) => c.field === 'new_team') as Json;
-    assert.deepEqual([line.after, line.grant], [true, true], '에이전트를 더하는 줄은 굵게');
     const agentsNow = async () => ok(await api.get('/api/agents', owner)).agents as Json[];
     const before = (await agentsNow()).length;
-
+    const made = await propose(token, {
+      setting: 'app',
+      op: 'create',
+      fields: { name: '여행 계획', slug, kind: 'page' },
+    });
     await decide(made.approval_id);
     const app = (ok(await api.get('/api/apps', owner)).apps as Json[]).find(
       (a) => a.slug === slug,
     ) as Json;
     assert.deepEqual([app.kind, app.visibility], ['page', 'private']);
-    const agents = await agentsNow();
-    const leader = agents.find((a) => a.id === app.agentId) as Json;
-    assert.deepEqual([leader.name, leader.reportsTo], ['편집장', null]);
-    assert.deepEqual(
-      agents
-        .filter((a) => a.reportsTo === leader.id)
-        .map((a) => a.name)
-        .sort(),
-      ['앱 디자이너', '자료 조사', '작가'].sort(),
-    );
-    assert.equal(agents.length, before + 4);
-
-    // 같은 결재로 다시 부르면 같은 팀 (결재마다 하나). 다른 결재 · 관리자는 팀을 부르지 못한다
-    const [row] = await db.sql<{ space_id: string; decided_by: string }[]>`
-      SELECT space_id, decided_by FROM task.approvals WHERE id = ${made.approval_id}`;
-    const directory = api.service(AgentDirectory);
-    const as = (approvalId: unknown) =>
-      new ApprovedActor(
-        String(row?.space_id),
-        String(row?.decided_by),
-        String(approvalId),
-        SettingKinds.ACTION,
-      );
-    assert.equal(await directory.teamFor(as(made.approval_id)), app.agentId);
-    assert.equal((await agentsNow()).length, before + 4);
-    await assert.rejects(directory.teamFor(as(randomUUID())), Forbidden);
-
-    const { token: next } = await partner();
-    const { apps } = await call(next, 'get_settings', { kind: 'apps' });
-    const listed = (apps as Json[]).find((a) => a.slug === slug) as Json;
-    const edit = await tool(next, 'propose_setting', {
-      request_id: randomUUID(),
-      setting: 'app',
-      op: 'edit',
-      target_id: listed.id,
-      version: listed.version,
-      fields: { new_team: true },
-      note: '왜',
-    });
-    assert.equal(edit.body.code, 'rule_violation', '운영 팀 새로 만들기는 만들 때만');
+    assert.equal((await agentsNow()).length, before);
   });
 });
 
@@ -725,24 +671,16 @@ describe('설정 바꾸기: 플러그인 설정 (D)', () => {
 });
 
 describe('설정 바꾸기: 막는 것', () => {
-  test('팀장 · 팀원은 승인 동작에 넣어 주지 않으면 읽지도 제안하지도 못한다 (기본으로는 대표만, O-2)', async () => {
-    const head = await agent();
-    const member = await agent({ reportsTo: head.id });
-    for (const who of [head, member]) {
-      const job = await take(who.id);
-      const res = await tool(String(job.run_token), 'get_settings', { kind: 'team' });
-      assert.deepEqual([res.ok, res.body.code], [false, 'forbidden']);
-    }
+  test('일꾼은 승인 동작에 넣어 주지 않으면 읽지도 제안하지도 못한다 (기본으로는 대표만, O-2)', async () => {
+    const plain = await agent();
+    const res = await tool(String((await take(plain.id)).run_token), 'get_settings', {
+      kind: 'team',
+    });
+    assert.deepEqual([res.ok, res.body.code], [false, 'forbidden']);
+    // 모든 일꾼이 브라우저를 써도(2026-11-21) 넣어 준 일꾼은 읽는다
     const allowed = await agent({ approvalActions: ['task.setting.change'] });
     const job = await take(allowed.id);
     assert.equal((await tool(String(job.run_token), 'get_settings', { kind: 'team' })).ok, true);
-  });
-
-  test('브라우저 에이전트는 승인 동작에 넣어 줘도 읽지 못한다', async () => {
-    const browser = await agent({ scopes: ['browse'], approvalActions: ['task.setting.change'] });
-    const job = await take(browser.id);
-    const res = await tool(String(job.run_token), 'get_settings', { kind: 'schedules' });
-    assert.equal(res.body.code, 'forbidden');
   });
 
   test('request_approval로 설정 바꾸기를 바로 올리지 못한다 (바뀔 값을 서버가 미리 해 봐야)', async () => {

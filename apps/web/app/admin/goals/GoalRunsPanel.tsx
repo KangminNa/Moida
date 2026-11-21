@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { CHECKPOINTS, GOAL_RUN_STATUS, when } from '../../_task/labels';
-import { useAgents, useGoalRuns, useGoals } from '../../_task/live';
+import { useAgents, useGoalRuns, useGoals, useLead } from '../../_task/live';
 import type { GoalRun } from '../../_task/types';
 import { type GoalRunBody, GoalRunForm } from './GoalRunForm';
 
@@ -17,17 +17,19 @@ const PILLS: Record<string, string> = {
   stopped: 'pill off',
 };
 
-// 목표 실행: 목표를 이룰 때까지 팀장 에이전트에게 맡긴다. 회차는 저절로 이어 돌고 주인은 승인 요청서만 받는다.
+// 목표 실행: 목표를 이룰 때까지 에이전트(대표나 일꾼)에게 맡긴다. 회차는 저절로 이어 돌고 관리자는 승인 요청서만 받는다.
 export function GoalRunsPanel() {
   const runs = useGoalRuns();
   const goals = useGoals();
   const agents = useAgents();
+  const lead = useLead();
   const [open, setOpen] = useState(false);
   const start = useAction();
   const list = runs.data?.runs;
   const activeGoals = goals.data?.goals.filter((g) => g.status === 'active') ?? [];
-  const leads = agents.data?.agents.filter((a) => a.status !== 'paused') ?? [];
-  const ready = activeGoals.length > 0 && leads.length > 0;
+  const workers = agents.data?.agents.filter((a) => a.status !== 'paused') ?? [];
+  const boss = lead.data?.lead?.status === 'active' ? lead.data.lead : null;
+  const ready = activeGoals.length > 0 && (boss !== null || workers.length > 0);
 
   async function submit(body: GoalRunBody, requestId: string) {
     const reply = await start.run(
@@ -62,7 +64,8 @@ export function GoalRunsPanel() {
       {open && (
         <GoalRunForm
           goals={activeGoals}
-          agents={leads}
+          lead={boss}
+          agents={workers}
           busy={start.busy !== null}
           problem={start.problem}
           onSubmit={submit}
@@ -73,7 +76,7 @@ export function GoalRunsPanel() {
         !runs.error && <p className="label-mono">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="note">
-          맡긴 목표 실행 없음. 팀장이 회차마다 보고하고, 정한 때와 끝에 승인이 와요
+          맡긴 목표 실행 없음. 맡은 에이전트가 회차마다 보고하고, 정한 때와 끝에 승인이 와요
         </p>
       ) : (
         <ul className="list" aria-label="목표 실행 목록">
@@ -83,7 +86,7 @@ export function GoalRunsPanel() {
                 <div className="item-main">
                   <b>{r.title}</b>
                   <small>
-                    {r.goalTitle ?? '목표'} · 팀장 {r.agentName ?? '–'} · {r.round}/{r.maxRounds}
+                    {r.goalTitle ?? '목표'} · {r.agentName ?? '–'} · {r.round}/{r.maxRounds}
                     회차 · 승인 {CHECKPOINTS[r.checkpoint] ?? r.checkpoint} · {when(r.createdAt)}
                   </small>
                 </div>

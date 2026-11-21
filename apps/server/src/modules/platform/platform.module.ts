@@ -11,7 +11,6 @@ import { SecretBox } from './base/secret-box';
 import { SecretRotation } from './base/secret-rotation';
 import { SensitivePolicy } from './base/sensitive-policy';
 import { ActionChecks } from './directory/action-checks';
-import { AgentDirectory } from './directory/agent-directory';
 import { Lookups } from './directory/lookups';
 import { FailedEvent } from './failed-event/failed-event';
 import { FailedEventController } from './failed-event/failed-event.api';
@@ -90,7 +89,6 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
-    AgentDirectory,
     Lookups,
     HostGate,
     ActionChecks,
@@ -138,7 +136,6 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
-    AgentDirectory,
     Lookups,
     HostGate,
     ActionChecks,
