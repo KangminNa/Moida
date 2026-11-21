@@ -94,6 +94,8 @@ import { UsageController } from './usage/usage.api';
 import { UsageQuery } from './usage/usage.query';
 import { VerdictHandler } from './verdict/verdict.handler';
 import { VerdictService } from './verdict/verdict.service';
+import { LinkPreviewController } from './web/link-preview.api';
+import { LinkPreviewQuery } from './web/link-preview.query';
 import { WebQuery } from './web/web.query';
 import { WebPageGateway } from './web/web-page.gateway';
 
@@ -172,6 +174,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     // 주소 읽기 (read_url): 서버가 AI 대신 연다. 목줄은 WebReach
     WebPageGateway,
     WebQuery,
+    LinkPreviewQuery,
     OutputPurgeJob,
     // 자동화 레시피 (2차 5단계): 레시피의 일이 끝나면 그 뒤의 레시피 (계기 after)
     ScheduleFollowHandler,
@@ -208,6 +211,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatController,
     ExternalToolController,
     ExternalToolOAuthController,
+    LinkPreviewController,
   ],
   exports: [TaskTools, TaskQuery],
 })

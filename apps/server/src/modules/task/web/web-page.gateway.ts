@@ -3,11 +3,11 @@ import { lookup } from 'node:dns/promises';
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
-import { BaseGateway, ExternalFailure, RuleViolation } from '../../platform';
+import { BaseGateway, ExternalFailure, FileSniff, RuleViolation } from '../../platform';
 import { HtmlText } from './html-text';
 import { PublicAddress } from './public-address.policy';
 
-/** 받아 온 페이지 한 장 (글자만) */
+/** 받아 온 페이지 한 장 (글자만). 미리보기 칸(사이트 이름 · 설명 · 대표 그림 주소)은 HTML의 메타 태그에서 (없으면 빈 글자 · null) */
 export class WebPage {
   constructor(
     readonly url: string,
@@ -15,6 +15,17 @@ export class WebPage {
     readonly text: string,
     readonly truncated: boolean,
     readonly contentType: string,
+    readonly site: string = '',
+    readonly description: string = '',
+    readonly image: string | null = null,
+  ) {}
+}
+
+/** 받아 온 그림 한 장 (링크 미리보기의 대표 그림). 형식은 앞부분으로 알아본 것 */
+export class WebImage {
+  constructor(
+    readonly bytes: Buffer,
+    readonly mime: string,
   ) {}
 }
 
@@ -28,6 +39,14 @@ export class WebPageGateway extends BaseGateway {
   static readonly MAX_HOPS = 3;
   static readonly MAX_BYTES = 2 * 1024 * 1024;
   static readonly TEXT_MAX = 60_000;
+  /** 링크 미리보기의 대표 그림 한도 */
+  static readonly IMAGE_MAX = 1024 * 1024;
+  private static readonly IMAGES: readonly string[] = [
+    FileSniff.PNG,
+    FileSniff.JPEG,
+    FileSniff.GIF,
+    FileSniff.WEBP,
+  ];
   protected readonly name = '웹 페이지';
   protected override readonly timeoutMs = 15_000;
   private static readonly TEXT_TYPES =
@@ -37,6 +56,32 @@ export class WebPageGateway extends BaseGateway {
 
   /** 주소 하나를 연다. allow는 주소마다(리다이렉트 포함) 목줄을 묻는다 (안 되면 던진다) */
   async read(start: URL, allow: (url: URL) => void): Promise<WebPage> {
+    const [url, res] = await this.open(start, allow);
+    return this.page(url, res);
+  }
+
+  /** 그림 하나 (링크 미리보기). PNG · JPEG · GIF · WebP를 앞부분으로 알아본 것만, IMAGE_MAX까지. 길은 read와 같다 */
+  async image(start: URL, allow: (url: URL) => void): Promise<WebImage> {
+    const [, res] = await this.open(start, allow);
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of res as AsyncIterable<Buffer>) {
+      chunks.push(chunk);
+      size += chunk.length;
+      if (size > WebPageGateway.IMAGE_MAX) {
+        res.destroy();
+        throw new RuleViolation('그림이 너무 커요');
+      }
+    }
+    const bytes = Buffer.concat(chunks);
+    const mime = FileSniff.mimeOf(bytes);
+    if (mime === null || !WebPageGateway.IMAGES.includes(mime))
+      throw new RuleViolation('PNG · JPEG · GIF · WebP 그림이 아니에요');
+    return new WebImage(bytes, mime);
+  }
+
+  /** 리다이렉트를 따라가며 연다 (매번 목줄 · 내부망을 다시 본다). 2xx의 응답과 마지막 주소 */
+  private async open(start: URL, allow: (url: URL) => void): Promise<[URL, IncomingMessage]> {
     let url = start;
     for (let hop = 0; hop <= WebPageGateway.MAX_HOPS; hop++) {
       allow(url);
@@ -53,7 +98,7 @@ export class WebPageGateway extends BaseGateway {
         res.resume();
         throw new ExternalFailure(`열지 못했어요 (HTTP ${status})`);
       }
-      return this.page(url, res);
+      return [url, res];
     }
     throw new RuleViolation(`다른 주소로 ${WebPageGateway.MAX_HOPS}번 넘게 넘어가요`);
   }
@@ -124,7 +169,8 @@ export class WebPageGateway extends BaseGateway {
     const bytes = Buffer.concat(chunks).subarray(0, WebPageGateway.MAX_BYTES);
     const html = WebPageGateway.HTML_TYPES.test(type);
     const raw = WebPageGateway.decode(bytes, type, html);
-    const title = html ? HtmlText.title(raw) : '';
+    const meta = (names: readonly string[]) => (html ? HtmlText.meta(raw, names) : '');
+    const title = (html ? HtmlText.title(raw) : '') || meta(['og:title']);
     const body = html ? HtmlText.body(raw) : raw.trim();
     const short = body.length > WebPageGateway.TEXT_MAX;
     return new WebPage(
@@ -133,7 +179,17 @@ export class WebPageGateway extends BaseGateway {
       short ? body.slice(0, WebPageGateway.TEXT_MAX) : body,
       cut || short,
       (type.split(';')[0] ?? '').trim().toLowerCase(),
+      meta(['og:site_name', 'application-name']).slice(0, 100),
+      meta(['og:description', 'description', 'twitter:description']).slice(0, 300),
+      WebPageGateway.absolute(meta(['og:image', 'og:image:url', 'twitter:image']), url),
     );
+  }
+
+  /** 메타 태그의 그림 주소를 페이지 기준의 http(s) 주소로. 아니면 null */
+  private static absolute(src: string, base: URL): string | null {
+    if (!src || src.length > 2000 || !URL.canParse(src, base.toString())) return null;
+    const url = new URL(src, base);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
   }
 
   /** 머리글 · <meta>의 문자 집합으로 (euc-kr 같은 옛 한국어 페이지). 모르는 이름이면 utf-8 */

@@ -9,6 +9,7 @@ import { OutputOpen } from '../../_task/parts';
 import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
 import { ChatDecisions, type Decision, decisionOf } from './ChatDecisions';
 import { RefChips } from './ChatRefs';
+import { LinkCards } from './LinkCards';
 
 /** 일하는 중인 회차의 상태 */
 const OPEN = ['queued', 'running', 'waiting'];
@@ -299,7 +300,14 @@ function fixLine(message: string): string {
 function Reply({ turn: t, fold }: { turn: ChatTurn; fold: boolean }) {
   if (t.status === 'done')
     // 승인한 일을 서버가 실행해 끝난 회차에는 글 답이 없다
-    return t.reply?.trim() ? <Answer text={t.reply} fold={fold} /> : <p className="note">완료</p>;
+    return t.reply?.trim() ? (
+      <>
+        <Answer text={t.reply} fold={fold} />
+        <LinkCards text={t.reply} />
+      </>
+    ) : (
+      <p className="note">완료</p>
+    );
   if (t.status === 'failed') return <p className="error">{t.error ?? '실패'}</p>;
   if (t.status === 'cancelled') return <p className="note">멈춤</p>;
   const doing =
