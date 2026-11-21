@@ -4,6 +4,15 @@ import { readdir, readFile, rm, stat } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { pause } from './backoff';
 
+/** 폴더 바로 아래의 항목 하나: 이름, 보통 파일인지(폴더 · 링크는 아님), 크기 */
+export class FolderEntry {
+  constructor(
+    readonly name: string,
+    readonly file: boolean,
+    readonly size: number,
+  ) {}
+}
+
 /** agent로 돌린 명령 하나의 끝 */
 export class StepOutput {
   constructor(
@@ -46,6 +55,8 @@ export class AgentUser {
   private static readonly TAIL_MAX = 4_000;
   private static readonly KILL_ROUNDS = 5;
   private static readonly SHORT_MS = 30_000;
+  /** 폴더 목록의 한도 (이름 · 종류 · 크기) */
+  private static readonly LIST_MAX = 1024 * 1024;
   /** 셸 없이 부르는 도구들의 PATH */
   private static readonly PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
   /** 사용자를 바꾼 뒤 폴더를 옮겨 주는 것 (coreutils env --chdir) */
@@ -234,6 +245,49 @@ export class AgentUser {
     }
     await rm(to, { force: true });
     return false;
+  }
+
+  /**
+   * agent 권한으로 폴더 바로 아래의 이름 · 종류 · 크기를 읽는다 (결과물 폴더). 칸의 러너는 root지만 DAC_OVERRIDE가 없어
+   * agent의 700 폴더를 직접 읽지 못한다 (EACCES, 2026-11-21 배포 서버: 파일이 있는데도 "만든 파일이 없어요").
+   * 읽지 못했으면 null (agent로 읽을 때는 없는 폴더도): 부른 쪽이 까닭을 남긴다, 조용히 빈 목록으로 두지 않는다
+   */
+  async list(dir: string, signal?: AbortSignal): Promise<readonly FolderEntry[] | null> {
+    if (this.isSelf) return AgentUser.listOwn(dir);
+    const out = await this.exec(
+      'find',
+      [dir, '-mindepth', '1', '-maxdepth', '1', '-printf', '%y\\t%s\\t%f\\0'],
+      {
+        cwd: '/',
+        env: { PATH: AgentUser.PATH },
+        timeoutMs: AgentUser.SHORT_MS,
+        stdoutMax: AgentUser.LIST_MAX,
+        ...(signal ? { signal } : {}),
+      },
+    );
+    if (!out.ok || out.stdout === null) return null;
+    return out.stdout
+      .toString('utf8')
+      .split('\0')
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        const [type = '', size = '0', ...name] = line.split('\t');
+        return new FolderEntry(name.join('\t'), type === 'f', Number(size) || 0);
+      });
+  }
+
+  /** 러너 자신의 권한으로 읽은 목록 (칸이 아닌 러너 · self). 폴더가 없으면 빈 목록, 그 밖의 실패는 null */
+  static async listOwn(dir: string): Promise<readonly FolderEntry[] | null> {
+    const entries = await readdir(dir, { withFileTypes: true }).catch((error: { code?: string }) =>
+      error.code === 'ENOENT' ? [] : null,
+    );
+    if (entries === null) return null;
+    const found: FolderEntry[] = [];
+    for (const entry of entries) {
+      const info = entry.isFile() ? await stat(`${dir}/${entry.name}`).catch(() => null) : null;
+      found.push(new FolderEntry(entry.name, entry.isFile(), info?.size ?? 0));
+    }
+    return found;
   }
 
   async readFile(path: string, maxBytes: number): Promise<string | null> {

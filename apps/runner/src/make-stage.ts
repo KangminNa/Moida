@@ -1,6 +1,5 @@
-import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { AgentUser } from './agent-user';
+import type { AgentUser, FolderEntry } from './agent-user';
 import type { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
 import type { CairnServer } from './cairn-server';
@@ -232,17 +231,20 @@ export class MakeStage implements SandboxStage {
   async check(): Promise<StageCheck[]> {
     if (this.room === null) return [];
     const dir = this.room.outputsDir;
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-    const names = entries
-      .filter((e) => e.isFile() && OutputBatch.nameProblem(e.name) === null)
-      .map((e) => e.name);
+    // 목록 · 크기는 agent 권한으로 읽는다 (칸의 러너는 agent의 700 폴더를 직접 읽지 못한다)
+    const listed = await this.agent.list(dir);
+    const files = (listed ?? []).filter((e) => e.file && OutputBatch.nameProblem(e.name) === null);
+    const names = files.map((e) => e.name);
     const made = names.length > 0;
-    const none = `${dir} 바로 아래에 둔 파일이 없어요 (폴더 · 링크 · 숨김 파일은 올라가지 않아요)`;
+    const none =
+      listed === null
+        ? `${dir}를 읽지 못했어요 (러너의 문제예요. 파일을 다시 만들 필요는 없어요)`
+        : `${dir} 바로 아래에 둔 파일이 없어요 (폴더 · 링크 · 숨김 파일은 올라가지 않아요)`;
     const checks = [
       StageCheck.seen('결과물 파일', made, made ? `${names.length}개` : '없음', none),
     ];
     if (this.app !== null)
-      return [...checks, ...AppCodeCheck.checks(this.app.code, await this.madeCode(dir, names))];
+      return [...checks, ...AppCodeCheck.checks(this.app.code, await this.madeCode(dir, files))];
     if (!this.job.page || this.base !== null) return checks;
     const entry = names.includes(MakeStage.ENTRY);
     const why = `새 페이지는 ${dir}/${MakeStage.ENTRY}가 문이에요. 없으면 페이지가 되지 않아요`;
@@ -254,11 +256,10 @@ export class MakeStage implements SandboxStage {
    * 앱 코드 일에서 AI가 낸 파일: 크기와, 템플릿 · cairn.json의 글. 글은 agent 권한으로 읽는다 (AI가 둔 링크를 러너가 따라가지 않게).
    * 한도를 넘는 글은 null (검사가 떨어진다)
    */
-  private async madeCode(dir: string, names: readonly string[]): Promise<AppCodeEntry[]> {
+  private async madeCode(dir: string, files: readonly FolderEntry[]): Promise<AppCodeEntry[]> {
     const made: AppCodeEntry[] = [];
-    for (const name of names) {
+    for (const { name, size } of files) {
       const path = join(dir, name);
-      const size = (await stat(path).catch(() => null))?.size ?? 0;
       const max = AppCodeCheck.isTemplate(name)
         ? AppCodeCheck.TEMPLATE_BYTES_MAX
         : name === AppCodeCheck.MANIFEST

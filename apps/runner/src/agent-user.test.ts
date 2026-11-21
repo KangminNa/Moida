@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -89,6 +89,57 @@ describe('AI를 돌릴 사용자', () => {
     assert.equal(await self.readFile(file, 100), '{"a":1}');
     assert.equal(await self.readFile(file, 3), null);
     assert.equal(await self.readFile(join(dir, '없음'), 100), null);
+  });
+
+  test('폴더 바로 아래의 이름 · 종류 · 크기를 읽는다. 없는 폴더는 빈 목록', async () => {
+    const out = await mkdtemp(join(dir, 'outputs-'));
+    await writeFile(join(out, 'index.html'), '<html></html>');
+    await mkdir(join(out, 'sub'));
+    const listed = [...((await self.list(out)) ?? [])].sort((a, b) => (a.name < b.name ? -1 : 1));
+    assert.deepEqual(
+      listed.map((e) => [e.name, e.file, e.file ? e.size : 0]),
+      [
+        ['index.html', true, 13],
+        ['sub', false, 0],
+      ],
+    );
+    assert.deepEqual(await self.list(join(dir, '없는 폴더')), []);
+  });
+
+  // 칸의 러너(root, DAC_OVERRIDE 없음)는 agent의 700 폴더를 직접 읽지 못해 목록을 agent 권한(find)으로 읽는다
+  // (2026-11-21 배포 서버: 파일이 있는데도 "만든 파일이 없어요"). 사용자를 바꿀 수 있을 때(root)만 돈다
+  test('agent의 700 폴더는 agent 권한으로 읽는다 (이름의 공백 · 탭 포함)', {
+    skip: process.getuid?.() !== 0,
+  }, async () => {
+    const room = await mkdtemp(join(tmpdir(), 'cairn-agent-list-'));
+    try {
+      await chmod(room, 0o711);
+      const out = join(room, 'outputs');
+      await mkdir(out, { mode: 0o700 });
+      await writeFile(join(out, '보고서 최종.html'), 'abc');
+      await writeFile(join(out, 'a\tb.css'), 'x');
+      await mkdir(join(out, 'sub'));
+      const agent = AgentUser.parse('65534:65534') as AgentUser;
+      await agent.handTo(out);
+      const listed = [...((await agent.list(out)) ?? [])].sort((a, b) =>
+        a.name < b.name ? -1 : 1,
+      );
+      assert.deepEqual(
+        listed.map((e) => [e.name, e.file, e.file ? e.size : 0]),
+        [
+          ['a\tb.css', true, 1],
+          ['sub', false, 0],
+          ['보고서 최종.html', true, 3],
+        ],
+      );
+      assert.equal(
+        await agent.list(join(room, '없음')),
+        null,
+        '읽지 못하면 null (조용히 빈 목록이 아니다)',
+      );
+    } finally {
+      await rm(room, { recursive: true, force: true });
+    }
   });
 
   test('자리를 지운다. 안의 링크는 따라가지 않는다', async () => {
