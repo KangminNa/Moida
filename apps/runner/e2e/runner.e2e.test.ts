@@ -187,17 +187,27 @@ const newAgent = async (more: Json = {}): Promise<Json> =>
   );
 
 /** 대표 (O-2). 없으면 첫 대화를 열어 만든다 */
+/** 일을 받을 수 있는 대표. 없으면 첫 대화로 만들고, 앞 테스트(연결 확인)가 에이전트를 모두 멈춰 뒀으면 다시 움직인다 */
 async function leadOf(): Promise<Json> {
-  const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
-  if (found) return found;
-  ok(
-    await api.request('POST', '/api/chats', owner, {
-      requestId: randomUUID(),
-      message: '대표를 만드는 첫 대화',
-    }),
-    201,
-  );
-  return ok(await api.get('/api/agents/lead', owner)).lead as Json;
+  const current = async () => ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+  let lead = await current();
+  if (!lead) {
+    ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '대표를 만드는 첫 대화',
+      }),
+      201,
+    );
+    lead = (await current()) as Json;
+  }
+  if (lead.status === 'paused') {
+    ok(
+      await api.request('POST', `/api/agents/${lead.id}/resume`, owner, { version: lead.version }),
+    );
+    lead = (await current()) as Json;
+  }
+  return lead;
 }
 
 /**
@@ -1863,7 +1873,7 @@ describe('Codex로 일한다', () => {
   });
 
   test('대화의 사진은 codex exec --image로 지시에 붙인다 (대화에 사진 넣기)', async () => {
-    const { lead } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
+    const lead = await leadOf();
     const tool = async (to: string): Promise<void> => {
       const { lead: now } = ok(await api.get('/api/agents/lead', owner)) as { lead: Json };
       ok(
@@ -1873,13 +1883,6 @@ describe('Codex로 일한다', () => {
         }),
       );
     };
-    // 앞 테스트(연결 확인)가 에이전트를 모두 멈춰 둘 수 있다: 대화를 받게 대표를 다시 움직인다
-    if (lead.status === 'paused')
-      ok(
-        await api.request('POST', `/api/agents/${lead.id}/resume`, owner, {
-          version: lead.version,
-        }),
-      );
     await tool('codex');
     try {
       const photo = await uploadPhoto('화이트보드.png');
