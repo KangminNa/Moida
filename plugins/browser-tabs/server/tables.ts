@@ -256,5 +256,6 @@ export interface SuggestionRow {
   created_at: Date;
   updated_at: Date;
   version: number;
+  note: string;
 }
 export type SuggestionNew = Partial<SuggestionRow> & Pick<SuggestionRow, 'id' | 'space_id' | 'site_id' | 'key' | 'count' | 'sample'>;
