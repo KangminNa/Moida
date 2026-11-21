@@ -13,9 +13,9 @@ import {
 } from '../../../apps/server/src/plugin-api';
 import { AgentSitesView } from './click-views';
 import { BROWSE_KIND, OPEN_CLICK, SITE_TARGET } from './job';
-import { clicks, sites } from './schema';
+import { clicks, integrations, sites } from './schema';
 import type { BrowserScreenGateway } from './screen.gateway';
-import type { SiteRow } from './tables';
+import type { IntegrationRow, SiteRow } from './tables';
 import { AskedView, ClearedView, SiteListView, SiteView } from './views';
 
 // 브라우저 에이전트가 일하는 사이트 (2026-11-08)와 일 맡기기. 사이트(이름 · 시작 주소 · 허용 출처)를 등록하고,
@@ -121,8 +121,17 @@ export class AgentSites extends Read<null> {
   }
 
   async run(work: Work, actor: Actor): Promise<AgentSitesView> {
+    const space = actor.requireSpace();
+    const tools = new Map<string, IntegrationRow[]>();
+    for (const t of await work.rows(
+      integrations,
+      { space_id: space, status: 'on' },
+      { order: ['name'] },
+    ))
+      tools.set(t.site_id, [...(tools.get(t.site_id) ?? []), t]);
     return new AgentSitesView(
-      await work.rows(sites, { space_id: actor.requireSpace() }, { order: ['id desc'] }),
+      await work.rows(sites, { space_id: space }, { order: ['id desc'] }),
+      tools,
     );
   }
 }

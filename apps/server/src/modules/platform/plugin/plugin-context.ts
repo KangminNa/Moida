@@ -6,7 +6,7 @@ import type { BaseAction } from '../base/base-action';
 import type { BaseHandler } from '../base/base-handler';
 import type { BaseJob } from '../base/base-job';
 import type { BaseLogin } from '../base/base-login';
-import { Command, Operation } from '../base/operation';
+import { Command, Operation, type Read } from '../base/operation';
 import type { PluginManifest } from './plugin-manifest';
 
 /** 등록된 이벤트 받기 하나 */
@@ -22,6 +22,17 @@ export class EventSubscription {
 export class EventReaction {
   constructor(
     readonly pattern: string,
+    readonly found: PackageOperation,
+  ) {}
+}
+
+/**
+ * 등록된 위임 지킴이 하나 (플러그인 API 0.9, 2026-11-21): 에이전트가 delegate_task로 이 대상 종류(target_kind)의 하위 작업을 맡길 때
+ * 코어가 먼저 돌리는 읽기 동작. RuleViolation을 던지면 그 글로 위임이 거절된다
+ */
+export class DelegateGuard {
+  constructor(
+    readonly targetKind: string,
     readonly found: PackageOperation,
   ) {}
 }
@@ -69,6 +80,7 @@ export class PluginContext {
   readonly logins: LoginMethod[] = [];
   readonly operations: PackageOperation[] = [];
   readonly reactions: EventReaction[] = [];
+  readonly guards: DelegateGuard[] = [];
 
   constructor(
     private readonly manifest: PluginManifest,
@@ -98,6 +110,17 @@ export class PluginContext {
       return;
     }
     this.subscriptions.push(new EventSubscription(this.manifest.name, pattern, handler));
+  }
+
+  /**
+   * 위임 지킴이: 이 대상 종류의 하위 작업을 맡기는 delegate_task를 코어가 먼저 보여 준다 (맡기는 에이전트의 actor,
+   * 입력 space_id · agent_id · task_id · target_kind · target_id · kind · title · instruction). 읽기 동작(Read)만:
+   * 코어의 트랜잭션 밖에서 돌고, 거절은 RuleViolation으로. 목록 파일에 delegate:<대상 종류>가 있어야 한다
+   */
+  guardDelegate(targetKind: string, guard: Read): void {
+    this.require(`delegate:${targetKind}`);
+    if (guard.writes) throw new Error(`위임 지킴이는 읽기 동작(Read)이어야 해요: ${guard.name}`);
+    this.guards.push(new DelegateGuard(targetKind, new PackageOperation(this.manifest, guard)));
   }
 
   /** every('30s' | '5m' | '1h', job) */

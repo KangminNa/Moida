@@ -1,6 +1,6 @@
 import type { BuildPartView } from './integration-views';
 import { PlanPartView } from './plan-views';
-import type { ClickPlanRow, ClickRow, ShotRow, SiteRow } from './tables';
+import type { ClickPlanRow, ClickRow, IntegrationRow, ShotRow, SiteRow } from './tables';
 
 // 브라우저 작업 · 결재된 클릭 · 화면이 내보내는 모양. 콘솔(관리자)은 camelCase, 러너 · 에이전트(MCP)는 snake_case.
 // 화면 그림(bytea)은 목록에 싣지 않는다: 하나를 열 때만 base64로.
@@ -44,7 +44,11 @@ export class JobView {
 
 /** browser_sites의 답 (에이전트가 사이트를 고를 때): 결재 · 위임의 target_id · target_version으로 쓴다 */
 export class AgentSitesView {
-  constructor(private readonly sites: readonly Readonly<SiteRow>[]) {}
+  constructor(
+    private readonly sites: readonly Readonly<SiteRow>[],
+    /** 사이트마다 켜진 사이트 도구 (2026-11-21: 있으면 브라우저 대신 도구를 먼저 쓴다. 위임 지킴이가 지킨다) */
+    private readonly tools: ReadonlyMap<string, readonly Readonly<IntegrationRow>[]>,
+  ) {}
 
   toJSON() {
     return {
@@ -55,8 +59,22 @@ export class AgentSitesView {
         start_url: s.start_url,
         origins: s.origins,
         login_needed: s.login_needed_at !== null,
+        tools: (this.tools.get(s.id) ?? []).map((t) => ({
+          name: t.name,
+          title: t.title,
+          mode: t.mode,
+        })),
       })),
     };
+  }
+}
+
+/** 위임 지킴이의 답 (코어가 버린다): 그 사이트의 켜진 도구 이름 */
+export class DelegationGuardedView {
+  constructor(private readonly tools: readonly string[]) {}
+
+  toJSON() {
+    return { ok: true, tools: this.tools };
   }
 }
 

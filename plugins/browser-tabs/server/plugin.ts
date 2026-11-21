@@ -3,6 +3,7 @@ import { SaveRequests } from './api-tools';
 import { ApprovalDecided, TaskSettled } from './approvals';
 import { BrowserJob, LoginNeeded } from './browse';
 import { ClickDetail, HoldClick, ListClicks, ManualClick, NextClick, SaveClick } from './clicks';
+import { GuardSiteDelegation } from './delegate-guard';
 import { SaveBuild } from './integration-build';
 import {
   BuildIntegration,
@@ -50,6 +51,8 @@ import { ManualRun } from './write-runs';
 // 코어를 고치지 않고 자기 표(browser_tabs) · API(/api/p/browser-tabs/…) · MCP 도구 · 콘솔 메뉴를 갖는다.
 export default class BrowserTabsPlugin extends BasePlugin {
   register(cairn: PluginContext): void {
+    // 위임 지킴이 (플러그인 API 0.9): 켜진 사이트 도구가 있는 사이트의 browse 위임은 도구를 먼저 쓰게 거절한다
+    cairn.guardDelegate('browser_site', new GuardSiteDelegation());
     const screen = new BrowserScreenGateway();
     // 로그인 카드의 값: 이 프로세스의 메모리에만 (DB에 남기지 않는다, 2026-11-19)
     const logins = new LoginInbox();

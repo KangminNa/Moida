@@ -1166,6 +1166,54 @@ describe('브라우저 일의 위임', () => {
     assert.deepEqual([explore.kind, explore.target], ['browse', null], '대상 없으면 둘러보기');
   });
 
+  test('사이트에 켜진 도구가 있으면 브라우저 위임을 거절한다 (위임 지킴이, 2026-11-21): 지시에 도구 이름을 적거나 도구를 써 봤으면 통과', async () => {
+    const lead = await leadId();
+    const db = api.service(Database);
+    const toolOn = async (site: Json) => {
+      const name = `api_guard_${randomUUID().slice(0, 6)}`;
+      const [row] = await db.sql<{ id: string }[]>`
+        INSERT INTO browser_tabs.integrations
+          (space_id, site_id, name, title, description, hint, mode, status, live_seq)
+        SELECT space_id, id, ${name}, '가격 읽기', '가격을 API로 읽는다', '', 'read', 'on', 1
+        FROM browser_tabs.sites WHERE id = ${String(site.id)} RETURNING id`;
+      return { name, id: String(row?.id) };
+    };
+    const first = await jobOf(lead);
+    const made = await toolOn(first.site);
+    const listed = (await tool(first.run, 'browser_sites')).body.sites as Json[];
+    assert.deepEqual(
+      (listed.find((s) => s.id === first.site.id) as Json).tools,
+      [{ name: made.name, title: '가격 읽기', mode: 'read' }],
+      '사이트 목록에 켜진 도구가 실린다',
+    );
+    const refused = await tool(first.run, 'delegate_task', {
+      subtasks: [subtask(first.member, first.site)],
+    });
+    assert.equal(refused.ok, false, JSON.stringify(refused.body));
+    assert.match(String(refused.body.message), new RegExp(`${made.name}.*site_run`));
+    const named = await tool(first.run, 'delegate_task', {
+      subtasks: [
+        {
+          ...subtask(first.member, first.site),
+          instruction: `${made.name} 도구는 가격만 읽어 주소 바꾸기는 못 해요. 배송 주소를 바꿔 주세요`,
+        },
+      ],
+    });
+    assert.equal(named.ok, true, JSON.stringify(named.body));
+
+    const second = await jobOf(lead);
+    const tried = await toolOn(second.site);
+    await db.sql`
+      INSERT INTO browser_tabs.runs
+        (space_id, integration_id, seq, agent_id, request_id, input, status, output, started_at, finished_at)
+      SELECT space_id, id, 1, ${lead}, ${`guard-${randomUUID()}`}, '{}'::jsonb, 'done', '{}'::jsonb, now(), now()
+      FROM browser_tabs.integrations WHERE id = ${tried.id}`;
+    const after = await tool(second.run, 'delegate_task', {
+      subtasks: [subtask(second.member, second.site)],
+    });
+    assert.equal(after.ok, true, JSON.stringify(after.body));
+  });
+
   test('일꾼은 브라우저 일을 맡기지 못한다: 맡기기는 대표만 (forbidden)', async () => {
     const { run, member, site } = await jobOf(await newAgent('맡기려는 일꾼'));
     const refused = await tool(run, 'delegate_task', { subtasks: [subtask(member, site)] });
