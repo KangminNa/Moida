@@ -1,7 +1,7 @@
 {
   "name": "browser-tabs",
-  "version": "0.8.0",
-  "cairn": ">=0.7",
+  "version": "0.9.0",
+  "cairn": ">=0.8",
   "description": "서버 브라우저로 하는 일: 주소를 탭으로 읽고, 등록한 사이트(로그인된 프로필)나 둘러보기(새 빈 창)에서 AI 에이전트가 일하고, 마지막 버튼은 결재 뒤 러너가 같은 버튼인지 확인하고 누른다. 콘솔에서 화면을 보고 누르고 사이트 세션을 지운다. 되풀이하는 일은 사이트 도구(Playwright 코드)로 굳혀 에이전트가 AI 없이 부른다 (쓰기 도구는 검토자 짝 · 부를 때마다 결재)",
   "settings": {
     "autoRepair": {
@@ -444,6 +444,173 @@
         "required": ["id", "version", "outcome"]
       }
     },
+    "browser_click_plan": {
+      "operation": "holdPlan",
+      "description": "AI가 남긴 누르기 계획(같은 사이트에서 마지막 버튼을 여러 번 누르는 일: 무엇을 · 몇 번)을 러너가 붙잡는다. 페이지는 사이트의 허용 출처 안이어야 한다. 받은 plan_id · version으로 request_approval(browser.site.publish, target_kind browser_click_plan)을 올린다. 승인되면 같은 작업이 다시 대기열로 가고, 다음 실행의 browser_job에 click_plan이 온다. 그 작업의 임대를 쥔 러너만.",
+      "input": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "빌린 browse 작업 id"
+          },
+          "page_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "첫 버튼이 있는 페이지 주소"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "무엇을 누르는지 한 줄 (예: 네이버 지도 '대구 여행' 목록에 12곳 저장)"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "누를 횟수 (마지막 버튼 기준)"
+          }
+        },
+        "required": ["task_id", "page_url", "summary", "count"]
+      }
+    },
+    "browser_press": {
+      "operation": "requestPress",
+      "description": "승인된 누르기 계획 안에서 마지막 버튼 하나를 눌러 달라고 한다 (작업 토큰). 러너(AI 없음)가 그 페이지의 탭에서 역할 + 이름으로 버튼을 다시 찾아 보이고 · 가장 위일 때만 누른다. 계획한 횟수까지, 계획한 사이트(허용 출처) 안에서만, 한 번에 하나: 앞 누르기의 결과를 browser_press_result로 본 뒤 다음을 요청한다. 직접 누르지 않는다. 승인된 계획이 없으면 거절된다(그때는 browser-stop.json으로 멈춘다).",
+      "input": {
+        "properties": {
+          "page_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "버튼이 있는 페이지 주소 (지금 탭의 주소)"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "버튼의 접근성 역할 (button · link …)"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "버튼의 접근성 이름"
+          },
+          "nth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "description": "같은 역할 · 이름 가운데 몇 번째인지 (0부터, 기본 0)"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "무엇을 누르는지 (예: 3/12 동성로 카페 저장)"
+          }
+        },
+        "required": ["page_url", "role", "name"]
+      }
+    },
+    "browser_press_result": {
+      "operation": "pressResult",
+      "description": "browser_press로 요청한 누르기의 결과. 끝날 때까지 최대 wait_seconds(기본 20초) 기다린다. status가 requested · clicking이면 다시 부른다. clicked면 눌렀다(after_url은 누른 뒤 주소), changed면 버튼을 다시 찾지 못했거나 가려져 누르지 않았다(reason). dropped면 계획이 닫혔다. left는 남은 횟수.",
+      "input": {
+        "properties": {
+          "click_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "browser_press의 click_id"
+          },
+          "wait_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          }
+        },
+        "required": ["click_id"]
+      }
+    },
+    "browser_press_next": {
+      "operation": "nextPress",
+      "description": "이 러너가 쥔 작업에서 AI가 요청한 누르기 하나를 누르는 중(clicking)으로 가져온다 (가져갈 때 계획의 횟수를 센다). 계획이 닫혔거나 다 셌으면 그 요청은 닫는다. 없으면 click: null.",
+      "input": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "빌린 browse 작업 id"
+          }
+        },
+        "required": ["task_id"]
+      }
+    },
+    "browser_press_save": {
+      "operation": "savePress",
+      "description": "가져간 누르기의 결과를 남긴다: clicked(버튼을 다시 찾아 눌렀다: 탭 · 자리 · 지문과 누르기 전 · 뒤 화면) 또는 changed(찾지 못했거나 가려져 누르지 않았다: 이유와 그때의 화면). 가져간 러너만.",
+      "input": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "빌린 browse 작업 id"
+          },
+          "click_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "browser_press_next의 click.id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["clicked", "changed"]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "after_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "tab_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "box": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "fingerprint": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "다시 찾은 버튼의 지문 (sha256)"
+          },
+          "before_image": {
+            "type": "string",
+            "description": "누르기 전 화면 (JPEG · PNG base64, 300KB까지)"
+          },
+          "after_image": {
+            "type": "string",
+            "description": "누른 뒤 · 바뀐 화면 (JPEG · PNG base64, 300KB까지)"
+          }
+        },
+        "required": ["task_id", "click_id", "version", "outcome"]
+      }
+    },
     "site_tools": {
       "operation": "siteTools",
       "description": "켜진 사이트 도구 목록: 사이트에서 되풀이하는 일을 코드로 굳힌 것이라 AI 없이 몇 초에 같은 모양의 답을 준다. 사이트에서 정보를 찾거나 같은 양식의 일을 할 때는 브라우저(browse)로 맡기기 전에 여기서 맞는 도구를 먼저 찾는다. 이름 · 설명 · 읽기/쓰기(mode) · 사이트 · 입력 형식(input_schema) · 답 형식(output_schema)이 온다. 쓰기 도구는 부를 때마다 결재가 필요하다.",
@@ -648,6 +815,11 @@
     "tool:browser_click_hold",
     "tool:browser_click_next",
     "tool:browser_click_save",
+    "tool:browser_click_plan",
+    "tool:browser_press",
+    "tool:browser_press_result",
+    "tool:browser_press_next",
+    "tool:browser_press_save",
     "tool:site_tools",
     "tool:site_run",
     "tool:site_result",

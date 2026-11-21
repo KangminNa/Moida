@@ -4,7 +4,7 @@
 import { TableColumns } from '../../../apps/server/src/plugin-api';
 
 const { customType, integer, jsonb, pgSchema, text, timestamp, uuid } = TableColumns;
-import type { ClickStatus, IntegrationMode, IntegrationReviewVerdict, IntegrationStatus, ReadStatus, RunErrorKind, RunStatus, ShotKind, ShotMime, SuggestionStatus } from './tables';
+import type { ClickPlanStatus, ClickStatus, IntegrationMode, IntegrationReviewVerdict, IntegrationStatus, ReadStatus, RunErrorKind, RunStatus, ShotKind, ShotMime, SuggestionStatus } from './tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const browserTabsSchema = pgSchema('browser_tabs');
@@ -19,21 +19,38 @@ export const browseSeen = browserTabsSchema.table('browse_seen', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
+/** browser_tabs.click_plans */
+export const clickPlans = browserTabsSchema.table('click_plans', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  task_id: uuid('task_id').notNull(),
+  site_id: uuid('site_id').notNull(),
+  page_url: text('page_url').notNull(),
+  summary: text('summary').notNull(),
+  max_clicks: integer('max_clicks').notNull(),
+  used: integer('used').notNull(),
+  status: text('status').$type<ClickPlanStatus>().notNull(),
+  approval_id: uuid('approval_id'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  decided_at: timestamp('decided_at', { withTimezone: true }),
+  version: integer('version').notNull(),
+});
+
 /** browser_tabs.clicks */
 export const clicks = browserTabsSchema.table('clicks', {
   id: uuid('id').notNull(),
   space_id: uuid('space_id').notNull(),
   task_id: uuid('task_id').notNull(),
   site_id: uuid('site_id').notNull(),
-  runner_id: uuid('runner_id').notNull(),
-  tab_id: text('tab_id').notNull(),
+  runner_id: uuid('runner_id'),
+  tab_id: text('tab_id'),
   page_url: text('page_url').notNull(),
   page_title: text('page_title').notNull(),
   role: text('role').notNull(),
   name: text('name').notNull(),
   nth: integer('nth').notNull(),
-  box: jsonb('box').notNull(),
-  fingerprint: text('fingerprint').notNull(),
+  box: jsonb('box'),
+  fingerprint: text('fingerprint'),
   note: text('note'),
   status: text('status').$type<ClickStatus>().notNull(),
   approval_id: uuid('approval_id'),
@@ -43,6 +60,7 @@ export const clicks = browserTabsSchema.table('clicks', {
   decided_at: timestamp('decided_at', { withTimezone: true }),
   clicked_at: timestamp('clicked_at', { withTimezone: true }),
   version: integer('version').notNull(),
+  plan_id: uuid('plan_id'),
 });
 
 /** browser_tabs.endpoints */

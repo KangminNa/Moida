@@ -8,6 +8,7 @@ import { LoginCalls } from './login-calls';
 import type { McpClient } from './mcp-client';
 import { NoteSource } from './note-source';
 import { PageBase } from './page-base';
+import { PressCalls } from './press-calls';
 import { type ProgressBatch, ProgressState, type RunResult } from './progress';
 import type { RunRecordBody } from './run-recorder';
 import type { RunnerAbility } from './runner-ability';
@@ -32,10 +33,13 @@ export class CairnServer {
   readonly siteTools: SiteToolCalls;
   /** browser-tabs 0.7 로그인 (로그인 필요 · 로그인 카드의 값 꺼내기 · 결과) */
   readonly logins: LoginCalls;
+  /** browser-tabs 0.9 누르기 계획 (계획 붙잡기 · AI가 요청한 누르기 가져가기 · 결과, F2) */
+  readonly presses: PressCalls;
 
   constructor(private readonly mcp: McpClient) {
     this.siteTools = new SiteToolCalls(mcp);
     this.logins = new LoginCalls(mcp);
+    this.presses = new PressCalls(mcp);
   }
 
   /** 일을 limit개까지 빌린다. 없으면 waitSeconds까지 기다린다. 서버는 이 러너가 할 수 있는 일만 준다 */

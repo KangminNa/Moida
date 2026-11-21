@@ -112,6 +112,14 @@ export abstract class Actor {
     return false;
   }
 
+  /**
+   * 작업 토큰이면 그 작업의 id (플러그인 API 0.8, 2026-11-21): 에이전트가 부른 도구를 지금 하는 일에 묶는다
+   * (browser-tabs의 계획 안 누르기). 작업 토큰이 살아 있는지는 MCP 입구가 호출마다 본다. 그 밖의 요청자는 null
+   */
+  runTask(): string | null {
+    return null;
+  }
+
   toJSON(): object {
     return { kind: this.kind, spaceId: this.spaceId, id: this.id };
   }
@@ -217,6 +225,9 @@ export class AgentActor extends Actor {
 
   override hasReadGrants(): boolean {
     return this.reads.size > 0;
+  }
+  override runTask(): string {
+    return this.taskId;
   }
 
   override toJSON(): object {

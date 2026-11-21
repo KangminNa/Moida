@@ -93,7 +93,8 @@ export class ApprovalService extends BaseService {
       if (!seen?.approved || seen.taskId === null) return;
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, seen.taskId);
-      task.concludeExecution(req.succeeded, req.error, now);
+      if (req.continues) task.continueAfterApproval(now);
+      else task.concludeExecution(req.succeeded, req.error, now);
       await tasks.save(task);
     });
   }

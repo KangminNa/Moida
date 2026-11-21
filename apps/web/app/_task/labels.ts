@@ -90,6 +90,7 @@ export const TARGET_LABELS: Record<string, string> = {
   agent: '에이전트',
   browser_site: '사이트',
   browser_click: '브라우저 버튼',
+  browser_click_plan: '누르기 계획',
   pull_request: 'PR',
   [GOAL_RUN]: '목표 실행',
   chat: '대화',

@@ -260,6 +260,7 @@ describe('브라우저 에이전트: 관리자 입구', () => {
       login_needed: false,
       held: null,
       build: null,
+      click_plan: null,
     });
     const held = await hold(String(task.id));
     assert.equal(held.ok, false);
@@ -354,6 +355,7 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
       login_needed: false,
       held: null,
       build: null,
+      click_plan: null,
     });
     const step = await tool(runner, 'browser_shot_save', {
       task_id: taskId,
@@ -521,6 +523,168 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
     await drain();
     assert.equal((await clickOf(clickId)).status, 'dropped');
     assert.deepEqual((await tool(runner, 'browser_click_next')).body, { click: null });
+  });
+});
+
+describe('누르기 계획: 일 하나에 승인 한 번 (F2, 2026-11-21)', () => {
+  const press = (token: string, more: Json = {}) =>
+    tool(token, 'browser_press', {
+      page_url: 'https://blog.example/place/1',
+      role: 'button',
+      name: '저장',
+      ...more,
+    });
+
+  test('계획 붙잡기 → 한 번 승인 → 같은 일이 다시 돌고, AI가 요청한 버튼을 러너가 누른다. 횟수 · 사이트는 서버가 지킨다', async () => {
+    const site = await newSite();
+    const { taskId, run } = await siteJob(site);
+    const early = await press(run);
+    assert.equal(early.ok, false);
+    assert.match(JSON.stringify(early.body), /승인된 누르기 계획이 없어요/);
+    const away = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://evil.example/x',
+      summary: '저장',
+      count: 2,
+    });
+    assert.equal(away.ok, false, '허용 출처 밖');
+    const held = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://blog.example/place/1',
+      summary: '목록에 2곳 저장',
+      count: 2,
+    });
+    assert.equal(held.ok, true, JSON.stringify(held.body));
+    const asked = await tool(run, 'request_approval', {
+      request_id: `plan-${held.body.plan_id}`,
+      action: 'browser.site.publish',
+      target_kind: 'browser_click_plan',
+      target_id: held.body.plan_id,
+      target_version: held.body.version,
+      note: '누르기 계획: 목록에 2곳 저장 (2번)',
+    });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    assert.equal((await taskOf(taskId)).status, 'waiting');
+    await decide(ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)), 'approve');
+    const resumed = await taskOf(taskId);
+    assert.equal(resumed.status, 'queued', '승인하면 같은 일이 다시 대기열로');
+
+    const again = await leased(String(resumed.title));
+    assert.equal((again.task as Json).id, taskId);
+    const next = String(again.run_token);
+    const job = await tool(runner, 'browser_job', { task_id: taskId });
+    assert.deepEqual(job.body.click_plan, {
+      id: held.body.plan_id,
+      summary: '목록에 2곳 저장',
+      max_clicks: 2,
+      used: 0,
+      left: 2,
+    });
+    const elsewhere = await press(next, { page_url: 'https://evil.example/place/1' });
+    assert.match(JSON.stringify(elsewhere.body), /계획한 사이트/);
+
+    const first = await press(next, { note: '1/2 저장' });
+    assert.equal(first.ok, true, JSON.stringify(first.body));
+    assert.deepEqual([first.body.status, first.body.left], ['requested', 2]);
+    const busy = await press(next);
+    assert.match(JSON.stringify(busy.body), /앞 누르기가 끝난 뒤에/);
+    assert.equal(
+      (await tool(other, 'browser_press_next', { task_id: taskId })).ok,
+      false,
+      '쥐지 않은 러너',
+    );
+    const one = (await tool(runner, 'browser_press_next', { task_id: taskId })).body.click as Json;
+    assert.deepEqual(
+      [one.id, one.role, one.name, one.nth, one.note],
+      [first.body.click_id, 'button', '저장', 0, '1/2 저장'],
+    );
+    const clicked = await tool(runner, 'browser_press_save', {
+      task_id: taskId,
+      click_id: one.id,
+      version: one.version,
+      outcome: 'clicked',
+      after_url: 'https://blog.example/place/1?saved=1',
+      tab_id: 'A'.repeat(32),
+      box: { x: 1, y: 2, width: 3, height: 4 },
+      fingerprint: FINGERPRINT,
+      before_image: JPEG,
+      after_image: JPEG,
+    });
+    assert.equal(clicked.ok, true, JSON.stringify(clicked.body));
+    const seen = await tool(next, 'browser_press_result', {
+      click_id: first.body.click_id,
+      wait_seconds: 0,
+    });
+    assert.deepEqual([seen.body.status, seen.body.left], ['clicked', 1]);
+    const detail = await clickOf(String(first.body.click_id));
+    assert.deepEqual(
+      [detail.status, detail.beforeImage, detail.afterImage],
+      ['clicked', JPEG, JPEG],
+    );
+
+    const second = await press(next, { page_url: 'https://blog.example/place/2' });
+    const two = (await tool(runner, 'browser_press_next', { task_id: taskId })).body.click as Json;
+    const missed = await tool(runner, 'browser_press_save', {
+      task_id: taskId,
+      click_id: two.id,
+      version: two.version,
+      outcome: 'changed',
+      reason: '버튼이 없어요: button "저장"',
+    });
+    assert.equal(missed.ok, true, JSON.stringify(missed.body));
+    const late = await tool(next, 'browser_press_result', { click_id: second.body.click_id });
+    assert.deepEqual(
+      [late.body.status, late.body.reason, late.body.left],
+      ['changed', '버튼이 없어요: button "저장"', 0],
+      '가져갈 때 세므로 누르지 못한 것도 센다',
+    );
+    const over = await press(next);
+    assert.match(JSON.stringify(over.body), /계획한 2번을 다 눌렀어요/);
+
+    const submitted = await tool(runner, 'submit_result', {
+      task_id: taskId,
+      request_id: randomUUID(),
+      status: 'done',
+      result: { summary: '1곳 저장, 1곳은 버튼이 없음' },
+    });
+    assert.equal(submitted.ok, true, JSON.stringify(submitted.body));
+    await drain();
+    const [row] = await api.service(Database).sql`
+      SELECT status, used FROM browser_tabs.click_plans WHERE id = ${String(held.body.plan_id)}`;
+    assert.deepEqual([row?.status, row?.used], ['closed', 2], '작업이 끝나면 계획을 닫는다');
+  });
+
+  test('계획 결재의 수정 요청 · 반려는 계획을 닫고, 다시 빌린 일은 계획 없이 돈다', async () => {
+    const { taskId, run } = await siteJob(await newSite());
+    const held = await tool(runner, 'browser_click_plan', {
+      task_id: taskId,
+      page_url: 'https://blog.example/write',
+      summary: '글 3개 올리기',
+      count: 3,
+    });
+    const asked = await tool(run, 'request_approval', {
+      request_id: `plan-${held.body.plan_id}`,
+      action: 'browser.site.publish',
+      target_kind: 'browser_click_plan',
+      target_id: held.body.plan_id,
+      target_version: held.body.version,
+      note: '누르기 계획',
+    });
+    await decide(
+      ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)),
+      'revise',
+      '두 개만',
+    );
+    const back = await taskOf(taskId);
+    assert.equal(back.status, 'queued');
+    await leased(String(back.title));
+    const job = await tool(runner, 'browser_job', { task_id: taskId });
+    assert.equal(job.ok, true, JSON.stringify(job.body));
+    assert.equal(job.body.click_plan, null);
+    assert.equal((job.body.site as Json).origins !== undefined, true, '계획의 사이트로 돈다');
+    const [row] = await api.service(Database).sql`
+      SELECT status FROM browser_tabs.click_plans WHERE id = ${String(held.body.plan_id)}`;
+    assert.equal(row?.status, 'dropped');
   });
 });
 

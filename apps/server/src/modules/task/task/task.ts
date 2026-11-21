@@ -478,6 +478,17 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     else this.fail(error ?? '실행하지 못했어요', now);
   }
 
+  /**
+   * 승인한 것을 같은 작업이 이어서 한다 (플러그인 API 0.8, browser-tabs의 누르기 계획): 승인 뒤 결과를 기다리던
+   * running(임대 없음) → queued. 다시 빌려 가는 일이라 시도 횟수는 새로 센다. 그 밖의 상태면 그대로 (두 번 와도 같다)
+   */
+  continueAfterApproval(now: Date): void {
+    if (this.row.status !== Task.RUNNING || this.row.lease_until !== null) return;
+    this.move([Task.RUNNING], Task.QUEUED);
+    this.put('attempts', 0);
+    this.log(Task.LOG_READ, '승인받아 이어서 해요', 0, now);
+  }
+
   /** 끝낸다: running → done */
   finish(result: Readonly<Record<string, unknown>>, now: Date): void {
     this.move([Task.RUNNING], Task.DONE);

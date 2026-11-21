@@ -23,6 +23,16 @@ export class HeldPage {
   ) {}
 }
 
+/** 승인된 누르기 계획 (F2, 2026-11-21): 이 실행에서 AI가 browser_press로 요청하면 러너가 누른다 */
+export class ClickPlan {
+  constructor(
+    readonly id: string,
+    readonly summary: string,
+    /** 남은 횟수 */
+    readonly left: number,
+  ) {}
+}
+
 // browser_job의 답: 러너가 빌린 browse 작업이 어디서 도는지 (browser-tabs 패키지가 작업의 대상으로 정한다).
 // 사이트 일(대상 browser_site · browser_click)이면 사이트 값과 로그인 필요, 대상이 없으면 둘러보기.
 // 서버가 걸렀지만 러너도 출처 모양만 본다: http(s)://호스트[:포트], 경로 없음
@@ -36,11 +46,14 @@ export class BrowseJob {
     readonly held: HeldPage | null,
     /** 사이트 도구를 굳히는 일이면 그 몫 (2026-11-16 MCP 2단계, SiteBuild) */
     readonly build: SiteBuildPlan | null = null,
+    /** 승인된 누르기 계획 (옛 서버는 없다) */
+    readonly clickPlan: ClickPlan | null = null,
   ) {}
 
   static from(body: Json): BrowseJob {
     const site = body.field('site') ? body.child('site') : null;
     const held = body.field('held') ? body.child('held') : null;
+    const plan = body.field('click_plan') ? body.child('click_plan') : null;
     return new BrowseJob(
       site === null
         ? null
@@ -56,6 +69,9 @@ export class BrowseJob {
         ? null
         : new HeldPage(held.text('click_id'), held.text('page_url'), held.text('tab_id')),
       site === null ? null : SiteBuildPlan.from(body),
+      site === null || plan === null
+        ? null
+        : new ClickPlan(plan.text('id'), plan.text('summary'), plan.number('left')),
     );
   }
 

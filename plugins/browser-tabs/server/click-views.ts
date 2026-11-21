@@ -1,5 +1,6 @@
 import type { BuildPartView } from './integration-views';
-import type { ClickRow, ShotRow, SiteRow } from './tables';
+import { PlanPartView } from './plan-views';
+import type { ClickPlanRow, ClickRow, ShotRow, SiteRow } from './tables';
 
 // 브라우저 작업 · 결재된 클릭 · 화면이 내보내는 모양. 콘솔(관리자)은 camelCase, 러너 · 에이전트(MCP)는 snake_case.
 // 화면 그림(bytea)은 목록에 싣지 않는다: 하나를 열 때만 base64로.
@@ -16,6 +17,8 @@ export class JobView {
     private readonly site: Readonly<SiteRow> | null,
     private readonly held: Readonly<ClickRow> | null,
     private readonly build: BuildPartView | null = null,
+    /** 승인된 누르기 계획 (F2, 2026-11-21) */
+    private readonly plan: Readonly<ClickPlanRow> | null = null,
   ) {}
 
   toJSON() {
@@ -34,6 +37,7 @@ export class JobView {
       login_needed: site?.login_needed_at != null,
       held: held ? { click_id: held.id, page_url: held.page_url, tab_id: held.tab_id } : null,
       build: this.build?.toJSON() ?? null,
+      click_plan: this.plan ? new PlanPartView(this.plan).toJSON() : null,
     };
   }
 }

@@ -22,6 +22,7 @@ const browserCall = callFor('browser-tabs');
 /** 러너가 승인 메모 앞에 적는 까닭: "확인 필요(캡차): …" (apps/runner browse-stage.ts의 needLogin과 같게) */
 const REASON = /^확인 필요\((.+?)\)/;
 const CLICK_STATUS: Record<string, string> = {
+  requested: '누르기 요청됨',
   held: '승인 대기',
   approved: '누를 차례',
   clicking: '누르는 중',
@@ -71,6 +72,23 @@ function MarkedShot({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * browser.site.publish의 누르기 계획 (대상 browser_click_plan, F2 2026-11-21): 같은 사이트에서 마지막 버튼을 여러 번 누르는 일.
+ * 승인하면 같은 일이 이어서 돌고, AI가 요청한 버튼을 러너가 다시 찾아 계획한 횟수까지만 누른다. 누른 것은 브라우저 › 클릭에 하나씩 남는다
+ */
+export function PlanTarget({ approval }: { approval: Approval }) {
+  return (
+    <section className="preview" aria-label="누르기 계획">
+      <b>{approval.note ?? '누르기 계획'}</b>
+      <p className="note">
+        승인하면 이 일이 이어서 돌고, 버튼마다 러너가 같은 사이트 안에서 다시 찾아 눌러요. 계획한
+        횟수를 넘거나 다른 사이트의 버튼은 누르지 않아요. 누른 것은{' '}
+        <Link href={BROWSER_PAGE}>브라우저</Link>의 클릭에 하나씩 남아요
+      </p>
+    </section>
   );
 }
 

@@ -70,6 +70,36 @@ describe('멈춘 자리 (browser-stop.json)', () => {
       assert.throws(() => BrowserStop.of(raw), BrowserStopProblem, JSON.stringify(raw));
   });
 
+  test('click_plan은 한 줄로 다듬은 요약과 1~50의 횟수 (F2)', () => {
+    const plan = BrowserStop.of({
+      stop: 'click_plan',
+      page_url: 'https://map.example/list',
+      plan: { summary: "  '대구 여행' 목록에\n12곳 저장 ", count: 12 },
+    });
+    assert.deepEqual(
+      [plan.kind, plan.pageUrl, plan.button, plan.plan],
+      [
+        'click_plan',
+        'https://map.example/list',
+        null,
+        { summary: "'대구 여행' 목록에 12곳 저장", count: 12 },
+      ],
+    );
+    for (const bad of [
+      { summary: '', count: 3 },
+      { summary: '저장', count: 0 },
+      { summary: '저장', count: 51 },
+      { summary: '저장', count: 2.5 },
+      { count: 3 },
+      null,
+    ])
+      assert.throws(
+        () => BrowserStop.of({ stop: 'click_plan', page_url: 'https://a.example', plan: bad }),
+        BrowserStopProblem,
+        JSON.stringify(bad),
+      );
+  });
+
   test('없으면 null, JSON이 아니거나 링크면 문제', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-stop-'));
     try {
