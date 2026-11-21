@@ -1,6 +1,7 @@
 import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
+import { JobAfter } from './job-after';
 import { JobLineage } from './job-lineage';
 import { JobPlan } from './job-plan';
 import { JobRefs, type RefPhotos } from './job-refs';
@@ -145,6 +146,8 @@ export class Job {
     readonly delegated = false,
     /** 이 일에서 set_plan으로 정한 계획 (payload.plan, 2026-11-20). 정하지 않았으면 null */
     readonly plan: JobPlan | null = null,
+    /** 앞 단계의 결과 (payload.afterResults, D2 순서가 있는 위임). 앞 단계 없이 맡긴 일이면 null */
+    readonly after: JobAfter | null = null,
   ) {}
 
   static from(raw: Json): Job {
@@ -191,6 +194,7 @@ export class Job {
       raw.optionalText('wake'),
       Boolean(payload.optionalText('delegatedBy')),
       JobPlan.from(payload),
+      JobAfter.from(payload),
     );
   }
 
@@ -261,6 +265,7 @@ export class Job {
       this.wake,
       this.delegated,
       this.plan,
+      this.after,
     );
   }
 
@@ -341,7 +346,7 @@ export class Job {
     if (this.goalChain.length > 0)
       parts.push(prompts.fill('goal', { chain: this.goalChain.join(' › ') }));
     if (this.revisionNote) parts.push(prompts.fill('revision', { note: this.revisionNote }));
-    if (this.plan) parts.push(this.plan.part(prompts));
+    for (const p of [this.plan, this.after]) if (p) parts.push(p.part(prompts));
     if (this.subtaskResults.length > 0)
       parts.push(SubtaskResult.part(prompts, this.subtaskResults, this.wake, this.roundsLeft));
     if (this.brief) parts.push(this.brief);

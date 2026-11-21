@@ -2,8 +2,10 @@ import { ChangeSignal, Conflict, Database, Rule, TableRepository } from '../../p
 import type { Agent } from '../agent/agent';
 import { taskEvents, taskRuns, tasks } from '../task.schema';
 import type { OutputRow, TaskRow, TaskRunNew, TaskRunRow } from '../task.tables';
+import { type AfterOrderRow, type AfterSiblingRow, SubtaskAfter } from './subtask-after.policy';
 import { Task } from './task';
 import type { ReportProgressInput } from './task.input';
+import type { TaskKind } from './task-kinds';
 
 // task.tasks + task_events ↔ Task. 불러오기·잠그기·저장(바뀐 칸만)은 기반이 하고, 여기에는 대기열 SQL과 실행 기록이 있다.
 export class TaskRepository extends TableRepository<TaskRow, Task> {
@@ -171,6 +173,19 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     return this.find({ parent_id: parentId }, { order: ['id'] });
   }
 
+  /** 하위 작업의 열쇠 · 상태 · 결과 (순서가 있는 위임 D2: 앞 단계가 끝났는지, 넘길 결과 글) */
+  async afterRows(parentId: string): Promise<AfterSiblingRow[]> {
+    return this.sql<AfterSiblingRow[]>`
+      SELECT id, request_id, status, title, result FROM task.tasks WHERE parent_id = ${parentId}`;
+  }
+
+  /** 위 작업에 적어 둔 하위 작업 (D2, payload.afterOrders). 없으면 [] */
+  async heldAfter(taskId: string): Promise<AfterOrderRow[]> {
+    const [row] = await this.sql<Pick<TaskRow, 'payload'>[]>`
+      SELECT payload FROM task.tasks WHERE id = ${taskId}`;
+    return SubtaskAfter.held(row?.payload);
+  }
+
   /** 끝나지 않은 하위 작업의 수 */
   async openChildren(parentId: string): Promise<number> {
     const [row] = await this.sql<{ n: number }[]>`
@@ -275,12 +290,12 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       .sql`SELECT pg_advisory_xact_lock(hashtextextended(${`ai_signin:${spaceId}:${tool}`}, 0))`;
   }
 
-  /** 도구의 끝나지 않은 웹 로그인 (도구마다 하나) */
-  async findPendingAiSignin(spaceId: string, tool: string): Promise<Task | null> {
+  /** 도구의 끝나지 않은 웹 로그인 · 연결 확인 (kind는 Task.AI_SIGNIN · Task.AI_TEST, 도구마다 하나) */
+  async findPendingAi(spaceId: string, kind: TaskKind, tool: string): Promise<Task | null> {
     return this.maybeOne(
       await this.sql`
         SELECT * FROM task.tasks
-        WHERE space_id = ${spaceId} AND kind = ${Task.AI_SIGNIN} AND payload->>'tool' = ${tool}
+        WHERE space_id = ${spaceId} AND kind = ${kind} AND payload->>'tool' = ${tool}
           AND status IN (${Task.QUEUED}, ${Task.RUNNING})
         ORDER BY id DESC LIMIT 1`,
     );
@@ -292,17 +307,6 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
       await this.sql`
         SELECT * FROM task.tasks
         WHERE space_id = ${spaceId} AND kind = ${Task.TOOL_CHECK} AND payload->>'toolId' = ${toolId}
-          AND status IN (${Task.QUEUED}, ${Task.RUNNING})
-        LIMIT 1`,
-    );
-  }
-
-  /** 도구의 끝나지 않은 연결 확인 */
-  async findPendingAiTest(spaceId: string, tool: string): Promise<Task | null> {
-    return this.maybeOne(
-      await this.sql`
-        SELECT * FROM task.tasks
-        WHERE space_id = ${spaceId} AND kind = ${Task.AI_TEST} AND payload->>'tool' = ${tool}
           AND status IN (${Task.QUEUED}, ${Task.RUNNING})
         LIMIT 1`,
     );

@@ -4,8 +4,8 @@ import { ModelTier } from '../agent/model-tier.policy';
 import { TurnBrief } from '../chat/turn-brief.policy';
 import type { TaskNew, TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
+import type { SubtaskOrder } from './subtask-order.input';
 import { SubtaskWait } from './subtask-wait.policy';
-import type { SubtaskOrder } from './task.input';
 import { TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
 

@@ -6,8 +6,8 @@ import { Agent } from '../agent/agent';
 import type { TaskRow } from '../task.tables';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
+import type { SubtaskOrder } from './subtask-order.input';
 import { Task } from './task';
-import type { SubtaskOrder } from './task.input';
 import { TeamRoster } from './team-roster';
 
 /** 위임 입력 하나 (delegate_task의 subtasks 한 줄). 참조는 넘기지 않는다 */

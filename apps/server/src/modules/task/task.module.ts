@@ -76,6 +76,7 @@ import { JobService } from './task/job.service';
 import { LeaseJob } from './task/lease.job';
 import { LessonHandler } from './task/lesson.handler';
 import { LessonQuery } from './task/lesson.query';
+import { SubtaskService } from './task/subtask.service';
 import { SubtaskSettledHandler } from './task/subtask-settled.handler';
 import { SubtaskWaitJob } from './task/subtask-wait.job';
 import { Task } from './task/task';
@@ -126,6 +127,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     AgentlessService,
     InboxQuery,
     SubtaskSettledHandler,
+    SubtaskService,
     ApprovalResultHandler,
     LeaseJob,
     SubtaskWaitJob,

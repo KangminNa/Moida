@@ -28,8 +28,8 @@ import {
 import { MakeMaterials } from './make-materials';
 import { MakeOrder } from './make-order';
 import type { RunRecord } from './run-record';
+import type { SubtaskOrder } from './subtask-order.input';
 import { SubtaskWait } from './subtask-wait.policy';
-import type { SubtaskOrder } from './task.input';
 import { TaskView } from './task.view';
 import { type TaskKind, TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';

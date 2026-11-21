@@ -96,7 +96,7 @@ export class AiLoginService extends BaseService {
       if (!login) throw new RuleViolation('로그인을 먼저 해 주세요');
       login.assertUsable(now);
       const tasks = new TaskRepository(tx);
-      const pending = await tasks.findPendingAiTest(spaceId, login.tool);
+      const pending = await tasks.findPendingAi(spaceId, Task.AI_TEST, login.tool);
       if (pending) return pending;
       const task = AiTasks.test(spaceId, login.tool, login.version, now);
       await tasks.insertOnce(task);
@@ -112,7 +112,7 @@ export class AiLoginService extends BaseService {
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       await tasks.lockSigninSlot(spaceId, req.tool);
-      const pending = await tasks.findPendingAiSignin(spaceId, req.tool);
+      const pending = await tasks.findPendingAi(spaceId, Task.AI_SIGNIN, req.tool);
       if (pending) return pending;
       const task = AiTasks.signin(spaceId, req.tool, new Date());
       await tasks.insertOnce(task);

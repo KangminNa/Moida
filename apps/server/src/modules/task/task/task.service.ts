@@ -6,6 +6,7 @@ import {
   Conflict,
   Database,
   Forbidden,
+  PluginRegistry,
   RuleViolation,
   type Sql,
   type VersionInput,
@@ -20,6 +21,8 @@ import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import { Lessons } from './lesson.policy';
 import { LessonQuery } from './lesson.query';
+import { SubtaskAfter } from './subtask-after.policy';
+import type { SubtaskOrder } from './subtask-order.input';
 import type { AskHelpInput, WaitSubtasksInput } from './subtask-wait.input';
 import { SubtaskWait } from './subtask-wait.policy';
 import { HelpAskedView } from './subtask-wait.view';
@@ -27,6 +30,7 @@ import { Task } from './task';
 import { CreateTaskInput, type DelegateTaskInput, type TaskIdInput } from './task.input';
 import { TaskQuery } from './task.query';
 import { TaskRepository } from './task.repository';
+import { TaskKinds } from './task-kinds';
 import type { SetPlanInput } from './task-plan.input';
 import { TaskPlan } from './task-plan.policy';
 import { PlanSetView } from './task-plan.view';
@@ -47,6 +51,7 @@ export class TaskService extends BaseService {
     private readonly lessons: LessonQuery,
     private readonly skills: SkillQuery,
     private readonly reviews: TeamReviewQuery,
+    private readonly plugins: PluginRegistry,
   ) {
     super(db);
   }
@@ -144,7 +149,12 @@ export class TaskService extends BaseService {
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const parent = await tasks.lock(spaceId, taskId);
-      const keys = req.subtasks.map((s) => DelegationPolicy.requestIdOf(parent.id, s.requestId));
+      // 순서가 있는 위임 (D2): after가 있는 하위 작업은 앞 단계가 끝나면 서버가 만든다 (SubtaskService)
+      const { now: first, later } = SubtaskAfter.split(req.subtasks);
+      const kinds = req.subtasks.map((s) => String(s.fields.kind ?? Task.GENERAL));
+      TaskKinds.assertReady(kinds, this.plugins.packageTools());
+      const keyOf = (requestId: string) => DelegationPolicy.requestIdOf(parent.id, requestId);
+      const keys = first.map((s) => keyOf(s.requestId));
       const before = await tasks.findByRequests(spaceId, keys);
       if (before.length > 0) {
         // 응답을 놓쳐 같은 호출을 다시 보냈다: 그때 만든 것을 그대로. 일부만 겹치면 다른 호출이다
@@ -158,9 +168,11 @@ export class TaskService extends BaseService {
       const manager = org.find((a) => a.id === agentId);
       if (!manager) throw new Forbidden(Actor.AGENT);
       const tainted = await tasks.privateTouched(spaceId, parent.id);
-      const made = req.subtasks.map((s) =>
-        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now, tainted),
-      );
+      SubtaskAfter.assertSafe(req.subtasks, org);
+      const order = (s: SubtaskOrder) =>
+        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now, tainted);
+      later.forEach(order); // 받는 쪽 · 종류 · 한도는 지금 본다 (만들기는 앞 단계 뒤)
+      const made = first.map(order);
       // 코드 하위 작업끼리(아직 안 끝난 형제 포함) 고칠 곳이 겹치면 PR이 부딪친다
       CodeScope.assertApart(
         [...siblings.filter((t) => t.open), ...made].flatMap((t) => t.codeScope ?? []),
@@ -168,9 +180,9 @@ export class TaskService extends BaseService {
       for (const child of made)
         if (!(await tasks.insertOnce(child)))
           throw new Conflict('같은 하위 작업이 동시에 만들어졌어요. 다시 보내 주세요');
-      const kinds = req.subtasks.map((s) => String(s.fields.kind ?? Task.GENERAL));
       const until = SubtaskWait.until(now, req.waitMinutes, kinds);
-      parent.waitForSubtasks(`하위 작업 ${made.length}개를 맡겼어요`, until, now);
+      if (later.length > 0) parent.declare((p) => SubtaskAfter.hold(p, later, keyOf));
+      parent.waitForSubtasks(`하위 작업 ${req.subtasks.length}개를 맡겼어요`, until, now);
       await tasks.save(parent);
       return made;
     });
@@ -306,27 +318,9 @@ export class TaskService extends BaseService {
       });
   }
 
-  /**
-   * 하위 작업 하나가 끝났다 (일꾼이 task.task.changed로 부른다). 형제가 모두 끝났거나 이것이 실패했으면
-   * 위 작업을 대기열로 돌린다 (SubtaskWait.wakeOn: 실패는 형제를 기다리지 않고 바로, 팀원 기다리기).
-   * 위 작업만 잠그고 세므로, 둘이 동시에 끝나도 늦게 커밋한 쪽이 깨운다. 두 번 불려도 같다
-   */
-  async settleSubtask(actor: Actor, taskId: string, status: string): Promise<void> {
-    actor.assertCan(Actor.RUN);
-    await this.transaction(async (tx) => {
-      const tasks = new TaskRepository(tx);
-      const parentId = await tasks.parentOf(taskId);
-      const parent = parentId === null ? null : await tasks.lockById(parentId);
-      if (!parent?.waitingForSubtasks) return;
-      const reason = SubtaskWait.wakeOn(status, await tasks.openChildren(parent.id));
-      if (reason === null) return;
-      parent.wakeAfterSubtasks(reason, new Date());
-      await tasks.save(parent);
-    });
-  }
-
   private async open(actor: Actor, spaceId: string, req: CreateTaskInput): Promise<Task> {
     const task = Task.open(spaceId, req.requestId, req.fields, new Date());
+    TaskKinds.assertReady([String(req.fields.kind)], this.plugins.packageTools());
     // 만들기의 재료 결과물은 트랜잭션 밖에서 미리 본다. 그사이 휴지통에 가면 러너가 받을 때 빼고 기록한다
     const materials = task.makeMaterials;
     if (materials !== null && materials.outputs.length > 0)
