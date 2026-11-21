@@ -91,7 +91,7 @@ export function TidyPanel() {
       {stuck && (
         <p className="warn">
           일할 에이전트 없음 · 대기 {countOf(tasks, queued.data?.next)}건.{' '}
-          <Link href="/admin/agents">에이전트</Link>를 추가하거나 다시 시작하면 정리가 시작돼요
+          <Link href="/admin/agents">일꾼</Link>을 추가하거나 다시 시작하면 정리가 시작돼요
         </p>
       )}
       {problem && <p className="error">{problem}</p>}

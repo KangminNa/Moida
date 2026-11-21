@@ -41,7 +41,7 @@ export function DeletedAgents({
       ) : list.length === 0 ? (
         <p className="note">휴지통 비어 있음</p>
       ) : (
-        <ul className="list" aria-label="삭제한 에이전트 목록">
+        <ul className="list" aria-label="삭제한 일꾼 목록">
           {list.map((a) => (
             <li key={a.id} className="item">
               <div className="item-main">
@@ -64,7 +64,7 @@ export function DeletedAgents({
                         await deleted.reload();
                         onRestored();
                       },
-                      conflict: '이미 바뀐 에이전트예요. 최신 내용을 다시 읽었어요',
+                      conflict: '이미 바뀐 일꾼이에요. 최신 내용을 다시 읽었어요',
                     },
                   )
                 }

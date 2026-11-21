@@ -7,6 +7,8 @@ const PATHS: Readonly<Record<string, string>> = {
   chat: 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z',
   approve: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3',
   team: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  worker:
+    'M12 11a4 4 0 1 0 0-8a4 4 0 1 0 0 8zM5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M7 6.5h10M12 3V1.5',
   box: 'M21 8v13H3V8M1 3h22v5H1zM10 12h4',
   gear: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   key: 'M7 14a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM10 15 20 5M16 9l3 3M18 7l2 2',

@@ -148,7 +148,7 @@ export function MakeForm({
         </select>
         {agents.data && makers.length === 0 && (
           <small className="warn">
-            에이전트 없음 · <Link href="/admin/agents">에이전트</Link>에서 추가
+            일꾼 없음 · <Link href="/admin/agents">일꾼</Link>에서 추가
           </small>
         )}
       </div>

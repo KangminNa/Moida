@@ -204,7 +204,7 @@ export function AskForm({
       {none && (
         <p className="note">
           에이전트 없음. 작업은 에이전트가 생길 때까지 대기{' · '}
-          <Link href="/admin/agents?new=1">에이전트 추가</Link>
+          <Link href="/admin/agents?new=1">일꾼 추가</Link>
         </p>
       )}
       {action.problem && <p className="error">{action.problem}</p>}

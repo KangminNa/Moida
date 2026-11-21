@@ -8,7 +8,7 @@ export default async function AgentsPage({
 }) {
   const { new: adding } = await searchParams;
   return (
-    <section className="console-inner wide" aria-label="에이전트">
+    <section className="console-inner wide" aria-label="일꾼">
       <AgentsPanel adding={adding === '1'} />
     </section>
   );
