@@ -115,6 +115,8 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/issues/:id': 403,
   'GET /api/issues/by-number/:app/:menu/:number': 400,
   'GET /api/library': 403,
+  'GET /api/link-preview': 400,
+  'GET /api/link-preview/image': 400,
   'GET /api/security/events': 403,
   'GET /api/project-rules': 403,
   'GET /api/schedules': 403,
