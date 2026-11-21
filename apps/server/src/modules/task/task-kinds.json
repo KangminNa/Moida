@@ -7,7 +7,12 @@
     "delegable": true,
     "recorded": false
   },
-  "browse": { "skill": "cairn-browse", "scopes": ["browse"], "delegable": true },
+  "browse": {
+    "skill": "cairn-browse",
+    "scopes": ["browse"],
+    "delegable": true,
+    "plugin": { "name": "browser-tabs", "tool": "browser_job" }
+  },
   "code": { "skill": "cairn-code", "scopes": ["code"], "delegable": true, "sandboxed": true },
   "make": { "skill": "cairn-make", "scopes": ["make"], "delegable": true, "sandboxed": true },
   "ai_test": { "agentless": true },

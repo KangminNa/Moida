@@ -23,7 +23,10 @@ import type {
 } from '../../../server/src/modules/task/approval/approval.view';
 import type { ChatDetailView, ChatListView } from '../../../server/src/modules/task/chat/chat.view';
 import type { ChatTrashView } from '../../../server/src/modules/task/chat/chat-trash.view';
-import type { ExternalToolListView } from '../../../server/src/modules/task/external-tool/external-tool.view';
+import type {
+  ExternalToolListView,
+  OAuthStartView,
+} from '../../../server/src/modules/task/external-tool/external-tool.view';
 import type { GoalListView, GoalView } from '../../../server/src/modules/task/goal/goal.view';
 import type {
   GoalRunDetailView,
@@ -94,6 +97,8 @@ export type AgentLead = ReturnType<AgentLeadView['toJSON']>;
 /** 외부 도구 (2차 7단계). 토큰은 실리지 않는다 (hasSecret만) */
 export type ExternalToolList = ReturnType<ExternalToolListView['toJSON']>;
 export type ExternalTool = ExternalToolList['tools'][number];
+/** OAuth 커넥터의 로그인 시작 (C1): 같은 탭으로 열 로그인 서버의 주소 */
+export type ExternalToolOAuthStart = ReturnType<OAuthStartView['toJSON']>;
 export type AgentTeamList = ReturnType<AgentTeamListView['toJSON']>;
 export type AgentTeam = AgentTeamList['teams'][number];
 export type AgentTeamSaved = ReturnType<AgentTeamSavedView['toJSON']>;

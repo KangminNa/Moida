@@ -356,6 +356,8 @@ export class ChatDetailView {
         agent: r.agent,
         taskId: r.task_id,
         createdAt: r.created_at.toISOString(),
+        /** 판단의 모양 (L1, kind decision만): { chosen, alternatives, why, weight, step }. 없으면 null */
+        decision: r.data,
       })),
       /** 이 대화에 회차를 쌓는 자동화 (O-3): 매일 시각(atTime "HH:MM") · 요일(월 1 ~ 일 7) 또는 N시간 · N분마다 */
       automations: this.automations.map((a) => ({

@@ -4,11 +4,12 @@ import { ModelTier } from '../agent/model-tier.policy';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import type { DelegatedView } from './job.view';
+import { SubtaskOrder } from './subtask-order.input';
 import { AskHelpInput, WaitSubtasksInput } from './subtask-wait.input';
 import { SubtaskWait } from './subtask-wait.policy';
 import type { HelpAskedView } from './subtask-wait.view';
 import { Task } from './task';
-import { DelegateTaskInput, SubtaskOrder } from './task.input';
+import { DelegateTaskInput } from './task.input';
 import { TaskService } from './task.service';
 import { SetPlanInput } from './task-plan.input';
 import { TaskPlan } from './task-plan.policy';
@@ -62,6 +63,11 @@ export class DelegateTaskTool extends BaseTool {
               items: { type: 'string', maxLength: 2000 },
             },
             deliver: { type: 'string', maxLength: SubtaskOrder.DELIVER_MAX },
+            after: {
+              type: 'array',
+              maxItems: SubtaskOrder.AFTER_MAX,
+              items: { type: 'string', maxLength: 200 },
+            },
             app_id: { type: 'string', format: 'uuid' },
             model: { type: 'string', enum: [...ModelTier.CHOICES] },
           },

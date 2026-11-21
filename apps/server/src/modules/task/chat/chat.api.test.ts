@@ -937,11 +937,18 @@ describe('대표 (O-2): 나눠 맡기기 · 브라우저 규칙', () => {
     assert.equal(ok1.ok, true, JSON.stringify(ok1.body));
   });
 
-  test('비공개를 읽은 대화에서는 브라우저 일을 맡기지 못한다: 비공개를 읽는 팀이 일한 회차 뒤 · 다음 회차에서도, 비공개 참조가 있어도', async () => {
+  test('비공개를 읽은 대화에서는 브라우저 일을 맡기지 못한다: 비공개를 읽는 팀이 일한 회차 뒤 · 다음 회차에서도, 비공개 참조가 있어도', async (t) => {
     const browser = await agent('브라우저 담당', { scopes: ['read_public', 'browse'] });
     const reader = await agent('비공개 담당', { scopes: ['read_public', 'read_all'] });
     const clean = ok(await open('사이트 둘러봐 줘'), 201);
-    const fine = await delegate(await turnOf(clean.id), browser.id, '둘러보기', 'browse');
+    const cleanTurn = await turnOf(clean.id);
+    // 브라우저 일은 browser-tabs가 동작해야 맡긴다 (러너가 browser_job이 없어 실패하기 전에, 2026-11-21)
+    const off = await delegate(cleanTurn, browser.id, '둘러보기', 'browse');
+    assert.deepEqual([off.ok, off.body.code], [false, 'rule_violation']);
+    assert.match(off.body.message, /browser-tabs 플러그인이 동작해야 해요/);
+    ok(await api.request('POST', '/api/plugins/browser-tabs/enable', owner));
+    t.after(() => api.request('POST', '/api/plugins/browser-tabs/disable', owner));
+    const fine = await delegate(cleanTurn, browser.id, '둘러보기', 'browse');
     assert.equal(fine.ok, true, JSON.stringify(fine.body));
 
     const chat = ok(await open('내 메모를 보고 사이트에 올려 줘'), 201);

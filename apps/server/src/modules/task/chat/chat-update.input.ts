@@ -1,5 +1,6 @@
 import { BaseRequest, RuleViolation } from '../../platform';
 import { ChatUpdates } from './chat-update.policy';
+import { DecisionNote, type DecisionNoteRow } from './decision-note.policy';
 import { TurnBrief, type TurnBriefRow } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
@@ -44,20 +45,41 @@ export class AgentUpdatesInput extends BaseRequest {
   }
 }
 
-/** MCP post_update { kind, text } (작업 토큰) */
+/** MCP post_update { kind, text, decision? } (작업 토큰). decision은 판단의 모양 (L1, kind decision에만, DecisionNote) */
 export class PostUpdateInput extends BaseRequest {
   private constructor(
     readonly kind: string,
     readonly text: string,
+    readonly decision: DecisionNoteRow | null,
   ) {
     super();
   }
 
   static from(raw: unknown): PostUpdateInput {
-    return BaseRequest.read(
-      raw,
-      (f) => new PostUpdateInput(f.text('kind', 40), f.text('text', ChatUpdates.TEXT_MAX)),
-    );
+    const given = (raw as { decision?: unknown } | null)?.decision;
+    return BaseRequest.read(raw, (f) => {
+      const D = DecisionNote;
+      const d = given === undefined || given === null ? null : f.nested('decision');
+      const decision =
+        d === null
+          ? null
+          : {
+              chosen: d.text('chosen', D.CHOSEN_MAX).trim(),
+              alternatives: (
+                d.optionalTextList('alternatives', D.ALTERNATIVES_MAX, D.ALTERNATIVE_MAX) ?? []
+              )
+                .map((a) => a.trim())
+                .filter(Boolean),
+              why: d.optionalText('why', D.WHY_MAX)?.trim() ?? '',
+              weight: d.optionalText('weight', 10) ?? 'medium',
+              step: d.optionalText('step', D.STEP_MAX)?.trim() || null,
+            };
+      return new PostUpdateInput(
+        f.text('kind', 40),
+        f.text('text', ChatUpdates.TEXT_MAX),
+        decision,
+      );
+    });
   }
 }
 

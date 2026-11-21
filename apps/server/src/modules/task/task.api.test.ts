@@ -427,6 +427,27 @@ describe('가짜 러너', () => {
     assert.equal((detail.events as Json[]).at(-1)?.body, '돌려줌: 모델 한도');
   });
 
+  test('같은 일을 5번 돌려받으면 실패로 끝낸다 (러너가 다시 떠 같은 일을 또 빌려 가는 되풀이를 끊는다)', async () => {
+    const task = await newTask(await newAgent());
+    for (let i = 1; i < 5; i++) {
+      await take();
+      const again = await tool(runner, 'release_job', {
+        task_id: task.id,
+        reason: 'CLI를 띄우지 못함',
+      });
+      assert.equal(again.body.status, 'queued', `${i}번째`);
+    }
+    await take();
+    const last = await tool(runner, 'release_job', {
+      task_id: task.id,
+      reason: 'CLI를 띄우지 못함',
+    });
+    assert.equal(last.body.status, 'failed');
+    const detail = await getTask(task.id);
+    assert.equal(detail.status, 'failed');
+    assert.match(String((detail.result as Json).error), /5번 돌려받아 멈췄어요: CLI를 띄우지 못함/);
+  });
+
   test('러너가 끝내면 done, 이유가 있으면 failed', async () => {
     const done = await newTask(await newAgent());
     await take();

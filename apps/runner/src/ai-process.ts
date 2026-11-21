@@ -35,12 +35,13 @@ export class AiProcess {
     /** 코드 러너 칸이면 AI를 돌릴 사용자 (agent). 아니면 러너와 같은 사용자 */
     user: AgentUser | null = null,
   ) {
-    const child = spawn(bin, args, {
-      cwd,
+    // agent로 띄울 때는 /에서 사용자를 바꾼 뒤 agent가 cwd로 옮긴다 (AgentUser.launch: 러너는 agent의 폴더에 들어가지 못한다)
+    const run = user ? user.launch(bin, args, cwd) : { bin, args: [...args], options: { cwd } };
+    const child = spawn(run.bin, run.args, {
+      ...run.options,
       env,
       detached: true,
       stdio: ['pipe', 'pipe', 'pipe'],
-      ...user?.spawnOptions(),
     });
     this.pid = child.pid;
     child.stdin.on('error', () => {});

@@ -7,6 +7,7 @@ import { clock, DELIVER_LABELS, NEWS_KINDS, OUTPUT_KINDS, tokens } from '../../_
 import { MarkdownText } from '../../_task/MarkdownText';
 import { OutputOpen } from '../../_task/parts';
 import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
+import { ChatDecisions, type Decision, decisionOf } from './ChatDecisions';
 import { RefChips } from './ChatRefs';
 
 /** 일하는 중인 회차의 상태 */
@@ -46,6 +47,8 @@ export function ChatTurns({
   deliver,
   busy,
   onCancel,
+  changing,
+  onChangeDecision,
 }: {
   turns: readonly ChatTurn[];
   /** 회차마다 쓴 토큰 (O-1). 없는 회차는 아직 실행 기록이 없다 */
@@ -63,6 +66,9 @@ export function ChatTurns({
   /** 지금 취소하는 회차의 작업 id */
   busy: string | null;
   onCancel: (taskId: string, version: number) => void;
+  /** 판단 바꾸기를 보내는 중 (L1) */
+  changing: boolean;
+  onChangeDecision: (news: ChatNews, decision: Decision, change: string) => void;
 }) {
   const before = news.filter((n) => isBefore(n, turns));
   return (
@@ -122,9 +128,14 @@ export function ChatTurns({
                 받을 것 · {DELIVER_LABELS[want] ?? want}
               </p>
             )}
+            {/* 팀의 판단 (L1): 모양이 있는 판단은 접지 않고 보이고 바꿀 수 있다 */}
+            <ChatDecisions items={within} busy={changing} onChange={onChangeDecision} />
             <Process
               turn={t}
-              items={within.filter((n) => PROCESS.includes(n.kind))}
+              items={within.filter(
+                (n) =>
+                  PROCESS.includes(n.kind) && !(n.kind === 'decision' && decisionOf(n.decision)),
+              )}
               usage={usage.find((u) => u.turn === t.turn) ?? null}
             />
             <div className="bubble theirs" aria-live={t.finishedAt ? undefined : 'polite'}>

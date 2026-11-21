@@ -10,10 +10,11 @@ import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { scheduleLabel, tokens } from '../../_task/labels';
 import { CHAT_DETAIL_TOPICS, useLead } from '../../_task/live';
-import type { Chat, ChatDetail, OutputSaved } from '../../_task/types';
+import type { Chat, ChatDetail, ChatNews, OutputSaved } from '../../_task/types';
 import { STORE_HREF } from '../menu';
 import { ChatBriefForm } from './ChatBriefForm';
 import { ChatCardForm } from './ChatCardForm';
+import { changeMessage, type Decision } from './ChatDecisions';
 import { ChatForm, type ChatMessageBody } from './ChatForm';
 import type { RefChoice } from './ChatRefs';
 import { ChatRuntimeForm } from './ChatRuntimeForm';
@@ -48,6 +49,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const tuning = useAction();
   const uploading = useAction();
   const hurrying = useAction();
+  const waking = useAction();
   const lead = useLead();
   /** 응답을 못 받아 다시 보내도 메시지가 한 번만 가게 (보낸 뒤에만 바꾼다) */
   const requestId = useRef('');
@@ -78,7 +80,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
   const hint =
     d.state === 'working' ? '일하는 중. 보내면 덧붙인 말이 되고 짧게 답해요 (회차마다 5개)' : null;
 
-  async function send(body: ChatMessageBody) {
+  async function send(body: ChatMessageBody): Promise<boolean> {
     const reply = await sending.run(
       'send',
       () =>
@@ -89,9 +91,20 @@ export function ChatThreadPanel({ id }: { id: string }) {
         }),
       { reload: detail.reload, conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요' },
     );
-    if (!reply?.ok) return;
+    if (!reply?.ok) return false;
     requestId.current = crypto.randomUUID();
     setSent((n) => n + 1);
+    return true;
+  }
+  /** 판단 바꾸기 (L1): 덧붙인 말로 보내고, 회차가 팀원을 기다리는 중이면 먼저 깨워 대표가 그 단계부터 다시 맡기게 한다 */
+  async function changeDecision(news: ChatNews, decision: Decision, change: string) {
+    const turn = d?.turns.at(-1);
+    if (!(await send({ message: changeMessage(news, decision, change) }))) return;
+    if (turn?.status !== 'waiting' || turn.waitReason !== 'subtasks') return;
+    await waking.run('wake', () => api('POST', `/api/tasks/${turn.taskId}/wake`), {
+      done: '대표가 바뀐 판단으로 다시 맡겨요',
+      reload: detail.reload,
+    });
   }
 
   const decide = (body: { decision: string; note?: string; picked?: string[] }) =>
@@ -252,7 +265,10 @@ export function ChatThreadPanel({ id }: { id: string }) {
           deliver={d.chat.deliver}
           busy={cancelling.busy}
           onCancel={cancel}
+          changing={sending.busy !== null || waking.busy !== null}
+          onChangeDecision={changeDecision}
         />
+        {waking.problem && <p className="error">{waking.problem}</p>}
         {cancelling.problem && <p className="error">{cancelling.problem}</p>}
         {/* 목표 확인 질문: 마지막 회차가 묻고 끝났으면 (답하면 다음 회차가 생겨 사라진다) */}
         {asked && (

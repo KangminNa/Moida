@@ -4114,3 +4114,36 @@ ul.picked > .chip {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* 팀의 판단 (L1 중간 판단 알림): 회차 아래 접지 않는 작은 카드, 무게 high는 왼쪽 진한 줄 */
+.decisions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--subtle);
+}
+
+.decision[data-weight="high"] {
+  box-shadow: inset 3px 0 0 var(--fg);
+}
+
+.decision small {
+  color: var(--muted);
+}
+
+.decision-change {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

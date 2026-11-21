@@ -16,6 +16,7 @@ import {
   type DeliverSetView,
   PostedUpdateView,
 } from './chat-update.view';
+import { DecisionNote } from './decision-note.policy';
 import { TurnBrief } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
@@ -56,6 +57,21 @@ export class PostUpdateTool extends BaseTool {
     properties: {
       kind: { type: 'string', enum: [...ChatUpdates.POSTED] },
       text: { type: 'string', maxLength: ChatUpdates.TEXT_MAX },
+      decision: {
+        type: 'object',
+        properties: {
+          chosen: { type: 'string', maxLength: DecisionNote.CHOSEN_MAX },
+          alternatives: {
+            type: 'array',
+            maxItems: DecisionNote.ALTERNATIVES_MAX,
+            items: { type: 'string', maxLength: DecisionNote.ALTERNATIVE_MAX },
+          },
+          why: { type: 'string', maxLength: DecisionNote.WHY_MAX },
+          weight: { type: 'string', enum: [...DecisionNote.WEIGHTS] },
+          step: { type: 'string', maxLength: DecisionNote.STEP_MAX },
+        },
+        required: ['chosen'],
+      },
     },
     required: ['kind', 'text'],
   };

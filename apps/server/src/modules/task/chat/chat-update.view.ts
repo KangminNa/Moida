@@ -21,6 +21,8 @@ export class ChatUpdateView {
       agent: r.agent,
       task_id: r.task_id,
       created_at: r.created_at.toISOString(),
+      /** 판단의 모양 (L1, kind decision만, post_update의 decision 그대로). 없으면 null */
+      decision: r.data,
     };
   }
 }

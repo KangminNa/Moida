@@ -38,7 +38,7 @@ export class ExternalToolQuery extends BaseQuery {
   /**
    * 일을 빌려 줄 때 그 에이전트에게 붙일 도구 (next_jobs의 tools). 러너만 부른다.
    * 객체설계 4장의 예외: 토큰을 푸는 읽기라 엔티티(`ExternalTool.jobView`)를 거친다 (`AiLoginQuery.token`과 같다)
-   * 허락한 이름 중 켜져 있고 토큰이 갖춰진 것만. 비공개를 읽거나 셸이 있는 에이전트에게는 늘 없음 (저장된 값이 어긋나도 여기서 한 번 더)
+   * 허락한 이름 중 켜져 있고 토큰이 갖춰진 것만 (OAuth면 로그인했고 접근 토큰이 끝나지 않은 것, C1). 비공개를 읽거나 셸이 있는 에이전트에게는 늘 없음 (저장된 값이 어긋나도 여기서 한 번 더)
    */
   async forJob(
     actor: Actor,
@@ -55,9 +55,10 @@ export class ExternalToolQuery extends BaseQuery {
       name: [...agent.externalTools],
       status: ExternalTool.ACTIVE,
     });
+    const now = new Date();
     return rows
       .map((r) => ExternalTool.restore(r))
-      .filter((t) => t.ready)
+      .filter((t) => t.ready(now))
       .map((t) => t.jobView(this.box));
   }
 
@@ -77,9 +78,10 @@ export class ExternalToolQuery extends BaseQuery {
 
   private async checked(spaceId: string, toolId: string): Promise<readonly JobToolView[]> {
     const rows = await this.rows(externalTools, { space_id: spaceId, id: toolId });
+    const now = new Date();
     return rows
       .map((r) => ExternalTool.restore(r))
-      .filter((t) => t.ready)
+      .filter((t) => t.ready(now))
       .map((t) => t.jobView(this.box));
   }
 }

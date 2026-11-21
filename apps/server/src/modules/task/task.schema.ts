@@ -2,7 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { bigint, boolean, customType, integer, jsonb, pgSchema, real, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
+import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolAuth, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const xid8Column = customType<{ data: string }>({ dataType: () => 'xid8' });
@@ -95,6 +95,7 @@ export const chatUpdates = taskSchema.table('chat_updates', {
   text: text('text').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   choices: uuid('choices').array(),
+  data: jsonb('data'),
 });
 
 /** task.chats */
@@ -142,6 +143,14 @@ export const externalTools = taskSchema.table('external_tools', {
   last_used_at: timestamp('last_used_at', { withTimezone: true }),
   last_failed_at: timestamp('last_failed_at', { withTimezone: true }),
   last_error: text('last_error'),
+  auth: text('auth').$type<ExternalToolAuth>().notNull(),
+  oauth: jsonb('oauth').notNull(),
+  oauth_pending: text('oauth_pending'),
+  token: byteaColumn('token'),
+  token_nonce: byteaColumn('token_nonce'),
+  token_expires_at: timestamp('token_expires_at', { withTimezone: true }),
+  token_refresh_at: timestamp('token_refresh_at', { withTimezone: true }),
+  oauth_error: text('oauth_error'),
 });
 
 /** task.goal_rounds */

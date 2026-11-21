@@ -2,6 +2,7 @@ import type { ExternalToolRow } from '../task.tables';
 
 // 외부 도구의 읽기 모양 (2차 7단계). 웹이 `import type`으로 가져온다 (객체설계 6장).
 // 토큰은 어느 View에도 싣지 않는다: 화면은 있는지(hasSecret)만, 러너는 일을 빌릴 때 JobToolView의 머리글로만 받는다.
+// OAuth 로그인(C1)도 상태만 싣는다 (연결됨 · 끝나는 때 · 로그인 필요 · 실패 까닭 · 로그인 서버). 토큰 · 검증값 · client_id는 싣지 않는다.
 
 /** 관리 화면의 외부 도구 하나. agents는 이 도구를 허락한 에이전트 */
 export class ExternalToolView {
@@ -17,7 +18,9 @@ export class ExternalToolView {
       name: r.name,
       title: r.title,
       url: r.url,
-      /** 토큰을 실을 머리글. null이면 토큰 없는 도구 */
+      /** 로그인 방식 (C1): header(고정 토큰을 머리글에) · oauth(서버가 연 OAuth 로그인) */
+      auth: r.auth,
+      /** 토큰을 실을 머리글. null이면 토큰 없는 도구 (OAuth면 늘 null) */
       headerName: r.header_name,
       /** 토큰을 넣었는가 (값은 내보내지 않는다) */
       hasSecret: r.secret !== null,
@@ -40,6 +43,24 @@ export class ExternalToolView {
       lastUsedAt: r.last_used_at?.toISOString() ?? null,
       lastFailedAt: r.last_failed_at?.toISOString() ?? null,
       lastError: r.last_error,
+      /** OAuth 로그인의 상태 (C1). header 방식이면 null */
+      oauth: r.auth === 'oauth' ? ExternalToolView.oauth(r) : null,
+    };
+  }
+
+  private static oauth(r: Readonly<ExternalToolRow>) {
+    const issuer = (r.oauth as { issuer?: unknown } | null)?.issuer;
+    return {
+      /** 로그인해서 토큰을 쥐고 있음 */
+      connected: r.token !== null,
+      /** 토큰이 없어 관리자가 로그인해야 함 (처음 · 갱신이 거절됨 · 갱신 토큰 없이 끝남) */
+      needsLogin: r.token === null,
+      /** 접근 토큰이 끝나는 때 (서버가 그 전에 갱신한다). 모르면 null */
+      expiresAt: r.token_expires_at?.toISOString() ?? null,
+      /** 마지막 로그인 · 갱신 실패 까닭 */
+      error: r.oauth_error,
+      /** 찾은 로그인 서버 (issuer). 아직 로그인을 시작하지 않았으면 null */
+      issuer: typeof issuer === 'string' ? issuer : null,
     };
   }
 }
@@ -64,5 +85,14 @@ export class ProposedToolView {
       version: this.row.version,
       status: this.row.status,
     };
+  }
+}
+
+/** OAuth 로그인 시작 (C1): 브라우저가 같은 탭으로 열 로그인 서버의 주소 */
+export class OAuthStartView {
+  constructor(private readonly url: string) {}
+
+  toJSON() {
+    return { url: this.url };
   }
 }

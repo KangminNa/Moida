@@ -76,8 +76,11 @@ export class BrowseStage implements SandboxStage {
       this.plan = await this.server.browserJob(this.job.taskId, signal);
     } catch (error) {
       if (signal.aborted) return RunEnding.release(BrowseStage.STOPPING);
+      // 도구가 없으면 browser-tabs 플러그인이 동작하지 않는 것이다 (서버가 맡기기 전에 막지만, 그 전에 쌓인 일은 여기로 온다)
       if (error instanceof ToolRefused)
-        return failed(`어디서 일할지 받지 못했어요: ${error.message}`);
+        return failed(
+          `어디서 일할지 받지 못했어요: ${error.message}${error.message.includes('도구가 없어요') ? '. 설정 › 플러그인에서 browser-tabs를 켜 주세요' : ''}`,
+        );
       if (!(error instanceof ServerUnreachable)) throw error;
       this.unreachable = true;
       return RunEnding.release(`서버에 닿지 못해 돌려줘요: ${error.message}`);

@@ -52,7 +52,7 @@ describe('외부 도구의 주소 (ExternalToolUrl)', () => {
 describe('ExternalTool', () => {
   test('관리자가 더하면 바로 켜지고, 이름은 러너의 MCP 서버 이름 규칙을 따른다', () => {
     const tool = ExternalTool.open('space', 'notion', fields, NOW);
-    assert.equal(tool.ready, true);
+    assert.equal(tool.ready(NOW), true);
     for (const name of ['N', 'notion_x', '1notion', 'a', 'x'.repeat(31)])
       assert.throws(() => ExternalTool.open('space', name, fields, NOW), RuleViolation, name);
   });
@@ -64,9 +64,9 @@ describe('ExternalTool', () => {
       { ...fields, header_name: 'Authorization' },
       NOW,
     );
-    assert.equal(tool.ready, false, '토큰 필요');
+    assert.equal(tool.ready(NOW), false, '토큰 필요');
     tool.setSecret(box.seal('Bearer abc'), NOW);
-    assert.equal(tool.ready, true);
+    assert.equal(tool.ready(NOW), true);
     assert.deepEqual(tool.jobView(box).toJSON().headers, { Authorization: 'Bearer abc' });
     tool.edit({ header_name: null }, NOW);
     assert.deepEqual(tool.jobView(box).toJSON().headers, {});
@@ -94,12 +94,12 @@ describe('ExternalTool', () => {
 
   test('제안은 결재로만 켠다: 끄기 · 켜기는 막고, 승인하면 켜고 제안한 에이전트에 붙인다', () => {
     const tool = ExternalTool.propose('space', 'agent-1', 'linear', fields, NOW);
-    assert.equal(tool.ready, false);
+    assert.equal(tool.ready(NOW), false);
     assert.throws(() => tool.switchTo(true, NOW), RuleViolation);
     const agent = agentWith(['read_public']);
     const done = tool.plugApproved('approval-1', null, agent, NOW);
     assert.deepEqual([done.data.outcome, done.data.approvalId], ['done', 'approval-1']);
-    assert.equal(tool.ready, true);
+    assert.equal(tool.ready(NOW), true);
     assert.deepEqual(agent.externalTools, ['linear']);
     const again = tool.plugApproved('approval-2', null, agent, NOW);
     assert.equal(again.data.outcome, 'failed', '이미 정한 제안');

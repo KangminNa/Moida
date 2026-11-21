@@ -63,7 +63,7 @@ export class SubtaskResult {
   }
 
   /**
-   * 지시문의 "맡긴 하위 작업의 결과" 단락 (틀 subtasks). wake: 깬 까닭 (next_jobs의 wake: all · failed · deadline · owner · help).
+   * 지시문의 "맡긴 하위 작업의 결과" 단락 (틀 subtasks). wake: 깬 까닭 (next_jobs의 wake: all · failed · deadline · owner · help · change).
    * 끝나지 않은 일이 있으면 고르는 법(마무리 · 더 기다리기 · 다시 맡기기)을, 관리자가 재촉했으면 마무리만 싣는다
    */
   static part(
@@ -78,6 +78,7 @@ export class SubtaskResult {
       failedWake: wake === 'failed',
       deadline: wake === 'deadline',
       helpWake: wake === 'help',
+      changeWake: wake === 'change',
       owner,
       open: !owner && results.some((r) => r.open !== null),
       rounds: String(rounds),

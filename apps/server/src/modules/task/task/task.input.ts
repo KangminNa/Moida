@@ -2,6 +2,7 @@ import { BaseRequest, type RequestFields, type Unchecked } from '../../platform'
 import type { PlanUsageRow, TaskNew } from '../task.tables';
 import { PlanUsage } from '../usage/plan-usage';
 import { MakeMaterials } from './make-materials';
+import { SubtaskOrder } from './subtask-order.input';
 import { SubtaskWait } from './subtask-wait.policy';
 
 // 작업 입력의 모양. REST(콘솔)는 camelCase, MCP(러너)는 다른 도구처럼 snake_case로 받는다.
@@ -305,57 +306,6 @@ export class ReleaseJobInput extends BaseRequest {
   }
 }
 
-/** delegate_task의 하위 작업 하나. 받는 에이전트와 일의 뜻(종류, 권한)은 Task.subtask가 검사한다 */
-export class SubtaskOrder extends BaseRequest {
-  /** 모양만 넉넉히 막는다. 개수 · 길이 · 위 작업 안인지는 도메인(CodeScope)이 본다 */
-  private static readonly PATHS_SHAPE = 40;
-  private static readonly PATH_SHAPE = 1_000;
-  private static readonly REFS_SHAPE = 10;
-  private static readonly REF_SHAPE = 2_000;
-  static readonly DELIVER_MAX = 300;
-
-  private constructor(
-    readonly requestId: string,
-    readonly toAgentId: string,
-    /** MCP 입력은 칸 이름 그대로다. 대상의 판(base_version)만 target_version으로 받는다 */
-    readonly fields: Omit<TaskNew, 'id' | 'space_id'>,
-    /** code 일의 고칠 수 있는 곳 (위 code 작업의 경로 안). 다른 일에는 없다 */
-    readonly paths: readonly string[] | null,
-    /** 넘길 참조: 위 작업의 참조 가운데 id나 주소 (TaskRefs.handOn이 고른다) */
-    readonly refs: readonly string[] | null,
-    /** 받을 것: 하위 작업이 돌려줄 결과의 형식 (D1, 2026-11-17). 하위 작업의 deliver, 위 작업의 subtask_results[].deliver */
-    readonly deliver: string | null,
-    /** make 일의 결과를 이 앱 코드의 새 버전으로 (payload.appCode, 스토어 1-6b). 다른 일에는 없다 */
-    readonly appId: string | null,
-    /** 이 일의 모델 (haiku · sonnet · opus, 맡기는 일의 모델 이하, ModelTier). 없으면 팀원의 설정 */
-    readonly model: string | null,
-  ) {
-    super();
-  }
-
-  static from(f: RequestFields): SubtaskOrder {
-    const targetKind = f.optionalText('target_kind', 40);
-    return new SubtaskOrder(
-      f.text('request_id', 200),
-      f.uuid('to_agent_id'),
-      {
-        kind: f.optionalText('kind', 100) ?? 'general',
-        title: f.text('title', 200),
-        instruction: f.text('instruction', 20_000),
-        target_kind: targetKind,
-        target_id: targetKind === null ? null : f.uuid('target_id'),
-        base_version:
-          targetKind === null ? null : f.optionalInteger('target_version', 0, VERSION_MAX),
-      },
-      f.optionalTextList('paths', SubtaskOrder.PATHS_SHAPE, SubtaskOrder.PATH_SHAPE),
-      f.optionalTextList('refs', SubtaskOrder.REFS_SHAPE, SubtaskOrder.REF_SHAPE),
-      f.optionalText('deliver', SubtaskOrder.DELIVER_MAX),
-      f.optionalText('app_id', 36) === null ? null : f.uuid('app_id'),
-      f.optionalText('model', 20),
-    );
-  }
-}
-
 /**
  * delegate_task. 어느 작업 · 어느 에이전트인지는 작업 토큰에서 나온다.
  * 몇 개까지 맡길 수 있는지는 한도라 도메인(Task.assertCanDelegate)이 정하고, 여기서는 모양만 넉넉히 막는다.
@@ -371,12 +321,20 @@ export class DelegateTaskInput extends BaseRequest {
     super();
   }
 
+  /** 받은 하위 작업 하나의 모양 그대로 (SubtaskOrder.raw) */
+  private static itemOf(raw: unknown, i: number): unknown {
+    const list = (raw as { subtasks?: unknown } | null)?.subtasks;
+    return Array.isArray(list) ? list[i] : null;
+  }
+
   static from(raw: unknown): DelegateTaskInput {
     return BaseRequest.read(
       raw,
       (f) =>
         new DelegateTaskInput(
-          f.nestedList('subtasks', DelegateTaskInput.SHAPE_MAX).map((s) => SubtaskOrder.from(s)),
+          f
+            .nestedList('subtasks', DelegateTaskInput.SHAPE_MAX)
+            .map((s, i) => SubtaskOrder.from(s, DelegateTaskInput.itemOf(raw, i))),
           f.optionalInteger('wait_minutes', 1, SubtaskWait.MINUTES_MAX),
         ),
     );
