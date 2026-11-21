@@ -1,13 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  type Actor,
-  ApprovedActor,
-  BaseQuery,
-  NotFound,
-  Rule,
-  SettingKinds,
-  ValueList,
-} from '../../platform';
+import { type Actor, BaseQuery, NotFound, Rule, ValueList } from '../../platform';
 import { approvals } from '../task.schema';
 import { APPROVAL_STATUS } from '../task.tables';
 import type { ApprovalIdInput, ListApprovalsInput } from './approval.input';
@@ -47,22 +39,5 @@ export class ApprovalQuery extends BaseQuery {
     const row = await this.row(approvals, { space_id: actor.requireSpace(), id: req.id });
     if (!row) throw new NotFound('승인 요청을 찾을 수 없어요');
     return new ApprovalView(row);
-  }
-
-  /**
-   * 승인한 앱 만들기가 앱 운영 팀을 새로 만들자고 했는가 (스토어 2-6, blog 설정 app의 new_team). 그 결재의 요청자(ApprovedActor)만.
-   * payload의 칸을 보는 이 결재만의 조건이라 SQL로 읽는다
-   */
-  async asksAppTeam(actor: Actor): Promise<boolean> {
-    if (!(actor instanceof ApprovedActor) || actor.action !== SettingKinds.ACTION) return false;
-    const [row] = await this.sql<{ asked: boolean }[]>`
-      SELECT EXISTS (
-        SELECT 1 FROM task.approvals
-        WHERE space_id = ${actor.requireSpace()} AND id = ${actor.approvalId}
-          AND status = 'approved' AND action = ${SettingKinds.ACTION}
-          AND payload->>'setting' = 'app' AND payload->>'op' = 'create'
-          AND payload->'body'->'new_team' = 'true'::jsonb
-      ) AS asked`;
-    return row?.asked === true;
   }
 }

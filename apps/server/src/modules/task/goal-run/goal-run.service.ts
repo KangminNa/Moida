@@ -66,7 +66,7 @@ export class GoalRunService extends BaseService {
       const round = GoalRun.roundOf(task);
       if (runId === null)
         throw new RuleViolation(
-          '목표 실행의 회차 작업이 아니에요 (팀장에게 맡겨진 하위 작업이면 결과로 알려요)',
+          '목표 실행의 회차 작업이 아니에요 (맡겨진 하위 작업이면 결과로 알려요)',
         );
       const run = await new GoalRunRepository(tx).lock(spaceId, runId);
       run.assertReportable(round);

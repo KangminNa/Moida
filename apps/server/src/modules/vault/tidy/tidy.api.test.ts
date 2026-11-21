@@ -110,6 +110,15 @@ before(async () => {
       version: device?.version,
     }),
   );
+  // 대표는 첫 대화에서 생긴다 (같은 DB를 쓰는 앞 파일이 이미 만들었을 수 있다). 그 회차는 beforeEach가 취소한다
+  if (!ok(await api.get('/api/agents/lead', owner)).lead)
+    ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '대표를 만드는 첫 대화',
+      }),
+      201,
+    );
 });
 
 after(async () => {
@@ -346,13 +355,12 @@ describe('쌓인 세션 정리', () => {
 });
 
 describe('가짜 러너', () => {
-  const newAgent = async (scopes: string[]): Promise<Json> =>
+  const newAgent = async (): Promise<Json> =>
     ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
         name: '정리',
         tool: 'claude',
-        scopes,
       }),
       201,
     );
@@ -360,7 +368,7 @@ describe('가짜 러너', () => {
   const nextJobs = async (): Promise<Json[]> => (await tool(runner, 'next_jobs')).jobs as Json[];
 
   test('실패한 세션은 뒤를 막지 않고, 새 판이 오면 다시 요청한다', async () => {
-    await newAgent(['read_all', 'tidy']);
+    await newAgent();
     const sources = new Map<unknown, string>();
     for (let i = 0; i < 21; i++) {
       const source = `failing-${i}`;
@@ -392,8 +400,8 @@ describe('가짜 러너', () => {
     assert.equal((await tidyTasks(failing)).length, 1, '새 판이 다시 시도다');
   });
 
-  test('tidy가 없는 에이전트뿐이면 작업은 대기열에 남는다', async () => {
-    await newAgent(['read_all']);
+  test('일꾼이 없고 대표뿐이면 작업은 대기열에 남는다: 대표는 담당 없는 정리 일을 집어 가지 않는다', async () => {
+    assert.ok(ok(await api.get('/api/agents/lead', owner)).lead, '대표는 있다');
     await turn(true);
     const { session_id: id } = await save('waiting', '한 일');
     await drain();
@@ -404,7 +412,7 @@ describe('가짜 러너', () => {
   });
 
   test('세션 저장 → 작업 → 빌리기 → 변경 묶음 → 그래프', async () => {
-    const agent = await newAgent(['read_all', 'tidy']);
+    const agent = await newAgent();
     await turn(true);
     const { session_id: id } = await save('full-circle', '세션 저장을 고쳤다', '세션 저장');
     await drain();

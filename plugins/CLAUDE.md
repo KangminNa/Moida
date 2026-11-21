@@ -68,7 +68,7 @@ plugins/<이름>/
 ```
 
 - 표는 자기 스키마(`schema`)에만. 코어 표를 읽거나 쓰지 않고 외래키도 걸지 않는다 (`space_id`는 값으로). `Work`가 다른 스키마의 표를 막고, `pnpm check`가 `work.sql`의 스키마를 본다
-- 동작의 `allow`: `Operation.OWNER`(주인만), `Operation.ANYONE`(방문자도), 또는 `Actor.RUN` 같은 권한. 관리 일은 늘 `Operation.OWNER`. 입력이 바깥 사이트로 나가는 에이전트 도구는 `Actor.AGENT_OUT`(비공개를 읽거나 쓰지 않는 에이전트만, `browser-tabs`의 `site_run`)
+- 동작의 `allow`: `Operation.OWNER`(주인만), `Operation.ANYONE`(방문자도), 또는 `Actor.RUN` 같은 권한. 관리 일은 늘 `Operation.OWNER`. 입력이 바깥 사이트로 나가는 에이전트 도구는 `Actor.AGENT_OUT`(에이전트만, 기기는 안 된다. 2026-11-21부터 모든 에이전트가 비공개도 읽는 같은 일꾼이라 에이전트면 모두 통과한다, `browser-tabs`의 `site_run`)
 - 입력은 `this.fields(raw, (f) => …)`로 읽는다 (틀린 칸을 모아 400). 뜻의 검사는 `run`에서 `RuleViolation`
 - 목록 파일의 `api` · `tools`가 가리키지 않는 동작은 등록되지 않는다. 도구 입력 모양(`tools.<이름>.input`)을 바꾸면 쓰는 스킬 · 러너도 함께 고친다 (`browser-tabs`의 러너 쪽은 `apps/runner/src/tab-reader.ts` · `browse-stage.ts` · `browse-login.ts` · `click-runner.ts` · `login-runner.ts` · `login-calls.ts` · `cairn-server.ts` · 사이트 도구의 `site-tool-calls.ts` · `site-build.ts` · `integration-runner.ts`, 스킬 `cairn-browse`, 지시문 틀 `site-build`)
 - 러너가 부르는 도구를 그 러너가 쥔 일에 묶으려면 `work.leased(id)` (플러그인 API 0.3): 코어가 임대를 확인하고 일의 id · 종류 · 입력(`LeasedWork`)을 준다. 0.4부터 일의 대상(`targetKind` · `targetId` · `targetVersion`), 0.5부터 지시(`instruction`), 0.7부터 관리자가 쓴 지시(`ownerText`: 위임된 일이면 맨 위 일의 제목과 지시, `read_url`의 기준과 같은 글)도 준다. 쥐고 있지 않으면 거절한다 (`code-github`의 `code_credential` · `code_pull_opened`, `browser-tabs`의 `browser_job` · `browser_click_hold` …)

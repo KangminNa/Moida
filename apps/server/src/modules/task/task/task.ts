@@ -373,15 +373,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   }
 
   /** 하위 작업 하나를 만든다. 받는 쪽 · 종류 · 물려주는 것은 DelegationPolicy.subtask */
-  subtask(manager: Agent, worker: Agent | null, order: SubtaskOrder, now: Date, tainted = false) {
-    const fields = DelegationPolicy.subtask(
-      this.row,
-      this.codeScope,
-      manager,
-      worker,
-      order,
-      tainted,
-    );
+  subtask(manager: Agent, worker: Agent | null, order: SubtaskOrder, now: Date) {
+    const fields = DelegationPolicy.subtask(this.row, this.codeScope, manager, worker, order);
     const requestId = DelegationPolicy.requestIdOf(this.id, order.requestId);
     return Task.open(this.row.space_id, requestId, fields, now);
   }

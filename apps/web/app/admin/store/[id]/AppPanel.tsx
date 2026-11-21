@@ -16,14 +16,12 @@ import { AppMenus } from './AppMenus';
 import { AppOverview } from './AppOverview';
 import { AppPosts } from './AppPosts';
 import { AppSettings } from './AppSettings';
-import { AppTeamTab } from './AppTeamTab';
 
-export type AppTab = 'overview' | 'community' | 'team' | 'menus' | 'posts' | 'code' | 'settings';
+export type AppTab = 'overview' | 'community' | 'menus' | 'posts' | 'code' | 'settings';
 
 const TAB_NAMES: Record<AppTab, string> = {
   overview: '개요',
   community: '커뮤니티',
-  team: '운영 팀',
   menus: '메뉴',
   posts: '글',
   code: '코드',
@@ -31,19 +29,19 @@ const TAB_NAMES: Record<AppTab, string> = {
 };
 
 /** 앱 종류마다의 탭: 커뮤니티(스토어 3-2)는 블로그 글 · 메뉴 대신 커뮤니티 탭 */
-const BLOG_TABS: readonly AppTab[] = ['overview', 'team', 'menus', 'posts', 'code', 'settings'];
+const BLOG_TABS: readonly AppTab[] = ['overview', 'menus', 'posts', 'code', 'settings'];
 const TABS_OF: Record<AdminApp['kind'], readonly AppTab[]> = {
   blog: BLOG_TABS,
   magazine: BLOG_TABS,
   page: BLOG_TABS,
-  community: ['overview', 'community', 'team', 'code', 'settings'],
+  community: ['overview', 'community', 'code', 'settings'],
 };
 
 const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어요';
 
-// 앱 관리 (스토어 1-5): 머리(아이콘 · 이름 · 종류 · 주소 · 공개 전환)와 탭(개요 · 운영 팀 · 메뉴 · 글 · 코드 · 설정,
-// 코드는 스토어 1-6, 운영 팀은 2단계, 커뮤니티 앱은 메뉴 · 글 대신 커뮤니티 탭: 3-2). 공개는 관리자만 이 전환 하나로 한다
-// (AI · 대화는 공개를 제안하지 못한다).
+// 앱 관리 (스토어 1-5): 머리(아이콘 · 이름 · 종류 · 주소 · 공개 전환)와 탭(개요 · 메뉴 · 글 · 코드 · 설정,
+// 코드는 스토어 1-6, 커뮤니티 앱은 메뉴 · 글 대신 커뮤니티 탭: 3-2). 운영 팀 탭은 없다 (2026-11-21: 맡기기는 개요, 편집 방침은 설정).
+// 공개는 관리자만 이 전환 하나로 한다 (AI · 대화는 공개를 제안하지 못한다).
 export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
   const apps = useApps();
   const visibility = useAction();
@@ -138,7 +136,6 @@ export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
       </nav>
       {tab === 'overview' && <AppOverview app={app} />}
       {tab === 'community' && <AppCommunityTab app={app} />}
-      {tab === 'team' && <AppTeamTab app={app} onChanged={apps.reload} />}
       {tab === 'menus' &&
         (app.kind === 'page' ? (
           <p className="rows-empty">페이지 앱에는 메뉴가 없음 · 첫 화면은 앱의 페이지나 앱 코드</p>

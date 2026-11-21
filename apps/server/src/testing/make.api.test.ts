@@ -8,8 +8,9 @@ import { ServerRunnerPolicy } from '../modules/account';
 import { OutboxWorker } from '../modules/platform';
 import { ApiClient, type TestUser } from './api-client';
 
-// 만들기 작업 (결과물 2차): 주인이 고른 재료(결과물 · 위키)로 맡기고, 칸 러너가 재료 파일을 표로 받고,
-// 칸 안의 AI는 작업 토큰에 봉인한 허락으로 고른 위키만 읽는다. 보는 사람별: 방문자 · 칸이 아닌 러너 · 칸 러너 · 작업 토큰 · 주인.
+// 만들기 작업 (결과물 2차): 주인이 고른 재료(결과물 · 위키)로 맡기고, 칸 러너가 재료 파일을 표로 받는다.
+// 칸 안의 AI는 고른 위키를 재료로 읽고, 모든 에이전트가 비공개도 읽으므로(2026-11-21) 다른 위키도 읽고 찾는다.
+// 보는 사람별: 방문자 · 칸이 아닌 러너 · 칸 러너 · 작업 토큰 · 주인.
 
 type Json = Record<string, unknown>;
 type TestUserLike = { cookies: Record<string, string> };
@@ -155,19 +156,17 @@ before(async () => {
       token: `sk-ant-oat01-${randomUUID()}`,
     }),
   );
-  const agent = async (name: string, scopes: string[]) =>
+  const agent = async (name: string) =>
     ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
         name,
         tool: 'claude',
-        scopes,
       }),
       201,
     );
-  writer = await agent('재료 쓰기', ['read_public']);
-  // 읽기 권한 없이 make만: 재료 위키는 작업 토큰의 허락으로만 읽는다
-  maker = await agent('만들기', ['make']);
+  writer = await agent('재료 쓰기');
+  maker = await agent('만들기');
 });
 
 after(async () => {
@@ -176,19 +175,10 @@ after(async () => {
 });
 
 describe('만들기 작업을 맡긴다', () => {
-  test('make는 read_all · write와 함께 줄 수 없다 (422)', async () => {
-    for (const scopes of [
-      ['make', 'read_all'],
-      ['make', 'write'],
-    ]) {
-      const res = await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: `막힘 ${scopes.join('+')}`,
-        tool: 'claude',
-        scopes,
-      });
-      assert.equal(res.status, 422, res.text);
-    }
+  test('만들기 일은 어느 에이전트에게나 맡긴다: 모든 에이전트가 같은 권한이다 (2026-11-21)', async () => {
+    const res = await makeTask({ outputIds: [] }, 'make', writer.id);
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.json().kind, 'make');
   });
 
   test('재료는 payload.make가 되고 작업 상세에 보인다', async () => {
@@ -256,7 +246,7 @@ describe('주인이 파일을 올려 재료로 준다', () => {
   });
 });
 
-describe('칸 러너가 재료를 받고 AI가 고른 위키만 읽는다', () => {
+describe('칸 러너가 재료를 받고 AI가 위키를 읽는다', () => {
   test('칸만 빌린다: 칸이 아닌 러너에게는 가지 않는다', async () => {
     const task = ok(await makeTask({ outputIds: [] }), 201);
     assert.equal(await lease(runner, String(task.id)), null);
@@ -301,7 +291,7 @@ describe('칸 러너가 재료를 받고 AI가 고른 위키만 읽는다', () =
     assert.equal(gone.body.code, 'not_found');
   });
 
-  test('작업 토큰은 고른 위키만 읽는다: 고르지 않은 비공개 · 찾기는 안 된다', async () => {
+  test('작업 토큰은 고른 위키를 읽고, 비공개도 읽는 에이전트라 고르지 않은 위키 · 찾기도 열린다 (2026-11-21)', async () => {
     const chosen = await aWiki(`고른 위키 ${randomUUID()}`);
     const other = await aWiki(`고르지 않은 위키 ${randomUUID()}`);
     const task = ok(await makeTask({ wikiIds: [chosen.id] }), 201);
@@ -310,36 +300,46 @@ describe('칸 러너가 재료를 받고 AI가 고른 위키만 읽는다', () =
 
     const tools = (await api.mcp(token, 'tools/list', {})).json().result as { tools: Json[] };
     const names = tools.tools.map((t) => t.name);
-    assert.ok(names.includes('get_wiki'), '허락이 있으면 get_wiki가 열린다');
-    assert.ok(!names.includes('search_wikis'), '찾기는 열리지 않는다');
+    assert.ok(names.includes('get_wiki'));
+    assert.ok(names.includes('search_wikis'), '전체 읽기가 있어 찾기도 열린다');
 
     const read = await mcp(token, 'get_wiki', { wiki_id: chosen.id });
     assert.ok(read.ok, JSON.stringify(read.body));
     assert.match(String(read.body.body_md), /고른 위키/);
-    const denied = await mcp(token, 'get_wiki', { wiki_id: other.id });
-    assert.equal(denied.ok, false);
+    const notChosen = await mcp(token, 'get_wiki', { wiki_id: other.id });
+    assert.ok(notChosen.ok, JSON.stringify(notChosen.body));
+    assert.match(String(notChosen.body.body_md), /고르지 않은 위키/);
     const search = await mcp(token, 'search_wikis', { query: '위키' });
-    assert.equal(search.ok, false);
+    assert.ok(search.ok, JSON.stringify(search.body));
   });
 });
 
-describe('만들기 위임 (결과물 팀)', () => {
-  test('팀장이 바로 아래 make 팀원에게 만들기를 맡긴다: 재료 없이 지시만, 칸이 빌리고, 끝나면 결과물이 팀장에게 간다', async () => {
+describe('만들기 위임', () => {
+  /** 대표 (O-2). 없으면 첫 대화를 열어 만든다 */
+  async function leadOf(): Promise<Json> {
+    const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+    if (found) return found;
+    ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '대표를 만드는 첫 대화',
+      }),
+      201,
+    );
+    return ok(await api.get('/api/agents/lead', owner)).lead as Json;
+  }
+
+  test('대표가 일꾼에게 만들기를 맡긴다: 재료 없이 지시만, 칸이 빌리고, 끝나면 결과물이 대표에게 간다', async () => {
     const worker = api.service(OutboxWorker);
-    const member = async (name: string, scopes: string[], reportsTo: unknown = null) =>
-      ok(
-        await api.request('POST', '/api/agents', owner, {
-          requestId: randomUUID(),
-          name,
-          tool: 'claude',
-          scopes,
-          reportsTo,
-        }),
-        201,
-      );
-    const lead = await member('결과물 팀장', ['read_public']);
-    const slides = await member('슬라이드 제작자', ['make'], lead.id);
-    const reader = await member('자료 정리', ['read_public'], lead.id);
+    const lead = await leadOf();
+    const slides = ok(
+      await api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: `슬라이드 제작자 ${randomUUID().slice(0, 6)}`,
+        tool: 'claude',
+      }),
+      201,
+    );
     const parent = ok(
       await api.request('POST', '/api/tasks', owner, {
         requestId: randomUUID(),
@@ -353,7 +353,7 @@ describe('만들기 위임 (결과물 팀)', () => {
     const team = job.team as Json[];
     assert.ok(
       ((team.find((m) => m.agent_id === slides.id)?.kinds ?? []) as string[]).includes('make'),
-      'make 팀원에게 맡길 수 있는 일로 보인다',
+      '일꾼에게 맡길 수 있는 일로 보인다',
     );
     const order = (to: unknown, requestId: string) => ({
       subtasks: [
@@ -366,8 +366,8 @@ describe('만들기 위임 (결과물 팀)', () => {
         },
       ],
     });
-    const refused = await mcp(String(job.run_token), 'delegate_task', order(reader.id, 'r1'));
-    assert.equal(refused.ok, false, 'make 권한이 없는 팀원에게는 못 맡긴다');
+    const refused = await mcp(String(job.run_token), 'delegate_task', order(lead.id, 'r1'));
+    assert.equal(refused.ok, false, '대표 자신에게는 맡기지 못한다');
     const sent = await mcp(String(job.run_token), 'delegate_task', order(slides.id, 'r2'));
     assert.ok(sent.ok, JSON.stringify(sent.body));
     const subId = String(((sent.body.subtasks as Json[])[0] as Json).task_id);
@@ -404,7 +404,7 @@ describe('만들기 위임 (결과물 팀)', () => {
     for (let i = 0; i < 100 && (await worker.tick()) > 0; i++);
 
     const back = await lease(runner, String(parent.id));
-    assert.ok(back, '하위 작업이 끝나 팀장이 깨어난다');
+    assert.ok(back, '하위 작업이 끝나 대표가 깨어난다');
     const result = (back.subtask_results as Json[])[0] as Json;
     assert.equal(result.summary, '세 장 개요를 만들었어요');
     assert.deepEqual(result.outputs, [{ id: output.id, name: '발표 개요.md', kind: output.kind }]);

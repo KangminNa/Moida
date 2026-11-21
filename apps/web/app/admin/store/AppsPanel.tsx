@@ -6,7 +6,7 @@ import { appPath } from '../../_blog/format';
 import { APP_KIND_LABELS } from '../../_blog/labels';
 import { useApps } from '../../_blog/live';
 import type { AdminApp } from '../../_blog/types';
-import { useAgents, useChats } from '../../_task/live';
+import { useChats } from '../../_task/live';
 import { NewTabLink } from '../../_ui/NewTabLink';
 import { STORE_HREF } from '../menu';
 
@@ -21,17 +21,12 @@ function summary(app: AdminApp): string {
 }
 
 // 내 앱 (스토어 1-5, 시안 1번): 만든 앱 카드를 순서대로. 공개 앱은 "열기"(공개 주소), 모든 앱은 "관리".
-// 카드에 운영 팀장과 승인 대기 수 (스토어 2단계: 대화 목록의 앱 · 상태, 최근 대화 100개 안에서).
+// 카드에 승인 대기 수 (스토어 2단계: 대화 목록의 앱 · 상태, 최근 대화 100개 안에서).
 // 만들기는 스토어(앱 종류 고르기)에서, 대화에서도 제안 → 승인으로 만들 수 있다.
 export function AppsPanel() {
   const apps = useApps();
-  const agents = useAgents();
   const chats = useChats();
   const list = apps.data?.apps ?? null;
-  const leaderOf = (app: AdminApp) =>
-    app.agentId === null
-      ? '운영 팀 없음'
-      : `운영 팀장 ${agents.data?.agents.find((g) => g.id === app.agentId)?.name ?? '…'}`;
   const waiting = (app: AdminApp) =>
     (chats.data?.chats ?? []).filter((c) => c.appId === app.id && c.state === 'waiting_approval')
       .length;
@@ -68,7 +63,9 @@ export function AppsPanel() {
                   {waiting(a) > 0 && <span className="pill on">승인 대기 {waiting(a)}</span>}
                 </b>
                 <small>
-                  {a.domainCheckedAt ? a.domain : appPath(a.slug)} · {summary(a)} · {leaderOf(a)}
+                  {[a.domainCheckedAt ? a.domain : appPath(a.slug), summary(a)]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </small>
               </div>
               <div className="row">

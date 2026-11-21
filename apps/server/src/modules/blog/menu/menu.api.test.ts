@@ -126,44 +126,12 @@ describe('메뉴 (/api/menus)', () => {
     assert.equal((await create({ name: '종류 없음' })).status, 400);
   });
 
-  test('운영 팀은 이 공간의, 비공개를 읽지 않는 에이전트만 (422 · 404)', async () => {
-    const reader = ok(
-      await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: `다 읽는 ${mark}`,
-        tool: 'claude',
-        scopes: ['read_all', 'write'],
-      }),
+  test('운영 팀 칸은 없다 (2026-11-21): agentId를 보내도 메뉴에 담당이 생기지 않는다', async () => {
+    const made = ok(
+      await create({ kind: 'posts', name: `팀 ${mark}`, agentId: randomUUID() }),
       201,
     );
-    const writerAgent = ok(
-      await api.request('POST', '/api/agents', owner, {
-        requestId: randomUUID(),
-        name: `쓰는 ${mark}`,
-        tool: 'claude',
-        scopes: ['read_public', 'write'],
-      }),
-      201,
-    );
-    const refused = await create({ kind: 'posts', name: `팀 ${mark}`, agentId: reader.id });
-    assert.equal(refused.status, 422, refused.text);
-    assert.match(refused.text, /비공개를 읽는 에이전트/);
-    assert.equal(
-      (await create({ kind: 'posts', name: `팀 ${mark}`, agentId: randomUUID() })).status,
-      404,
-    );
-    const team = ok(
-      await create({ kind: 'posts', name: `팀 ${mark}`, agentId: writerAgent.id }),
-      201,
-    );
-    assert.equal(team.agentId, writerAgent.id);
-    const cleared = ok(
-      await api.request('PATCH', `/api/menus/${team.id}`, owner, {
-        version: team.version,
-        agentId: null,
-      }),
-    );
-    assert.equal(cleared.agentId, null);
+    assert.equal('agentId' in made, false);
   });
 
   test('빈 메뉴는 지우고, 낡은 version은 409', async () => {

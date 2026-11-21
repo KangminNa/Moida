@@ -1,6 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import {
-  AgentDirectory,
   BlobStore,
   CoreWorkers,
   EventCatalog,
@@ -11,7 +10,6 @@ import {
 import { AgentController } from './agent/agent.api';
 import { AgentQuery } from './agent/agent.query';
 import { AgentService } from './agent/agent.service';
-import { AgentTeamController } from './agent/agent-team.api';
 import { AiLoginController } from './ai/ai-login.api';
 import { AiLoginQuery } from './ai/ai-login.query';
 import { AiLoginService } from './ai/ai-login.service';
@@ -88,8 +86,6 @@ import { TaskController } from './task/task.api';
 import { TaskQuery } from './task/task.query';
 import { TaskService } from './task/task.service';
 import { TaskRequestedHandler } from './task/task-requested.handler';
-import { TeamReviewHandler } from './task/team-review.handler';
-import { TeamReviewQuery } from './task/team-review.query';
 import events from './task.events.json';
 import { TaskNotices } from './task-notices';
 import { TaskSettings } from './task-settings';
@@ -168,8 +164,6 @@ import { WebPageGateway } from './web/web-page.gateway';
     LessonQuery,
     LessonHandler,
     // 주간 팀 점검 (2026-11-20): 7일마다 대표에게 성적표로 팀을 점검하는 일
-    TeamReviewQuery,
-    TeamReviewHandler,
     // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
     AppCodeCardHandler,
     // 승인 뒤 이어서 (O-2): 대표가 continue로 올린 설정 바꾸기가 적용되어 끝난 회차 → 같은 대화의 다음 회차
@@ -200,7 +194,6 @@ import { WebPageGateway } from './web/web-page.gateway';
   ],
   controllers: [
     AgentController,
-    AgentTeamController,
     TaskController,
     ApprovalController,
     UsageController,
@@ -243,15 +236,11 @@ export class TaskModule implements OnModuleInit {
     private readonly verdicts: VerdictHandler,
     private readonly chatCards: ChatCardHandler,
     private readonly lessons: LessonHandler,
-    private readonly teamReviews: TeamReviewHandler,
     private readonly appCodeCards: AppCodeCardHandler,
     private readonly chatContinues: ChatContinueHandler,
     private readonly agentless: AgentlessRequestHandler,
     private readonly library: LibraryQuery,
     private readonly follows: ScheduleFollowHandler,
-    private readonly directory: AgentDirectory,
-    private readonly agentQuery: AgentQuery,
-    private readonly agentService: AgentService,
     private readonly toolPlugs: ExternalToolPlugHandler,
     private readonly externalTools: ExternalToolService,
     private readonly settingApply: SettingApplyHandler,
@@ -273,7 +262,6 @@ export class TaskModule implements OnModuleInit {
     this.workers.on(Task.CHANGED, this.verdicts);
     for (const topic of ChatCardHandler.TOPICS) this.workers.on(topic, this.chatCards);
     for (const topic of LessonHandler.TOPICS) this.workers.on(topic, this.lessons);
-    this.workers.on(Task.CHANGED, this.teamReviews);
     this.workers.on(AppCodeCardHandler.TOPIC, this.appCodeCards);
     this.workers.on(Task.CHANGED, this.chatContinues);
     this.workers.on(Task.CHANGED, this.follows);
@@ -301,12 +289,6 @@ export class TaskModule implements OnModuleInit {
     // 결과물이 가리키는 파일: 쓰는 동안 platform이 지우지 않게
     this.blobs.registerUse(['task.outputs.blob_hash'], (actor, hashes) =>
       this.outputs.usedBlobs(actor, hashes),
-    );
-    // 다른 모듈이 묻는 에이전트 (2차 6단계, blog 메뉴의 운영 팀)
-    this.directory.register((actor, id) => this.agentQuery.card(actor, id));
-    // 승인한 앱 만들기의 앱 운영 팀 (스토어 2-6, blog의 new_team)
-    this.directory.registerTeamMaker(
-      async (actor) => (await this.agentService.createAppTeam(actor)).id,
     );
     // 보관함의 결과물 (2차 5단계)
     this.library.register([OutputQuery.LIBRARY_KIND], (a, f) => this.outputs.library(a, f));

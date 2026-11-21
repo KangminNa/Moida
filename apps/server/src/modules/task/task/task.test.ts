@@ -8,6 +8,7 @@ import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import type { SubtaskOrder } from './subtask-order.input';
 import { Task } from './task';
+import { TaskKinds } from './task-kinds';
 import { TeamRoster } from './team-roster';
 
 /** 위임 입력 하나 (delegate_task의 subtasks 한 줄). 참조는 넘기지 않는다 */
@@ -255,18 +256,11 @@ describe('작업 토큰', () => {
 });
 
 describe('위임', () => {
-  /** 팀장과 바로 아래 팀원 둘(글쓰기, 정리), 팀 밖의 에이전트 하나 */
+  /** 대표와 일꾼 둘(글쓰기, 정리). 팀은 없다 (2026-11-21) */
   function org() {
-    const make = (name: string, scopes: string[]) =>
-      Agent.open('space', { name, tool: 'claude', scopes }, NOW);
-    const lead = make('팀장', ['read_public']);
-    const writer = make('글쓰기', ['read_public', 'write']);
-    const tidier = make('정리', ['tidy', 'read_all']);
-    const outsider = make('남', ['write']);
-    const all = [lead, writer, tidier, outsider];
-    writer.reportTo(lead.id, all);
-    tidier.reportTo(lead.id, all);
-    return { lead, writer, tidier, outsider };
+    const make = (name: string) => Agent.open('space', { name, tool: 'claude' }, NOW);
+    const lead = Agent.openLead('space', 'claude', NOW);
+    return { lead, writer: make('글쓰기'), tidier: make('정리') };
   }
 
   function leadTask(lead: Agent): Task {
@@ -298,7 +292,7 @@ describe('위임', () => {
       NOW,
     );
 
-  test('바로 아래 팀원에게 맡기면 목표 · 우선순위 · 깊이를 물려받은 대기 작업이 생긴다', () => {
+  test('대표가 일꾼에게 맡기면 목표 · 우선순위 · 깊이를 물려받은 대기 작업이 생긴다', () => {
     const { lead, writer } = org();
     const parent = leadTask(lead);
     parent.assertCanDelegate(lead.id, 1, 0, NOW);
@@ -336,16 +330,17 @@ describe('위임', () => {
     assert.equal((plain.unsaved.payload as Record<string, unknown> | null)?.deliver, undefined);
   });
 
-  test('팀이 아니거나 없는 에이전트, 권한으로 못 하는 일, 맡길 수 없는 종류는 막는다', () => {
-    const { lead, writer, tidier, outsider } = org();
+  test('없거나 지운 에이전트, 일꾼끼리, 맡길 수 없는 종류는 막는다. 일꾼은 모든 일을 받는다', () => {
+    const { lead, writer, tidier } = org();
     const parent = leadTask(lead);
-    assert.throws(() => order(parent, lead, outsider), Forbidden);
     assert.throws(() => order(parent, lead, null), Forbidden);
-    assert.throws(() => order(parent, writer, tidier), Forbidden, '팀원끼리는 맡기지 못한다');
-    assert.throws(() => order(parent, lead, writer, 'tidy_session'), RuleViolation);
+    assert.throws(() => order(parent, writer, tidier), Forbidden, '일꾼끼리는 맡기지 못한다');
     assert.throws(() => order(parent, lead, writer, 'ai_test'), RuleViolation);
-    assert.equal(order(parent, lead, tidier, 'tidy_session').unsaved.kind, 'tidy_session');
-    assert.deepEqual(DelegationPolicy.kindsFor(writer.scopes), ['general', 'draft_post']);
+    assert.equal(order(parent, lead, writer, 'tidy_session').unsaved.kind, 'tidy_session');
+    assert.equal(order(parent, lead, tidier, 'browse').unsaved.kind, 'browse');
+    assert.deepEqual(DelegationPolicy.kindsFor(writer.scopes), [...TaskKinds.DELEGABLE]);
+    tidier.delete(NOW);
+    assert.throws(() => order(parent, lead, tidier), Forbidden, '지운 일꾼');
   });
 
   test('한도: 한 번에 5개, 작업 하나에 10개, 깊이 3, 라운드 3. 실행 중이 아니면 conflict', () => {
@@ -427,11 +422,8 @@ describe('코드 일 나눠 맡기기 (코드 작업 5단계)', () => {
   };
 
   function team() {
-    const make = (name: string) =>
-      Agent.open('space', { name, tool: 'claude', scopes: ['code'] }, NOW);
-    const lead = make('팀장');
-    const coder = make('코더');
-    coder.reportTo(lead.id, [lead, coder]);
+    const lead = Agent.openLead('space', 'claude', NOW);
+    const coder = Agent.open('space', { name: '코더', tool: 'claude' }, NOW);
     return { lead, coder };
   }
 
@@ -549,11 +541,8 @@ describe('만들기 작업 (결과물 2차)', () => {
     assert.equal(plain?.mayRead(WIKI), false);
   });
 
-  test('make는 read_all · write와 함께 줄 수 없다', () => {
-    const agent = (scopes: string[]) =>
-      Agent.open('space', { name: 'm', tool: 'claude', scopes }, NOW);
-    assert.deepEqual(agent(['make', 'read_public']).scopes, ['read_public', 'make']);
-    assert.throws(() => agent(['make', 'read_all']), /파일 만들기는 전체 읽기/);
-    assert.throws(() => agent(['make', 'write']), /파일 만들기는 전체 읽기/);
+  test('make도 다른 권한과 함께 쓴다 (2026-11-21, 모두 같은 일꾼)', () => {
+    const agent = Agent.open('space', { name: 'm', tool: 'claude', scopes: ['make'] }, NOW);
+    assert.ok(['make', 'read_all', 'write'].every((s) => agent.scopes.includes(s)));
   });
 });

@@ -105,7 +105,7 @@ describe('ExternalTool', () => {
     assert.equal(again.data.outcome, 'failed', '이미 정한 제안');
   });
 
-  test('결재 뒤 바뀐 제안 · 비공개를 읽게 된 에이전트에는 붙이지 않는다 (실패 결과)', () => {
+  test('결재 뒤 바뀐 제안에는 붙이지 않는다 (실패 결과). 비공개를 읽는 에이전트에도 붙인다 (2026-11-21)', () => {
     const stale = ExternalTool.propose('space', 'agent-1', 'linear', fields, NOW);
     assert.equal(
       stale.plugApproved('a', 99, agentWith(['read_public']), NOW).data.outcome,
@@ -113,21 +113,15 @@ describe('ExternalTool', () => {
     );
     const tool = ExternalTool.propose('space', 'agent-1', 'linear', fields, NOW);
     const privateAgent = agentWith(['read_all']);
-    const result = tool.plugApproved('a', null, privateAgent, NOW);
-    assert.equal(result.data.outcome, 'failed');
-    assert.deepEqual(privateAgent.externalTools, []);
-    assert.equal(tool.proposed, true, '그대로 제안');
+    assert.equal(tool.plugApproved('a', null, privateAgent, NOW).data.outcome, 'done');
+    assert.deepEqual(privateAgent.externalTools, ['linear']);
   });
 });
 
 describe('에이전트의 외부 도구 칸', () => {
-  test('비공개를 읽거나 셸이 있는 권한과 함께 두지 않는다: 도구를 붙일 때도, 권한을 바꿀 때도', () => {
+  test('어느 권한과도 함께 둔다 (2026-11-21, 같은 일꾼). 겹친 이름은 하나로', () => {
     for (const scope of ['read_all', 'write', 'code', 'make'])
-      assert.throws(() => agentWith([scope]).edit({ external_tools: ['notion'] }), RuleViolation);
-    assert.throws(
-      () => agentWith(['read_public'], ['notion']).edit({ scopes: ['read_all'] }),
-      RuleViolation,
-    );
+      assert.doesNotThrow(() => agentWith([scope]).edit({ external_tools: ['notion'] }));
     const agent = agentWith(['read_public', 'browse'], ['notion']);
     agent.edit({ external_tools: ['notion', 'notion', 'linear'] });
     assert.deepEqual(agent.externalTools, ['notion', 'linear'], '겹친 이름은 하나로');

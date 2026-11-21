@@ -30,9 +30,7 @@ export class AgentEdit {
       'tool',
       'model',
       'effort',
-      'scopes',
       'approval_actions',
-      'reports_to',
       'reviewer_id',
       'runner_id',
       'external_tools',
@@ -42,7 +40,7 @@ export class AgentEdit {
     ],
     target: 'id',
     versioned: true,
-    grants: ['scopes', 'approval_actions', 'external_tools', 'runner_id'],
+    grants: ['approval_actions', 'external_tools', 'runner_id'],
   };
 
   constructor(
@@ -50,12 +48,10 @@ export class AgentEdit {
     private readonly spaceId: string,
   ) {}
 
-  /** 새 에이전트 (아직 저장 전). 보고 대상을 정하면 조직도 전체를 잠근다 */
+  /** 새 에이전트 (아직 저장 전) */
   async open(req: CreateAgentInput, now: Date): Promise<Agent> {
     await this.assertKnownTools(req.fields.external_tools);
     const agent = Agent.open(this.spaceId, req.fields, now);
-    if (req.reportsTo !== null)
-      agent.reportTo(req.reportsTo, await new AgentRepository(this.tx).lockAll(this.spaceId));
     if (req.runnerId !== null) agent.edit({}, await this.runner(req.runnerId));
     return agent;
   }
@@ -76,15 +72,13 @@ export class AgentEdit {
     return lead;
   }
 
-  /** 보고 대상을 바꾸지 않으면 그 에이전트만 잠근다. 러너 · 검토자는 같은 공간의 것만 (없으면 404) */
+  /** 그 에이전트만 잠근다. 러너 · 검토자는 같은 공간의 것만 (없으면 404) */
   async update(req: UpdateAgentInput): Promise<Agent> {
     await this.assertKnownTools(req.changes.external_tools);
-    const { reportsTo, runnerId, reviewerId, reviewerApproves, secondInspectorId } = req;
+    const { runnerId, reviewerId, reviewerApproves, secondInspectorId } = req;
     const agents = new AgentRepository(this.tx);
-    const org = reportsTo === undefined ? [] : await agents.lockAll(this.spaceId);
-    const agent = org.find((a) => a.id === req.id) ?? (await agents.lock(this.spaceId, req.id));
+    const agent = await agents.lock(this.spaceId, req.id);
     agent.assertVersion(req.version);
-    if (reportsTo !== undefined) agent.reportTo(reportsTo, org);
     agent.edit(req.changes, typeof runnerId === 'string' ? await this.runner(runnerId) : runnerId);
     if (reviewerId !== undefined)
       agent.pairReviewer(reviewerId === null ? null : await agents.load(this.spaceId, reviewerId));

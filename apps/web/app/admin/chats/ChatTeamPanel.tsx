@@ -7,10 +7,10 @@ import type { ChatTeamMember } from '../../_task/types';
 /** 걸린 시간을 다시 그리는 간격 */
 const TICK_MS = 30_000;
 
-// 대화 오른쪽 칸 "팀이 동시에 일하는 중" (2026-11-15 화면 정리): 이 대화의 회차 · 덧붙인 말의 답 · 검토와 그 아래에서
+// 대화 오른쪽 칸 "일꾼이 동시에 일하는 중" (2026-11-15 화면 정리): 이 대화의 회차 · 덧붙인 말의 답 · 검토와 그 아래에서
 // 끝나지 않은 작업을 한 줄씩. 고르는 것은 서버(ChatQuery.team)가 하고 여기서는 그리기만 한다. 대화를 다시 읽을 때 함께 온다.
 // 일하는 작업이 없으면 칸을 그리지 않는다.
-// 팀원을 기다리는 줄(팀원 기다리기, 2026-11-19)에는 기한(지나면 다 끝나지 않아도 깬다)과 "지금까지로 답하기"가 있다.
+// 일꾼을 기다리는 줄(일꾼 기다리기, 2026-11-19)에는 기한(지나면 다 끝나지 않아도 깬다)과 "지금까지로 답하기"가 있다.
 // 누르는 동작은 패널(ChatThreadPanel)이 돌리고 여기서는 부른다
 export function ChatTeamPanel({
   team,
@@ -33,9 +33,9 @@ export function ChatTeamPanel({
 
   const working = team.filter((t) => t.status === 'running').length;
   return (
-    <aside className="chat-team" aria-label="팀이 일하는 중">
+    <aside className="chat-team" aria-label="일꾼이 일하는 중">
       <h2>
-        팀이 동시에 일하는 중 <span className="label-mono">{working}명 일하는 중</span>
+        일꾼이 동시에 일하는 중 <span className="label-mono">{working}명 일하는 중</span>
       </h2>
       <ul>
         {team.map((t) => {

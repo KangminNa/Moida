@@ -448,12 +448,10 @@ describe('에이전트의 작업 토큰', () => {
     assert.notEqual(a.post_id, b.post_id);
   });
 
-  test('write가 없는 에이전트에게는 도구가 없다', async () => {
+  test('모든 에이전트가 초안 도구를 쓴다 (2026-11-21, 같은 일꾼)', async () => {
     const { token } = await runToken(['read_public']);
-    assert.equal((await toolNames(token)).includes('blog_save_draft'), false);
-    const { ok: done, body } = await tool(token, 'basket_get');
-    assert.equal(done, false);
-    assert.equal(body.code, 'forbidden');
+    assert.equal((await toolNames(token)).includes('blog_save_draft'), true);
+    assert.equal((await tool(token, 'basket_get')).ok, true);
   });
 
   test('작업 토큰은 REST에서 요청자가 되지 않는다', async () => {

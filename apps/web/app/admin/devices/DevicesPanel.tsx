@@ -8,7 +8,7 @@ import { SCOPE_LABELS } from '../../_lib/types';
 import { useAction } from '../../_lib/use-action';
 import { ConnectGuide } from './ConnectGuide';
 
-/** 켤 수 있는 권한. delegate: 이 기기의 AI 도구가 서버 팀에 일을 맡기고 답을 받는다 (MCP ask_agent, 승인은 콘솔에서만). inbox: 기다리는 승인 · 질문 수 (MCP inbox) */
+/** 켤 수 있는 권한. delegate: 이 기기의 AI 도구가 서버의 에이전트에게 일을 맡기고 답을 받는다 (MCP ask_agent, 승인은 콘솔에서만). inbox: 기다리는 승인 · 질문 수 (MCP inbox) */
 const SCOPES: readonly Device['scopes'][number][] = [
   'upload',
   'read_public',

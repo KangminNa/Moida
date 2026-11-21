@@ -3,7 +3,6 @@ import { describe, test } from 'node:test';
 import { RuleViolation } from '../../platform';
 import type { AgentRow } from '../task.tables';
 import { Agent } from './agent';
-import { AgentOrg } from './agent-org.policy';
 import { AgentUsage } from './agent-usage';
 
 // 에이전트가 쉬는 규칙. DB 없이 돈다.
@@ -20,7 +19,6 @@ function agentWith(fiveHourLimit: number | null, planStopPercent: number | null)
     monthly_limit: null,
     five_hour_limit: fiveHourLimit,
     plan_stop_percent: planStopPercent,
-    reports_to: null,
     status: Agent.ACTIVE,
   } as AgentRow);
 }
@@ -78,26 +76,19 @@ describe('AgentUsage', () => {
   });
 });
 
-describe('권한', () => {
-  test('브라우저(browse)는 비공개 읽기(read_all) · 초안 작성(write)과 함께 줄 수 없다', () => {
+describe('권한 (2026-11-21: 모두 같은 일꾼)', () => {
+  test('무엇을 보내도 권한은 늘 전부다. 모르는 이름은 막는다', () => {
     const agent = agentWith(null, null);
-    assert.throws(() => agent.edit({ scopes: ['browse', 'read_all'] }), RuleViolation);
-    // write도 임시 글 본문과 소재 메모를 연다
-    assert.throws(() => agent.edit({ scopes: ['browse', 'write'] }), RuleViolation);
-    agent.edit({ scopes: ['browse', 'read_public'] });
-    assert.deepEqual(agent.scopes, ['read_public', 'browse']);
+    agent.edit({ scopes: ['browse', 'read_all', 'write', 'code'] });
+    assert.deepEqual(agent.scopes, [...Agent.SCOPES]);
+    assert.throws(() => agent.edit({ scopes: ['sandbox'] }), RuleViolation, '기기의 권한');
   });
 
-  test('코드 작업(code)은 비공개 읽기(read_all) · 초안 작성(write)과 함께 줄 수 없다', () => {
-    const agent = agentWith(null, null);
-    assert.throws(() => agent.edit({ scopes: ['code', 'read_all'] }), RuleViolation);
-    assert.throws(() => agent.edit({ scopes: ['code', 'write'] }), RuleViolation);
-    agent.edit({ scopes: ['code', 'read_public', 'tidy'] });
-    assert.deepEqual(agent.scopes, ['read_public', 'tidy', 'code']);
-  });
-
-  test('sandbox는 기기의 권한이라 에이전트에게 줄 수 없다', () => {
-    assert.throws(() => agentWith(null, null).edit({ scopes: ['sandbox'] }), RuleViolation);
+  test('새 에이전트는 모든 권한과 사이트 클릭 · 로그인 승인 동작으로 시작한다', () => {
+    const fresh = Agent.open('space', { name: '새', tool: 'claude' }, NOW);
+    assert.deepEqual(fresh.scopes, [...Agent.SCOPES]);
+    fresh.assertMayRequest('browser.site.login');
+    fresh.assertMayRequest('browser.site.publish');
   });
 });
 
@@ -185,74 +176,15 @@ describe('설정 판', () => {
   });
 });
 
-describe('조직도 (Agent.reportTo)', () => {
-  /** 이름만 다른 에이전트. 보고 대상은 reportTo로 잇는다 */
-  function named(name: string): Agent {
-    return Agent.restore({
-      id: `agent-${name}`,
-      version: 1,
-      space_id: 'space',
-      name,
-      tool: 'claude',
-      reports_to: null,
-      status: Agent.ACTIVE,
-      created_at: NOW,
-    } as AgentRow);
-  }
-
-  /** 지금 보고 대상 */
-  const managerOf = (agent: Agent) => agent.view().toJSON().reportsTo;
-
-  test('보고 대상이 없으면 주인에게 보고한다. 정하면 바뀐 열로 남는다', () => {
-    const lead = named('팀장');
-    const member = named('담당');
-    const all = [lead, member];
-    assert.equal(managerOf(member), null);
-    member.reportTo(lead.id, all);
-    assert.equal(managerOf(member), lead.id);
-    assert.deepEqual(member.unsaved, { reports_to: lead.id, settings_revision: 2 });
-    assert.equal(lead.manages(member), true);
-    assert.equal(member.manages(lead), false);
-    member.reportTo(null, all);
-    assert.equal(managerOf(member), null, '주인에게 돌아갈 수 있다');
-  });
-
-  test('자기 자신이나 자기 팀원에게 보고하면 순환이라 막는다', () => {
-    const a = named('가');
-    const b = named('나');
-    const c = named('다');
-    const all = [a, b, c];
-    b.reportTo(a.id, all);
-    c.reportTo(b.id, all);
-    assert.throws(() => a.reportTo(a.id, all), RuleViolation);
-    assert.throws(() => a.reportTo(c.id, all), RuleViolation, '손자에게도');
-    assert.equal(managerOf(a), null, '막히면 그대로');
-  });
-
-  test('없는 에이전트에게는 보고하지 못한다', () => {
-    const a = named('가');
-    assert.throws(() => a.reportTo('no-such', [a]), RuleViolation);
-  });
-
-  test(`깊이는 ${AgentOrg.DEPTH_MAX}단계까지: 아래 팀째로 옮겨도 가장 깊은 팀원을 센다`, () => {
-    const [a, b, c, d, e] = ['1', '2', '3', '4', '5'].map(named) as [
-      Agent,
-      Agent,
-      Agent,
-      Agent,
-      Agent,
-    ];
-    const all = [a, b, c, d, e];
-    b.reportTo(a.id, all);
-    c.reportTo(b.id, all);
-    d.reportTo(c.id, all);
-    assert.throws(() => e.reportTo(d.id, all), RuleViolation, '5단계');
-
-    // d 아래에 e가 있는 두 단계짜리 팀을 c 아래(4단계부터)로 옮기면 5단계가 된다
-    d.reportTo(null, all);
-    e.reportTo(d.id, all);
-    assert.throws(() => d.reportTo(c.id, all), RuleViolation);
-    d.reportTo(b.id, all);
-    assert.equal(managerOf(d), b.id, '3단계 + 팀원 하나는 4단계라 된다');
+describe('맡기기 (Agent.manages)', () => {
+  test('대표만 맡긴다: 지운 에이전트 · 다른 대표에게는 맡기지 않는다. 일꾼은 맡기지 않는다', () => {
+    const lead = Agent.openLead('space', 'claude', NOW);
+    const worker = Agent.open('space', { name: '일꾼', tool: 'codex' }, NOW);
+    const other = Agent.open('space', { name: '다른 일꾼', tool: 'claude' }, NOW);
+    assert.equal(lead.manages(worker), true);
+    assert.equal(worker.manages(other), false);
+    assert.equal(lead.manages(lead), false);
+    other.delete(NOW);
+    assert.equal(lead.manages(other), false);
   });
 });

@@ -2,8 +2,7 @@ import { SETTING_NAMES, settingField, settingValue } from './setting-labels';
 import type { SettingChangeLine } from './types';
 
 // 설정 바꾸기의 바뀔 칸 (2026-11-15 C · D): 어떤 설정인지, "칸: 전 → 후" 한 줄씩.
-// 권한 · 승인 동작 · 커넥터 · 러너를 더하는 줄은 굵게 "권한 추가", 플러그인 설정(바깥으로 보내는 곳이 많다)은 모든 줄이 굵게 "바깥 연결",
-// 앱 만들기의 운영 팀 새로 만들기는 "에이전트 추가".
+// 권한 · 승인 동작 · 커넥터 · 러너를 더하는 줄은 굵게 "권한 추가", 플러그인 설정(바깥으로 보내는 곳이 많다)은 모든 줄이 굵게 "바깥 연결".
 // 결과 카드(ChatCardForm)와 승인 화면(ApprovalTargets)이 함께 쓴다
 export function ChangeLines({
   lines,
@@ -14,9 +13,7 @@ export function ChangeLines({
 }) {
   if (lines.length === 0) return null;
   const name = setting ? (SETTING_NAMES[setting] ?? setting) : null;
-  // 앱 만들기의 굵은 줄은 운영 팀 새로 만들기 (에이전트가 늘어난다, 스토어 2-6)
-  const strong =
-    setting === 'plugin' ? '바깥 연결' : setting === 'app' ? '에이전트 추가' : '권한 추가';
+  const strong = setting === 'plugin' ? '바깥 연결' : '권한 추가';
   return (
     <ul className="change-lines" aria-label={name ? `바뀔 칸 · ${name}` : '바뀔 칸'}>
       {name && <li className="change-setting">{name}</li>}

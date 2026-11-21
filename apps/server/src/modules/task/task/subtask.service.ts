@@ -44,13 +44,12 @@ export class SubtaskService extends BaseService {
     if (plan.ready.length === 0 && plan.dropped.length === 0) return;
     const org = await new AgentRepository(tx).all(parent.spaceId);
     const manager = org.find((a) => a.id === parent.agentId);
-    const tainted = await tasks.privateTouched(parent.spaceId, parent.id);
     for (const item of plan.ready) {
       const order = SubtaskOrder.saved(item.order);
       const worker = org.find((a) => a.id === order.toAgentId) ?? null;
       if (!manager) break;
       try {
-        const child = parent.subtask(manager, worker, order, now, tainted);
+        const child = parent.subtask(manager, worker, order, now);
         child.declare((p) => ({ ...p, afterResults: SubtaskAfter.results(item, siblings) }));
         await tasks.insertOnce(child);
       } catch (error) {

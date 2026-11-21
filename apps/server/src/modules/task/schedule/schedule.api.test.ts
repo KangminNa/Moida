@@ -230,12 +230,10 @@ describe('스케줄 (/api/schedules)', () => {
     assert.equal((await tasksOf(schedule)).length, 2, '다시 움직이면 돈다');
   });
 
-  test('페이지를 가리키면 그 페이지의 만들기 일. 같은 페이지를 고치는 일이 돌면 건너뛰고, 담당은 make 권한이 있어야 한다', async () => {
+  test('페이지를 가리키면 그 페이지의 만들기 일. 같은 페이지를 고치는 일이 돌면 건너뛴다. 담당은 어느 에이전트든 된다 (2026-11-21)', async () => {
     const pageId = randomUUID();
-    const plain = await newAgent();
-    const refused = await create({ ...DAILY, agentId: plain.id, pageId });
-    assert.equal(refused.status, 422, refused.text);
-    const maker = await newAgent({ scopes: ['make'] });
+    // 모든 에이전트가 같은 권한이라 따로 make 권한을 주지 않은 에이전트도 만들기 일을 맡는다
+    const maker = await newAgent();
     const schedule = ok(
       await create({ ...DAILY, title: '현황판', agentId: maker.id, pageId }),
       201,

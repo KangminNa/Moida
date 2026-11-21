@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   Actor,
-  AgentDirectory,
   BaseQuery,
   Database,
   NotFound,
@@ -9,9 +8,8 @@ import {
   type SettingChangeInput,
 } from '../../platform';
 import { App } from '../app/app';
-import { AppTeam } from '../app/app-team.policy';
 import { issues, menus, posts } from '../blog.schema';
-import type { AppRow, MenuRow } from '../blog.tables';
+import type { AppRow } from '../blog.tables';
 import type { ListMenusInput, ToolMenusInput } from './menu.input';
 import type { MenuListRow, PublicMenuRow } from './menu.view';
 import {
@@ -30,10 +28,7 @@ export class MenuQuery extends BaseQuery {
   /** blog_menus의 recent_posts 수 */
   private static readonly RECENT_POSTS = 10;
 
-  constructor(
-    db: Database,
-    private readonly agents: AgentDirectory,
-  ) {
+  constructor(db: Database) {
     super(db);
   }
 
@@ -63,7 +58,7 @@ export class MenuQuery extends BaseQuery {
 
   /**
    * blog_menus: 글을 쓸 AI가 고를 앱 · 메뉴와 편집 방침 (write 권한). 페이지 앱은 글을 담지 않아 뺀다.
-   * 앱 · 메뉴마다 이 요청자가 놓을 수 있는지(운영 팀, 스토어 2단계): 요청자의 보고 대상은 platform AgentDirectory로 읽는다
+   * 운영 팀은 없앴다 (2026-11-21): 쓰기 권한이 있으면 어느 앱 · 메뉴에나 놓는다 (can_write는 늘 true)
    */
   async forTool(actor: Actor, req: ToolMenusInput): Promise<ToolMenuView> {
     actor.assertCan(Actor.WRITE);
@@ -94,29 +89,7 @@ export class MenuQuery extends BaseQuery {
               columns: ['id', 'title', 'published_at'],
             },
           );
-    const writable = await this.writable(actor, apps, rows);
-    return new ToolMenuView(apps, rows, drafts, writable, recent);
-  }
-
-  /** 이 요청자가 글을 놓을 수 있는 앱 · 메뉴 (메뉴의 운영 팀, 없으면 앱의 운영 팀. AppTeam) */
-  private async writable(
-    actor: Actor,
-    apps: readonly AppRow[],
-    rows: readonly MenuRow[],
-  ): Promise<ReadonlySet<string>> {
-    const card =
-      AppTeam.needsRanks(actor) && actor.id !== null
-        ? await this.agents.find(actor, actor.id)
-        : null;
-    const ranks = AppTeam.ranks(actor, card);
-    const teams = new Map(apps.map((a) => [a.id, a.agent_id]));
-    const ids = [
-      ...apps.filter((a) => AppTeam.allows(actor, ranks, a.agent_id)).map((a) => a.id),
-      ...rows
-        .filter((m) => AppTeam.allows(actor, ranks, m.agent_id ?? teams.get(m.app_id) ?? null))
-        .map((m) => m.id),
-    ];
-    return new Set(ids);
+    return new ToolMenuView(apps, rows, drafts, recent);
   }
 
   /** 대화로 바꾸는 메뉴 (2026-11-15 D, get_settings menus). 확인을 거친 제안자만 */

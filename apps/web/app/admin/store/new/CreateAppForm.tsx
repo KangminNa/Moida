@@ -3,8 +3,6 @@
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { APP_KIND_LABELS } from '../../../_blog/labels';
 import type { AdminApp, PageList } from '../../../_blog/types';
-import type { Agent } from '../../../_task/types';
-import { leaderLabel } from '../app-team';
 
 /** 칸의 길이 (서버 App의 값과 같다) */
 const NAME_MAX = 40;
@@ -21,22 +19,15 @@ export type CreateAppBody = {
   description: string;
   menus?: string[];
   pageId?: string;
-  /** 운영 팀장 (스토어 2단계) */
-  agentId?: string;
 };
 
-/** 운영 팀 칸에서 "앱 운영 팀 새로 만들기"의 값 */
-const NEW_TEAM = 'new';
-
 // 앱 만들기 시트 (스토어 1-5, 시안 3번): 아이콘 · 이름 · 주소 · 설명, 블로그는 시작 메뉴, 페이지 앱은 앱이 될 페이지(없어도 됨: 화면은 앱 코드, 스토어 2-6).
-// 비공개로 만들어진다. 운영 팀(스토어 2단계): 나중에 · 있는 팀장 · 앱 운영 팀 새로 만들기.
-// 저장(새 팀 → 만들기 → 아이콘 올리기)은 패널이 한다.
+// 비공개로 만들어진다. 앱의 일은 대표가 받아 일꾼에게 맡긴다 (2026-11-21 팀 없는 에이전트).
+// 저장(만들기 → 아이콘 올리기)은 패널이 한다.
 export function CreateAppForm({
   kind,
   origin,
   pages,
-  leaders,
-  apps,
   busy,
   problem,
   onSubmit,
@@ -48,19 +39,10 @@ export function CreateAppForm({
   origin: string;
   /** 앱 밖의 페이지 (페이지 앱이 될 수 있는 것) */
   pages: PageList['pages'];
-  /** 운영 팀장이 될 수 있는 에이전트 (app-team.ts teamLeaders) */
-  leaders: readonly Agent[];
-  /** 모든 앱 (팀장마다 이미 운영하는 앱을 이름 옆에) */
-  apps: readonly AdminApp[];
   busy: boolean;
   problem: string | null;
-  /** 만들기. newTeam이면 앱 운영 팀을 먼저 만들어 그 편집장을 팀장으로. 됐으면 true */
-  onSubmit: (
-    body: CreateAppBody,
-    icon: File | null,
-    requestId: string,
-    newTeam: boolean,
-  ) => Promise<boolean>;
+  /** 만들기. 됐으면 true */
+  onSubmit: (body: CreateAppBody, icon: File | null, requestId: string) => Promise<boolean>;
   onEdit: () => void;
   onClose: () => void;
 }) {
@@ -71,7 +53,6 @@ export function CreateAppForm({
   const [menus, setMenus] = useState('');
   const [pageId, setPageId] = useState('');
   const [icon, setIcon] = useState<File | null>(null);
-  const [team, setTeam] = useState('');
   const requestId = useRef<string | null>(null);
 
   function edit(apply: () => void) {
@@ -93,10 +74,9 @@ export function CreateAppForm({
       description: description.trim(),
       ...(kind === 'blog' && names.length > 0 ? { menus: names } : {}),
       ...(kind === 'page' && pageId ? { pageId } : {}),
-      ...(team && team !== NEW_TEAM ? { agentId: team } : {}),
     };
     requestId.current ??= crypto.randomUUID();
-    if (await onSubmit(body, icon, requestId.current, team === NEW_TEAM)) requestId.current = null;
+    if (await onSubmit(body, icon, requestId.current)) requestId.current = null;
   }
 
   return (
@@ -188,26 +168,6 @@ export function CreateAppForm({
             onChange={(e) => edit(() => setIcon(e.target.files?.[0] ?? null))}
           />
         </label>
-      </div>
-      <div className="field">
-        <label htmlFor={`${id}-team`}>운영 팀</label>
-        <select
-          id={`${id}-team`}
-          className="input"
-          value={team}
-          onChange={(e) => edit(() => setTeam(e.target.value))}
-        >
-          <option value="">나중에 (앱 관리 › 운영 팀에서)</option>
-          <option value={NEW_TEAM}>
-            앱 운영 팀 새로 만들기 (편집장 · 작가 · 자료 조사 · 앱 디자이너)
-          </option>
-          {leaders.map((a) => (
-            <option key={a.id} value={a.id}>
-              {leaderLabel(a, apps)}
-            </option>
-          ))}
-        </select>
-        <small>대표가 이 앱의 일을 운영 팀장에게 맡김</small>
       </div>
       <p className="note">비공개로 만들어짐 · 앱 관리에서 공개로 바꿈</p>
       {problem && <p className="error">{problem}</p>}

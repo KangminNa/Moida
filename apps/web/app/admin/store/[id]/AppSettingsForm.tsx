@@ -8,11 +8,20 @@ const NAME_MAX = 40;
 const SLUG_MAX = 30;
 const DESCRIPTION_MAX = 200;
 const SORT_MAX = 1000;
+/** 편집 방침의 길이 (서버 App.POLICY_MAX와 같다) */
+const POLICY_MAX = 4000;
 
 /** 고칠 때 보내는 본문 (PATCH /api/apps/:id). version은 패널이 붙인다 */
-export type AppSettingsBody = { name: string; slug: string; description: string; sort: number };
+export type AppSettingsBody = {
+  name: string;
+  slug: string;
+  description: string;
+  sort: number;
+  policy: string;
+};
 
-// 앱 관리 › 설정의 칸 (스토어 1-5): 이름 · 주소 · 설명 · 순서. 종류는 바꾸지 않는다. 저장은 패널이 한다.
+// 앱 관리 › 설정의 칸 (스토어 1-5): 이름 · 주소 · 설명 · 순서 · 편집 방침(스토어 2단계, 2026-11-21 앱 설정으로 옮김).
+// 종류는 바꾸지 않는다. 저장은 패널이 한다.
 export function AppSettingsForm({
   app,
   busy,
@@ -31,6 +40,7 @@ export function AppSettingsForm({
   const [slug, setSlug] = useState(app.slug);
   const [description, setDescription] = useState(app.description);
   const [sort, setSort] = useState(app.sort);
+  const [policy, setPolicy] = useState(app.policy);
 
   function edit(apply: () => void) {
     onEdit();
@@ -39,7 +49,13 @@ export function AppSettingsForm({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    onSubmit({ name: name.trim(), slug: slug.trim(), description: description.trim(), sort });
+    onSubmit({
+      name: name.trim(),
+      slug: slug.trim(),
+      description: description.trim(),
+      sort,
+      policy: policy.trim(),
+    });
   }
 
   return (
@@ -92,6 +108,19 @@ export function AppSettingsForm({
           value={sort}
           onChange={(e) => edit(() => setSort(Number(e.target.value)))}
         />
+      </div>
+      <div className="field">
+        <label htmlFor={`${id}-policy`}>편집 방침</label>
+        <textarea
+          id={`${id}-policy`}
+          className="input"
+          rows={5}
+          value={policy}
+          maxLength={POLICY_MAX}
+          placeholder="예: 한 글에 사진 한 장 이상. 반말 금지. 제목은 30자 안"
+          onChange={(e) => edit(() => setPolicy(e.target.value))}
+        />
+        <small>이 앱에 쓰는 AI가 메뉴의 방침과 함께 지킴</small>
       </div>
       {problem && <p className="error">{problem}</p>}
       <div className="row">

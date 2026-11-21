@@ -5,7 +5,7 @@ import { ChatInspect } from './chat-inspect.policy';
 import { ChatReview } from './chat-review.policy';
 
 // 검수의 판단 (2026-11-20): 판정 → 결정, 결재에 남길 말, 검수자가 올린 쪽 밖인지
-const member = (id: string, reportsTo: string | null) => ({ id, reportsTo }) as unknown as Agent;
+const member = (id: string, tool: string) => ({ id, tool }) as unknown as Agent;
 const review = (verdict: string, fixes: string[] = [], summary = '까닭') =>
   ChatReview.parse(JSON.stringify({ verdict, summary, fixes }));
 
@@ -84,19 +84,15 @@ describe('ChatInspect', () => {
     assert.equal(ChatInspect.opinion(null, 'hold'), '검수를 끝내지 못했어요');
   });
 
-  test('검수자는 올린 에이전트도, 그 위도, 그 아래도 아니어야 한다', () => {
-    const agents = [
-      member('boss', null),
-      member('writer', 'boss'),
-      member('helper', 'writer'),
-      member('outside', null),
-    ];
-    const [boss, writer, helper, outside] = agents as [Agent, Agent, Agent, Agent];
-    assert.equal(ChatInspect.independent(outside, 'writer', agents), true);
-    assert.equal(ChatInspect.independent(writer, 'writer', agents), false, '자기 일');
-    assert.equal(ChatInspect.independent(boss, 'writer', agents), false, '팀장이 제 팀의 일');
-    assert.equal(ChatInspect.independent(helper, 'writer', agents), false, '팀원이 팀장의 일');
-    assert.equal(ChatInspect.independent(outside, null, agents), false, '올린 쪽을 모름');
-    assert.equal(ChatInspect.independent(boss, 'outside', agents), true);
+  test('검수자는 결재를 올린 에이전트가 아니면 된다 (2026-11-21, 팀 · 도구로 가르지 않음)', () => {
+    const [writer, codex, same] = [
+      member('writer', 'claude'),
+      member('codex', 'codex'),
+      member('same', 'claude'),
+    ] as [Agent, Agent, Agent];
+    assert.equal(ChatInspect.independent(codex, 'writer'), true);
+    assert.equal(ChatInspect.independent(same, 'writer'), true, '같은 AI 도구여도 다른 에이전트');
+    assert.equal(ChatInspect.independent(writer, 'writer'), false, '자기 일');
+    assert.equal(ChatInspect.independent(codex, null), false, '올린 쪽을 모름');
   });
 });

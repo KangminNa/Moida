@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Actor, BaseQuery, Database, SecretBox } from '../../platform';
 import type { Agent } from '../agent/agent';
-import { AgentScopes } from '../agent/agent-scopes.policy';
 import type { JobToolView } from '../task/job.view';
 import { externalTools } from '../task.schema';
 import type { TaskRow } from '../task.tables';
@@ -38,7 +37,7 @@ export class ExternalToolQuery extends BaseQuery {
   /**
    * 일을 빌려 줄 때 그 에이전트에게 붙일 도구 (next_jobs의 tools). 러너만 부른다.
    * 객체설계 4장의 예외: 토큰을 푸는 읽기라 엔티티(`ExternalTool.jobView`)를 거친다 (`AiLoginQuery.token`과 같다)
-   * 허락한 이름 중 켜져 있고 토큰이 갖춰진 것만 (OAuth면 로그인했고 접근 토큰이 끝나지 않은 것, C1). 비공개를 읽거나 셸이 있는 에이전트에게는 늘 없음 (저장된 값이 어긋나도 여기서 한 번 더)
+   * 허락한 이름 중 켜져 있고 토큰이 갖춰진 것만 (OAuth면 로그인했고 접근 토큰이 끝나지 않은 것, C1)
    */
   async forJob(
     actor: Actor,
@@ -48,8 +47,7 @@ export class ExternalToolQuery extends BaseQuery {
     actor.assertCan(Actor.RUN);
     // 커넥터 확인 (tool_check, 2026-11-15 MCP 1단계): 에이전트가 없고 확인할 도구 하나만 (러너가 tools/list를 부른다)
     if (checkedToolId !== null) return this.checked(actor.requireSpace(), checkedToolId);
-    if (!agent || agent.externalTools.length === 0 || !AgentScopes.mayUseTools(agent.scopes))
-      return [];
+    if (!agent || agent.externalTools.length === 0) return [];
     const rows = await this.rows(externalTools, {
       space_id: agent.spaceId,
       name: [...agent.externalTools],

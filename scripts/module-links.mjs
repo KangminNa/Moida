@@ -9,12 +9,6 @@ import { join, relative } from 'node:path';
  * 새 등록부를 만들면 여기에 메서드를 적는다: 적지 않은 메서드를 부르면 막는다
  */
 const REGISTRIES = {
-  AgentDirectory: {
-    register: ['provides', 'agents'],
-    find: ['asks', 'agents'],
-    registerTeamMaker: ['provides', 'teams'],
-    teamFor: ['asks', 'teams'],
-  },
   ActionChecks: { register: ['provides', 'action-checks'], problemsOf: ['asks', 'action-checks'] },
   Leases: {
     register: ['provides', 'leases'],

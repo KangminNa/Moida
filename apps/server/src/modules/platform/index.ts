@@ -64,7 +64,6 @@ export { ValueList } from './base/value-list';
 export { ZipFile } from './base/zip-file';
 export { ZipLimits, ZipReader } from './base/zip-reader';
 export { ActionChecks, type ActionTarget } from './directory/action-checks';
-export { AgentCard, AgentDirectory } from './directory/agent-directory';
 export { Lookups } from './directory/lookups';
 export { FailedEventInput } from './failed-event/failed-event.input';
 export { FailedEventQuery } from './failed-event/failed-event.query';

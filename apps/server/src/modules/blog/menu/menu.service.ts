@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   Actor,
-  AgentDirectory,
   Database,
   EntityService,
   Idempotency,
@@ -12,23 +11,17 @@ import {
   type Sql,
   type VersionInput,
 } from '../../platform';
-import { AppTeam } from '../app/app-team.policy';
-import type { MenuRow } from '../blog.tables';
 import { Menu } from './menu';
 import type { CreateMenuInput, UpdateMenuInput } from './menu.input';
 import { MenuRepository } from './menu.repository';
 import { MenuEdit } from './menu-edit';
 
-// 메뉴 쓰기 (관리자만: 화면에서 바로, 또는 대화에서 AI가 제안한 것을 승인해서 2026-11-15 D, MenuEdit). 운영 팀은 트랜잭션 전에 platform AgentDirectory로 확인한다:
-// 이 공간에 있고 비공개를 읽지 않는(read_all 없는) 에이전트만 (메뉴의 글은 공개된다, 원칙 5).
+// 메뉴 쓰기 (관리자만: 화면에서 바로, 또는 대화에서 AI가 제안한 것을 승인해서 2026-11-15 D, MenuEdit).
 @Injectable()
 export class MenuService extends EntityService<Menu> {
   private static readonly CREATE = 'create_menu';
 
-  constructor(
-    db: Database,
-    private readonly agents: AgentDirectory,
-  ) {
+  constructor(db: Database) {
     super(db);
   }
 
@@ -40,7 +33,6 @@ export class MenuService extends EntityService<Menu> {
   async create(actor: Actor, req: CreateMenuInput): Promise<Menu> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
-    await this.assertTeam(actor, req.fields);
     return this.transaction(async (tx) => {
       const items = this.store(tx);
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, MenuService.CREATE);
@@ -56,14 +48,12 @@ export class MenuService extends EntityService<Menu> {
   /** 본 version이 지금과 다르면 409 */
   async update(actor: Actor, req: UpdateMenuInput): Promise<Menu> {
     actor.assertOwner();
-    await this.assertTeam(actor, req.changes);
     return this.changeAsOwner(actor, req, (menu) => menu.edit(req.changes, new Date()));
   }
 
-  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 D): 같은 줄(운영 팀 확인 + MenuEdit)을 지나고 저장하지 않는다 */
+  /** 설정 바꾸기 제안의 미리 해 보기 (2026-11-15 D): 같은 줄(MenuEdit)을 지나고 저장하지 않는다 */
   async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
     const spaceId = SettingActor.spaceOf(actor);
-    await this.assertTeamOf(actor, change);
     await this.transaction(async (tx) => {
       await new MenuEdit(tx, spaceId).apply(change, new Date());
     });
@@ -78,7 +68,6 @@ export class MenuService extends EntityService<Menu> {
       spaceId,
       change.key,
       async (tx) => {
-        await this.assertTeamOf(actor, change);
         await this.store(tx).save(await new MenuEdit(tx, spaceId).apply(change, new Date()));
       },
     );
@@ -97,17 +86,5 @@ export class MenuService extends EntityService<Menu> {
         throw new RuleViolation(`메뉴에 ${items}개가 있어 지우지 못해요. 먼저 빼 주세요`);
       await menus.remove(menu);
     });
-  }
-
-  /** 설정 바꾸기의 운영 팀 (글자가 아니면 MenuEdit의 입력 검사가 막는다) */
-  private assertTeamOf(actor: Actor, change: SettingChangeInput): Promise<void> {
-    const agentId = change.body.agent_id;
-    return this.assertTeam(actor, typeof agentId === 'string' ? { agent_id: agentId } : {});
-  }
-
-  /** 운영 팀장으로 고른 에이전트: 이 공간에 있고 read_all이 없어야 한다 (깊이는 보지 않는다, AppTeam) */
-  private async assertTeam(actor: Actor, fields: Partial<MenuRow>): Promise<void> {
-    if (!fields.agent_id) return;
-    AppTeam.assertLeader(await this.agents.find(actor, fields.agent_id), false);
   }
 }

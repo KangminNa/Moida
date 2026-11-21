@@ -3,8 +3,7 @@
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { type RunnerChoice, useEngines } from '../../_task/live';
 import type { Agent, ExternalTool } from '../../_task/types';
-import { type Access, AccessFields } from './AccessFields';
-import { BossField } from './BossField';
+import { type Access, AccessFields, BROWSE_ACTIONS } from './AccessFields';
 import { LimitField } from './LimitField';
 import { ReviewerField } from './ReviewerField';
 import { RunnerField } from './RunnerField';
@@ -31,12 +30,10 @@ export type AgentBody = {
   name: string;
   role: string;
   tool: string;
-  scopes: readonly string[];
   approvalActions: readonly string[];
   monthlyLimit: number | null;
   fiveHourLimit: number | null;
   planStopPercent: number | null;
-  reportsTo: string | null;
   runnerId: string | null;
   /** 허락한 외부 도구의 이름 (2차 7단계) */
   externalTools: readonly string[];
@@ -47,11 +44,11 @@ export type AgentBody = {
   reviewerId?: string | null;
 };
 
-// 에이전트 추가·편집 폼: 칸의 상태와 보낼 본문만 가진다. 저장은 패널이 돌린다 (onSubmit). agent가 있으면 편집이다.
+// 에이전트(일꾼) 추가·편집 폼: 칸의 상태와 보낼 본문만 가진다. 저장은 패널이 돌린다 (onSubmit). agent가 있으면 편집이다.
+// 권한 · 보고 대상은 없다: 모든 일꾼이 같은 권한으로 같은 일을 하고 대표가 누구에게나 맡긴다 (2026-11-21)
 export function AgentForm({
   agent,
   agents,
-  ownerName,
   runners,
   externalTools,
   busy,
@@ -61,10 +58,8 @@ export function AgentForm({
   onClose,
 }: {
   agent: Agent | null;
-  /** 공간의 모든 에이전트 (보고 대상 고르기) */
+  /** 공간의 모든 에이전트 (검토자 고르기) */
   agents: readonly Agent[];
-  /** 관리자의 이름 (보고 대상이 없으면 이 사람에게) */
-  ownerName: string;
   /** 묶을 수 있는 러너 (실행 러너 고르기) */
   runners: readonly RunnerChoice[];
   /** 공간의 외부 도구 (허락 칸, 2차 7단계) */
@@ -87,16 +82,12 @@ export function AgentForm({
     model: agent?.model ?? '',
     effort: agent?.effort ?? '',
   });
-  const [reportsTo, setReportsTo] = useState(agent?.reportsTo ?? '');
   const [runnerId, setRunnerId] = useState(agent?.runnerId ?? '');
   const [reviewerId, setReviewerId] = useState(agent?.reviewerId ?? '');
   const [access, setAccess] = useState<Access>({
-    scopes: agent?.scopes ?? [],
-    actions: agent?.approvalActions ?? [],
+    actions: agent?.approvalActions ?? BROWSE_ACTIONS,
     tools: agent?.externalTools ?? [],
   });
-  const { scopes } = access;
-  const sandboxed = scopes.includes('code') || scopes.includes('make');
   const [limit, setLimit] = useState(agent?.monthlyLimit?.toString() ?? '');
   const [fiveHour, setFiveHour] = useState(agent?.fiveHourLimit?.toString() ?? '');
   const [planStop, setPlanStop] = useState(agent?.planStopPercent?.toString() ?? '');
@@ -133,15 +124,12 @@ export function AgentForm({
         name: name.trim(),
         role: role.trim(),
         tool,
-        scopes,
         approvalActions: access.actions,
         externalTools: access.tools,
         monthlyLimit,
         fiveHourLimit,
         planStopPercent,
-        reportsTo: reportsTo || null,
-        // 코드 · 만들기는 코드 러너 칸에서만 돌아 묶지 않는다 (서버도 막는다)
-        runnerId: sandboxed ? null : runnerId || null,
+        runnerId: runnerId || null,
         model: runtime.model.trim(),
         effort: runtime.effort,
         ...(agent ? { reviewerId: reviewerId || null } : {}),
@@ -177,6 +165,7 @@ export function AgentForm({
           maxLength={2000}
           onChange={(e) => change(() => setRole(e.target.value))}
         />
+        <small>모든 일꾼은 같은 일을 해요. 역할은 대표가 맡길 때 참고해요</small>
       </div>
       <div className="field">
         <label htmlFor={`${id}-tool`}>AI 도구</label>
@@ -205,18 +194,9 @@ export function AgentForm({
         value={runtime}
         onChange={(value) => change(() => setRuntime(value))}
       />
-      <BossField
-        id={`${id}-boss`}
-        value={reportsTo}
-        agent={agent}
-        agents={agents}
-        ownerName={ownerName}
-        onChange={(value) => change(() => setReportsTo(value))}
-      />
       <RunnerField
         id={`${id}-runner`}
         value={runnerId}
-        sandboxed={sandboxed}
         runners={runners}
         onChange={(value) => change(() => setRunnerId(value))}
       />

@@ -23,7 +23,7 @@
       "lookups": { "provides": ["app", "community-app"], "asks": ["wiki", "session"] },
       "registries": {
         "provides": ["action-checks", "app-hosts", "settings"],
-        "asks": ["agents", "leases", "site", "teams"]
+        "asks": ["leases", "site"]
       }
     },
     "task": {
@@ -31,7 +31,7 @@
       "schemas": ["task"],
       "lookups": { "asks": ["app"] },
       "registries": {
-        "provides": ["agents", "leases", "run-records", "settings", "teams"],
+        "provides": ["leases", "run-records", "settings"],
         "asks": ["action-checks", "settings", "site"]
       }
     },

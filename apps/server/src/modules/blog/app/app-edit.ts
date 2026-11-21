@@ -22,28 +22,16 @@ import { AppRepository } from './app.repository';
 export class AppEdit {
   /**
    * 대화로 바꾸는 앱 (get_settings apps · propose_setting app). 종류 · 시작 메뉴는 만들 때만, 공개 여부 · 첫 화면 고정은 없다.
-   * 운영 팀장 · 편집 방침은 스토어 2단계 (팀장 확인은 AppService가 트랜잭션 전에). new_team(true, 만들 때만, 스토어 2-6)은
-   * 승인 뒤 앱 운영 팀을 새로 만들어 운영 팀장으로 넣는다 (AppService가 platform AgentDirectory.teamFor로 부탁한다)
+   * 편집 방침은 스토어 2단계. 앱의 운영 팀(운영 팀장 · new_team)은 없앴다 (2026-11-21 팀 없는 에이전트: 대표가 누구에게나 맡긴다)
    */
   static readonly SETTING: SettingShape = {
     setting: 'app',
     list: 'apps',
     ops: ['create', 'edit'],
-    fields: [
-      'name',
-      'slug',
-      'kind',
-      'description',
-      'sort',
-      'menus',
-      'agent_id',
-      'policy',
-      'new_team',
-    ],
+    fields: ['name', 'slug', 'kind', 'description', 'sort', 'menus', 'policy'],
     target: 'id',
     versioned: true,
-    // 앱 운영 팀 새로 만들기는 에이전트 넷을 더한다 (스토어 2-6)
-    grants: ['new_team'],
+    grants: [],
   };
   /** 종류마다 시작 메뉴 (menus를 보내지 않았을 때): 블로그는 글 목록, 매거진은 호 목록 */
   private static readonly BLOG_STARTER = ['글', 'posts', Menu.POSTS] as const;
@@ -95,28 +83,11 @@ export class AppEdit {
     return app;
   }
 
-  /** 승인한 앱 만들기가 앱 운영 팀을 새로 만들자고 했는가 (스토어 2-6). 모양은 apply가 본다 */
-  static wantsTeam(change: SettingChangeInput): boolean {
-    return change.op === 'create' && change.body.new_team === true;
-  }
-
-  /**
-   * 설정 바꾸기 하나: body는 get_settings와 같은 칸, key는 만들기의 requestId.
-   * leader: 승인 뒤 적용에서 new_team으로 만든 팀의 팀장 (미리 해 보기는 null: 팀장 없이 지나 본다)
-   */
-  apply(change: SettingChangeInput, now: Date, leader: string | null = null): Promise<App> {
-    const { kind, menus, agent_id: chosen, new_team: newTeam, ...rest } = change.body;
-    if ('visibility' in rest || 'home' in rest || 'domain' in rest)
+  /** 설정 바꾸기 하나: body는 get_settings와 같은 칸, key는 만들기의 requestId */
+  apply(change: SettingChangeInput, now: Date): Promise<App> {
+    const { kind, menus, ...fields } = change.body;
+    if ('visibility' in fields || 'home' in fields || 'domain' in fields)
       throw new RuleViolation('공개 여부 · 첫 화면 · 도메인은 관리자가 앱 관리에서 바꿔요');
-    if (newTeam !== undefined) {
-      if (change.op !== 'create')
-        throw new RuleViolation('운영 팀 새로 만들기는 앱을 만들 때만 해요');
-      if (newTeam !== true) throw new RuleViolation('new_team은 true만 받아요');
-      if (chosen !== undefined && chosen !== null)
-        throw new RuleViolation('운영 팀장을 고르거나 새로 만들거나 하나만 해요');
-    }
-    const agentId = leader ?? chosen;
-    const fields = { ...rest, ...(agentId === undefined ? {} : { agentId }) };
     if (change.op === 'create')
       return this.create(
         CreateAppInput.from({ ...fields, kind, menus, requestId: change.key }),

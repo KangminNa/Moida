@@ -9,7 +9,7 @@ export interface ActionTarget {
 
 // 결재 동작 확인 (2차 6단계): 결과 카드에 싣기 전에, 동작의 대상을 가진 모듈에 "지금 실행하면 무엇이 빠졌나"를 묻는다.
 // 예: blog는 메뉴에 올리지 않은 글의 발행을 짚는다 (받을 것 "블로그"의 검사). 모듈이 동작마다 한 번 등록하고,
-// 묻는 쪽(task)은 무엇을 보는지 모른다 (Leases · AgentDirectory와 같은 방식). 등록되지 않은 동작은 보지 않는다
+// 묻는 쪽(task)은 무엇을 보는지 모른다 (Leases와 같은 방식). 등록되지 않은 동작은 보지 않는다
 @Injectable()
 export class ActionChecks {
   private readonly checks = new Map<

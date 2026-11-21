@@ -222,33 +222,6 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     return (await this.rootOf(taskId))?.chat_id ?? null;
   }
 
-  /**
-   * 브라우저 일을 맡겨도 되는가를 보는 "비공개를 읽었는가" (O-2, DelegationPolicy): 대화의 일이면 그 대화의 모든 회차 ·
-   * 덧붙인 말의 답 · 검토와 그 아래 전부, 대화가 아니면(목표 실행의 회차 · REST로 연 일) 맨 위 작업과 그 아래.
-   * 그 안에 비공개를 읽는 에이전트(전체 읽기 · 초안 작성, 지금 권한)의 작업이 하나라도 있거나 비공개 참조(payload.refs)가 있으면 참
-   */
-  async privateTouched(spaceId: string, taskId: string): Promise<boolean> {
-    const root = await this.rootOf(taskId);
-    if (!root) return false;
-    const seed =
-      root.chat_id === null
-        ? this.sql`id = ${root.id}`
-        : this.sql`request_id LIKE ${`chat:${root.chat_id}:%`}`;
-    const [row] = await this.sql<{ touched: boolean }[]>`
-      WITH RECURSIVE tree AS (
-        SELECT id FROM task.tasks WHERE space_id = ${spaceId} AND ${seed}
-        UNION ALL
-        SELECT t.id FROM task.tasks t JOIN tree ON t.parent_id = tree.id
-      )
-      SELECT EXISTS (
-        SELECT 1 FROM tree JOIN task.tasks t ON t.id = tree.id
-        LEFT JOIN task.agents a ON a.id = t.agent_id
-        WHERE a.scopes && ARRAY['read_all', 'write']::text[]
-           OR t.payload->'refs' @> '[{"private": true}]'::jsonb
-      ) AS touched`;
-    return row?.touched === true;
-  }
-
   /** 맨 위 작업 (위 작업을 따라 10단계까지)과 그 대화 */
   private async rootOf(taskId: string): Promise<{ id: string; chat_id: string | null } | null> {
     const [row] = await this.sql<{ id: string; chat_id: string | null }[]>`

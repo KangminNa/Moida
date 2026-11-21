@@ -9,12 +9,9 @@ import { SubtaskWait } from './subtask-wait.policy';
 import { TaskKinds } from './task-kinds';
 import { TaskRefs } from './task-refs.policy';
 
-// 위임 하나의 판단 (Task.assertCanDelegate · subtask가 부른다): 한도와 하위 작업의 모양. 받는 쪽 · 종류 · 권한은 코드가 막고 LLM에게 맡기지 않는다.
-// 브라우저 일(browse, 2차 3단계 2026-11-14)은 맡기는 쪽도 비공개(전체 읽기 · 초안 작성)를 읽지 못해야 한다:
-// 맡기는 쪽이 쓴 지시문이 곧 브라우저 담당의 재료라서, 비공개가 지시문을 타고 바깥 사이트로 갈 수 있다.
-// 그런 에이전트는 브라우저 일을 맡기지 못하고, 관리자가 브라우저 메뉴에서 맡긴다.
-// O-2 (2026-11-18): 대표는 비공개를 읽지 않지만 대화 안에서 비공개를 읽은 팀의 결과를 받는다. 그래서 대화 단위로 본다:
-// 그 대화(대화가 아니면 맨 위 작업의 나무)가 비공개를 읽었으면(tainted, TaskRepository.privateTouched) 아무도 브라우저 일을 맡기지 못한다
+// 위임 하나의 판단 (Task.assertCanDelegate · subtask가 부른다): 한도와 하위 작업의 모양. 받는 쪽 · 종류는 코드가 막고 LLM에게 맡기지 않는다.
+// 팀 없는 같은 일꾼 (2026-11-21, 사용자 결정 "비공개도 그냥 읽어"): 대표만 맡기고 일꾼은 모두 같은 권한이다.
+// 비공개를 읽은 대화에서 브라우저 일을 막던 규칙은 없앴다. 바깥을 바꾸는 동작은 원칙 7대로 승인 뒤, 비밀값은 원칙 8대로 AI 밖
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳
 export class DelegationPolicy {
   /** 위임 한도: 깊이(주인이 맡긴 작업이 0), 작업 하나가 위임하는 횟수, 한 번에, 작업 하나에 */
@@ -22,8 +19,6 @@ export class DelegationPolicy {
   static readonly ROUNDS_MAX = 3;
   static readonly DELEGATE_AT_ONCE = 5;
   static readonly SUBTASKS_MAX = 10;
-  /** 브라우저 일을 맡기는 쪽에게 없어야 하는 권한 (browse와 함께 줄 수 없는 권한과 같다) */
-  private static readonly NOT_WITH_BROWSE: readonly string[] = [Actor.READ_ALL, Actor.WRITE];
 
   /** 이 권한을 가진 에이전트에게 맡길 수 있는 일의 종류 (팀원 정보의 kinds) */
   static kindsFor(scopes: readonly string[]): readonly string[] {
@@ -33,8 +28,8 @@ export class DelegationPolicy {
   }
 
   /**
-   * 받는 쪽은 manager의 바로 아래 팀원, 종류는 위임할 수 있는 것(delegable), 받는 쪽은 그 일에 필요한 권한(needs)을 가졌는가.
-   * 필요한 권한에 browse가 있으면 맡기는 쪽에게 전체 읽기 · 초안 작성이 없어야 하고, 이 일의 대화가 비공개를 읽지 않았어야 한다
+   * 맡기는 쪽은 대표, 받는 쪽은 지우지 않은 일꾼(Agent.manages), 종류는 위임할 수 있는 것(delegable),
+   * 받는 쪽은 그 일에 필요한 권한(needs)을 가졌는가 (권한은 모두 같아 옛 판 · 잘못된 값만 걸린다)
    */
   static assert(
     manager: Agent,
@@ -42,24 +37,13 @@ export class DelegationPolicy {
     kind: string,
     delegable: readonly string[],
     needs: readonly string[],
-    tainted = false,
   ): asserts worker is Agent {
     if (worker === null || !manager.manages(worker))
-      throw new Forbidden(Actor.AGENT, '바로 아래 팀원에게만 맡길 수 있어요');
+      throw new Forbidden(Actor.AGENT, '대표만 일꾼에게 맡길 수 있어요');
     if (!delegable.includes(kind))
       throw new RuleViolation(`맡길 수 있는 일은 ${delegable.join(' · ')}예요: ${kind}`);
     if (!needs.every((scope) => worker.scopes.includes(scope)))
       throw new RuleViolation(`${worker.name}의 권한으로는 할 수 없는 일이에요: ${kind}`);
-    const reader = DelegationPolicy.NOT_WITH_BROWSE.some((s) => manager.scopes.includes(s));
-    if (!needs.includes(Actor.BROWSE)) return;
-    if (reader)
-      throw new RuleViolation(
-        '전체 읽기 · 초안 작성 권한이 있는 에이전트는 브라우저 일을 맡기지 못해요 (관리자가 브라우저 메뉴에서 맡겨요)',
-      );
-    if (tainted)
-      throw new RuleViolation(
-        '비공개를 읽은 대화에서는 브라우저 일을 맡기지 못해요 (새 대화에서 맡겨요)',
-      );
   }
 
   /**
@@ -100,10 +84,10 @@ export class DelegationPolicy {
   }
 
   /**
-   * 하위 작업 하나의 칸. 받는 쪽은 manager의 바로 아래 팀원이어야 하고, 그 에이전트의 권한으로 할 수 있는 종류여야 한다 (assert).
+   * 하위 작업 하나의 칸. 받는 쪽은 대표가 맡길 수 있는 일꾼이어야 하고, 그 에이전트의 권한으로 할 수 있는 종류여야 한다 (assert).
    * 하위 작업은 위 작업의 목표와 우선순위를 물려받고, 담당은 worker로 정해진다.
    * code는 code 작업에서만 맡긴다: 위 작업의 저장소 · 명령을 물려받고 경로(paths)는 위 작업의 경로 안으로 좁힌다 (CodeScope).
-   * 참조(refs)는 위 작업의 참조 가운데 고른 것만 넘긴다 (TaskRefs.handOn). tainted: 이 일의 대화가 비공개를 읽었다 (브라우저 일 막기)
+   * 참조(refs)는 위 작업의 참조 가운데 고른 것만 넘긴다 (TaskRefs.handOn)
    */
   static subtask(
     parent: TaskRow,
@@ -111,12 +95,11 @@ export class DelegationPolicy {
     manager: Agent,
     worker: Agent | null,
     order: SubtaskOrder,
-    tainted: boolean,
   ): Omit<TaskNew, 'id' | 'space_id'> {
     const { fields, paths, refs } = order;
     const { kind } = fields;
     const needs = TaskKinds.SCOPES[kind] ?? [];
-    DelegationPolicy.assert(manager, worker, kind, TaskKinds.DELEGABLE, needs, tainted);
+    DelegationPolicy.assert(manager, worker, kind, TaskKinds.DELEGABLE, needs);
     // 모델 상한: 맡기는 일이 쓰는 모델(대화가 정한 것 → 맡기는 에이전트의 설정) 이하에서 (ModelTier)
     const model = ModelTier.forSubtask(
       DelegationPolicy.modelOf(parent) || manager.model,
@@ -129,7 +112,7 @@ export class DelegationPolicy {
       payload: {
         delegatedBy: parent.id,
         ...CodeScope.forSubtask(kind, paths, parentScope),
-        ...TaskRefs.of(parent.payload).handOn(refs, worker).payload,
+        ...TaskRefs.of(parent.payload).handOn(refs).payload,
         ...(order.deliver ? { deliver: order.deliver } : {}),
         // 앱 코드를 고치는 make 일 (스토어 1-6b): 어느 앱인지만 물려준다. make 일이 아니면 MakeOrder가 막는다
         ...(order.appId ? { appCode: { appId: order.appId } } : {}),

@@ -34,9 +34,6 @@ import { TaskKinds } from './task-kinds';
 import type { SetPlanInput } from './task-plan.input';
 import { TaskPlan } from './task-plan.policy';
 import { PlanSetView } from './task-plan.view';
-import { TeamReview } from './team-review.policy';
-import { TeamReviewQuery } from './team-review.query';
-import { TeamRoster } from './team-roster';
 
 // 작업 쓰기: 만들기와 취소(주인), 일 요청(이벤트), 위임(에이전트가 작업 토큰으로)과 하위 작업이 끝났을 때 위 작업 깨우기(일꾼).
 // 팀원 기다리기 (2026-11-19, SubtaskWait): 기한 · 실패 · 관리자 재촉으로 먼저 깨우기, 더 기다리기(wait_subtasks).
@@ -50,7 +47,6 @@ export class TaskService extends BaseService {
     private readonly query: TaskQuery,
     private readonly lessons: LessonQuery,
     private readonly skills: SkillQuery,
-    private readonly reviews: TeamReviewQuery,
     private readonly plugins: PluginRegistry,
   ) {
     super(db);
@@ -89,34 +85,6 @@ export class TaskService extends BaseService {
       title: Lessons.TITLE,
       instruction,
       priority: Lessons.PRIORITY,
-    });
-    return this.open(actor, spaceId, req);
-  }
-
-  /**
-   * 주간 팀 점검 (2026-11-20, TeamReview): 지난 점검 뒤로 7일이 지났고 그동안 끝난 일이 쌓였으면 대표에게 성적표를 실은
-   * 점검 일 하나를 맡긴다. 대표가 없거나 열린 점검이 있으면 아무것도 하지 않는다 (두 번 불려도 날마다 하나)
-   */
-  async reviewTeam(actor: Actor, spaceId: string): Promise<Task | null> {
-    actor.assertCan(Actor.RUN);
-    const now = new Date();
-    const lead = await this.reviews.lead(actor, spaceId);
-    if (lead === null) return null;
-    const last = await this.reviews.last(actor, spaceId);
-    const done = await this.reviews.doneSince(actor, spaceId, TeamReview.since(last, now));
-    if (!TeamReview.due(last, done, now, lead.created_at)) return null;
-    const members = await this.reviews.members(actor, spaceId);
-    const scores = await this.reviews.scores(actor, spaceId, now);
-    const instruction = (await this.skills.prompts(actor, spaceId)).fill(
-      'team-review',
-      TeamReview.fields(members, scores, TeamRoster.SCORE_DAYS),
-    );
-    const req = CreateTaskInput.from({
-      requestId: TeamReview.requestId(spaceId, now),
-      agentId: lead.id,
-      title: TeamReview.TITLE,
-      instruction,
-      priority: TeamReview.PRIORITY,
     });
     return this.open(actor, spaceId, req);
   }
@@ -167,10 +135,8 @@ export class TaskService extends BaseService {
       const org = await new AgentRepository(tx).all(spaceId);
       const manager = org.find((a) => a.id === agentId);
       if (!manager) throw new Forbidden(Actor.AGENT);
-      const tainted = await tasks.privateTouched(spaceId, parent.id);
-      SubtaskAfter.assertSafe(req.subtasks, org);
       const order = (s: SubtaskOrder) =>
-        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now, tainted);
+        parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now);
       later.forEach(order); // 받는 쪽 · 종류 · 한도는 지금 본다 (만들기는 앞 단계 뒤)
       const made = first.map(order);
       // 코드 하위 작업끼리(아직 안 끝난 형제 포함) 고칠 곳이 겹치면 PR이 부딪친다
@@ -298,7 +264,7 @@ export class TaskService extends BaseService {
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const task = await tasks.lock(spaceId, req.id);
-      if (!task.waitingForSubtasks) throw new Conflict('팀원을 기다리는 일이 아니에요');
+      if (!task.waitingForSubtasks) throw new Conflict('하위 작업을 기다리는 일이 아니에요');
       task.wakeAfterSubtasks(SubtaskWait.CHANGE, new Date());
       await tasks.save(task);
       return task;

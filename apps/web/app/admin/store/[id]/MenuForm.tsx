@@ -3,7 +3,6 @@
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { MENU_KIND_LABELS } from '../../../_blog/labels';
 import type { Menu } from '../../../_blog/types';
-import type { Agent } from '../../../_task/types';
 
 /** 칸의 길이 (서버 Menu의 값과 같다) */
 const NAME_MAX = 40;
@@ -17,15 +16,13 @@ export type MenuBody = {
   slug?: string;
   sort: number;
   policy: string;
-  agentId: string | null;
   rss: boolean;
 };
 
 // 메뉴 하나를 만들거나 고치는 폼: 칸의 상태와 보낼 본문만 가진다. 저장은 패널이 돌린다.
-// 종류는 만들 때만 고른다. 운영 팀은 비공개를 읽지 않는 에이전트만 보인다 (서버도 422로 막는다).
+// 종류는 만들 때만 고른다.
 export function MenuForm({
   menu,
-  agents,
   busy,
   problem,
   onSubmit,
@@ -34,7 +31,6 @@ export function MenuForm({
 }: {
   /** 고칠 메뉴. 없으면 새로 만든다 */
   menu: Menu | null;
-  agents: readonly Agent[];
   busy: boolean;
   problem: string | null;
   /** 저장. 됐으면 true */
@@ -48,10 +44,8 @@ export function MenuForm({
   const [slug, setSlug] = useState(menu?.slug ?? '');
   const [sort, setSort] = useState(menu?.sort ?? 0);
   const [policy, setPolicy] = useState(menu?.policy ?? '');
-  const [agentId, setAgentId] = useState(menu?.agentId ?? '');
   const [rss, setRss] = useState(menu?.rss ?? true);
   const requestId = useRef<string | null>(null);
-  const team = agents.filter((a) => !a.scopes.includes('read_all') || a.id === agentId);
 
   function edit(apply: () => void) {
     requestId.current = null;
@@ -67,7 +61,6 @@ export function MenuForm({
       ...(slug.trim() ? { slug: slug.trim() } : {}),
       sort,
       policy: policy.trim(),
-      agentId: agentId || null,
       rss,
     };
     requestId.current ??= crypto.randomUUID();
@@ -147,23 +140,6 @@ export function MenuForm({
           onChange={(e) => edit(() => setPolicy(e.target.value))}
         />
         <small>이 메뉴에 쓰는 AI가 읽음</small>
-      </div>
-      <div className="field">
-        <label htmlFor={`${id}-agent`}>운영 팀</label>
-        <select
-          id={`${id}-agent`}
-          className="input"
-          value={agentId}
-          onChange={(e) => edit(() => setAgentId(e.target.value))}
-        >
-          <option value="">없음</option>
-          {team.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <small>비공개를 읽지 않는 에이전트만</small>
       </div>
       <label className="check">
         <input type="checkbox" checked={rss} onChange={() => edit(() => setRss(!rss))} />

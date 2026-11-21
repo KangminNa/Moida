@@ -373,8 +373,8 @@ export class Job {
     if (this.skill && skillReady) parts.push(prompts.fill('skill', { name: this.skill }));
     else if (this.skill && skillText)
       parts.push(prompts.fill('skill', { name: this.skill, text: skillText.trim() }));
-    // 도움 요청 (2026-11-20): 팀장이 맡긴 일이고 아래 팀이 없을 때만 (아래 팀이 있으면 그 팀에 나눠 맡긴다)
-    const help = this.delegated && this.team.length === 0;
+    // 도움 요청 (2026-11-20): 대표가 맡긴 일에서만 (일꾼은 맡기지 않고 대표에게 나눌 부분을 알린다, 2026-11-21)
+    const help = this.delegated;
     parts.push(prompts.fill('work', { outputs: outputsDir, browse: this.isBrowse, help }));
     // 외부 도구 (2차 7단계): 어댑터가 붙이는 조건과 같다 (MCP가 붙는 일, 셸이 없는 일)
     const tools = this.runToken === null || this.sandboxed ? [] : this.runtime.tools;

@@ -173,7 +173,7 @@ export function ChatForm({
           aria-label="메시지"
           placeholder={
             refsEnabled
-              ? '팀에게 맡길 일을 적어요 (+ 단추나 @로 위키 · 파일 · 주소 넣기)'
+              ? '맡길 일을 적어요 (+ 단추나 @로 위키 · 파일 · 주소 넣기)'
               : '메시지 (Enter로 보내기, Shift+Enter로 줄 바꿈)'
           }
           rows={rows}

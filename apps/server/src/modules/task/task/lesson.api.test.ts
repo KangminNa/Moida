@@ -109,7 +109,6 @@ before(async () => {
       requestId: randomUUID(),
       name: `글쓰기 ${randomUUID().slice(0, 6)}`,
       tool: 'claude',
-      scopes: ['read_public', 'write'],
       approvalActions: ['blog.post.publish', 'browser.site.login'],
     }),
     201,

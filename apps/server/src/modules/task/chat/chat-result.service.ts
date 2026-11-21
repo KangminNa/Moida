@@ -83,7 +83,7 @@ export class ChatResultService extends BaseService {
       // 두 번째 검수자 (2026-11-20, 선택): 있으면 둘 다 따로 검수한다
       const second = agents.find((a) => a.id === partner?.secondInspectorId && !a.deleted) ?? null;
       const inspectors = [inspector, second].filter((a): a is Agent => a !== null);
-      const due = inspector ? actions.filter((a) => ChatInspect.due(a, inspectors, agents)) : [];
+      const due = inspector ? actions.filter((a) => ChatInspect.due(a, inspectors)) : [];
       if (inspector && due.length > 0) {
         for (const approval of due) {
           const fixed = await approvals.inspectorFixes(approval);

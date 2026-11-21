@@ -45,17 +45,9 @@ export interface TeamStatRow {
   scorecard: Readonly<Record<string, number | null>> | null;
 }
 
-/** 팀원 아래 팀 전체의 요약 (이름 없이, O-2): 사람 수, 맡길 수 있는 일마다 · 켜진 커넥터마다 몇 명 */
-export interface SubTeamRow {
-  members: number;
-  kinds: Readonly<Record<string, number>>;
-  connectors: Readonly<Record<string, number>>;
-}
-
-/** next_jobs의 팀원 한 명: 이 에이전트가 일을 맡길 수 있는 바로 아래 팀원 (팀원 정보 D1, TeamRoster) */
+/** next_jobs의 일꾼 한 명: 대표가 일을 맡길 수 있는 에이전트 (팀원 정보 D1, TeamRoster. 팀은 2026-11-21에 없앴다) */
 export class JobTeamMemberView {
   private stat: Readonly<TeamStatRow> | null = null;
-  private team: Readonly<SubTeamRow> | null = null;
 
   constructor(
     private readonly row: Readonly<AgentRow>,
@@ -63,10 +55,9 @@ export class JobTeamMemberView {
     private readonly kinds: readonly string[],
   ) {}
 
-  /** 일 수 · 커넥터 · 바로 아래 팀 요약 (팀원 정보, 2026-11-17) */
-  withStats(stat: Readonly<TeamStatRow> | null, team: Readonly<SubTeamRow> | null): this {
+  /** 일 수 · 커넥터 · 성적표 (팀원 정보, 2026-11-17) */
+  withStats(stat: Readonly<TeamStatRow> | null): this {
     this.stat = stat;
-    this.team = team;
     return this;
   }
 
@@ -87,7 +78,6 @@ export class JobTeamMemberView {
       recent: { done: s?.done ?? 0, failed: s?.failed ?? 0, revised: s?.revised ?? 0 },
       scorecard: s?.scorecard ?? null,
       connectors: s?.connectors ?? [],
-      team: this.team,
     };
   }
 }

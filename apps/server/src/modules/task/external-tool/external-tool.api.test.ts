@@ -54,7 +54,6 @@ const agent = async (more: Json = {}) =>
       requestId: randomUUID(),
       name: `도구 ${randomUUID().slice(0, 6)}`,
       tool: 'claude',
-      scopes: ['read_public'],
       ...more,
     }),
     201,
@@ -226,28 +225,14 @@ describe('외부 도구 (/api/external-tools)', () => {
     assert.deepEqual((await take(a.id)).tools, [], '끈 도구는 빠진다');
   });
 
-  test('비공개 · 셸 권한의 에이전트에는 붙이지 못하고, 없는 도구는 허락하지 못한다 (422)', async () => {
+  test('비공개를 읽고 셸을 쓰는 에이전트에도 붙인다 (2026-11-21, 같은 일꾼). 없는 도구는 허락하지 못한다 (422)', async () => {
     ok(await create({ name: 'plain', title: '평범', url: 'https://plain.example.com/mcp' }), 201);
-    for (const scopes of [['read_all'], ['write'], ['code'], ['make']])
-      assert.equal(
-        (
-          await api.request('POST', '/api/agents', owner, {
-            requestId: randomUUID(),
-            name: '막힘',
-            tool: 'claude',
-            scopes,
-            externalTools: ['plain'],
-          })
-        ).status,
-        422,
-        scopes.join(),
-      );
     const a = await agent({ externalTools: ['plain'] });
-    assert.equal(
-      (await patchAgent(a.id, { scopes: ['read_all'] })).status,
-      422,
-      '붙인 채로 비공개',
-    );
+    assert.deepEqual(a.externalTools, ['plain']);
+    const [row] = await db.sql<{ scopes: string[] }[]>`
+      SELECT scopes FROM task.agents WHERE id = ${String(a.id)}`;
+    for (const scope of ['read_all', 'write', 'code', 'make'])
+      assert.ok(row?.scopes.includes(scope), `${scope} 권한과 함께`);
     assert.equal((await patchAgent(a.id, { externalTools: ['no-such'] })).status, 422);
   });
 
@@ -269,8 +254,8 @@ describe('외부 도구 (/api/external-tools)', () => {
 });
 
 describe('AI의 제안 → 결재 → 붙음', () => {
-  async function propose(scopes: readonly string[] = ['read_public']) {
-    const a = await agent({ scopes, approvalActions: ['task.tool.plug'] });
+  async function propose() {
+    const a = await agent({ approvalActions: ['task.tool.plug'] });
     const job = await take(a.id);
     return { a, job, token: String(job.run_token) };
   }
@@ -338,17 +323,25 @@ describe('AI의 제안 → 결재 → 붙음', () => {
     assert.equal(await one('rejected-one'), undefined);
   });
 
-  test('비공개를 읽는 에이전트는 제안하지 못하고, 토큰 칸은 받지 않는다', async () => {
-    const { token } = await propose(['read_all']);
-    const blocked = await tool(token, 'propose_tool', {
+  test('비공개를 읽는 에이전트도 제안한다 (2026-11-21). 토큰 칸은 받지 않는다', async () => {
+    const { token } = await propose();
+    const proposed = await call(token, 'propose_tool', {
       request_id: randomUUID(),
-      name: 'leak',
-      title: '새는 것',
-      url: 'https://mcp.leak.example.com',
+      name: 'from-private',
+      title: '비공개를 읽는 에이전트의 제안',
+      url: 'https://mcp.private.example.com',
+      header_name: 'Authorization',
+      secret: SECRET,
       note: '-',
     });
-    assert.equal(blocked.ok, false);
-    assert.equal(await one('leak'), undefined);
+    assert.equal(proposed.status, 'proposed');
+    assert.equal(JSON.stringify(proposed).includes('tool-secret'), false);
+    const made = await one('from-private');
+    assert.deepEqual(
+      [made?.status, made?.hasSecret],
+      ['proposed', false],
+      '토큰은 관리자가 넣는다',
+    );
   });
 });
 

@@ -12,6 +12,7 @@ import {
   Outbox,
   OutboxWorker,
 } from '../platform';
+import { AGENT_SCOPE } from './task.tables';
 
 // 결과 이벤트: 결과를 담는 주제(ApprovalResultHandler.TOPICS) 가운데 칸이 approvalId · outcome · error?뿐인 task의 주제로
 // 실행하는 모듈 없이 결과를 흉내 낸다 (다른 모듈의 진짜 주제를 칸을 덜 채워 흉내 내지 않는다, 리팩토링 R3c).
@@ -72,7 +73,6 @@ async function newAgent(more: Json = {}): Promise<Json> {
       requestId: randomUUID(),
       name: '글쓰기',
       tool: 'claude',
-      scopes: ['read_public', 'write'],
       approvalActions: ['blog.post.publish'],
       ...more,
     }),
@@ -150,6 +150,31 @@ async function noReceivers(): Promise<ReadonlySet<unknown>> {
   return receivers;
 }
 
+/** 대표 (O-2): 첫 대화에서 생긴다. 같은 DB를 쓰는 앞 파일이 이미 만들었을 수 있다. 첫 대화의 회차는 닫는다 */
+async function leadAgent(): Promise<Json> {
+  const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+  if (found) return found;
+  ok(
+    await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      message: '대표를 만드는 첫 대화',
+    }),
+    201,
+  );
+  const lead = ok(await api.get('/api/agents/lead', owner)).lead as Json;
+  await db.sql`
+    UPDATE task.tasks SET status = 'cancelled', lease_until = NULL, wait_reason = NULL, wait_until = NULL
+    WHERE agent_id = ${String(lead.id)} AND status IN ('queued', 'running', 'waiting')`;
+  return lead;
+}
+
+/** 에이전트의 권한 (화면에는 싣지 않는다: 모두 같다) */
+async function scopesOf(agent: Json): Promise<string[]> {
+  const [row] = await db.sql<{ scopes: string[] }[]>`
+    SELECT scopes FROM task.agents WHERE id = ${String(agent.id)}`;
+  return row?.scopes ?? [];
+}
+
 async function spaceId(): Promise<string> {
   const [row] = await db.sql`SELECT space_id FROM task.agents LIMIT 1`;
   return String(row?.space_id);
@@ -223,14 +248,19 @@ describe('누가 쓸 수 있나', () => {
     assert.equal((await askApproval(runner)).body.scope, 'agent');
   });
 
-  test('에이전트에게 러너의 권한을 줄 수 없다', async () => {
-    const res = await api.request('POST', '/api/agents', owner, {
-      requestId: randomUUID(),
-      name: '러너가 되려는 에이전트',
-      tool: 'claude',
-      scopes: ['run'],
-    });
-    assert.equal(res.status, 422);
+  test('에이전트에게 러너의 권한을 줄 수 없다: 권한 칸은 받지 않고 늘 run 없는 전부다 (2026-11-21)', async () => {
+    const agent = ok(
+      await api.request('POST', '/api/agents', owner, {
+        requestId: randomUUID(),
+        name: '러너가 되려는 에이전트',
+        tool: 'claude',
+        scopes: ['run'],
+      }),
+      201,
+    );
+    const scopes = await scopesOf(agent);
+    assert.equal(scopes.includes('run'), false);
+    assert.deepEqual([...scopes].sort(), [...AGENT_SCOPE].sort());
   });
 });
 
@@ -505,7 +535,7 @@ describe('가짜 러너', () => {
 
 describe('일 요청 이벤트', () => {
   test('task.task.requested가 outbox를 거쳐 대기 중인 작업이 된다. 두 번 와도 하나', async () => {
-    const agent = await newAgent({ scopes: ['read_all', 'tidy'] });
+    const agent = await newAgent();
     const requestId = `tidy:${randomUUID()}`;
     const targetId = randomUUID();
     const event = new DomainEvent('task.task.requested', 1, await spaceId(), {
@@ -544,9 +574,9 @@ describe('일 요청 이벤트', () => {
 });
 
 describe('일의 종류와 권한', () => {
-  /** tidy 권한을 가진 에이전트를 모두 쉬게 한다. 이 테스트의 에이전트만 일을 맡게 */
+  /** 대표 말고 모두 쉬게 한다. 이 테스트의 에이전트만 일을 맡게 (대표는 담당 없는 일을 맡지 않는다) */
   beforeEach(async () => {
-    await db.sql`UPDATE task.agents SET status = 'paused' WHERE 'tidy' = ANY(scopes)`;
+    await db.sql`UPDATE task.agents SET status = 'paused' WHERE NOT lead`;
   });
 
   const next = async (): Promise<Json[]> => {
@@ -555,47 +585,46 @@ describe('일의 종류와 권한', () => {
     return body.jobs as Json[];
   };
 
-  test('tidy_session은 tidy가 없는 에이전트에게 가지 않고 대기열에 남아 뒤의 일을 막지 않는다', async () => {
-    await newAgent({ scopes: ['read_public', 'write'] });
+  test('모든 에이전트가 tidy · 전체 읽기를 가져 담당 없는 tidy_session을 가장 먼저 만든 움직이는 에이전트가 맡는다 (2026-11-21)', async () => {
+    const first = await newAgent();
+    await newAgent();
+    for (const scope of ['tidy', 'read_all'])
+      assert.equal((await scopesOf(first)).includes(scope), true, scope);
     const tidy = await newTask(null, { kind: 'tidy_session', instruction: '정리해 주세요' });
-    const other = await newTask(null);
 
     const [job, ...rest] = await next();
     assert.equal(rest.length, 0);
-    assert.equal((job?.task as Json | undefined)?.id, other.id, '뒤의 일은 그대로 빌려 간다');
-    assert.equal((await getTask(tidy.id)).status, 'queued', '빌렸다가 돌려주지 않는다');
-    assert.equal((await getTask(tidy.id)).attempts, 0);
-    assert.equal((await next()).length, 0);
+    assert.equal((job?.task as Json | undefined)?.id, tidy.id);
+    assert.equal((job?.agent as Json | undefined)?.id, first.id);
+    assert.equal(job?.skill, 'cairn-tidy');
+    assert.equal((await getTask(tidy.id)).agentId, first.id);
   });
 
-  test('담당이 tidy가 없는 에이전트로 정해져 있어도 빌려 주지 않는다', async () => {
-    const plain = await newAgent({ scopes: ['read_public'] });
-    const task = await newTask(plain, { kind: 'tidy_session', instruction: '정리해 주세요' });
-    assert.equal((await next()).length, 0);
-    assert.equal((await getTask(task.id)).status, 'queued');
+  test('담당으로 정한 에이전트가 맡는다: 먼저 만든 에이전트를 건너뛴다', async () => {
+    await newAgent();
+    const chosen = await newAgent();
+    const task = await newTask(chosen, { kind: 'tidy_session', instruction: '정리해 주세요' });
+    const [job] = await next();
+    assert.equal((job?.task as Json | undefined)?.id, task.id);
+    assert.equal((job?.agent as Json | undefined)?.id, chosen.id);
   });
 
-  test('tidy가 있는 에이전트가 생기면 먼저 만든 에이전트를 건너뛰고 그 에이전트가 맡는다', async () => {
-    await newAgent({ scopes: ['read_public'] });
+  test('맡을 에이전트가 없으면 대기열에 남고(대표는 고르지 않는다), 에이전트가 생기면 그 에이전트가 맡는다', async () => {
+    await leadAgent();
     const task = await newTask(null, { kind: 'tidy_session', instruction: '정리해 주세요' });
     assert.equal((await next()).length, 0);
+    assert.equal((await getTask(task.id)).status, 'queued', '빌렸다가 돌려주지 않는다');
+    assert.equal((await getTask(task.id)).attempts, 0);
 
-    const able = await newAgent({ scopes: ['read_all', 'tidy'] });
+    const able = await newAgent();
     const [job] = await next();
     assert.equal((job?.task as Json | undefined)?.id, task.id);
     assert.equal((job?.agent as Json | undefined)?.id, able.id);
     assert.equal((await getTask(task.id)).agentId, able.id);
   });
 
-  test('tidy만 있고 전체 읽기가 없으면 맡지 않는다: 세션은 기본이 비공개다', async () => {
-    await newAgent({ scopes: ['tidy'] });
-    const task = await newTask(null, { kind: 'tidy_session', instruction: '정리해 주세요' });
-    assert.equal((await next()).length, 0);
-    assert.equal((await getTask(task.id)).status, 'queued');
-  });
-
-  test('tidy가 있어도 멈춘 에이전트는 맡지 않는다', async () => {
-    const able = await newAgent({ scopes: ['read_all', 'tidy'] });
+  test('멈춘 에이전트는 맡지 않는다', async () => {
+    const able = await newAgent();
     ok(await api.request('POST', `/api/agents/${able.id}/pause`, owner, { version: able.version }));
     const task = await newTask(null, { kind: 'tidy_session', instruction: '정리해 주세요' });
     assert.equal((await next()).length, 0);
@@ -882,58 +911,42 @@ describe('작업 토큰', () => {
     assert.equal((await api.mcp(`${job.run_token}x`, 'tools/list')).status, 401);
   });
 
-  test('에이전트의 권한만큼만 도구가 보이고 불린다', async () => {
-    await newTask(await newAgent({ scopes: ['read_public'] }));
-    const reader = await take();
-    const names = await toolNames(reader.run_token);
-    assert.deepEqual(names, [
+  test('모든 에이전트에게 같은 도구가 보인다 (2026-11-21 같은 권한). 러너의 도구는 없다', async () => {
+    await newTask(await newAgent());
+    const one = await take();
+    const names = await toolNames(one.run_token);
+    for (const name of [
       'search_sessions',
       'get_session',
       'search_wikis',
       'get_wiki',
-      'neighbors',
-      'request_approval',
-      'delegate_task',
-      'wait_subtasks',
-      'ask_help',
-      'set_plan',
-      'read_url',
-      'report_round',
-      'post_update',
-      'set_deliver',
-      'ask_brief',
-      'propose_tool',
-      'get_settings',
-      'propose_setting',
-    ]);
-    assert.equal((await tool(reader.run_token, 'save_session')).body.scope, 'upload');
-    assert.equal((await tool(reader.run_token, 'next_jobs')).body.scope, 'run');
-
-    await newTask(await newAgent({ scopes: ['upload'] }));
-    const uploader = await take();
-    assert.deepEqual((await toolNames(uploader.run_token)).sort(), [
-      'ask_brief',
-      'ask_help',
-      'check_session',
-      'delegate_task',
-      'get_settings',
-      'keep_page',
-      'post_update',
-      'propose_setting',
-      'propose_tool',
-      'read_url',
-      'report_round',
-      'request_approval',
       'save_session',
       'save_transcript',
-      'set_deliver',
-      'set_plan',
+      'check_session',
+      'keep_page',
+      'request_approval',
+      'delegate_task',
       'wait_subtasks',
-    ]);
+      'ask_help',
+      'set_plan',
+      'read_url',
+      'post_update',
+      'propose_tool',
+      'get_settings',
+      'propose_setting',
+    ])
+      assert.equal(names.includes(name), true, name);
+    for (const name of ['next_jobs', 'report_progress', 'submit_result', 'release_job'])
+      assert.equal(names.includes(name), false, name);
+    assert.equal((await tool(one.run_token, 'next_jobs')).body.scope, 'run');
+
+    await newTask(await newAgent({ name: '다른 에이전트' }));
+    const other = await take();
+    assert.deepEqual((await toolNames(other.run_token)).sort(), [...names].sort());
   });
 
   test('작업 토큰은 REST에서 쓸 수 없다', async () => {
-    await newTask(await newAgent({ scopes: ['write', 'read_all'] }));
+    await newTask(await newAgent());
     const job = await take();
     const headers = { authorization: `Bearer ${job.run_token}` };
     for (const path of ['/api/agents', '/api/approvals', '/api/devices', '/api/tasks']) {
@@ -1047,8 +1060,8 @@ describe('에이전트', () => {
     await take();
   });
 
-  test('권한과 맡길 동작은 목록 그대로 저장된다', async () => {
-    const agent = await newAgent({ scopes: ['read_public'], approvalActions: [] });
+  test('맡길 동작은 목록 그대로 저장된다. 권한 칸은 받지 않는다 (2026-11-21 모두 같은 권한)', async () => {
+    const agent = await newAgent({ approvalActions: [] });
     ok(
       await api.request('PATCH', `/api/agents/${agent.id}`, owner, {
         scopes: ['write', 'upload'],
@@ -1058,63 +1071,11 @@ describe('에이전트', () => {
     );
     const { agents } = ok(await api.get('/api/agents', owner)) as { agents: Json[] };
     const saved = agents.find((a) => a.id === agent.id);
-    assert.deepEqual(saved?.scopes, ['upload', 'write']);
     assert.deepEqual(saved?.approvalActions, ['blog.post.publish', 'sns.post.send']);
+    assert.deepEqual((await scopesOf(agent)).sort(), [...AGENT_SCOPE].sort(), '권한은 그대로 전부');
     // 바꾼 칸만 저장하고 버전은 한 번 오른다
     assert.equal(saved?.name, agent.name);
     assert.equal(saved?.version, Number(agent.version) + 1);
-  });
-
-  test('조직도: 보고 대상을 정하고 주인에게 되돌린다. 순환과 없는 대상은 422', async () => {
-    const lead = await newAgent({ name: '팀장' });
-    const member = await newAgent({ name: '담당', reportsTo: lead.id });
-    assert.equal(member.reportsTo, lead.id, '만들 때 정할 수 있다');
-
-    const cycle = await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
-      reportsTo: member.id,
-      version: lead.version,
-    });
-    assert.equal(cycle.status, 422, '자기 팀원에게 보고할 수 없다');
-    const self = await api.request('PATCH', `/api/agents/${lead.id}`, owner, {
-      reportsTo: lead.id,
-      version: lead.version,
-    });
-    assert.equal(self.status, 422);
-    const nobody = await api.request('PATCH', `/api/agents/${member.id}`, owner, {
-      reportsTo: randomUUID(),
-      version: member.version,
-    });
-    assert.equal(nobody.status, 422, nobody.text);
-
-    const back = ok(
-      await api.request('PATCH', `/api/agents/${member.id}`, owner, {
-        reportsTo: null,
-        version: member.version,
-      }),
-    );
-    assert.equal(back.reportsTo, null, 'null이면 주인에게 보고');
-    const kept = ok(
-      await api.request('PATCH', `/api/agents/${member.id}`, owner, {
-        name: '담당 2',
-        version: back.version,
-      }),
-    );
-    assert.equal(kept.reportsTo, null, '보내지 않으면 그대로');
-    const { agents } = ok(await api.get('/api/agents', owner)) as { agents: Json[] };
-    assert.equal(agents.find((a) => a.id === lead.id)?.reportsTo, null);
-  });
-
-  test('조직도는 4단계까지', async () => {
-    let boss = await newAgent({ name: '1단계' });
-    for (const name of ['2단계', '3단계', '4단계'])
-      boss = await newAgent({ name, reportsTo: boss.id });
-    const deep = await api.request('POST', '/api/agents', owner, {
-      requestId: randomUUID(),
-      name: '5단계',
-      tool: 'claude',
-      reportsTo: boss.id,
-    });
-    assert.equal(deep.status, 422, deep.text);
   });
 
   test('없는 에이전트에게 일을 시킬 수 없다', async () => {
@@ -1129,18 +1090,17 @@ describe('에이전트', () => {
 });
 
 describe('위임', () => {
-  /** 팀장과 바로 아래 팀원 둘 (글쓰기, 정리). 정리 팀원만 세션 정리 권한이 있다 */
+  /** 대표와 일꾼 둘 (글쓰기, 정리). 맡기기는 대표만 하고, 일꾼은 모두 같은 권한이다 (2026-11-21) */
   async function team(): Promise<{ lead: Json; writer: Json; tidier: Json }> {
-    const lead = await newAgent({ name: '팀장', scopes: ['read_public'], approvalActions: [] });
-    const writer = await newAgent({ name: '글쓰기 팀원', reportsTo: lead.id });
-    const tidier = await newAgent({
-      name: '정리 팀원',
-      scopes: ['tidy', 'read_all'],
-      approvalActions: ['blog.post.publish'],
-      reportsTo: lead.id,
-    });
+    const lead = await leadAgent();
+    const writer = await newAgent({ name: '글쓰기 일꾼' });
+    const tidier = await newAgent({ name: '정리 일꾼' });
     return { lead, writer, tidier };
   }
+
+  /** 대표의 일꾼 목록 가운데 이 테스트의 일꾼만 (대표는 공간의 일꾼 모두에게 맡긴다) */
+  const ours = (team: unknown, ...agents: Json[]): Json[] =>
+    (team as Json[]).filter((m) => agents.some((a) => a.id === m.agent_id));
 
   const order = (requestId: string, agent: Json, more: Json = {}) => ({
     request_id: requestId,
@@ -1150,7 +1110,7 @@ describe('위임', () => {
     ...more,
   });
 
-  test('팀장 → 팀원 둘 → 모두 끝나면 결과를 싣고 팀장에게 돌아온다', async () => {
+  test('대표 → 일꾼 둘 → 모두 끝나면 결과를 싣고 대표에게 돌아온다', async () => {
     const { lead, writer, tidier } = await team();
     const company = ok(
       await api.request('POST', '/api/goals', owner, { requestId: randomUUID(), title: '회사' }),
@@ -1169,20 +1129,33 @@ describe('위임', () => {
     const job = (await take()) as Awaited<ReturnType<typeof take>> & Json;
     assert.equal(job.task.id, parent.id);
     assert.deepEqual(job.goal_chain, [{ title: '회사' }, { title: '이번 달 글 4편' }]);
+    // 모든 일꾼이 같은 권한이라 맡길 수 있는 일도 같다
+    const kinds = ['general', 'draft_post', 'tidy_session', 'browse', 'code', 'make'];
     assert.deepEqual(
-      (job.team as Json[]).map((m) => [m.name, m.kinds]),
+      ours(job.team, writer, tidier).map((m) => [m.name, m.kinds]),
       [
-        ['글쓰기 팀원', ['general', 'draft_post']],
-        ['정리 팀원', ['general', 'draft_post', 'tidy_session']],
+        ['글쓰기 일꾼', kinds],
+        ['정리 일꾼', kinds],
       ],
     );
-    // 팀원 정보 (D1): 아직 맡은 일이 없으면 0, 아래 팀이 없으면 null
+    // 일꾼 정보 (D1): 아직 맡은 일이 없으면 0. 팀 요약 칸(team)은 없다 (2026-11-21)
     assert.deepEqual(
-      (job.team as Json[]).map((m) => [m.tool, m.open, m.recent, m.connectors, m.team]),
+      ours(job.team, writer, tidier).map((m) => [
+        m.tool,
+        m.open,
+        m.recent,
+        m.connectors,
+        'team' in m,
+      ]),
       [
-        ['claude', 0, { done: 0, failed: 0, revised: 0 }, [], null],
-        ['claude', 0, { done: 0, failed: 0, revised: 0 }, [], null],
+        ['claude', 0, { done: 0, failed: 0, revised: 0 }, [], false],
+        ['claude', 0, { done: 0, failed: 0, revised: 0 }, [], false],
       ],
+    );
+    assert.equal(
+      (job.team as Json[]).some((m) => m.agent_id === lead.id),
+      false,
+      '대표 자신은 일꾼 목록에 없다',
     );
     assert.deepEqual(job.subtask_results, []);
     assert.equal(job.rounds_left, 3);
@@ -1221,17 +1194,17 @@ describe('위임', () => {
     const progress = await tool(runner, 'report_progress', { task_id: parent.id, events: [] });
     assert.equal(progress.body.status, 'waiting');
 
-    // 팀원의 일: 목표를 물려받고, 글쓰기는 끝내고 정리는 실패한다. 같은 때 만든 둘은 어느 쪽이 먼저 나올지 정하지 않는다
+    // 일꾼의 일: 목표를 물려받고, 글쓰기는 끝내고 정리는 실패한다. 같은 때 만든 둘은 어느 쪽이 먼저 나올지 정하지 않는다
     const first = (await take()) as Awaited<ReturnType<typeof take>> & Json;
     assert.deepEqual(first.goal_chain, job.goal_chain);
-    assert.deepEqual(first.team, [], '팀원에게는 팀이 없다');
+    assert.deepEqual(first.team, [], '일꾼의 일에는 일꾼 목록이 없다 (맡기기는 대표만)');
     assert.equal(
       first.deliver,
-      first.agent.name === '글쓰기 팀원' ? '초안 한 편과 제목 후보 3개' : null,
+      first.agent.name === '글쓰기 일꾼' ? '초안 한 편과 제목 후보 3개' : null,
       '받을 것은 정한 하위 작업에만 간다',
     );
     const finish = (child: Awaited<ReturnType<typeof take>>) =>
-      child.agent.name === '글쓰기 팀원'
+      child.agent.name === '글쓰기 일꾼'
         ? tool(runner, 'submit_result', {
             task_id: child.task.id,
             request_id: randomUUID(),
@@ -1250,7 +1223,7 @@ describe('위임', () => {
       made.map((m) => String(m.task_id)).sort(),
     );
     // 끝낸 쪽부터: 하나가 남으면 아직 기다린다 (실패면 형제를 기다리지 않고 깬다, 팀원 기다리기 subtask-wait.api.test)
-    const writerJob = first.agent.name === '글쓰기 팀원' ? first : second;
+    const writerJob = first.agent.name === '글쓰기 일꾼' ? first : second;
     const failingJob = writerJob === first ? second : first;
     assert.equal((await finish(writerJob)).ok, true);
     await drain();
@@ -1263,7 +1236,8 @@ describe('위임', () => {
 
     const back = (await take()) as Awaited<ReturnType<typeof take>> & Json;
     assert.equal(back.task.id, parent.id);
-    assert.equal(back.agent.name, '팀장');
+    assert.equal(back.agent.id, lead.id);
+    assert.equal(back.agent.name, '대표');
     assert.equal(back.wake, 'all', '모두 끝나 깼다');
     assert.deepEqual(
       (back.subtask_results as Json[])
@@ -1271,22 +1245,22 @@ describe('위임', () => {
         .sort(),
       [
         [
-          '글쓰기 팀원의 일',
-          '글쓰기 팀원',
+          '글쓰기 일꾼의 일',
+          '글쓰기 일꾼',
           'done',
           '초안을 썼어요',
           null,
           '초안 한 편과 제목 후보 3개',
         ],
-        ['정리 팀원의 일', '정리 팀원', 'failed', null, '세션이 없어요', null],
+        ['정리 일꾼의 일', '정리 일꾼', 'failed', null, '세션이 없어요', null],
       ],
     );
-    // 최근 7일의 결과가 팀원 정보에 쌓인다 (쥔 일은 이제 없다)
+    // 최근 7일의 결과가 일꾼 정보에 쌓인다 (쥔 일은 이제 없다)
     assert.deepEqual(
-      (back.team as Json[]).map((m) => [m.name, m.open, m.recent]),
+      ours(back.team, writer, tidier).map((m) => [m.name, m.open, m.recent]),
       [
-        ['글쓰기 팀원', 0, { done: 1, failed: 0, revised: 0 }],
-        ['정리 팀원', 0, { done: 0, failed: 1, revised: 0 }],
+        ['글쓰기 일꾼', 0, { done: 1, failed: 0, revised: 0 }],
+        ['정리 일꾼', 0, { done: 0, failed: 1, revised: 0 }],
       ],
     );
     assert.equal(back.rounds_left, 2);
@@ -1299,21 +1273,28 @@ describe('위임', () => {
     assert.equal(done.body.status, 'done');
   });
 
-  test('바로 아래 팀이 아니면 forbidden, 권한으로 못 하는 일은 rule_violation, 기다리는 중이면 conflict', async () => {
+  test('지운 에이전트 · 대표 자신 · 없는 에이전트에게는 forbidden, 맡길 수 없는 종류는 rule_violation, 기다리는 중이면 conflict', async () => {
     const { lead, writer } = await team();
-    const outsider = await newAgent({ name: '다른 팀' });
+    const gone = await newAgent({ name: '지운 일꾼' });
+    ok(
+      await api.request('POST', `/api/agents/${gone.id}/delete`, owner, { version: gone.version }),
+    );
     await newTask(lead, { kind: 'general' });
     const job = await take();
 
-    const notMine = await tool(job.run_token, 'delegate_task', {
-      subtasks: [order('x', outsider)],
-    });
-    assert.equal(notMine.ok, false);
-    assert.equal(notMine.body.code, 'forbidden');
+    for (const [label, to] of [
+      ['지운 에이전트', gone],
+      ['대표 자신', lead],
+      ['없는 에이전트', { id: randomUUID(), name: '없는 에이전트' }],
+    ] as const) {
+      const refused = await tool(job.run_token, 'delegate_task', { subtasks: [order('x', to)] });
+      assert.equal(refused.ok, false, label);
+      assert.equal(refused.body.code, 'forbidden', label);
+    }
     const cannot = await tool(job.run_token, 'delegate_task', {
-      subtasks: [order('y', writer, { kind: 'tidy_session' })],
+      subtasks: [order('y', writer, { kind: 'ai_test' })],
     });
-    assert.equal(cannot.body.code, 'rule_violation');
+    assert.equal(cannot.body.code, 'rule_violation', '에이전트 없는 일은 맡기지 못한다');
     const tooMany = await tool(job.run_token, 'delegate_task', {
       subtasks: ['1', '2', '3', '4', '5', '6'].map((id) => order(id, writer)),
     });
@@ -1331,15 +1312,16 @@ describe('위임', () => {
     assert.equal(approval.ok, false, '하위 작업을 기다리는 중에는 결재도 올리지 못한다');
   });
 
-  test('팀원은 자기 팀이 없으면 맡기지 못하고, 기기에게는 위임 도구가 보이지 않는다', async () => {
-    const { writer } = await team();
+  test('일꾼은 맡기지 못하고(forbidden), 기기에게는 위임 도구가 보이지 않는다', async () => {
+    const { writer, tidier } = await team();
     await newTask(writer, { kind: 'general' });
     const job = await take();
     assert.ok((await toolNames(job.run_token)).includes('delegate_task'));
-    const none = await tool(job.run_token, 'delegate_task', {
-      subtasks: [order('a', { id: randomUUID(), name: '없는 에이전트' })],
+    const refused = await tool(job.run_token, 'delegate_task', {
+      subtasks: [order('a', tidier)],
     });
-    assert.equal(none.body.code, 'forbidden');
+    assert.equal(refused.body.code, 'forbidden');
+    assert.match(JSON.stringify(refused.body), /대표만 일꾼에게 맡길 수 있어요/);
     assert.equal((await toolNames(runner)).includes('delegate_task'), false);
     assert.equal((await toolNames(laptop)).includes('delegate_task'), false);
   });
@@ -1353,7 +1335,7 @@ describe('위임', () => {
         subtasks: [order('a', writer), order('b', tidier)],
       })
     ).body.subtasks as Json[];
-    // 먼저 나온 팀원은 일을 시작해 결재를 올린다 (둘 다 글 공개를 맡을 수 있다)
+    // 먼저 나온 일꾼은 일을 시작해 결재를 올린다 (둘 다 글 공개를 맡을 수 있다)
     const child = await take();
     assert.equal((await askApproval(child.run_token)).ok, true);
 

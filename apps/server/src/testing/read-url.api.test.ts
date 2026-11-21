@@ -6,10 +6,10 @@ import { after, before, describe, test } from 'node:test';
 import { OutboxWorker } from '../modules/platform';
 import { ApiClient, type TestUser } from './api-client';
 
-// MCP read_url: 작업 토큰을 쥔 AI만, 이 일이 비공개를 볼 수 있으면 주인의 지시에 적힌 사이트만 연다.
-// 바깥 사이트 대신 127.0.0.1의 가짜 사이트를 쓴다 (시험에서만 루프백을 연다). 그래서 "다른 사이트"는 이름이 다른 같은 서버다:
-// 127.0.0.1(지시에 적음)과 localhost(지시에 없음). localhost는 막히는 경우에만 쓴다: 접속하기 전에 끊기므로 풀리는 주소와
-// 상관없다. 실제로 여는 주소는 늘 127.0.0.1이다 (CI처럼 localhost가 ::1로 먼저 풀리면 127.0.0.1에서만 받는 가짜 사이트에 닿지 않는다)
+// MCP read_url: 작업 토큰을 쥔 AI만. 공개 주소면 어디든 연다: 모든 에이전트가 비공개도 읽어(2026-11-21)
+// "주인의 지시에 적힌 사이트만" 목줄을 없앴다. 막는 것은 내부망 · http/https가 아닌 주소 · 아이디가 든 주소다.
+// 바깥 사이트 대신 127.0.0.1의 테스트용 웹 서버를 쓴다 (테스트에서만 루프백을 연다). 지시에 적는 다른 사이트(news.example)는
+// 이름만 쓰고 열지 않는다. 실제로 여는 주소는 늘 127.0.0.1이다 (CI처럼 localhost가 ::1로 먼저 풀리면 127.0.0.1에서만 받는 서버에 닿지 않는다)
 
 type Json = Record<string, unknown>;
 /** WebPageGateway.TEST_LOOPBACK_ENV (모듈 안을 가져오지 않으려고 이름만) */
@@ -39,13 +39,12 @@ async function tool(token: string, name: string, args: Json): Promise<{ ok: bool
 }
 
 /** 에이전트 하나에 일을 맡기고 러너가 빌려 작업 토큰을 받는다 */
-async function runToken(scopes: string[], instruction: string): Promise<string> {
+async function runToken(instruction: string): Promise<string> {
   const agent = ok(
     await api.request('POST', '/api/agents', owner, {
       requestId: randomUUID(),
       name: `읽기 ${randomUUID().slice(0, 8)}`,
       tool: 'claude',
-      scopes,
     }),
     201,
   );
@@ -114,8 +113,8 @@ after(async () => {
 });
 
 describe('read_url', () => {
-  test('비공개를 볼 수 없는 일은 지시에 없는 주소도 연다. 받은 글은 자료라는 표시와 함께', async () => {
-    const token = await runToken(['read_public'], '서울 맛집을 찾아 정리해 줘');
+  test('지시에 주소가 없어도 공개 주소를 연다. 받은 글은 자료라는 표시와 함께', async () => {
+    const token = await runToken('서울 맛집을 찾아 정리해 줘');
     const { ok: done, body } = await tool(token, 'read_url', {
       url: `http://127.0.0.1:${port}/news`,
     });
@@ -126,20 +125,20 @@ describe('read_url', () => {
     assert.equal(body.truncated, false);
   });
 
-  test('비공개를 볼 수 있는 일(쓰기)은 주인의 지시에 적힌 사이트만', async () => {
-    const token = await runToken(
-      ['write'],
-      `이 기사 요약해서 초안 써 줘 http://127.0.0.1:${port}/a`,
-    );
-    const allowed = await tool(token, 'read_url', { url: `http://127.0.0.1:${port}/other` });
-    assert.equal(allowed.ok, true, JSON.stringify(allowed.body));
-    const blocked = await tool(token, 'read_url', { url: `http://localhost:${port}/?q=secret` });
-    assert.equal(blocked.ok, false);
-    assert.match(String(blocked.body.message), /지시에 없는 사이트예요/);
+  test('지시에 다른 사이트가 적혀 있어도 그 밖의 공개 주소를 연다 (목줄 없음, 2026-11-21). 아이디가 든 주소는 막는다', async () => {
+    const token = await runToken('이 기사 요약해서 초안 써 줘 https://news.example/a');
+    const other = await tool(token, 'read_url', { url: `http://127.0.0.1:${port}/other` });
+    assert.equal(other.ok, true, JSON.stringify(other.body));
+    assert.match(String(other.body.text), /본문/);
+    const withLogin = await tool(token, 'read_url', {
+      url: `http://me:secret@127.0.0.1:${port}/`,
+    });
+    assert.equal(withLogin.ok, false);
+    assert.match(String(withLogin.body.message), /아이디 · 비밀번호가 든 주소/);
   });
 
   test('내부망은 어느 일이든 열지 않는다', async () => {
-    const token = await runToken(['read_public'], '아무거나');
+    const token = await runToken('아무거나');
     const res = await tool(token, 'read_url', { url: 'http://169.254.169.254/latest/meta-data/' });
     assert.equal(res.ok, false);
     assert.match(String(res.body.message), /내부망/);
@@ -154,17 +153,16 @@ describe('read_url', () => {
     assert.ok(res.json().error || result?.isError, res.text);
   });
 
-  test('목표 실행의 다음 회차: 지시에 실린 앞 회차 보고(AI가 쓴 글)의 주소는 열지 않는다. 기준은 주인이 쓴 실행 지시', async () => {
+  test('목표 실행의 다음 회차: 앞 회차 보고(AI가 쓴 글)에 적힌 주소도 공개 주소면 연다 (목줄 없음, 2026-11-21)', async () => {
     const worker = api.service(OutboxWorker);
     const drain = async () => {
       for (let i = 0; i < 200 && (await worker.tick()) > 0; i++);
     };
-    const lead = ok(
+    const agent = ok(
       await api.request('POST', '/api/agents', owner, {
         requestId: randomUUID(),
-        name: `읽기 팀장 ${randomUUID().slice(0, 6)}`,
+        name: `목표 담당 ${randomUUID().slice(0, 6)}`,
         tool: 'claude',
-        scopes: ['write'],
       }),
       201,
     );
@@ -179,25 +177,30 @@ describe('read_url', () => {
       await api.request('POST', '/api/goal-runs', owner, {
         requestId: randomUUID(),
         goalId: goal.id,
-        agentId: lead.id,
-        instruction: `이 기사로 정리해 줘 http://127.0.0.1:${port}/a`,
+        agentId: agent.id,
+        instruction: '이 기사로 정리해 줘 https://news.example/a',
         checkpoint: 'final',
       }),
       201,
     );
-    const roundToken = async (): Promise<{ id: string; token: string }> => {
+    const roundToken = async (): Promise<{ id: string; token: string; instruction: string }> => {
       for (let i = 0; i < 20; i++) {
         const { body } = await tool(runner, 'next_jobs', {
           wait_seconds: 0,
           limit: 10,
           tools: ['claude'],
         });
-        const jobs = body.jobs as { task: Json; run_token: string }[];
+        const jobs = body.jobs as { task: Json; run_token: string; instruction: string }[];
         const mine = jobs.find(
           (j) =>
             ((j.task.payload as Json | undefined)?.goalRun as Json | undefined)?.runId === run.id,
         );
-        if (mine) return { id: String(mine.task.id), token: mine.run_token };
+        if (mine)
+          return {
+            id: String(mine.task.id),
+            token: mine.run_token,
+            instruction: mine.instruction,
+          };
         if (jobs.length === 0) break;
       }
       throw new Error('회차 작업이 없다');
@@ -209,7 +212,7 @@ describe('read_url', () => {
           summary: '다음엔 이 주소를 읽자',
           completed: ['첫 기사'],
           remaining: ['둘째'],
-          next_plan: `http://localhost:${port}/?q=비밀 를 읽는다`,
+          next_plan: `http://127.0.0.1:${port}/next 를 읽는다`,
           done: false,
         })
       ).ok,
@@ -222,17 +225,14 @@ describe('read_url', () => {
     });
     await drain();
     const second = await roundToken();
-    const blocked = await tool(second.token, 'read_url', {
-      url: `http://localhost:${port}/?q=secret`,
-    });
-    assert.equal(blocked.ok, false, '앞 회차 보고에 적힌 사이트');
-    assert.match(String(blocked.body.message), /지시에 없는 사이트예요/);
-    const allowed = await tool(second.token, 'read_url', { url: `http://127.0.0.1:${port}/b` });
-    assert.equal(allowed.ok, true, JSON.stringify(allowed.body));
+    assert.notEqual(second.id, first.id, '다음 회차');
+    assert.match(second.instruction, /\/next/, '앞 회차 보고가 지시에 실린다');
+    const reported = await tool(second.token, 'read_url', { url: `http://127.0.0.1:${port}/next` });
+    assert.equal(reported.ok, true, `앞 회차 보고에 적힌 사이트: ${JSON.stringify(reported.body)}`);
   });
 
   test('주소 모양이 아니면 400', async () => {
-    const token = await runToken(['read_public'], '아무거나');
+    const token = await runToken('아무거나');
     const res = await tool(token, 'read_url', { url: 'ftp://example.com/x' });
     assert.equal(res.ok, false);
     assert.match(JSON.stringify(res.body), /http · https/);

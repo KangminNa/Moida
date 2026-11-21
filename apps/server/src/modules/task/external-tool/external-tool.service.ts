@@ -11,7 +11,6 @@ import {
   type Sql,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
-import { AgentScopes } from '../agent/agent-scopes.policy';
 import { ExternalTool } from './external-tool';
 import type {
   CreateExternalToolInput,
@@ -102,15 +101,11 @@ export class ExternalToolService extends EntityService<ExternalTool> {
 
   /**
    * AI의 제안 (MCP propose_tool, 작업 토큰). proposed로 두고, AI는 답의 id · version으로 결재(task.tool.plug)를 올린다.
-   * 붙일 수 없는 에이전트(비공개 · 셸)는 처음부터 막는다. 같은 request_id는 처음 제안을 돌려준다
+   * 같은 request_id는 처음 제안을 돌려준다
    */
   async propose(actor: Actor, req: ProposeToolInput): Promise<ExternalTool> {
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
     const { agentId } = actor;
-    if (!AgentScopes.mayUseTools(AgentScopes.ALL.filter((s) => actor.can(s))))
-      throw new RuleViolation(
-        '전체 읽기 · 초안 작성 · 코드 · 만들기 권한의 에이전트에는 외부 도구를 붙이지 않아요',
-      );
     const spaceId = actor.requireSpace();
     return this.transaction(async (tx) => {
       const tools = this.store(tx);

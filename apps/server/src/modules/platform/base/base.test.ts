@@ -166,13 +166,11 @@ describe('Actor', () => {
     assert.equal(new SystemActor().canManage(), true);
   });
 
-  test('바깥으로 보내는 도구(agent_out)는 비공개를 읽거나 쓰지 않는 에이전트만, 기기는 아무도', () => {
+  test('바깥으로 보내는 도구(agent_out)는 모든 에이전트가 (2026-11-21, 같은 일꾼), 기기는 아무도', () => {
     const reader = new AgentActor('s', 'a', 't', new Set([Actor.READ_PUBLIC, Actor.BROWSE]));
     assert.equal(reader.can(Actor.AGENT_OUT), true);
-    for (const scope of Actor.KEEPS_PRIVATE) {
-      const keeper = new AgentActor('s', 'a', 't', new Set([Actor.READ_PUBLIC, scope]));
-      assert.equal(keeper.can(Actor.AGENT_OUT), false, scope);
-    }
+    const keeper = new AgentActor('s', 'a', 't', new Set([Actor.READ_ALL, Actor.WRITE]));
+    assert.equal(keeper.can(Actor.AGENT_OUT), true);
     const device = new DeviceActor('s', 'd', new Set([DeviceActor.RUN, DeviceActor.READ_PUBLIC]));
     assert.equal(device.can(Actor.AGENT_OUT), false);
   });

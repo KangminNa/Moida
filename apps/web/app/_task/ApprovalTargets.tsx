@@ -16,7 +16,7 @@ import type { Agent, Approval, CodeAsk, CodePull } from './types';
 
 /**
  * 목표 실행의 승인 요청서: 이번 회차의 보고와 완료 조건. 왜 승인이 올라왔는지는 요청 메모에 있다.
- * 보고는 팀장(AI)의 주장이라 근거와 회차 작업을 함께 보여 준다
+ * 보고는 맡은 에이전트(AI)의 주장이라 근거와 회차 작업을 함께 보여 준다
  */
 export function GoalRunTarget({ approval }: { approval: Approval }) {
   const run = useGoalRun(approval.target.id);
@@ -35,7 +35,7 @@ export function GoalRunTarget({ approval }: { approval: Approval }) {
         {r.title} · {r.round}회차 (한도 {r.maxRounds})
       </b>
       <p className="note">
-        목표 {r.goalTitle ?? '–'} · 팀장 {r.agentName ?? '–'} · 승인{' '}
+        목표 {r.goalTitle ?? '–'} · {r.agentName ?? '–'} · 승인{' '}
         {CHECKPOINTS[r.checkpoint] ?? r.checkpoint}
       </p>
       {!asking ? (

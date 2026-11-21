@@ -1,5 +1,4 @@
-import { Actor, RuleViolation } from '../../platform';
-import type { Agent } from '../agent/agent';
+import { RuleViolation } from '../../platform';
 import type { TaskRow } from '../task.tables';
 import type { SubtaskOrder } from './subtask-order.input';
 
@@ -16,14 +15,12 @@ export type AfterSiblingRow = Pick<TaskRow, 'id' | 'request_id' | 'status' | 'ti
 // 순서가 있는 위임 (D2 `after`, 기획서 결정 2026-11-17 "위임 계약" · 2026-11-21): delegate_task의 하위 작업이 after로 같은 호출의
 // 앞 하위 작업을 가리키면, 서버는 바로 만들지 않고 위 작업의 payload.afterOrders에 적어 둔다. 앞 단계가 모두 끝나면(done)
 // SubtaskService가 그 하위 작업을 만들고 앞 단계의 결과 글을 payload.afterResults로 넘긴다. 앞 단계 하나가 실패 · 취소되면
-// 시작하지 않고 지운다 (위 작업은 실패로 이미 깨어 다시 정한다). 비공개를 읽는 팀원의 결과는 외부 작업 담당(브라우저 · 커넥터)에게
-// 넘기지 못한다. 팀장이 단계마다 다시 뜨지 않아도 되게 하는 것이 목적이다. 상태 없음
+// 시작하지 않고 지운다 (위 작업은 실패로 이미 깨어 다시 정한다). 대표가 단계마다 다시 뜨지 않아도 되게 하는 것이 목적이다. 상태 없음
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. TaskService(위임)와 SubtaskService(시작)가 쓴다
 export class SubtaskAfter {
   static readonly RESULT_MAX = 3000;
   private static readonly DONE = 'done';
   private static readonly ENDED = ['failed', 'cancelled'];
-  private static readonly PRIVATE = [Actor.READ_ALL, Actor.WRITE];
 
   /** 바로 맡길 것과 앞 단계를 기다릴 것. after는 같은 호출에서 앞에 적은 하위 작업만 (아니면 RuleViolation) */
   static split(orders: readonly SubtaskOrder[]): { now: SubtaskOrder[]; later: SubtaskOrder[] } {
@@ -40,22 +37,6 @@ export class SubtaskAfter {
       (order.after.length > 0 ? later : now).push(order);
     }
     return { now, later };
-  }
-
-  /** 외부 작업 담당(브라우저 · 커넥터)은 비공개를 읽는 팀원의 결과를 앞 단계로 받지 못한다 */
-  static assertSafe(orders: readonly SubtaskOrder[], org: readonly Agent[]): void {
-    const agentOf = (order: SubtaskOrder | undefined) => org.find((a) => a.id === order?.toAgentId);
-    for (const order of orders) {
-      const worker = agentOf(order);
-      const outward =
-        worker && (worker.scopes.includes(Actor.BROWSE) || worker.externalTools.length > 0);
-      if (!outward) continue;
-      const before = order.after.map((a) => agentOf(orders.find((o) => o.requestId === a)));
-      if (before.some((a) => a?.scopes.some((s) => SubtaskAfter.PRIVATE.includes(s))))
-        throw new RuleViolation(
-          `${worker.name}은(는) 바깥으로 나가는 일이라 비공개를 읽는 팀원의 결과를 받지 못해요`,
-        );
-    }
   }
 
   /** 위 작업에 적어 둔다 (열쇠는 위 작업마다 따로 센 request_id, DelegationPolicy.requestIdOf) */

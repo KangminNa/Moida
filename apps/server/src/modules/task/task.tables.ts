@@ -39,7 +39,6 @@ export interface AgentRow {
   created_at: Date;
   five_hour_limit: number | null;
   plan_stop_percent: number | null;
-  reports_to: string | null;
   settings_revision: number;
   deleted_at: Date | null;
   runner_id: string | null;

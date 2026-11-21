@@ -6,7 +6,7 @@ import { ApiClient, TestUser } from './api-client';
 
 // 기능 패키지 browser-tabs의 브라우저 에이전트 (2차 3단계 서버 브라우저 목표, 2026-11-14).
 // 사이트 일 · 둘러보기 맡기기, 러너의 browser_job · 단계 화면 · 로그인 필요 · 결재된 클릭(붙잡기 → 승인 → 누르기 · 바뀜),
-// 세션 지우기, 브라우저 일의 위임 규칙. 보는 사람별: 방문자 · write 기기 · 러너(쥔 · 쥐지 않은) · 에이전트 · 관리자.
+// 세션 지우기, 브라우저 일의 위임 규칙(대표만 맡긴다). 보는 사람별: 방문자 · write 기기 · 러너(쥔 · 쥐지 않은) · 에이전트 · 관리자.
 // 브라우저는 없다 (러너 쪽은 apps/runner의 단위 · 통합 테스트가 진짜 Chromium으로 본다).
 
 type Json = Record<string, unknown>;
@@ -61,12 +61,11 @@ async function newRunner(name: string): Promise<string> {
   return String(ok(made, 201).token);
 }
 
-async function newAgent(name: string, scopes: string[], more: Json = {}): Promise<string> {
+async function newAgent(name: string, more: Json = {}): Promise<string> {
   const made = await api.request('POST', '/api/agents', owner, {
     requestId: randomUUID(),
     name,
     tool: 'claude',
-    scopes,
     approvalActions: ['browser.site.publish', 'browser.site.login'],
     ...more,
   });
@@ -171,7 +170,7 @@ before(async () => {
     }),
   );
   ok(await api.request('POST', '/api/plugins/browser-tabs/enable', owner));
-  agentId = await newAgent('브라우저 담당', ['read_public', 'browse']);
+  agentId = await newAgent('브라우저 담당');
 });
 after(async () => {
   // 다음 시험 파일이 보는 도구 목록이 패키지 상태에 흔들리지 않게 끄고 끝낸다
@@ -882,16 +881,27 @@ describe('API 기록 → API 사이트 도구 (B2 · B3, 2026-11-19)', () => {
 });
 
 describe('브라우저 일의 위임', () => {
-  async function leadJob(scopes: string[]): Promise<{ run: string; member: string; site: Json }> {
-    const lead = await newAgent(`팀장 ${scopes.join('+')}`, scopes, { approvalActions: [] });
-    const member = await newAgent('팀 브라우저 담당', ['read_public', 'browse'], {
-      reportsTo: lead,
-    });
+  /** 대표 (O-2). 없으면 첫 대화를 열어 만든다 */
+  async function leadId(): Promise<string> {
+    const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+    if (found) return String(found.id);
+    ok(
+      await api.request('POST', '/api/chats', owner, {
+        requestId: randomUUID(),
+        message: '대표를 만드는 첫 대화',
+      }),
+      201,
+    );
+    return String((ok(await api.get('/api/agents/lead', owner)).lead as Json).id);
+  }
+  /** 맡기는 쪽(agent)의 일을 러너가 빌린 작업 토큰, 맡을 일꾼, 사이트 */
+  async function jobOf(agent: string): Promise<{ run: string; member: string; site: Json }> {
+    const member = await newAgent('브라우저 일꾼');
     const mark = randomUUID().slice(0, 8);
     ok(
       await api.request('POST', '/api/tasks', owner, {
         requestId: randomUUID(),
-        agentId: lead,
+        agentId: agent,
         title: `조사 ${mark}`,
         instruction: '가입 양식을 채워 주세요',
       }),
@@ -900,42 +910,40 @@ describe('브라우저 일의 위임', () => {
     const job = await leased(mark);
     return { run: String(job.run_token), member, site: await newSite() };
   }
-  const order = (member: string, site: Json | null) => ({
-    subtasks: [
-      {
-        request_id: randomUUID(),
-        to_agent_id: member,
-        kind: 'browse',
-        title: '양식 채우기',
-        instruction: '이름 칸에 홍길동',
-        ...(site
-          ? { target_kind: 'browser_site', target_id: site.id, target_version: site.version }
-          : {}),
-      },
-    ],
+  const subtask = (member: string, site: Json | null) => ({
+    request_id: randomUUID(),
+    to_agent_id: member,
+    kind: 'browse',
+    title: site ? '양식 채우기' : '둘러보기',
+    instruction: '이름 칸에 홍길동',
+    ...(site
+      ? { target_kind: 'browser_site', target_id: site.id, target_version: site.version }
+      : {}),
   });
 
-  test('공개 읽기만 가진 팀장은 사이트 일 · 둘러보기를 맡긴다. 브라우저 담당은 browser_sites로 사이트를 고른다', async () => {
-    const { run, member, site } = await leadJob(['read_public']);
+  test('대표는 비공개를 읽어도 일꾼에게 사이트 일 · 둘러보기를 맡긴다 (2026-11-21). 사이트는 browser_sites로 고른다', async () => {
+    const { run, member, site } = await jobOf(await leadId());
     const sites = await tool(run, 'browser_sites');
     assert.ok(
       (sites.body.sites as Json[]).some((s) => s.id === site.id && s.start_url === SITE.startUrl),
     );
-    const done = await tool(run, 'delegate_task', order(member, site));
+    const done = await tool(run, 'delegate_task', {
+      subtasks: [subtask(member, site), subtask(member, null)],
+    });
     assert.equal(done.ok, true, JSON.stringify(done.body));
-    const child = await taskOf(String(((done.body.subtasks as Json[])[0] as Json).task_id));
-    assert.deepEqual(
-      [child.kind, (child.target as Json).kind, (child.target as Json).id],
-      ['browse', 'browser_site', site.id],
-    );
+    const [siteJob, explore] = (await Promise.all(
+      (done.body.subtasks as Json[]).map((s) => taskOf(String(s.task_id))),
+    )) as [Json, Json];
+    const target = siteJob.target as Json;
+    assert.deepEqual([siteJob.kind, target.kind, target.id], ['browse', 'browser_site', site.id]);
+    assert.deepEqual([explore.kind, explore.target], ['browse', null], '대상 없으면 둘러보기');
   });
 
-  test('전체 읽기 · 초안 작성 권한이 있는 팀장은 브라우저 일을 맡기지 못한다', async () => {
-    for (const scopes of [['read_all'], ['read_public', 'write']]) {
-      const { run, member } = await leadJob(scopes);
-      const refused = await tool(run, 'delegate_task', order(member, null));
-      assert.equal(refused.ok, false, scopes.join());
-      assert.match(JSON.stringify(refused.body), /브라우저 일을 맡기지 못해요/);
-    }
+  test('일꾼은 브라우저 일을 맡기지 못한다: 맡기기는 대표만 (forbidden)', async () => {
+    const { run, member, site } = await jobOf(await newAgent('맡기려는 일꾼'));
+    const refused = await tool(run, 'delegate_task', { subtasks: [subtask(member, site)] });
+    assert.equal(refused.ok, false, JSON.stringify(refused.body));
+    assert.equal(refused.body.code, 'forbidden');
+    assert.match(String(refused.body.message), /대표만 일꾼에게 맡길 수 있어요/);
   });
 });

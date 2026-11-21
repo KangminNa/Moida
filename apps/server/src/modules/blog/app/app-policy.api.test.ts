@@ -4,8 +4,8 @@ import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
 import { Database, OutboxWorker } from '../../platform';
 
-// 앱별 운영 (스토어 2단계, docs/스토어.md 10장): 앱의 운영 팀장은 맨 위의, 비공개를 읽지 않는 에이전트만.
-// 운영 팀은 팀장과 그 아래 팀 전체이고, 메뉴에 운영 팀이 있으면 메뉴가 정한다. 관리자 · 기기는 늘 놓는다.
+// 앱별 운영 (스토어 2단계, docs/스토어.md 10장): 앱 · 메뉴의 편집 방침. 운영 팀은 2026-11-21에 없앴다:
+// 모든 에이전트가 같은 일꾼이라 어느 앱 · 메뉴에나 초안을 놓는다 (공개는 여전히 승인 뒤).
 // 방문자 첫 화면 고정은 관리자만, 공개 앱만, 공간마다 하나.
 
 type Json = Record<string, unknown>;
@@ -40,14 +40,12 @@ async function tool(token: string, name: string, args: Json = {}) {
 /** 이 파일이 만든 에이전트 (끝나면 멈춘다) */
 const agents: Json[] = [];
 
-const agent = async (name: string, scopes: readonly string[], more: Json = {}) => {
+const agent = async (name: string) => {
   const made = ok(
     await api.request('POST', '/api/agents', owner, {
       requestId: randomUUID(),
       name: `${name} ${mark}`,
       tool: 'claude',
-      scopes,
-      ...more,
     }),
     201,
   );
@@ -98,7 +96,7 @@ const menusOf = async (app: Json) =>
 const draft = (token: string, more: Json) =>
   tool(token, 'blog_save_draft', {
     request_id: randomUUID(),
-    title: '운영 팀 초안',
+    title: '앱 초안',
     body_md: '본문',
     ...more,
   });
@@ -135,40 +133,10 @@ after(async () => {
   await api.close();
 });
 
-describe('앱의 운영 팀장 · 편집 방침 (관리자)', () => {
-  test('맨 위의, 비공개를 읽지 않는 에이전트만 팀장이 된다 (422 · 404). 방침은 4000자까지', async () => {
-    const head = await agent('팀장', ['write']);
-    const member = await agent('팀원', ['write'], { reportsTo: head.id });
-    const reader = await agent('비공개', ['read_all']);
-    const app = await newApp('lead', { agentId: head.id, policy: '짧게' });
-    assert.deepEqual([app.agentId, app.policy, app.home], [head.id, '짧게', false]);
-
-    const deep = await api.request('POST', '/api/apps', owner, {
-      requestId: randomUUID(),
-      kind: 'blog',
-      name: '아래 팀원',
-      slug: `deep-${mark}`,
-      agentId: member.id,
-    });
-    assert.equal(deep.status, 422, deep.text);
-    assert.equal(
-      (
-        await api.request('PATCH', `/api/apps/${app.id}`, owner, {
-          version: app.version,
-          agentId: reader.id,
-        })
-      ).status,
-      422,
-    );
-    assert.equal(
-      (
-        await api.request('PATCH', `/api/apps/${app.id}`, owner, {
-          version: app.version,
-          agentId: randomUUID(),
-        })
-      ).status,
-      404,
-    );
+describe('앱의 편집 방침 (관리자)', () => {
+  test('만들 때 · 고칠 때 정하고 4000자까지. 운영 팀 칸은 없다', async () => {
+    const app = await newApp('policy', { policy: '짧게' });
+    assert.deepEqual([app.policy, app.home, 'agentId' in app], ['짧게', false, false]);
     assert.equal(
       (
         await api.request('PATCH', `/api/apps/${app.id}`, owner, {
@@ -179,108 +147,69 @@ describe('앱의 운영 팀장 · 편집 방침 (관리자)', () => {
       400,
       '입력 모양에서 막힌다 (방침 한도)',
     );
-
-    const cleared = await patchApp(app, { agentId: null, policy: '' });
-    assert.deepEqual([cleared.agentId, cleared.policy], [null, '']);
+    const cleared = await patchApp(app, { policy: '' });
+    assert.equal(cleared.policy, '');
   });
 
-  test('방문자 · write 기기는 운영 팀을 보지도 바꾸지도 못한다', async () => {
-    const head = await agent('공개 팀장', ['write']);
-    const app = await newApp('seen', { agentId: head.id, policy: '방침' });
+  test('방문자 · write 기기는 방침을 보지도 바꾸지도 못한다', async () => {
+    const app = await newApp('seen', { policy: '방침' });
     await patchApp(app, { visibility: 'public' });
     const shown = (ok(await api.get('/api/apps')).apps as Json[]).find((a) => a.slug === app.slug);
     assert.ok(shown);
-    assert.deepEqual(['agentId' in shown, 'policy' in shown, shown.home], [false, false, false]);
+    assert.deepEqual(['policy' in shown, shown.home], [false, false]);
     const res = await api.request(
       'PATCH',
       `/api/apps/${app.id}`,
       TestUser.visitor,
-      { version: 2, agentId: null },
+      { version: 2, policy: '' },
       device,
     );
     assert.ok([401, 403].includes(res.status), res.text);
   });
 });
 
-describe('운영 팀만 앱 · 메뉴에 글을 놓는다 (blog_save_draft · blog_menus)', () => {
+describe('모든 에이전트가 앱 · 메뉴에 글을 놓는다 (blog_save_draft · blog_menus, 2026-11-21)', () => {
   let app: Json;
   let other: Json;
   let menu: Json;
-  let head: Json;
   let writer: string;
-  let outsider: string;
-  let outsiderId: unknown;
+  let another: string;
 
   before(async () => {
-    head = await agent('편집장', ['write']);
-    const member = await agent('작가', ['write'], { reportsTo: head.id });
-    const stranger = await agent('남의 팀', ['write']);
-    outsiderId = stranger.id;
-    app = await newApp('team', { agentId: head.id, policy: '앱 방침' });
+    const first = await agent('작가');
+    const second = await agent('다른 일꾼');
+    app = await newApp('team', { policy: '앱 방침' });
     other = await newApp('free');
     menu = (await menusOf(app))[0] as Json;
-    writer = await tokenOf(member.id);
-    outsider = await tokenOf(stranger.id);
+    writer = await tokenOf(first.id);
+    another = await tokenOf(second.id);
   });
 
-  test('blog_menus: 앱 · 메뉴마다 방침 · 운영 팀장 · can_write. app_id로 한 앱만', async () => {
+  test('blog_menus: 앱 · 메뉴마다 방침과 can_write(늘 true). app_id로 한 앱만', async () => {
     const mine = (await tool(writer, 'blog_menus', { app_id: app.id })).body;
-    const apps = mine.apps as Json[];
     assert.deepEqual(
-      apps.map((a) => [a.id, a.policy, a.agent_id, a.can_write]),
-      [[app.id, '앱 방침', head.id, true]],
+      (mine.apps as Json[]).map((a) => [a.id, a.policy, a.can_write, 'agent_id' in a]),
+      [[app.id, '앱 방침', true, false]],
     );
-    const menus = mine.menus as Json[];
     assert.deepEqual(
-      menus.map((m) => [m.id, m.app_id, m.can_write]),
+      (mine.menus as Json[]).map((m) => [m.id, m.app_id, m.can_write]),
       [[menu.id, app.id, true]],
     );
-    const theirs = (await tool(outsider, 'blog_menus')).body;
-    const seen = (theirs.apps as Json[]).find((a) => a.id === app.id) as Json;
-    const free = (theirs.apps as Json[]).find((a) => a.id === other.id) as Json;
-    assert.deepEqual([seen.can_write, free.can_write], [false, true]);
     const missing = await tool(writer, 'blog_menus', { app_id: randomUUID() });
     assert.equal(missing.body.code, 'not_found');
   });
 
-  test('팀장 아래 작가는 앱 · 메뉴에 놓고, 팀 밖은 403', async () => {
-    const intoApp = await draft(writer, { app_id: app.id });
-    assert.equal(intoApp.ok, true, JSON.stringify(intoApp.body));
-    assert.deepEqual(await placeOf(intoApp.body.post_id), { app_id: app.id, menu_id: null });
-    const intoMenu = await draft(writer, { menu_id: menu.id });
-    assert.equal(intoMenu.ok, true, JSON.stringify(intoMenu.body));
-    assert.deepEqual(await placeOf(intoMenu.body.post_id), { app_id: app.id, menu_id: menu.id });
-
-    for (const where of [{ app_id: app.id }, { menu_id: menu.id }]) {
-      const refused = await draft(outsider, where);
-      assert.equal(refused.body.code, 'forbidden', JSON.stringify(where));
-    }
-    const free = await draft(outsider, { app_id: other.id });
-    assert.equal(free.ok, true, '운영 팀이 없는 앱은 지금처럼 누구나 (비공개를 읽지 않으면)');
-  });
-
-  test('메뉴에 운영 팀이 있으면 메뉴가 정한다', async () => {
-    const now = (await menusOf(app)).find((m) => m.id === menu.id) as Json;
-    ok(
-      await api.request('PATCH', `/api/menus/${menu.id}`, owner, {
-        version: now.version,
-        agentId: outsiderId,
-      }),
-    );
-    try {
-      assert.equal((await draft(outsider, { menu_id: menu.id })).ok, true);
-      assert.equal((await draft(writer, { menu_id: menu.id })).body.code, 'forbidden');
-      assert.equal((await draft(writer, { app_id: app.id })).ok, true, '앱에는 그대로');
-      const listed = (await tool(writer, 'blog_menus', { app_id: app.id })).body;
-      assert.equal(((listed.menus as Json[])[0] as Json).can_write, false);
-    } finally {
-      const back = (await menusOf(app)).find((m) => m.id === menu.id) as Json;
-      ok(
-        await api.request('PATCH', `/api/menus/${menu.id}`, owner, {
-          version: back.version,
-          agentId: null,
-        }),
-      );
+  test('어느 에이전트나 앱 · 메뉴에 놓는다', async () => {
+    for (const token of [writer, another]) {
+      const intoApp = await draft(token, { app_id: app.id });
+      assert.equal(intoApp.ok, true, JSON.stringify(intoApp.body));
+      assert.deepEqual(await placeOf(intoApp.body.post_id), { app_id: app.id, menu_id: null });
+      const intoMenu = await draft(token, { menu_id: menu.id });
+      assert.equal(intoMenu.ok, true, JSON.stringify(intoMenu.body));
+      assert.deepEqual(await placeOf(intoMenu.body.post_id), {
+        app_id: app.id,
+        menu_id: menu.id,
+      });
     }
   });
 
@@ -292,7 +221,7 @@ describe('운영 팀만 앱 · 메뉴에 글을 놓는다 (blog_save_draft · bl
       request_id: randomUUID(),
       post_id: placed.body.post_id,
       base_version: placed.body.version,
-      title: '운영 팀 초안',
+      title: '앱 초안',
       body_md: '고친 본문',
       app_id: app.id,
     });
@@ -300,7 +229,7 @@ describe('운영 팀만 앱 · 메뉴에 글을 놓는다 (blog_save_draft · bl
     assert.deepEqual(await placeOf(placed.body.post_id), { app_id: app.id, menu_id: menu.id });
   });
 
-  test('기기는 운영 팀과 상관없이 놓는다 (사람이 연결한 도구)', async () => {
+  test('기기도 놓는다 (사람이 연결한 도구)', async () => {
     const token = String(device.authorization).replace('Bearer ', '');
     const placed = await draft(token, { menu_id: menu.id });
     assert.equal(placed.ok, true, JSON.stringify(placed.body));

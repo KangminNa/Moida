@@ -367,7 +367,7 @@ describe('AI 도구 (MCP)', () => {
     assert.equal(body.code, 'invalid_request');
   });
 
-  test('write뿐인 기기·에이전트에게 비공개 wiki는 없는 wiki와 똑같다', async () => {
+  test('write뿐인 기기에게 비공개 wiki는 없는 wiki와 똑같다. 에이전트는 모두 잇는다 (2026-11-21, 같은 일꾼)', async () => {
     const hidden = await newWiki(false);
     const draft = (more: Json) => ({
       request_id: randomUUID(),
@@ -376,7 +376,7 @@ describe('AI 도구 (MCP)', () => {
       ...more,
     });
     const { token } = await lease(['write']);
-    for (const actor of [writer, token]) {
+    for (const actor of [writer]) {
       const secret = await tool(actor, 'blog_save_draft', draft({ main_wiki_id: hidden.id }));
       const absent = await tool(actor, 'blog_save_draft', draft({ main_wiki_id: randomUUID() }));
       assert.equal(secret.ok, false);
@@ -386,12 +386,14 @@ describe('AI 도구 (MCP)', () => {
       const inRefs = await tool(actor, 'blog_save_draft', draft({ ref_wiki_ids: [hidden.id] }));
       assert.deepEqual(inRefs.body, absent.body);
     }
-    // read_all이 있으면 비공개 wiki도 잇는다
-    const saved = await call(reader, 'blog_save_draft', draft({ main_wiki_id: hidden.id }));
-    assert.equal(
-      (await call(reader, 'blog_get_post', { post_id: saved.post_id })).main_wiki_id,
-      hidden.id,
-    );
+    // read_all이 있으면 비공개 wiki도 잇는다. 에이전트는 모두 read_all이 있다
+    for (const actor of [reader, token]) {
+      const saved = await call(actor, 'blog_save_draft', draft({ main_wiki_id: hidden.id }));
+      assert.equal(
+        (await call(actor, 'blog_get_post', { post_id: saved.post_id })).main_wiki_id,
+        hidden.id,
+      );
+    }
   });
 
   test('주인이 비공개 wiki에 이은 초안을 write뿐인 기기가 읽어도 그 id는 나오지 않는다', async () => {

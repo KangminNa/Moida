@@ -25,7 +25,6 @@ export const SETTING_FIELDS: Readonly<Record<string, string>> = {
   effort: '생각 강도',
   scopes: '권한',
   approval_actions: '승인 동작',
-  reports_to: '보고 대상',
   reviewer_id: '검토자',
   runner_id: '러너',
   external_tools: '커넥터',
@@ -67,15 +66,10 @@ export const SETTING_FIELDS: Readonly<Record<string, string>> = {
   cadence: '정리 주기',
   collect: '모으기',
   menus: '시작 메뉴',
-  new_team: '운영 팀',
 };
 
-/**
- * 칸마다 따로 읽는 값 (켜고 끔 · 영어 값으로 읽으면 뜻이 틀리는 것). 키는 "칸" 또는 같은 칸 이름이 설정마다 뜻이 다르면 "설정.칸".
- * 앱 만들기의 new_team(스토어 2-6)은 true만 온다
- */
+/** 칸마다 따로 읽는 값 (켜고 끔 · 영어 값으로 읽으면 뜻이 틀리는 것). 키는 "칸" 또는 같은 칸 이름이 설정마다 뜻이 다르면 "설정.칸" */
 const SETTING_VALUES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  new_team: { true: '앱 운영 팀 새로 만들기 (편집장 · 작가 · 자료 조사 · 앱 디자이너)' },
   'app.kind': APP_KIND_LABELS,
 };
 

@@ -14,7 +14,7 @@ export const TASK_STATUS: Record<string, string> = {
 /** 기다리는 작업이 무엇을 기다리는지 (서버의 Task.WAIT_*) */
 export const WAIT_LABELS: Record<string, string> = {
   approval: '승인 대기',
-  subtasks: '팀원 기다리는 중',
+  subtasks: '일꾼 기다리는 중',
 };
 
 /** 작업 상태의 이름. 기다리는 중이면 무엇을 기다리는지까지 */
@@ -52,9 +52,6 @@ export const SETTING_CHANGE = 'task.setting.change';
 export const START_CODE = 'code.task.start';
 /** 앱 코드 공개 (스토어 1-6b): 대화의 만들기 일이 낸 확인 대기 버전. 대상은 앱, 판은 버전 번호 (서버의 Approval.APP_CODE_SHOW) */
 export const SHOW_APP_CODE = 'blog.app_code.show';
-/** 대화 상대(관리자 바로 아래)가 승인 동작에 넣지 않아도 올리는 것 (서버의 Approval.PARTNER_ACTIONS) */
-export const PARTNER_ACTIONS: readonly string[] = [SETTING_CHANGE, START_CODE];
-
 /** 목표 실행의 승인: 다음 회차로 갈지, 목표 실행을 완료로 닫을지 (서버의 Approval.GOAL_*) */
 export const GOAL_CONTINUE = 'task.goal.continue';
 export const GOAL_COMPLETE = 'task.goal.complete';
@@ -151,13 +148,6 @@ export const REF_KINDS: Record<string, string> = {
   url: '주소',
 };
 
-/** 팀 템플릿이 다 돌려면 필요한 것 (서버의 AgentTeamRow.needs) */
-export const NEEDS_LABELS: Record<string, string> = {
-  'code-runner': '샌드박스 필요 (만들기 · 코드)',
-  'code-github': 'code-github 플러그인 필요',
-  browser: '서버 브라우저 · browser-tabs 플러그인 필요',
-};
-
 /** ISO 요일 (월 1 ~ 일 7)의 이름 */
 export const WEEKDAY_LABELS: Record<number, string> = {
   1: '월',
@@ -202,7 +192,7 @@ export const GOAL_STATUS: Record<string, string> = {
 };
 
 /**
- * 나무를 위에서부터 펼친다 (목표, 조직도). 형제는 받은 순서 그대로, 부모를 찾을 수 없는 것은 맨 위로.
+ * 나무를 위에서부터 펼친다 (목표). 형제는 받은 순서 그대로, 부모를 찾을 수 없는 것은 맨 위로.
  * depth는 맨 위가 0
  */
 export function flatTree<T extends { id: string }>(
@@ -256,7 +246,7 @@ export function elapsed(iso: string, now: number): string {
   return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분째`;
 }
 
-/** 기한까지 남은 때 (팀원 기다리기: 지나면 다 끝나지 않아도 대표 · 팀장이 깬다) */
+/** 기한까지 남은 때 (일꾼 기다리기: 지나면 다 끝나지 않아도 대표가 깬다) */
 export function remaining(iso: string, now: number): string {
   const minutes = Math.ceil((new Date(iso).getTime() - now) / 60_000);
   if (minutes <= 0) return '기한 지남';
@@ -337,8 +327,8 @@ export const CHAT_NEEDS_ME: readonly string[] = ['asking', 'waiting_approval'];
 
 /** 대화의 소식 종류 (task.chat_updates.kind) */
 export const NEWS_KINDS: Record<string, string> = {
-  member_done: '팀원 끝남',
-  member_failed: '팀원 실패',
+  member_done: '일꾼 끝남',
+  member_failed: '일꾼 실패',
   progress: '중간 보고',
   decision: '정한 것',
   assumption: '가정',

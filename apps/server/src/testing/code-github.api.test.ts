@@ -79,6 +79,20 @@ async function leasedJob(repo: Json, paths = ['src'], agent = agentId): Promise<
   throw new Error('빌린 일이 없다');
 }
 
+/** 대표 (O-2). 없으면 첫 대화를 열어 만든다 */
+async function leadOf(): Promise<Json> {
+  const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+  if (found) return found;
+  ok(
+    await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      message: '대표를 만드는 첫 대화',
+    }),
+    201,
+  );
+  return ok(await api.get('/api/agents/lead', owner)).lead as Json;
+}
+
 before(async () => {
   api = await ApiClient.start();
   owner = await api.signIn();
@@ -109,7 +123,6 @@ before(async () => {
         requestId: randomUUID(),
         name: '코드 담당',
         tool: 'claude',
-        scopes: ['read_public', 'code'],
         approvalActions: ['code.pr.merge'],
       }),
       201,
@@ -315,7 +328,6 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
           requestId: randomUUID(),
           name: `${name} ${randomUUID().slice(0, 6)}`,
           tool: 'claude',
-          scopes: ['code'],
           approvalActions: ['code.pr.merge'],
           ...more,
         }),
@@ -357,15 +369,15 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
   const pathsOf = (job: Json) => codeOf(job).paths;
 
   before(async () => {
-    lead = await newAgent('팀장');
-    coder = await newAgent('코더', { reportsTo: lead });
+    lead = String((await leadOf()).id);
+    coder = await newAgent('코더');
     const secret = api.service(ServerRunnerPolicy).codeSecret();
     slot2 = String(
       ok(await api.request('POST', '/api/devices/code-runner', owner, { secret, slot: '8' })).token,
     );
   });
 
-  test('팀장은 code 일을 경로로 나눠 맡긴다: 하위 작업은 저장소를 물려받고, 겹치거나 밖이거나 경로가 없으면 거절', async () => {
+  test('대표는 code 일을 경로로 나눠 일꾼에게 맡긴다: 하위 작업은 저장소를 물려받고, 겹치거나 밖이거나 경로가 없으면 거절', async () => {
     const repo = await newRepo();
     const job = await leasedJob(repo, ['src', 'docs'], lead);
     const run = String(job.run_token);
@@ -395,7 +407,7 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
     const parent = ok(await api.get(`/api/tasks/${(job.task as Json).id}`, owner));
     assert.equal(parent.status, 'waiting');
 
-    // 하위 작업을 기다리는 팀장은 저장소를 쥐지 않는다: 칸 둘이 하위 작업을 동시에 빌린다
+    // 하위 작업을 기다리는 대표는 저장소를 쥐지 않는다: 칸 둘이 하위 작업을 동시에 빌린다
     const first = await leaseFrom(slot, repo);
     const second = await leaseFrom(slot2, repo);
     const leased = [...first, ...second].map(pathsOf).sort();
@@ -459,20 +471,9 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
 });
 
 describe('코드 작업 열기 (2026-11-15 C): 에이전트의 요청 → 승인 → 코드 작업', () => {
-  /** 대표(O-2, 코드 권한 없음, 승인 동작 없이도 코드 작업 열기를 올린다)의 일을 내 러너가 빌린 작업 토큰 */
+  /** 대표(O-2, 승인 동작 없이도 코드 작업 열기를 올린다)의 일을 내 러너가 빌린 작업 토큰 */
   async function partnerToken(): Promise<{ token: string; taskId: string }> {
-    let lead = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
-    if (!lead) {
-      // 대표는 첫 대화에서 생긴다
-      ok(
-        await api.request('POST', '/api/chats', owner, {
-          requestId: randomUUID(),
-          message: '대표를 만드는 첫 대화',
-        }),
-        201,
-      );
-      lead = ok(await api.get('/api/agents/lead', owner)).lead as Json;
-    }
+    const lead = await leadOf();
     const task = ok(
       await api.request('POST', '/api/tasks', owner, {
         requestId: randomUUID(),

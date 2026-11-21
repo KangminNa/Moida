@@ -8,7 +8,6 @@ import { AGENT_TOPICS, useEngines } from '../../_task/live';
 import type { AgentList } from '../../_task/types';
 
 // 삭제한 에이전트 (휴지통). 작업 · 승인 기록은 그대로 남아 있고, 복원하면 다시 일을 받는다.
-// 보고 대상이 그사이 삭제됐으면 서버가 관리자 아래로 되돌린다.
 export function DeletedAgents({
   onRestored,
   onClose,

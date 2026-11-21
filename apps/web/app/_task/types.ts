@@ -8,8 +8,6 @@ import type { PullView, TaskAskView } from '../../../../plugins/code-github/serv
 import type {
   AgentLeadView,
   AgentListView,
-  AgentTeamListView,
-  AgentTeamSavedView,
   AgentView,
 } from '../../../server/src/modules/task/agent/agent.view';
 import type {
@@ -99,9 +97,6 @@ export type ExternalToolList = ReturnType<ExternalToolListView['toJSON']>;
 export type ExternalTool = ExternalToolList['tools'][number];
 /** OAuth 커넥터의 로그인 시작 (C1): 같은 탭으로 열 로그인 서버의 주소 */
 export type ExternalToolOAuthStart = ReturnType<OAuthStartView['toJSON']>;
-export type AgentTeamList = ReturnType<AgentTeamListView['toJSON']>;
-export type AgentTeam = AgentTeamList['teams'][number];
-export type AgentTeamSaved = ReturnType<AgentTeamSavedView['toJSON']>;
 export type Schedule = ReturnType<ScheduleView['toJSON']>;
 export type ScheduleList = ReturnType<ScheduleListView['toJSON']>;
 export type Usage = ReturnType<UsageView['toJSON']>;
@@ -137,7 +132,7 @@ export type Chat = ChatDetail['chat'];
 export type ChatTurn = ChatDetail['turns'][number];
 /** 회차에 넣은 참조 하나 (2026-11-15 B) */
 export type ChatRef = ChatTurn['refs'][number];
-/** 팀이 동시에 일하는 칸의 한 줄 */
+/** 일꾼이 동시에 일하는 칸의 한 줄 */
 export type ChatTeamMember = ChatDetail['team'][number];
 /** 기다리는 결과 카드 (2차 2단계) */
 export type ChatCard = NonNullable<ChatDetail['card']>;

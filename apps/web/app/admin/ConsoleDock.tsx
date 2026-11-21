@@ -4,7 +4,7 @@ import { APPROVALS_HREF, CHAT_HREF, DOCK, SETTINGS_SECTION } from './menu';
 import { NotificationBell } from './NotificationBell';
 
 // 독 (2026-11-16 떠 있는 화면): 데스크톱은 왼쪽에 세로로, 폰은 아래에 가로로 떠 있다.
-// 위는 보는 화면 여섯(대화 · 팀 · 스토어 · 오피스 · 승인 · 보관함), 아래 묶음은 알림 · 설정 (폰에서는 위쪽 줄 오른쪽).
+// 위는 보는 화면 여섯(대화 · 에이전트 · 스토어 · 오피스 · 승인 · 보관함), 아래 묶음은 알림 · 설정 (폰에서는 위쪽 줄 오른쪽).
 // 메뉴는 일반 링크로 둔다: 글 편집기의 "저장 안 한 내용" 확인(beforeunload)이 페이지를 떠날 때 돌아야 한다.
 export function ConsoleDock({
   here,

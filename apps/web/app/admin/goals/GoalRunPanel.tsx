@@ -74,7 +74,7 @@ export function GoalRunPanel({ id }: { id: string }) {
         <dl className="kv">
           <dt>목표</dt>
           <dd>{r.goalTitle ?? '–'}</dd>
-          <dt>팀장</dt>
+          <dt>맡은 에이전트</dt>
           <dd>{r.agentName ?? '–'}</dd>
           <dt>회차</dt>
           <dd>
@@ -115,7 +115,7 @@ export function GoalRunPanel({ id }: { id: string }) {
       <section className="stack" aria-label="회차 보고">
         <h3>회차 보고</h3>
         {r.status === 'running' && (
-          <p className="note">{r.round}회차 진행 중. 팀장이 보고하면 여기에 보여요</p>
+          <p className="note">{r.round}회차 진행 중. 맡은 에이전트가 보고하면 여기에 보여요</p>
         )}
         {rounds.length === 0 ? (
           r.status !== 'running' && <p className="note">보고 없음</p>

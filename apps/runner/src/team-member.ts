@@ -2,8 +2,8 @@ import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
 
 /**
- * 일을 맡길 수 있는 바로 아래 팀원 한 명 (위임). 서버가 계산한 팀원 정보(D1, 2026-11-17)를 함께 받는다:
- * 쥔 일 수 · 최근 7일의 끝냄 · 실패 · 고쳐 달라 · 반려 수 · AI 도구 · 커넥터 · 그 아래 팀의 요약(이름 없음)
+ * 대표가 일을 맡길 수 있는 일꾼 한 명 (위임, 팀은 2026-11-21에 없앴다). 서버가 계산한 일꾼 정보(D1, 2026-11-17)를 함께 받는다:
+ * 쥔 일 수 · 최근 7일의 끝냄 · 실패 · 고쳐 달라 · 반려 수 · AI 도구 · 커넥터 · 성적표
  */
 export class TeamMember {
   constructor(
@@ -23,8 +23,6 @@ export class TeamMember {
     readonly revised = 0,
     /** 허락받았고 켜진 커넥터 */
     readonly connectors: readonly string[] = [],
-    /** 그 아래 팀의 요약 한 줄 (예: "2명 (general 2, browse 1)"). 없으면 null */
-    readonly team: string | null = null,
     /** 최근 30일 성적표 한 줄 (2026-11-20, 예: "첫 판정 통과 3/4 · 평균 고친 횟수 0.25"). 판정 · 결정이 없으면 null */
     readonly score: string | null = null,
   ) {}
@@ -44,7 +42,6 @@ export class TeamMember {
       recent.number('failed'),
       recent.number('revised'),
       raw.texts('connectors'),
-      TeamMember.teamLine(raw.child('team')),
       TeamMember.scoreLine(raw.child('scorecard')),
     );
   }
@@ -67,25 +64,6 @@ export class TeamMember {
     return parts.length > 0 ? parts.join(' · ') : null;
   }
 
-  /**
-   * 아래 팀 전체의 요약: 사람 수, 일의 종류마다 · 켜진 커넥터마다 쓸 수 있는 사람 수 (O-2: 손자 팀까지, 이름 없이).
-   * 사람이 없으면 null
-   */
-  private static teamLine(team: Json): string | null {
-    const members = team.number('members');
-    if (members === 0) return null;
-    const countsOf = (field: Json) =>
-      field
-        .keys()
-        .map((key) => `${key} ${field.number(key)}`)
-        .join(', ');
-    const connectors = countsOf(team.child('connectors'));
-    const parts = [countsOf(team.child('kinds')), connectors ? `커넥터 ${connectors}` : '']
-      .filter(Boolean)
-      .join(' · ');
-    return parts ? `${members}명 (${parts})` : `${members}명`;
-  }
-
   /** 지시문의 한 줄 (틀 member). 역할은 첫 줄만 */
   line(prompts: PromptPack): string {
     return prompts.fill('member', {
@@ -99,7 +77,6 @@ export class TeamMember {
       failed: this.failed,
       revised: this.revised,
       connectors: this.connectors.join(', '),
-      team: this.team,
       score: this.score,
       paused: this.status === 'paused',
       bound: this.bound,

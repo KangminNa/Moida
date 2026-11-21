@@ -1,47 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import {
   type Actor,
-  ApprovedActor,
   Database,
   EntityService,
-  Forbidden,
   Idempotency,
   NotFound,
   RuleViolation,
   SettingActor,
   type SettingChangeInput,
-  SettingKinds,
   SettingOutcome,
   type Sql,
   type VersionInput,
 } from '../../platform';
-import { Engines } from '../ai/engines';
-import { ApprovalQuery } from '../approval/approval.query';
 import { SettingChanges } from '../setting-change/setting-change.policy';
 import { Agent } from './agent';
-import type {
-  CreateAgentInput,
-  CreateAgentTeamInput,
-  DeleteAgentInput,
-  UpdateAgentInput,
-} from './agent.input';
+import type { CreateAgentInput, DeleteAgentInput, UpdateAgentInput } from './agent.input';
 import { AgentQuery } from './agent.query';
 import { AgentRepository } from './agent.repository';
 import { AgentEdit } from './agent-edit';
-import { AgentOrg } from './agent-org.policy';
-import { AgentTeams } from './agent-team.policy';
 
 // 에이전트 쓰기: 만들기, 고치기, 멈추기, 다시 시작, 휴지통 · 복원. 모두 주인만.
-// 보고 대상을 정할 때는 조직도 전체를 잠근다 (AgentRepository.lockAll): 동시에 바꿔도 순환이 생기지 않게.
 @Injectable()
 export class AgentService extends EntityService<Agent> {
   private static readonly CREATE = 'create_agent';
-  private static readonly CREATE_TEAM = 'create_agent_team';
 
   constructor(
     db: Database,
     private readonly agents: AgentQuery,
-    private readonly approvals: ApprovalQuery,
   ) {
     super(db);
   }
@@ -51,42 +36,35 @@ export class AgentService extends EntityService<Agent> {
   }
 
   /**
-   * 휴지통으로 (기획서 결정 2026-11-14). team이면 아래 팀 전체를 아래부터, 아니면 바로 아래 팀원을 이 에이전트의 보고 대상으로
-   * 올린다. 진행 중인 작업 · 스케줄 · 도는 목표 실행이 있으면 지우지 않고 까닭을 알린다 (조용히 취소하지 않는다)
+   * 휴지통으로 (기획서 결정 2026-11-14). 진행 중인 작업 · 스케줄 · 도는 목표 실행이 있으면 지우지 않고 까닭을 알린다
+   * (조용히 취소하지 않는다)
    */
   async delete(actor: Actor, req: DeleteAgentInput): Promise<Agent> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     return this.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      const org = await agents.lockAll(spaceId);
-      const agent = org.find((a) => a.id === req.id && !a.deleted);
-      if (!agent) throw new NotFound('에이전트를 찾을 수 없어요');
+      const agent = await agents.lock(spaceId, req.id);
       agent.assertVersion(req.version);
-      const gone = AgentOrg.toDelete(agent, org, req.team);
-      const why = await this.agents.blockers(
-        actor,
-        gone.map((a) => a.id),
-      );
+      // 대표 · 이미 지운 것은 엔티티가 먼저 막는다 (막히면 트랜잭션째 되돌린다)
+      agent.delete(new Date());
+      const why = await this.agents.blockers(actor, [agent.id]);
       if (why.length > 0) throw new RuleViolation(`삭제할 수 없어요: ${why.join(', ')}`);
-      const now = new Date();
-      const moved = gone.flatMap((a) => a.delete(org, now));
-      for (const a of new Set([...moved, ...gone])) await agents.save(a);
+      await agents.save(agent);
       return agent;
     });
   }
 
-  /** 휴지통에서 되돌린다 (보고 대상이 그사이 지워졌으면 주인 아래로) */
+  /** 휴지통에서 되돌린다 */
   async restore(actor: Actor, req: VersionInput): Promise<Agent> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     return this.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      const org = await agents.lockAll(spaceId);
-      const agent = org.find((a) => a.id === req.id);
+      const agent = (await agents.lockAll(spaceId)).find((a) => a.id === req.id);
       if (!agent) throw new NotFound('에이전트를 찾을 수 없어요');
       agent.assertVersion(req.version);
-      agent.restore(org);
+      agent.restore();
       await agents.save(agent);
       return agent;
     });
@@ -108,76 +86,7 @@ export class AgentService extends EntityService<Agent> {
     });
   }
 
-  /**
-   * 템플릿으로 팀 하나를 한 트랜잭션에서 만든다 (반쪽 팀이 남지 않게). 조직도 전체를 잠근 뒤 보고 대상이 앞인 순서로
-   * 만들고 잇는다. 같은 requestId가 다시 오면 처음 만든 팀을 돌려준다
-   */
-  async createTeam(actor: Actor, req: CreateAgentTeamInput): Promise<readonly Agent[]> {
-    actor.assertOwner();
-    return this.build(actor, actor.requireSpace(), req.team, req.tool, req.requestId);
-  }
-
-  /**
-   * 승인한 앱 만들기의 앱 운영 팀 (스토어 2-6, platform AgentDirectory.teamFor ← blog AppService.applySetting).
-   * 그 결재(new_team: true)의 요청자만. requestId가 결재 id라 같은 결재가 다시 와도 팀은 하나. 팀장(맨 위)을 돌려준다
-   */
-  async createAppTeam(actor: Actor): Promise<Agent> {
-    if (!(actor instanceof ApprovedActor) || !(await this.approvals.asksAppTeam(actor)))
-      throw new Forbidden(SettingKinds.ACTION);
-    const spaceId = actor.requireSpace();
-    const team = await this.build(
-      actor,
-      spaceId,
-      AgentTeams.APP,
-      Engines.preferred(),
-      actor.approvalId,
-    );
-    const leader = team.find((a) => a.reportsTo === null);
-    if (!leader) throw new Error('앱 운영 팀 템플릿에 맨 위 구성원이 없어요');
-    return leader;
-  }
-
-  /** 템플릿 key의 팀을 만든다 (관리자의 팀 만들기 · 승인한 앱 만들기). 같은 요청자 · requestId면 처음 만든 팀 */
-  private build(
-    actor: Actor,
-    spaceId: string,
-    key: string,
-    tool: string,
-    requestId: string,
-  ): Promise<readonly Agent[]> {
-    const team = AgentTeams.of(key);
-    return this.transaction(async (tx) => {
-      const agents = new AgentRepository(tx);
-      const once = new Idempotency(tx, actor.id ?? spaceId, requestId, AgentService.CREATE_TEAM);
-      const before = await once.previous();
-      if (before)
-        return Promise.all((before.agentIds as string[]).map((id) => agents.load(spaceId, id)));
-      const org = [...(await agents.lockAll(spaceId))];
-      const made = new Map<string, Agent>();
-      const now = new Date();
-      for (const m of team.members) {
-        const agent = Agent.open(
-          spaceId,
-          {
-            name: m.name,
-            role: m.role,
-            tool,
-            scopes: m.scopes,
-            approval_actions: m.approval_actions,
-          },
-          now,
-        );
-        org.push(agent);
-        agent.reportTo(m.reports_to === null ? null : (made.get(m.reports_to)?.id ?? null), org);
-        made.set(m.key, agent);
-      }
-      for (const agent of made.values()) await agents.save(agent);
-      await once.remember({ agentIds: [...made.values()].map((a) => a.id) });
-      return [...made.values()];
-    });
-  }
-
-  /** 보고 대상 · 러너 · 검토자의 규칙은 AgentEdit (제안 · 승인 뒤 적용과 같은 줄) */
+  /** 러너 · 검토자의 규칙은 AgentEdit (제안 · 승인 뒤 적용과 같은 줄) */
   async update(actor: Actor, req: UpdateAgentInput): Promise<Agent> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();

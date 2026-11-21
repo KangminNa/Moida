@@ -63,6 +63,20 @@ describe('PromptTemplates', () => {
     const skill = RepoSkillGateway.fromEnv().get(PromptTemplates.SKILL);
     assert.ok(skill, '저장소에 cairn-runner가 없다');
     const t = PromptTemplates.of(skill);
+    // 서버가 fill로 채우는 틀이 모두 있다 (틀을 지울 때 이웃 틀까지 지우지 않게, 2026-11-21)
+    for (const name of [
+      'goal-round',
+      'goal-report',
+      'lessons',
+      'read-url-note',
+      'recipe',
+      'result-check',
+      'result-fix',
+      'result-inspect',
+      'result-review',
+      'setting-continue',
+    ])
+      assert.doesNotThrow(() => t.fill(name, {}), name);
     assert.match(
       t.fill('goal-round', { round: 2, maxRounds: 5, instruction: '지시' }),
       /^# 목표 실행 2회차 \(회차 한도 5\)\n## 지시\n지시\n## 완료 조건\n- 지시를 다 이루면 끝\n## 이번 회차/,
@@ -78,11 +92,6 @@ describe('PromptTemplates', () => {
         notes: '- [2026-11-20] blog.post.publish\n  관리자 메모: 짧게',
       }),
       /^# 피드백에서 배우기\n관리자가 최근 수정 요청에 남긴 메모 3개[\s\S]*관리자 메모: 짧게\n## 하는 법/,
-    );
-    // 주간 팀 점검 (2026-11-20): 서버가 성적표를 채운다
-    assert.match(
-      t.fill('team-review', { days: 30, members: '- 작가 (agent_id: a)\n  끝낸 일 4' }),
-      /^# 주간 팀 점검\n지난 30일[\s\S]*## 팀원 \(최근 30일\)\n- 작가 \(agent_id: a\)\n {2}끝낸 일 4\n## 하는 법/,
     );
   });
 });

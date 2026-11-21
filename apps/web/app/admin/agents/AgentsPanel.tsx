@@ -2,34 +2,33 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useMe } from '../../_account/live';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
-import { flatTree, holdLabel, taskStatusLabel } from '../../_task/labels';
+import { holdLabel, taskStatusLabel } from '../../_task/labels';
 import {
   useAgents,
   useExternalTools,
+  useLead,
   useRunnerChoices,
   useTasksIn,
   useUsage,
 } from '../../_task/live';
 import type { Agent, Chat } from '../../_task/types';
-import { AgentCard } from './AgentCard';
+import { AgentCard, LeadCard } from './AgentCard';
 import { type AgentBody, AgentForm } from './AgentForm';
-import { AgentTeamsPanel } from './AgentTeamsPanel';
 import { DeletedAgents } from './DeletedAgents';
 
 const NEW = 'new';
 const CONFLICT = '이미 바뀐 에이전트예요. 최신 내용을 다시 읽었어요';
 /** 역할 다듬기 (2026-11-20 ECC형 에이전트 정의): 대표에게 보내는 말. 표준 형식은 대표의 지시문 틀에 있다 */
 const TIDY_ROLES =
-  '팀원들의 역할 설명을 표준 형식으로 다듬어 제안해 줘. 일을 많이 하는 팀원부터 3명까지, 내가 쓴 뜻은 바꾸지 말고 빠진 단락만 채워 줘.';
+  '일꾼들의 역할 설명을 표준 형식으로 다듬어 제안해 줘. 일을 많이 하는 일꾼부터 3명까지, 내가 쓴 뜻은 바꾸지 말고 빠진 단락만 채워 줘.';
 
-// 에이전트: 조직도, 사용량과 한도, 추가, 편집, 중지, 재개.
+// 에이전트 (2026-11-21 팀 없는 에이전트): 맨 앞에 대표, 그 뒤로 모두 같은 일꾼. 사용량과 한도, 추가, 편집, 중지, 재개.
+// 대표는 목록(api/agents)에 없어 따로 읽고(useLead), 고치기는 설정 › AI에서 한다.
 export function AgentsPanel({ adding }: { adding: boolean }) {
   const agents = useAgents();
-  // 맨 위(보고 대상이 없을 때)에 보일 관리자의 이름
-  const ownerName = useMe().data?.name ?? '관리자';
+  const lead = useLead().data?.lead ?? null;
   const running = useTasksIn('running');
   const waiting = useTasksIn('waiting');
   const usage = useUsage();
@@ -37,8 +36,6 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   const externalTools = useExternalTools().data?.tools ?? [];
   // 열린 입력 칸: 추가, 또는 편집 중인 에이전트의 id
   const [open, setOpen] = useState<string | null>(adding ? NEW : null);
-  // 팀 템플릿 칸 (에이전트가 없을 때는 늘 보인다)
-  const [teams, setTeams] = useState(false);
   // 삭제한 에이전트(휴지통) 칸
   const [trash, setTrash] = useState(false);
   const action = useAction();
@@ -53,6 +50,11 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
     if (running.data?.tasks.some((t) => t.agentId === agent.id)) return taskStatusLabel('running');
     const waits = waiting.data?.tasks.find((t) => t.agentId === agent.id);
     return waits ? taskStatusLabel(waits.status, waits.waitReason) : null;
+  }
+
+  /** 쉬기 한도에 닿았으면 그 문구 */
+  function hold(agent: Agent): string | null {
+    return holdLabel(usage.data?.agents.find((u) => u.id === agent.id));
   }
 
   /** 대표와 새 대화를 열어 역할 다듬기를 맡기고 그 대화로 간다 (제안은 결과 카드의 승인으로) */
@@ -79,19 +81,17 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
     );
   }
 
-  /** 휴지통으로. team이면 아래 팀 전체를, 아니면 팀원은 이 에이전트의 보고 대상에게 올린다 (서버가 같은 규칙으로) */
-  function remove(agent: Agent, team: boolean) {
-    const members = (list ?? []).filter((a) => a.reportsTo === agent.id).length;
-    const boss = (list ?? []).find((a) => a.id === agent.reportsTo)?.name ?? ownerName;
-    const what = team
-      ? `${agent.name} 팀 전체(아래 팀원 모두)를 삭제할까요?`
-      : members > 0
-        ? `${agent.name}을(를) 삭제할까요? 아래 팀원 ${members}명은 ${boss}에게 보고하게 바뀌어요.`
-        : `${agent.name}을(를) 삭제할까요?`;
-    if (!window.confirm(`${what} 작업 기록은 남고 휴지통에서 복원할 수 있어요`)) return;
+  /** 휴지통으로. 작업 기록은 남고 복원하면 다시 일을 받는다 */
+  function remove(agent: Agent) {
+    if (
+      !window.confirm(
+        `${agent.name}을(를) 삭제할까요? 작업 기록은 남고 휴지통에서 복원할 수 있어요`,
+      )
+    )
+      return;
     void action.run(
       agent.id,
-      () => api('POST', `/api/agents/${agent.id}/delete`, { version: agent.version, team }),
+      () => api('POST', `/api/agents/${agent.id}/delete`, { version: agent.version }),
       { done: `${agent.name} 삭제됨`, reload: agents.reload, conflict: CONFLICT },
     );
   }
@@ -126,19 +126,13 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
     <>
       <header className="page-head">
         <div>
-          <h1>팀</h1>
-          <p>
-            일을 맡는 AI 에이전트. 역할 · 모델 · 권한 · 한도를 정해요. 대화는 대표가 받아 맨 위
-            팀장들에게 나눠 맡겨요 (대표는 설정 › AI)
-          </p>
+          <h1>에이전트</h1>
+          <p>대화는 대표가 받아 일꾼에게 나눠 맡겨요. 모든 일꾼은 같은 권한으로 같은 일을 해요</p>
         </div>
         {list && list.length > 0 && open !== NEW && (
           <div className="row">
             <button type="button" className="ghost" onClick={() => setTrash(!trash)}>
               휴지통
-            </button>
-            <button type="button" className="ghost" onClick={() => setTeams(!teams)}>
-              팀 템플릿
             </button>
             <button
               type="button"
@@ -157,15 +151,10 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
       </header>
       {problem && <p className="error">{problem}</p>}
       {trash && <DeletedAgents onRestored={agents.reload} onClose={() => setTrash(false)} />}
-      {teams && list && list.length > 0 && (
-        <AgentTeamsPanel onMade={agents.reload} onClose={() => setTeams(false)} />
-      )}
-      {list && list.length > 0 && <OrgChart agents={list} ownerName={ownerName} />}
       {open === NEW && (
         <AgentForm
           agent={null}
           agents={list ?? []}
-          ownerName={ownerName}
           runners={runners}
           externalTools={externalTools}
           busy={save.busy !== null}
@@ -180,28 +169,25 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
       ) : list.length === 0 ? (
         open !== NEW && (
           <>
+            {lead && <LeadCard lead={lead} work={workOf(lead)} hold={hold(lead)} />}
             <div className="panel">
-              <b>에이전트 없음</b>
-              <p className="note">
-                작업은 활성 에이전트가 생길 때까지 대기. 하나씩 추가하거나 아래 팀 템플릿으로 한
-                번에
-              </p>
+              <b>일꾼 없음</b>
+              <p className="note">대표가 맡길 일꾼이 생길 때까지 작업은 대기</p>
               <button type="button" className="cta small fit" onClick={() => show(NEW)}>
                 에이전트 추가
               </button>
             </div>
-            <AgentTeamsPanel onMade={agents.reload} onClose={null} />
           </>
         )
       ) : (
         <div className="agents">
+          {lead && <LeadCard lead={lead} work={workOf(lead)} hold={hold(lead)} />}
           {list.map((a) =>
             open === a.id ? (
               <AgentForm
                 key={a.id}
                 agent={a}
                 agents={list}
-                ownerName={ownerName}
                 runners={runners}
                 externalTools={externalTools}
                 busy={save.busy !== null}
@@ -215,44 +201,20 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
                 key={a.id}
                 agent={a}
                 work={workOf(a)}
-                hold={holdLabel(usage.data?.agents.find((u) => u.id === a.id))}
+                hold={hold(a)}
                 score={usage.data?.agents.find((u) => u.id === a.id)?.scorecard ?? null}
-                boss={list.find((b) => b.id === a.reportsTo)?.name ?? ownerName}
                 runner={
                   a.runnerId ? (runners.find((r) => r.runner.id === a.runnerId) ?? null) : undefined
                 }
                 busy={action.busy === a.id}
-                members={list.filter((m) => m.reportsTo === a.id).length}
                 onFlip={() => flip(a)}
                 onEdit={() => show(a.id)}
-                onRemove={(team) => remove(a, team)}
+                onRemove={() => remove(a)}
               />
             ),
           )}
         </div>
       )}
     </>
-  );
-}
-
-/** 조직도: 맨 위는 관리자(정한 이름). 보고 대상이 없는 에이전트는 관리자에게 보고한다. 위임은 바로 아래 팀에게만 */
-function OrgChart({ agents, ownerName }: { agents: readonly Agent[]; ownerName: string }) {
-  const rows = flatTree(agents, (a) => a.reportsTo);
-  return (
-    <section className="panel" aria-labelledby="org-chart">
-      <h2 id="org-chart">조직도</h2>
-      <ol className="org" aria-label="보고 순서">
-        <li>
-          <b>{ownerName}</b> <small className="note">승인 · 발행</small>
-        </li>
-        {rows.map(({ item, depth }) => (
-          <li key={item.id} style={{ paddingLeft: (depth + 1) * 20 }}>
-            └ {item.name}
-            {item.role && <small className="note"> · {item.role.split('\n')[0]}</small>}
-            {item.status === 'paused' && <small className="note"> · 중지</small>}
-          </li>
-        ))}
-      </ol>
-    </section>
   );
 }

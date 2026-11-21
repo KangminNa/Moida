@@ -1,4 +1,3 @@
-import { SCOPE_LABELS } from '../../_lib/types';
 import {
   actionLabel,
   LOGIN_SITE,
@@ -9,18 +8,13 @@ import {
 } from '../../_task/labels';
 import type { ExternalTool } from '../../_task/types';
 
-/** 에이전트에게 줄 수 있는 권한. run은 러너의 것이라 없다 (서버의 Agent.SCOPES와 맞춘다) */
-const SCOPES = ['upload', 'read_public', 'read_all', 'tidy', 'write', 'browse', 'code', 'make'];
 /** 고를 수 있는 승인 동작: 승인 뒤 실행하는 모듈이 있는 것만. 없으면 작업이 끝나지 않는다. 한도 변경은 서버만 올린다 */
 const ACTIONS = [PUBLISH_POST, PUBLISH_SITE, LOGIN_SITE, MERGE_PULL, PLUG_TOOL];
-/** 브라우저 사용을 켜면 함께 켜는 승인 동작: 러너가 이 에이전트의 이름으로 클릭 · 로그인 승인을 올린다 */
-const BROWSE_ACTIONS = [PUBLISH_SITE, LOGIN_SITE];
-/** 외부 도구와 함께 줄 수 없는 권한 (서버 AgentScopes.NOT_WITH_TOOLS와 맞춘다): 비공개를 열거나 셸이 있는 것 */
-const NOT_WITH_TOOLS = ['read_all', 'write', 'code', 'make'];
+/** 새 일꾼의 처음 승인 동작: 모든 일꾼이 브라우저를 써서 러너가 이 일꾼의 이름으로 클릭 · 로그인 승인을 올린다 */
+export const BROWSE_ACTIONS: readonly string[] = [PUBLISH_SITE, LOGIN_SITE];
 
-/** 권한 · 승인 동작 · 외부 도구 칸의 값 */
+/** 승인 동작 · 커넥터 칸의 값 */
 export type Access = {
-  scopes: readonly string[];
   actions: readonly string[];
   tools: readonly string[];
 };
@@ -29,8 +23,8 @@ function toggled(list: readonly string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-// 에이전트 폼의 권한 · 승인 요청할 수 있는 동작 · 외부 도구 (2차 7단계) 칸. 값은 폼이 들고 바뀐 한 벌을 onChange로 돌려준다.
-// 외부 도구는 비공개를 읽거나 셸이 있는 에이전트에 붙이지 않는다: 그 권한을 켜면 고른 도구를 뺀다 (서버도 422로 막는다).
+// 에이전트 폼의 승인 요청할 수 있는 동작 · 커넥터 (2차 7단계) 칸. 값은 폼이 들고 바뀐 한 벌을 onChange로 돌려준다.
+// 권한은 고르지 않는다: 모든 일꾼이 같은 권한(전부)을 가진다 (2026-11-21 팀 없는 에이전트).
 export function AccessFields({
   value,
   kept,
@@ -44,34 +38,10 @@ export function AccessFields({
   tools: readonly ExternalTool[];
   onChange: (next: Access) => void;
 }) {
-  const closed = value.scopes.some((s) => NOT_WITH_TOOLS.includes(s));
   const pick = tools.filter((t) => t.status !== 'proposed' || value.tools.includes(t.name));
-
-  function scope(s: string) {
-    const scopes = toggled(value.scopes, s);
-    const actions =
-      s === 'browse' && scopes.includes(s)
-        ? [...new Set([...value.actions, ...BROWSE_ACTIONS])]
-        : value.actions;
-    const shut = scopes.some((x) => NOT_WITH_TOOLS.includes(x));
-    onChange({ scopes, actions, tools: shut ? [] : value.tools });
-  }
 
   return (
     <>
-      <fieldset className="checks">
-        <legend>권한</legend>
-        <small>
-          위키 정리는 비공개까지 읽기와 함께 필요. 브라우저 쓰기 · 코드 고치기 · 파일 만들기 ·
-          커넥터는 비공개까지 읽기 · 블로그 초안 쓰기와 함께 줄 수 없음
-        </small>
-        {SCOPES.map((s) => (
-          <label key={s} className="check">
-            <input type="checkbox" checked={value.scopes.includes(s)} onChange={() => scope(s)} />
-            {SCOPE_LABELS[s]}
-          </label>
-        ))}
-      </fieldset>
       <fieldset className="checks">
         <legend>승인 요청할 수 있는 동작</legend>
         {[...new Set([...ACTIONS, ...kept])].map((a) => (
@@ -85,12 +55,11 @@ export function AccessFields({
           </label>
         ))}
       </fieldset>
-      <fieldset className="checks" disabled={closed}>
+      <fieldset className="checks">
         <legend>커넥터</legend>
         <small>
-          {closed
-            ? '비공개까지 읽기 · 블로그 초안 쓰기 · 코드 고치기 · 파일 만들기 권한에는 붙이지 않음'
-            : '이 에이전트의 일에만 붙음. 커넥터는 대화에서 붙여 달라고 하거나 설정 › 고급 › 커넥터에서 추가'}
+          이 에이전트의 일에만 붙음. 커넥터는 대화에서 붙여 달라고 하거나 설정 › 고급 › 커넥터에서
+          추가
         </small>
         {pick.length === 0 && <small>커넥터 없음</small>}
         {pick.map((t) => (

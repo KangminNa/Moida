@@ -43,7 +43,6 @@ export interface AppRow {
   code_seq: number | null;
   code_pending_seq: number | null;
   code_versions: number;
-  agent_id: string | null;
   policy: string;
   home: boolean;
   domain: string | null;
@@ -92,7 +91,6 @@ export interface MenuRow {
   version: number;
   kind: MenuKind;
   policy: string;
-  agent_id: string | null;
   rss: boolean;
   created_at: Date;
   updated_at: Date;

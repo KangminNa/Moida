@@ -4,10 +4,9 @@ import {
   type RequestFields,
   type Unchecked,
 } from '../../platform';
-import { Engines } from '../ai/engines';
 import type { AgentRow } from '../task.tables';
 
-// 에이전트 입력의 모양. 뜻(도구 이름, 권한 목록)은 Agent가 검사한다.
+// 에이전트 입력의 모양. 뜻(도구 이름)은 Agent가 검사한다. 권한은 받지 않는다 (2026-11-21: 모든 에이전트가 같은 권한)
 
 const LIMIT_MAX = Number.MAX_SAFE_INTEGER;
 
@@ -16,7 +15,6 @@ const COLUMNS: ColumnReaders<AgentRow> = {
   name: (f, n) => f.optionalText(n, 200) ?? undefined,
   role: (f, n) => f.optionalText(n, 4000) ?? '',
   tool: (f, n) => f.optionalText(n, 40) ?? undefined,
-  scopes: (f, n) => f.optionalTextList(n, 20, 40) ?? undefined,
   approval_actions: (f, n) => f.optionalTextList(n, 20, 100) ?? undefined,
   monthly_limit: (f, n) => f.optionalInteger(n, 1, LIMIT_MAX),
   five_hour_limit: (f, n) => f.optionalInteger(n, 1, LIMIT_MAX),
@@ -25,13 +23,6 @@ const COLUMNS: ColumnReaders<AgentRow> = {
   effort: (f, n) => f.optionalText(n, 10) ?? '',
   external_tools: (f, n) => f.optionalTextList(n, 10, 30) ?? undefined,
 };
-
-/** 보고 대상 칸 (만들기 · 고치기가 함께 쓴다): 보내지 않으면 undefined, null이면 주인에게 보고 */
-function reportsToOf(f: RequestFields, raw: unknown): string | null | undefined {
-  const body = (raw ?? {}) as Record<string, unknown>;
-  if (!('reportsTo' in body)) return undefined;
-  return body.reportsTo === null ? null : f.uuid('reportsTo');
-}
 
 /** 일을 맡을 러너 칸 (만들기 · 고치기가 함께 쓴다): 보내지 않으면 undefined, null이면 아무 러너 */
 function runnerOf(f: RequestFields, raw: unknown): string | null | undefined {
@@ -62,8 +53,6 @@ export class CreateAgentInput extends BaseRequest {
   private constructor(
     readonly requestId: string,
     readonly fields: Partial<Unchecked<AgentRow>>,
-    /** 보고 대상. 없으면 주인에게 보고한다 */
-    readonly reportsTo: string | null,
     /** 일을 맡을 러너 (task.runners의 id). 없으면 아무 러너 */
     readonly runnerId: string | null,
   ) {
@@ -78,36 +67,8 @@ export class CreateAgentInput extends BaseRequest {
       const role = f.optionalText('role', 4000) ?? '';
       const tool = f.text('tool', 40);
       const fields = { ...f.columns(COLUMNS), name, role, tool };
-      return new CreateAgentInput(
-        requestId,
-        fields,
-        reportsToOf(f, raw) ?? null,
-        runnerOf(f, raw) ?? null,
-      );
+      return new CreateAgentInput(requestId, fields, runnerOf(f, raw) ?? null);
     });
-  }
-}
-
-/** POST /api/agent-teams: 템플릿(team)으로 팀 하나. tool은 모든 구성원의 AI 도구 (기본 claude) */
-export class CreateAgentTeamInput extends BaseRequest {
-  private constructor(
-    readonly requestId: string,
-    readonly team: string,
-    readonly tool: string,
-  ) {
-    super();
-  }
-
-  static from(raw: unknown): CreateAgentTeamInput {
-    return BaseRequest.read(
-      raw,
-      (f) =>
-        new CreateAgentTeamInput(
-          f.uuid('requestId'),
-          f.text('team', 40),
-          f.optionalText('tool', 40) ?? Engines.preferred(),
-        ),
-    );
   }
 }
 
@@ -122,37 +83,27 @@ export class ListAgentsInput extends BaseRequest {
   }
 }
 
-/** POST /api/agents/:id/delete { version, team? }: team이면 아래 팀 전체를 함께, 아니면 팀원을 위로 올린다 */
+/** POST /api/agents/:id/delete { version } */
 export class DeleteAgentInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
-    readonly team: boolean,
   ) {
     super();
   }
 
   static from(id: string, raw: unknown): DeleteAgentInput {
     const body = { ...(raw as object), id } as Record<string, unknown>;
-    return BaseRequest.read(
-      body,
-      (f) =>
-        new DeleteAgentInput(
-          f.uuid('id'),
-          f.version(),
-          body.team === undefined ? false : f.boolean('team'),
-        ),
-    );
+    return BaseRequest.read(body, (f) => new DeleteAgentInput(f.uuid('id'), f.version()));
   }
 }
 
-/** PATCH /api/agents/:id. reportsTo에 null이면 주인에게 보고, runnerId에 null이면 아무 러너, reviewerId에 null이면 검토자 없음 */
+/** PATCH /api/agents/:id. runnerId에 null이면 아무 러너, reviewerId에 null이면 검토자 없음 */
 export class UpdateAgentInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
     readonly changes: Partial<Unchecked<AgentRow>>,
-    readonly reportsTo: string | null | undefined,
     readonly runnerId: string | null | undefined,
     readonly reviewerId: string | null | undefined,
     /** 검수 승인: 검토자가 앱 안의 공개를 검수해 통과하면 관리자 대신 승인한다 (대표만, 2026-11-20) */
@@ -172,7 +123,6 @@ export class UpdateAgentInput extends BaseRequest {
           f.uuid('id'),
           f.version(),
           f.columns(COLUMNS),
-          reportsToOf(f, body),
           runnerOf(f, body),
           reviewerOf(f, body),
           reviewerApprovesOf(f, body),
