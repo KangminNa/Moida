@@ -79,15 +79,49 @@ export function renderAppScreen(
   return head >= 0 ? `${html.slice(0, head)}${block}${html.slice(head)}` : `${block}${html}`;
 }
 
+/** 문서의 앞머리: doctype · <html> · <head>를 여는 곳까지 (그 바로 뒤에 넣어야 <base>가 다른 주소보다 먼저 읽힌다) */
+const OPENING = /^\s*(?:<!doctype[^>]*>\s*)?(?:<html[^>]*>\s*)?(?:<head[^>]*>)?/i;
+
+/**
+ * 정적 앱의 HTML 하나 (스토어 9.13): 템플릿으로 채우지 않고 그대로 내보낸다. 더하는 것은 둘뿐이다.
+ *   <base>      파일이 있는 폴더의 주소. /<앱>/about 과 /<앱>/about/ 어디서 열든, 없는 화면 주소에서 첫 화면을 열든
+ *               묶음 안의 상대 주소(assets/app.js)가 같은 파일을 가리킨다
+ *   cairn-data  템플릿 앱과 같은 데이터 블록 (앱 JS가 읽는다)
+ * file: 묶음 안의 이름 (about/index.html)
+ */
+export function renderStaticScreen(
+  html: string,
+  file: string,
+  data: AppScreenData,
+  siteName: string,
+  ticket: string | null,
+): string {
+  const root = data.base === '/' ? '' : data.base;
+  const folder = file.includes('/') ? `${file.slice(0, file.lastIndexOf('/'))}/` : '';
+  const href = `${root}/${encodeURI(folder)}`.replace(/"/g, '%22');
+  const added = `<base href="${href}">${dataBlock(enrich(data, {}, siteName, ticket))}`;
+  const at = OPENING.exec(html)?.[0].length ?? 0;
+  return `${html.slice(0, at)}${added}${html.slice(at)}`;
+}
+
 /**
  * 앱 화면 · 앱 파일의 격리 머리글. 출처 없는 문서로 열려 앱의 스크립트가 로그인 · 콘솔 API에 닿지 못한다 (sandbox에
  * allow-same-origin 없음). 불러오기는 이 사이트와 그 버전의 cairn.json 바깥 주소만 (그림은 글 본문이 쓰는 https 어디서나).
  * 출처 없는 문서에서 'self'가 맞지 않는 브라우저가 있어 사이트 주소를 그대로 적는다
  */
-export function appHeaders(site: string, hosts: readonly string[], preview: boolean): Headers {
+export function appHeaders(
+  site: string,
+  hosts: readonly string[],
+  preview: boolean,
+  /**
+   * 정적 앱이면 그 앱의 주소 앞부분 (https://<사이트>/<앱>/, 앱 도메인이면 https://<도메인>/): <base>를 쓰고,
+   * 앱 JS가 자기 묶음의 파일(data.json 따위)을 fetch로 읽는다. 사이트의 다른 주소(api)는 여전히 부르지 못한다
+   */
+  own: string | null = null,
+): Headers {
   const outside = hosts.map((h) => `https://${h}`).join(' ');
   const from = `${site} ${outside}`.trim();
-  const only = (list: string) => list || "'none'";
+  const only = (list: string) => list.trim() || "'none'";
   const policy = [
     'sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads',
     `default-src ${from}`,
@@ -95,9 +129,9 @@ export function appHeaders(site: string, hosts: readonly string[], preview: bool
     `style-src ${from} 'unsafe-inline'`,
     `img-src ${from} data: blob: https:`,
     `font-src ${from} data:`,
-    `connect-src ${only(outside)}`,
+    `connect-src ${only(`${own ?? ''} ${outside}`)}`,
     `form-action ${only(outside)}`,
-    "base-uri 'none'",
+    `base-uri ${own === null ? "'none'" : site}`,
     "object-src 'none'",
     "frame-ancestors 'self'",
   ].join('; ');

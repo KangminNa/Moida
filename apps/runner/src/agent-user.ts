@@ -291,9 +291,14 @@ export class AgentUser {
   }
 
   async readFile(path: string, maxBytes: number): Promise<string | null> {
+    return (await this.readBytes(path, maxBytes))?.toString('utf8') ?? null;
+  }
+
+  /** 파일 하나의 내용 (agent 권한으로). 없거나 maxBytes를 넘으면 null */
+  async readBytes(path: string, maxBytes: number): Promise<Buffer | null> {
     if (this.isSelf) {
-      const text = await readFile(path).catch(() => null);
-      return text === null || text.length > maxBytes ? null : text.toString('utf8');
+      const bytes = await readFile(path).catch(() => null);
+      return bytes === null || bytes.length > maxBytes ? null : bytes;
     }
     const out = await this.exec('head', ['-c', String(maxBytes + 1), '--', path], {
       cwd: '/',
@@ -301,7 +306,7 @@ export class AgentUser {
       timeoutMs: AgentUser.SHORT_MS,
       stdoutMax: maxBytes,
     });
-    return out.ok && out.stdout !== null ? out.stdout.toString('utf8') : null;
+    return out.ok && out.stdout !== null ? out.stdout : null;
   }
 
   /**

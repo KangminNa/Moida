@@ -56,6 +56,7 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
     note: string,
     now: Date,
   ): void {
+    bundle.assertFits(this.row.kind);
     const seq = this.row.code_versions + 1;
     const held = this.row.visibility === AppCode.PUBLIC;
     this.put('code_versions', seq);

@@ -12,7 +12,7 @@ import {
 } from '../../platform';
 import { appCodeVersions, apps } from '../blog.schema';
 import type { AppCodeVersionRow, AppRow } from '../blog.tables';
-import { PageFiles } from '../page/page-files';
+import type { PageFiles } from '../page/page-files';
 import type {
   AppCodeBaseInput,
   AppCodeIdInput,
@@ -27,7 +27,7 @@ import {
   AppCodeVersionView,
   AppCodeView,
 } from './app-code.view';
-import { AppCodeBundle } from './app-code-bundle';
+import { AppCodeBundle, type AppCodeRender } from './app-code-bundle';
 import { AppCodeFiles } from './app-code-files';
 import { AppStarterGateway } from './app-starter.gateway';
 import { AppTicket } from './app-ticket';
@@ -69,7 +69,7 @@ export class AppCodeQuery extends BaseQuery {
     const shown = await this.filesOf(actor, app, null);
     return new AppCodeView(
       app,
-      rows.map((r) => new AppCodeVersionView(r, PageFiles.of(r.files).toJSON())),
+      rows.map((r) => new AppCodeVersionView(r, AppCodeBundle.files(r.files).toJSON())),
       shown.files.toJSON(),
       await this.hostsOf(actor, shown),
     );
@@ -120,15 +120,28 @@ export class AppCodeQuery extends BaseQuery {
     const app = await this.row(apps, { space_id: actor.requireSpace(), id: appId });
     if (!app) return new AppCodeBaseView(null, 0, [], []);
     const code = await this.filesOf(actor, app, app.code_versions);
-    let budget = AppCodeQuery.BASE_TEXT_MAX;
+    const given = AppCodeQuery.givenOf(code.files);
     const files: AppCodeBaseFile[] = [];
     for (const f of code.files.toJSON()) {
-      const readable = AppCodeQuery.TEXT.test(f.name) && f.sizeBytes <= budget;
-      const text = readable ? await this.textOf(actor, code, f.name, budget) : null;
-      if (text !== null) budget -= f.sizeBytes;
+      const text = given.has(f.name) ? await this.textOf(actor, code, f.name, f.sizeBytes) : null;
       files.push({ name: f.name, size: f.sizeBytes, text });
     }
     return new AppCodeBaseView(app, code.seq, files, await this.hostsOf(actor, code));
+  }
+
+  /**
+   * 러너가 내용까지 받는 파일의 이름: 글 파일을 목록 순서대로, 모두 BASE_TEXT_MAX바이트까지. 그 밖의 파일(그림 · 큰 파일)은
+   * 이름 · 크기만 간다. AI가 묶음 전체(app.zip)를 낼 때 받지 못한 파일을 남기는 기준이기도 하다 (AppCodeService.built)
+   */
+  static givenOf(files: PageFiles): Set<string> {
+    let budget = AppCodeQuery.BASE_TEXT_MAX;
+    const given = new Set<string>();
+    for (const f of files.toJSON()) {
+      if (!AppCodeQuery.TEXT.test(f.name) || f.sizeBytes > budget) continue;
+      budget -= f.sizeBytes;
+      given.add(f.name);
+    }
+    return given;
   }
 
   /** 앱 한 줄 (쓰기 전에 읽기: 일꾼 · 관리자). 없거나 다른 공간이면 null */
@@ -150,7 +163,7 @@ export class AppCodeQuery extends BaseQuery {
       { columns: ['files'] },
     );
     if (!row) throw new NotFound(`없는 버전이에요: ${wanted}`);
-    return AppCodeFiles.stored(wanted, PageFiles.of(row.files));
+    return AppCodeFiles.stored(wanted, AppCodeBundle.files(row.files));
   }
 
   /** 글 파일 하나의 내용. 없거나 max바이트를 넘으면 null */
@@ -168,17 +181,26 @@ export class AppCodeQuery extends BaseQuery {
 
   /** 이 코드의 바깥 주소 (cairn.json의 hosts). 저장할 때 검사한 값이라 읽을 수 없으면 비운다 */
   async hostsOf(actor: Actor, code: AppCodeFiles): Promise<readonly string[]> {
+    return (await this.manifestOf(actor, code)).hosts;
+  }
+
+  /** 이 코드의 cairn.json: 바깥 주소와 그리는 법 (없거나 읽을 수 없으면 바깥 주소 없음 · 템플릿) */
+  async manifestOf(
+    actor: Actor,
+    code: AppCodeFiles,
+  ): Promise<{ hosts: readonly string[]; render: AppCodeRender }> {
     const text = await this.textOf(
       actor,
       code,
       AppCodeBundle.MANIFEST,
       AppCodeBundle.MANIFEST_BYTES_MAX,
     );
-    if (text === null) return [];
+    const none = { hosts: [], render: AppCodeBundle.TEMPLATED };
+    if (text === null) return none;
     try {
-      return AppCodeBundle.hostsOf(text);
+      return AppCodeBundle.manifestOf(text);
     } catch {
-      return [];
+      return none;
     }
   }
 

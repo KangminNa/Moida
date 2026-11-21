@@ -38,7 +38,7 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/apps/by-slug/:slug/icon': 404,
   // 스토어 1-6: 앱 화면 · 앱 코드의 파일은 누구나 (없는 앱 · 비공개 앱은 404)
   'GET /api/apps/site/:slug/screen': 404,
-  'GET /api/apps/site/:slug/files/:name': 404,
+  'GET /api/apps/site/:slug/files/*path': 404,
   'GET /api/issues': 200,
   'GET /api/pages/site/*path': 404,
   'GET /api/plugins': 200,

@@ -11,7 +11,12 @@ import { AppCodeQuery } from './app-code.query';
 import { AppCodeBundle } from './app-code-bundle';
 import type { AppCodeFiles } from './app-code-files';
 import { AppScreenQuery } from './app-screen.query';
-import { AppScreenPageView, AppScreenRedirectView, AppScreenView } from './app-screen.view';
+import {
+  AppScreenPageView,
+  AppScreenRedirectView,
+  AppScreenStaticView,
+  AppScreenView,
+} from './app-screen.view';
 import { AppTicket } from './app-ticket';
 
 /** 앱 코드의 파일 하나 (웹의 /<앱>/files/<이름>) */
@@ -42,6 +47,8 @@ export class AppSiteQuery extends BaseQuery {
     [AppScreenQuery.TOPIC]: 'topic.html',
   };
   private static readonly NOT_FOUND = '404.html';
+  /** 파일 이름처럼 생긴 마디 (확장자) */
+  private static readonly EXTENSION = /\.[A-Za-z0-9]{1,8}$/;
 
   constructor(
     db: Database,
@@ -61,7 +68,7 @@ export class AppSiteQuery extends BaseQuery {
     actor: Actor,
     req: AppScreenInput,
     now: Date,
-  ): Promise<AppScreenView | AppScreenRedirectView | AppScreenPageView> {
+  ): Promise<AppScreenView | AppScreenRedirectView | AppScreenPageView | AppScreenStaticView> {
     const found = await this.visible(actor, req.slug, req.ticket, now);
     if (found instanceof AppScreenRedirectView) {
       const rest = req.path.map(encodeURIComponent).join('/');
@@ -79,9 +86,22 @@ export class AppSiteQuery extends BaseQuery {
       if (page !== null) return new AppScreenPageView(page, req.path[0] ?? null, root);
     }
     const site = own ? ((await this.gate.siteOrigin()) ?? '') : null;
+    const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);
+    const manifest = await this.code.manifestOf(actor, code);
+    // 정적 앱 (스토어 9.13): 주소는 묶음의 파일이다. 데이터는 첫 화면의 것 하나 (앱 JS가 읽는다)
+    if (manifest.render === AppCodeBundle.STATIC) {
+      const file = AppSiteQuery.staticFile(code, req.path);
+      const text =
+        file !== null && AppCodeBundle.isTemplate(file)
+          ? await this.code.textOf(actor, code, file, AppCodeBundle.TEMPLATE_BYTES_MAX)
+          : null;
+      if (text === null) return new AppScreenStaticView(code.seq, file, null, manifest.hosts, null);
+      const home = await this.screens.screen(actor, app, base, site, [], null);
+      if (home instanceof AppScreenRedirectView) return home;
+      return new AppScreenStaticView(code.seq, file, text, manifest.hosts, home);
+    }
     const data = await this.screens.screen(actor, app, base, site, req.path, req.cursor);
     if (data instanceof AppScreenRedirectView) return data;
-    const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);
     const templates = await this.templatesOf(actor, code);
     // 페이지 앱의 다른 화면은 그 이름의 템플릿이고, 없으면 앱 안의 없는 주소다
     const view = data.screen === AppScreenQuery.VIEW ? `${req.path[0]}.html` : null;
@@ -96,9 +116,22 @@ export class AppSiteQuery extends BaseQuery {
       code.seq,
       template,
       templates,
-      await this.code.hostsOf(actor, code),
+      manifest.hosts,
       data,
     );
+  }
+
+  /**
+   * 정적 앱에서 이 주소가 가리키는 파일: 그 이름의 파일, 폴더면 그 안의 index.html, 둘 다 아니고 마지막 마디에 확장자가 없으면
+   * 첫 화면(index.html: 앱 안의 화면 전환을 앱 JS가 맡는다). 확장자가 있는 없는 파일은 null (404)
+   */
+  private static staticFile(code: AppCodeFiles, path: readonly string[]): string | null {
+    const named = path.join('/');
+    if (named === '') return PageFiles.ENTRY;
+    if (code.files.find(named)) return named;
+    const index = `${named}/${PageFiles.ENTRY}`;
+    if (code.files.find(index)) return index;
+    return AppSiteQuery.EXTENSION.test(path.at(-1) ?? '') ? null : PageFiles.ENTRY;
   }
 
   /** 페이지 앱의 화면이 될 페이지: 그 앱에 든 공개 페이지 중 판이 있는 첫 것 (만든 순서) */
@@ -118,7 +151,7 @@ export class AppSiteQuery extends BaseQuery {
     return new AppScreenRedirectView(`https://${domain}/${rest}${more}`, true);
   }
 
-  /** 파일 하나 (템플릿은 내보내지 않는다: 채우지 않은 템플릿이 그대로 보이지 않게) */
+  /** 파일 하나 (HTML은 내보내지 않는다: 채우지 않은 템플릿이 그대로 보이지 않게. 정적 앱의 HTML도 화면으로만 나간다) */
   async file(actor: Actor, req: AppFileInput, now: Date): Promise<AppFileAnswer> {
     const found = await this.visible(actor, req.slug, req.ticket, now);
     if (found instanceof AppScreenRedirectView || req.isTemplate)

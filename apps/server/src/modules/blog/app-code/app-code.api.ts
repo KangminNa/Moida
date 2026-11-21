@@ -28,7 +28,12 @@ import type {
   AppCodeStateView,
   AppCodeView,
 } from './app-code.view';
-import type { AppScreenPageView, AppScreenRedirectView, AppScreenView } from './app-screen.view';
+import type {
+  AppScreenPageView,
+  AppScreenRedirectView,
+  AppScreenStaticView,
+  AppScreenView,
+} from './app-screen.view';
 import { AppSiteQuery } from './app-site.query';
 
 // 앱 코드 (스토어 1-6, docs/스토어.md 9.5). 관리자만: 코드 탭 · 바뀐 점 · zip 받기 · 올리기 · 공개 · 시작 코드로 · 미리 보기 주소.
@@ -126,20 +131,22 @@ export class AppSiteController {
     @CurrentActor() actor: Actor,
     @Param('slug') slug: string,
     @Query() query: unknown,
-  ): Promise<AppScreenView | AppScreenRedirectView | AppScreenPageView> {
+  ): Promise<AppScreenView | AppScreenRedirectView | AppScreenPageView | AppScreenStaticView> {
     return this.site.screen(actor, AppScreenInput.from(slug, query), new Date());
   }
 
-  @Get('files/:name')
+  @Get('files/*path')
   async file(
     @CurrentActor() actor: Actor,
     @Param('slug') slug: string,
-    @Param('name') name: string,
+    @Param('path') path: string | readonly string[],
     @Query() query: unknown,
     @Res({ passthrough: true }) res: HttpResponse,
   ): Promise<StreamableFile> {
-    const file = await this.site.file(actor, AppFileInput.from(slug, name, query), new Date());
+    const file = await this.site.file(actor, AppFileInput.from(slug, path, query), new Date());
     res.setHeader('Content-Security-Policy', PageSiteAnswer.CSP);
+    // 격리된 앱 화면(출처 없는 문서)이 모듈 스크립트 · 글꼴 · fetch로 자기 파일을 읽게 (쿠키와 상관없는 답이다: 공개 앱이거나 토큰 주소)
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Cache-Control', file.cacheControl);
