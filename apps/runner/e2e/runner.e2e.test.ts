@@ -186,6 +186,36 @@ const newAgent = async (more: Json = {}): Promise<Json> =>
     201,
   );
 
+/** 대표 (O-2). 없으면 첫 대화를 열어 만든다 */
+async function leadOf(): Promise<Json> {
+  const found = ok(await api.get('/api/agents/lead', owner)).lead as Json | null;
+  if (found) return found;
+  ok(
+    await api.request('POST', '/api/chats', owner, {
+      requestId: randomUUID(),
+      message: '대표를 만드는 첫 대화',
+    }),
+    201,
+  );
+  return ok(await api.get('/api/agents/lead', owner)).lead as Json;
+}
+
+/**
+ * 맡기기는 대표만 한다 (2026-11-21). 대표의 지시문에는 지우지 않은 일꾼이 모두 실리고 테스트용 CLI는 그 모두(나누기는 첫 일꾼)에게
+ * 맡기므로, keep 밖의 일꾼을 잠깐 휴지통에 넣는다. 돌려 놓는 함수를 준다 (뒤 테스트의 일꾼은 그대로 쓴다)
+ */
+async function onlyWorkers(keep: readonly Json[]): Promise<() => Promise<void>> {
+  const ids = keep.map((a) => String(a.id));
+  const hidden = await db.sql<{ id: string }[]>`
+    UPDATE task.agents SET deleted_at = now()
+    WHERE NOT lead AND deleted_at IS NULL AND NOT (id = ANY(${ids}::uuid[]))
+    RETURNING id`;
+  const back = hidden.map((r) => r.id);
+  return async () => {
+    await db.sql`UPDATE task.agents SET deleted_at = NULL WHERE id = ANY(${back}::uuid[])`;
+  };
+}
+
 /** 지시문의 표시로 가짜 CLI가 할 일을 정한다 */
 const newTask = async (agent: Json, marks: string, more: Json = {}): Promise<Json> =>
   ok(
@@ -667,33 +697,35 @@ describe('러너가 일을 처리한다', () => {
     });
   });
 
-  test('팀장이 팀에게 맡기면 팀원의 일이 돌고, 모두 끝나면 결과를 받아 팀장이 끝낸다', async () => {
-    const lead = await newAgent({ name: '팀장' });
-    const members = [
-      await newAgent({ name: '조사 1', reportsTo: lead.id }),
-      await newAgent({ name: '조사 2', reportsTo: lead.id }),
-    ];
-    const spy = new Spy();
-    const created = await newTask(lead, `[fake:delegate] ${spy.mark}`);
+  test('대표가 일꾼에게 맡기면 일꾼의 일이 돌고, 모두 끝나면 결과를 받아 대표가 끝낸다 (맡기기는 대표만, 2026-11-21)', async () => {
+    const lead = await leadOf();
+    const members = [await newAgent({ name: '조사 1' }), await newAgent({ name: '조사 2' })];
+    const restore = await onlyWorkers(members);
+    try {
+      const spy = new Spy();
+      const created = await newTask(lead, `[fake:delegate] ${spy.mark}`);
 
-    await runner.logged(`${created.id}: 결재나 하위 작업을 기다려요`);
-    // 팀장을 깨우는 일은 일꾼(outbox)이 한다. 이 테스트에는 일꾼 프로세스가 없어 직접 돌린다
-    const worker = api.service(OutboxWorker);
-    const done = await until('팀장이 깨어나 끝남', async () => {
-      await worker.tick();
-      const task = await getTask(created.id);
-      return task.status === 'done' ? task : null;
-    });
-    const children = done.children as Json[];
-    assert.deepEqual(
-      children.map((c) => [c.agentId, c.status]).sort(),
-      members.map((m) => [m.id, 'done']).sort(),
-    );
-    // 마지막 실행(깨어난 팀장)의 지시문에 팀원의 결과가 있다
-    const { prompt } = await spy.seen();
-    assert.ok(String(prompt).includes('# 맡긴 하위 작업의 결과'));
-    assert.ok(String(prompt).includes('## [완료] 조사 1에게 맡긴 조사 (조사 1)'));
-    assert.ok(String(prompt).includes('남은 위임 · 기다리기 횟수: 2'));
+      await runner.logged(`${created.id}: 결재나 하위 작업을 기다려요`);
+      // 대표를 깨우는 일은 일꾼(outbox)이 한다. 이 테스트에는 일꾼 프로세스가 없어 직접 돌린다
+      const worker = api.service(OutboxWorker);
+      const done = await until('대표가 깨어나 끝남', async () => {
+        await worker.tick();
+        const task = await getTask(created.id);
+        return task.status === 'done' ? task : null;
+      });
+      const children = done.children as Json[];
+      assert.deepEqual(
+        children.map((c) => [c.agentId, c.status]).sort(),
+        members.map((m) => [m.id, 'done']).sort(),
+      );
+      // 마지막 실행(깨어난 대표)의 지시문에 일꾼의 결과가 있다
+      const { prompt } = await spy.seen();
+      assert.ok(String(prompt).includes('# 맡긴 하위 작업의 결과'));
+      assert.ok(String(prompt).includes('## [완료] 조사 1에게 맡긴 조사 (조사 1)'));
+      assert.ok(String(prompt).includes('남은 위임 · 기다리기 횟수: 2'));
+    } finally {
+      await restore();
+    }
   });
 
   test('대화는 대표가 맡고(O-2), 대표의 지시문에는 lead 단락과 맨 위 팀장 목록이 들어간다', async () => {
@@ -1560,7 +1592,7 @@ describe('코드 작업 (작업 공간)', () => {
     });
 
     // 코드 작업 5단계의 끝났다는 기준: 팀장 하나가 셋으로 나누고, 칸 둘이 함께 돌아, PR 셋이 부딪치지 않고 머지된다
-    test('팀장이 경로로 셋으로 나누면 칸 둘이 함께 맡아 PR 셋이 부딪치지 않고, 모두 머지하면 팀장도 끝난다', async () => {
+    test('대표가 경로로 셋으로 나누면 칸 둘이 함께 맡아 PR 셋이 부딪치지 않고, 모두 머지하면 대표도 끝난다', async () => {
       const url = git.create('me/split', {
         'src/a.ts': 'export const a = 1;\n',
         'README.md': '# split\n',
@@ -1575,17 +1607,10 @@ describe('코드 작업 (작업 공간)', () => {
           checks: ['test -f src/a.ts'],
         }),
       );
-      const lead = await newAgent({
-        name: '코드 팀장',
-        scopes: ['read_public', 'code'],
-        approvalActions: ['code.pr.merge'],
-      });
-      await newAgent({
-        name: '코드 팀원',
-        scopes: ['read_public', 'code'],
-        approvalActions: ['code.pr.merge'],
-        reportsTo: lead.id,
-      });
+      const lead = await leadOf();
+      const member = await newAgent({ name: '코드 일꾼', approvalActions: ['code.pr.merge'] });
+      // 테스트용 CLI는 대표의 지시문에 실린 첫 일꾼에게 나눠 맡긴다: 이 일꾼만 남긴다
+      const restore = await onlyWorkers([member]);
       const work2 = mkdtempSync(join(tmpdir(), 'cairn-work-'));
       const pairing = join(spyDir, 'code-pairing-4');
       writeFileSync(pairing, api.service(ServerRunnerPolicy).codeSecret());
@@ -1608,7 +1633,7 @@ describe('코드 작업 (작업 공간)', () => {
             agentId: lead.id,
           }),
         );
-        const leadTask = await until('팀장 작업이 생김', async () => {
+        const leadTask = await until('대표 작업이 생김', async () => {
           await worker().tick();
           const { tasks } = ok(await api.get('/api/tasks', owner)) as { tasks: Json[] };
           return tasks.find((t) => String(t.title).includes(uniq)) ?? null;
@@ -1640,7 +1665,7 @@ describe('코드 작업 (작업 공간)', () => {
             }),
           );
         }
-        const done = await until('모두 머지한 뒤 팀장이 끝남', async () => {
+        const done = await until('모두 머지한 뒤 대표가 끝남', async () => {
           await worker().tick();
           const task = await getTask(leadTask.id);
           return task.status === 'done' ? task : null;
@@ -1656,6 +1681,7 @@ describe('코드 작업 (작업 공간)', () => {
         );
         await roomsLeft();
       } finally {
+        await restore();
         assert.equal(await slot2.stop('SIGTERM'), 0);
         rmSync(work2, { recursive: true, force: true });
       }
