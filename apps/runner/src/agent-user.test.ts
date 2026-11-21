@@ -101,3 +101,24 @@ describe('AI를 돌릴 사용자', () => {
     assert.equal(await self.readFile(join(room, 'link'), 100), null);
   });
 });
+
+// 칸의 러너는 root지만 DAC_OVERRIDE가 없어 agent의 700 폴더로 옮기지 못한다. libuv는 cwd로 옮긴 뒤 사용자를 바꾸므로
+// /에서 agent로 바꾼 뒤 env --chdir가 agent 권한으로 옮긴다 (2026-11-21 배포 서버의 spawn claude EACCES)
+describe('agent로 띄우는 길', () => {
+  test('agent면 /에서 사용자를 바꾸고 env --chdir로 옮긴다. self(시험)면 그대로', () => {
+    const agent = AgentUser.parse('1001:1001');
+    assert.ok(agent);
+    assert.deepEqual(agent.launch('claude', ['-p', '--verbose'], '/work/t/work'), {
+      bin: '/usr/bin/env',
+      args: ['--chdir', '/work/t/work', '--', 'claude', '-p', '--verbose'],
+      options: { cwd: '/', uid: 1001, gid: 1001 },
+    });
+    const self = AgentUser.parse('self');
+    assert.ok(self);
+    assert.deepEqual(self.launch('claude', ['-p'], '/tmp/x'), {
+      bin: 'claude',
+      args: ['-p'],
+      options: { cwd: '/tmp/x' },
+    });
+  });
+});

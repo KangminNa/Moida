@@ -60,6 +60,8 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   static readonly LEASE_MS = 2 * 60_000;
   /** 임대가 이만큼 끝나면 실패로 둔다 */
   static readonly MAX_ATTEMPTS = 3;
+  /** 같은 일을 이만큼 돌려받으면 실패로 (release) */
+  static readonly RELEASE_MAX = 5;
   /**
    * 작업 토큰의 상한. AI CLI는 처음 받은 토큰을 바꿔 끼울 수 없어서, 임대가 늘어도 끊기지 않게 넉넉히 둔다.
    * 실제 만료는 임대다: mcp 모듈이 호출마다 임대가 살아 있는지 묻는다.
@@ -505,26 +507,33 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     this.forgetSignin();
   }
 
-  /** 러너가 처리하지 못하고 돌려준다: running → queued. 실패가 아니라 시도로 세지 않는다 */
+  /**
+   * 러너가 처리하지 못하고 돌려준다: running → queued. 실패가 아니라 시도로 세지 않는다.
+   * 다만 RELEASE_MAX번째 돌려받으면 실패로 끝낸다 (센 수는 payload.released): 러너가 같은 까닭으로 멈추고 다시 떠
+   * 같은 일을 또 빌려 가는 되풀이를 끊는다 (2026-11-21 배포 서버, 만들기 일이 30초마다 50번 돌려졌다)
+   */
   release(runnerId: string, reason: string, now: Date): void {
     this.assertHeldBy(runnerId, now);
-    this.move([Task.RUNNING], Task.QUEUED);
-    this.holdLease(null, null);
-    this.put('attempts', Math.max(0, this.row.attempts - 1));
-    this.log(Task.LOG_ERROR, `돌려줌: ${reason}`, 0, now);
-    this.forgetSignin();
+    const n = Number(this.payload.released ?? 0) + 1;
+    this.put('payload', { ...this.payload, released: n });
+    if (n >= Task.RELEASE_MAX) this.expire(now, `${n}번 돌려받아 멈췄어요: ${reason}`);
+    else this.requeue(`돌려줌: ${reason}`, now, Math.max(0, this.row.attempts - 1));
   }
 
-  /** 임대가 끝남 (러너가 죽음): 다시 대기열로, MAX_ATTEMPTS번째면 실패로 */
-  expire(now: Date): void {
-    if (this.row.attempts >= Task.MAX_ATTEMPTS) {
-      this.fail('임대가 세 번 끝나 멈췄어요', now);
-      this.holdLease(null, null);
-      return;
-    }
+  /** 임대가 끝남 (러너가 죽음): 다시 대기열로, MAX_ATTEMPTS번째면 실패로. stopped를 주면 그 까닭으로 바로 실패 */
+  expire(now: Date, stopped: string | null = null): void {
+    this.holdLease(null, null);
+    if (stopped === null && this.row.attempts < Task.MAX_ATTEMPTS)
+      this.requeue('임대가 끝나 다시 대기열로 돌아갔어요', now);
+    else this.fail(stopped ?? '임대가 세 번 끝나 멈췄어요', now);
+  }
+
+  /** running → queued: 임대를 비우고 까닭을 남긴다. attempts: 다음 시도 횟수 (돌려준 일은 이번 실행을 세지 않는다) */
+  private requeue(note: string, now: Date, attempts = this.row.attempts): void {
     this.move([Task.RUNNING], Task.QUEUED);
     this.holdLease(null, null);
-    this.log(Task.LOG_ERROR, '임대가 끝나 다시 대기열로 돌아갔어요', 0, now);
+    this.put('attempts', attempts);
+    this.log(Task.LOG_ERROR, note, 0, now);
     this.forgetSignin();
   }
 

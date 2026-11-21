@@ -48,6 +48,8 @@ export class AgentUser {
   private static readonly SHORT_MS = 30_000;
   /** 셸 없이 부르는 도구들의 PATH */
   private static readonly PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+  /** 사용자를 바꾼 뒤 폴더를 옮겨 주는 것 (coreutils env --chdir) */
+  private static readonly ENV = '/usr/bin/env';
 
   private constructor(
     /** null이면 self */
@@ -72,9 +74,28 @@ export class AgentUser {
     return this.isSelf ? AgentUser.SELF : `${this.uid}:${this.gid}`;
   }
 
-  /** child_process.spawn에 더할 값. self면 비어 있다 */
+  /** child_process.spawn에 더할 값. self면 비어 있다 (cwd가 /인 때만 쓴다. 다른 cwd는 launch) */
   spawnOptions(): { uid?: number; gid?: number } {
     return this.uid === null || this.gid === null ? {} : { uid: this.uid, gid: this.gid };
+  }
+
+  /**
+   * agent로 띄울 실행 파일 · 인자 · 옵션. libuv는 자식에서 cwd로 먼저 옮기고 그 뒤에 사용자를 바꾼다: 칸의 러너는 root지만
+   * DAC_OVERRIDE가 없어 agent의 700 폴더로 옮기지 못하고 spawn이 EACCES로 실패한다 (2026-11-21 배포 서버, 만들기 일).
+   * 그래서 /에서 agent로 바꾼 뒤 env --chdir가 agent 권한으로 옮겨 가 그 명령을 실행한다 (exec라 pid · 그룹은 그대로).
+   * self(시험)면 그대로 띄운다
+   */
+  launch(
+    bin: string,
+    args: readonly string[],
+    cwd: string,
+  ): { bin: string; args: string[]; options: { cwd: string; uid?: number; gid?: number } } {
+    if (this.uid === null || this.gid === null) return { bin, args: [...args], options: { cwd } };
+    return {
+      bin: AgentUser.ENV,
+      args: ['--chdir', cwd, '--', bin, ...args],
+      options: { cwd: '/', uid: this.uid, gid: this.gid },
+    };
   }
 
   /** 셸 명령 하나를 agent로 돌린다 (setup · checks). 자기 프로세스 그룹에서 돌고 끝나면 그룹을 모두 끈다 */
@@ -112,12 +133,12 @@ export class AgentUser {
       let timedOut = false;
       let aborted = false;
       let ended = false;
-      const child = spawn(bin, args, {
-        cwd,
+      const run = this.launch(bin, args, cwd);
+      const child = spawn(run.bin, run.args, {
+        ...run.options,
         env,
         detached: true,
         stdio: ['ignore', 'pipe', 'pipe'],
-        ...this.spawnOptions(),
       });
       const group = (name: NodeJS.Signals) => {
         if (child.pid === undefined) return;
