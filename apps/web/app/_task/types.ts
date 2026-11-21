@@ -57,10 +57,13 @@ import type {
   TaskView,
 } from '../../../server/src/modules/task/task/task.view';
 import type { UsageView } from '../../../server/src/modules/task/usage/usage.view';
+import type { LinkPreviewView } from '../../../server/src/modules/task/web/link-preview.view';
 
 // 서버가 돌려주는 모양. import 없는 view 파일의 toJSON()이 원본이다 (API설계 2장).
 // 서버 코드가 웹 번들에 들어가지 않게 반드시 import type으로만 가져온다.
 
+/** 링크 미리보기 카드 (F3, 2026-11-21) */
+export type LinkPreview = ReturnType<LinkPreviewView['toJSON']>;
 export type Task = ReturnType<TaskView['toJSON']>;
 export type TaskPage = ReturnType<TaskPageView['toJSON']>;
 export type TaskDetail = ReturnType<TaskDetailView['toJSON']>;

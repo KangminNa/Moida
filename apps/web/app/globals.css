@@ -3578,6 +3578,60 @@ ul.picked > .chip {
   font-size: 0.875rem;
 }
 
+/* 링크 미리보기 카드 (F3): 답 아래, 그림 · 사이트 · 제목 · 설명 */
+.link-cards {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.link-card {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 520px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: inherit;
+  text-decoration: none;
+}
+
+.link-card:hover {
+  background: var(--hover);
+}
+
+.link-card img {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+}
+
+.link-card-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px 10px 0;
+}
+
+.link-card-text:first-child {
+  padding-left: 12px;
+}
+
+.link-card-text b,
+.link-card-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-card-desc {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
 /* 결과물을 내는 회차의 긴 답 (O-3): 세 줄쯤 보이고 아래로 흐려진다. "펼치기"로 전부 */
 .answer-fold {
   max-height: 5.4em;

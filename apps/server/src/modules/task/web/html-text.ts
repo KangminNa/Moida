@@ -2,6 +2,8 @@
 // 문단 · 줄 바꿈만 살린다. 라이브러리 없이 하는 만큼이라 모양이 복잡한 페이지는 글자가 섞일 수 있다.
 // biome-ignore lint/complexity/noStaticOnlyClass: 글자 바꾸기 묶음. 상태가 없다 (FileSniff와 같은 모양)
 export class HtmlText {
+  /** 메타 태그를 찾는 앞부분 (<head>는 보통 이 안에 있다) */
+  private static readonly HEAD_MAX = 65_536;
   /** 통째로 버리는 덩어리 */
   private static readonly DROP =
     /<(script|style|noscript|svg|template|iframe|object|canvas|head|title)\b[\s\S]*?<\/\1\s*>/gi;
@@ -48,6 +50,25 @@ export class HtmlText {
       .replace(/ *\n */g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
+  }
+
+  /**
+   * <meta property|name="…" content="…"> 가운데 names 차례로 처음 찾은 값 (링크 미리보기, 2026-11-21: og:site_name · og:description ·
+   * og:image). 한 줄로 다듬는다. 앞부분(HEAD_MAX)만 본다. 없으면 빈 글자
+   */
+  static meta(html: string, names: readonly string[]): string {
+    const tags = html.slice(0, HtmlText.HEAD_MAX).match(/<meta\b[^>]*>/gi) ?? [];
+    for (const name of names)
+      for (const tag of tags) {
+        const key = /\b(?:property|name)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase();
+        if (key !== name) continue;
+        const found = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
+        const value = HtmlText.decode(found?.[1] ?? found?.[2] ?? '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (value) return value;
+      }
+    return '';
   }
 
   /** HTML 앞부분의 <meta charset> (머리글에 없을 때) */
