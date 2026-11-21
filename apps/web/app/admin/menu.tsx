@@ -6,7 +6,7 @@
 export const CHAT_HREF = '/admin';
 export const CHATS_HREF = '/admin/chats';
 export const APPROVALS_HREF = '/admin/approvals';
-/** 에이전트: 대표와 일꾼 (2026-11-21 팀 없는 에이전트). 이 제품의 핵심 설정 */
+/** 일꾼: 대표와 일꾼 (2026-11-21 팀 없는 에이전트, 메뉴 이름은 사용자 결정 "일꾼"). 이 제품의 핵심 설정 */
 const AGENTS_HREF = '/admin/agents';
 /** 스토어 (스토어 1-5): 내 앱 · 앱 종류 고르기 · 앱 관리(/admin/store/<앱 id>) */
 export const STORE_HREF = '/admin/store';
@@ -39,12 +39,12 @@ export const DOCK = [
   {
     key: 'agents',
     href: AGENTS_HREF,
-    name: '에이전트',
-    icon: 'team',
+    name: '일꾼',
+    icon: 'worker',
     side: false,
     tabs: true,
     pages: [
-      { href: AGENTS_HREF, name: '에이전트' },
+      { href: AGENTS_HREF, name: '일꾼' },
       { href: '/admin/tasks', name: '작업 기록' },
     ],
   },

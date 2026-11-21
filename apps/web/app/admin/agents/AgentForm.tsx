@@ -142,7 +142,7 @@ export function AgentForm({
     <form
       className="panel"
       onSubmit={submit}
-      aria-label={agent ? `${agent.name} 편집` : '에이전트 추가'}
+      aria-label={agent ? `${agent.name} 편집` : '일꾼 추가'}
     >
       <div className="field">
         <label htmlFor={`${id}-name`}>이름</label>

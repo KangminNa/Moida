@@ -19,7 +19,7 @@ import { type AgentBody, AgentForm } from './AgentForm';
 import { DeletedAgents } from './DeletedAgents';
 
 const NEW = 'new';
-const CONFLICT = '이미 바뀐 에이전트예요. 최신 내용을 다시 읽었어요';
+const CONFLICT = '이미 바뀐 일꾼이에요. 최신 내용을 다시 읽었어요';
 /** 역할 다듬기 (2026-11-20 ECC형 에이전트 정의): 대표에게 보내는 말. 표준 형식은 대표의 지시문 틀에 있다 */
 const TIDY_ROLES =
   '일꾼들의 역할 설명을 표준 형식으로 다듬어 제안해 줘. 일을 많이 하는 일꾼부터 3명까지, 내가 쓴 뜻은 바꾸지 말고 빠진 단락만 채워 줘.';
@@ -111,9 +111,9 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
           ? api('PATCH', `/api/agents/${target.id}`, { ...body, version: target.version })
           : api('POST', '/api/agents', { ...body, requestId }),
       {
-        done: target ? '에이전트 저장됨' : '에이전트 추가됨',
+        done: target ? '일꾼 저장됨' : '일꾼 추가됨',
         reload: agents.reload,
-        conflict: '이미 바뀐 에이전트예요. 다시 저장하면 입력한 내용으로 덮어요',
+        conflict: '이미 바뀐 일꾼이에요. 다시 저장하면 입력한 내용으로 덮어요',
       },
     );
     if (!reply?.ok) return;
@@ -126,7 +126,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
     <>
       <header className="page-head">
         <div>
-          <h1>에이전트</h1>
+          <h1>일꾼</h1>
           <p>대화는 대표가 받아 일꾼에게 나눠 맡겨요. 모든 일꾼은 같은 권한으로 같은 일을 해요</p>
         </div>
         {list && list.length > 0 && open !== NEW && (
@@ -144,7 +144,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
               역할 다듬기
             </button>
             <button type="button" className="cta small" onClick={() => show(NEW)}>
-              ＋ 에이전트 추가
+              ＋ 일꾼 추가
             </button>
           </div>
         )}
@@ -174,7 +174,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
               <b>일꾼 없음</b>
               <p className="note">대표가 맡길 일꾼이 생길 때까지 작업은 대기</p>
               <button type="button" className="cta small fit" onClick={() => show(NEW)}>
-                에이전트 추가
+                일꾼 추가
               </button>
             </div>
           </>

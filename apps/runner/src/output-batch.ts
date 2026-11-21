@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
-import type { AgentUser } from './agent-user';
+import { AgentUser } from './agent-user';
 
 /** 올릴 결과물 파일 하나. path는 러너가 읽을 곳 (코드 러너 칸이면 agent 권한으로 옮겨 둔 사본) */
 export class OutputFile {
@@ -48,9 +48,12 @@ export class OutputBatch {
     agent: AgentUser | null,
     signal?: AbortSignal,
   ): Promise<OutputBatch> {
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    // 목록은 agent 권한으로: 칸의 러너(root, DAC_OVERRIDE 없음)는 agent의 700 폴더를 읽지 못한다
+    const listed = await (agent ? agent.list(dir, signal) : AgentUser.listOwn(dir));
     const files: OutputFile[] = [];
     const skipped: string[] = [];
+    if (listed === null) return new OutputBatch([], [`${dir}: 결과물 폴더를 읽지 못했어요`]);
+    const entries = [...listed];
     let bytes = 0;
     /** 옮겨 둔 사본의 이름 (뺀 파일도 세어 겹치지 않게) */
     let copies = 0;
@@ -62,7 +65,7 @@ export class OutputBatch {
         skipped.push(`${name}: ${problem}`);
         continue;
       }
-      if (!entry.isFile()) {
+      if (!entry.file) {
         skipped.push(`${name}: 폴더 바로 아래의 보통 파일만 올려요 (폴더 · 링크는 빼요)`);
         continue;
       }
