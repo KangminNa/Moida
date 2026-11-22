@@ -818,7 +818,7 @@ describe('설정 바꾸기: 앱 데이터 (앱 플랫폼, 스토어 12.4)', () =
         lessons: { columns: { title: 'text', level: 'int' }, read: 'anyone', write: 'admin' },
       },
     });
-    const { token } = await partner();
+    const { token, job } = await partner();
     const { app_data: tables } = await call(token, 'get_settings', { kind: 'app_data' });
     const mine = (tables as Json[]).find((t) => t.app_id === site.appId) as Json;
     assert.deepEqual([mine.table, mine.columns], ['lessons', { title: 'text', level: 'int' }]);
@@ -850,5 +850,7 @@ describe('설정 바꾸기: 앱 데이터 (앱 플랫폼, 스토어 12.4)', () =
       (after.rows as Json[]).map((r) => r.title),
       ['인사하기', '길 묻기'],
     );
+    // 넣은 결과(community.setting.changed)를 받아 기다리던 작업이 끝난다 (ApprovalResultHandler)
+    assert.equal(ok(await api.get(`/api/tasks/${job.task.id}`, owner)).status, 'done');
   });
 });

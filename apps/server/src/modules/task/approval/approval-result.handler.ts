@@ -16,6 +16,7 @@ export class ApprovalResultHandler extends BaseHandler {
     'account.setting.changed',
     'vault.setting.changed',
     'blog.setting.changed',
+    'community.setting.changed',
     'task.setting.changed',
     'blog.post.published',
     'blog.post.publish_failed',
