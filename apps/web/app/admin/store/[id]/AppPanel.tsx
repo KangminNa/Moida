@@ -12,30 +12,47 @@ import { NewTabLink } from '../../../_ui/NewTabLink';
 import { STORE_HREF } from '../../menu';
 import { AppCodeTab } from './AppCodeTab';
 import { AppCommunityTab } from './AppCommunityTab';
+import { AppDataTab } from './AppDataTab';
 import { AppMenus } from './AppMenus';
 import { AppOverview } from './AppOverview';
 import { AppPosts } from './AppPosts';
 import { AppSettings } from './AppSettings';
+import { CommunityMembers } from './CommunityMembers';
 
-export type AppTab = 'overview' | 'community' | 'menus' | 'posts' | 'code' | 'settings';
+export type AppTab =
+  | 'overview'
+  | 'community'
+  | 'members'
+  | 'menus'
+  | 'posts'
+  | 'code'
+  | 'data'
+  | 'settings';
 
 const TAB_NAMES: Record<AppTab, string> = {
   overview: '개요',
   community: '커뮤니티',
+  members: '회원',
   menus: '메뉴',
   posts: '글',
   code: '코드',
+  data: '데이터',
   settings: '설정',
 };
 
 /** 앱 종류마다의 탭: 커뮤니티(스토어 3-2)는 블로그 글 · 메뉴 대신 커뮤니티 탭 */
-const BLOG_TABS: readonly AppTab[] = ['overview', 'menus', 'posts', 'code', 'settings'];
+const BLOG_TABS: readonly AppTab[] = ['overview', 'menus', 'posts', 'code', 'data', 'settings'];
 const TABS_OF: Record<AdminApp['kind'], readonly AppTab[]> = {
   blog: BLOG_TABS,
   magazine: BLOG_TABS,
-  page: BLOG_TABS,
-  community: ['overview', 'community', 'code', 'settings'],
+  page: ['overview', 'members', 'menus', 'posts', 'code', 'data', 'settings'],
+  community: ['overview', 'community', 'code', 'data', 'settings'],
 };
+
+/** 이 앱에 보일 탭: 회원 탭은 회원을 받는 페이지 앱에만 (커뮤니티의 회원은 커뮤니티 탭 안에 있다, 스토어 12.3) */
+function tabsOf(app: AdminApp): readonly AppTab[] {
+  return TABS_OF[app.kind].filter((t) => t !== 'members' || app.members);
+}
 
 const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어요';
 
@@ -57,7 +74,7 @@ export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
       !problem && <p className="label-mono">불러오는 중…</p>
     );
 
-  const tabs = TABS_OF[app.kind];
+  const tabs = tabsOf(app);
   const tab = tabs.includes(asked) ? asked : 'overview';
   const community = app.kind === 'community';
   /** 커뮤니티는 연결을 확인한 도메인이 있어야 공개된다 (스토어 3-2, 서버 App.edit) */
@@ -143,7 +160,9 @@ export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
           <AppMenus app={app} />
         ))}
       {tab === 'posts' && <AppPosts app={app} />}
+      {tab === 'members' && <CommunityMembers appId={app.id} />}
       {tab === 'code' && <AppCodeTab app={app} />}
+      {tab === 'data' && <AppDataTab app={app} />}
       {tab === 'settings' && <AppSettings app={app} onChanged={apps.reload} />}
     </>
   );

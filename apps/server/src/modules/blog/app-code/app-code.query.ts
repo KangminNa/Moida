@@ -18,12 +18,14 @@ import type {
   AppCodeBaseInput,
   AppCodeIdInput,
   CodeVersionInput,
+  DeployCodeInput,
   PreviewCodeInput,
 } from './app-code.input';
 import {
   type AppCodeBaseFile,
   AppCodeBaseView,
   AppCodeChangesView,
+  AppCodeDeployView,
   AppCodePreviewView,
   AppCodeVersionView,
   AppCodeView,
@@ -33,6 +35,7 @@ import { AppCodeFiles } from './app-code-files';
 import { AppManifest } from './app-manifest';
 import { AppStarterGateway } from './app-starter.gateway';
 import { AppTicket } from './app-ticket';
+import { DeployTicket } from './deploy-ticket';
 
 /** 버전 하나를 묶은 zip (관리자의 내려받기) */
 export class AppCodeArchive {
@@ -151,6 +154,36 @@ export class AppCodeQuery extends BaseQuery {
     const approved = actor instanceof ApprovedActor && actor.action === AppCodeQuery.SHOW;
     if (!approved) actor.assertOwnerOrSystem();
     return this.row(apps, { space_id: spaceId, id });
+  }
+
+  /**
+   * 배포 도구(MCP app_code_upload, write 기기 · cairn app deploy): 그 앱에 묶음을 올릴 표 (스토어 12.5).
+   * 표는 그 앱 · 지금의 마지막 버전 · 크기 · sha256 · 메모에 묶인다 (10분)
+   */
+  async deployTicket(actor: Actor, req: DeployCodeInput, now: Date): Promise<AppCodeDeployView> {
+    actor.assertCan(Actor.WRITE);
+    const spaceId = actor.requireSpace();
+    const app = await this.row(apps, { space_id: spaceId, slug: req.slug });
+    if (app === null) throw new NotFound(AppCodeQuery.MISSING);
+    const ticket = new DeployTicket(
+      spaceId,
+      app.id,
+      app.code_versions,
+      req.size,
+      req.sha256,
+      req.note,
+    );
+    return new AppCodeDeployView(
+      ticket.path,
+      DeployTicket.HEADER,
+      ticket.seal(this.box, now),
+      DeployTicket.expiresAt(now),
+    );
+  }
+
+  /** 배포 표를 연다 (PUT …/code/versions). 없거나 · 틀리거나 · 끝났으면 403 */
+  async deployOf(_actor: Actor, token: string | null, now: Date): Promise<DeployTicket> {
+    return DeployTicket.open(this.box, token, now);
   }
 
   /**

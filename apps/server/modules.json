@@ -41,6 +41,7 @@
     "community": {
       "dependsOn": ["platform"],
       "schemas": ["community"],
+      "registries": { "provides": ["settings"] },
       "lookups": { "asks": ["app", "community-app", "member-app"] }
     },
     "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }

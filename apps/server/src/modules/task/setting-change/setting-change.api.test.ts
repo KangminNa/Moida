@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
+import { CommunitySite } from '../../../testing/community-site';
 import { Database, OutboxWorker } from '../../platform';
 
 // 설정 바꾸기 제안 (2026-11-15 C · D): get_settings → propose_setting(미리 해 보기 + 결재 task.setting.change) → 승인 → 적용.
@@ -806,5 +807,48 @@ describe('승인 뒤 이어서 (O-2): 대표의 propose_setting continue', () =>
     const [row] = await db.sql`
       SELECT payload ? 'continue' AS has FROM task.approvals WHERE id = ${theirs.approval_id}`;
     assert.equal(row?.has, false);
+  });
+});
+
+describe('설정 바꾸기: 앱 데이터 (앱 플랫폼, 스토어 12.4)', () => {
+  test('표에 줄 넣기는 승인 뒤에 들어간다. 없는 표 · 틀린 값은 제안에서 막힌다', async () => {
+    const mark = randomUUID().slice(0, 6);
+    const site = await CommunitySite.openPage(api, owner, `lessons-${mark}`, {
+      tables: {
+        lessons: { columns: { title: 'text', level: 'int' }, read: 'anyone', write: 'admin' },
+      },
+    });
+    const { token } = await partner();
+    const { app_data: tables } = await call(token, 'get_settings', { kind: 'app_data' });
+    const mine = (tables as Json[]).find((t) => t.app_id === site.appId) as Json;
+    assert.deepEqual([mine.table, mine.columns], ['lessons', { title: 'text', level: 'int' }]);
+
+    const propose = (fields: Json) =>
+      tool(token, 'propose_setting', {
+        request_id: randomUUID(),
+        note: '오늘의 레슨',
+        setting: 'app_data',
+        op: 'create',
+        fields: { app_id: site.appId, ...fields },
+      });
+    assert.equal((await propose({ table: 'nothing', rows: [{ title: 'x' }] })).ok, false);
+    assert.equal((await propose({ table: 'lessons', rows: [{ level: '높음' }] })).ok, false);
+
+    const made = await propose({
+      table: 'lessons',
+      rows: [
+        { title: '인사하기', level: 1 },
+        { title: '길 묻기', level: 2 },
+      ],
+    });
+    assert.equal(made.ok, true, JSON.stringify(made.body));
+    const before = ok(await site.at('/api/community/data/lessons'));
+    assert.equal(before.rows.length, 0, '승인 전에는 들어가지 않는다');
+    await decide(made.body.approval_id);
+    const after = ok(await site.at('/api/community/data/lessons?order=level.asc'));
+    assert.deepEqual(
+      (after.rows as Json[]).map((r) => r.title),
+      ['인사하기', '길 묻기'],
+    );
   });
 });

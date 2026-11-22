@@ -21,8 +21,9 @@ export interface AppTableRow {
   created_at: Date;
   updated_at: Date;
   version: number;
+  space_id: string;
 }
-export type AppTableNew = Partial<AppTableRow> & Pick<AppTableRow, 'id' | 'app_id' | 'name' | 'columns' | 'read_rule' | 'write_rule' | 'applied_seq'>;
+export type AppTableNew = Partial<AppTableRow> & Pick<AppTableRow, 'id' | 'app_id' | 'name' | 'columns' | 'read_rule' | 'write_rule' | 'applied_seq' | 'space_id'>;
 
 /** community.comments.state (값 목록 CHECK) */
 export const COMMENT_STATE = ['shown', 'hidden', 'removed', 'deleted'] as const;

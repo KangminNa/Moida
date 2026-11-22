@@ -10,7 +10,7 @@ export const SCOPE_LABELS: Record<string, string> = {
   read_public: '공개 자료 읽기',
   read_all: '비공개까지 읽기',
   tidy: '위키 정리',
-  write: '블로그 초안 쓰기',
+  write: '초안 쓰기 · 앱 코드 올리기',
   browse: '브라우저 쓰기',
   code: '코드 고치기',
   make: '파일 만들기',

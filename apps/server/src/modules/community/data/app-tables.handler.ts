@@ -14,6 +14,6 @@ export class AppTablesHandler extends BaseHandler {
   }
 
   async handle(event: DomainEvent): Promise<void> {
-    await this.data.apply(new SystemActor(), TablesShownInput.from(event.data));
+    await this.data.apply(new SystemActor(), event.spaceId, TablesShownInput.from(event.data));
   }
 }

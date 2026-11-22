@@ -52,11 +52,19 @@ export class AppTable extends TableEntity<AppTableRow, AppTableNew> {
   }
 
   /** 새로 선언한 표 */
-  static open(appId: string, name: string, spec: unknown, seq: number, now: Date): AppTable {
+  static open(
+    spaceId: string,
+    appId: string,
+    name: string,
+    spec: unknown,
+    seq: number,
+    now: Date,
+  ): AppTable {
     const { columns, read, write } = AppTable.specOf(name, spec);
     return new AppTable(
       {
         id: BaseEntity.newId(),
+        space_id: spaceId,
         app_id: appId,
         name,
         columns,
@@ -81,6 +89,11 @@ export class AppTable extends TableEntity<AppTableRow, AppTableNew> {
 
   get name(): string {
     return this.row.name;
+  }
+
+  /** 이 공간의 표인가 (대화의 설정 제안은 자기 공간의 표에만 넣는다) */
+  inSpace(spaceId: string): boolean {
+    return this.row.space_id === spaceId;
   }
 
   get isOpen(): boolean {

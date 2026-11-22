@@ -6,11 +6,13 @@ import {
   Lookups,
   MemberActor,
   NotFound,
+  SettingActor,
   ZipFile,
 } from '../../platform';
+import { appTables } from '../community.schema';
 import type { MemberPlace } from '../member/member.input';
 import type { AdminAppInput, AdminDataInput, DataListInput } from './app-data.input';
-import { AppRowsView, AppTablesView } from './app-data.view';
+import { AppDataSettingsView, AppRowsView, AppTablesView } from './app-data.view';
 import { type AppDataFilter, AppTable } from './app-table';
 import { AppTableRepository } from './app-table.repository';
 
@@ -113,6 +115,17 @@ export class AppDataQuery extends BaseQuery {
       FROM community.members WHERE app_id = ${req.appId} ORDER BY id`;
     zip.add('members.json', JSON.stringify({ members }, null, 2));
     return new AppDataExport(`app-data-${now.toISOString().slice(0, 10)}.zip`, zip.toBuffer());
+  }
+
+  /** 대화의 get_settings app_data: 이 공간의 열려 있는 표와 칸 · 규칙 (줄을 넣자고 제안할 곳) */
+  async settings(actor: Actor): Promise<AppDataSettingsView> {
+    const spaceId = SettingActor.spaceOf(actor);
+    const rows = await this.rows(
+      appTables,
+      { space_id: spaceId, open: true },
+      { order: ['app_id', 'name'] },
+    );
+    return new AppDataSettingsView(rows);
   }
 
   /** 관리자만, 공간의 앱만 (아니면 404) */

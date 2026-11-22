@@ -3,6 +3,7 @@ import { ClaudeCode } from './claude-code';
 import { Codex } from './codex';
 import { CollectSetup } from './collect-setup';
 import { ConnectCommand, REVIEWERS } from './connect.command';
+import { DeployCommand } from './deploy.command';
 import { DeviceLogin } from './device-login';
 import { NewsSetup } from './news-setup';
 import { Shell } from './shell';
@@ -20,6 +21,9 @@ const HELP = `cairn: 작업하는 컴퓨터의 AI 도구를 Cairn 블로그에 �
       세션 자동 저장도: 세션 저장 기기(세션 올리기만) + 세션이 끝나면 블로그에 올리는 훅
       --review-with: 다른 회사 모델로 교차 검토할 때 쓸 명령줄
   cairn status [--tool claude-code|codex]   넣은 스킬과 연결 상태, 소식 · 세션 저장 기기와 훅
+  cairn app deploy <앱 주소> <폴더> [--site <블로그 주소>] [--note <메모>]
+      빌드한 폴더(index.html이 든)를 앱 코드의 새 버전으로 올리기. 처음에는 --site와 브라우저 승인(배포 기기: 쓰기만)
+      공개 앱의 새 버전은 콘솔에서 공개해야 보여요
 
 ChatGPT · Claude 앱은 블로그 관리 화면 → 기기에서 연결해요.`;
 
@@ -29,7 +33,12 @@ async function main(argv: readonly string[]): Promise<void> {
     const at = rest.indexOf(name);
     return at >= 0 ? (rest[at + 1] ?? '') : null;
   };
-  const values = new Set([option('--tool'), option('--review-with')]);
+  const values = new Set([
+    option('--tool'),
+    option('--review-with'),
+    option('--site'),
+    option('--note'),
+  ]);
   const args = rest.filter(
     (a, i) => !a.startsWith('-') && !(values.has(a) && rest[i - 1]?.startsWith('--')),
   );
@@ -53,6 +62,13 @@ async function main(argv: readonly string[]): Promise<void> {
   if (command === 'connect' && args[0])
     return new ConnectCommand(terminal, tool, skills, reviewWith, devices).run(args[0]);
   if (command === 'status') return new StatusCommand(terminal, tool, skills, devices).run();
+  if (command === 'app' && args[0] === 'deploy' && args[1] && args[2])
+    return new DeployCommand(terminal, shell, login).run(
+      args[1],
+      args[2],
+      option('--site'),
+      option('--note'),
+    );
   terminal.say(HELP);
   if (command) process.exitCode = 1;
 }

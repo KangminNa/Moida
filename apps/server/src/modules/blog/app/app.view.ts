@@ -76,6 +76,8 @@ export class AppView {
       theme: shown(r).theme ?? null,
       /** 보이는 코드가 선언한 표 이름 (앱 데이터, 스토어 12.4) */
       tables: Object.keys(shown(r).tables ?? {}),
+      /** 방문자에게 보이는 코드의 버전. 없으면 null (시작 코드) */
+      codeSeq: r.code_seq,
       /** 공개 글 · 임시 글(휴지통 제외) · 메뉴 · 페이지의 수 */
       counts: this.counts,
       version: r.version,

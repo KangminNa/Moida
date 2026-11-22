@@ -4,6 +4,7 @@ import { CommentController } from './comment/comment.api';
 import { CommentService } from './comment/comment.service';
 import events from './community.events.json';
 import { CommunityNotices } from './community-notices';
+import { CommunitySettings } from './community-settings';
 import { AppDataAdminController, AppDataController } from './data/app-data.api';
 import { AppDataQuery } from './data/app-data.query';
 import { AppDataService } from './data/app-data.service';
@@ -42,6 +43,7 @@ import { TopicService } from './topic/topic.service';
     AppDataQuery,
     AppDataService,
     AppTablesHandler,
+    CommunitySettings,
   ],
   controllers: [
     MemberController,

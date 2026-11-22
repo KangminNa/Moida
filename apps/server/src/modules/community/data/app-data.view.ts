@@ -64,6 +64,23 @@ export class AppTablesView {
   }
 }
 
+/** 대화의 get_settings app_data: 줄을 넣을 수 있는 표 (공간의 열린 표) */
+export class AppDataSettingsView {
+  constructor(private readonly tables: readonly Readonly<AppTableRow>[]) {}
+
+  toJSON() {
+    return {
+      app_data: this.tables.map((t) => ({
+        app_id: t.app_id,
+        table: t.name,
+        columns: t.columns as Record<string, string>,
+        read: t.read_rule,
+        write: t.write_rule,
+      })),
+    };
+  }
+}
+
 /** 넣은 줄 수 (관리자 · 승인받은 일꾼의 넣기) */
 export class AppRowsAddedView {
   constructor(

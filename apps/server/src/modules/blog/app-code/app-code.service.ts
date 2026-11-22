@@ -11,6 +11,7 @@ import {
   NotFound,
   RuleViolation,
   type Sql,
+  SystemActor,
   type VersionInput,
   type VersionTarget,
   ZipLimits,
@@ -19,7 +20,12 @@ import {
 import type { AppCodeVersionSource, AppRow } from '../blog.tables';
 import { type PageFileEntry, PageFiles } from '../page/page-files';
 import { AppCode } from './app-code';
-import type { AppCodeBuiltInput, ShowCodeInput, UploadCodeInput } from './app-code.input';
+import type {
+  AppCodeBuiltInput,
+  DeployedCodeInput,
+  ShowCodeInput,
+  UploadCodeInput,
+} from './app-code.input';
 import { AppCodeQuery } from './app-code.query';
 import { AppCodeRepository } from './app-code.repository';
 import { AppCodeBundle } from './app-code-bundle';
@@ -96,6 +102,34 @@ export class AppCodeService extends EntityService<AppCode> {
     const latest = await this.code.filesOf(actor, app, app.code_versions);
     bundle.manifest.assertExtends(await this.code.manifestOf(actor, latest));
     return this.add(actor, req, bundle, 'upload', req.note);
+  }
+
+  /**
+   * 배포 표로 받은 묶음을 새 버전으로 (PUT …/code/versions, cairn app deploy, 스토어 12.5). 요청자는 표다:
+   * 표가 묶인 앱 · 크기 · sha256과 맞아야 하고, 표를 받은 뒤 다른 버전이 생겼으면 409.
+   * AI가 만든 버전과 같은 규칙이다: 공개 앱은 확인 대기(관리자가 공개), 비공개 앱은 바로 보인다
+   */
+  async deployed(actor: Actor, req: DeployedCodeInput): Promise<AppCode> {
+    const now = new Date();
+    const ticket = await this.code.deployOf(actor, req.token, now);
+    const sha256 = createHash('sha256').update(req.zip).digest('hex');
+    if (ticket.appId !== req.id || ticket.size !== req.zip.length || ticket.sha256 !== sha256)
+      throw new Forbidden('deploy_ticket', '배포 표와 다른 묶음이에요. 다시 배포해 주세요');
+    const system = new SystemActor();
+    const app = await this.code.appOf(system, ticket.spaceId, ticket.appId);
+    if (app === null) throw new NotFound('앱을 찾을 수 없어요');
+    const bundle = await this.unzipped(req.zip, app.kind);
+    const latest = await this.code.filesOf(system, app, app.code_versions);
+    bundle.manifest.assertExtends(await this.code.manifestOf(system, latest));
+    return this.transaction(async (tx) => {
+      const codes = this.store(tx);
+      const code = await codes.lock(ticket.spaceId, app.id);
+      if (code.latestSeq !== ticket.base)
+        throw new Conflict('그사이 앱 코드가 바뀌었어요. 다시 배포해 주세요');
+      code.add(bundle, 'upload', null, null, ticket.note || '배포', now);
+      await codes.save(code);
+      return code;
+    });
   }
 
   /**

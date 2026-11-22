@@ -15,7 +15,7 @@ import { AppService } from './app/app.service';
 import { AppCodeController, AppSiteController } from './app-code/app-code.api';
 import { AppCodeQuery } from './app-code/app-code.query';
 import { AppCodeService } from './app-code/app-code.service';
-import { AppCodeBaseTool } from './app-code/app-code.tool';
+import { AppCodeBaseTool, AppCodeUploadTool } from './app-code/app-code.tool';
 import { AppCodeBuiltHandler } from './app-code/app-code-built.handler';
 import { AppCodeShowHandler } from './app-code/app-code-show.handler';
 import { AppScreenQuery } from './app-code/app-screen.query';
@@ -93,6 +93,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     AppSiteQuery,
     AppScreenQuery,
     AppCodeBaseTool,
+    AppCodeUploadTool,
     AppCodeBuiltHandler,
     AppCodeShowHandler,
     { provide: AppStarterGateway, useFactory: () => AppStarterGateway.fromEnv() },
