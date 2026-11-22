@@ -1,4 +1,5 @@
 import type { AppCodeBase } from './app-code-base';
+import { AppManifestCheck } from './app-manifest-check';
 import { StageCheck } from './stage-check';
 
 /** 검사할 파일 하나: 앞 코드의 것이거나 AI가 낸 것. text는 읽은 글(템플릿 · cairn.json)만, 못 읽었으면 null */
@@ -21,13 +22,13 @@ class TemplateScan {
 //   템플릿 문법 (Mustache: 여닫는 짝 · 없는 조각 · {{{ }}}는 html 값에만 · 구분자 바꾸기 금지)
 //   데이터 이름 (약속 cairn: 1에 없는 이름은 빈 칸으로 그려진다)
 // 정적 앱 (cairn.json의 "render": "static", 스토어 9.13)은 템플릿이 아니라 파일 그대로 나가므로 묶음 규칙만 본다
-// (500개 · 경로 여섯 마디 · HTML 하나 1MB · 페이지 앱에서만). 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
+// (500개 · 경로 여섯 마디 · HTML 하나 1MB · 페이지 · 커뮤니티 앱에서만). 선언서(cairn.json)의 모양은 AppManifestCheck가 본다. 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
 // 떨어지면 JobRun이 AI에게 한 번 더 맡긴다 (검증 고리 V). 그래도 묶음 · 문법이 틀리면 MakeStage가 일을 실패로 끝낸다:
 // 서버는 Mustache를 읽지 않아 틀린 템플릿도 버전이 되고, 비공개 앱은 바로 방문자(관리자)에게 보이기 때문이다.
 // 러너에는 런타임 의존 패키지가 없어 Mustache 라이브러리 대신 태그만 훑는다 (웹은 mustache 4로 그린다).
 export class AppCodeCheck {
   static readonly ENTRY = 'index.html';
-  static readonly MANIFEST = 'cairn.json';
+  static readonly MANIFEST = AppManifestCheck.FILE;
   /** 폴더가 든 묶음 전체를 내는 zip의 이름 (서버의 AppCodeService.BUILD_ZIP) */
   static readonly PACKED = 'app.zip';
   static readonly FILES_MAX = 100;
@@ -35,11 +36,10 @@ export class AppCodeCheck {
   static readonly STATIC_FILES_MAX = 500;
   static readonly DEPTH_MAX = 6;
   static readonly PATH_MAX = 300;
-  private static readonly STATIC = 'static';
-  private static readonly STATIC_KIND = 'page';
+  /** 정적 앱으로 만들 수 있는 종류 (서버의 AppCodeBundle.STATIC_KINDS) */
+  private static readonly STATIC_KINDS: readonly string[] = ['page', 'community'];
   static readonly BYTES_MAX = 20 * 1024 * 1024;
   static readonly TEMPLATE_BYTES_MAX = 1024 * 1024;
-  static readonly HOSTS_MAX = 10;
   /** 검사 이름: 일을 실패로 끝낼 것(묶음 · 문법)과 알리기만 할 것(이름) */
   static readonly BUNDLE = '앱 코드 묶음';
   static readonly SYNTAX = '템플릿 문법';
@@ -65,8 +65,6 @@ export class AppCodeCheck {
   ];
   private static readonly KNOWN = new Set(AppCodeCheck.NAMES);
   private static readonly TEMPLATE = /\.html$/i;
-  private static readonly HOST =
-    /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
   /** AI에게 보일 문제 줄 수 */
   private static readonly SHOWN = 20;
 
@@ -80,7 +78,7 @@ export class AppCodeCheck {
     const all = new Map<string, AppCodeEntry>();
     for (const f of base.files) all.set(f.name, new AppCodeEntry(f.name, f.size, f.text));
     for (const f of made) all.set(f.name, f);
-    const fixed = AppCodeCheck.isStatic(all.get(AppCodeCheck.MANIFEST)?.text ?? null);
+    const fixed = AppManifestCheck.isStatic(all.get(AppCodeCheck.MANIFEST)?.text ?? null);
     const checks = [AppCodeCheck.bundle([...all.values()], made, fixed, base.kind)];
     // 정적 앱의 HTML은 템플릿이 아니다: 문법 · 데이터 이름을 보지 않는다
     const templates = fixed ? [] : made.filter((f) => AppCodeCheck.isTemplate(f.name));
@@ -134,7 +132,7 @@ export class AppCodeCheck {
       .filter((f) => f.text === null && !inside.has(f.name))
       .map((f) => new AppCodeEntry(f.name, f.size, null));
     const manifest = entries.find((f) => f.name === AppCodeCheck.MANIFEST);
-    const fixed = AppCodeCheck.isStatic(manifest?.text ?? null);
+    const fixed = AppManifestCheck.isStatic(manifest?.text ?? null);
     const extra = fixed
       ? []
       : [
@@ -170,7 +168,7 @@ export class AppCodeCheck {
       const nested = all.find((f) => f.name.includes('/'));
       if (nested)
         problems.push(
-          `폴더는 정적 앱만 써요: ${nested.name} (cairn.json에 "render": "static", 페이지 앱에서만)`,
+          `폴더는 정적 앱만 써요: ${nested.name} (cairn.json에 "render": "static", 페이지 · 커뮤니티 앱에서만)`,
         );
     }
     if (!all.some((f) => f.name === AppCodeCheck.ENTRY))
@@ -178,7 +176,10 @@ export class AppCodeCheck {
         `${AppCodeCheck.ENTRY}가 없어요 (${fixed ? '앱의 첫 화면' : '모든 화면의 기본 템플릿'})`,
       );
     const manifest = made.find((f) => f.name === AppCodeCheck.MANIFEST);
-    if (manifest) problems.push(...AppCodeCheck.manifestProblems(manifest.text));
+    if (manifest)
+      problems.push(
+        ...AppManifestCheck.problems(manifest.text, kind, new Set(all.map((f) => f.name))),
+      );
     const size = bytes < 1024 ? `${bytes}B` : `${Math.round(bytes / 1024)}KB`;
     return AppCodeCheck.seen(AppCodeCheck.BUNDLE, problems, `${all.length}개 · ${size}`, '');
   }
@@ -190,8 +191,8 @@ export class AppCodeCheck {
     kind: string,
   ): string[] {
     const problems: string[] = [];
-    if (kind !== AppCodeCheck.STATIC_KIND)
-      problems.push('정적 앱("render": "static")은 페이지 앱에서만 돼요');
+    if (!AppCodeCheck.STATIC_KINDS.includes(kind))
+      problems.push('정적 앱("render": "static")은 페이지 · 커뮤니티 앱에서만 돼요');
     const big = pages.find((f) => f.size > AppCodeCheck.TEMPLATE_BYTES_MAX);
     if (big) problems.push(`HTML 파일 하나는 1MB까지예요: ${big.name}`);
     const bad = all.find((f) => {
@@ -207,44 +208,6 @@ export class AppCodeCheck {
         `쓸 수 없는 이름이에요: ${bad.name} (경로는 파일까지 ${AppCodeCheck.DEPTH_MAX}마디, ${AppCodeCheck.PATH_MAX}자까지, 숨김 파일 없이)`,
       );
     return problems;
-  }
-
-  /** cairn.json이 정적 앱이라고 하는가 ("render": "static"). 읽을 수 없으면 템플릿 앱으로 본다 */
-  private static isStatic(manifest: string | null): boolean {
-    if (manifest === null) return false;
-    try {
-      const parsed = JSON.parse(manifest) as { render?: unknown } | null;
-      return parsed?.render === AppCodeCheck.STATIC;
-    } catch {
-      return false;
-    }
-  }
-
-  /** cairn.json의 모양 (서버의 AppCodeBundle.manifestOf와 같은 규칙) */
-  private static manifestProblems(text: string | null): string[] {
-    const name = AppCodeCheck.MANIFEST;
-    if (text === null) return [`${name}을 읽지 못했어요 (16KB까지)`];
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return [`${name}이 JSON이 아니에요`];
-    }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
-      return [`${name}은 객체여야 해요`];
-    const {
-      cairn,
-      hosts = [],
-      render = 'template',
-    } = parsed as { cairn?: unknown; hosts?: unknown; render?: unknown };
-    if (cairn !== undefined && cairn !== 1) return ['데이터 약속(cairn)은 1이에요'];
-    if (render !== 'template' && render !== AppCodeCheck.STATIC)
-      return ['그리는 법(render)은 template · static 중 하나예요'];
-    if (!Array.isArray(hosts) || hosts.length > AppCodeCheck.HOSTS_MAX)
-      return ['바깥 주소(hosts)는 10개까지의 목록이에요'];
-    return hosts
-      .filter((h) => typeof h !== 'string' || !AppCodeCheck.HOST.test(h))
-      .map((h) => `바깥 주소는 정확한 호스트 이름만 (와일드카드 · IP · 포트 없이): ${String(h)}`);
   }
 
   /**

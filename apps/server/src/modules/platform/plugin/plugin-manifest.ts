@@ -239,7 +239,9 @@ export class PluginManifest {
     // 기능 패키지: 자기 스키마 · API · MCP 도구 · 메뉴. 쓰려면 uses에도 적어 주인이 켤 때 허락한다
     const schema = str('schema') || null;
     if (schema) {
-      if (!/^[a-z][a-z0-9_]{1,39}$/.test(schema) || CORE_SCHEMAS.includes(schema))
+      // app_<앱 id>는 앱 데이터의 스키마다 (community, 스토어 12.4)
+      const taken = CORE_SCHEMAS.includes(schema) || /^app_[0-9a-f]{32}$/.test(schema);
+      if (!/^[a-z][a-z0-9_]{1,39}$/.test(schema) || taken)
         problems.push(`schema는 소문자·숫자·밑줄이고 코어 스키마가 아니어야 해요: ${schema}`);
       if (!existsSync(join(dir, 'migrations')))
         problems.push('schema를 쓰려면 migrations/가 있어야 해요');

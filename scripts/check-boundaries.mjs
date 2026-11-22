@@ -2,6 +2,7 @@
 //
 //   node scripts/check-boundaries.mjs        코드 검사
 //   node scripts/check-boundaries.mjs --db   DB 검사 (모듈 사이 외래키, 주인 없는 스키마). Docker의 db가 떠 있어야 함
+//                                            앱마다 생기는 스키마(app_<앱 id>, 스토어 12.4)는 community의 것이라 세지 않는다
 //
 // 코드 검사 항목
 //   1. 다른 모듈은 index.ts로만 가져온다
@@ -211,6 +212,7 @@ function checkDatabase() {
     UNION ALL
     SELECT 'schema|' || nspname FROM pg_namespace
     WHERE nspname NOT LIKE 'pg\\_%' AND nspname NOT IN ('information_schema', 'public')
+      AND nspname !~ '^app_[0-9a-f]{32}$'
       AND nspname NOT IN (SELECT schema FROM m);`;
   const out = execFileSync(
     'docker',

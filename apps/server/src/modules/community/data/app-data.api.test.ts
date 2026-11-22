@@ -312,3 +312,43 @@ describe('버전이 바뀌면', () => {
     assert.equal((await api.get(admin('/export'))).status, 403);
   });
 });
+
+describe('커뮤니티 앱의 화면 자유화 (스토어 12.6)', () => {
+  test('커뮤니티 앱도 정적 앱이 되고, 회원 규칙의 표를 members 없이 쓴다. 글은 회원 API 그대로다', async () => {
+    const club = await CommunitySite.open(api, owner, `club-${mark}`);
+    const app = await club.deploy(owner, {
+      tables: { likes: { columns: { topic: 'text' }, read: 'member', write: 'owner' } },
+    });
+    assert.equal(app.members, true, '커뮤니티 앱은 늘 회원을 받는다');
+    assert.deepEqual(app.tables, ['likes']);
+
+    // 화면은 묶음의 파일 그대로 (템플릿을 채우지 않는다), 그 앱의 도메인에서는 격리를 푼다
+    const screen = ok(
+      await api.get(`/api/apps/site/club-${mark}/screen?path=&host=${club.host}`),
+    ) as Json;
+    assert.equal((screen.static as Json).file, 'index.html');
+    assert.equal(screen.open, true);
+
+    const cara = await club.member('cara_member', '카라');
+    const topic = ok(
+      await club.write(cara, 'POST', '/api/community/topics', {
+        requestId: randomUUID(),
+        title: '첫 글',
+        body: '직접 그린 화면에서 쓴 글',
+      }),
+      201,
+    );
+    const liked = ok(
+      await club.write(cara, 'POST', '/api/community/data/likes', { topic: String(topic.id) }),
+      201,
+    );
+    assert.equal(liked.topic, topic.id);
+    assert.equal(rowsOf(await club.at('/api/community/data/likes', { as: cara })).length, 1);
+    assert.equal(rowsOf(await club.at('/api/community/data/likes')).length, 0, '회원만 읽는다');
+    const listed = ok(await club.at('/api/community/topics')) as { topics: Json[] };
+    assert.deepEqual(
+      listed.topics.map((t) => t.title),
+      ['첫 글'],
+    );
+  });
+});

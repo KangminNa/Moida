@@ -19,7 +19,7 @@ export default async function JoinPage({ params, searchParams }: Props) {
   if (place.member) redirect(back);
   return (
     <MemberFrame place={place} title="가입">
-      <JoinPanel csrf={place.csrf} returnTo={back} />
+      <JoinPanel csrf={place.csrf} returnTo={back} community={place.app.kind === 'community'} />
     </MemberFrame>
   );
 }
