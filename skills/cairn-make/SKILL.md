@@ -36,12 +36,13 @@ description: 코드 러너 칸에서 발표 · 표 · 문서 · 도표 · 영상
 | 문서 (.docx · .pdf) · 표 (.xlsx) | python-docx · openpyxl · LibreOffice | [references/documents.md](references/documents.md) |
 | 도표 · 그림 (.png) | matplotlib · Pillow | [references/documents.md](references/documents.md) |
 | 영상 (.mp4) | ffmpeg (+ 슬라이드를 그린 PNG) | [references/video.md](references/video.md) |
+| 받은 영상 편집 (자르기 · 무음 빼기 · 세로로 · 자막 · 소리) | ffmpeg · ffprobe | [references/video.md](references/video.md)의 "받은 영상 편집" |
 | 웹 페이지 (index.html) | 손으로 쓰는 HTML · CSS · JS | [references/page.md](references/page.md) |
 | 앱 코드 (스토어의 앱 화면) | Mustache 템플릿 · CSS · JS | [references/app-code.md](references/app-code.md) |
 | PDF로 · 미리 보기 | `soffice --headless --convert-to pdf` · `pdftoppm -png` | [references/slides.md](references/slides.md) |
 
 한글 글꼴은 **Noto Sans CJK KR**(본문) · **Noto Serif CJK KR**(제목에 쓸 수 있음)이다. 글꼴을 정하지 않으면 한글이 □로 깨질 수 있다.
-음성(내레이션)과 그림 생성 AI는 없다. 영상은 글자 · 그림 · 도표에 자막과 시간을 넣어 만든다.
+음성(내레이션) · 음성 받아 적기 · 그림 생성 AI는 없다. 새 영상은 글자 · 그림 · 도표에 자막과 시간을 넣어 만든다. 받은 영상은 뽑은 그림과 소리 구간을 보고 편집한다 (자막은 대본을 받았을 때만).
 
 ## 순서
 
@@ -87,3 +88,4 @@ description: 코드 러너 칸에서 발표 · 표 · 문서 · 도표 · 영상
 
 재료에 앞 결과물(.pptx · .docx 등)이 있고 지시가 고칠 점이면, 처음부터 다시 만들지 않는다.
 그 파일을 열어(python-pptx · python-docx) 말한 곳만 고치고, 같은 이름으로 결과물 폴더에 둔다. 답에는 고친 곳을 쪽 · 절 단위로 적는다.
+재료가 영상이면 편집이다 ([references/video.md](references/video.md)의 "받은 영상 편집"): 원본을 덮지 않고 새 이름(`<원본 이름> 편집.mp4`)으로 내고, 답에는 남긴 구간 · 뺀 구간을 시각으로 적는다.
