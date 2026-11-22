@@ -5,17 +5,26 @@ import {
   HttpCode,
   Param,
   Post,
+  Put,
   Query,
+  Req,
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { type Actor, CurrentActor, type HttpResponse, VersionInput } from '../../platform';
+import {
+  type Actor,
+  CurrentActor,
+  type HttpRequest,
+  type HttpResponse,
+  VersionInput,
+} from '../../platform';
 import { PageSiteAnswer } from '../page/page.query';
 import {
   AppCodeIdInput,
   AppFileInput,
   AppScreenInput,
   CodeVersionInput,
+  DeployedCodeInput,
   PreviewCodeInput,
   ShowCodeInput,
   UploadCodeInput,
@@ -35,6 +44,7 @@ import type {
   AppScreenView,
 } from './app-screen.view';
 import { AppSiteQuery } from './app-site.query';
+import { DeployTicket } from './deploy-ticket';
 
 // 앱 코드 (스토어 1-6, docs/스토어.md 9.5). 관리자만: 코드 탭 · 바뀐 점 · zip 받기 · 올리기 · 공개 · 시작 코드로 · 미리 보기 주소.
 // 기기 토큰 · AI는 버전을 공개하지 못한다 (원칙 7): AI의 버전은 만들기 작업의 이벤트로만 들어온다.
@@ -84,6 +94,21 @@ export class AppCodeController {
     @Body() body: unknown,
   ): Promise<AppCodeStateView> {
     return (await this.service.upload(actor, UploadCodeInput.from(id, query, body))).view();
+  }
+
+  /**
+   * 배포 (cairn app deploy, 스토어 12.5): 본문이 zip 그대로, 머리글 x-cairn-deploy에 app_code_upload의 표 (로그인 없음).
+   * 표가 그 앱 · 크기 · sha256에 묶여 있어 다른 묶음에는 쓸 수 없다
+   */
+  @Put('versions')
+  async deployed(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Req() req: HttpRequest,
+    @Body() body: unknown,
+  ): Promise<AppCodeStateView> {
+    const input = DeployedCodeInput.from(id, req.headers[DeployTicket.HEADER], body);
+    return (await this.service.deployed(actor, input)).view();
   }
 
   /** 이 버전 공개 (확인 대기 버전 · 앞 버전으로 되돌리기) */

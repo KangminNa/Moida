@@ -1,6 +1,6 @@
 import { MemberFrame } from '../../../../_community/MemberFrame';
 import {
-  memberPlace,
+  communityPlace,
   memberTitle,
   signedIn,
   writeNotice,
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function WritePage({ params }: Props) {
-  const place = await memberPlace((await params).app);
+  const place = await communityPlace((await params).app);
   const member = signedIn(place, '/_/write');
   return (
     <MemberFrame place={place} title="글쓰기">

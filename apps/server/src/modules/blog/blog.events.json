@@ -78,7 +78,7 @@
       "fields": ["appId", "name", "seq", "source", "pending", "taskId"]
     },
     "blog.app_code.shown": {
-      "fields": ["appId", "seq", "settled"]
+      "fields": ["appId", "seq", "settled", "members", "tables"]
     },
     "blog.app_code.refused": {
       "fields": ["appId", "name", "taskId", "error"]

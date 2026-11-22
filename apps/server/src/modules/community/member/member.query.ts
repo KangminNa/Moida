@@ -8,7 +8,7 @@ import { MemberCsrf } from './member-csrf.policy';
 import { MemberSession } from './member-session';
 
 // 회원 읽기 (스토어 3-1): 이 브라우저가 누구인지, 그리고 회원 쿠키 → 요청자(MemberGuard).
-// 모두 앱 도메인의 공개된 커뮤니티 앱에서만 (blog가 Lookups 'community-app'으로 알려 준다). 아니면 없는 주소와 같다
+// 모두 앱 도메인의 공개된 커뮤니티 앱에서만 (blog가 Lookups 'member-app'으로 알려 준다: 커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3). 아니면 없는 주소와 같다
 @Injectable()
 export class MemberQuery extends BaseQuery {
   private readonly csrf: MemberCsrf;
@@ -52,6 +52,6 @@ export class MemberQuery extends BaseQuery {
   }
 
   private assertCommunity(actor: Actor, place: MemberPlace): Promise<void> {
-    return this.lookups.assertVisible('community-app', actor, [place.appId], '없는 주소예요');
+    return this.lookups.assertVisible('member-app', actor, [place.appId], '없는 주소예요');
   }
 }

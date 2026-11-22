@@ -14,7 +14,16 @@ const MISMATCH: ApiReply<MemberSelf> = {
 };
 
 // 가입: 아이디 · 비밀번호 · 닉네임 · 만 14세 이상 확인 (규칙은 서버가 본다: 커뮤니티 CLAUDE.md의 회원 규칙)
-export function JoinPanel({ csrf, returnTo }: { csrf: string | null; returnTo: string }) {
+// community: 커뮤니티 앱인가 (글 · 댓글의 가입 직후 대기를 알린다. 그 밖의 앱에는 글 · 댓글이 없다)
+export function JoinPanel({
+  csrf,
+  returnTo,
+  community,
+}: {
+  csrf: string | null;
+  returnTo: string;
+  community: boolean;
+}) {
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
@@ -101,7 +110,7 @@ export function JoinPanel({ csrf, returnTo }: { csrf: string | null; returnTo: s
       </button>
       <p className="member-hint">
         이미 회원이면 <a href={`/_/login?return=${encodeURIComponent(returnTo)}`}>로그인</a>.
-        가입하고 5분 뒤부터 글 · 댓글을 쓸 수 있어요.
+        {community && ' 가입하고 5분 뒤부터 글 · 댓글을 쓸 수 있어요.'}
       </p>
     </form>
   );

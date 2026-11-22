@@ -30,7 +30,7 @@ import { MemberSession } from './member-session';
 // - 틀린 시도는 아이디마다 · 곳(IP, IPv6는 /64)마다 센다 (서버 메모리에만, IP는 저장하지 않는다). 넘으면 429
 // - 가입은 곳마다 시간당 몇 번까지 (봇 가입 막기). 가입 직후에는 글 · 댓글을 바로 쓰지 못한다 (Member.JOIN_WAIT_MS)
 // - 가입 · 로그인할 때마다 새 세션 토큰. 비밀번호를 바꾸면 지금 로그인 말고 다른 로그인은 모두 끝난다
-// 모두 앱 도메인의 공개된 커뮤니티 앱에서만 (Lookups 'community-app')
+// 모두 앱 도메인의 공개된 커뮤니티 앱에서만 (Lookups 'member-app': 커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3)
 @Injectable()
 export class MemberService extends BaseService {
   /** 틀린 로그인: 한 아이디에 15분에 5번, 한 곳에서 15분에 20번 */
@@ -182,6 +182,6 @@ export class MemberService extends BaseService {
   }
 
   private assertCommunity(actor: Actor, place: MemberPlace): Promise<void> {
-    return this.lookups.assertVisible('community-app', actor, [place.appId], '없는 주소예요');
+    return this.lookups.assertVisible('member-app', actor, [place.appId], '없는 주소예요');
   }
 }

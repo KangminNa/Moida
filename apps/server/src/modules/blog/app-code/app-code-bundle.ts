@@ -1,13 +1,12 @@
 import { RuleViolation } from '../../platform';
 import { type PageFileEntry, PageFiles } from '../page/page-files';
+import { type AppCodeRender, AppManifest } from './app-manifest';
 
 // 앱 코드 버전 하나의 파일 묶음 (스토어 1-6, docs/스토어.md 9.2). 파일 규칙(폴더 없는 이름 · 100개 · index.html · 형식)은
 // 페이지와 같아 PageFiles를 그대로 쓰고, 앱 코드만의 규칙을 더한다: 크기 한도와 cairn.json(바깥 주소 목록).
 // 템플릿(.html)은 웹이 Mustache로 채워 그린다. 코드는 우리 서버에서 실행되지 않는다.
 // 정적 앱 (스토어 9.13, 2026-11-21 사용자 결정 "템플릿 없는 자유로운 앱"): cairn.json에 "render": "static"이면 템플릿을 거치지 않고
 // 파일 그대로 내보낸다. 폴더가 든 이름(`assets/app.js`) · 파일 500개까지, 페이지 앱에서만. 버전 · 확인 대기 · 격리는 같다.
-export type AppCodeRender = 'template' | 'static';
-
 export class AppCodeBundle {
   /** 묶음의 설정 파일. 없으면 바깥 주소 없음 */
   static readonly MANIFEST = 'cairn.json';
@@ -15,25 +14,31 @@ export class AppCodeBundle {
   static readonly BYTES_MAX = 20 * 1024 * 1024;
   static readonly TEMPLATE_BYTES_MAX = 1024 * 1024;
   static readonly MANIFEST_BYTES_MAX = 16 * 1024;
-  static readonly HOSTS_MAX = 10;
-  /** 데이터 약속의 버전 (cairn.json의 cairn). 지금은 1뿐 */
-  static readonly CONTRACT = 1;
   private static readonly TEMPLATE = /\.html$/i;
-  /** 정확한 호스트 이름만: 소문자 글자 · 숫자 · 하이픈 마디 둘 이상, 와일드카드 · IP · 포트 없음 */
-  private static readonly HOST =
-    /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
   /** 그리는 법 (cairn.json의 render): 템플릿을 채우거나(기본), 파일 그대로(정적 앱, 스토어 9.13) */
-  static readonly TEMPLATED: AppCodeRender = 'template';
-  static readonly STATIC: AppCodeRender = 'static';
-  /** 정적 앱은 페이지 앱에서만 (블로그 · 매거진 · 커뮤니티의 글 화면은 템플릿이 그린다) */
-  private static readonly STATIC_KIND = 'page';
+  static readonly TEMPLATED: AppCodeRender = AppManifest.TEMPLATED;
+  static readonly STATIC: AppCodeRender = AppManifest.STATIC;
+  private static readonly COMMUNITY = 'community';
+  /**
+   * 정적 앱이 되는 종류: 페이지 앱과 커뮤니티 앱 (커뮤니티는 앱 JS가 글을 회원 API로 읽어 그린다, 스토어 12.6).
+   * 블로그 · 매거진의 글 화면은 템플릿이 그린다
+   */
+  private static readonly STATIC_KINDS: readonly string[] = ['page', AppCodeBundle.COMMUNITY];
 
   private constructor(
     readonly files: PageFiles,
-    readonly hosts: readonly string[],
-    readonly render: AppCodeRender,
+    /** 선언서 (cairn.json. 없으면 AppManifest.NONE) */
+    readonly manifest: AppManifest,
   ) {}
+
+  get hosts(): readonly string[] {
+    return this.manifest.hosts;
+  }
+
+  get render(): AppCodeRender {
+    return this.manifest.render;
+  }
 
   /** 앱 코드의 파일 목록: 폴더가 든 이름까지 읽는다 (폴더를 써도 되는지는 of가 render로 본다) */
   static files(raw: unknown): PageFiles {
@@ -42,8 +47,9 @@ export class AppCodeBundle {
 
   /** 이 묶음을 그 종류의 앱에 둘 수 있는가. 아니면 RuleViolation */
   assertFits(kind: string): void {
-    if (this.render === AppCodeBundle.STATIC && kind !== AppCodeBundle.STATIC_KIND)
+    if (this.render === AppCodeBundle.STATIC && !AppCodeBundle.STATIC_KINDS.includes(kind))
       throw new RuleViolation('파일 그대로 내보내는 앱("render": "static")은 페이지 앱에서만 돼요');
+    this.manifest.assertFits(kind, AppCodeBundle.COMMUNITY);
   }
 
   /**
@@ -60,10 +66,11 @@ export class AppCodeBundle {
     const listed = files.find(AppCodeBundle.MANIFEST);
     if (listed !== null && manifest === null)
       throw new RuleViolation(`${AppCodeBundle.MANIFEST}을 읽을 수 없어요`);
-    const { hosts, render } =
-      listed === null
-        ? { hosts: [], render: AppCodeBundle.TEMPLATED }
-        : AppCodeBundle.manifestOf(manifest ?? '');
+    const declared = listed === null ? AppManifest.NONE : AppManifest.of(manifest ?? '');
+    const { render } = declared;
+    const logo = declared.theme?.logo ?? null;
+    if (logo !== null && files.find(logo) === null)
+      throw new RuleViolation(`테마의 로고 파일이 묶음에 없어요: ${logo}`);
     const pages = entries.filter((f) => AppCodeBundle.isTemplate(f.name));
     if (render === AppCodeBundle.STATIC) {
       // 정적 앱: HTML은 웹이 주소 기준 · 데이터를 넣어 보내므로 파일 하나의 크기만 본다
@@ -72,7 +79,7 @@ export class AppCodeBundle {
         throw new RuleViolation(
           `HTML 파일 하나는 ${AppCodeBundle.mb(AppCodeBundle.TEMPLATE_BYTES_MAX)}까지예요: ${big.name}`,
         );
-      return new AppCodeBundle(files, hosts, render);
+      return new AppCodeBundle(files, declared);
     }
     const folder = entries.find((f) => PageFiles.isNested(f.name));
     if (folder)
@@ -85,7 +92,7 @@ export class AppCodeBundle {
       throw new RuleViolation(
         `템플릿(.html)은 합쳐 ${AppCodeBundle.mb(AppCodeBundle.TEMPLATE_BYTES_MAX)}까지예요`,
       );
-    return new AppCodeBundle(files, hosts, render);
+    return new AppCodeBundle(files, declared);
   }
 
   /** 웹이 템플릿으로 채우는 파일인가 */
@@ -93,40 +100,9 @@ export class AppCodeBundle {
     return AppCodeBundle.TEMPLATE.test(name);
   }
 
-  /** cairn.json의 바깥 주소 목록. 모양이 틀리면 RuleViolation */
-  static hostsOf(manifest: string): readonly string[] {
-    return AppCodeBundle.manifestOf(manifest).hosts;
-  }
-
-  /** cairn.json의 바깥 주소 목록과 그리는 법. 모양이 틀리면 RuleViolation */
-  static manifestOf(manifest: string): { hosts: readonly string[]; render: AppCodeRender } {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(manifest);
-    } catch {
-      throw new RuleViolation(`${AppCodeBundle.MANIFEST}이 JSON이 아니에요`);
-    }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
-      throw new RuleViolation(`${AppCodeBundle.MANIFEST}은 객체여야 해요`);
-    const {
-      cairn,
-      hosts = [],
-      render = AppCodeBundle.TEMPLATED,
-    } = parsed as { cairn?: unknown; hosts?: unknown; render?: unknown };
-    if (render !== AppCodeBundle.TEMPLATED && render !== AppCodeBundle.STATIC)
-      throw new RuleViolation(
-        `그리는 법(render)은 ${AppCodeBundle.TEMPLATED} · ${AppCodeBundle.STATIC} 중 하나예요`,
-      );
-    if (cairn !== undefined && cairn !== AppCodeBundle.CONTRACT)
-      throw new RuleViolation(`데이터 약속(cairn)은 ${AppCodeBundle.CONTRACT}이에요`);
-    if (!Array.isArray(hosts) || hosts.length > AppCodeBundle.HOSTS_MAX)
-      throw new RuleViolation(`바깥 주소(hosts)는 ${AppCodeBundle.HOSTS_MAX}개까지의 목록이에요`);
-    for (const host of hosts)
-      if (typeof host !== 'string' || !AppCodeBundle.HOST.test(host))
-        throw new RuleViolation(
-          `바깥 주소는 정확한 호스트 이름만 적어요 (와일드카드 · IP · 포트 없이): ${String(host)}`,
-        );
-    return { hosts: [...new Set(hosts as string[])], render: render as AppCodeRender };
+  /** cairn.json의 글 → 선언서. 모양이 틀리면 RuleViolation */
+  static manifestOf(manifest: string): AppManifest {
+    return AppManifest.of(manifest);
   }
 
   /** 두 버전의 파일 비교 (이름 · 내용 해시). 앞이 시작 코드여도 같은 모양이다 */

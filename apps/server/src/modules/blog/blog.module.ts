@@ -15,7 +15,7 @@ import { AppService } from './app/app.service';
 import { AppCodeController, AppSiteController } from './app-code/app-code.api';
 import { AppCodeQuery } from './app-code/app-code.query';
 import { AppCodeService } from './app-code/app-code.service';
-import { AppCodeBaseTool } from './app-code/app-code.tool';
+import { AppCodeBaseTool, AppCodeUploadTool } from './app-code/app-code.tool';
 import { AppCodeBuiltHandler } from './app-code/app-code-built.handler';
 import { AppCodeShowHandler } from './app-code/app-code-show.handler';
 import { AppScreenQuery } from './app-code/app-screen.query';
@@ -93,6 +93,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     AppSiteQuery,
     AppScreenQuery,
     AppCodeBaseTool,
+    AppCodeUploadTool,
     AppCodeBuiltHandler,
     AppCodeShowHandler,
     { provide: AppStarterGateway, useFactory: () => AppStarterGateway.fromEnv() },
@@ -152,6 +153,8 @@ export class BlogModule implements OnModuleInit {
     this.lookups.provide('app', (a, ids) => this.apps.names(a, ids));
     // 커뮤니티 앱 (스토어 3-1): community가 공개된 커뮤니티 앱인지 묻는다 (관리자는 공간의 커뮤니티 앱)
     this.lookups.provide('community-app', (a, ids) => this.apps.names(a, ids, App.COMMUNITY));
+    // 회원을 받는 앱 (스토어 12.3): 커뮤니티 앱과 선언서에 members를 적은 앱. community의 회원 API가 묻는다
+    this.lookups.provide('member-app', (a, ids) => this.apps.memberApps(a, ids));
     // 앱마다 도메인 (스토어 3-0): blog가 앱 도메인에서 여는 경로는 글의 사진 · 앱 아이콘 · 연결 확인 값뿐이다
     // (화면은 웹이 그리고, 웹은 서버를 기본 이름으로 부른다)
     this.gate.registerApps((a) => this.apps.hosts(a));

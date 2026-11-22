@@ -4192,3 +4192,13 @@ ul.picked > .chip {
   flex-direction: column;
   gap: 6px;
 }
+
+/* 고정 화면의 앱 테마 (스토어 12.3): 로고는 앱 이름 앞에 작게 */
+.member-theme input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+.member-logo {
+  border-radius: 6px;
+  margin-right: 8px;
+  vertical-align: -5px;
+}

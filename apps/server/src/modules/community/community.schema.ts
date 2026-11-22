@@ -1,10 +1,26 @@
 // 자동으로 만든 파일이라 고치지 않는다. 마이그레이션 뒤 pnpm db:rows로 다시 만든다 (scripts/db-rows.mjs).
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
-import { integer, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { CommentHiddenBy, CommentState, DecisionAction, DecisionByKind, ReportReason, ReportState, TopicHiddenBy, TopicState } from './community.tables';
+import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { AppTableReadRule, AppTableWriteRule, CommentHiddenBy, CommentState, DecisionAction, DecisionByKind, ReportReason, ReportState, TopicHiddenBy, TopicState } from './community.tables';
 
 const communitySchema = pgSchema('community');
+
+/** community.app_tables */
+export const appTables = communitySchema.table('app_tables', {
+  id: uuid('id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  name: text('name').notNull(),
+  columns: jsonb('columns').notNull(),
+  read_rule: text('read_rule').$type<AppTableReadRule>().notNull(),
+  write_rule: text('write_rule').$type<AppTableWriteRule>().notNull(),
+  open: boolean('open').notNull(),
+  applied_seq: integer('applied_seq').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  version: integer('version').notNull(),
+  space_id: uuid('space_id').notNull(),
+});
 
 /** community.comments */
 export const comments = communitySchema.table('comments', {

@@ -2,6 +2,7 @@ import { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
 import {
   Actor,
+  ApprovedActor,
   BaseQuery,
   BlobStore,
   Database,
@@ -17,20 +18,24 @@ import type {
   AppCodeBaseInput,
   AppCodeIdInput,
   CodeVersionInput,
+  DeployCodeInput,
   PreviewCodeInput,
 } from './app-code.input';
 import {
   type AppCodeBaseFile,
   AppCodeBaseView,
   AppCodeChangesView,
+  AppCodeDeployView,
   AppCodePreviewView,
   AppCodeVersionView,
   AppCodeView,
 } from './app-code.view';
-import { AppCodeBundle, type AppCodeRender } from './app-code-bundle';
+import { AppCodeBundle } from './app-code-bundle';
 import { AppCodeFiles } from './app-code-files';
+import { AppManifest } from './app-manifest';
 import { AppStarterGateway } from './app-starter.gateway';
 import { AppTicket } from './app-ticket';
+import { DeployTicket } from './deploy-ticket';
 
 /** 버전 하나를 묶은 zip (관리자의 내려받기) */
 export class AppCodeArchive {
@@ -144,10 +149,41 @@ export class AppCodeQuery extends BaseQuery {
     return given;
   }
 
-  /** 앱 한 줄 (쓰기 전에 읽기: 일꾼 · 관리자). 없거나 다른 공간이면 null */
+  /** 앱 한 줄 (쓰기 전에 읽기: 일꾼 · 관리자 · 승인한 앱 화면 공개). 없거나 다른 공간이면 null */
   async appOf(actor: Actor, spaceId: string, id: string): Promise<AppRow | null> {
-    actor.assertOwnerOrSystem();
+    const approved = actor instanceof ApprovedActor && actor.action === AppCodeQuery.SHOW;
+    if (!approved) actor.assertOwnerOrSystem();
     return this.row(apps, { space_id: spaceId, id });
+  }
+
+  /**
+   * 배포 도구(MCP app_code_upload, write 기기 · cairn app deploy): 그 앱에 묶음을 올릴 표 (스토어 12.5).
+   * 표는 그 앱 · 지금의 마지막 버전 · 크기 · sha256 · 메모에 묶인다 (10분)
+   */
+  async deployTicket(actor: Actor, req: DeployCodeInput, now: Date): Promise<AppCodeDeployView> {
+    actor.assertCan(Actor.WRITE);
+    const spaceId = actor.requireSpace();
+    const app = await this.row(apps, { space_id: spaceId, slug: req.slug });
+    if (app === null) throw new NotFound(AppCodeQuery.MISSING);
+    const ticket = new DeployTicket(
+      spaceId,
+      app.id,
+      app.code_versions,
+      req.size,
+      req.sha256,
+      req.note,
+    );
+    return new AppCodeDeployView(
+      ticket.path,
+      DeployTicket.HEADER,
+      ticket.seal(this.box, now),
+      DeployTicket.expiresAt(now),
+    );
+  }
+
+  /** 배포 표를 연다 (PUT …/code/versions). 없거나 · 틀리거나 · 끝났으면 403 */
+  async deployOf(_actor: Actor, token: string | null, now: Date): Promise<DeployTicket> {
+    return DeployTicket.open(this.box, token, now);
   }
 
   /**
@@ -184,23 +220,19 @@ export class AppCodeQuery extends BaseQuery {
     return (await this.manifestOf(actor, code)).hosts;
   }
 
-  /** 이 코드의 cairn.json: 바깥 주소와 그리는 법 (없거나 읽을 수 없으면 바깥 주소 없음 · 템플릿) */
-  async manifestOf(
-    actor: Actor,
-    code: AppCodeFiles,
-  ): Promise<{ hosts: readonly string[]; render: AppCodeRender }> {
+  /** 이 코드의 선언서 cairn.json (없거나 읽을 수 없으면 AppManifest.NONE: 바깥 주소 없음 · 템플릿) */
+  async manifestOf(actor: Actor, code: AppCodeFiles): Promise<AppManifest> {
     const text = await this.textOf(
       actor,
       code,
       AppCodeBundle.MANIFEST,
       AppCodeBundle.MANIFEST_BYTES_MAX,
     );
-    const none = { hosts: [], render: AppCodeBundle.TEMPLATED };
-    if (text === null) return none;
+    if (text === null) return AppManifest.NONE;
     try {
       return AppCodeBundle.manifestOf(text);
     } catch {
-      return none;
+      return AppManifest.NONE;
     }
   }
 

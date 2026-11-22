@@ -31,7 +31,7 @@ import {
 /** 쓴 회원의 닉네임 · 아이디와 열린 신고 수를 더한 줄 */
 type Authored = { nickname: string; login_id: string; open_reports: number };
 
-// 커뮤니티 관리 읽기 (스토어 3-1c): 관리자만, 기본 도메인에서. 앱은 공간의 커뮤니티 앱이어야 한다 (Lookups 'community-app').
+// 커뮤니티 관리 읽기 (스토어 3-1c): 관리자만, 기본 도메인에서. 앱은 공간의 커뮤니티 앱이어야 한다 (Lookups 'member-app': 커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3).
 // 모든 상태(가림 · 내림 · 지움 포함)를 보이고, 쓴 회원의 아이디 · 열린 신고 수 · 정할 때 쓸 version을 싣는다.
 // 목록은 최근부터 PAGE개씩, cursor는 앞 쪽의 마지막 id
 @Injectable()
@@ -205,7 +205,7 @@ export class ModerationQuery extends BaseQuery {
   /** 관리자만, 공간의 커뮤니티 앱만 (아니면 404) */
   private async assertApp(actor: Actor, appId: string): Promise<void> {
     actor.assertOwner();
-    await this.lookups.assertVisible('community-app', actor, [appId], '없는 커뮤니티예요');
+    await this.lookups.assertVisible('member-app', actor, [appId], '없는 커뮤니티예요');
   }
 
   private after(alias: string, cursor: string | null) {

@@ -210,7 +210,7 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     ) as AppCodeBase;
   const tail = (checks: readonly StageCheck[]) => checks[0]?.tail ?? '';
 
-  test('정적 앱의 HTML은 템플릿으로 보지 않는다. 페이지 앱에서만, 폴더는 정적 앱만', () => {
+  test('정적 앱의 HTML은 템플릿으로 보지 않는다. 페이지 · 커뮤니티 앱에서만, 폴더는 정적 앱만', () => {
     const empty = page([]);
     const made = [
       new AppCodeEntry('index.html', 200, '<div id="app">{{ count }}</div>{{#broken'),
@@ -225,11 +225,87 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     const again = AppCodeCheck.checks(before, [new AppCodeEntry('index.html', 10, '{{#x')]);
     assert.deepEqual(short(again), [[AppCodeCheck.BUNDLE, true, '2개 · 40B']]);
 
-    assert.match(tail(AppCodeCheck.checks(codeOf([]), made)), /페이지 앱에서만/);
+    assert.match(tail(AppCodeCheck.checks(codeOf([]), made)), /페이지 · 커뮤니티 앱에서만/);
     assert.match(
       tail(AppCodeCheck.checks(empty, [new AppCodeEntry('cairn.json', 20, '{"render":"server"}')])),
       /render\)은 template · static/,
     );
+  });
+
+  test('선언서의 회원 · 권한 · 테마 · 표를 서버와 같은 규칙으로 본다 (앱 플랫폼, 스토어 12.1)', () => {
+    const empty = page([]);
+    const withManifest = (manifest: object, extra: AppCodeEntry[] = []) =>
+      AppCodeCheck.checks(empty, [
+        new AppCodeEntry('index.html', 100, '<div id="app"></div>'),
+        new AppCodeEntry(
+          'cairn.json',
+          200,
+          JSON.stringify({ cairn: 1, render: 'static', ...manifest }),
+        ),
+        ...extra,
+      ]);
+    const good = withManifest(
+      {
+        members: true,
+        permissions: ['microphone'],
+        theme: { accent: '#58cc02', logo: 'logo.svg' },
+        tables: {
+          progress: { columns: { lesson: 'text', xp: 'int' }, read: 'owner', write: 'owner' },
+          words: { columns: { word: 'text', meta: 'json' }, read: 'anyone', write: 'admin' },
+        },
+      },
+      [new AppCodeEntry('logo.svg', 300, null)],
+    );
+    assert.deepEqual(short(good), [[AppCodeCheck.BUNDLE, true, '3개 · 600B']]);
+
+    const bad = withManifest({
+      members: 'yes',
+      permissions: ['bluetooth'],
+      theme: { accent: 'green', logo: 'none.svg' },
+      tables: {
+        Progress: { columns: { a: 'text' }, read: 'anyone', write: 'admin' },
+        scores: { columns: { id: 'int', when: 'date' }, read: 'everyone', write: 'owner' },
+      },
+    });
+    const lines = tail(bad);
+    for (const pattern of [
+      /회원\(members\)은 true · false/,
+      /권한\(permissions\)은 microphone · camera · geolocation/,
+      /테마의 색\(accent\)은 #rrggbb/,
+      /로고 파일이 묶음에 없어요: none\.svg/,
+      /표 이름은 영문 소문자로 시작하는.*Progress/,
+      /쓸 수 없는 칸 이름이에요: scores\.id/,
+      /칸의 타입은 text · int · number · bool · time · json 중 하나예요: scores\.when/,
+      /표 scores의 읽기 규칙\(read\)/,
+      /표 scores의 규칙\(member · owner\)은 회원이 있는 앱에서만/,
+    ])
+      assert.match(lines, pattern);
+    assert.equal(AppCodeCheck.fatal(bad)?.name, AppCodeCheck.BUNDLE);
+
+    // 커뮤니티 앱은 늘 회원이 있다: members 없이도 회원 규칙을 쓴다
+    const community = AppCodeBase.from(
+      Json.of({
+        app_id: id(3),
+        name: '모임',
+        kind: 'community',
+        slug: 'club',
+        seq: 1,
+        files: [],
+        hosts: [],
+      }),
+    ) as AppCodeBase;
+    const club = AppCodeCheck.checks(community, [
+      new AppCodeEntry('index.html', 100, '<div id="app"></div>'),
+      new AppCodeEntry(
+        'cairn.json',
+        100,
+        JSON.stringify({
+          render: 'static',
+          tables: { likes: { columns: { topic: 'text' }, read: 'member', write: 'owner' } },
+        }),
+      ),
+    ]);
+    assert.deepEqual(short(club), [[AppCodeCheck.BUNDLE, true, '2개 · 200B']]);
   });
 
   test('app.zip은 묶음 전체다: 정적 앱이어야 하고, 폴더 · 이름 · 개수 규칙을 본다. 받지 못한 파일은 남는다', () => {
@@ -444,7 +520,7 @@ describe('앱 코드 일 (MakeStage)', () => {
       await writeFile(join(room.outputsDir, 'app.zip'), zip);
       const packed = await stage.check();
       assert.deepEqual(short(packed).at(-1), [AppCodeCheck.BUNDLE, false, '문제 1개']);
-      assert.match(packed.at(-1)?.tail ?? '', /페이지 앱에서만/);
+      assert.match(packed.at(-1)?.tail ?? '', /페이지 · 커뮤니티 앱에서만/);
       await writeFile(join(room.outputsDir, 'app.zip'), 'zip이 아닌 글');
       assert.match((await stage.check()).at(-1)?.tail ?? '', /app\.zip을 읽지 못했어요/);
     } finally {

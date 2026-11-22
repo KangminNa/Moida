@@ -565,6 +565,8 @@ describe('소식 기기 (scope=news)', () => {
     };
     const local = await register();
     assert.deepEqual((await shownFor(local, 'collect')).scopes, ['upload']);
+    // 배포 기기 (cairn app deploy, 스토어 12.5): 쓰기만. 승인 화면에 그 권한이 보인다
+    assert.deepEqual((await shownFor(local, 'deploy')).scopes, ['write']);
 
     const extension = `https://${'b'.repeat(32)}.chromiumapp.org/`;
     const ext = await register(extension);
@@ -589,6 +591,8 @@ describe('소식 기기 (scope=news)', () => {
     for (const [clientId, scope, redirect] of [
       [ext, '', extension],
       [ext, 'collect', extension],
+      [ext, 'deploy', extension],
+      [local, 'deploy read_all', REDIRECT],
       [local, 'extension', REDIRECT],
       [local, 'collect upload', REDIRECT],
     ] as const) {

@@ -20,7 +20,10 @@
     "blog": {
       "dependsOn": ["platform"],
       "schemas": ["blog", "work"],
-      "lookups": { "provides": ["app", "community-app"], "asks": ["wiki", "session"] },
+      "lookups": {
+        "provides": ["app", "community-app", "member-app"],
+        "asks": ["wiki", "session"]
+      },
       "registries": {
         "provides": ["action-checks", "app-hosts", "settings"],
         "asks": ["leases", "site"]
@@ -38,7 +41,8 @@
     "community": {
       "dependsOn": ["platform"],
       "schemas": ["community"],
-      "lookups": { "asks": ["community-app"] }
+      "registries": { "provides": ["settings"] },
+      "lookups": { "asks": ["app", "community-app", "member-app"] }
     },
     "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }
   },

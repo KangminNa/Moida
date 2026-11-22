@@ -43,6 +43,7 @@ const app = {
   home: false,
   domain: null,
   domain_checked_at: null,
+  code_manifest: {},
 } satisfies AppRow;
 const menu = {
   id: 'm1',

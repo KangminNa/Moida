@@ -1,4 +1,8 @@
 import type {
+  AppRowsView,
+  AppTablesView,
+} from '../../../server/src/modules/community/data/app-data.view';
+import type {
   MemberMeView,
   MemberSelfView,
 } from '../../../server/src/modules/community/member/member.view';
@@ -42,3 +46,11 @@ export type AdminMember = AdminMemberPage['items'][number];
 export type DecisionPage = AdminPage<DecisionView>;
 /** 비밀번호 초기화의 답: 임시 비밀번호는 이 응답에만 */
 export type MemberReset = ReturnType<MemberResetView['toJSON']>;
+
+// 앱 데이터 (앱 플랫폼, 스토어 12.4): 앱 관리의 데이터 탭
+
+/** GET /api/community/admin/:appId/data: 앱이 선언한 표와 줄 수 */
+export type AppTableList = ReturnType<AppTablesView['toJSON']>;
+export type AppTableLine = AppTableList['tables'][number];
+/** GET /api/community/admin/:appId/data/:table: 줄 (관리자에게는 쓴 회원까지) */
+export type AppRowPage = ReturnType<AppRowsView['toJSON']>;

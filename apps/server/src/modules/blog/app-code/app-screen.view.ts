@@ -266,6 +266,15 @@ export class AppScreenDataView {
   }
 }
 
+/**
+ * 화면을 어떻게 여는가 (스토어 12.2). open: 그 앱의 확인한 도메인으로 연 공개 화면이라 격리(sandbox)를 풀어도 된다
+ * (콘솔과 다른 출처다). 기본 도메인의 /<앱>과 미리 보기는 거짓. permissions: 선언서가 바라는 브라우저 권한 (open일 때만 열린다)
+ */
+export interface AppScreenAccess {
+  open: boolean;
+  permissions: readonly string[];
+}
+
 /** 화면 하나: 템플릿(.html 전부) · 고른 템플릿 · 바깥 주소 · 데이터. 앱 안의 없는 주소는 status 404 */
 export class AppScreenView {
   constructor(
@@ -277,6 +286,8 @@ export class AppScreenView {
     private readonly templates: ReadonlyMap<string, string>,
     private readonly hosts: readonly string[],
     private readonly data: AppScreenDataView,
+    /** 격리를 푼 화면인가 · 그때 여는 브라우저 권한 (스토어 12.2) */
+    private readonly access: AppScreenAccess,
   ) {}
 
   toJSON() {
@@ -286,6 +297,8 @@ export class AppScreenView {
       template: this.template,
       templates: Object.fromEntries(this.templates),
       hosts: [...this.hosts],
+      open: this.access.open,
+      permissions: [...this.access.permissions],
       data: this.data.toJSON(),
       redirect: null,
       page: null,
@@ -307,6 +320,7 @@ export class AppScreenStaticView {
     private readonly hosts: readonly string[],
     /** HTML로 나가는 화면에만 싣는다 (그 밖의 파일은 웹이 파일 주소에서 받아 넘길 뿐이다) */
     private readonly data: AppScreenDataView | null,
+    private readonly access: AppScreenAccess,
   ) {}
 
   toJSON() {
@@ -315,6 +329,8 @@ export class AppScreenStaticView {
       seq: this.seq,
       static: { file: this.file, text: this.text },
       hosts: [...this.hosts],
+      open: this.access.open,
+      permissions: [...this.access.permissions],
       data: this.data === null ? null : this.data.toJSON(),
       redirect: null,
       page: null,

@@ -31,7 +31,7 @@
 - 같은 묶음의 파일은 `{{files}}/style.css`처럼 연다. 앱의 첫 화면 링크는 `{{base}}`다 (미리 보기 주소에는 토큰이 들어 있어서 `/<앱>`을 직접 쓰면 미리 보기를 벗어난다).
 - 앱 안의 링크는 같은 탭, 다른 사이트로 가는 링크는 `target="_blank" rel="noopener noreferrer"`로 새 탭에 연다. 글 본문(`post.html`)의 바깥 링크는 웹이 이미 그렇게 그린다.
 
-### 정적 앱 (템플릿 없음, 페이지 앱에서만, 2026-11-21)
+### 정적 앱 (템플릿 없음, 페이지 · 커뮤니티 앱에서, 2026-11-21)
 
 `cairn.json`에 `"render": "static"`을 넣으면 웹이 템플릿을 채우지 않고 **묶음의 파일을 그대로** 내보낸다. 스크립트가 화면을 그리는 앱(도구 · 지도 · 대시보드), 프레임워크로 빌드한 결과(`dist/`)는 이쪽으로 만든다.
 
@@ -44,9 +44,9 @@
 - 폴더를 쓸 수 있다: 파일 500개 · 합쳐 20MB · HTML 하나 1MB · 경로는 파일까지 여섯 마디 · 300자. 점으로 시작하는 이름은 쓸 수 없다.
 - **주소는 모두 상대 주소로 쓴다** (`assets/app.js` · `./about/` · `../`). 웹이 HTML마다 `<base>`를 넣어 그 파일이 있는 폴더를 기준으로 풀리게 한다. `/`로 시작하는 주소는 앱 밖(사이트의 뿌리)을 가리켜 깨진다: 미리 보기 주소에는 토큰이 들어 있고, 앱 주소는 `/<앱>` 아래다. 빌드 도구를 쓰면 기준 주소를 상대로 둔다 (Vite는 `base: './'`). `<base>`를 직접 넣지 않는다.
 - 데이터는 템플릿 앱과 같은 블록 하나로 온다: `JSON.parse(document.getElementById('cairn-data').textContent)` (첫 화면의 데이터: `app` · `site` · `apps` · `menus` · `pages` · `base`). `{{base}}` · `{{files}}`는 없다.
-- 같은 묶음의 파일은 `fetch('data.json')`으로 읽을 수 있다 (모듈 스크립트 · 글꼴도 된다). 이 서버의 API · 쿠키 · `localStorage`는 템플릿 앱과 같이 쓸 수 없고, 바깥 호스트는 `hosts`에 적은 것만 열린다. 워커 · 서비스 워커 · 위치 정보도 쓸 수 없다.
+- 같은 묶음의 파일은 `fetch('data.json')`으로 읽을 수 있다 (모듈 스크립트 · 글꼴도 된다). 바깥 호스트는 `hosts`에 적은 것만 열린다. 쿠키 · `localStorage` · 서비스 워커 · 회원 · 데이터는 그 앱의 도메인으로 연 공개 화면에서만 된다 (아래 "회원 · 데이터 · 권한").
 - **내는 법**: 폴더가 없으면 파일을 결과물 폴더에 그대로 둔다 (앞 코드 위에 얹힌다). 폴더가 있으면 묶음 전체를 `app.zip` 하나로 낸다: `python3 -c "import shutil; shutil.make_archive('<결과물 폴더>/app', 'zip', 'dist')"`. zip 안이 새 버전의 전부다: zip에 없는 글 파일은 사라지고, 지시문에 "그대로 남아요"라고 적힌 파일(내용 없이 이름만 받은 그림 · 큰 파일)은 zip에 없어도 남는다. `app.zip`과 함께 둔 다른 파일은 묶음에 들지 않는다.
-- zip 안에 `cairn.json`(`"render": "static"`)과 `index.html`이 꼭 있어야 한다. 블로그 · 매거진 · 커뮤니티 앱은 정적 앱이 될 수 없다 (글 · 메뉴 화면이 템플릿이다).
+- zip 안에 `cairn.json`(`"render": "static"`)과 `index.html`이 꼭 있어야 한다. 블로그 · 매거진 앱은 정적 앱이 될 수 없다 (글 · 메뉴 화면이 템플릿이다). 커뮤니티 앱을 정적 앱으로 만들면 글 목록 · 글 · 쓰기 화면을 `cairn.community`로 직접 그린다.
 - 빌드에 패키지가 필요하면 샌드박스에서 받을 수 있는지 먼저 본다. 받을 수 없으면 빌드 없이 손으로 쓴 HTML · CSS · JS(모듈)로 만든다.
 
 ## 문법 (로직 없는 Mustache)
@@ -83,21 +83,74 @@
 
 - `date`는 ISO 시각, `dateText`는 웹이 만든 한국어 날짜 (`2026년 11월 18일`).
 - 없는 이름은 빈 칸으로 그려진다. 러너의 검사가 약속에 없는 이름을 알려 준다.
-- 커뮤니티의 글 · 댓글은 회원이 쓴 글이다: 템플릿에서 링크로 바꾸거나 스크립트로 다시 그리지 않는다. 쓰기 폼은 템플릿에 두지 않는다 (격리된 화면에서는 보낼 수 없다, `community`의 고정 화면 주소로 링크한다).
+- 커뮤니티의 글 · 댓글은 회원이 쓴 글이다: 템플릿에서 링크로 바꾸지 않는다. 쓰기는 `community`의 고정 화면 주소로 링크하거나, 앱 도메인의 화면에서 `cairn.community`로 직접 보낸다 (아래 "회원 · 데이터 · 권한").
 
 ## 스크립트
 
 - 같은 데이터가 `<script id="cairn-data" type="application/json">`으로 페이지에 실린다: `JSON.parse(document.getElementById('cairn-data').textContent)`.
-- 화면은 격리되어 열린다 (출처 없는 문서): 쿠키 · `localStorage` · 이 서버의 API를 쓸 수 없다. 상태는 메모리에만 둔다.
+- 화면이 열리는 곳은 둘이다.
+  - **그 앱의 도메인으로 연 공개 화면**: 보통 웹 페이지처럼 열린다. 쿠키 · `localStorage` · IndexedDB · 서비스 워커를 쓰고, 회원 · 데이터(`cairn.js`)가 돈다.
+  - **미리 보기 · 기본 도메인의 `/<앱>`**: 격리되어 열린다 (출처 없는 문서). 쿠키 · 저장소 · 회원 · 데이터를 쓸 수 없다. 관리자가 공개 전에 보는 화면이 이쪽이라, 로그인 없이도 첫 화면이 그려지게 만든다 (`cairn.open`이 거짓이면 안내를 보인다).
 - 바깥으로의 요청(`fetch` · 글꼴 · 스크립트 · 폼)은 `cairn.json`의 `hosts`에 적은 호스트만 열린다. 그림은 https 어디서나 된다.
 
-## cairn.json (없으면 바깥 주소 없음)
+## cairn.json (앱의 선언서)
+
+앱이 Cairn에게 바라는 것을 적는 한 장이다. 없으면 템플릿 앱이고 바깥 주소 · 회원 · 표가 없다.
 
 ```json
-{ "cairn": 1, "hosts": ["fonts.example.com"] }
+{
+  "cairn": 1,
+  "render": "static",
+  "hosts": ["fonts.example.com"],
+  "members": true,
+  "permissions": ["microphone"],
+  "theme": { "accent": "#58cc02", "background": "#ffffff", "text": "#1f2937", "logo": "logo.svg" },
+  "tables": {
+    "progress": { "columns": { "lesson": "text", "xp": "int", "done": "bool" }, "read": "owner", "write": "owner" },
+    "scores": { "columns": { "nickname": "text", "xp": "int" }, "read": "anyone", "write": "owner" },
+    "lessons": { "columns": { "title": "text", "body": "json" }, "read": "anyone", "write": "admin" }
+  }
+}
 ```
 
 - `hosts`는 정확한 호스트 이름만 10개까지 (와일드카드 · IP · 포트 없이). 지시가 바깥 서비스(글꼴 · 지도 · 댓글)를 요구할 때만 더한다.
+- `members`: 가입 · 로그인을 받는다 (커뮤니티 앱은 적지 않아도 늘 받는다).
+- `permissions`: 브라우저 권한. `microphone` · `camera` · `geolocation` 가운데 쓰는 것만. 적지 않은 권한은 막힌다.
+- `theme`: Cairn이 그리는 가입 · 로그인 화면에 입힐 색(`#rrggbb`)과 로고(묶음 바로 아래의 파일 이름).
+- `tables`: 이 앱의 데이터. 아래 "회원 · 데이터 · 권한".
+- 틀린 선언서는 러너의 묶음 검사에 떨어진다.
+
+## 회원 · 데이터 · 권한 (cairn.js, 그 앱의 도메인에서만)
+
+앱 코드는 서버 코드 · SQL을 갖지 않는다. 표는 `cairn.json`에 선언하고, 화면에서는 `cairn.js`로 읽고 쓴다.
+
+```html
+<script src="_/cairn.js"></script>
+```
+
+- 주소는 상대로 쓴다: 묶음 맨 위의 HTML에서는 `_/cairn.js`, `about/index.html`처럼 폴더 안이면 `../_/cairn.js`. 템플릿 앱에서는 `{{base}}/_/cairn.js`.
+- `cairn.open`: 이 화면에서 회원 · 데이터를 쓸 수 있는가 (그 앱의 도메인으로 연 공개 화면). 거짓이면 아래 호출은 실패한다 (`code: 'closed'`).
+
+| 부르는 것 | 하는 일 |
+|---|---|
+| `await cairn.me()` | `{ member: { nickname } \| null }` |
+| `cairn.login(돌아올 곳?)` · `cairn.join(돌아올 곳?)` | Cairn의 로그인 · 가입 화면으로 간다. 끝나면 돌아온다 |
+| `await cairn.logout()` | 로그아웃 |
+| `await cairn.from('scores').select().order('xp', 'desc').limit(10)` | `{ rows, more }`. 조건: `.eq` · `.neq` · `.gt` · `.gte` · `.lt` · `.lte`(칸, 값), 내 줄만: `.mine()`, 다음 쪽: `.offset(n)` (한 번에 100줄까지) |
+| `await cairn.from('progress').insert({ lesson: 'a1', xp: 10 })` | 줄 하나를 넣고 그 줄을 돌려준다 |
+| `await cairn.from('progress').update(id, { xp: 20 })` · `.delete(id)` | 줄 하나를 고친다 · 지운다 |
+
+- 줄마다 Cairn이 붙이는 칸: `id` · `owner`(넣은 회원) · `created_at` · `updated_at`. 이 이름은 선언하지 않는다.
+- 칸의 타입: `text`(1만 자) · `int` · `number` · `bool` · `time`(ISO 시각) · `json`(16KB). 표 20개 · 표마다 칸 30개까지. 이름은 영문 소문자로 시작하는 소문자 · 숫자 · `_`.
+- 읽기 규칙 `read`: `anyone`(누구나) · `member`(로그인한 회원) · `owner`(넣은 회원 자신) · `admin`(콘솔에서만).
+- 쓰기 규칙 `write`: `member`(회원이면 넣고, 고치기 · 지우기는 자기 줄만) · `owner`(같다: 자기 줄만) · `admin`(화면에서는 못 쓴다. 관리자가 콘솔에서, 일꾼이 승인받아 넣는다).
+- 규칙은 서버(DB의 줄 단위 규칙)가 지킨다. 화면에서 감추는 것으로 대신하지 않는다. 순위표처럼 모두가 보는 값은 따로 `read: "anyone"` 표에 둔다 (`owner` 표는 남이 읽지 못한다).
+- 표와 칸은 더하기만 한다. 칸의 타입은 바꿀 수 없다 (새 이름으로 더한다). 선언에서 뺀 표 · 칸의 데이터는 지워지지 않고 남는다.
+- 회원 한 명이 표 하나에 넣는 줄은 1,000개까지, 표 하나는 10만 줄까지다. 자주 바뀌는 값은 줄을 새로 넣지 않고 `update`로 고친다.
+- 비밀번호 · 가입 폼은 앱 코드에 두지 않는다: `cairn.login()` · `cairn.join()`이 Cairn의 화면으로 보낸다 (원칙 8).
+- 읽기 규칙에 맞지 않는 줄은 오류 없이 빠져서 온다 (로그인하지 않은 방문자가 `member` · `owner` 표를 읽으면 빈 목록). 쓰기가 실패하면 `Error`를 던진다 (`status` · `code` · `message`): 401은 로그인이 필요하다는 뜻이고, 남의 줄을 고치려 하면 없는 줄(404)이다.
+- 커뮤니티 앱: `cairn.community.topics(cursor?)` · `topic(id)` · `write({ title, body })` · `edit(id, { version, title, body })` · `remove(id, version)` · `comment(topicId, body)` · `removeComment(id, version)` · `report({ topicId | commentId, reason, note? })`. 글 · 댓글은 회원이 쓴 글자다: `textContent`로 넣고 `innerHTML`에 그대로 넣지 않는다 (`topic.html`만 서버가 거른 HTML이다).
+- 처음 채울 내용(레슨 · 단어 목록 같은 `write: "admin"` 표의 줄)은 앱 코드에 넣지 않는다. 답에 "넣을 줄"을 적으면 대표가 승인을 받아 넣는다. 바뀌지 않는 작은 내용은 묶음의 `data.json`에 두어도 된다.
 
 ## 고치는 법
 

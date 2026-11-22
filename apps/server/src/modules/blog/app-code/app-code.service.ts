@@ -11,19 +11,26 @@ import {
   NotFound,
   RuleViolation,
   type Sql,
+  SystemActor,
   type VersionInput,
   type VersionTarget,
   ZipLimits,
   ZipReader,
 } from '../../platform';
-import type { AppCodeVersionSource } from '../blog.tables';
+import type { AppCodeVersionSource, AppRow } from '../blog.tables';
 import { type PageFileEntry, PageFiles } from '../page/page-files';
 import { AppCode } from './app-code';
-import type { AppCodeBuiltInput, ShowCodeInput, UploadCodeInput } from './app-code.input';
+import type {
+  AppCodeBuiltInput,
+  DeployedCodeInput,
+  ShowCodeInput,
+  UploadCodeInput,
+} from './app-code.input';
 import { AppCodeQuery } from './app-code.query';
 import { AppCodeRepository } from './app-code.repository';
 import { AppCodeBundle } from './app-code-bundle';
 import type { AppCodeFiles } from './app-code-files';
+import type { AppManifest } from './app-manifest';
 
 // 앱 코드 쓰기 (스토어 1-6): 새 버전 쌓기(AI 작업의 결과 · zip 올리기 · 시작 코드로)와 보이는 버전 옮기기.
 // 파일은 트랜잭션 밖에서 BlobStore에 먼저 쓰고, 트랜잭션 안에서는 앱을 잠가 버전 한 줄만 넣는다.
@@ -57,6 +64,7 @@ export class AppCodeService extends EntityService<AppCode> {
     const app = await this.code.appOf(actor, spaceId, req.appId);
     if (app === null) return;
     const base = await this.code.filesOf(actor, app, app.code_versions);
+    const before = await this.code.manifestOf(actor, base);
     let bundle: AppCodeBundle | null = null;
     let problem: string | null = null;
     try {
@@ -66,6 +74,7 @@ export class AppCodeService extends EntityService<AppCode> {
       bundle = zipped
         ? await this.unzipped(zipped, app.kind, AppCodeService.keptOf(base))
         : await this.fitting(AppCodeBundle.files(base.files.overlay(req.files)), base, app.kind);
+      bundle.manifest.assertExtends(before);
     } catch (error) {
       if (!(error instanceof RuleViolation)) throw error;
       problem = error.message;
@@ -90,7 +99,37 @@ export class AppCodeService extends EntityService<AppCode> {
     const app = await this.code.appOf(actor, actor.requireSpace(), req.id);
     if (app === null) throw new NotFound('앱을 찾을 수 없어요');
     const bundle = await this.unzipped(req.zip, app.kind);
+    const latest = await this.code.filesOf(actor, app, app.code_versions);
+    bundle.manifest.assertExtends(await this.code.manifestOf(actor, latest));
     return this.add(actor, req, bundle, 'upload', req.note);
+  }
+
+  /**
+   * 배포 표로 받은 묶음을 새 버전으로 (PUT …/code/versions, cairn app deploy, 스토어 12.5). 요청자는 표다:
+   * 표가 묶인 앱 · 크기 · sha256과 맞아야 하고, 표를 받은 뒤 다른 버전이 생겼으면 409.
+   * AI가 만든 버전과 같은 규칙이다: 공개 앱은 확인 대기(관리자가 공개), 비공개 앱은 바로 보인다
+   */
+  async deployed(actor: Actor, req: DeployedCodeInput): Promise<AppCode> {
+    const now = new Date();
+    const ticket = await this.code.deployOf(actor, req.token, now);
+    const sha256 = createHash('sha256').update(req.zip).digest('hex');
+    if (ticket.appId !== req.id || ticket.size !== req.zip.length || ticket.sha256 !== sha256)
+      throw new Forbidden('deploy_ticket', '배포 표와 다른 묶음이에요. 다시 배포해 주세요');
+    const system = new SystemActor();
+    const app = await this.code.appOf(system, ticket.spaceId, ticket.appId);
+    if (app === null) throw new NotFound('앱을 찾을 수 없어요');
+    const bundle = await this.unzipped(req.zip, app.kind);
+    const latest = await this.code.filesOf(system, app, app.code_versions);
+    bundle.manifest.assertExtends(await this.code.manifestOf(system, latest));
+    return this.transaction(async (tx) => {
+      const codes = this.store(tx);
+      const code = await codes.lock(ticket.spaceId, app.id);
+      if (code.latestSeq !== ticket.base)
+        throw new Conflict('그사이 앱 코드가 바뀌었어요. 다시 배포해 주세요');
+      code.add(bundle, 'upload', null, null, ticket.note || '배포', now);
+      await codes.save(code);
+      return code;
+    });
   }
 
   /**
@@ -148,18 +187,30 @@ export class AppCodeService extends EntityService<AppCode> {
     if (!(actor instanceof ApprovedActor) || actor.action !== AppCode.SHOW_ACTION)
       throw new Forbidden('approved', '승인한 공개만 할 수 있어요');
     const spaceId = actor.requireSpace();
+    const app = await this.code.appOf(actor, spaceId, appId);
+    if (app === null || seq < 1 || seq > app.code_versions) return;
+    const manifest = await this.manifestAt(actor, app, seq);
     await this.transaction(async (tx) => {
       const codes = this.store(tx);
       const code = await codes.lockOrNull(spaceId, appId);
       if (code === null) return;
-      code.showApproved(seq, new Date());
+      code.showApproved(seq, new Date(), manifest);
       await codes.save(code);
     });
   }
 
   /** 이 버전 공개 (확인 대기 버전 · 앞 버전으로 되돌리기). 관리자만 */
-  show(actor: Actor, req: ShowCodeInput): Promise<AppCode> {
-    return this.changeAsOwner(actor, req, (code) => code.show(req.seq, new Date()));
+  async show(actor: Actor, req: ShowCodeInput): Promise<AppCode> {
+    actor.assertOwner();
+    const app = await this.code.appOf(actor, actor.requireSpace(), req.id);
+    if (app === null) throw new NotFound('앱을 찾을 수 없어요');
+    const manifest = await this.manifestAt(actor, app, req.seq);
+    return this.changeAsOwner(actor, req, (code) => code.show(req.seq, new Date(), manifest));
+  }
+
+  /** 버전 하나의 선언서 (보이게 할 때 앱 줄에 함께 둔다). 없는 버전이면 NotFound */
+  private async manifestAt(actor: Actor, app: Readonly<AppRow>, seq: number): Promise<AppManifest> {
+    return this.code.manifestOf(actor, await this.code.filesOf(actor, app, seq));
   }
 
   private add(

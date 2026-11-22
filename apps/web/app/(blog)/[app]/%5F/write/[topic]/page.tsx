@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { MemberFrame } from '../../../../../_community/MemberFrame';
 import {
-  memberPlace,
+  communityPlace,
   memberTitle,
   shownTopic,
   signedIn,
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function EditTopicPage({ params }: Props) {
   const { app, topic: id } = await params;
-  const place = await memberPlace(app);
+  const place = await communityPlace(app);
   // 고치기는 차단만 막는다 (가입 대기는 새 글 · 댓글만, 서버 Topic 규칙)
   const member = signedIn(place, `/_/write/${encodeURIComponent(id)}`);
   const topic = await shownTopic(place, id);

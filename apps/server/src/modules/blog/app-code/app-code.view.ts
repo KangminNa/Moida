@@ -109,6 +109,25 @@ export class AppCodePreviewView {
   }
 }
 
+/** MCP app_code_upload의 답 (snake_case): 묶음을 낼 경로 · 머리글 이름 · 표 · 끝나는 때 */
+export class AppCodeDeployView {
+  constructor(
+    private readonly path: string,
+    private readonly header: string,
+    private readonly token: string,
+    private readonly expiresAt: Date,
+  ) {}
+
+  toJSON() {
+    return {
+      upload_path: this.path,
+      header: this.header,
+      token: this.token,
+      expires_at: this.expiresAt.toISOString(),
+    };
+  }
+}
+
 /** app_code_base의 파일 하나: 글 파일이면 내용, 그림 등은 이름 · 크기만 */
 export interface AppCodeBaseFile {
   readonly name: string;

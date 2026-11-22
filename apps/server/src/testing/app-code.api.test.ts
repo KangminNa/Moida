@@ -693,6 +693,105 @@ describe('정적 앱 ("render": "static")', () => {
   });
 });
 
+describe('배포 도구 (MCP app_code_upload → PUT …/code/versions, 스토어 12.5)', () => {
+  const site = {
+    'index.html': '<html><head></head><body>배포</body></html>',
+    'assets/app.js': 'console.log(1)',
+    'cairn.json': JSON.stringify({ cairn: 1, render: 'static' }),
+  };
+  const token = () => (writer.authorization ?? '').replace('Bearer ', '');
+  const begin = (bearer: string, slug: string, zip: Buffer, note?: string) =>
+    mcp(bearer, 'app_code_upload', {
+      app: slug,
+      size: zip.length,
+      sha256: sha(zip),
+      ...(note ? { note } : {}),
+    });
+  /** 받은 표로 묶음을 낸다 (로그인 없이) */
+  const put = async (ticket: Json, zip: Buffer, path = String(ticket.upload_path)) => {
+    const res = await fetch(`${api.baseUrl}${path}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/zip', [String(ticket.header)]: String(ticket.token) },
+      body: new Uint8Array(zip),
+    });
+    return { status: res.status, text: await res.text() };
+  };
+
+  test('write 기기가 표를 받아 묶음을 올린다: 비공개 앱은 바로 보이고, 공개 앱은 확인 대기', async () => {
+    const slug = `deploy-a-${mark}`;
+    const app = await newApp(slug, 'page');
+    const zip = zipOf(site);
+    const ticket = await begin(token(), slug, zip);
+    assert.equal(ticket.upload_path, `/api/apps/${app.id}/code/versions`);
+    assert.equal(ticket.header, 'x-cairn-deploy');
+    const first = await put(ticket, zip);
+    assert.equal(first.status, 200, first.text);
+    const state = JSON.parse(first.text) as Json;
+    assert.deepEqual([state.current, state.pending, state.latest], [1, null, 1]);
+    const versions = (await code(app)).versions as Json[];
+    assert.deepEqual([versions[0]?.source, versions[0]?.note], ['upload', '배포']);
+
+    // 같은 표는 다시 쓸 수 없다: 그사이 버전이 생겼다
+    assert.equal((await put(ticket, zip)).status, 409);
+
+    await publish(app);
+    const second = zipOf({ ...site, 'index.html': '<html><head></head><body>둘째</body></html>' });
+    const next = await put(await begin(token(), slug, second, '둘째 배포'), second);
+    assert.equal(next.status, 200, next.text);
+    const held = JSON.parse(next.text) as Json;
+    assert.deepEqual([held.current, held.pending, held.latest], [1, 2, 2]);
+    const shown = ok(await screen(slug, '')) as Json;
+    assert.equal(
+      (shown.static as Json).text,
+      site['index.html'],
+      '공개 앱은 관리자가 공개해야 바뀐다',
+    );
+  });
+
+  test('표 없이 · 다른 묶음 · 다른 앱 · 틀린 묶음은 거절한다', async () => {
+    const slug = `deploy-b-${mark}`;
+    const app = await newApp(slug, 'page');
+    const other = await newApp(`deploy-b2-${mark}`, 'page');
+    const zip = zipOf(site);
+    const ticket = await begin(token(), slug, zip);
+
+    assert.equal((await put({ ...ticket, token: '' }, zip)).status, 403, '표 없이');
+    assert.equal((await put({ ...ticket, token: 'x.y.z' }, zip)).status, 403, '틀린 표');
+    const changed = zipOf({ ...site, 'assets/app.js': 'console.log(2)' });
+    assert.equal((await put(ticket, changed)).status, 403, '표와 다른 묶음');
+    assert.equal(
+      (await put(ticket, zip, `/api/apps/${other.id}/code/versions`)).status,
+      403,
+      '다른 앱에는 쓸 수 없다',
+    );
+    const bad = zipOf({ 'a.txt': 'x' });
+    const refused = await put(await begin(token(), slug, bad), bad);
+    assert.equal(refused.status, 422, refused.text);
+    assert.equal(((await code(app)).versions as Json[]).length, 0, '쌓인 버전이 없다');
+
+    const call = async (bearer: string, args: Json) => {
+      const res = await api.mcp(bearer, 'tools/call', { name: 'app_code_upload', arguments: args });
+      return (res.json().result as { isError?: boolean } | undefined)?.isError;
+    };
+    const args = { size: zip.length, sha256: sha(zip) };
+    assert.equal(await call(token(), { ...args, app: `none-${mark}` }), true, '없는 앱');
+    assert.equal(await call(token(), { ...args, app: slug, size: 0 }), true, '빈 묶음');
+    const plain = await api.connectDevice(owner, `deploy-plain-${mark}`);
+    assert.notEqual(await call(plain, { ...args, app: slug }), false, 'write 없는 기기');
+    assert.equal((await call(plain, { ...args, app: slug })) ?? true, true);
+  });
+
+  test('배포 기기(scope=deploy)는 쓰기만 받아 이 도구를 쓴다', async () => {
+    const slug = `deploy-c-${mark}`;
+    await newApp(slug, 'page');
+    const deployer = await api.connectDevice(owner, `deployer-${mark}`, 'deploy');
+    const zip = zipOf(site);
+    const made = await put(await begin(deployer, slug, zip), zip);
+    assert.equal(made.status, 200, made.text);
+    assert.equal((JSON.parse(made.text) as Json).latest, 1);
+  });
+});
+
 describe('AI로 고치기 (payload.appCode → task.app_code.built)', () => {
   test('러너는 시작 코드를 받고, 바꾼 파일만 낸 결과가 그 위에 얹힌 새 버전이 된다', async () => {
     const app = await publish(await newApp(`code-j-${mark}`));

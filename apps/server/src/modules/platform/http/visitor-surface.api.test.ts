@@ -34,6 +34,11 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/community/admin/:appId/reports': 403,
   'GET /api/community/admin/:appId/members': 403,
   'GET /api/community/admin/:appId/decisions': 403,
+  // 앱 플랫폼 (스토어 12장): 앱 데이터의 회원 쪽은 앱 도메인에서만, 관리 · 내보내기는 관리자만
+  'GET /api/community/data/:table': 404,
+  'GET /api/community/admin/:appId/data': 403,
+  'GET /api/community/admin/:appId/data/:table': 403,
+  'GET /api/community/admin/:appId/export': 403,
   'GET /api/apps/by-slug/:slug': 404,
   'GET /api/apps/by-slug/:slug/icon': 404,
   // 스토어 1-6: 앱 화면 · 앱 코드의 파일은 누구나 (없는 앱 · 비공개 앱은 404)

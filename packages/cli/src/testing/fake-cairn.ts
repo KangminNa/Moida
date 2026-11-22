@@ -12,18 +12,35 @@ export class ToolCall {
   ) {}
 }
 
-// 시험용 가짜 Cairn 블로그 (127.0.0.1): 기기(소식 · 세션 저장)를 만드는 OAuth(등록 → 승인 → 토큰 · 갱신 · 버리기)와
-// MCP agent_updates · save_transcript. 승인 화면 대신 /oauth/authorize가 바로 코드를 붙여 돌려보낸다. 도구의 답은 시험이 정한다.
+/** 가짜 서버가 받은 앱 코드 묶음 하나 (PUT …/code/versions) */
+export class DeployedZip {
+  constructor(
+    readonly path: string,
+    /** 머리글 x-cairn-deploy의 표 */
+    readonly ticket: string,
+    readonly bytes: Buffer,
+  ) {}
+}
+
+// 시험용 가짜 Cairn 블로그 (127.0.0.1): 기기(소식 · 세션 저장 · 배포)를 만드는 OAuth(등록 → 승인 → 토큰 · 갱신 · 버리기)와
+// MCP agent_updates · save_transcript · app_code_upload(+ 그 표로 받는 PUT). 승인 화면 대신 /oauth/authorize가 바로 코드를 붙여 돌려보낸다. 도구의 답은 시험이 정한다.
 // 실제 서버의 규칙은 apps/server의 API 시험이 보고, 여기서는 cairn connect · 훅 · 상태 줄 · 세션 저장의 순서만 본다.
 export class FakeCairn {
   readonly calls: ToolCall[] = [];
+  /** 배포 표로 받은 묶음들 */
+  readonly deployed: DeployedZip[] = [];
+  /** 묶음을 받은 뒤의 답 (앱의 코드 상태). 상태 코드가 200이 아니면 거절 */
+  deployAnswer: { status: number; body: object } = {
+    status: 200,
+    body: { current: 1, pending: null, latest: 1 },
+  };
   readonly revoked: string[] = [];
   readonly refreshed: string[] = [];
   /** 승인 요청에 실려 온 scope */
   readonly asked: (string | null)[] = [];
   /** 요청한 scope에 토큰이 돌려줄 권한 (세션 저장은 upload만. 옛 서버처럼 모르면 'upload read_public') */
   grant: (scope: string | null) => string = (scope) =>
-    scope === 'collect' ? 'upload' : (scope ?? '');
+    scope === 'collect' ? 'upload' : scope === 'deploy' ? 'write' : (scope ?? '');
   /** agent_updates의 답. 함수면 부를 때마다 받은 인자로 만든다 */
   updates: (args: Record<string, unknown>) => object = () => ({ news: [], cursor: 0, board: [] });
   /** save_transcript의 답 */
@@ -48,6 +65,7 @@ export class FakeCairn {
     { challenge: string; redirect: string; scope: string | null }
   >();
   private server: Server | null = null;
+  private static readonly DEPLOY_TICKET = 'deploy-ticket-1';
 
   get origin(): string {
     return `http://127.0.0.1:${(this.server?.address() as AddressInfo | undefined)?.port ?? 0}`;
@@ -82,17 +100,27 @@ export class FakeCairn {
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', this.origin);
     // 조각을 모아 한 번에 읽는다 (조각마다 읽으면 조각 사이에 걸친 한글이 깨진다)
-    const raw = await new Promise<string>((done) => {
+    const bytes = await new Promise<Buffer>((done) => {
       const chunks: Buffer[] = [];
       req.on('data', (chunk: Buffer) => {
         chunks.push(chunk);
       });
-      req.on('end', () => done(Buffer.concat(chunks).toString('utf8')));
+      req.on('end', () => done(Buffer.concat(chunks)));
     });
+    const raw = bytes.toString('utf8');
     const json = (status: number, body: object) => {
       res.writeHead(status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(body));
     };
+    if (req.method === 'PUT' && url.pathname.endsWith('/code/versions')) {
+      const ticket = String(req.headers['x-cairn-deploy'] ?? '');
+      if (ticket !== FakeCairn.DEPLOY_TICKET)
+        return json(403, { code: 'deploy_ticket', message: '배포 표가 맞지 않아요' });
+      this.deployed.push(new DeployedZip(url.pathname, ticket, bytes));
+      return json(this.deployAnswer.status, this.deployAnswer.body);
+    }
+    if (url.pathname === '/.well-known/oauth-protected-resource/mcp')
+      return json(200, { resource: `${this.origin}/mcp`, resource_name: 'Cairn' });
     const form = new URLSearchParams(raw);
     if (url.pathname === '/.well-known/oauth-authorization-server')
       return json(200, {
@@ -186,7 +214,14 @@ export class FakeCairn {
         structuredContent:
           params.name === 'save_transcript'
             ? this.transcripts(params.arguments)
-            : this.updates(params.arguments),
+            : params.name === 'app_code_upload'
+              ? {
+                  upload_path: `/api/apps/${String(params.arguments.app)}/code/versions`,
+                  header: 'x-cairn-deploy',
+                  token: FakeCairn.DEPLOY_TICKET,
+                  expires_at: new Date(Date.now() + 600_000).toISOString(),
+                }
+              : this.updates(params.arguments),
       },
     });
   }

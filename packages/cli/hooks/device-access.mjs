@@ -1,6 +1,6 @@
 // Cairn 기기의 열쇠와 서버 부르기 (cairn connect가 ~/.cairn/bin에 넣는다). Node 내장 모듈만 쓴다.
 //
-//   ~/.cairn/credentials.json   기기마다 키 하나: { news: {…}, collect: {…} }
+//   ~/.cairn/credentials.json   기기마다 키 하나: { news: {…}, collect: {…}, deploy: {…} }
 //                               { site, mcp, token_endpoint, client_id, device, access_token, refresh_token, expires_at, dead? }
 //                               0600. cairn connect가 쓰고, 갱신하면 여기서 다시 쓴다
 //   ~/.cairn/credentials.lock   갱신하는 동안만 있다. 기기가 여럿이어도 하나다: 한 파일을 함께 고쳐 쓰므로 갱신은 한 번에 하나
@@ -66,7 +66,7 @@ function readCredentials() {
   }
 }
 
-/** 기기 하나(news · collect)의 열쇠. 없으면 null */
+/** 기기 하나(news · collect · deploy)의 열쇠. 없으면 null */
 export function deviceCredential(key) {
   const device = readCredentials()[key];
   return device && typeof device.access_token === 'string' && typeof device.mcp === 'string'

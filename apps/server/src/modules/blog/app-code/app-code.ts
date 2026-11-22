@@ -8,6 +8,7 @@ import type {
 } from '../blog.tables';
 import { AppCodeStateView } from './app-code.view';
 import type { AppCodeBundle } from './app-code-bundle';
+import type { AppManifest } from './app-manifest';
 
 // 앱의 코드 (스토어 1-6, docs/스토어.md 9장): blog.apps 한 줄의 코드 칸(code_seq · code_pending_seq · code_versions)과
 // 추가만 하는 버전(blog.app_code_versions). 앱 이름 · 공개 여부 같은 설정은 App이 고치고, 여기서는 코드만 바꾼다
@@ -24,6 +25,7 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
   static readonly SHOW_ACTION = 'blog.app_code.show';
   static readonly NOTE_MAX = 2000;
   private static readonly PUBLIC = 'public';
+  private static readonly COMMUNITY = 'community';
   /** 이번에 쌓을 버전 (saveParts가 넣는다) */
   private added: AppCodeVersionNew | null = null;
 
@@ -61,7 +63,10 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
     const held = this.row.visibility === AppCode.PUBLIC;
     this.put('code_versions', seq);
     this.put(held ? 'code_pending_seq' : 'code_seq', seq);
-    if (!held) this.put('code_pending_seq', null);
+    if (!held) {
+      this.put('code_pending_seq', null);
+      this.put('code_manifest', bundle.manifest.toJSON());
+    }
     this.put('updated_at', now);
     this.added = {
       id: BaseEntity.newId(),
@@ -87,33 +92,35 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
         taskId,
       }),
     );
-    if (!held) this.announceShown(seq, true);
+    if (!held) this.announceShown(seq, true, bundle.manifest);
   }
 
   /**
    * 보이는 버전을 옮긴다 (확인 대기 버전 공개 · 앞 버전으로 되돌리기가 같다). 기다리던 버전이나 그보다 새 버전을 보이면
-   * 기다림이 끝난다. 이미 그 버전이면 아무것도 바뀌지 않는다
+   * 기다림이 끝난다. 이미 그 버전이면 아무것도 바뀌지 않는다.
+   * manifest: 그 버전의 선언서 (Service가 트랜잭션 전에 읽는다): 앱 줄의 code_manifest가 함께 바뀐다 (스토어 12.1)
    */
-  show(seq: number, now: Date): void {
+  show(seq: number, now: Date, manifest: AppManifest): void {
     if (seq < 1 || seq > this.row.code_versions) throw new NotFound(`없는 버전이에요: ${seq}`);
     const pending = this.row.code_pending_seq;
     const settles = pending !== null && seq >= pending;
     if (seq === this.row.code_seq && !settles) return;
     this.put('code_seq', seq);
+    this.put('code_manifest', manifest.toJSON());
     if (settles) this.put('code_pending_seq', null);
     this.put('updated_at', now);
-    this.announceShown(seq, settles);
+    this.announceShown(seq, settles, manifest);
   }
 
   /**
    * 대화의 결과 카드에서 승인한 공개 (스토어 1-6b). 그 버전이 아직 보이지 않을 때만 보인다: 그사이 관리자가 같은 버전이나
    * 더 새 버전을 공개했으면 되돌리지 않는다. 없는 버전이면 아무것도 하지 않는다 (승인은 이미 끝났다)
    */
-  showApproved(seq: number, now: Date): void {
+  showApproved(seq: number, now: Date, manifest: AppManifest): void {
     if (seq < 1 || seq > this.row.code_versions) return;
     const current = this.row.code_seq;
     if (current !== null && current >= seq) return;
-    this.show(seq, now);
+    this.show(seq, now, manifest);
   }
 
   /**
@@ -141,10 +148,20 @@ export class AppCode extends TableEntity<AppRow, AppNew> {
     return new AppCodeStateView(this.row);
   }
 
-  /** settled: 확인 대기가 끝났나 (대기 버전보다 앞 버전으로 되돌린 것이면 아직 기다린다) */
-  private announceShown(seq: number, settled: boolean): void {
+  /**
+   * settled: 확인 대기가 끝났나 (대기 버전보다 앞 버전으로 되돌린 것이면 아직 기다린다).
+   * members · tables: 보이게 된 버전의 선언 (community가 받아 그 앱의 표를 맞춘다, 스토어 12.4)
+   */
+  private announceShown(seq: number, settled: boolean, manifest: AppManifest): void {
+    const { members, tables } = manifest.toJSON();
     this.record(
-      new DomainEvent(AppCode.SHOWN, 1, this.row.space_id, { appId: this.id, seq, settled }),
+      new DomainEvent(AppCode.SHOWN, 1, this.row.space_id, {
+        appId: this.id,
+        seq,
+        settled,
+        members: members || this.row.kind === AppCode.COMMUNITY,
+        tables,
+      }),
     );
   }
 }

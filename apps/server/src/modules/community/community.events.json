@@ -11,6 +11,9 @@
     },
     "community.member.decided": {
       "fields": ["appId", "decisionId", "action", "memberId"]
+    },
+    "community.setting.changed": {
+      "fields": ["approvalId", "outcome", "error?"]
     }
   }
 }

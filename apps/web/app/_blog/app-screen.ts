@@ -118,29 +118,56 @@ export function appHeaders(
    * 앱 JS가 자기 묶음의 파일(data.json 따위)을 fetch로 읽는다. 사이트의 다른 주소(api)는 여전히 부르지 못한다
    */
   own: string | null = null,
+  /**
+   * 격리를 푼 화면의 브라우저 권한 (스토어 12.2). null이 아니면 그 앱의 확인한 도메인으로 연 공개 화면이다:
+   * sandbox를 빼 저장소 · 회원 · 앱 데이터를 쓰게 하고(그 도메인은 콘솔과 다른 출처다), 선언서가 바란 권한만 연다.
+   * 바깥으로의 요청은 여전히 이 출처와 cairn.json의 hosts뿐이다
+   */
+  open: readonly string[] | null = null,
 ): Headers {
   const outside = hosts.map((h) => `https://${h}`).join(' ');
   const from = `${site} ${outside}`.trim();
   const only = (list: string) => list.trim() || "'none'";
+  const isolated = open === null;
   const policy = [
-    'sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads',
+    isolated
+      ? 'sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads'
+      : '',
     `default-src ${from}`,
     `script-src ${from} 'unsafe-inline'`,
     `style-src ${from} 'unsafe-inline'`,
     `img-src ${from} data: blob: https:`,
     `font-src ${from} data:`,
-    `connect-src ${only(`${own ?? ''} ${outside}`)}`,
-    `form-action ${only(outside)}`,
+    `media-src ${from} data: blob:`,
+    `worker-src ${site}`,
+    `manifest-src ${site}`,
+    `connect-src ${only(isolated ? `${own ?? ''} ${outside}` : from)}`,
+    `form-action ${only(isolated ? outside : from)}`,
     `base-uri ${own === null ? "'none'" : site}`,
     "object-src 'none'",
     "frame-ancestors 'self'",
-  ].join('; ');
+  ]
+    .filter(Boolean)
+    .join('; ');
   return new Headers({
     'Content-Security-Policy': policy,
     'X-Content-Type-Options': 'nosniff',
     // 미리 보기 주소에는 토큰이 들어 있어 어디에도 싣지 않는다
     'Referrer-Policy': preview ? 'no-referrer' : 'strict-origin-when-cross-origin',
     'Cache-Control': preview ? 'private, no-store' : 'no-cache',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Permissions-Policy': PERMISSIONS.map(
+      (name) => `${name}=(${open?.includes(name) ? 'self' : ''})`,
+    ).join(', '),
   });
+}
+
+/** 앱이 선언서로 바랄 수 있는 브라우저 권한 (서버의 AppManifest.PERMISSIONS). 적지 않은 것은 닫는다 */
+const PERMISSIONS = ['camera', 'microphone', 'geolocation'] as const;
+
+/**
+ * 격리를 푼 화면에서 내보내는 앱 파일의 머리글 (스토어 12.2): 서버가 붙인 sandbox를 빼야 서비스 워커 · 워커가 그 출처로 돈다.
+ * 파일은 이 출처의 것만 읽게 한다 (바깥 주소는 화면의 머리글이 정한다)
+ */
+export function openFilePolicy(site: string): string {
+  return `default-src ${site}; script-src ${site} 'unsafe-inline'; style-src ${site} 'unsafe-inline'; img-src ${site} data: blob: https:; object-src 'none'; frame-ancestors 'self'`;
 }

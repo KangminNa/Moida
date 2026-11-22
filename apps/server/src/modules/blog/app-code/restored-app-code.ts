@@ -19,6 +19,8 @@ export class RestoredAppCode {
     private readonly files: PageFiles,
     /** 파일의 내용 (복원이 BlobStore에 먼저 저장한다) */
     readonly blobs: readonly ArchiveBlob[],
+    /** 이 코드의 선언서를 정리한 모양 (앱 줄의 code_manifest) */
+    private readonly manifest: unknown,
   ) {}
 
   /** 보관 파일 가운데 앱 코드를 앱 주소마다 묶는다. 묶음 규칙에 맞지 않으면 RuleViolation (어느 앱인지 붙여) */
@@ -48,8 +50,8 @@ export class RestoredAppCode {
     }
     try {
       const files = AppCodeBundle.files(entries.sort((a, b) => (a.name < b.name ? -1 : 1)));
-      AppCodeBundle.of(files, manifest);
-      return new RestoredAppCode(slug, files, blobs);
+      const bundle = AppCodeBundle.of(files, manifest);
+      return new RestoredAppCode(slug, files, blobs, bundle.manifest.toJSON());
     } catch (error) {
       if (error instanceof RuleViolation)
         throw new RuleViolation(`앱 ${slug}의 코드: ${error.message}`);
@@ -69,6 +71,15 @@ export class RestoredAppCode {
     };
   }
 
-  /** 복원한 앱 행에 더할 코드 칸: 이 버전이 보이는 버전이다 */
-  static readonly SHOWN = { code_seq: RestoredAppCode.SEQ, code_versions: RestoredAppCode.SEQ };
+  /**
+   * 복원한 앱 행에 더할 코드 칸: 이 버전이 보이는 버전이다. 선언한 표는 이 버전을 다시 보이거나 새 버전이 보일 때 맞춰진다
+   * (복원은 이벤트를 내지 않는다, 스토어 12.4)
+   */
+  get shown(): { code_seq: number; code_versions: number; code_manifest: unknown } {
+    return {
+      code_seq: RestoredAppCode.SEQ,
+      code_versions: RestoredAppCode.SEQ,
+      code_manifest: this.manifest,
+    };
+  }
 }

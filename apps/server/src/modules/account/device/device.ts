@@ -74,11 +74,14 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
    *     (ALL_SCOPES에 없음, DB CHECK devices_news_only)
    *   collect: 수집 기기 (2차 4단계, 세션이 끝날 때 원문을 올리는 훅). 올리기만
    *   extension: 브라우저 확장 (2차 4단계). 원문 · 페이지 올리기, 서버 팀에 맡기기, 기다리는 결재 · 질문 보기
+   *   deploy: 배포 기기 (앱 플랫폼, 스토어 12.5, cairn app deploy). 쓰기만: 앱 코드의 새 버전을 올린다
+   *     (공개 앱의 새 버전은 관리자가 확인해야 보인다)
    */
   static readonly PROFILES: Readonly<Record<string, DeviceRow['scopes']>> = {
     news: [Actor.NEWS],
     collect: [Actor.UPLOAD],
     extension: [Actor.UPLOAD, Actor.DELEGATE, Actor.INBOX],
+    deploy: [Actor.WRITE],
   };
   static readonly ALL_SCOPES: DeviceRow['scopes'] = [
     Actor.UPLOAD,
@@ -128,7 +131,7 @@ export class Device extends TableEntity<DeviceRow, DeviceNew> {
 
   /**
    * OAuth로 연결한 기기: 주인이 승인 화면에서 정한 이름과 기본 권한.
-   * 앱이 기기 모양(PROFILES: news · collect · extension)을 요청해 승인됐으면 그 모양의 권한만 갖는다
+   * 앱이 기기 모양(PROFILES: news · collect · extension · deploy)을 요청해 승인됐으면 그 모양의 권한만 갖는다
    */
   static connect(
     spaceId: string,

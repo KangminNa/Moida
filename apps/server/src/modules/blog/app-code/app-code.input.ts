@@ -63,6 +63,56 @@ export class UploadCodeInput extends BaseRequest {
   }
 }
 
+/**
+ * MCP app_code_upload { app, size, sha256, note? }: 이 컴퓨터에서 빌드한 묶음(zip)을 올릴 표를 받는다 (스토어 12.5).
+ * 묶음 자체는 싣지 않는다 (JSON 본문은 512KB까지): 크기와 sha256만 알리고, 받은 표로 PUT한다
+ */
+export class DeployCodeInput extends BaseRequest {
+  private static readonly SHA256 = /^[0-9a-f]{64}$/;
+
+  private constructor(
+    /** 앱의 주소 (/<slug>) */
+    readonly slug: string,
+    readonly size: number,
+    readonly sha256: string,
+    readonly note: string,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): DeployCodeInput {
+    return BaseRequest.read(raw, (f) => {
+      const sha256 = f.text('sha256', 64);
+      if (!DeployCodeInput.SHA256.test(sha256)) f.reject('sha256', '소문자 16진수 64자여야 해요');
+      return new DeployCodeInput(
+        f.text('app', 200),
+        f.integer('size', 1, UploadCodeInput.MAX_BYTES),
+        sha256,
+        f.optionalText('note', 200) ?? '',
+      );
+    });
+  }
+}
+
+/** PUT /api/apps/:id/code/versions: 배포 표(머리글 X-Cairn-Deploy)와 zip 본문 (application/zip) */
+export class DeployedCodeInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly token: string | null,
+    readonly zip: Buffer,
+  ) {
+    super();
+  }
+
+  static from(id: string, token: unknown, body: unknown): DeployedCodeInput {
+    const target = BaseRequest.read({ id }, (f) => ({ id: f.uuid('id') }));
+    if (!Buffer.isBuffer(body)) throw new UnsupportedType('zip 파일만 올릴 수 있어요');
+    if (body.length > UploadCodeInput.MAX_BYTES)
+      throw new TooLarge(`zip 파일은 ${UploadCodeInput.MAX_BYTES / 1024 / 1024}MB까지예요`);
+    return new DeployedCodeInput(target.id, typeof token === 'string' ? token : null, body);
+  }
+}
+
 /** POST /api/apps/:id/code/current: 이 버전 공개 (되돌리기도 같다) */
 export class ShowCodeInput extends BaseRequest {
   private static readonly SEQ_MAX = 2_147_483_647;

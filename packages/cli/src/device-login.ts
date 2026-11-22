@@ -18,6 +18,15 @@ export class DeviceKind {
     '세션 올리기만',
   );
 
+  /** 앱 코드 배포 (앱 플랫폼, 스토어 12.5): 블로그는 쓰기(write)만 가진 기기를 만든다 */
+  static readonly DEPLOY = new DeviceKind(
+    'deploy',
+    'write',
+    '배포 기기',
+    '배포',
+    '초안 쓰기 · 앱 코드 올리기만',
+  );
+
   private constructor(
     /** 요청할 scope이자 credentials.json의 키 */
     readonly scope: string,
@@ -31,7 +40,7 @@ export class DeviceKind {
   ) {}
 }
 
-/** 기기의 열쇠 (~/.cairn/credentials.json의 news · collect). 토큰은 화면에 찍지 않는다 */
+/** 기기의 열쇠 (~/.cairn/credentials.json의 news · collect · deploy). 토큰은 화면에 찍지 않는다 */
 export class DeviceCredential {
   constructor(
     readonly site: string,
@@ -101,7 +110,7 @@ class LoopbackCallback {
         () =>
           fail(
             new CliError(
-              `${this.kind.label} 승인을 기다리다 그만뒀어요. cairn connect를 다시 실행해 주세요`,
+              `${this.kind.label} 승인을 기다리다 그만뒀어요. 명령을 다시 실행해 주세요`,
             ),
           ),
         waitMs,
@@ -188,7 +197,7 @@ export class DeviceLogin {
           for (const key of ['refresh_token', 'access_token'])
             await this.form(kind, revoke, { token: String(token[key] ?? '') }).catch(() => ({}));
         throw new CliError(
-          `블로그가 ${kind.label}를 모르는 버전이에요. 서버를 새 버전으로 올린 뒤 cairn connect를 다시 실행해 주세요`,
+          `블로그가 ${kind.label}를 모르는 버전이에요. 서버를 새 버전으로 올린 뒤 명령을 다시 실행해 주세요`,
         );
       }
       return new DeviceCredential(

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { MemberFrame } from '../../../../_community/MemberFrame';
 import {
-  memberPlace,
+  communityPlace,
   memberTitle,
   shownTopic,
   signedIn,
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ReportPage({ params, searchParams }: Props) {
-  const place = await memberPlace((await params).app);
+  const place = await communityPlace((await params).app);
   const { topic: topicId = '', comment: commentId } = await searchParams;
   const query = new URLSearchParams({
     topic: topicId,
