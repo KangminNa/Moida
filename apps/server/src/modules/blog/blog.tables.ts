@@ -47,6 +47,7 @@ export interface AppRow {
   home: boolean;
   domain: string | null;
   domain_checked_at: Date | null;
+  code_manifest: unknown;
 }
 export type AppNew = Partial<AppRow> & Pick<AppRow, 'id' | 'space_id' | 'kind' | 'name' | 'slug'>;
 

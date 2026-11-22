@@ -42,6 +42,7 @@ export const apps = blogSchema.table('apps', {
   home: boolean('home').notNull(),
   domain: text('domain'),
   domain_checked_at: timestamp('domain_checked_at', { withTimezone: true }),
+  code_manifest: jsonb('code_manifest').notNull(),
 });
 
 /** blog.assets */

@@ -88,6 +88,11 @@ export class AppSiteQuery extends BaseQuery {
     const site = own ? ((await this.gate.siteOrigin()) ?? '') : null;
     const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);
     const manifest = await this.code.manifestOf(actor, code);
+    // 격리를 풀어도 되는 화면: 연결을 확인한 자기 도메인으로 연 공개 화면만 (미리 보기 · 기본 도메인은 격리, 스토어 12.2)
+    const access = {
+      open: own && ticket === null && app.domain_checked_at !== null,
+      permissions: manifest.permissions,
+    };
     // 정적 앱 (스토어 9.13): 주소는 묶음의 파일이다. 데이터는 첫 화면의 것 하나 (앱 JS가 읽는다)
     if (manifest.render === AppCodeBundle.STATIC) {
       const file = AppSiteQuery.staticFile(code, req.path);
@@ -95,10 +100,11 @@ export class AppSiteQuery extends BaseQuery {
         file !== null && AppCodeBundle.isTemplate(file)
           ? await this.code.textOf(actor, code, file, AppCodeBundle.TEMPLATE_BYTES_MAX)
           : null;
-      if (text === null) return new AppScreenStaticView(code.seq, file, null, manifest.hosts, null);
+      if (text === null)
+        return new AppScreenStaticView(code.seq, file, null, manifest.hosts, null, access);
       const home = await this.screens.screen(actor, app, base, site, [], null);
       if (home instanceof AppScreenRedirectView) return home;
-      return new AppScreenStaticView(code.seq, file, text, manifest.hosts, home);
+      return new AppScreenStaticView(code.seq, file, text, manifest.hosts, home, access);
     }
     const data = await this.screens.screen(actor, app, base, site, req.path, req.cursor);
     if (data instanceof AppScreenRedirectView) return data;
@@ -118,6 +124,7 @@ export class AppSiteQuery extends BaseQuery {
       templates,
       manifest.hosts,
       data,
+      access,
     );
   }
 

@@ -1,0 +1,139 @@
+import { Injectable } from '@nestjs/common';
+import {
+  type Actor,
+  BaseQuery,
+  Database,
+  Lookups,
+  MemberActor,
+  NotFound,
+  ZipFile,
+} from '../../platform';
+import type { MemberPlace } from '../member/member.input';
+import type { AdminAppInput, AdminDataInput, DataListInput } from './app-data.input';
+import { AppRowsView, AppTablesView } from './app-data.view';
+import { type AppDataFilter, AppTable } from './app-table';
+import { AppTableRepository } from './app-table.repository';
+
+/** 앱 하나를 내보낸 묶음 (관리자의 내려받기) */
+export class AppDataExport {
+  constructor(
+    readonly fileName: string,
+    readonly bytes: Buffer,
+  ) {}
+}
+
+// 앱 데이터 읽기 (스토어 12.4). 회원 쪽(앱 도메인): 공개 앱의 열려 있는 표를 역할 cairn_app으로 읽는다 —
+// 읽기 규칙(anyone · member · owner)은 DB의 행 수준 보안이 거른다. 관리자(기본 도메인): 공간의 앱의 표 목록 · 줄 · 내보내기.
+// 표 · 칸 이름은 선언 목록(AppTable)에서 온 것만 SQL에 쓴다
+@Injectable()
+export class AppDataQuery extends BaseQuery {
+  private static readonly MISSING = '없는 표예요';
+
+  constructor(
+    db: Database,
+    private readonly lookups: Lookups,
+  ) {
+    super(db);
+  }
+
+  /** 줄 목록 (회원 쪽). 읽지 못하는 표 · 닫힌 표는 없는 표와 같다 */
+  async list(actor: Actor, place: MemberPlace, req: DataListInput): Promise<AppRowsView> {
+    await this.lookups.assertVisible('app', actor, [place.appId], '없는 주소예요');
+    const memberId = actor instanceof MemberActor && actor.appId === place.appId ? actor.id : null;
+    return this.db.transaction(async (tx) => {
+      const tables = new AppTableRepository(tx);
+      const table = await tables.openOf(place.appId, req.table);
+      if (!table?.memberReadable) throw new NotFound(AppDataQuery.MISSING);
+      const filters = AppDataQuery.filtersOf(table, req, memberId);
+      await tables.asMember(memberId);
+      const rows = await tables.readRows(table, filters, req.order, req.limit, req.offset);
+      return new AppRowsView(rows.slice(0, req.limit), rows.length > req.limit, memberId);
+    });
+  }
+
+  /** 관리자: 앱의 표 목록 (닫힌 것까지) */
+  async tables(actor: Actor, req: AdminAppInput): Promise<AppTablesView> {
+    await this.assertOwned(actor, req.appId);
+    return this.db.transaction(async (tx) => {
+      const tables = new AppTableRepository(tx);
+      const listed = [];
+      for (const table of await tables.listOf(req.appId))
+        listed.push(table.listed((await tables.countRows(table, null))[0]));
+      return new AppTablesView(listed);
+    });
+  }
+
+  /** 관리자: 표 하나의 줄 (모든 줄, 쓴 회원 id까지) */
+  async adminRows(actor: Actor, req: AdminDataInput): Promise<AppRowsView> {
+    await this.assertOwned(actor, req.appId);
+    return this.db.transaction(async (tx) => {
+      const tables = new AppTableRepository(tx);
+      const table = await tables.openOf(req.appId, req.list.table);
+      if (!table) throw new NotFound(AppDataQuery.MISSING);
+      const { order, limit, offset } = req.list;
+      const filters = AppDataQuery.filtersOf(table, req.list, null);
+      const rows = await tables.readRows(table, filters, order, limit, offset);
+      return new AppRowsView(rows.slice(0, limit), rows.length > limit, null, true);
+    });
+  }
+
+  /**
+   * 관리자: 앱의 데이터와 회원을 한 묶음으로 (스토어 12.5). tables.json(선언) · schema.sql(CREATE TABLE) · data.sql(INSERT) ·
+   * members.json(아이디 · 닉네임 · 비밀번호 해시 · 가입한 때). schema.sql · data.sql은 어느 Postgres에나 들어간다
+   */
+  async export(actor: Actor, req: AdminAppInput, now: Date): Promise<AppDataExport> {
+    await this.assertOwned(actor, req.appId);
+    const zip = new ZipFile();
+    await this.db.transaction(async (tx) => {
+      const tables = new AppTableRepository(tx);
+      const listed = await tables.listOf(req.appId);
+      const schema: string[] = [];
+      const data: string[] = [];
+      for (const table of listed) {
+        const columns = Object.entries(table.columns)
+          .map(([name, type]) => `  "${name}" ${AppTable.SQL_TYPES[type]}`)
+          .join(',\n');
+        schema.push(
+          `CREATE TABLE "${table.name}" (\n  id uuid PRIMARY KEY,\n  owner uuid,\n  created_at timestamptz NOT NULL,\n  updated_at timestamptz NOT NULL,\n${columns}\n);`,
+        );
+        data.push(`-- ${table.name}`, ...(await tables.dumpRows(table)));
+      }
+      const declared = Object.fromEntries(
+        listed.map((t) => [
+          t.name,
+          { columns: t.columns, read: t.readRule, write: t.writeRule, open: t.isOpen },
+        ]),
+      );
+      zip.add('tables.json', JSON.stringify(declared, null, 2));
+      zip.add('schema.sql', `${schema.join('\n\n')}\n`);
+      zip.add('data.sql', `${data.join('\n')}\n`);
+    });
+    const members = await this.sql<Record<string, unknown>[]>`
+      SELECT id, login_id, nickname, password_hash, joined_at, blocked_until
+      FROM community.members WHERE app_id = ${req.appId} ORDER BY id`;
+    zip.add('members.json', JSON.stringify({ members }, null, 2));
+    return new AppDataExport(`app-data-${now.toISOString().slice(0, 10)}.zip`, zip.toBuffer());
+  }
+
+  /** 관리자만, 공간의 앱만 (아니면 404) */
+  private async assertOwned(actor: Actor, appId: string): Promise<void> {
+    actor.assertOwner();
+    await this.lookups.assertVisible('app', actor, [appId], '없는 앱이에요');
+  }
+
+  /** 요청의 조건을 표의 선언으로 읽는다. owner의 값 me는 지금 회원 (로그인하지 않았으면 아무 줄도 맞지 않는다) */
+  private static filtersOf(
+    table: AppTable,
+    req: DataListInput,
+    memberId: string | null,
+  ): AppDataFilter[] {
+    table.assertSortable(req.order[0]);
+    const none = '00000000-0000-0000-0000-000000000000';
+    return [...req.filters].map(([column, expression]) =>
+      table.filterOf(
+        column,
+        column === 'owner' ? expression.replace(/\.me$/, `.${memberId ?? none}`) : expression,
+      ),
+    );
+  }
+}

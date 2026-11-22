@@ -23,6 +23,20 @@ export interface AppListRow extends AppRow {
   pages: number;
 }
 
+/** 보이는 코드의 선언서에서 화면에 쓰는 칸 (apps.code_manifest, 쌓을 때 AppManifest가 검사한 값) */
+function shown(r: Readonly<AppRow>): {
+  members?: boolean;
+  tables?: Record<string, unknown>;
+  theme?: {
+    accent: string | null;
+    background: string | null;
+    text: string | null;
+    logo: string | null;
+  } | null;
+} {
+  return (r.code_manifest ?? {}) as ReturnType<typeof shown>;
+}
+
 /** 앱 하나 (관리자) */
 export class AppView {
   constructor(
@@ -57,6 +71,11 @@ export class AppView {
       domainCheckedAt: r.domain_checked_at?.toISOString() ?? null,
       /** 바깥 주소: 확인한 도메인이면 https://<도메인>/, 아니면 /<slug> */
       url: urlOf(r),
+      /** 회원을 받는 앱인가 · 고정 화면의 테마 (보이는 코드의 선언서, 스토어 12.3) */
+      members: r.kind === 'community' || shown(r).members === true,
+      theme: shown(r).theme ?? null,
+      /** 보이는 코드가 선언한 표 이름 (앱 데이터, 스토어 12.4) */
+      tables: Object.keys(shown(r).tables ?? {}),
       /** 공개 글 · 임시 글(휴지통 제외) · 메뉴 · 페이지의 수 */
       counts: this.counts,
       version: r.version,
@@ -100,6 +119,10 @@ export class PublicAppView {
       home: r.home,
       /** 바깥 주소: 확인한 도메인이면 https://<도메인>/, 아니면 /<slug> (스토어 3-0) */
       url: urlOf(r),
+      /** 회원을 받는 앱인가 (커뮤니티 앱이거나 보이는 코드의 선언서에 members, 스토어 12.3) */
+      members: r.kind === 'community' || shown(r).members === true,
+      /** 고정 화면에 입힐 테마 (보이는 코드의 선언서). 없으면 null. logo는 앱 코드의 파일 이름 */
+      theme: shown(r).theme ?? null,
     };
   }
 }

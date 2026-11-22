@@ -2,6 +2,7 @@ import { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
 import {
   Actor,
+  ApprovedActor,
   BaseQuery,
   BlobStore,
   Database,
@@ -27,8 +28,9 @@ import {
   AppCodeVersionView,
   AppCodeView,
 } from './app-code.view';
-import { AppCodeBundle, type AppCodeRender } from './app-code-bundle';
+import { AppCodeBundle } from './app-code-bundle';
 import { AppCodeFiles } from './app-code-files';
+import { AppManifest } from './app-manifest';
 import { AppStarterGateway } from './app-starter.gateway';
 import { AppTicket } from './app-ticket';
 
@@ -144,9 +146,10 @@ export class AppCodeQuery extends BaseQuery {
     return given;
   }
 
-  /** 앱 한 줄 (쓰기 전에 읽기: 일꾼 · 관리자). 없거나 다른 공간이면 null */
+  /** 앱 한 줄 (쓰기 전에 읽기: 일꾼 · 관리자 · 승인한 앱 화면 공개). 없거나 다른 공간이면 null */
   async appOf(actor: Actor, spaceId: string, id: string): Promise<AppRow | null> {
-    actor.assertOwnerOrSystem();
+    const approved = actor instanceof ApprovedActor && actor.action === AppCodeQuery.SHOW;
+    if (!approved) actor.assertOwnerOrSystem();
     return this.row(apps, { space_id: spaceId, id });
   }
 
@@ -184,23 +187,19 @@ export class AppCodeQuery extends BaseQuery {
     return (await this.manifestOf(actor, code)).hosts;
   }
 
-  /** 이 코드의 cairn.json: 바깥 주소와 그리는 법 (없거나 읽을 수 없으면 바깥 주소 없음 · 템플릿) */
-  async manifestOf(
-    actor: Actor,
-    code: AppCodeFiles,
-  ): Promise<{ hosts: readonly string[]; render: AppCodeRender }> {
+  /** 이 코드의 선언서 cairn.json (없거나 읽을 수 없으면 AppManifest.NONE: 바깥 주소 없음 · 템플릿) */
+  async manifestOf(actor: Actor, code: AppCodeFiles): Promise<AppManifest> {
     const text = await this.textOf(
       actor,
       code,
       AppCodeBundle.MANIFEST,
       AppCodeBundle.MANIFEST_BYTES_MAX,
     );
-    const none = { hosts: [], render: AppCodeBundle.TEMPLATED };
-    if (text === null) return none;
+    if (text === null) return AppManifest.NONE;
     try {
       return AppCodeBundle.manifestOf(text);
     } catch {
-      return none;
+      return AppManifest.NONE;
     }
   }
 

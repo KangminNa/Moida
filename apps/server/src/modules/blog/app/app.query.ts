@@ -117,6 +117,22 @@ export class AppQuery extends BaseQuery {
     return new Map(rows.map((r) => [r.id, r.name]));
   }
 
+  /**
+   * 회원을 받는 앱 (Lookups 'member-app', 스토어 12.3): 커뮤니티 앱이거나 보이는 코드의 선언서에 members가 참인 앱.
+   * 관리자는 공간의 그런 앱, 그 밖은 공개했고 도메인 연결을 확인한 앱만 (회원 가입 · 로그인은 앱 도메인에서만 된다)
+   */
+  async memberApps(actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const where =
+      actor.kind === 'owner'
+        ? this.sql`AND space_id = ${actor.requireSpace()}`
+        : this.sql`AND visibility = ${App.PUBLIC} AND domain_checked_at IS NOT NULL`;
+    const rows = await this.sql<Pick<AppRow, 'id' | 'name'>[]>`
+      SELECT id, name FROM blog.apps
+      WHERE id = ANY(${ids as string[]}::uuid[]) ${where}
+        AND (kind = ${App.COMMUNITY} OR code_manifest->>'members' = 'true')`;
+    return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
   /** 모든 앱의 도메인(확인 전 것까지) → [앱 id, 공간 id] (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
   async hosts(actor: Actor): Promise<ReadonlyMap<string, readonly [string, string]>> {
     actor.assertOwnerOrSystem();

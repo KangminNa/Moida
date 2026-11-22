@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { Database } from '../modules/platform';
+import { Database, OutboxWorker, ZipFile } from '../modules/platform';
 import { type ApiClient, type ApiResult, TestUser } from './api-client';
 
 // 커뮤니티 API 테스트 도구 (스토어 3-1): 공개된 커뮤니티 앱 하나와 그 도메인, 그 도메인으로 보내는 요청, 회원 만들기.
@@ -8,9 +8,15 @@ import { type ApiClient, type ApiResult, TestUser } from './api-client';
 // 쓰기는 이 도메인의 화면에서 보낸 것처럼 Origin과 그 회원의 CSRF 값을 붙인다
 export class CommunitySite {
   private static places = 0;
+  /** 도메인을 연결하지 않은 앱에 버전만 올려 보는 도구 (deploy만 쓴다) */
+  static readonly Probe = class extends CommunitySite {
+    constructor(api: ApiClient, appId: string) {
+      super(api, '', appId);
+    }
+  };
 
-  private constructor(
-    private readonly api: ApiClient,
+  protected constructor(
+    protected readonly api: ApiClient,
     readonly host: string,
     readonly appId: string,
   ) {}
@@ -27,6 +33,70 @@ export class CommunitySite {
     assert.equal(made.status, 201, made.text);
     const app = await CommunitySite.link(api, owner, made.json(), host, true);
     return new CommunitySite(api, host, String(app.id));
+  }
+
+  /**
+   * 회원 · 표를 선언한 공개 페이지 앱 하나 (앱 플랫폼, 스토어 12장): 선언서(cairn.json)가 든 정적 앱 코드를 올리고
+   * 도메인을 연결해 공개한 뒤, 일꾼을 돌려 선언한 표를 맞춘다. 파일은 index.html 하나와 선언서
+   */
+  static async openPage(
+    api: ApiClient,
+    owner: TestUser,
+    slug: string,
+    manifest: object,
+  ): Promise<CommunitySite> {
+    const host = `${slug}.example.com`;
+    const made = await api.request('POST', '/api/apps', owner, {
+      requestId: randomUUID(),
+      kind: 'page',
+      name: `앱 ${slug}`,
+      slug,
+    });
+    assert.equal(made.status, 201, made.text);
+    const site = new CommunitySite(api, host, String(made.json().id));
+    const app = await site.deploy(owner, manifest);
+    await CommunitySite.link(api, owner, app, host, true);
+    return site;
+  }
+
+  /**
+   * 앱 코드의 새 버전을 올린다 (관리자의 zip 올리기). 공개 앱이면 그 버전을 바로 공개하고, 일꾼을 돌려 표를 맞춘다.
+   * 답은 앱의 마지막 모습. 올리기가 거절되면 그 응답을 던지지 않고 status로 돌려준다 (expect로 받는다)
+   */
+  async deploy(owner: TestUser, manifest: object, expect = 201): Promise<Record<string, unknown>> {
+    const appOf = async () => {
+      const list = (await this.api.get('/api/apps', owner)).json().apps as Record<
+        string,
+        unknown
+      >[];
+      return list.find((a) => a.id === this.appId) as Record<string, unknown>;
+    };
+    const zip = new ZipFile();
+    zip.add('index.html', '<!doctype html><html><head></head><body>앱</body></html>');
+    zip.add('cairn.json', JSON.stringify({ cairn: 1, render: 'static', ...manifest }));
+    const before = await appOf();
+    const res = await fetch(
+      `${this.api.baseUrl}/api/apps/${this.appId}/code/versions?version=${before.version}&note=test`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/zip', cookie: owner.header ?? '' },
+        body: zip.toBuffer(),
+      },
+    );
+    const text = await res.text();
+    assert.equal(res.status, expect, text);
+    if (res.status !== 201) return { status: res.status, text };
+    const state = JSON.parse(text) as { version: number; pending: number | null };
+    if (state.pending !== null) {
+      const shown = await this.api.request('POST', `/api/apps/${this.appId}/code/current`, owner, {
+        version: state.version,
+        seq: state.pending,
+      });
+      assert.equal(shown.status, 200, shown.text);
+    }
+    const worker = this.api.service(OutboxWorker);
+    while ((await worker.tick()) > 0);
+    return appOf();
   }
 
   /**

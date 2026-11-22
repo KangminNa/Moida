@@ -2,6 +2,28 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** community.app_tables.read_rule (값 목록 CHECK) */
+export const APP_TABLE_READ_RULE = ['anyone', 'member', 'owner', 'admin'] as const;
+export type AppTableReadRule = (typeof APP_TABLE_READ_RULE)[number];
+/** community.app_tables.write_rule (값 목록 CHECK) */
+export const APP_TABLE_WRITE_RULE = ['member', 'owner', 'admin'] as const;
+export type AppTableWriteRule = (typeof APP_TABLE_WRITE_RULE)[number];
+/** community.app_tables */
+export interface AppTableRow {
+  id: string;
+  app_id: string;
+  name: string;
+  columns: unknown;
+  read_rule: AppTableReadRule;
+  write_rule: AppTableWriteRule;
+  open: boolean;
+  applied_seq: number;
+  created_at: Date;
+  updated_at: Date;
+  version: number;
+}
+export type AppTableNew = Partial<AppTableRow> & Pick<AppTableRow, 'id' | 'app_id' | 'name' | 'columns' | 'read_rule' | 'write_rule' | 'applied_seq'>;
+
 /** community.comments.state (값 목록 CHECK) */
 export const COMMENT_STATE = ['shown', 'hidden', 'removed', 'deleted'] as const;
 export type CommentState = (typeof COMMENT_STATE)[number];

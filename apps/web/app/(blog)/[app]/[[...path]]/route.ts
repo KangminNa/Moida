@@ -1,7 +1,13 @@
 import type { NextRequest } from 'next/server';
 import type { SpaceInfo } from '../../../_account/types';
 import { appOfHost } from '../../../_blog/app-domains';
-import { appHeaders, renderAppScreen, renderStaticScreen } from '../../../_blog/app-screen';
+import {
+  appHeaders,
+  openFilePolicy,
+  renderAppScreen,
+  renderStaticScreen,
+} from '../../../_blog/app-screen';
+import { cairnAnswer } from '../../../_blog/cairn-client';
 import { slugFrom } from '../../../_blog/format';
 import { hostOf, originOf } from '../../../_blog/request-host';
 import { brokenAnswer, missingAnswer, unreachableAnswer } from '../../../_blog/site-answer';
@@ -39,25 +45,44 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   const app = slugFrom(rawApp);
   const parts = rawPath.map(slugFrom);
   const ticket = parts[0]?.startsWith(TICKET) ? (parts.shift() ?? '').slice(1) : null;
+  // 미리 보기 주소 아래의 cairn.js (/<앱>/~<토큰>/_/cairn.js): 닫힌 스크립트 (미리 보기는 격리한다, 스토어 12.2)
+  if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'cairn.js')
+    return cairnAnswer(false);
   if (parts[0] === 'files' && parts.length === 2) {
     // 없으면 화면으로 넘긴다: 정적 앱의 files/ 폴더일 수 있다 (그 밖에는 화면이 404를 낸다)
-    const found = await file(app, parts[1] ?? '', ticket);
+    const found = await file(request, app, parts[1] ?? '', ticket);
     if (found) return found;
   }
   return screen(request, app, parts, ticket);
 }
 
-/** 앱 코드의 파일 하나 (name은 폴더가 든 이름일 수 있다). 없는 파일이면 null */
-async function file(app: string, name: string, ticket: string | null): Promise<Response | null> {
+/**
+ * 앱 코드의 파일 하나 (name은 폴더가 든 이름일 수 있다). 없는 파일이면 null.
+ * 그 앱의 도메인으로 온 요청(미리 보기 아님)이면 격리 머리글을 뺀다 (스토어 12.2: 서비스 워커 · 워커가 그 출처로 돌게)
+ */
+async function file(
+  request: NextRequest,
+  app: string,
+  name: string,
+  ticket: string | null,
+): Promise<Response | null> {
   const query = ticket ? `?ticket=${encodeURIComponent(ticket)}` : '';
   const path = name.split('/').map(encodeURIComponent).join('/');
   const res = await serverRaw(`/api/apps/site/${encodeURIComponent(app)}/files/${path}${query}`);
   if (!res) return unreachableAnswer();
-  return res.ok ? passOn(res) : null;
+  if (!res.ok) return null;
+  const own = ticket === null && (await appOfHost(hostOf(request.headers))) === app;
+  return passOn(
+    res,
+    own ? openFilePolicy(originOf(request.headers, request.nextUrl.protocol)) : null,
+  );
 }
 
-/** 서버가 붙인 형식 · 캐시 · 격리 머리글을 그대로 넘긴다 (앱 코드의 파일 · 페이지의 파일) */
-function passOn(res: Response): Response {
+/**
+ * 서버가 붙인 형식 · 캐시 · 격리 머리글을 그대로 넘긴다 (앱 코드의 파일 · 페이지의 파일).
+ * policy를 주면 격리 머리글 대신 그 CSP를 붙인다 (격리를 푼 앱 도메인의 파일)
+ */
+function passOn(res: Response, policy: string | null = null): Response {
   const headers = new Headers();
   for (const key of [
     'content-type',
@@ -72,6 +97,11 @@ function passOn(res: Response): Response {
   ]) {
     const value = res.headers.get(key);
     if (value) headers.set(key, value);
+  }
+  if (policy !== null) {
+    headers.set('content-security-policy', policy);
+    // 서비스 워커가 앱 주소 전체를 맡을 수 있게 (assets/sw.js처럼 폴더 안에 두어도)
+    headers.set('service-worker-allowed', '/');
   }
   return new Response(res.body, { status: 200, headers });
 }
@@ -133,7 +163,13 @@ async function screen(
     return brokenAnswer(ticket && error instanceof Error ? error.message : null);
   }
   const site = await siteOf(request, app, host, space);
-  const headers = appHeaders(site.origin, shown.hosts, ticket !== null);
+  const headers = appHeaders(
+    site.origin,
+    shown.hosts,
+    ticket !== null,
+    null,
+    shown.open ? shown.permissions : null,
+  );
   headers.set('Content-Type', 'text/html; charset=utf-8');
   return new Response(html, { status, headers });
 }
@@ -167,11 +203,17 @@ async function staticScreen(
   const { file: name, text } = shown.static;
   if (name === null) return missingAnswer();
   if (text === null || shown.data === null)
-    return (await file(app, name, ticket)) ?? missingAnswer();
+    return (await file(request, app, name, ticket)) ?? missingAnswer();
   const space = await serverGet<SpaceInfo>('/api/space', true);
   const html = renderStaticScreen(text, name, shown.data, space?.name || 'Cairn', ticket);
   const site = await siteOf(request, app, host, space);
-  const headers = appHeaders(site.origin, shown.hosts, ticket !== null, site.own);
+  const headers = appHeaders(
+    site.origin,
+    shown.hosts,
+    ticket !== null,
+    site.own,
+    shown.open ? shown.permissions : null,
+  );
   headers.set('Content-Type', 'text/html; charset=utf-8');
   return new Response(html, { status: 200, headers });
 }

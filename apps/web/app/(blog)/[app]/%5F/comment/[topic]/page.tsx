@@ -1,6 +1,6 @@
 import { MemberFrame } from '../../../../../_community/MemberFrame';
 import {
-  memberPlace,
+  communityPlace,
   memberTitle,
   shownTopic,
   signedIn,
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function CommentPage({ params }: Props) {
   const { app, topic: id } = await params;
-  const place = await memberPlace(app);
+  const place = await communityPlace(app);
   const member = signedIn(place, `/_/comment/${encodeURIComponent(id)}`);
   const topic = await shownTopic(place, id);
   return (

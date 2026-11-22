@@ -24,7 +24,7 @@ export class PostRestoreRepository {
     code: RestoredAppCode | null,
   ): Promise<void> {
     const row = app.rowIn(spaceId, withIcon ? app.icon : null);
-    const shown = code === null ? row : { ...row, ...RestoredAppCode.SHOWN };
+    const shown = code === null ? row : { ...row, ...code.shown };
     await this.tx`INSERT INTO blog.apps ${this.tx(shown as never)}`;
     if (code === null) return;
     const version = code.versionRow(app.id, spaceId);

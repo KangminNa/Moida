@@ -25,7 +25,7 @@ import { Moderation } from './moderation.policy';
 // 커뮤니티 관리 쓰기 (스토어 3-1c): 신고로 임시 가림(일꾼) · 관리자의 가림 · 되돌림 · 내림 · 차단 · 풀기 · 비밀번호 초기화.
 // 같은 모듈의 여러 묶음을 한 트랜잭션에서 쓰는 곳은 여기뿐이다 (객체설계 4장 예외, 11.5): 결정은 대상(글 · 댓글 · 회원)과
 // 열린 신고 · 결정 기록을 함께 바꾼다. 잠그는 순서는 대상 → 신고 → 결정 기록(넣기만).
-// 관리자 일은 기본 도메인에서 assertOwner로만 (원칙 10: 회원은 관리자가 아니다), 앱은 Lookups 'community-app'으로 공간의 커뮤니티 앱인지 본다.
+// 관리자 일은 기본 도메인에서 assertOwner로만 (원칙 10: 회원은 관리자가 아니다), 앱은 Lookups 'member-app'으로 공간의 회원을 받는 앱인지 본다 (스토어 12.3).
 // 3-3에서 AI 운영 팀의 의견을 관리자가 승인하면 ApprovedActor로 같은 decide · block을 부른다 (지우기 · 제재는 승인으로만, 원칙 7)
 @Injectable()
 export class ModerationService extends BaseService {
@@ -153,7 +153,7 @@ export class ModerationService extends BaseService {
 
   /** 공간의 커뮤니티 앱인가 (아니면 404) */
   private assertApp(actor: Actor, appId: string): Promise<void> {
-    return this.lookups.assertVisible('community-app', actor, [appId], '없는 커뮤니티예요');
+    return this.lookups.assertVisible('member-app', actor, [appId], '없는 커뮤니티예요');
   }
 
   /** 대상 글이나 댓글을 잠근다 (commentId가 있으면 댓글). 그 앱에 없으면 null */
