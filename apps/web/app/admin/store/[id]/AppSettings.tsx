@@ -61,9 +61,11 @@ export function AppSettings({
     const reply = await remove.run(
       'delete',
       () => api('POST', `/api/apps/${app.id}/delete`, { version: app.version }),
-      { done: `${app.name} 삭제`, conflict: CONFLICT },
+      { done: `${app.name} 삭제` },
     );
     if (reply?.ok) router.push(STORE_HREF);
+    // 못 지운 까닭은 서버의 말 그대로 보인다 (남은 글 · 페이지 · 호의 수, 또는 그사이 바뀜). 그사이 바뀐 것이면 다시 누를 수 있게 새로 읽는다
+    else if (reply?.status === 409) await onChanged();
   }
 
   return (
@@ -116,7 +118,8 @@ export function AppSettings({
           <div>
             <b>앱 삭제</b>
             <p>
-              글 · 페이지 · 호가 남아 있으면 삭제할 수 없음. 먼저 다른 앱으로 옮기거나 휴지통으로
+              글(휴지통의 글 포함) · 페이지 · 호가 남아 있으면 삭제할 수 없음. 먼저 다른 앱으로
+              옮기기
             </p>
           </div>
         </div>

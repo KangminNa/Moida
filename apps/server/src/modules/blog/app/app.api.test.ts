@@ -265,10 +265,24 @@ describe('앱 (/api/apps)', () => {
       version: app.version,
     });
     assert.equal(full.status, 409);
-    assert.match(full.text, /글 1개/);
+    assert.match(full.text, /글 1개 · 페이지 0개/);
+    // 휴지통의 글도 앱에 남아 있어 막는다: 몇 개가 휴지통에 있는지 알려 준다
+    const trashed = ok(
+      await api.request('DELETE', `/api/posts/${post.id}`, owner, { version: post.version }),
+    );
+    const still = await api.request('POST', `/api/apps/${app.id}/delete`, owner, {
+      version: app.version,
+    });
+    assert.equal(still.status, 409);
+    assert.match(still.text, /글 1개 \(휴지통 1개\)/);
+    const restored = ok(
+      await api.request('POST', `/api/posts/${post.id}/restore`, owner, {
+        version: trashed.version,
+      }),
+    );
     ok(
       await api.request('POST', `/api/posts/${post.id}/menu`, owner, {
-        version: post.version,
+        version: restored.version,
         menuId: null,
         appId: null,
       }),

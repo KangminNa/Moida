@@ -148,10 +148,12 @@ export class AppService extends EntityService<App> {
           await pages.save(page);
         }
       const left = await apps.contents(app.id);
-      if (left.posts + left.pages + left.issues > 0)
+      if (left.posts + left.pages + left.issues > 0) {
+        const trashed = left.trashed > 0 ? ` (휴지통 ${left.trashed}개)` : '';
         throw new Conflict(
-          `앱에 글 ${left.posts}개 · 페이지 ${left.pages}개 · 호 ${left.issues}개가 있어 지우지 못해요`,
+          `앱에 글 ${left.posts}개${trashed} · 페이지 ${left.pages}개 · 호 ${left.issues}개가 있어 지우지 못해요. 다른 앱으로 옮긴 뒤 지워요`,
         );
+      }
       await new MenuRepository(tx).removeAllIn(app.id);
       app.remove();
       await apps.remove(app);
