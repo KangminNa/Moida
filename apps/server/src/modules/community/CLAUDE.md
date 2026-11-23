@@ -11,6 +11,7 @@
   맞추기: `blog.app_code.shown`(`AppTablesHandler`) → `AppDataService.apply`가 없는 스키마 · 표 · 칸을 더하고 정책(`cairn_read` · `cairn_insert` · `cairn_update` · `cairn_delete`)을 다시 건다 (`AppTableRepository.ensure`). 지우는 DDL은 없다: 선언에서 빠진 표는 닫기만 한다(`open = false`, 줄은 남는다).
   회원 쪽 `api/community/data/:table`(`AppDataController`, 앱 도메인 · `MemberGuard`): 읽기 · 넣기 · 고치기 · 지우기. 쿼리는 트랜잭션 안에서 `cairn.member`(회원 id) · 5초 제한 · `SET LOCAL ROLE cairn_app`을 정한 뒤 돈다(`AppTableRepository.asMember`): 규칙(`anyone` · `member` · `owner` · `admin`)은 DB의 행 수준 보안이 거른다. 이 뒤에는 community의 다른 표를 읽지 못하므로 회원 확인은 그 앞에서 한다.
   관리자 `api/community/admin/:appId/data`(표 목록 · 줄 읽기 · 넣기 · 지우기) · `…/export`(`tables.json` · `schema.sql` · `data.sql` · `members.json`의 zip). 역할을 바꾸지 않는다.
+  남은 데이터 (2026-11-23): `AppDataQuery.holdings`가 앱마다 회원 수 · 앱 데이터 줄 수를 세어 Lookups `app-holdings`로 준다 (관리자만, 없는 앱은 빠짐). blog가 앱을 지우기 전에 묻고, 있으면 지우지 않는다.
   일꾼의 넣기는 설정 바꾸기 제안 `app_data`(`AppDataService.SETTING` · `rehearseSetting` · `applySetting`, `community-settings.ts`가 등록, 승인 뒤 반영: 원칙 7). 넣기만 한다.
 - `member/`: 회원(`Member`, 앱마다 따로) · 회원 세션(`MemberSession`, `cairn_member` 쿠키).
   규칙: 아이디 `LoginId`(영문 소문자로 시작하는 4~20자, 소문자로, 운영자로 보이는 아이디 막기, 바꾸지 않음) · 비밀번호 `MemberPassword`(10~200자, 아이디 · 닉네임과 같은 값 · 한 글자 되풀이 · 흔한 값 막기) · 닉네임 `Nickname`(2~20자 · 운영자로 보이는 이름 막기 · 겹침 열쇠, 7일에 한 번 바꿈) · 가입 대기 `Member.JOIN_WAIT_MS` · 차단(`blocked_until`, 무기한은 `Member.FOREVER`)이면 `assertActive`가 403.
@@ -55,7 +56,7 @@
 - `blog.app_code.shown`: 보이는 버전이 선언한 표에 맞춘다 (`AppTablesHandler`). 두 번 받아도 같다 (맞춘 버전 `applied_seq`보다 옛 것은 넘긴다)
 
 ## 써도 되는 모듈
-platform. blog의 앱은 platform `Lookups`로만 묻는다 (`modules.json`의 lookups.asks): `community-app`(공개된 커뮤니티 앱: 글 · 댓글 · 신고) · `member-app`(회원을 받는 공개 앱: 회원 API · 관리) · `app`(앱 데이터). 앱 도메인에서 여는 경로는 `HostGate.openPaths`로 등록한다 (`/api/community` 아래, `admin/`만 빼고 쓰기까지)
+platform. 앱마다 남은 회원 · 앱 데이터는 Lookups `app-holdings`로 준다 (blog의 앱 지우기). blog의 앱은 platform `Lookups`로만 묻는다 (`modules.json`의 lookups.asks): `community-app`(공개된 커뮤니티 앱: 글 · 댓글 · 신고) · `member-app`(회원을 받는 공개 앱: 회원 API · 관리) · `app`(앱 데이터). 앱 도메인에서 여는 경로는 `HostGate.openPaths`로 등록한다 (`/api/community` 아래, `admin/`만 빼고 쓰기까지)
 
 ## 지켜야 할 것
 - 회원 쿠키는 앱 도메인에서만 읽고, Domain 없이 그 도메인에만 둔다. 기본 도메인(콘솔과 같은 출처)에서는 회원 API가 없는 주소와 같다
