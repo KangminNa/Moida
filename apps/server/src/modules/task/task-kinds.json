@@ -1,5 +1,5 @@
 {
-  "general": { "delegable": true },
+  "general": { "skill": "cairn-work", "delegable": true },
   "draft_post": { "skill": "cairn-write", "delegable": true },
   "tidy_session": {
     "skill": "cairn-tidy",

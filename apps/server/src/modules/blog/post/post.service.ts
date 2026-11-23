@@ -12,7 +12,6 @@ import {
   type VersionTarget,
 } from '../../platform';
 import { AppRepository } from '../app/app.repository';
-import type { Menu } from '../menu/menu';
 import { MenuRepository } from '../menu/menu.repository';
 import { Post } from './post';
 import type {

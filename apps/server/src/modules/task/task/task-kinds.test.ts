@@ -41,6 +41,7 @@ describe('작업 종류 목록', () => {
       make: ['make'],
     });
     assert.deepEqual(TaskKinds.SKILLS, {
+      general: 'cairn-work',
       draft_post: 'cairn-write',
       tidy_session: 'cairn-tidy',
       browse: 'cairn-browse',
