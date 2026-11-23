@@ -1,7 +1,7 @@
 # 플러그인
 
 코어가 몰라도 되는 기능은 플러그인으로 만든다 (기획서 결정 기록 2026-10-10, 객체설계 12장).
-지금 있는 플러그인: `comments-giscus`(글 아래 giscus 댓글), `sync-github`(보관 형식을 GitHub에 동기화), `login-github`(GitHub 계정으로 로그인), `office`(콘솔의 픽셀 사무실), `browser-tabs`(서버 브라우저, 기능 패키지), `code-github`(코드 작업을 GitHub와 잇기, 기능 패키지), `map`(지도 API 등록: 설정만 있는 플러그인, 앱 코드의 `cairn.map`이 쓴다, docs/스토어.md 12.6a).
+지금 있는 플러그인: `comments-giscus`(글 아래 giscus 댓글), `sync-github`(보관 형식을 GitHub에 동기화), `login-github`(GitHub 계정으로 로그인), `office`(콘솔의 픽셀 사무실), `browser-tabs`(서버 브라우저, 기능 패키지), `code-github`(코드 작업을 GitHub와 잇기, 기능 패키지), `map`(지도 API 등록: 설정만 있는 플러그인, 앱 코드의 `cairn.map`이 쓴다, docs/스토어.md 12.6a), `messenger-telegram`(텔레그램 봇으로 대표와 대화, 기능 패키지, 대화 입구 `uses: chat`).
 
 ## 폴더 하나 = 플러그인 하나
 
@@ -71,6 +71,7 @@ plugins/<이름>/
 - 동작의 `allow`: `Operation.OWNER`(주인만), `Operation.ANYONE`(방문자도), 또는 `Actor.RUN` 같은 권한. 관리 일은 늘 `Operation.OWNER`. 입력이 바깥 사이트로 나가는 에이전트 도구는 `Actor.AGENT_OUT`(에이전트만, 기기는 안 된다. 2026-11-21부터 모든 에이전트가 비공개도 읽는 같은 일꾼이라 에이전트면 모두 통과한다, `browser-tabs`의 `site_run`)
 - 입력은 `this.fields(raw, (f) => …)`로 읽는다 (틀린 칸을 모아 400). 뜻의 검사는 `run`에서 `RuleViolation`
 - 목록 파일의 `api` · `tools`가 가리키지 않는 동작은 등록되지 않는다. 도구 입력 모양(`tools.<이름>.input`)을 바꾸면 쓰는 스킬 · 러너도 함께 고친다 (`browser-tabs`의 러너 쪽은 `apps/runner/src/tab-reader.ts` · `browse-stage.ts` · `browse-login.ts` · `click-runner.ts` · `stop-hold.ts` · `press-loop.ts` · `press-calls.ts` · `login-runner.ts` · `login-calls.ts` · `cairn-server.ts` · 사이트 도구의 `site-tool-calls.ts` · `site-build.ts` · `integration-runner.ts`, 스킬 `cairn-browse`, 지시문 틀 `site-build`)
+- 관리자의 대화에 말을 넣으려면 `uses`에 `chat`을 적고 쓰기 동작에서 `work.sendChat(공간, 대화 id 또는 null, requestId, 글)` (플러그인 API 0.10): 콘솔에서 보낸 말과 같다 (덧붙인 말 · 새 대화 · 같은 requestId는 한 번). 누가 보낸 말인지(관리자가 이어 둔 계정인지)는 패키지가 확인한다. 대화의 답은 `task.chat.said`(최종 답 · 덧붙인 말의 답 · 실패)로 받는다 (`messenger-telegram`)
 - 러너가 부르는 도구를 그 러너가 쥔 일에 묶으려면 `work.leased(id)` (플러그인 API 0.3): 코어가 임대를 확인하고 일의 id · 종류 · 입력(`LeasedWork`)을 준다. 0.4부터 일의 대상(`targetKind` · `targetId` · `targetVersion`), 0.5부터 지시(`instruction`), 0.7부터 관리자가 쓴 지시(`ownerText`: 위임된 일이면 맨 위 일의 제목과 지시, `read_url`의 기준과 같은 글)도 준다. 쥐고 있지 않으면 거절한다 (`code-github`의 `code_credential` · `code_pull_opened`, `browser-tabs`의 `browser_job` · `browser_click_hold` …)
 - 에이전트의 위임을 대상 종류로 먼저 보려면 `cairn.guardDelegate('<대상 종류>', new XxxGuard())` (플러그인 API 0.9, 읽기 동작 `Read`, 맡기는 에이전트의 자격): `RuleViolation`을 던지면 그 글로 위임이 거절된다 (`browser-tabs`의 `GuardSiteDelegation`: 켜진 사이트 도구가 있는 사이트의 browse는 도구를 써 본 뒤에만)
 - 이벤트를 받아 표에 쓰거나 이벤트를 남기려면 `cairn.onEvent(무늬, new XxxCommand())`: `allow = Operation.SYSTEM`, 코어가 트랜잭션 하나에서 돌린다 (처리기 `BaseHandler`는 DB에 쓸 길이 없다)

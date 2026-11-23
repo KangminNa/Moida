@@ -1,5 +1,6 @@
 import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
 import type { LeasedWork } from '../plugin/leases';
+import type { ChatSent } from '../plugin/plugin-chats';
 import type { Actor } from './actor';
 import { BaseRequest, type RequestFields } from './base-request';
 import type { ToolAnswer } from './base-tool';
@@ -63,6 +64,14 @@ export abstract class Command<I = unknown> extends Operation<I> {
   readonly writes = true;
 }
 
+/** 대화 입구: 부르는 쪽의 연결(트랜잭션)에 묶인 PluginChats.send */
+type ChatPort = (
+  spaceId: string,
+  chatId: string | null,
+  requestId: string,
+  text: string,
+) => Promise<ChatSent>;
+
 /**
  * 동작이 일하는 자리: 자기 스키마의 표만 조건 규칙으로 읽고 쓰고, 이벤트를 남긴다.
  * 그 기능만의 쿼리(표 잇기 · 모으기)는 work.sql로 쓴다 (자기 스키마만: pnpm check가 본다).
@@ -82,8 +91,25 @@ export class Work extends TableWriter {
     /** 요청자가 지금 임대를 쥔 일 (코어의 Leases). 러너가 부른 도구를 그 일에 묶을 때 */
     private readonly lease: (id: string) => Promise<LeasedWork> = () =>
       Promise.reject(new Error('임대를 확인할 수 없어요')),
+    /** 대화 입구 (플러그인 API 0.10). 목록 파일의 uses에 chat이 없으면 null */
+    private readonly chat: ChatPort | null = null,
   ) {
     super();
+  }
+
+  /**
+   * 관리자의 대화에 말 하나 (플러그인 API 0.10, uses의 chat): 이 일과 같은 트랜잭션에서.
+   * chatId가 없거나 그 대화가 없거나 휴지통이면 새 대화를 연다. 같은 requestId는 한 번만 (응답을 놓쳐 다시 와도 같다).
+   * 관리자가 이어 둔 계정에서 온 말인지는 패키지가 확인한다. 결재는 이 길로 하지 못한다
+   */
+  sendChat(
+    spaceId: string,
+    chatId: string | null,
+    requestId: string,
+    text: string,
+  ): Promise<ChatSent> {
+    if (!this.chat) throw new Error('대화 입구를 쓰려면 목록 파일의 uses에 chat을 적어요');
+    return this.chat(spaceId, chatId, requestId, text);
   }
 
   /** 요청자(러너)가 지금 임대를 쥔 일. 쥐고 있지 않으면 코어가 거절한다 (RuleViolation · NotFound) */

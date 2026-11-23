@@ -43,6 +43,7 @@ import { PackageService } from './plugin/package.service';
 import { PluginController } from './plugin/plugin.api';
 import { PluginQuery } from './plugin/plugin.query';
 import { PluginService } from './plugin/plugin.service';
+import { PluginChats } from './plugin/plugin-chats';
 import { PluginRegistry } from './plugin/plugin-registry';
 import { SecurityEventController } from './security/security-event.api';
 import { SecurityEventQuery } from './security/security-event.query';
@@ -62,6 +63,7 @@ import { OutboxWorker } from './worker/outbox-worker';
   providers: [
     PackageService,
     Leases,
+    PluginChats,
     Database,
     BlobStore,
     BlobSweepJob,
@@ -133,6 +135,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     PluginService,
     PackageService,
     Leases,
+    PluginChats,
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,

@@ -4,7 +4,7 @@
     "platform": {
       "dependsOn": [],
       "schemas": ["platform"],
-      "registries": { "provides": ["settings"], "asks": ["leases"] }
+      "registries": { "provides": ["settings"], "asks": ["leases", "plugin-chats"] }
     },
     "account": {
       "dependsOn": ["platform"],
@@ -34,7 +34,7 @@
       "schemas": ["task"],
       "lookups": { "asks": ["app"] },
       "registries": {
-        "provides": ["leases", "run-records", "settings"],
+        "provides": ["leases", "plugin-chats", "run-records", "settings"],
         "asks": ["action-checks", "settings", "site"]
       }
     },

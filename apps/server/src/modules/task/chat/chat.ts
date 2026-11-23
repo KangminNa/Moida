@@ -16,7 +16,7 @@ import { ChatView } from './chat.view';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
 import { ChatInspect } from './chat-inspect.policy';
 import { ChatRequest } from './chat-request.policy';
-import { type ChatSaid, ChatUpdates } from './chat-update.policy';
+import { type ChatSaid, ChatUpdates, type SettledLine } from './chat-update.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
 /** 회차 하나에 더 실을 것 (Chat.send) */
@@ -343,10 +343,14 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     return this.fix(lead, message, previous, now, { by: 'setting', note });
   }
 
-  /** 끝난 작업의 소식 (ChatUpdateService). 회차의 최종 답이면 알림 이벤트도 (답은 앞부분만) */
-  settled(kind: ChatUpdateKind, text: string, taskId: string, agentId: string | null, now: Date) {
+  /**
+   * 끝난 작업의 소식 (ChatUpdateService). 회차의 최종 답이면 알림 이벤트도 (답은 앞부분만).
+   * 관리자에게 돌아가는 말(최종 답 · 덧붙인 말의 답 · 회차 실패, said)은 task.chat.said로도 (메신저 패키지가 받는다, 2026-11-23)
+   */
+  settled({ kind, text, said }: SettledLine, taskId: string, agentId: string | null, now: Date) {
     this.note(kind, text, taskId, agentId, now);
     if (kind === ChatUpdates.FINAL) this.announce(Chat.ANSWERED, { text: text.slice(0, 300) });
+    if (said !== undefined) this.announce('task.chat.said', { kind, taskId, text: said });
   }
 
   /** 소식 한 줄을 남긴다 (끝난 작업 · post_update · 덧붙인 말). 저장할 때 함께 쌓인다 */

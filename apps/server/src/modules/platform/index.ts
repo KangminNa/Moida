@@ -87,6 +87,7 @@ export { LeasedWork, Leases, RunRecordTarget } from './plugin/leases';
 export { PackageService } from './plugin/package.service';
 export { PackageTool } from './plugin/package.tool';
 export { PluginService } from './plugin/plugin.service';
+export { ChatSent, PluginChats } from './plugin/plugin-chats';
 export type { PluginContext } from './plugin/plugin-context';
 export { LoginMethod } from './plugin/plugin-context';
 export { PluginManifest } from './plugin/plugin-manifest';
