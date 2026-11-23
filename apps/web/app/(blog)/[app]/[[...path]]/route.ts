@@ -9,6 +9,7 @@ import {
 } from '../../../_blog/app-screen';
 import { cairnAnswer } from '../../../_blog/cairn-client';
 import { slugFrom } from '../../../_blog/format';
+import { mapFor, mapHosts } from '../../../_blog/map-config';
 import { hostOf, originOf } from '../../../_blog/request-host';
 import { brokenAnswer, missingAnswer, unreachableAnswer } from '../../../_blog/site-answer';
 import type {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   const ticket = parts[0]?.startsWith(TICKET) ? (parts.shift() ?? '').slice(1) : null;
   // 미리 보기 주소 아래의 cairn.js (/<앱>/~<토큰>/_/cairn.js): 닫힌 스크립트 (미리 보기는 격리한다, 스토어 12.2)
   if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'cairn.js')
-    return cairnAnswer(false);
+    return cairnAnswer(false, await mapFor(false));
   if (parts[0] === 'files' && parts.length === 2) {
     // 없으면 화면으로 넘긴다: 정적 앱의 files/ 폴더일 수 있다 (그 밖에는 화면이 404를 낸다)
     const found = await file(request, app, parts[1] ?? '', ticket);
@@ -165,7 +166,7 @@ async function screen(
   const site = await siteOf(request, app, host, space);
   const headers = appHeaders(
     site.origin,
-    shown.hosts,
+    [...shown.hosts, ...mapHosts(await mapFor(shown.open))],
     ticket !== null,
     null,
     shown.open ? shown.permissions : null,
@@ -209,7 +210,7 @@ async function staticScreen(
   const site = await siteOf(request, app, host, space);
   const headers = appHeaders(
     site.origin,
-    shown.hosts,
+    [...shown.hosts, ...mapHosts(await mapFor(shown.open))],
     ticket !== null,
     site.own,
     shown.open ? shown.permissions : null,

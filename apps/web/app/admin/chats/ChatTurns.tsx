@@ -9,6 +9,7 @@ import { OutputOpen } from '../../_task/parts';
 import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
 import { ChatDecisions, type Decision, decisionOf } from './ChatDecisions';
 import { RefChips } from './ChatRefs';
+import { ChatReportLinks } from './ChatReportLinks';
 import { LinkCards } from './LinkCards';
 
 /** 일하는 중인 회차의 상태 */
@@ -38,6 +39,7 @@ const isBefore = (n: ChatNews, turns: readonly ChatTurn[]) =>
 // 팀이 무엇을 하는지는 과정을 펼쳐야 보인다. 결과 카드에 싣지 않는 승인(사이트 로그인 등)만 답 아래에 둔다.
 // 결과물 중심 (O-3): 서버가 연 회차는 지시문 원문 대신 한 줄(note), 결과물을 내는 회차의 긴 답은 세 줄까지 접는다
 export function ChatTurns({
+  chatId,
   turns,
   usage,
   news,
@@ -51,6 +53,8 @@ export function ChatTurns({
   changing,
   onChangeDecision,
 }: {
+  /** 대화 id (회차의 결과 HTML 주소) */
+  chatId: string;
   turns: readonly ChatTurn[];
   /** 회차마다 쓴 토큰 (O-1). 없는 회차는 아직 실행 기록이 없다 */
   usage: readonly ChatTurnUsage[];
@@ -143,6 +147,7 @@ export function ChatTurns({
               <span className="bubble-meta">
                 {partner ?? '에이전트'}
                 {t.finishedAt ? ` · ${when(t.finishedAt)}` : ''}
+                {t.reply && <ChatReportLinks chatId={chatId} turn={t.turn} />}
               </span>
               <Status turn={t} news={within} />
               <Reply turn={t} fold={(want !== null && want !== 'answer') || t.outputs.length > 0} />

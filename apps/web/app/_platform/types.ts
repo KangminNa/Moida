@@ -9,6 +9,7 @@ import type {
 import type {
   PluginActionResultView,
   PluginListView,
+  PluginSettingsView,
   PluginSettingView,
   PluginView,
 } from '../../../server/src/modules/platform/plugin/plugin.view';
@@ -36,3 +37,6 @@ export type SecurityEvent = SecurityEventPage['events'][number];
 /** 8번 실패해 멈춘 이벤트 (설정 › 일 › 처리 실패, 리팩토링 R1) */
 export type FailedEventList = ReturnType<FailedEventListView['toJSON']>;
 export type FailedEvent = FailedEventList['items'][number];
+
+/** 켜진 플러그인 하나의 공개 설정 (GET /api/plugins/<이름>/settings: 화면 자리 · 지도 플러그인) */
+export type PluginPublicSettings = ReturnType<PluginSettingsView['toJSON']>;

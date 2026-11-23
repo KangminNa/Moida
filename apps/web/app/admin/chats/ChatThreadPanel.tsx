@@ -257,6 +257,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
         {trashing.problem && <p className="error">{trashing.problem}</p>}
         {tuning.problem && <p className="error">{tuning.problem}</p>}
         <ChatTurns
+          chatId={d.chat.id}
           turns={d.turns}
           usage={d.usage.turns}
           news={d.news}
