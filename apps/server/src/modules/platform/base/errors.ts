@@ -94,6 +94,17 @@ export class Conflict extends DomainError {
   readonly status = 409;
 }
 
+/**
+ * ⑤ 규칙: 요청자가 본 version이 낡았다 (다시 읽으면 풀린다). 응답에 `stale: true`를 싣는다.
+ * 409가 다른 뜻(이름이 겹침 · 남은 것이 있어 못 지움)인 Conflict와 화면이 가를 수 있게: 화면은 낡은 version일 때만
+ * 자기 말("이미 바뀐 …")로 바꾸고, 나머지 409는 서버의 문구를 그대로 보인다 (웹 useAction의 conflict)
+ */
+export class StaleVersion extends Conflict {
+  override toJSON(): object {
+    return { ...super.toJSON(), stale: true };
+  }
+}
+
 /** ⑤ 규칙: 도메인 규칙에 어긋남 */
 export class RuleViolation extends DomainError {
   readonly code = 'rule_violation';

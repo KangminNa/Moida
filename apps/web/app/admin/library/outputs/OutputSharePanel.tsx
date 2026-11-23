@@ -62,11 +62,15 @@ export function OutputSharePanel({
     copy(reply.data);
   }
 
-  const end = (share: OutputShare) =>
-    action.run(share.id, () => api<OutputShare>('POST', `/api/output-shares/${share.id}/end`), {
-      done: '공유를 껐어요',
-      reload: list.reload,
-    });
+  const end = (share: OutputShare) => {
+    if (!window.confirm('공유를 끌까요? 이 링크는 다시 켤 수 없고, 새로 만들면 주소가 달라져요'))
+      return;
+    void action.run(
+      share.id,
+      () => api<OutputShare>('POST', `/api/output-shares/${share.id}/end`),
+      { done: '공유를 껐어요', reload: list.reload },
+    );
+  };
 
   if (!output && shares.length === 0) return null;
   return (

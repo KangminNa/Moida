@@ -17,6 +17,7 @@ import {
 } from '../../platform';
 import { MenuRepository } from '../menu/menu.repository';
 import { PageRepository } from '../page/page.repository';
+import { PostRepository } from '../post/post.repository';
 import type { App } from './app';
 import type {
   CheckDomainInput,
@@ -133,7 +134,10 @@ export class AppService extends EntityService<App> {
     });
   }
 
-  /** 지운다. 페이지 앱의 페이지는 앱 밖으로 풀고, 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다) */
+  /**
+   * 지운다. 페이지 앱의 페이지는 앱 밖으로 풀고, 휴지통의 글은 앱에서 빼 휴지통에 그대로 둔다.
+   * 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다)
+   */
   async remove(actor: Actor, req: VersionInput): Promise<void> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
@@ -147,13 +151,17 @@ export class AppService extends EntityService<App> {
           page.moveToApp(null, new Date());
           await pages.save(page);
         }
-      const left = await apps.contents(app.id);
-      if (left.posts + left.pages + left.issues > 0) {
-        const trashed = left.trashed > 0 ? ` (휴지통 ${left.trashed}개)` : '';
-        throw new Conflict(
-          `앱에 글 ${left.posts}개${trashed} · 페이지 ${left.pages}개 · 호 ${left.issues}개가 있어 지우지 못해요. 다른 앱으로 옮긴 뒤 지워요`,
-        );
+      // 휴지통의 글은 앱에서 빼 둔다 (휴지통에는 그대로): 옮길 수 없는 글이 지우기를 막지 않게
+      const posts = new PostRepository(tx);
+      for (const post of await posts.lockTrashedIn(spaceId, { appId: app.id })) {
+        post.unplaceTrashed(true, actor, new Date());
+        await posts.save(post);
       }
+      const left = await apps.contents(app.id);
+      if (left.posts + left.pages + left.issues > 0)
+        throw new Conflict(
+          `앱에 글 ${left.posts}개 · 페이지 ${left.pages}개 · 호 ${left.issues}개가 있어 지우지 못해요. 다른 앱으로 옮기거나 지운 뒤 지워요`,
+        );
       await new MenuRepository(tx).removeAllIn(app.id);
       app.remove();
       await apps.remove(app);

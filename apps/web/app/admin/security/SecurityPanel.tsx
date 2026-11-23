@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useDevices, useSpace } from '../../_account/live';
 import type { WebSessionItem, WebSessionList } from '../../_account/types';
 import { api } from '../../_lib/client-api';
+import { ago } from '../../_lib/time-ago';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { browserOf } from '../../_platform/labels';
@@ -63,7 +64,7 @@ export function SecurityPanel() {
               <span>틀린 로그인</span>
               <b>
                 아이디마다 {list.limits.triesPerLogin}번 · 한 곳에서 {list.limits.triesPerPlace}번 /{' '}
-                {list.limits.windowSeconds}초, 넘으면 잠시 막음
+                {Math.round(list.limits.windowSeconds / 60)}분, 넘으면 그 시간이 지날 때까지 막음
               </b>
             </li>
             <li>
@@ -112,7 +113,7 @@ export function SecurityPanel() {
                   </b>
                   <small>
                     {s.lastIp ?? s.ip ?? '주소 모름'} · 로그인 {when(s.createdAt)} · 마지막 접근{' '}
-                    {s.lastSeenAt ? when(s.lastSeenAt) : '–'}
+                    {s.lastSeenAt ? ago(s.lastSeenAt) : '–'}
                   </small>
                 </div>
                 {!s.current && (
@@ -147,7 +148,7 @@ export function SecurityPanel() {
                   <b>{d.name}</b>
                   <small>
                     {d.lastSeenAt
-                      ? [when(d.lastSeenAt), d.lastIp].filter(Boolean).join(' · ')
+                      ? [ago(d.lastSeenAt), d.lastIp].filter(Boolean).join(' · ')
                       : '접근 기록 없음'}
                   </small>
                 </div>

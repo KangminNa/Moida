@@ -22,9 +22,10 @@ export function LinkedLogins({ onMessage }: { onMessage: (text: string) => void 
   const action = useAction();
   const methods = found.data?.methods ?? null;
   const links = linked.data?.links ?? [];
-  const error = action.problem ?? found.error;
+  const error = found.error ?? linked.error;
 
   async function unlink(method: string) {
+    if (!window.confirm(`${method} 연결을 해제할까요? 그 계정으로는 더 로그인할 수 없어요`)) return;
     const reply = await action.run(method, () => api('DELETE', `/api/auth/links/${method}`), {
       reload: () => Promise.all([found.reload(), linked.reload()]),
     });
@@ -36,6 +37,7 @@ export function LinkedLogins({ onMessage }: { onMessage: (text: string) => void 
   return (
     <div className="field">
       <span>연결된 로그인</span>
+      {action.problem && <p className="error">{action.problem}</p>}
       {methods.length === 0 ? (
         <small>로그인 플러그인(예: login-github)을 켜면 그 계정으로도 로그인할 수 있어요</small>
       ) : (

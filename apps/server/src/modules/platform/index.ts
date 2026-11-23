@@ -39,6 +39,7 @@ export {
   InvalidRequest,
   NotFound,
   RuleViolation,
+  StaleVersion,
   TooLarge,
   TooManyRequests,
   Unauthenticated,

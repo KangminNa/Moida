@@ -11,6 +11,7 @@ import {
   type Sql,
   type VersionInput,
 } from '../../platform';
+import { PostRepository } from '../post/post.repository';
 import { Menu } from './menu';
 import type { CreateMenuInput, UpdateMenuInput } from './menu.input';
 import { MenuRepository } from './menu.repository';
@@ -81,6 +82,12 @@ export class MenuService extends EntityService<Menu> {
       const menus = this.store(tx);
       const menu = await menus.lock(spaceId, req.id);
       menu.assertVersion(req.version);
+      // 휴지통의 글은 메뉴에서 빼 둔다 (앱과 휴지통에는 그대로): 목록에 보이지 않는 글이 지우기를 막지 않게
+      const posts = new PostRepository(tx);
+      for (const post of await posts.lockTrashedIn(spaceId, { menuId: menu.id })) {
+        post.unplaceTrashed(false, actor, new Date());
+        await posts.save(post);
+      }
       const items = await menus.itemsIn(menu.id);
       if (items > 0)
         throw new RuleViolation(`메뉴에 ${items}개가 있어 지우지 못해요. 먼저 빼 주세요`);

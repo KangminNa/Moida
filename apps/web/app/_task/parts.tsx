@@ -1,5 +1,5 @@
 import { NewTabLink } from '../_ui/NewTabLink';
-import { APPROVAL_STATUS, taskStatusLabel, tokens } from './labels';
+import { APPROVAL_STATUS, share, taskStatusLabel, tokens } from './labels';
 import type { Agent } from './types';
 
 // 상태는 색 없이 채움·테두리·굵기로 구분한다.
@@ -40,25 +40,27 @@ export function ApprovalPill({ status }: { status: string }) {
   return <span className={look}>{APPROVAL_STATUS[status] ?? status}</span>;
 }
 
-/** 이번 달 사용량과 한도. 숫자가 함께 보이므로 막대는 읽어 주지 않는다 */
-export function AgentUsage({ agent }: { agent: Agent }) {
+/**
+ * 이번 달 사용량. 한도가 있으면 한도에서의 비율, 없으면 모든 일꾼이 쓴 것(total)에서의 몫 (옅은 막대).
+ * 숫자가 함께 보이므로 막대는 읽어 주지 않는다
+ */
+export function AgentUsage({ agent, total }: { agent: Agent; total: number }) {
   const { usedThisMonth: used, monthlyLimit: limit } = agent;
   const over = limit !== null && used > limit;
+  const whole = limit ?? total;
   return (
     <div className="usage">
       <div className="usage-text">
         <span>이번 달</span>
         <span className={over ? 'mono strong' : 'mono'}>
           {limit === null
-            ? `${tokens(used)} 토큰 · 한도 없음`
-            : `${tokens(used)} / ${tokens(limit)} 토큰${over ? ' · 한도 초과' : ''}`}
+            ? `${tokens(used)} 토큰 · 전체의 ${share(used, total)}`
+            : `${tokens(used)} / ${tokens(limit)} 토큰 · ${share(used, limit)}${over ? ' · 한도 초과' : ''}`}
         </span>
       </div>
-      {limit !== null && (
-        <div className="bar" aria-hidden="true">
-          <i style={{ width: `${Math.min(100, Math.round((used / limit) * 100))}%` }} />
-        </div>
-      )}
+      <div className={limit === null ? 'bar part' : 'bar'} aria-hidden="true">
+        <i style={{ width: `${whole > 0 ? Math.min(100, (used / whole) * 100) : 0}%` }} />
+      </div>
     </div>
   );
 }

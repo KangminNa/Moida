@@ -4,7 +4,7 @@ import { type FormEvent, useId, useRef, useState } from 'react';
 import { flatTree } from '../../_task/labels';
 import { useGoals } from '../../_task/live';
 import type { Agent, Schedule } from '../../_task/types';
-import { type Period, PeriodFields, periodBody, periodOf } from './PeriodFields';
+import { type Period, PeriodFields, periodBody, periodOf, runsPerDay } from './PeriodFields';
 import { type Recipe, RecipeFields, recipeOf, TriggerFields } from './RecipeFields';
 
 /** 하루 한도의 끝 (서버의 Schedule.DAILY_MAX_LIMIT, 5분마다 하루 내내) */
@@ -85,6 +85,8 @@ export function ScheduleForm({
   const [recipe, setRecipe] = useState<Recipe>(recipeOf(schedule));
   const [instruction, setInstruction] = useState(schedule?.instruction ?? '');
   const [dailyMax, setDailyMax] = useState(schedule?.dailyMax ?? 3);
+  /** 이 주기가 하루에 돌 수 있는 횟수 (하루 한도와 견준다) */
+  const perDay = runsPerDay(period);
   // 만들기: 같은 내용을 다시 보내면 같은 requestId (응답을 놓쳐 다시 눌러도 스케줄은 하나)
   const requestId = useRef<string | null>(null);
   const goalRows = flatTree(goals.data?.goals ?? [], (g) => g.parentId).filter(
@@ -185,6 +187,12 @@ export function ScheduleForm({
           onChange={(e) => edit(() => setDailyMax(Number(e.target.value)))}
         />
         <small>시간대 기준 하루에 저절로 만드는 작업 수 (1~288). "지금 실행"은 세지 않아요</small>
+        {recipe.trigger === 'time' && perDay > dailyMax && (
+          <small className="warn">
+            이 주기는 하루 {perDay}번인데 한도가 {dailyMax}번이라, {dailyMax}번 만든 뒤 그날은
+            멈춰요. 하루 내내 돌리려면 한도를 {perDay} 이상으로
+          </small>
+        )}
       </div>
       <div className="field">
         <label htmlFor={`${id}-zone`}>시간대</label>

@@ -1,8 +1,13 @@
 // 웹 전체가 함께 쓰는 것. 서버 응답 모양은 여기에 손으로 적지 않고 서버 view에서 import type으로
 // app/_<모듈>/types.ts에 만든다 (scripts/check-structure.mjs). 오류 모양만은 모든 실패 응답의 모양이라 여기 둔다.
 
-/** 서버의 오류 모양: { code, message, fields? } */
-export type ApiError = { code: string; message: string; fields?: Record<string, string> };
+/** 서버의 오류 모양: { code, message, fields?, stale? }. stale은 본 version이 낡은 409 (서버 StaleVersion) */
+export type ApiError = {
+  code: string;
+  message: string;
+  fields?: Record<string, string>;
+  stale?: boolean;
+};
 
 /** 기기 권한의 화면 이름 */
 export const SCOPE_LABELS: Record<string, string> = {

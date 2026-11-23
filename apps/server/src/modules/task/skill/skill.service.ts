@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import {
   type Actor,
-  Conflict,
   Database,
   EntityService,
   Idempotency,
   NotFound,
   type Sql,
+  StaleVersion,
 } from '../../platform';
 import { RepoSkillGateway } from './repo-skill.gateway';
 import { Skill } from './skill';
@@ -46,7 +46,7 @@ export class SkillService extends EntityService<Skill> {
       const found = await skills.lockByName(spaceId, req.name);
       // 콘솔 판이 아직 없으면 화면이 본 version은 0이다
       if (!found && req.version !== 0)
-        throw new Conflict('다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요');
+        throw new StaleVersion('다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요');
       found?.assertVersion(req.version);
       const skill = found ?? Skill.open(spaceId, req.name, now);
       skill.addRevision(files, base, req.note, now);

@@ -44,6 +44,11 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   const router = useRouter();
   const list = agents.data?.agents;
   const problem = agents.error ?? action.problem ?? tidy.problem;
+  /** 모든 일꾼(대표 포함)이 이번 달에 쓴 토큰: 카드마다 그중 몫을 보인다 */
+  const total = [...(list ?? []), ...(lead ? [lead] : [])].reduce(
+    (all, a) => all + a.usedThisMonth,
+    0,
+  );
 
   /** 실행 중이거나 기다리는 작업이 있으면 그 상태 이름 (승인 · 하위 작업 대기를 나눈다) */
   function workOf(agent: Agent): string | null {
@@ -169,7 +174,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
       ) : list.length === 0 ? (
         open !== NEW && (
           <>
-            {lead && <LeadCard lead={lead} work={workOf(lead)} hold={hold(lead)} />}
+            {lead && <LeadCard lead={lead} work={workOf(lead)} hold={hold(lead)} total={total} />}
             <div className="panel">
               <b>일꾼 없음</b>
               <p className="note">대표가 맡길 일꾼이 생길 때까지 작업은 대기</p>
@@ -181,7 +186,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
         )
       ) : (
         <div className="agents">
-          {lead && <LeadCard lead={lead} work={workOf(lead)} hold={hold(lead)} />}
+          {lead && <LeadCard lead={lead} work={workOf(lead)} hold={hold(lead)} total={total} />}
           {list.map((a) =>
             open === a.id ? (
               <AgentForm
@@ -202,6 +207,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
                 agent={a}
                 work={workOf(a)}
                 hold={hold(a)}
+                total={total}
                 score={usage.data?.agents.find((u) => u.id === a.id)?.scorecard ?? null}
                 runner={
                   a.runnerId ? (runners.find((r) => r.runner.id === a.runnerId) ?? null) : undefined

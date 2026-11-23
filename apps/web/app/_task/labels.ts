@@ -271,6 +271,12 @@ export function tokens(n: number): string {
   return `${(Number.isInteger(man) ? man : Math.round(man * 10) / 10).toLocaleString('ko-KR')}만`;
 }
 
+/** 비율 (%). 조금이라도 있는데 반올림해 0이면 "1% 미만", 전체가 0이면 0% */
+export function share(part: number, whole: number): string {
+  const percent = whole > 0 ? Math.round((part / whole) * 100) : 0;
+  return part > 0 && percent === 0 ? '1% 미만' : `${percent}%`;
+}
+
 /** 결과물의 종류 (서버 OutputPolicy.KINDS) */
 export const OUTPUT_KINDS: Record<string, string> = {
   document: '문서',

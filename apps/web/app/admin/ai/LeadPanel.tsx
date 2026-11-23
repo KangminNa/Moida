@@ -2,7 +2,7 @@
 
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
-import { tokens } from '../../_task/labels';
+import { share, tokens } from '../../_task/labels';
 import { useAgents, useLead } from '../../_task/live';
 import { type LeadBody, LeadForm } from './LeadForm';
 
@@ -32,7 +32,11 @@ export function LeadPanel() {
       <header className="page-head">
         <h2>대표</h2>
         {boss && boss.usedThisMonth > 0 && (
-          <small className="label-mono">이번 달 토큰 {tokens(boss.usedThisMonth)}</small>
+          <small className="label-mono">
+            {boss.monthlyLimit === null
+              ? `이번 달 ${tokens(boss.usedThisMonth)} 토큰 · 한도 없음`
+              : `이번 달 ${tokens(boss.usedThisMonth)} / ${tokens(boss.monthlyLimit)} 토큰 · ${share(boss.usedThisMonth, boss.monthlyLimit)}`}
+          </small>
         )}
       </header>
       <p className="note">모든 대화를 받아 일꾼에게 나눠 맡기고 결과를 모아 답해요</p>

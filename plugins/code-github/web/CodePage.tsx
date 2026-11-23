@@ -196,6 +196,12 @@ function RepoItem({
   }
 
   async function archive() {
+    if (
+      !window.confirm(
+        `${repo.name}을(를) 보관할까요? 목록에서 사라지고 새 일을 맡길 수 없어요. 다시 꺼내는 길은 없어요`,
+      )
+    )
+      return;
     const reply = await call('POST', `repos/${repo.id}/archive`, { version: repo.version });
     if (!reply.ok) return notify(reply.message);
     notify(`${repo.name} 보관함`);

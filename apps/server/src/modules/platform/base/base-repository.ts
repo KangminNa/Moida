@@ -1,6 +1,6 @@
 import type { BaseEntity } from './base-entity';
 import type { Row, Sql } from './database';
-import { Conflict, NotFound } from './errors';
+import { NotFound, StaleVersion } from './errors';
 import { Outbox } from './outbox';
 import { TableWriter } from './table-query';
 
@@ -29,10 +29,10 @@ export abstract class BaseRepository<E extends BaseEntity> extends TableWriter {
 
   /**
    * `UPDATE … WHERE id = … AND version = …` 결과를 확인한다.
-   * 바뀐 행이 없으면 그사이 다른 쪽이 먼저 저장한 것이므로 Conflict.
+   * 바뀐 행이 없으면 그사이 다른 쪽이 먼저 저장한 것이므로 StaleVersion(409).
    */
   protected expectUpdated(count: number, entity: E): void {
-    if (count === 0) throw new Conflict(`다른 곳에서 먼저 바뀌었어요 (${entity.id})`);
+    if (count === 0) throw new StaleVersion(`다른 곳에서 먼저 바뀌었어요 (${entity.id})`);
     entity.markSaved(entity.version + 1);
   }
 

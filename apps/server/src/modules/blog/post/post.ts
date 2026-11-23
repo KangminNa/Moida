@@ -22,6 +22,7 @@ import { PublicSavedPostView, SavedPostView, ToolDraftView } from './post.view';
 import { PostContent } from './post-content';
 import { PostPublish } from './post-publish.policy';
 import { PostRevision } from './post-revision';
+import { PostTags } from './post-tags.policy';
 
 /** 글 한 줄과 함께 읽는 칸: 지금 판의 제목·본문, 판 수, 참고 wiki */
 export interface LoadedPost extends PostRow {
@@ -41,8 +42,8 @@ export class Post extends TableEntity<PostRow, PostNew> {
   static readonly DRAFT: PostStatus = 'draft';
   static readonly PUBLISHED: PostStatus = 'published';
   static readonly UNLISTED: PostStatus = 'unlisted';
-  static readonly TAGS_MAX = 20;
-  static readonly TAG_MAX = 40;
+  static readonly TAGS_MAX = PostTags.MAX;
+  static readonly TAG_MAX = PostTags.LENGTH_MAX;
   /** 글 하나의 참고 wiki */
   static readonly REFS_MAX = 20;
   /** 휴지통에 둔 글을 영구히 지우기까지 (영구 삭제 일꾼은 뒤 단계) */
@@ -52,19 +53,8 @@ export class Post extends TableEntity<PostRow, PostNew> {
   private static readonly RULES: ColumnRules<PostRow> = {
     /** 모양과 겹침은 SlugPolicy가 먼저 본다 (겹침은 DB를 읽어야 안다) */
     slug: (value) => value,
-    /** 앞뒤 빈칸·# 지우기, 빈 것·겹치는 것 빼기 */
-    tags: (value) => {
-      const clean = [
-        ...new Set(
-          value.map((t) => t.trim().replace(/^#+/, '').trim()).filter((t) => t.length > 0),
-        ),
-      ];
-      if (clean.length > Post.TAGS_MAX)
-        throw new RuleViolation(`태그는 ${Post.TAGS_MAX}개까지예요`);
-      const long = clean.find((t) => t.length > Post.TAG_MAX);
-      if (long) throw new RuleViolation(`태그는 ${Post.TAG_MAX}자까지예요: ${long}`);
-      return clean;
-    },
+    /** 앞뒤 빈칸·# 지우기, 빈 것·겹치는 것 빼기, 개수 · 길이 한도 (PostTags) */
+    tags: (value) => PostTags.clean(value),
     align: (value) => {
       if (!ValueList.has(POST_ALIGN, value))
         throw new RuleViolation(`정렬은 ${POST_ALIGN.join(' · ')} 중 하나예요`);
@@ -237,7 +227,8 @@ export class Post extends TableEntity<PostRow, PostNew> {
     by: Actor,
     now: Date,
   ): void {
-    this.assertLive();
+    // 빼기는 휴지통의 글에도 된다: 호를 지울 때 휴지통 글이 지우기를 막지 않게
+    if (issueId !== null) this.assertLive();
     if (this.row.status !== Post.DRAFT) Post.assertOwner(by);
     if (issueId === this.row.issue_id && (issueId === null || order === this.row.issue_order))
       return;
@@ -298,6 +289,23 @@ export class Post extends TableEntity<PostRow, PostNew> {
     this.put('purge_after', new Date(now.getTime() + Post.TRASH_DAYS * 24 * 60 * 60 * 1000));
     this.touch(now);
     this.announce('blog.post.deleted');
+  }
+
+  /**
+   * 휴지통의 글을 놓인 자리에서 뺀다 (그 글이 든 앱이나 메뉴를 지울 때). 휴지통의 글은 옮길 수 없어
+   * 그대로 두면 눈에 보이지 않는 글이 지우기를 막는다. 메뉴 · 호에서 빠지고, fromApp이면 앱에서도 빠져 임시 글이 된다
+   * (앱 밖의 글은 공개일 수 없다). 휴지통에는 그대로 있고 되살리면 그 모습이다 (원칙 2: 버리지 않는다).
+   * 휴지통에 갈 때 이미 지운 것으로 알렸으므로 이벤트는 없다
+   */
+  unplaceTrashed(fromApp: boolean, by: Actor, now: Date): void {
+    Post.assertOwner(by);
+    if (!this.row.deleted_at) throw new RuleViolation('휴지통에 있는 글이 아니에요');
+    this.put('menu_id', null);
+    this.put('issue_id', null);
+    this.put('issue_order', null);
+    if (fromApp) this.put('app_id', null);
+    if (fromApp) this.put('status', Post.DRAFT);
+    this.touch(now);
   }
 
   /** 휴지통에서 되살리기. 공개 범위는 지우기 전 그대로 */

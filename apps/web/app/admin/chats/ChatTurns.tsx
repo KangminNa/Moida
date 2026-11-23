@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { ApprovalDetail } from '../../_task/ApprovalDetail';
-import { clock, DELIVER_LABELS, NEWS_KINDS, OUTPUT_KINDS, tokens } from '../../_task/labels';
+import { DELIVER_LABELS, NEWS_KINDS, OUTPUT_KINDS, tokens, when } from '../../_task/labels';
 import { MarkdownText } from '../../_task/MarkdownText';
 import { OutputOpen } from '../../_task/parts';
 import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
@@ -118,7 +118,7 @@ export function ChatTurns({
                 ) : (
                   <div key={n.n} className="bubble theirs">
                     <span className="bubble-meta">
-                      {n.agent ?? partner} · {clock(n.createdAt)}
+                      {n.agent ?? partner} · {when(n.createdAt)}
                     </span>
                     <p className="text">{n.text}</p>
                   </div>
@@ -142,7 +142,7 @@ export function ChatTurns({
             <div className="bubble theirs" aria-live={t.finishedAt ? undefined : 'polite'}>
               <span className="bubble-meta">
                 {partner ?? '에이전트'}
-                {t.finishedAt ? ` · ${clock(t.finishedAt)}` : ''}
+                {t.finishedAt ? ` · ${when(t.finishedAt)}` : ''}
               </span>
               <Status turn={t} news={within} />
               <Reply turn={t} fold={(want !== null && want !== 'answer') || t.outputs.length > 0} />
@@ -219,7 +219,7 @@ function Mine({ who, at, text }: { who: string; at?: string; text: string }) {
     <div className="bubble mine">
       <span className="bubble-meta">
         {who}
-        {at ? ` · ${clock(at)}` : ''}
+        {at ? ` · ${when(at)}` : ''}
       </span>
       <p className="text">{text}</p>
     </div>
@@ -233,7 +233,7 @@ function Before({ items, me }: { items: readonly ChatNews[]; me: string }) {
       <Mine key={n.n} who={me} at={n.createdAt} text={n.text} />
     ) : n.kind === 'question' ? (
       <div key={n.n} className="bubble theirs">
-        <span className="bubble-meta">질문 · {clock(n.createdAt)}</span>
+        <span className="bubble-meta">질문 · {when(n.createdAt)}</span>
         <p className="text">{n.text}</p>
       </div>
     ) : (
@@ -278,7 +278,7 @@ function Process({
           <li key={n.n}>
             <small>
               {NEWS_KINDS[n.kind] ?? n.kind}
-              {n.agent ? ` · ${n.agent}` : ''} · {clock(n.createdAt)}
+              {n.agent ? ` · ${n.agent}` : ''} · {when(n.createdAt)}
             </small>
             <span>{n.text}</span>
           </li>

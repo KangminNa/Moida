@@ -2325,7 +2325,23 @@ a.chip {
   background: var(--fg);
 }
 
-/* 홈의 사용량. 막대마다 글자 값이 함께 있다 */
+/* 한도가 아니라 전체에서의 몫을 보이는 막대는 옅게 */
+.bar.part i {
+  background: var(--faint);
+}
+
+.usage-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* 사용량: 구독 칸 아래에 일꾼 칸 (좁은 설정 화면이라 나란히 두지 않는다) */
+.usage-cols {
+  display: grid;
+  gap: 18px;
+}
+
+/* 사용량. 막대마다 글자 값이 함께 있다 */
 .usage-agents {
   margin: 0;
   list-style: none;

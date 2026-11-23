@@ -52,6 +52,7 @@ async function send<T>(path: string, init: RequestInit): Promise<ApiReply<T>> {
         code: json.code ?? 'error',
         message: json.message ?? `오류 ${res.status}`,
         fields: json.fields,
+        stale: json.stale === true,
       },
     };
   } catch {

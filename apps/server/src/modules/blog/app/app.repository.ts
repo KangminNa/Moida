@@ -61,20 +61,14 @@ export class AppRepository extends TableRepository<AppRow, App> {
     return row?.taken ?? false;
   }
 
-  /** 앱에 든 글(휴지통 포함, trashed는 그 가운데 휴지통의 것) · 페이지 · 호의 수. 모두 없어야 지운다 (빈 메뉴는 함께 지운다) */
-  async contents(
-    appId: string,
-  ): Promise<{ posts: number; trashed: number; pages: number; issues: number }> {
-    const [row] = await this.sql<
-      { posts: number; trashed: number; pages: number; issues: number }[]
-    >`
+  /** 앱에 든 글 · 페이지 · 호의 수. 모두 없어야 지운다 (빈 메뉴는 함께 지운다. 휴지통의 글은 AppService가 먼저 앱에서 뺀다) */
+  async contents(appId: string): Promise<{ posts: number; pages: number; issues: number }> {
+    const [row] = await this.sql<{ posts: number; pages: number; issues: number }[]>`
       SELECT (SELECT count(*) FROM blog.posts WHERE app_id = ${appId})::int AS posts,
-             (SELECT count(*) FROM blog.posts
-              WHERE app_id = ${appId} AND deleted_at IS NOT NULL)::int AS trashed,
              (SELECT count(*) FROM blog.pages WHERE app_id = ${appId})::int AS pages,
              (SELECT count(*) FROM blog.issues i JOIN blog.menus m ON m.id = i.menu_id
               WHERE m.app_id = ${appId})::int AS issues`;
-    return row ?? { posts: 0, trashed: 0, pages: 0, issues: 0 };
+    return row ?? { posts: 0, pages: 0, issues: 0 };
   }
 
   /** 지운다 (설정이라 판을 남기지 않는다). 안의 메뉴는 부르는 쪽이 먼저 지운다. 지운 것을 알린다 (App.remove) */

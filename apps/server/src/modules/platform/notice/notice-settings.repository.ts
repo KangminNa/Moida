@@ -1,5 +1,5 @@
 import { BaseRepository } from '../base/base-repository';
-import { Conflict } from '../base/errors';
+import { StaleVersion } from '../base/errors';
 import { Outbox } from '../base/outbox';
 import type { EntityStore } from '../base/table-repository';
 import { type LoadedNoticeSettings, NoticeSettings } from './notice-settings';
@@ -50,7 +50,7 @@ export class NoticeSettingsRepository
       INSERT INTO platform.notice_settings ${this.sql(columns as never)}
       ON CONFLICT (space_id) DO NOTHING
       RETURNING *, space_id AS id`;
-    if (!row) throw new Conflict('다른 곳에서 먼저 바뀌었어요');
+    if (!row) throw new StaleVersion('다른 곳에서 먼저 바뀌었어요');
     settings.saved(row);
   }
 

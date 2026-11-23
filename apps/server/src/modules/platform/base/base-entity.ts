@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Conflict } from './errors';
+import { StaleVersion } from './errors';
 import type { DomainEvent } from './event';
 
 // 도메인 객체의 기반. id와 버전(낙관적 잠금), 그리고 저장할 때 내보낼 이벤트를 가진다.
@@ -17,10 +17,10 @@ export abstract class BaseEntity {
     return this.loadedVersion;
   }
 
-  /** 요청자가 보고 고친 버전이 지금과 같은지. 다르면 그사이 다른 곳에서 바뀐 것이므로 Conflict */
+  /** 요청자가 보고 고친 버전이 지금과 같은지. 다르면 그사이 다른 곳에서 바뀐 것이므로 StaleVersion(409) */
   assertVersion(seen: number): void {
     if (seen !== this.loadedVersion)
-      throw new Conflict(
+      throw new StaleVersion(
         `다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요 (지금 ${this.loadedVersion}, 보낸 것 ${seen})`,
       );
   }

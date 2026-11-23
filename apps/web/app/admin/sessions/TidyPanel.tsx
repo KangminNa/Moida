@@ -46,7 +46,14 @@ export function TidyPanel() {
     const reply = await action.run('backlog', () => api<TidyBacklog>('POST', '/api/tidy/backlog'));
     if (!reply?.ok) return;
     const { requested, remaining } = reply.data;
-    setResult(requested === 0 ? '정리할 세션 없음' : `${requested}건 요청 · ${remaining}건 남음`);
+    // 한 번에 20건까지 요청한다 (서버 TidyQuery.BACKLOG_BATCH): 남은 것이 있으면 다시 누르면 된다는 것까지
+    setResult(
+      requested === 0
+        ? '정리할 세션 없음'
+        : remaining > 0
+          ? `${requested}건 요청 (한 번에 20건까지) · ${remaining}건 남음. 다시 누르면 이어서 요청해요`
+          : `${requested}건 요청 · 남은 것 없음`,
+    );
   }
 
   return (
