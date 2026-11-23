@@ -8,6 +8,8 @@
 //      응답 타입은 서버 view에서 import type으로 만든다 (ReturnType<XxxView['toJSON']>, app/_<모듈>/types.ts)
 //   5. 웹의 최상위 경로(app/의 폴더 · (묶음) 안의 폴더, next.config의 rewrites)는 앱 주소로 못 쓰는 이름(App.RESERVED)이다:
 //      빠지면 그 이름의 앱 주소(/<앱>)가 웹의 화면에 가려진다 (docs/스토어.md 8.7)
+//   6. compose의 일꾼(worker)은 서버와 같은 파일 저장소(blob-data · CAIRN_BLOBS_DIR)를 붙인다: 이벤트를 받는 쪽이 파일을 읽고 쓴다.
+//      빠지면 일꾼이 서버가 받은 파일을 찾지 못한다 (2026-11-23 배포 서버: task.app_code.built가 "파일을 찾을 수 없어요"로 멈춤)
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -180,6 +182,35 @@ function checkWebRoutes() {
       );
 }
 
+/** compose 파일에서 서비스 하나의 줄들 (들여쓰기 두 칸의 "<이름>:"부터 다음 서비스 앞까지) */
+function serviceBlock(text, name) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => line === `  ${name}:`);
+  if (start < 0) return null;
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^ {0,2}\S/.test(line) && !line.trimStart().startsWith('#'));
+  return (end < 0 ? rest : rest.slice(0, end)).join('\n');
+}
+
+function checkCompose() {
+  for (const name of ['docker-compose.yml', 'docker-compose.prod.yml']) {
+    const text = readFileSync(join(root, name), 'utf8');
+    for (const service of ['server', 'worker']) {
+      const block = serviceBlock(text, service);
+      if (block === null) {
+        problems.push(`${name}에 ${service} 서비스가 없어요`);
+        continue;
+      }
+      if (!/^\s*- blob-data:\/data\/blobs\b/m.test(block))
+        problems.push(
+          `${name}의 ${service}에 파일 저장소(blob-data:/data/blobs)가 붙어 있지 않아요`,
+        );
+      if (!/^\s*CAIRN_BLOBS_DIR: \/data\/blobs\b/m.test(block))
+        problems.push(`${name}의 ${service}에 CAIRN_BLOBS_DIR: /data/blobs가 없어요`);
+    }
+  }
+}
+
 const files = walk(modulesDir).filter((f) => f.endsWith('.ts'));
 checkNames(files);
 checkTests(files);
@@ -187,6 +218,7 @@ checkMenu();
 checkWebTypes();
 checkReserved();
 checkWebRoutes();
+checkCompose();
 
 if (problems.length > 0) {
   console.error(`구조 검사 위반 ${problems.length}건\n`);

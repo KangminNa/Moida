@@ -106,9 +106,11 @@ services:
       DATABASE_URL: *db-url
       CAIRN_SECRET_KEY: ${CAIRN_SECRET_KEY:-}
       CAIRN_WEB_URL: ${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}   # 브라우저 푸시의 연락처 (https일 때)
+      CAIRN_BLOBS_DIR: /data/blobs   # 서버와 같은 파일 저장소: 이벤트를 받는 쪽이 파일을 읽고 쓴다 (앱 코드 버전 · 페이지 · 안 쓰는 파일 지우기)
     volumes:
       - ./apps/server/src:/repo/apps/server/src
       - ./plugins:/repo/plugins
+      - blob-data:/data/blobs
     depends_on:
       migrate:
         condition: service_completed_successfully
