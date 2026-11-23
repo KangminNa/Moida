@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
@@ -13,16 +12,13 @@ import {
   useTasksIn,
   useUsage,
 } from '../../_task/live';
-import type { Agent, Chat } from '../../_task/types';
+import type { Agent } from '../../_task/types';
 import { AgentCard, LeadCard } from './AgentCard';
 import { type AgentBody, AgentForm } from './AgentForm';
 import { DeletedAgents } from './DeletedAgents';
 
 const NEW = 'new';
 const CONFLICT = '이미 바뀐 일꾼이에요. 최신 내용을 다시 읽었어요';
-/** 역할 다듬기 (2026-11-20 ECC형 에이전트 정의): 대표에게 보내는 말. 표준 형식은 대표의 지시문 틀에 있다 */
-const TIDY_ROLES =
-  '일꾼들의 역할 설명을 표준 형식으로 다듬어 제안해 줘. 일을 많이 하는 일꾼부터 3명까지, 내가 쓴 뜻은 바꾸지 말고 빠진 단락만 채워 줘.';
 
 // 에이전트 (2026-11-21 팀 없는 에이전트): 맨 앞에 대표, 그 뒤로 모두 같은 일꾼. 사용량과 한도, 추가, 편집, 중지, 재개.
 // 대표는 목록(api/agents)에 없어 따로 읽고(useLead), 고치기는 설정 › AI에서 한다.
@@ -40,10 +36,8 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   const [trash, setTrash] = useState(false);
   const action = useAction();
   const save = useAction();
-  const tidy = useAction();
-  const router = useRouter();
   const list = agents.data?.agents;
-  const problem = agents.error ?? action.problem ?? tidy.problem;
+  const problem = agents.error ?? action.problem;
   /** 모든 일꾼(대표 포함)이 이번 달에 쓴 토큰: 카드마다 그중 몫을 보인다 */
   const total = [...(list ?? []), ...(lead ? [lead] : [])].reduce(
     (all, a) => all + a.usedThisMonth,
@@ -60,14 +54,6 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
   /** 쉬기 한도에 닿았으면 그 문구 */
   function hold(agent: Agent): string | null {
     return holdLabel(usage.data?.agents.find((u) => u.id === agent.id));
-  }
-
-  /** 대표와 새 대화를 열어 역할 다듬기를 맡기고 그 대화로 간다 (제안은 결과 카드의 승인으로) */
-  async function tidyRoles() {
-    const reply = await tidy.run('tidy', () =>
-      api<Chat>('POST', '/api/chats', { requestId: crypto.randomUUID(), message: TIDY_ROLES }),
-    );
-    if (reply?.ok) router.push(`/admin/chats/${reply.data.id}`);
   }
 
   function flip(agent: Agent) {
@@ -139,15 +125,6 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
             <button type="button" className="ghost" onClick={() => setTrash(!trash)}>
               휴지통
             </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={tidy.busy !== null}
-              title="대표가 역할 설명을 표준 형식(언제 맡기나 · 하는 일 · 순서 · 결과 형식 · 확인 · 하지 않는 것)으로 다듬어 승인으로 올려요"
-              onClick={tidyRoles}
-            >
-              역할 다듬기
-            </button>
             <button type="button" className="cta small" onClick={() => show(NEW)}>
               ＋ 일꾼 추가
             </button>
@@ -159,6 +136,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
       {open === NEW && (
         <AgentForm
           agent={null}
+          suggestedName={`일꾼 ${(list?.length ?? 0) + 1}`}
           agents={list ?? []}
           runners={runners}
           externalTools={externalTools}
