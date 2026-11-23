@@ -129,6 +129,14 @@ export class ChangeService extends BaseService {
     });
   }
 
+  /** 보관함의 일괄 지우기 (2026-11-23): 읽어 둔 판으로 만든 휴지통 묶음 하나 (edit과 같은 길). 고를 것이 없으면 0 */
+  async trashMany(actor: Actor, req: EditInput): Promise<number> {
+    actor.assertOwner();
+    if (req.ops.length === 0) return 0;
+    await this.edit(actor, req);
+    return req.ops.length;
+  }
+
   /**
    * 검토 결정 (T6). 묶음·대상 잠금 → 판정한 뒤 대상이 바뀌었으면 밀려남, 아니면 적용 → 남은 검토가 없으면 묶음을 닫는다.
    * 최신 내용 위에 덮어쓰지 않는다. 승인한 사람은 decided_by, 내용의 주인은 그대로 AI다.

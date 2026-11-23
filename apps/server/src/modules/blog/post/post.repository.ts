@@ -122,4 +122,12 @@ export class PostRepository extends TableRepository<PostRow, Post> {
               FROM blog.post_wiki_refs x WHERE x.post_id = p.id) AS ref_wiki_ids
       FROM blog.posts p LEFT JOIN blog.post_revisions r ON r.id = p.head_revision_id`;
   }
+
+  /** 휴지통이 아닌 것만 골라 잠근다 (보관함의 일괄 지우기, 2026-11-23) */
+  lockLive(spaceId: string, ids: readonly string[]): Promise<Post[]> {
+    return this.find(
+      { space_id: spaceId, id: [...ids], deleted_at: null },
+      { order: ['id'], lock: true },
+    );
+  }
 }

@@ -88,6 +88,23 @@ export class BasketService extends BaseService {
     });
   }
 
+  /** 보관함의 일괄 지우기 (2026-11-23): 고른 소재를 지운다 (하나씩 지울 때처럼 바로). 없는 것은 넘어간다. 지운 수 */
+  async removeMany(actor: Actor, ids: readonly string[]): Promise<number> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    return this.transaction(async (tx) => {
+      const items = new BasketRepository(tx);
+      let removed = 0;
+      for (const id of ids) {
+        const item = await items.lockOrNull(spaceId, id);
+        if (!item) continue;
+        await items.remove(item);
+        removed += 1;
+      }
+      return removed;
+    });
+  }
+
   /** 가리키는 세션·글의 제목. 없거나 볼 수 없으면 NotFound. 링크·메모는 가리키는 것이 없다 */
   private async titleOf(actor: Actor, req: AddBasketItemInput): Promise<string | null> {
     const { kind, ref_id: refId } = req.fields;

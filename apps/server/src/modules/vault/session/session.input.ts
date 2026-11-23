@@ -274,6 +274,14 @@ export class TrashSessionInput extends BaseRequest {
   }
 }
 
+/** 보관함의 일괄 지우기 (2026-11-23): 고른 세션들을 한 변경 묶음으로 휴지통에 (읽어 둔 지금 판으로) */
+export class TrashSessionsInput {
+  static of(live: readonly { id: string; version: number }[]): EditInput {
+    const ops = live.map((s, i) => new SessionTrashOp(i + 1, s.id, s.version));
+    return new EditInput(null, `세션 ${ops.length}개를 휴지통으로`, ops);
+  }
+}
+
 /** POST /api/sessions/:id/restore { version }. 휴지통에서 꺼낸다 */
 export class RestoreSessionInput extends BaseRequest {
   static from(id: string, raw: unknown): EditInput {

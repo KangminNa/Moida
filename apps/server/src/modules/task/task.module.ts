@@ -5,6 +5,7 @@ import {
   EventCatalog,
   Leases,
   LibraryQuery,
+  LibraryTrashService,
   PluginChats,
   SecretRotation,
 } from '../platform';
@@ -88,6 +89,7 @@ import { TaskController } from './task/task.api';
 import { TaskQuery } from './task/task.query';
 import { TaskService } from './task/task.service';
 import { TaskRequestedHandler } from './task/task-requested.handler';
+import { TaskTrashService } from './task/task-trash.service';
 import events from './task.events.json';
 import { TaskNotices } from './task-notices';
 import { TaskSettings } from './task-settings';
@@ -111,6 +113,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     AgentService,
     TaskQuery,
     TaskService,
+    TaskTrashService,
     JobService,
     ApprovalQuery,
     ApprovalService,
@@ -247,6 +250,8 @@ export class TaskModule implements OnModuleInit {
     private readonly chatContinues: ChatContinueHandler,
     private readonly agentless: AgentlessRequestHandler,
     private readonly library: LibraryQuery,
+    private readonly libraryTrash: LibraryTrashService,
+    private readonly outputService: OutputService,
     private readonly follows: ScheduleFollowHandler,
     private readonly toolPlugs: ExternalToolPlugHandler,
     private readonly externalTools: ExternalToolService,
@@ -303,5 +308,8 @@ export class TaskModule implements OnModuleInit {
     );
     // 보관함의 결과물 (2차 5단계)
     this.library.register([OutputQuery.LIBRARY_KIND], (a, f) => this.outputs.library(a, f));
+    this.libraryTrash.register([OutputQuery.LIBRARY_KIND], (a, ids) =>
+      this.outputService.trashMany(a, ids),
+    );
   }
 }

@@ -78,6 +78,7 @@ export { type RequestLogSink, RequestTrace } from './http/request-trace';
 export { LibraryInput } from './library/library.input';
 export { LibraryQuery } from './library/library.query';
 export type { LibraryRow } from './library/library.view';
+export { LibraryTrashService } from './library/library-trash.service';
 export { NoticeCatalog } from './notice/notice-catalog';
 export { NoticeKind } from './notice/notice-kind';
 export { type NoticeNew, Notices } from './notice/notices';

@@ -73,4 +73,12 @@ export class OutputRepository extends TableRepository<OutputRow, Output> {
   purgeExpired(now: Date): Promise<number> {
     return this.deleteRows(outputs, { purge_after: Rule.before(now) });
   }
+
+  /** 휴지통이 아닌 것만 골라 잠근다 (보관함의 일괄 지우기, 2026-11-23) */
+  lockLive(spaceId: string, ids: readonly string[]): Promise<Output[]> {
+    return this.find(
+      { space_id: spaceId, id: [...ids], deleted_at: null },
+      { order: ['id'], lock: true },
+    );
+  }
 }

@@ -314,6 +314,19 @@ export class SessionQuery extends BaseQuery {
   }
 
   /** 보관함의 세션 (2차 5단계, platform LibraryQuery에 등록). 프로젝트로 거를 수 있는 종류는 세션뿐이다 */
+  /** 보관함의 일괄 지우기 (2026-11-23): 휴지통이 아닌 세션의 지금 판 (주인만) */
+  async liveVersions(
+    actor: Actor,
+    ids: readonly string[],
+  ): Promise<{ id: string; version: number }[]> {
+    actor.assertOwner();
+    return this.sql<{ id: string; version: number }[]>`
+      SELECT s.node_id AS id, s.version FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
+      WHERE s.space_id = ${actor.requireSpace()} AND s.node_id = ANY(${[...ids]}::uuid[])
+        AND n.deleted_at IS NULL
+      ORDER BY s.node_id`;
+  }
+
   async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
     actor.assertOwner();
     const rows = await this.sql<

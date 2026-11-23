@@ -38,6 +38,7 @@ function task(more: Partial<TaskRow> = {}): TaskRow {
     depth: 0,
     wait_reason: null,
     rounds: 0,
+    deleted_at: null,
     ...more,
   };
 }

@@ -80,6 +80,7 @@ export class TaskQuery extends BaseQuery {
         WHERE task_id = t.id AND body <> '' ORDER BY id DESC LIMIT 1
       ) e ON true
       WHERE t.space_id = ${actor.spaceId}
+        AND t.deleted_at IS ${req.trash ? this.sql`NOT NULL` : this.sql`NULL`}
         ${req.status === null ? this.sql`` : this.sql`AND t.status = ${req.status}`}
         ${req.goalId === null ? this.sql`` : this.sql`AND t.goal_id = ${req.goalId}`}
         ${req.cursor === null ? this.sql`` : this.sql`AND t.id < ${req.cursor}`}

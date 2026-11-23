@@ -54,6 +54,7 @@ import type {
 import type {
   TaskDetailView,
   TaskPageView,
+  TaskTrashedView,
   TaskView,
 } from '../../../server/src/modules/task/task/task.view';
 import type { UsageView } from '../../../server/src/modules/task/usage/usage.view';
@@ -66,6 +67,7 @@ import type { LinkPreviewView } from '../../../server/src/modules/task/web/link-
 export type LinkPreview = ReturnType<LinkPreviewView['toJSON']>;
 export type Task = ReturnType<TaskView['toJSON']>;
 export type TaskPage = ReturnType<TaskPageView['toJSON']>;
+export type TaskTrashed = ReturnType<TaskTrashedView['toJSON']>;
 export type TaskDetail = ReturnType<TaskDetailView['toJSON']>;
 export type TaskEvent = TaskDetail['events'][number];
 export type TaskRun = TaskDetail['runs'][number];

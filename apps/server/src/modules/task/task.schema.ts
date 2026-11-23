@@ -374,6 +374,7 @@ export const tasks = taskSchema.table('tasks', {
   wait_reason: text('wait_reason').$type<TaskWaitReason>(),
   rounds: integer('rounds').notNull(),
   wait_until: timestamp('wait_until', { withTimezone: true }),
+  deleted_at: timestamp('deleted_at', { withTimezone: true }),
 });
 
 /** task.verdicts */

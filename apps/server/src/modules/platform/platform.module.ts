@@ -22,6 +22,7 @@ import { DomainErrorFilter } from './http/domain-error.filter';
 import { HostGate } from './http/host-gate';
 import { LibraryController } from './library/library.api';
 import { LibraryQuery } from './library/library.query';
+import { LibraryTrashService } from './library/library-trash.service';
 import { NoticeCatalog } from './notice/notice-catalog';
 import { NoticeKind } from './notice/notice-kind';
 import { NoticePushJob } from './notice/notice-push.job';
@@ -91,6 +92,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
+    LibraryTrashService,
     Lookups,
     HostGate,
     ActionChecks,
@@ -139,6 +141,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
+    LibraryTrashService,
     Lookups,
     HostGate,
     ActionChecks,

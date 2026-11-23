@@ -4218,3 +4218,22 @@ ul.picked > .chip {
   margin-right: 8px;
   vertical-align: -5px;
 }
+
+/* 여럿 고르는 목록 (2026-11-23 일괄 지우기): 줄 앞의 체크 칸 + 줄 */
+.list > .pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+}
+
+.pick-row > .item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 보관함 줄의 고르기 칸과 종류 (2026-11-23 일괄 지우기) */
+.library-pick {
+  gap: 8px;
+  align-self: flex-start;
+}

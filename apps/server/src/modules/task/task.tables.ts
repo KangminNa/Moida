@@ -468,6 +468,7 @@ export interface TaskRow {
   wait_reason: TaskWaitReason | null;
   rounds: number;
   wait_until: Date | null;
+  deleted_at: Date | null;
 }
 export type TaskNew = Partial<TaskRow> & Pick<TaskRow, 'id' | 'space_id' | 'kind' | 'title'>;
 

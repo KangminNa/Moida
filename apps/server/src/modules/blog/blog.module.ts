@@ -6,6 +6,7 @@ import {
   EventCatalog,
   HostGate,
   LibraryQuery,
+  LibraryTrashService,
   Lookups,
 } from '../platform';
 import { App } from './app/app';
@@ -124,6 +125,9 @@ export class BlogModule implements OnModuleInit {
     private readonly pages: PageQuery,
     private readonly posts: PostQuery,
     private readonly library: LibraryQuery,
+    private readonly libraryTrash: LibraryTrashService,
+    private readonly postService: PostService,
+    private readonly basketService: BasketService,
     private readonly checks: ActionChecks,
     private readonly issuePublish: IssuePublishHandler,
     private readonly issues: IssueQuery,
@@ -149,6 +153,13 @@ export class BlogModule implements OnModuleInit {
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
     this.library.register([BasketQuery.LIBRARY_KIND], (a, f) => this.basket.library(a, f));
+    // 보관함의 일괄 지우기 (2026-11-23): 글은 휴지통으로, 스크랩은 하나씩 지울 때처럼 바로. 페이지는 페이지 화면에서
+    this.libraryTrash.register([PostQuery.LIBRARY_KIND], (a, ids) =>
+      this.postService.trashMany(a, ids),
+    );
+    this.libraryTrash.register([BasketQuery.LIBRARY_KIND], (a, ids) =>
+      this.basketService.removeMany(a, ids),
+    );
     // 앱 이름 (스토어 2단계): task가 대화의 앱을 확인한다 (관리자는 공간의 앱, 그 밖은 공개 앱)
     this.lookups.provide('app', (a, ids) => this.apps.names(a, ids));
     // 커뮤니티 앱 (스토어 3-1): community가 공개된 커뮤니티 앱인지 묻는다 (관리자는 공간의 커뮤니티 앱)

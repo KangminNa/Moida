@@ -156,6 +156,22 @@ export class OutputService extends EntityService<Output> {
     return this.changeAsOwner(actor, req, (output) => output.trash(new Date()));
   }
 
+  /** 보관함의 일괄 지우기 (2026-11-23): 고른 결과물을 휴지통으로. 없거나 이미 휴지통이면 넘어간다. 보낸 수 */
+  async trashMany(actor: Actor, ids: readonly string[]): Promise<number> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const store = new OutputRepository(tx);
+      const outputs = await store.lockLive(spaceId, ids);
+      for (const output of outputs) {
+        output.trash(now);
+        await store.save(output);
+      }
+      return outputs.length;
+    });
+  }
+
   /** 휴지통에서 꺼낸다 */
   untrash(actor: Actor, req: OutputActionInput): Promise<Output> {
     return this.changeAsOwner(actor, req, (output) => output.untrash(new Date()));

@@ -102,6 +102,8 @@ export class ListTasksInput extends BaseRequest {
     readonly goalId: string | null,
     /** 앞 응답의 next */
     readonly cursor: string | null,
+    /** 작업 기록의 휴지통만 (2026-11-23) */
+    readonly trash = false,
   ) {
     super();
   }
@@ -115,6 +117,7 @@ export class ListTasksInput extends BaseRequest {
           f.optionalText('status', 20),
           query.goalId ? f.uuid('goalId') : null,
           query.cursor ? f.uuid('cursor') : null,
+          query.trash === '1',
         ),
     );
   }
@@ -338,5 +341,33 @@ export class DelegateTaskInput extends BaseRequest {
           f.optionalInteger('wait_minutes', 1, SubtaskWait.MINUTES_MAX),
         ),
     );
+  }
+}
+
+/**
+ * 작업 기록의 휴지통 (2026-11-23 일괄 지우기). POST /api/tasks/trash { ids } 또는 { finished: true }(끝난 작업 모두),
+ * POST /api/tasks/restore { ids }. 한 번에 200개까지
+ */
+export class TaskTrashInput extends BaseRequest {
+  static readonly MAX = 200;
+  private static readonly UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  private constructor(
+    /** 고른 작업. null이면 공간의 끝난 작업 모두 (finished) */
+    readonly ids: readonly string[] | null,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown, allowAll = true): TaskTrashInput {
+    const all = (raw as { finished?: unknown } | null)?.finished === true;
+    return BaseRequest.read(raw, (f) => {
+      if (all && allowAll) return new TaskTrashInput(null);
+      const ids = f.optionalTextList('ids', TaskTrashInput.MAX, 36) ?? [];
+      if (ids.length === 0) f.reject('ids', '고른 작업이 없어요');
+      if (ids.some((id) => !TaskTrashInput.UUID.test(id)))
+        f.reject('ids', '작업 id 모양이 아니에요');
+      return new TaskTrashInput([...new Set(ids)]);
+    });
   }
 }
