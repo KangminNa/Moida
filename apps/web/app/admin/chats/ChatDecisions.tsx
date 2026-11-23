@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { clock } from '../../_task/labels';
+import { when } from '../../_task/labels';
 import type { ChatNews } from '../../_task/types';
 
 /** 판단의 모양 (서버 소식의 decision, post_update의 decision 그대로) */
@@ -56,7 +56,7 @@ export function ChatDecisions({
       {shown.map(({ n, d }) => (
         <li key={n.n} className="decision" data-weight={d.weight}>
           <span className="bubble-meta">
-            {n.agent ?? '일꾼'} · 판단{d.step ? ` · ${d.step}` : ''} · {clock(n.createdAt)}
+            {n.agent ?? '일꾼'} · 판단{d.step ? ` · ${d.step}` : ''} · {when(n.createdAt)}
           </span>
           <p className="text">
             <b>{n.text}</b>

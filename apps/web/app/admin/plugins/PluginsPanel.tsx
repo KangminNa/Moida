@@ -39,6 +39,13 @@ function PluginRow({
   const save = useAction();
 
   async function toggle() {
+    if (
+      plugin.enabled &&
+      !window.confirm(
+        `${plugin.name}을(를) 끌까요? 이 플러그인이 필요한 대기 중인 일은 끝나지 않아요. 다시 켜면 권한을 다시 확인해요`,
+      )
+    )
+      return;
     const reply = await action.run(
       'toggle',
       () => api('POST', `/api/plugins/${plugin.name}/${plugin.enabled ? 'disable' : 'enable'}`),

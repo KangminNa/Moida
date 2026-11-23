@@ -1,9 +1,10 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { type Actor, CurrentActor, VersionInput } from '../../platform';
-import { CreateTaskInput, ListTasksInput, TaskIdInput } from './task.input';
+import { CreateTaskInput, ListTasksInput, TaskIdInput, TaskTrashInput } from './task.input';
 import { TaskQuery } from './task.query';
 import { TaskService } from './task.service';
-import type { TaskDetailView, TaskPageView, TaskView } from './task.view';
+import type { TaskDetailView, TaskPageView, TaskTrashedView, TaskView } from './task.view';
+import { TaskTrashService } from './task-trash.service';
 
 // 작업 메뉴. 주인만 (Service·Query 첫 줄에서 확인).
 // 바꾼 작업은 목록의 한 줄과 같은 모양이고, 화면은 그 version으로 다음 변경을 보낸다.
@@ -12,9 +13,24 @@ export class TaskController {
   constructor(
     private readonly tasks: TaskQuery,
     private readonly service: TaskService,
+    private readonly trashes: TaskTrashService,
   ) {}
 
-  /** ?status=running · ?cursor=<앞 응답의 next> */
+  /** 작업 기록의 휴지통으로 { ids } 또는 { finished: true }(끝난 작업 모두). 도는 작업은 넘어간다 (2026-11-23) */
+  @HttpCode(200)
+  @Post('trash')
+  trash(@CurrentActor() actor: Actor, @Body() body: unknown): Promise<TaskTrashedView> {
+    return this.trashes.trash(actor, TaskTrashInput.from(body));
+  }
+
+  /** 휴지통에서 꺼낸다 { ids } */
+  @HttpCode(200)
+  @Post('restore')
+  restore(@CurrentActor() actor: Actor, @Body() body: unknown): Promise<TaskTrashedView> {
+    return this.trashes.restore(actor, TaskTrashInput.from(body, false));
+  }
+
+  /** ?status=running · ?trash=1(휴지통) · ?cursor=<앞 응답의 next> */
   @Get()
   list(@CurrentActor() actor: Actor, @Query() query: unknown): Promise<TaskPageView> {
     return this.tasks.list(actor, ListTasksInput.from(query));

@@ -61,7 +61,7 @@ export class AppRepository extends TableRepository<AppRow, App> {
     return row?.taken ?? false;
   }
 
-  /** 앱에 든 글(휴지통 포함) · 페이지 · 호의 수. 모두 없어야 지운다 (빈 메뉴는 함께 지운다) */
+  /** 앱에 든 글 · 페이지 · 호의 수. 모두 없어야 지운다 (빈 메뉴는 함께 지운다. 휴지통의 글은 AppService가 먼저 앱에서 뺀다) */
   async contents(appId: string): Promise<{ posts: number; pages: number; issues: number }> {
     const [row] = await this.sql<{ posts: number; pages: number; issues: number }[]>`
       SELECT (SELECT count(*) FROM blog.posts WHERE app_id = ${appId})::int AS posts,

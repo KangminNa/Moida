@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useMemo, useRef, useState } from 'react';
 import { api, describe } from '../../_lib/client-api';
 import { renderMarkdown } from '../../_lib/markdown';
+import { ago } from '../../_lib/time-ago';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { readPages } from '../../_task/live';
@@ -44,7 +45,6 @@ const ORIGIN_LABELS: Record<string, string> = { ai: 'AI', human: '사람' };
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
-const day = (iso: string) => new Date(iso).toLocaleDateString('ko-KR', { dateStyle: 'short' });
 const fixed = (n: number) => n.toFixed(2);
 
 /** 목록 보기를 지키는 위키 주소 */
@@ -378,13 +378,13 @@ function ScoreRow({
           <b>{wiki.title}</b>
           <small>
             쌓인 {fixed(wiki.accumulated)} · 물려받은 {fixed(wiki.inherited)} · 마지막 쓰임{' '}
-            {day(wiki.lastUsedAt)}
+            {ago(wiki.lastUsedAt)}
             {wiki.stale ? ' · 지울 만한' : ''}
           </small>
         </div>
         {/* 히스토리는 순위 밖이라 100점 환산 값을 보이지 않는다 */}
         <span className="pill" title={`최종 점수 ${fixed(wiki.total)}`}>
-          {wiki.replacedBy ? '히스토리' : wiki.score}
+          {wiki.replacedBy ? '히스토리' : `${wiki.score}점`}
         </span>
       </Link>
     </li>
@@ -413,7 +413,7 @@ function ScoreBox({ id }: { id: string }) {
         </dd>
         <dt>쓰임</dt>
         <dd>
-          {s.wiki.uses}번 · 마지막 {day(s.wiki.lastUsedAt)}
+          {s.wiki.uses}번 · 마지막 {ago(s.wiki.lastUsedAt)}
         </dd>
       </dl>
       {s.bases.length > 0 && <div className="kind">근거로 삼은 위키</div>}
@@ -446,9 +446,9 @@ function StaleList({ openId }: { openId: string | null }) {
   return (
     <>
       <p className="note">
-        오래 쓰이지 않은 위키예요 (최종 점수 {board.data.staleBelow} 아래). 공개 위키 · 글이
-        가리키는 위키 · 히스토리는 빼요. 저절로 지우지 않아요: 열어서 휴지통으로 보내면 되살릴 수
-        있어요
+        오래 쓰이지 않은 위키예요 (쌓인 점수 + 물려받은 점수가 {board.data.staleBelow} 아래. 줄 끝의
+        숫자는 그 합을 100점으로 환산한 것). 공개 위키 · 글이 가리키는 위키 · 히스토리는 빼요.
+        저절로 지우지 않아요: 열어서 휴지통으로 보내면 되살릴 수 있어요
       </p>
       {stale.length === 0 ? (
         <p className="rows-empty">지울 만한 위키 없음</p>

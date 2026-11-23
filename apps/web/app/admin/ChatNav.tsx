@@ -36,7 +36,7 @@ export function ChatNav({ pathname }: { pathname: string | null }) {
                   title={c.title}
                 >
                   <span className="clamp-1">{c.title}</span>
-                  {c.tokens > 0 && <small title="이 대화가 쓴 토큰">{tokens(c.tokens)}</small>}
+                  {c.tokens > 0 && <small title="이 대화가 쓴 토큰">{tokens(c.tokens)} 토큰</small>}
                   {MARKED.includes(c.state) && (
                     <span className={CHAT_NEEDS_ME.includes(c.state) ? 'pill on' : 'pill'}>
                       {CHAT_STATE[c.state] ?? c.state}

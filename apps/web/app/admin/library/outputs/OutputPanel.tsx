@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
 import { useLiveValue } from '../../../_lib/use-live';
-import { bytes, INLINE_MIMES, OUTPUT_KINDS, TEXT_MIMES, when } from '../../../_task/labels';
+import { bytes, INLINE_MIMES, OUTPUT_KINDS, share, TEXT_MIMES, when } from '../../../_task/labels';
 import { readPages } from '../../../_task/live';
 import { isHtmlOutput, OutputOpen } from '../../../_task/parts';
 import type { Output, OutputPage, OutputSaved, OutputUsage, Task } from '../../../_task/types';
@@ -63,6 +63,13 @@ export function OutputPanel({ taskId }: { taskId: string | null }) {
   const busy = action.busy !== null;
 
   async function act(output: Output, verb: 'delete' | 'restore' | 'purge', done: string) {
+    if (
+      verb === 'purge' &&
+      !window.confirm(
+        `${output.name}을(를) 바로 지울까요? 공유 링크도 함께 사라지고 되돌릴 수 없어요`,
+      )
+    )
+      return;
     const reply = await action.run(
       output.id,
       () =>
@@ -275,7 +282,8 @@ function Usage({ usage }: { usage: OutputUsage }) {
   return (
     <>
       <p className="label-mono">
-        {bytes(usage.usedBytes)} / {bytes(usage.maxBytes)} 사용 · 디스크 여유{' '}
+        {bytes(usage.usedBytes)} / {bytes(usage.maxBytes)} 사용 (
+        {share(usage.usedBytes, usage.maxBytes)}, 휴지통 포함) · 디스크 여유{' '}
         {bytes(usage.diskFreeBytes)}
       </p>
       {full && (

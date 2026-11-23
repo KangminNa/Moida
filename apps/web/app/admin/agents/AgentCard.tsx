@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { actionLabel, EFFORT_LABELS, engineLabel } from '../../_task/labels';
+import { actionLabel, EFFORT_LABELS, engineLabel, tokens } from '../../_task/labels';
 import { type RunnerChoice, useEngines } from '../../_task/live';
 import { AgentUsage } from '../../_task/parts';
 import type { Agent, UsageAgent } from '../../_task/types';
@@ -13,9 +13,7 @@ function scoreLine(card: UsageAgent['scorecard']): string | null {
     card.judged > 0 ? `첫 판정 통과 ${card.firstPass}/${card.judged}` : '',
     card.avgFixes !== null ? `평균 고친 횟수 ${card.avgFixes}` : '',
     card.decided > 0 ? `반려 · 수정 요청 ${card.sentBack}/${card.decided}` : '',
-    card.tokensPerDone !== null
-      ? `일 하나에 ${card.tokensPerDone.toLocaleString('ko-KR')} 토큰`
-      : '',
+    card.tokensPerDone !== null ? `일 하나에 ${tokens(card.tokensPerDone)} 토큰` : '',
   ].filter(Boolean);
   return parts.length > 0 ? `최근 ${card.days}일 · ${parts.join(' · ')}` : null;
 }
@@ -36,7 +34,8 @@ function CardTop({
 }) {
   const engines = useEngines();
   const paused = agent.status === 'paused';
-  const state = paused ? '멈춤' : (hold ?? work ?? '쉬는 중');
+  // 일이 없는 것은 "대기 중": "쉬는 중"은 한도에 닿아 새 일을 받지 않는 것(hold)에만 쓴다
+  const state = paused ? '멈춤' : (hold ?? work ?? '대기 중');
   const dot = paused || (!hold && !work) ? 'dot off' : hold ? 'dot half' : 'dot run';
   const tuning = [
     engineLabel(engines, agent.tool),
@@ -66,16 +65,19 @@ export function LeadCard({
   lead,
   work,
   hold,
+  total,
 }: {
   lead: Agent;
   work: string | null;
   hold: string | null;
+  /** 모든 일꾼이 이번 달에 쓴 토큰 (몫을 보이는 데) */
+  total: number;
 }) {
   return (
     <article className="agent" aria-label="대표">
       <CardTop agent={lead} name="대표" extra={null} work={work} hold={hold} />
       <p className="agent-role clamp">대화를 받아 일꾼에게 맡기고 결과를 모아 답해요</p>
-      <AgentUsage agent={lead} />
+      <AgentUsage agent={lead} total={total} />
       <div className="agent-acts">
         <Link className="text-button" href={SETTINGS_HREF}>
           편집 (설정 › AI)
@@ -91,6 +93,7 @@ export function AgentCard({
   agent,
   work,
   hold,
+  total,
   score = null,
   runner,
   busy,
@@ -101,6 +104,8 @@ export function AgentCard({
   agent: Agent;
   work: string | null;
   hold: string | null;
+  /** 모든 일꾼이 이번 달에 쓴 토큰 (몫을 보이는 데) */
+  total: number;
   /** 최근 성적표 (사용량 API, 2026-11-20) */
   score?: UsageAgent['scorecard'];
   /** 묶인 러너 (undefined: 아무 러너, null: 묶였지만 그 러너의 기기가 끊김) */
@@ -137,7 +142,7 @@ export function AgentCard({
           ))}
         </ul>
       )}
-      <AgentUsage agent={agent} />
+      <AgentUsage agent={agent} total={total} />
       {scoreLine(score) && <small className="agent-score">{scoreLine(score)}</small>}
       <div className="agent-acts">
         <button type="button" className="text-button" onClick={onEdit}>

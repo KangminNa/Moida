@@ -5,6 +5,7 @@ import { formatDate } from '../../../_blog/format';
 import { COMMUNITY_TOPICS } from '../../../_community/live';
 import type { AdminMember, AdminMemberPage, MemberReset } from '../../../_community/types';
 import { api } from '../../../_lib/client-api';
+import { ago } from '../../../_lib/time-ago';
 import { useAction } from '../../../_lib/use-action';
 import { useLiveValue } from '../../../_lib/use-live';
 import { CommunityPager } from './CommunityPager';
@@ -107,8 +108,8 @@ export function CommunityMembers({ appId }: { appId: string }) {
                     {blocked && <span className="pill on">차단</span>}
                   </b>
                   <small>
-                    가입 {formatDate(m.joinedAt)} · 마지막 접근 {formatDate(m.lastSeenAt)} · 글{' '}
-                    {m.topics} · 댓글 {m.comments}
+                    가입 {formatDate(m.joinedAt)} · 마지막 접근{' '}
+                    {m.lastSeenAt ? ago(m.lastSeenAt) : '없음'} · 글 {m.topics} · 댓글 {m.comments}
                     {blocked && m.blockedUntil && !m.blockedUntil.startsWith('9999')
                       ? ` · ${formatDate(m.blockedUntil)}까지 차단`
                       : ''}

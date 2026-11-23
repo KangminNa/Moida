@@ -39,6 +39,7 @@ export {
   InvalidRequest,
   NotFound,
   RuleViolation,
+  StaleVersion,
   TooLarge,
   TooManyRequests,
   Unauthenticated,
@@ -77,6 +78,7 @@ export { type RequestLogSink, RequestTrace } from './http/request-trace';
 export { LibraryInput } from './library/library.input';
 export { LibraryQuery } from './library/library.query';
 export type { LibraryRow } from './library/library.view';
+export { LibraryTrashService } from './library/library-trash.service';
 export { NoticeCatalog } from './notice/notice-catalog';
 export { NoticeKind } from './notice/notice-kind';
 export { type NoticeNew, Notices } from './notice/notices';
@@ -86,6 +88,7 @@ export { LeasedWork, Leases, RunRecordTarget } from './plugin/leases';
 export { PackageService } from './plugin/package.service';
 export { PackageTool } from './plugin/package.tool';
 export { PluginService } from './plugin/plugin.service';
+export { ChatSent, PluginChats } from './plugin/plugin-chats';
 export type { PluginContext } from './plugin/plugin-context';
 export { LoginMethod } from './plugin/plugin-context';
 export { PluginManifest } from './plugin/plugin-manifest';

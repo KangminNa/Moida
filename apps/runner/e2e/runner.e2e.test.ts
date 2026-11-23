@@ -411,7 +411,11 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(runs[0]?.cliVersion, '2.1.302 (Claude Code)');
     assert.equal(runs[0]?.model, 'fake');
     assert.ok(String(runs[0]?.runnerBuild).length > 0);
-    assert.equal(runs[0]?.skill, null, '일반 작업은 스킬이 없다');
+    assert.equal(
+      (runs[0]?.skill as { name?: string } | null)?.name,
+      'cairn-work',
+      '일반 작업은 cairn-work (2026-11-23)',
+    );
   });
 
   test('outputs 폴더의 파일을 결과물로 올린다: 숨김 파일 · 폴더는 빼고 실행 기록에 남긴다', async () => {
@@ -476,9 +480,14 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(env.CAIRN_RUNNER_TOKEN, undefined);
     assert.equal(env.DATABASE_URL, undefined);
     assert.notEqual(env.HOME, process.env.HOME);
-    // 빈 작업 폴더에 결과물 폴더와 인수인계 메모 자리(.cairn)만, 설정 폴더에는 권한 설정과 메모 훅만 (2026-11-17)
+    // 빈 작업 폴더에 결과물 폴더와 인수인계 메모 자리(.cairn)만, 설정 폴더에는 권한 설정 · 메모 훅 (2026-11-17)과
+    // 일반 작업의 스킬 cairn-work (2026-11-23)만
     assert.deepEqual([...(seen.cwdEntries as string[])].sort(), ['.cairn', 'outputs']);
-    assert.deepEqual([...(seen.configEntries as string[])].sort(), ['hooks', 'settings.json']);
+    assert.deepEqual([...(seen.configEntries as string[])].sort(), [
+      'hooks',
+      'settings.json',
+      'skills',
+    ]);
     assert.equal(seen.mcpConfigMode, 0o600);
     assert.equal(seen.mcpUrl, `${proxyUrl}/mcp`);
     assert.notEqual(seen.runToken, deviceToken);
@@ -487,7 +496,11 @@ describe('러너가 일을 처리한다', () => {
     for (const flag of ['-p', '--verbose', '--strict-mcp-config']) assert.ok(args.includes(flag));
     assert.equal(args.includes('--bare'), false);
     assert.equal(args[args.indexOf('--output-format') + 1], 'stream-json');
-    assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write,Edit,WebSearch');
+    assert.equal(
+      args[args.indexOf('--tools') + 1],
+      'Read,Write,Edit,WebSearch,Skill',
+      '스킬(cairn-work)을 깔았으면 Skill 도구',
+    );
 
     // 세션 키의 고정 자리: 작업 폴더 · 홈 · 작업 토큰은 지우고, 설정 폴더에는 CLI의 세션 파일(projects)만 남는다.
     // 비우기(LineagePlace.clear)는 작업 폴더 · 홈 · 작업 토큰 다음에 설정 폴더를 비우므로 끝까지 기다린다

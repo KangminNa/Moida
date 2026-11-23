@@ -81,6 +81,14 @@ export class TrashWikiInput extends BaseRequest {
   }
 }
 
+/** 보관함의 일괄 지우기 (2026-11-23): 고른 위키들을 한 변경 묶음으로 휴지통에 (읽어 둔 지금 판으로) */
+export class TrashWikisInput {
+  static of(live: readonly { id: string; version: number }[]): EditInput {
+    const ops = live.map((w, i) => new WikiTrashOp(i + 1, w.id, w.version));
+    return new EditInput(null, `위키 ${ops.length}개를 휴지통으로`, ops);
+  }
+}
+
 /** POST /api/wikis/:id/restore { version }. 휴지통에서 꺼낸다 */
 export class RestoreWikiInput extends BaseRequest {
   static from(id: string, raw: unknown): EditInput {

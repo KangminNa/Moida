@@ -11,8 +11,9 @@ export type ActionPlan<T> = {
   /** 끝난 뒤, 그리고 409일 때 다시 읽는다 */
   reload?: () => unknown;
   /**
-   * 본 version이 낡았을 때(409)의 문구. 서버의 문구에는 판 번호가 들어 있어 화면의 말로 바꾼다.
-   * 409가 다른 뜻인 동작(이름이 겹침 등)에는 주지 않는다: 서버의 문구를 그대로 보여 준다
+   * 본 version이 낡았을 때(서버가 `stale`로 알린 409)의 문구. 서버의 문구에는 버전 번호가 들어 있어 화면의 말로 바꾼다.
+   * 다른 뜻의 409(이름이 겹침 · 남은 것이 있어 못 지움 · 아직 도는 중)는 이 문구를 주어도 서버의 문구를 그대로 보인다:
+   * 못 한 까닭이 "이미 바뀌었어요"로 가려지지 않게
    */
   conflict?: string;
 };
@@ -47,7 +48,11 @@ export function useAction(): Action {
       send: () => Promise<ApiReply<T>>,
       plan: ActionPlan<T> = {},
     ): Promise<ApiReply<T> | null> => {
-      if (running.current) return null;
+      if (running.current) {
+        // 누른 것이 말없이 사라지지 않게 (줄마다 버튼이 있는 목록에서 다른 줄의 동작이 도는 중)
+        notify('앞 동작이 끝난 뒤 다시 눌러 주세요');
+        return null;
+      }
       running.current = true;
       setBusy(name);
       setProblem(null);
@@ -58,7 +63,7 @@ export function useAction(): Action {
           await plan.reload?.();
         } else if (reply.status === 409) {
           await plan.reload?.();
-          setProblem(plan.conflict ?? describe(reply.error));
+          setProblem(reply.error.stale && plan.conflict ? plan.conflict : describe(reply.error));
         } else {
           setProblem(describe(reply.error));
         }

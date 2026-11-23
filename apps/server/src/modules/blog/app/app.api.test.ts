@@ -139,6 +139,8 @@ describe('앱 (/api/apps)', () => {
       name: '늦은 고침',
     });
     assert.equal(stale.status, 409);
+    // 낡은 version의 409는 stale로 알린다: 화면이 "이미 바뀐 …"으로 바꿔 말하는 것은 이때뿐
+    assert.equal(stale.json().stale, true);
     assert.equal(opened.version, Number(app.version) + 1);
   });
 
@@ -165,10 +167,11 @@ describe('앱 (/api/apps)', () => {
     for (const slug of ['A', 'x', 'has space', '한글', '-dash', 'admin', 'posts', 'api'])
       assert.equal((await createApp({ kind: 'blog', name: '틀림', slug })).status, 422, slug);
     await newApp(`taken-${mark}`);
-    assert.equal(
-      (await createApp({ kind: 'blog', name: '겹침', slug: `taken-${mark}` })).status,
-      409,
-    );
+    const taken = await createApp({ kind: 'blog', name: '겹침', slug: `taken-${mark}` });
+    assert.equal(taken.status, 409);
+    // 다른 뜻의 409에는 stale이 없다: 화면이 서버의 까닭을 그대로 보인다
+    assert.equal(taken.json().stale, undefined);
+    assert.match(taken.text, /이미 쓰는 앱 주소/);
     assert.equal((await createApp({ kind: 'shop', name: '종류', slug: `k-${mark}` })).status, 422);
     const page = ok(await createApp({ kind: 'page', name: '지도', slug: `map-${mark}` }), 201);
     assert.equal(page.kind, 'page');
@@ -251,7 +254,7 @@ describe('앱 (/api/apps)', () => {
     assert.equal((await api.get(`/api/apps/by-slug/${app.slug}/icon`)).status, 404);
   });
 
-  test('지우기: 글이 남아 있으면 409, 비우면 빈 메뉴와 함께 지운다', async () => {
+  test('지우기: 글이 남아 있으면 409, 휴지통의 글은 앱에서 빠져 휴지통에 남고 빈 메뉴와 함께 지운다', async () => {
     const app = await newApp(`gone-${mark}`);
     const post = ok(
       await api.request('POST', '/api/posts', owner, {
@@ -265,13 +268,11 @@ describe('앱 (/api/apps)', () => {
       version: app.version,
     });
     assert.equal(full.status, 409);
-    assert.match(full.text, /글 1개/);
-    ok(
-      await api.request('POST', `/api/posts/${post.id}/menu`, owner, {
-        version: post.version,
-        menuId: null,
-        appId: null,
-      }),
+    assert.equal(full.json().stale, undefined);
+    assert.match(full.text, /글 1개 · 페이지 0개/);
+    // 휴지통의 글은 막지 않는다 (옮길 수 없는 글이라): 앱에서 빠져 휴지통에 그대로 남는다
+    const trashed = ok(
+      await api.request('DELETE', `/api/posts/${post.id}`, owner, { version: post.version }),
     );
     const gone = await api.request('POST', `/api/apps/${app.id}/delete`, owner, {
       version: app.version,
@@ -282,5 +283,12 @@ describe('앱 (/api/apps)', () => {
       (ok(await api.get(`/api/menus?app=${app.slug}`, owner)).menus as Json[]).length,
       0,
     );
+    // 휴지통의 글은 사라지지 않았다: 되살리면 앱 밖의 임시 글이다
+    const back = ok(
+      await api.request('POST', `/api/posts/${post.id}/restore`, owner, {
+        version: Number(trashed.version) + 1,
+      }),
+    );
+    assert.deepEqual([back.appId, back.status], [null, 'draft']);
   });
 });

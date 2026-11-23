@@ -11,6 +11,7 @@ import { Notices } from '../notice/notices';
 import type { OutboxRow } from '../platform.tables';
 import { Leases } from '../plugin/leases';
 import { PackageService } from '../plugin/package.service';
+import { PluginChats } from '../plugin/plugin-chats';
 import type { ScheduledJob } from '../plugin/plugin-context';
 import { PluginRegistry } from '../plugin/plugin-registry';
 import { CoreWorkers } from './core-workers';
@@ -62,8 +63,10 @@ export class OutboxWorker implements OnApplicationShutdown {
     private readonly core: CoreWorkers,
     /** 이벤트로 도는 패키지 동작에는 러너가 없어 쓰지 않지만, 동작을 돌리는 길이 같아 함께 넘긴다 */
     leases: Leases = new Leases(),
+    /** 이벤트로 도는 패키지 동작의 대화 입구 (플러그인 API 0.10): task가 등록한 것과 같은 하나 */
+    chats: PluginChats = new PluginChats(),
   ) {
-    this.packages = new PackageService(db, registry, leases);
+    this.packages = new PackageService(db, registry, leases, chats);
   }
 
   /** 듣기를 시작한다. 들으면(onReady) 한 번 다 돈다. 처음 듣기가 실패해도 한 번은 돌고, 듣기는 뒤에서 다시 시도된다 */

@@ -163,3 +163,43 @@ describe('보관함 (GET /api/library)', () => {
     assert.equal((await api.get('/api/library?cursor=xyz', owner)).status, 400);
   });
 });
+
+describe('보관함 일괄 지우기 (POST /api/library/trash, 2026-11-23)', () => {
+  test('방문자 · write 기기는 지우지 못한다', async () => {
+    const body = { items: [{ kind: 'post', id: made.post.id }] };
+    assert.equal(
+      (await api.request('POST', '/api/library/trash', TestUser.visitor, body)).status,
+      403,
+    );
+    const res = await api.request('POST', '/api/library/trash', TestUser.visitor, body, {
+      authorization: `Bearer ${writer}`,
+    });
+    assert.ok([401, 403].includes(res.status), res.text);
+  });
+
+  test('고른 줄을 종류마다 휴지통으로: 글 · 위키 · 세션 · 결과물은 휴지통, 스크랩은 바로, 페이지는 그 화면에서', async () => {
+    const items = [
+      { kind: 'post', id: made.post.id },
+      { kind: 'wiki', id: made.wiki.id },
+      { kind: 'session', id: made.session.session_id },
+      { kind: 'output', id: made.output.id },
+      { kind: 'link', id: made.link.id },
+      { kind: 'link', id: made.link.id },
+      { kind: 'page', id: randomUUID() },
+    ];
+    const done = ok(await api.request('POST', '/api/library/trash', owner, { items }));
+    assert.deepEqual(done, { trashed: 5, skipped: ['page'] }, '같은 줄은 한 번, 페이지는 넘긴다');
+    assert.deepEqual(
+      mine((await library()).items).filter((i) => i.title.endsWith(mark)),
+      [],
+    );
+    const again = ok(await api.request('POST', '/api/library/trash', owner, { items }));
+    assert.equal(again.trashed, 0, '이미 휴지통에 있으면 세지 않는다');
+    const trash = JSON.stringify(ok(await api.get('/api/wikis/trash', owner)));
+    assert.ok(trash.includes(made.wiki.id), '위키는 휴지통에 있다 (되살릴 수 있다)');
+    assert.equal(
+      (await api.request('POST', '/api/library/trash', owner, { items: [] })).status,
+      400,
+    );
+  });
+});

@@ -120,7 +120,9 @@ export function ChatThreadPanel({ id }: { id: string }) {
       },
     );
 
+  // 결과 카드가 기다리는 중이면 멈추기가 그 카드까지 취소한다: 고르기 전의 결과를 한 번에 잃지 않게 묻는다
   const stop = () =>
+    (!d.card || window.confirm('멈출까요? 기다리는 결과 카드도 함께 취소돼요')) &&
     stopping.run('stop', () => api('POST', `/api/chats/${id}/stop`, { version: d.chat.version }), {
       done: '멈췄어요',
       reload: detail.reload,
@@ -255,6 +257,7 @@ export function ChatThreadPanel({ id }: { id: string }) {
         {trashing.problem && <p className="error">{trashing.problem}</p>}
         {tuning.problem && <p className="error">{tuning.problem}</p>}
         <ChatTurns
+          chatId={d.chat.id}
           turns={d.turns}
           usage={d.usage.turns}
           news={d.news}

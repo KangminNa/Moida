@@ -185,3 +185,12 @@ export class TaskPageView {
     return { tasks: this.tasks.map((t) => t.toJSON()), next: this.next };
   }
 }
+
+/** 작업 기록의 휴지통에 넣거나 꺼낸 수 (2026-11-23 일괄 지우기) */
+export class TaskTrashedView {
+  constructor(private readonly count: number) {}
+
+  toJSON() {
+    return { count: this.count };
+  }
+}

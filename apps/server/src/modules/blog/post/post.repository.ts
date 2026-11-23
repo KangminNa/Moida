@@ -93,6 +93,19 @@ export class PostRepository extends TableRepository<PostRow, Post> {
     return rows.map((r) => this.toEntity(r));
   }
 
+  /** 앱(이나 메뉴)에 든 휴지통의 글을 잠근다 (앱 · 메뉴를 지울 때 그 자리에서 뺀다, Post.unplaceTrashed) */
+  async lockTrashedIn(
+    spaceId: string,
+    place: { appId: string } | { menuId: string },
+  ): Promise<Post[]> {
+    const rows = await this.sql<LoadedPost[]>`
+      ${this.columns()}
+      WHERE p.space_id = ${spaceId} AND p.deleted_at IS NOT NULL
+        AND ${'appId' in place ? this.sql`p.app_id = ${place.appId}` : this.sql`p.menu_id = ${place.menuId}`}
+      ORDER BY p.id FOR UPDATE OF p`;
+    return rows.map((r) => this.toEntity(r));
+  }
+
   /** 글 한 줄과 지금 판의 제목·본문, 판 수, 참고 wiki */
   protected override select(spaceId: string, id: string, lock: boolean) {
     return this.sql`
@@ -108,5 +121,13 @@ export class PostRepository extends TableRepository<PostRow, Post> {
              (SELECT array_agg(x.wiki_id ORDER BY x.wiki_id)
               FROM blog.post_wiki_refs x WHERE x.post_id = p.id) AS ref_wiki_ids
       FROM blog.posts p LEFT JOIN blog.post_revisions r ON r.id = p.head_revision_id`;
+  }
+
+  /** 휴지통이 아닌 것만 골라 잠근다 (보관함의 일괄 지우기, 2026-11-23) */
+  lockLive(spaceId: string, ids: readonly string[]): Promise<Post[]> {
+    return this.find(
+      { space_id: spaceId, id: [...ids], deleted_at: null },
+      { order: ['id'], lock: true },
+    );
   }
 }

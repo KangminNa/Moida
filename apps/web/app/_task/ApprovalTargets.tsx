@@ -7,7 +7,14 @@ import { api } from '../_lib/client-api';
 import { useLiveValue } from '../_lib/use-live';
 import { NewTabLink } from '../_ui/NewTabLink';
 import { ChangeLines } from './ChangeLines';
-import { CHECKPOINTS, GOAL_COMPLETE, GOAL_RUN_STATUS, TARGET_LABELS, tokens } from './labels';
+import {
+  CHECKPOINTS,
+  GOAL_COMPLETE,
+  GOAL_RUN_STATUS,
+  share,
+  TARGET_LABELS,
+  tokens,
+} from './labels';
 import { useGoalRun } from './live';
 import { Criteria, RoundReport } from './RoundReport';
 import type { Agent, Approval, CodeAsk, CodePull } from './types';
@@ -208,9 +215,15 @@ export function LimitTarget({ approval, agent }: { approval: Approval; agent: Ag
       <b>실행 내용</b>
       <dl className="kv">
         <dt>이번 달 사용량</dt>
-        <dd>{tokens(agent.usedThisMonth)} 토큰</dd>
+        <dd>
+          {limit === null
+            ? `${tokens(agent.usedThisMonth)} 토큰`
+            : `${tokens(agent.usedThisMonth)} / ${tokens(limit)} 토큰 · ${share(agent.usedThisMonth, limit)}`}
+        </dd>
         <dt>월 한도</dt>
-        <dd>{limit === null ? '한도 없음' : `${tokens(limit)} 토큰`}</dd>
+        <dd>
+          {limit === null ? '한도 없음' : `${tokens(limit)} 토큰 · 다음 달 1일에 사용량 초기화`}
+        </dd>
       </dl>
       {approval.status === 'pending' && (
         <p>

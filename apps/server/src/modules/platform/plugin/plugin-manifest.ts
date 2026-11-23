@@ -6,7 +6,7 @@ import { Database } from '../base/database';
 // 서버를 시작할 때 들어 있는 플러그인을 모두 읽고 검사한다. 틀리면 시작하지 않는다.
 
 /** 플러그인이 지원하는 Cairn 플러그인 API 버전 */
-const CAIRN_PLUGIN_API = '0.9';
+const CAIRN_PLUGIN_API = '0.10';
 
 /** 웹 화면 자리. 늘릴 때는 웹의 <Slot>과 문서를 함께 고친다 */
 const WEB_SLOTS: readonly string[] = ['post.after', 'task.office'];
@@ -25,6 +25,7 @@ const WEB_SLOTS: readonly string[] = ['post.after', 'task.office'];
  *   tool:<이름>   MCP 도구를 연다 (목록 파일 tools)
  *   menu          콘솔 메뉴와 화면을 더한다 (목록 파일 menu)
  *   task:request  동작이 task.task.requested 이벤트로 에이전트에게 일을 맡긴다
+ *   chat          쓰기 동작이 관리자의 대화에 말을 넣는다 (work.sendChat, 메신저 패키지. 결재는 못 한다)
  */
 const USES = [
   /^table$/,
@@ -32,6 +33,7 @@ const USES = [
   /^tool:[a-z][a-z0-9_]*$/,
   /^menu$/,
   /^task:request$/,
+  /^chat$/,
   /^delegate:[a-z][a-z0-9_]*$/,
   /^event:[a-z*][a-z_.*]*$/,
   /^job:[a-z][a-z0-9-]*$/,
@@ -134,6 +136,7 @@ export class PluginManifest {
     if (kind === 'tool') return `MCP 도구 "${arg}"을(를) AI에게 열어요`;
     if (use === 'menu') return '콘솔에 메뉴와 화면을 더해요';
     if (use === 'task:request') return 'AI 에이전트에게 작업을 맡겨요 (승인은 그대로 관리자가)';
+    if (use === 'chat') return '관리자의 대화에 메시지를 보내요 (승인은 그대로 콘솔에서)';
     return use;
   }
 

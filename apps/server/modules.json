@@ -4,7 +4,7 @@
     "platform": {
       "dependsOn": [],
       "schemas": ["platform"],
-      "registries": { "provides": ["settings"], "asks": ["leases"] }
+      "registries": { "provides": ["settings"], "asks": ["leases", "plugin-chats"] }
     },
     "account": {
       "dependsOn": ["platform"],
@@ -22,7 +22,7 @@
       "schemas": ["blog", "work"],
       "lookups": {
         "provides": ["app", "community-app", "member-app"],
-        "asks": ["wiki", "session"]
+        "asks": ["wiki", "session", "app-holdings"]
       },
       "registries": {
         "provides": ["action-checks", "app-hosts", "settings"],
@@ -34,7 +34,7 @@
       "schemas": ["task"],
       "lookups": { "asks": ["app"] },
       "registries": {
-        "provides": ["leases", "run-records", "settings"],
+        "provides": ["leases", "plugin-chats", "run-records", "settings"],
         "asks": ["action-checks", "settings", "site"]
       }
     },
@@ -42,7 +42,7 @@
       "dependsOn": ["platform"],
       "schemas": ["community"],
       "registries": { "provides": ["settings"] },
-      "lookups": { "asks": ["app", "community-app", "member-app"] }
+      "lookups": { "provides": ["app-holdings"], "asks": ["app", "community-app", "member-app"] }
     },
     "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }
   },

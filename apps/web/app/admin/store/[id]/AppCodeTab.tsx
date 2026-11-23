@@ -184,6 +184,7 @@ export function AppCodeTab({ app }: { app: AdminApp }) {
             내려받기
           </a>
         </div>
+        <small className="note">zip은 20MB · 파일 100개 · 템플릿 하나에 1MB까지</small>
         <ul className="list">
           {c.versions.map((v) => (
             <li key={v.seq} className="list-cell app-row">

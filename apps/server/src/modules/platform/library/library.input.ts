@@ -56,3 +56,35 @@ export class LibraryInput extends BaseRequest {
     return this.kind === null || this.kind === kind;
   }
 }
+
+/**
+ * 보관함에서 골라 휴지통으로 (POST /api/library/trash { items: [{ kind, id }] }, 2026-11-23 일괄 지우기).
+ * 한 번에 100개까지. 같은 줄을 두 번 보내도 한 번으로 친다
+ */
+export class TrashLibraryInput extends BaseRequest {
+  static readonly MAX = 100;
+
+  private constructor(
+    /** 종류 → 그 종류의 id들 (보낸 순서대로, 겹치지 않게) */
+    readonly byKind: ReadonlyMap<string, readonly string[]>,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): TrashLibraryInput {
+    return BaseRequest.read(raw, (f) => {
+      const items = f.nestedList('items', TrashLibraryInput.MAX).map((item) => ({
+        kind: item.text('kind', 20),
+        id: item.uuid('id'),
+      }));
+      if (items.length === 0) f.reject('items', '지울 것을 하나 이상 골라요');
+      const byKind = new Map<string, string[]>();
+      for (const { kind, id } of items) {
+        const ids = byKind.get(kind) ?? [];
+        if (!ids.includes(id)) ids.push(id);
+        byKind.set(kind, ids);
+      }
+      return new TrashLibraryInput(byKind);
+    });
+  }
+}

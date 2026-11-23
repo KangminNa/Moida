@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { useDevices } from '../../_account/live';
 import type { Device, DeviceSaved, SpaceInfo } from '../../_account/types';
 import { api } from '../../_lib/client-api';
+import { ago } from '../../_lib/time-ago';
 import { SCOPE_LABELS } from '../../_lib/types';
 import { useAction } from '../../_lib/use-action';
 import { ConnectGuide } from './ConnectGuide';
@@ -84,6 +85,12 @@ export function DevicesPanel({
   }
 
   async function revoke(device: Device) {
+    if (
+      !window.confirm(
+        `${device.name} 연결을 끊을까요? 토큰이 바로 막히고 되돌릴 수 없어요. 다시 쓰려면 새로 연결해야 해요`,
+      )
+    )
+      return;
     if (await change(device, 'POST', `/api/devices/${device.id}/revoke`))
       onMessage(`${device.name} 연결을 끊고 토큰을 바로 막았어요`);
   }
@@ -136,9 +143,7 @@ export function DevicesPanel({
                 <b>{d.name}</b> <span className="label-mono">{d.client}</span>
                 <p>
                   연결 {new Date(d.createdAt).toLocaleDateString('ko-KR')}
-                  {d.lastUsedAt
-                    ? ` · 마지막 로그인 ${new Date(d.lastUsedAt).toLocaleString('ko-KR')}`
-                    : ''}
+                  {d.lastUsedAt ? ` · 마지막 로그인 ${ago(d.lastUsedAt)}` : ''}
                 </p>
               </div>
               <button

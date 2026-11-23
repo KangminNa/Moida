@@ -313,6 +313,22 @@ describe('버전이 바뀌면', () => {
   });
 });
 
+describe('앱 지우기 (2026-11-23)', () => {
+  test('회원 · 앱 데이터가 남은 앱은 지우지 못한다 (409, 무엇이 남았는지)', async () => {
+    const appOf = async () =>
+      ((ok(await api.get('/api/apps', owner)).apps as Json[]) ?? []).find(
+        (a) => a.id === site.appId,
+      );
+    const app = (await appOf()) as { version: number };
+    const res = await api.request('POST', `/api/apps/${site.appId}/delete`, owner, {
+      version: app.version,
+    });
+    assert.equal(res.status, 409, res.text);
+    assert.match(res.text, /회원 2명 · 앱 데이터 \d+줄/);
+    assert.ok(await appOf(), '앱은 그대로');
+  });
+});
+
 describe('커뮤니티 앱의 화면 자유화 (스토어 12.6)', () => {
   test('커뮤니티 앱도 정적 앱이 되고, 회원 규칙의 표를 members 없이 쓴다. 글은 회원 API 그대로다', async () => {
     const club = await CommunitySite.open(api, owner, `club-${mark}`);

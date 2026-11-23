@@ -42,3 +42,15 @@ export class LibraryPageView {
     };
   }
 }
+
+/** 보관함 일괄 지우기의 결과: 휴지통으로 보낸 수, 여기서 지우지 않는 종류 (그 화면에서) */
+export class LibraryTrashedView {
+  constructor(
+    private readonly trashed: number,
+    private readonly skipped: readonly string[],
+  ) {}
+
+  toJSON() {
+    return { trashed: this.trashed, skipped: this.skipped };
+  }
+}

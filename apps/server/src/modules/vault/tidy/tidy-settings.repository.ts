@@ -1,4 +1,4 @@
-import { BaseRepository, Conflict, type EntityStore, Outbox } from '../../platform';
+import { BaseRepository, type EntityStore, Outbox, StaleVersion } from '../../platform';
 import { type LoadedTidySettings, TidySettings } from './tidy-settings';
 
 // vault.tidy_settings ↔ TidySettings. 공간마다 한 행이고 열쇠가 space_id다. 정리 일 요청도 저장할 때 outbox로 나간다.
@@ -37,7 +37,7 @@ export class TidySettingsRepository
       INSERT INTO vault.tidy_settings ${this.sql(columns as never)}
       ON CONFLICT (space_id) DO NOTHING
       RETURNING *, space_id AS id`;
-    if (!row) throw new Conflict('다른 곳에서 먼저 바뀌었어요');
+    if (!row) throw new StaleVersion('다른 곳에서 먼저 바뀌었어요');
     settings.saved(row);
   }
 

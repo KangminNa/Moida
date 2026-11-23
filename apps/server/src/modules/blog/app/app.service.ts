@@ -7,6 +7,7 @@ import {
   EntityService,
   HostGate,
   Idempotency,
+  Lookups,
   NotFound,
   SecretBox,
   SettingActor,
@@ -17,6 +18,7 @@ import {
 } from '../../platform';
 import { MenuRepository } from '../menu/menu.repository';
 import { PageRepository } from '../page/page.repository';
+import { PostRepository } from '../post/post.repository';
 import type { App } from './app';
 import type {
   CheckDomainInput,
@@ -43,6 +45,7 @@ export class AppService extends EntityService<App> {
     private readonly blobs: BlobStore,
     private readonly gate: HostGate,
     private readonly box: SecretBox,
+    private readonly lookups: Lookups,
   ) {
     super(db);
   }
@@ -133,10 +136,16 @@ export class AppService extends EntityService<App> {
     });
   }
 
-  /** 지운다. 페이지 앱의 페이지는 앱 밖으로 풀고, 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다) */
+  /**
+   * 지운다. 페이지 앱의 페이지는 앱 밖으로 풀고, 휴지통의 글은 앱에서 빼 휴지통에 그대로 둔다.
+   * 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다)
+   */
   async remove(actor: Actor, req: VersionInput): Promise<void> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
+    // 회원 · 앱 데이터가 남은 앱은 지우지 않는다 (2026-11-23, 커뮤니티 앱과 같다): 앱 id로만 이어진 데이터가 주인 없이 남는다.
+    // community에 묻는다 (트랜잭션 밖이라 묻고 지우는 사이에 가입한 회원은 막지 못한다)
+    const held = (await this.lookups.visible('app-holdings', actor, [req.id])).get(req.id);
     await this.transaction(async (tx) => {
       const apps = this.store(tx);
       const app = await apps.lock(spaceId, req.id);
@@ -147,13 +156,21 @@ export class AppService extends EntityService<App> {
           page.moveToApp(null, new Date());
           await pages.save(page);
         }
+      // 휴지통의 글은 앱에서 빼 둔다 (휴지통에는 그대로): 옮길 수 없는 글이 지우기를 막지 않게
+      const posts = new PostRepository(tx);
+      for (const post of await posts.lockTrashedIn(spaceId, { appId: app.id })) {
+        post.unplaceTrashed(true, actor, new Date());
+        await posts.save(post);
+      }
       const left = await apps.contents(app.id);
       if (left.posts + left.pages + left.issues > 0)
         throw new Conflict(
-          `앱에 글 ${left.posts}개 · 페이지 ${left.pages}개 · 호 ${left.issues}개가 있어 지우지 못해요`,
+          `앱에 글 ${left.posts}개 · 페이지 ${left.pages}개 · 호 ${left.issues}개가 있어 지우지 못해요. 다른 앱으로 옮기거나 지운 뒤 지워요`,
         );
-      await new MenuRepository(tx).removeAllIn(app.id);
       app.remove();
+      // 커뮤니티 앱은 위의 remove가 먼저 막는다 (그쪽 문구가 맞다). 여기서 던지면 위의 옮기기도 모두 되돌아간다
+      if (held) throw new Conflict(`앱에 ${held}이 남아 있어 지우지 못해요. 비공개로 바꿔 주세요`);
+      await new MenuRepository(tx).removeAllIn(app.id);
       await apps.remove(app);
     });
     this.gate.stale();

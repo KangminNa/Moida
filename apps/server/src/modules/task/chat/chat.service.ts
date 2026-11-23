@@ -8,14 +8,11 @@ import {
   Idempotency,
   LibraryQuery,
   Lookups,
-  RuleViolation,
   type Sql,
   SystemActor,
   type VersionInput,
 } from '../../platform';
-import type { Agent } from '../agent/agent';
 import { AgentRepository } from '../agent/agent.repository';
-import { AgentEdit } from '../agent/agent-edit';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
 import { OutputQuery } from '../output/output.query';
@@ -30,7 +27,7 @@ import { ChatRepository } from './chat.repository';
 import { ChatHistory } from './chat-history.policy';
 import { ChatProject } from './chat-project.policy';
 import { ChatResult } from './chat-result.policy';
-import { ChatUpdates } from './chat-update.policy';
+import { ChatTalk } from './chat-talk';
 
 // 대화 쓰기: 관리자(콘솔), 그리고 "에이전트에게 맡기기" 권한을 받은 기기(MCP ask_agent, 자기가 연 대화만). 대화와 회차 작업은 함께 바뀌어야 해서 같은 트랜잭션에서 쓴다 (목표 실행과 같은 이유).
 // 대화 줄을 잠그고 앞 회차를 읽어서, 동시에 두 메시지를 보내도 회차는 하나만 생긴다 (둘째는 그 회차에 덧붙인 말이 된다, 2차 1-1).
@@ -39,10 +36,7 @@ import { ChatUpdates } from './chat-update.policy';
 // O-2 전에 배정을 기다리던 대화는 다음 말에서 대표가 맡는다 (partnerOf). 승인 뒤 이어서는 continueAfter
 @Injectable()
 export class ChatService extends BaseService {
-  private static readonly APPEND = 'chat_append';
   private static readonly CONTINUE = 'chat_continue';
-  /** 참조는 새 회차에만 (덧붙인 말은 회차가 아니다) */
-  private static readonly REFS_WAIT = '일하는 중에는 참조를 넣지 못해요. 답이 온 뒤에 보내요';
 
   constructor(
     db: Database,
@@ -73,8 +67,7 @@ export class ChatService extends BaseService {
         pending_refs: refs.empty ? null : refs.lines,
         app_id: req.appId,
       });
-      await this.start(tx, chat, await new AgentEdit(tx, spaceId).lead(now), now);
-      return chat;
+      return new ChatTalk(tx).open(chat, now);
     });
   }
 
@@ -91,9 +84,10 @@ export class ChatService extends BaseService {
       const chat = await new ChatRepository(tx).lock(spaceId, req.id);
       chat.assertSender(null);
       const seen = chat.agentId === null ? undefined : req.version; // 맡으면(partnerOf) 판이 오른다
-      const lead = await this.partnerOf(tx, chat, now, req.version);
+      const talk = new ChatTalk(tx);
+      const lead = await talk.partnerOf(chat, now, req.version);
       const text = { requestId: req.requestId, message: req.message, refs };
-      return this.talk(tx, actor, chat, lead, text, now, null, seen);
+      return (await talk.talk(actor.id ?? spaceId, chat, lead, text, now, null, seen)).chat;
     });
   }
 
@@ -120,14 +114,14 @@ export class ChatService extends BaseService {
           project: ChatProject.of(req.project),
           deliver: ChatResult.deliverOf(req.deliver),
         });
-        await this.start(tx, chat, await new AgentEdit(tx, spaceId).lead(now), now);
-        return chat;
+        return new ChatTalk(tx).open(chat, now);
       }
       const chat = await chats.lock(spaceId, req.chatId);
       chat.assertSender(deviceId);
-      const lead = await this.partnerOf(tx, chat, now);
+      const talk = new ChatTalk(tx);
+      const lead = await talk.partnerOf(chat, now);
       const text = { requestId: req.requestId, message: req.message, refs: TaskRefs.of(null) };
-      return this.talk(tx, actor, chat, lead, text, now, deviceId);
+      return (await talk.talk(deviceId, chat, lead, text, now, deviceId)).chat;
     });
   }
 
@@ -216,7 +210,7 @@ export class ChatService extends BaseService {
       if (!revise || !card.note) return;
       const agent = await new AgentRepository(tx).load(spaceId, chat.partnerId);
       const text = { requestId: `card:${card.id}`, message: card.note, refs: TaskRefs.of(null) };
-      await this.talk(tx, actor, chat, agent, text, now, null);
+      await new ChatTalk(tx).talk(actor.id ?? spaceId, chat, agent, text, now, null);
     });
   }
 
@@ -274,71 +268,6 @@ export class ChatService extends BaseService {
       approval.cancel();
       await approvals.save(approval);
     }
-  }
-
-  /** 대표가 맡아 첫 회차를 연다 (새 대화 · O-2 전에 배정을 기다리던 대화) */
-  private async start(tx: Sql, chat: Chat, lead: Agent, now: Date): Promise<void> {
-    const turn = chat.assign(lead, now);
-    await new ChatRepository(tx).save(chat);
-    await new TaskRepository(tx).insertOnce(turn);
-  }
-
-  /**
-   * 대화의 상대 (대표). O-2 전에 배정을 기다리던 대화면 지금 대표가 맡아 맡기 전의 첫 메시지로 첫 회차를 열고,
-   * 이번 말은 그 회차에 덧붙인 말이 된다 (talk). version: 관리자가 본 대화의 판 (맡으면 판이 오르니 먼저 본다)
-   */
-  private async partnerOf(tx: Sql, chat: Chat, now: Date, version?: number): Promise<Agent> {
-    if (chat.agentId !== null) return new AgentRepository(tx).load(chat.spaceId, chat.agentId);
-    if (version !== undefined) chat.assertVersion(version);
-    const lead = await new AgentEdit(tx, chat.spaceId).lead(now);
-    await this.start(tx, chat, lead, now);
-    return lead;
-  }
-
-  /**
-   * 맡은 대화에 말한다: 앞 회차가 끝났으면 다음 회차, 아니면 그 회차에 덧붙인 말 (소식 + 상대가 짧게 답하는 작업).
-   * 같은 requestId는 한 번만 (회차는 회차의 requestId로, 덧붙인 말은 Idempotency로). version은 관리자가 본 대화의 판
-   */
-  private async talk(
-    tx: Sql,
-    actor: Actor,
-    chat: Chat,
-    agent: Agent,
-    { requestId, message, refs }: { requestId: string; message: string; refs: TaskRefs },
-    now: Date,
-    deviceId: string | null,
-    version?: number,
-  ): Promise<Chat> {
-    const chats = new ChatRepository(tx);
-    const previous = await chats.previousTurns(chat, chat.spaceId);
-    if (ChatHistory.sentAs(previous.at(-1), requestId)) return chat;
-    const once = new Idempotency(tx, actor.id ?? chat.spaceId, requestId, ChatService.APPEND);
-    if (await once.previous()) return chat;
-    if (version !== undefined) chat.assertVersion(version);
-    const current = previous.at(-1);
-    const tasks = new TaskRepository(tx);
-    if (current && ChatHistory.waiting(current)) {
-      if (!refs.empty) throw new RuleViolation(ChatService.REFS_WAIT);
-      const appended = await chats.countUpdates(current.id, [ChatUpdates.APPENDED]);
-      const reply = chat.appendTo(
-        current,
-        agent,
-        requestId,
-        message,
-        previous,
-        appended,
-        now,
-        deviceId,
-      );
-      await chats.save(chat);
-      if (reply) await tasks.insertOnce(reply);
-      await once.remember({ chatId: chat.id });
-      return chat;
-    }
-    const task = chat.send(agent, requestId, message, previous, now, { deviceId, refs });
-    await chats.save(chat);
-    await tasks.insertOnce(task);
-    return chat;
   }
 
   /** 고른 참조를 보관함으로 확인하고 사진인 결과물을 적는다 (트랜잭션 밖에서, 관리자만). 없으면 빈 참조 */

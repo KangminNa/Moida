@@ -214,7 +214,7 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
 
   async function trash() {
     if (!post) return;
-    if (!window.confirm('휴지통으로 옮길까요? 30일 동안 복원할 수 있어요')) return;
+    if (!window.confirm('휴지통으로 옮길까요? 글 목록의 휴지통에서 복원할 수 있어요')) return;
     const drop = () => api('DELETE', `/api/posts/${post.id}`, { version: post.version });
     const reply = await send('trash', drop);
     if (reply?.ok) window.location.href = '/admin/posts';

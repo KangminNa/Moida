@@ -369,8 +369,9 @@ describe('주인이 결과물을 본다', () => {
       409,
     );
     assert.deepEqual(
-      ((await list('?trash=1')).outputs as Json[]).map((o) => o.id),
+      ((await list(`?trash=1&taskId=${taskId}`)).outputs as Json[]).map((o) => o.id),
       [image.id],
+      '이 작업의 휴지통 (다른 테스트가 지운 결과물은 세지 않는다)',
     );
     const task = ok(await api.get(`/api/tasks/${taskId}`, owner));
     assert.deepEqual(
@@ -393,7 +394,7 @@ describe('주인이 결과물을 본다', () => {
       version: again.version,
     });
     assert.equal(purged.status, 204, purged.text);
-    assert.equal(((await list('?trash=1')).outputs as Json[]).length, 0);
+    assert.equal(((await list(`?trash=1&taskId=${taskId}`)).outputs as Json[]).length, 0);
   });
 
   test('일꾼은 30일 지난 휴지통을 지우고, 아무도 쓰지 않게 된 파일은 sweep이 지운다', async () => {

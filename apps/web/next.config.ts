@@ -45,6 +45,19 @@ const pageHeaders = securityHeaders.filter((h) => !PAGE_FRAME_HEADERS.has(h.key)
 
 // 결과물 공유 링크(/share/<토큰>, 기획서 결정 2026-11-19)도 서버가 격리 머리글(sandbox · frame-ancestors 'none' · no-referrer)을 붙여 보낸다.
 // 화면의 CSP · Referrer-Policy를 함께 붙이면 서버의 것을 덮어 격리가 풀릴 수 있어 그 둘만 뺀다 (X-Frame-Options DENY는 둔다)
+/**
+ * 대화 결과 HTML (/admin/chats/<대화>/report, 2026-11-23): AI가 쓴 답을 담은 독립 문서라 스크립트 없이 격리한다.
+ * 스타일은 문서 안의 것만, 그림은 https · 이 사이트, 링크는 새 창으로만 열린다. 콘솔 경로의 머리글 뒤에 적어 덮는다
+ */
+const REPORT_HEADERS = [
+  {
+    key: 'Content-Security-Policy',
+    value:
+      "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https: data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  },
+  { key: 'Referrer-Policy', value: 'no-referrer' },
+];
+
 const SHARE_OWN_HEADERS = new Set(['Content-Security-Policy', 'Referrer-Policy']);
 const shareHeaders = securityHeaders.filter((h) => !SHARE_OWN_HEADERS.has(h.key));
 
@@ -98,6 +111,7 @@ const config: NextConfig = {
       { source: '/pages', headers: securityHeaders },
       { source: '/pages/:path+', headers: pageHeaders },
       { source: '/share/:token', headers: shareHeaders },
+      { source: '/admin/chats/:id/report', headers: REPORT_HEADERS },
     ];
   },
   async rewrites() {

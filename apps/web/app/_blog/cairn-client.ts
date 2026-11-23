@@ -1,3 +1,6 @@
+import { cairnMapScript } from './cairn-map';
+import type { MapChoice } from './map-config';
+
 // cairn.js (앱 플랫폼, docs/스토어.md 12.4): 앱 코드가 Cairn의 기능을 부르는 작은 스크립트. 앱은 <script src="_/cairn.js">로 싣는다
 // (앱 도메인에서는 /_/cairn.js, 기본 도메인 · 미리 보기에서는 /<앱>/_/cairn.js: <base> 덕에 같은 상대 주소다).
 // 앱은 Cairn의 주소 · 응답 모양을 직접 알지 않고 이 약속만 쓴다:
@@ -8,6 +11,7 @@
 //   cairn.from('표').insert({…}) · .update(id, {…}) · .delete(id)
 //   cairn.community.topics(cursor?) · topic(id) · write({title, body}) · edit(id, {version, title, body}) · remove(id, version)
 //                  · comment(topicId, body) · removeComment(id, version) · report({topicId | commentId, reason, note?})
+//   cairn.map.provider · cairn.map.create(자리, { places })   지도 (지도 플러그인, 약속은 cairn-map.ts)
 // 실패하면 Error를 던진다 (status · code가 붙는다). 쓰기 확인 값(CSRF)은 스크립트가 me에서 읽어 싣는다.
 // 브라우저에서 그대로 도는 글자다: 빌드를 거치지 않는다
 
@@ -108,14 +112,17 @@ const SOURCE = String.raw`(() => {
 })();
 `;
 
-/** cairn.js의 글자. open: 격리를 푼 화면에서 싣는가 (그 앱의 도메인, 미리 보기 아님) */
-export function cairnScript(open: boolean): string {
-  return SOURCE.replace('__OPEN__', open ? 'true' : 'false');
+/**
+ * cairn.js의 글자. open: 격리를 푼 화면에서 싣는가 (그 앱의 도메인, 미리 보기 아님).
+ * 뒤에 지도(cairn.map, 지도 플러그인)를 붙인다: 격리된 화면이면 키가 필요 없는 OpenStreetMap
+ */
+function cairnScript(open: boolean, map: MapChoice): string {
+  return `${SOURCE.replace('__OPEN__', open ? 'true' : 'false')}\n${cairnMapScript(map)}`;
 }
 
 /** cairn.js의 응답. 버전마다 바뀔 수 있어 오래 담아 두지 않는다 */
-export function cairnAnswer(open: boolean): Response {
-  return new Response(cairnScript(open), {
+export function cairnAnswer(open: boolean, map: MapChoice): Response {
+  return new Response(cairnScript(open, map), {
     status: 200,
     headers: {
       'Content-Type': 'text/javascript; charset=utf-8',

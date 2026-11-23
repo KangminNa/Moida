@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef } from 'react';
 import { type ApiReply, api } from '../../_lib/client-api';
+import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import { AskForm } from '../../_task/AskForm';
 import { TASK_STATUS, when } from '../../_task/labels';
-import { countOf, readPages, TASK_LOG_TOPICS, useAgents } from '../../_task/live';
+import { countOf, TASK_LOG_TOPICS, useAgents } from '../../_task/live';
 import { TaskPill } from '../../_task/parts';
-import type { Agent, Task, TaskPage } from '../../_task/types';
+import type { Agent, Task, TaskPage, TaskTrashed } from '../../_task/types';
 import { useNotify } from '../../_ui/notify';
+import { TaskList, TRASH } from './TaskList';
 
 /** 보드의 칸. 끝난 작업은 완료 칸에 모은다 */
 const COLUMNS = [
@@ -36,15 +37,11 @@ async function readBoard(): Promise<ApiReply<Board>> {
   return { ok: true, data: board };
 }
 
-function mergePages(before: TaskPage, more: TaskPage): TaskPage {
-  return { ...more, tasks: [...before.tasks, ...more.tasks] };
-}
-
 // 작업: 입력과 보드. 칸 머리를 누르면 상태별 목록, 카드를 누르면 상세(/admin/tasks/<id>)로.
 export function TasksPanel({ status, ask }: { status: string | null; ask: boolean }) {
   const notify = useNotify();
   const agents = useAgents();
-  const filter = status && status in TASK_STATUS ? status : null;
+  const filter = status && (status in TASK_STATUS || status === TRASH) ? status : null;
   const list = agents.data?.agents ?? [];
 
   return (
@@ -70,6 +67,13 @@ export function TasksPanel({ status, ask }: { status: string | null; ask: boolea
                 {TASK_STATUS[s]}
               </Link>
             ))}
+            <Link
+              className="chip"
+              href={`/admin/tasks?status=${TRASH}`}
+              aria-current={filter === TRASH ? 'true' : undefined}
+            >
+              휴지통
+            </Link>
           </nav>
           <TaskList key={filter} filter={filter} agents={list} />
         </>
@@ -83,6 +87,22 @@ export function TasksPanel({ status, ask }: { status: string | null; ask: boolea
 function TaskBoard({ agents }: { agents: readonly Agent[] }) {
   const board = useLiveValue('tasks:board', readBoard, TASK_LOG_TOPICS);
   const nameOf = (id: string | null) => agents.find((a) => a.id === id)?.name;
+  const clear = useAction();
+
+  /** 끝난 작업(완료 · 실패 · 취소) 모두를 작업 기록의 휴지통으로 (2026-11-23 일괄 지우기) */
+  function clearFinished() {
+    if (
+      !window.confirm(
+        '끝난 작업(완료 · 실패 · 취소)을 모두 작업 기록에서 휴지통으로 보낼까요? 휴지통에서 꺼낼 수 있어요',
+      )
+    )
+      return;
+    void clear.run(
+      'finished',
+      () => api<TaskTrashed>('POST', '/api/tasks/trash', { finished: true }),
+      { done: (d) => `${d.count}개 휴지통으로`, reload: board.reload },
+    );
+  }
 
   if (board.data === null)
     return board.error ? (
@@ -95,6 +115,20 @@ function TaskBoard({ agents }: { agents: readonly Agent[] }) {
   return (
     <>
       {board.error && <p className="error">{board.error}</p>}
+      {clear.problem && <p className="error">{clear.problem}</p>}
+      <div className="row">
+        <button
+          type="button"
+          className="ghost small"
+          disabled={clear.busy !== null}
+          onClick={clearFinished}
+        >
+          끝난 작업 모두 휴지통으로
+        </button>
+        <Link className="ghost small" href={`/admin/tasks?status=${TRASH}`}>
+          휴지통
+        </Link>
+      </div>
       <div className="board">
         {COLUMNS.map((column) => {
           const shown = column.statuses.map((s) => pages[s]);
@@ -140,55 +174,5 @@ function TaskCard({ task, agent }: { task: Task; agent: string | undefined }) {
       </small>
       {marked && <TaskPill status={task.status} waitReason={task.waitReason} />}
     </Link>
-  );
-}
-
-/** 거르는 상태마다 따로 둔다: 바꾸면 읽은 쪽 수가 처음으로 돌아간다 */
-function TaskList({ filter, agents }: { filter: string; agents: readonly Agent[] }) {
-  const pages = useRef(1);
-  const list = useLiveValue(
-    `tasks:${filter}`,
-    () => readPages(`/api/tasks?status=${filter}`, pages.current, mergePages),
-    TASK_LOG_TOPICS,
-  );
-  const nameOf = (id: string | null) => agents.find((a) => a.id === id)?.name ?? '자동 배정';
-
-  return (
-    <>
-      {list.error && <p className="error">{list.error}</p>}
-      {list.data === null ? (
-        !list.error && <p className="label-mono">불러오는 중…</p>
-      ) : list.data.tasks.length === 0 ? (
-        <p className="rows-empty">{TASK_STATUS[filter]} 작업 없음</p>
-      ) : (
-        <ul className="list">
-          {list.data.tasks.map((t) => (
-            <li key={t.id}>
-              <Link className="item" href={`/admin/tasks/${t.id}`}>
-                <div className="item-main">
-                  <b>{t.title}</b>
-                  <small>
-                    {nameOf(t.agentId)} · {when(t.createdAt)}
-                  </small>
-                </div>
-                <TaskPill status={t.status} waitReason={t.waitReason} />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-      {list.data?.next && (
-        <button
-          type="button"
-          className="ghost wide"
-          onClick={() => {
-            pages.current += 1;
-            void list.reload();
-          }}
-        >
-          더 보기
-        </button>
-      )}
-    </>
   );
 }

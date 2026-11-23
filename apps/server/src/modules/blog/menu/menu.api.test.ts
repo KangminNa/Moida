@@ -209,6 +209,21 @@ describe('메뉴 (/api/menus)', () => {
       version: menu.version,
     });
     assert.equal(busy.status, 422, '글이 있는 메뉴는 지우지 못한다');
+    // 휴지통의 글은 막지 않는다 (목록의 개수에도 없다): 메뉴에서 빠져 앱과 휴지통에 그대로 남는다
+    const now = ok(await api.get(`/api/posts/${post.id}`, owner));
+    const trashed = ok(
+      await api.request('DELETE', `/api/posts/${post.id}`, owner, { version: now.version }),
+    );
+    const gone = await api.request('POST', `/api/menus/${menu.id}/delete`, owner, {
+      version: menu.version,
+    });
+    assert.equal(gone.status, 204, gone.text);
+    const back = ok(
+      await api.request('POST', `/api/posts/${post.id}/restore`, owner, {
+        version: Number(trashed.version) + 1,
+      }),
+    );
+    assert.deepEqual([back.menuId, back.appId !== null], [null, true]);
   });
 
   test('AI 도구: blog_menus로 편집 방침을 읽고, blog_save_draft의 menu_id로 초안을 메뉴에 올린다', async () => {

@@ -138,6 +138,19 @@ export class WikiQuery extends BaseQuery {
     return actor.spaceId === null ? this.sql`TRUE` : this.sql`w.space_id = ${actor.spaceId}`;
   }
 
+  /** 보관함의 일괄 지우기 (2026-11-23): 휴지통이 아닌 위키의 지금 판 (주인만) */
+  async liveVersions(
+    actor: Actor,
+    ids: readonly string[],
+  ): Promise<{ id: string; version: number }[]> {
+    actor.assertOwner();
+    return this.sql<{ id: string; version: number }[]>`
+      SELECT w.node_id AS id, w.version FROM vault.wikis w JOIN vault.nodes n ON n.id = w.node_id
+      WHERE w.space_id = ${actor.requireSpace()} AND w.node_id = ANY(${[...ids]}::uuid[])
+        AND n.deleted_at IS NULL
+      ORDER BY w.node_id`;
+  }
+
   /** 보관함의 위키 (2차 5단계, platform LibraryQuery에 등록). 휴지통 밖 */
   async library(actor: Actor, filter: LibraryInput): Promise<readonly LibraryRow[]> {
     actor.assertOwner();

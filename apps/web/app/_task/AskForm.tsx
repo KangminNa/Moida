@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, uploadFile } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
-import { flatTree } from './labels';
+import { bytes, flatTree } from './labels';
 import { useGoals } from './live';
 import type { Agent, OutputSaved, Task } from './types';
 
@@ -185,7 +185,7 @@ export function AskForm({
         <ul className="ask-files">
           {files.map((file, i) => (
             <li key={fileKey(file)}>
-              {file.name}
+              {file.name} · {bytes(file.size)}
               <button
                 type="button"
                 className="ghost"
@@ -197,7 +197,8 @@ export function AskForm({
             </li>
           ))}
           <li className="note">
-            파일은 결과물로 올라가고, 만들기 에이전트가 읽어 결과를 만들어요 (최대 {FILES_MAX}개)
+            {files.length}/{FILES_MAX}개 · 파일 하나에 100MB까지. 결과물로 올라가고 일꾼이 읽어
+            결과를 만들어요{files.length >= FILES_MAX ? '. 더 고른 파일은 넣지 않았어요' : ''}
           </li>
         </ul>
       )}

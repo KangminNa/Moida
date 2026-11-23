@@ -19,7 +19,14 @@ import { BaseQuery } from './base-query';
 import { BaseRepository } from './base-repository';
 import { BaseRequest, RequestFields } from './base-request';
 import { Database, type Row } from './database';
-import { Conflict, Forbidden, InvalidRequest, NotFound, TooManyRequests } from './errors';
+import {
+  Conflict,
+  Forbidden,
+  InvalidRequest,
+  NotFound,
+  StaleVersion,
+  TooManyRequests,
+} from './errors';
 import { DomainEvent } from './event';
 import { Idempotency } from './idempotency';
 import { Outbox } from './outbox';
@@ -681,6 +688,15 @@ describe('입력 읽기 (M1)', () => {
     const sample = Sample.open();
     sample.assertVersion(1);
     assert.throws(() => sample.assertVersion(2), Conflict);
+    // 낡은 version은 StaleVersion: 409 그대로에 stale을 실어 다른 뜻의 409와 가른다
+    assert.throws(
+      () => sample.assertVersion(2),
+      (error: unknown) =>
+        error instanceof StaleVersion &&
+        error.status === 409 &&
+        JSON.stringify(error).includes('"stale":true'),
+    );
+    assert.equal(JSON.stringify(new Conflict('남은 글이 있어요')).includes('stale'), false);
   });
 });
 

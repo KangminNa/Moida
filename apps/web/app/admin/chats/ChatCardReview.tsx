@@ -10,11 +10,16 @@ const VERDICT_LABELS: Record<string, string> = {
   reject: '반려 권함',
 };
 
+/** 서버의 ChatReview.PASS_SCORE · ChatResult.FIX_MAX · ChatReview.FIX_MAX: 통과 점수와 서버가 저절로 다시 맡기는 횟수의 한도 */
+const PASS_SCORE = 4;
+const DELIVER_FIX_MAX = 2;
+const REVIEW_FIX_MAX = 1;
+
 export function ChatCardReview({ card }: { card: ChatCard }) {
   const { review, fixed } = card;
   const auto = [
-    fixed.deliver > 0 ? `받을 것 다시 맡김 ${fixed.deliver}번` : '',
-    fixed.review > 0 ? `검토 반영 ${fixed.review}번` : '',
+    fixed.deliver > 0 ? `받을 것 다시 맡김 ${fixed.deliver}/${DELIVER_FIX_MAX}번` : '',
+    fixed.review > 0 ? `검토 반영 ${fixed.review}/${REVIEW_FIX_MAX}번` : '',
   ].filter(Boolean);
   if (!review && auto.length === 0) return null;
   const verdict = review ? VERDICT_LABELS[review.verdict] : undefined;
@@ -24,7 +29,7 @@ export function ChatCardReview({ card }: { card: ChatCard }) {
       {review && verdict && (
         <p className="result-verdict">
           <b>{verdict}</b>
-          {review.score !== null ? ` · 평균 ${review.score}점` : ''}
+          {review.score !== null ? ` · 평균 ${review.score}/5점 (${PASS_SCORE}점부터 통과)` : ''}
           {review.summary ? ` · ${review.summary}` : ''}
         </p>
       )}
@@ -34,7 +39,7 @@ export function ChatCardReview({ card }: { card: ChatCard }) {
           {review.checklist.map((line) => (
             <li key={line.item} className={line.ok ? '' : 'unmet'}>
               <Icon name={line.ok ? 'check' : 'x'} /> {line.item}
-              {line.score !== null ? <small> · {line.score}점</small> : null}
+              {line.score !== null ? <small> · {line.score}/5점</small> : null}
               {line.note ? <small> · {line.note}</small> : null}
             </li>
           ))}

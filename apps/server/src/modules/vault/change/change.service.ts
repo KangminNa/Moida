@@ -9,6 +9,7 @@ import {
   NotFound,
   RuleViolation,
   SensitivePolicy,
+  StaleVersion,
 } from '../../platform';
 import type { DecideChangeInput, EditInput, SubmitChangesInput } from './change.input';
 import { ChangeRepository } from './change.repository';
@@ -117,7 +118,7 @@ export class ChangeService extends BaseService {
         op.bind(board);
         if (op.missing) throw new NotFound('대상을 찾을 수 없어요');
         if (op.stale)
-          throw new Conflict('다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요');
+          throw new StaleVersion('다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요');
         op.judge(Verdict.direct());
         await this.apply(op, board, targets, sets, work);
       }
@@ -126,6 +127,14 @@ export class ChangeService extends BaseService {
       await once?.remember({ changeSetId: set.id });
       return set;
     });
+  }
+
+  /** 보관함의 일괄 지우기 (2026-11-23): 읽어 둔 판으로 만든 휴지통 묶음 하나 (edit과 같은 길). 고를 것이 없으면 0 */
+  async trashMany(actor: Actor, req: EditInput): Promise<number> {
+    actor.assertOwner();
+    if (req.ops.length === 0) return 0;
+    await this.edit(actor, req);
+    return req.ops.length;
   }
 
   /**

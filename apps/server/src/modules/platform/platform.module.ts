@@ -22,6 +22,7 @@ import { DomainErrorFilter } from './http/domain-error.filter';
 import { HostGate } from './http/host-gate';
 import { LibraryController } from './library/library.api';
 import { LibraryQuery } from './library/library.query';
+import { LibraryTrashService } from './library/library-trash.service';
 import { NoticeCatalog } from './notice/notice-catalog';
 import { NoticeKind } from './notice/notice-kind';
 import { NoticePushJob } from './notice/notice-push.job';
@@ -43,6 +44,7 @@ import { PackageService } from './plugin/package.service';
 import { PluginController } from './plugin/plugin.api';
 import { PluginQuery } from './plugin/plugin.query';
 import { PluginService } from './plugin/plugin.service';
+import { PluginChats } from './plugin/plugin-chats';
 import { PluginRegistry } from './plugin/plugin-registry';
 import { SecurityEventController } from './security/security-event.api';
 import { SecurityEventQuery } from './security/security-event.query';
@@ -62,6 +64,7 @@ import { OutboxWorker } from './worker/outbox-worker';
   providers: [
     PackageService,
     Leases,
+    PluginChats,
     Database,
     BlobStore,
     BlobSweepJob,
@@ -89,6 +92,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
+    LibraryTrashService,
     Lookups,
     HostGate,
     ActionChecks,
@@ -133,9 +137,11 @@ import { OutboxWorker } from './worker/outbox-worker';
     PluginService,
     PackageService,
     Leases,
+    PluginChats,
     ArchiveQuery,
     ArchiveRestoreService,
     LibraryQuery,
+    LibraryTrashService,
     Lookups,
     HostGate,
     ActionChecks,

@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { appOfHost } from '../../../../_blog/app-domains';
 import { cairnAnswer } from '../../../../_blog/cairn-client';
 import { slugFrom } from '../../../../_blog/format';
+import { mapFor } from '../../../../_blog/map-config';
 import { hostOf } from '../../../../_blog/request-host';
 
 // cairn.js (앱 플랫폼, docs/스토어.md 12.4): 앱 코드가 회원 · 앱 데이터 · 커뮤니티를 부르는 스크립트.
@@ -13,5 +14,6 @@ type Params = { params: Promise<{ app: string }> };
 
 export async function GET(request: NextRequest, { params }: Params): Promise<Response> {
   const app = slugFrom((await params).app);
-  return cairnAnswer((await appOfHost(hostOf(request.headers))) === app);
+  const open = (await appOfHost(hostOf(request.headers))) === app;
+  return cairnAnswer(open, await mapFor(open));
 }

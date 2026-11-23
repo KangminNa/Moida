@@ -7,6 +7,7 @@ import { NotFound } from '../base/errors';
 import { Work } from '../base/operation';
 import { Outbox } from '../base/outbox';
 import { Leases } from './leases';
+import { PluginChats } from './plugin-chats';
 import type { PackageOperation } from './plugin-context';
 import { PluginRegistry } from './plugin-registry';
 
@@ -19,6 +20,7 @@ export class PackageService extends BaseService {
     db: Database,
     private readonly registry: PluginRegistry,
     private readonly leases: Leases,
+    private readonly chats: PluginChats,
   ) {
     super(db);
   }
@@ -46,7 +48,12 @@ export class PackageService extends BaseService {
     if (!operation.writes)
       return operation.run(new Work(this.db.sql, manifest.schema, emits, leased), actor, input);
     return this.transaction(async (tx) => {
-      const work = new Work(tx, manifest.schema, emits, leased);
+      // 대화 입구 (0.10): 허락받은 쓰기 동작만, 같은 트랜잭션에서
+      const chat = manifest.allows('chat')
+        ? (spaceId: string, chatId: string | null, requestId: string, text: string) =>
+            this.chats.send(tx, spaceId, chatId, requestId, text)
+        : null;
+      const work = new Work(tx, manifest.schema, emits, leased, chat);
       const answer = await operation.run(work, actor, input);
       await new Outbox(tx).publish(work.events);
       return answer;

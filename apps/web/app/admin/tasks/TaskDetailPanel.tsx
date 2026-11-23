@@ -24,6 +24,8 @@ import { TaskRuns } from './TaskRuns';
 
 /** 서버가 상세에 보내는 실행 기록의 최대 개수 (TaskQuery.EVENTS) */
 const EVENTS_MAX = 500;
+/** 서버의 Task.MAX_ATTEMPTS: 러너가 끊겨 이만큼 다시 받으면 실패로 끝난다 */
+const MAX_ATTEMPTS = 3;
 const DETAIL_TOPICS = ['task.task.changed', 'task.event.added'];
 
 // 작업 상세: 지시, 대상, 결과, 실행 로그. 로그는 신호가 올 때마다 다시 읽어 새로 고침 없이 늘어난다.
@@ -38,8 +40,15 @@ export function TaskDetailPanel({ id }: { id: string }) {
   const approvals = usePendingApprovals();
   const action = useAction();
   const t = task.data;
+  /** 끝나지 않은 하위 작업 수 */
+  const open = t?.children.filter((c) => CANCELLABLE.includes(c.status)).length ?? 0;
 
+  // 하위 작업이 있으면 함께 취소된다: 묻고 한다
   const cancel = (version: number) =>
+    (open === 0 ||
+      window.confirm(
+        `취소할까요? 끝나지 않은 하위 작업 ${open}개도 함께 취소되고 되돌릴 수 없어요`,
+      )) &&
     action.run('cancel', () => api<Task>('POST', `/api/tasks/${id}/cancel`, { version }), {
       done: '작업 취소됨',
       reload: task.reload,
@@ -87,7 +96,10 @@ export function TaskDetailPanel({ id }: { id: string }) {
       </div>
       {paused && <p className="warn">담당 에이전트 중지됨. 재개하면 실행돼요</p>}
       {t.waitReason === 'subtasks' && (
-        <p className="warn">하위 작업을 기다리는 중. 모두 끝나면 결과를 받아 다시 실행돼요</p>
+        <p className="warn">
+          하위 작업을 기다리는 중 ({t.children.length - open}/{t.children.length} 끝남). 모두
+          끝나거나 하나가 실패하거나 기한이 되면 결과를 받아 다시 실행돼요
+        </p>
       )}
       {executing && <p className="warn">승인됨. 실행 결과를 기다리는 중</p>}
       <section className="panel" aria-labelledby="task-instruction">
@@ -198,7 +210,9 @@ function Facts({ task }: { task: TaskDetail }) {
       )}
       <Materials payload={task.payload} />
       <dt>시도</dt>
-      <dd>{task.attempts}회</dd>
+      <dd>
+        {task.attempts}/{MAX_ATTEMPTS}회
+      </dd>
       {task.finishedAt && (
         <>
           <dt>끝남</dt>

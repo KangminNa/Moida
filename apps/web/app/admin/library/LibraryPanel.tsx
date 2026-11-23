@@ -7,7 +7,8 @@ import type { EditablePost, MenuList, PageDetail } from '../../_blog/types';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
-import type { LibraryPage } from '../../_platform/types';
+import { usePicks } from '../../_lib/use-picks';
+import type { LibraryPage, LibraryTrashed } from '../../_platform/types';
 import { readPages } from '../../_task/live';
 import { NewTabLink } from '../../_ui/NewTabLink';
 import type { ProjectRules } from '../../_vault/types';
@@ -49,12 +50,18 @@ const MENU_KINDS: Record<string, readonly string[]> = {
   page: ['pages', 'page'],
 };
 
+/** 한 번에 휴지통으로 보낼 수 있는 수 (서버 TrashLibraryInput.MAX) */
+const TRASH_MAX = 100;
+/** 줄의 열쇠: 종류와 id (종류마다 id가 따로라 함께 둔다) */
+const keyOf = (i: { kind: string; id: string }) => `${i.kind}:${i.id}`;
+
 function when(iso: string): string {
   return new Date(iso).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 // 보관함 (2차 5단계): 결과물 · 페이지 · 읽은 글 · 세션 · 위키 · 글을 한 목록으로 (최근 것부터).
-// 종류 · 기간 · 프로젝트(세션만 프로젝트를 안다)로 거르고, 줄을 누르면 그것의 화면으로. 관리(지우기 · 공개 등)는 각 화면에서.
+// 종류 · 기간 · 프로젝트(세션만 프로젝트를 안다)로 거르고, 줄을 누르면 그것의 화면으로. 공개 등 관리는 각 화면에서.
+// 여럿 골라 휴지통으로 (2026-11-23 일괄 지우기): 종류마다 그 휴지통으로 가고(되살리기는 각 화면), 스크랩은 바로 지우고, 페이지는 페이지 화면에서.
 // 글 · 페이지 줄에서 블로그 메뉴에 올린다 (2차 6단계, 공개 대기. 공개는 글의 공개 범위 · 페이지의 공개로)
 export function LibraryPanel() {
   const [kind, setKind] = useState<string | null>(null);
@@ -82,7 +89,35 @@ export function LibraryPanel() {
   const apps = useApps();
   const appName = (id: string) => apps.data?.apps.find((a) => a.id === id)?.name ?? '';
   const place = useAction();
+  const trash = useAction();
+  const picks = usePicks();
   const items = list.data?.items ?? null;
+
+  /** 고른 줄을 휴지통으로. 되살리기는 그 종류의 화면(위키 · 세션 · 결과물 · 글의 휴지통)에서 */
+  function trashPicked() {
+    const picked = [...picks.picked].map((key) => {
+      const at = key.indexOf(':');
+      return { kind: key.slice(0, at), id: key.slice(at + 1) };
+    });
+    if (
+      !window.confirm(
+        `${picked.length}개를 휴지통으로 보낼까요? 각 화면의 휴지통에서 되살릴 수 있어요. 스크랩은 바로 지워지고, 페이지는 페이지 화면에서 지워요`,
+      )
+    )
+      return;
+    void trash.run(
+      'picked',
+      () => api<LibraryTrashed>('POST', '/api/library/trash', { items: picked }),
+      {
+        done: (d) =>
+          `${d.trashed}개 휴지통으로${d.skipped.length > 0 ? ' · 페이지는 페이지 화면에서 지워요' : ''}`,
+        reload: () => {
+          picks.clear();
+          return list.reload();
+        },
+      },
+    );
+  }
 
   /** 메뉴에 올리기 · 빼기: 지금 version을 읽어 함께 보낸다 (보관함 줄에는 version이 없다) */
   function moveTo(kind: string, id: string, menuId: string | null) {
@@ -168,6 +203,31 @@ export function LibraryPanel() {
       {project && <p className="note">프로젝트로 거르면 세션만 보여요</p>}
       {list.error && <p className="error">{list.error}</p>}
       {place.problem && <p className="error">{place.problem}</p>}
+      {trash.problem && <p className="error">{trash.problem}</p>}
+      {items && items.length > 0 && (
+        <div className="row">
+          <button
+            type="button"
+            className="ghost small"
+            onClick={() =>
+              picks.size === items.length ? picks.clear() : picks.all(items.map(keyOf))
+            }
+          >
+            {picks.size === items.length ? '고르기 풀기' : '보이는 것 모두 고르기'}
+          </button>
+          {picks.size > 0 && (
+            <button
+              type="button"
+              className="ghost small"
+              disabled={trash.busy !== null || picks.size > TRASH_MAX}
+              onClick={trashPicked}
+            >
+              고른 {picks.size}개 휴지통으로
+            </button>
+          )}
+          {picks.size > TRASH_MAX && <small className="note">한 번에 {TRASH_MAX}개까지</small>}
+        </div>
+      )}
       {items === null ? (
         !list.error && <p className="label-mono">불러오는 중…</p>
       ) : items.length === 0 ? (
@@ -180,8 +240,16 @@ export function LibraryPanel() {
       ) : (
         <ul className="list library-grid" aria-label="보관함">
           {items.map((i) => (
-            <li key={`${i.kind}:${i.id}`} className="list-cell library-row">
-              <span className="pill">{KIND_LABELS[i.kind] ?? i.kind}</span>
+            <li key={keyOf(i)} className="list-cell library-row">
+              <label className="row library-pick">
+                <input
+                  type="checkbox"
+                  aria-label={`${i.title} 고르기`}
+                  checked={picks.has(keyOf(i))}
+                  onChange={() => picks.toggle(keyOf(i))}
+                />
+                <span className="pill">{KIND_LABELS[i.kind] ?? i.kind}</span>
+              </label>
               <div className="library-main">
                 <Link href={i.href} className="clamp-1">
                   <b>{i.title}</b>

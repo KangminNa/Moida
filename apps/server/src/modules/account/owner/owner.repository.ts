@@ -1,4 +1,4 @@
-import { BaseRepository, Conflict, Database, Rule } from '../../platform';
+import { BaseRepository, Conflict, Database, Rule, StaleVersion } from '../../platform';
 import { loginLinks, spaceMembers, webSessions } from '../account.schema';
 import type { UserRow, WebSessionRow } from '../account.tables';
 import { type LoadedOwner, Owner, WebSession } from './owner';
@@ -115,7 +115,7 @@ export class OwnerRepository extends BaseRepository<Owner> {
           ${guarded ? this.sql`AND version = ${owner.version}` : this.sql``}
           RETURNING *`;
     if (!row && guarded)
-      throw new Conflict('다른 곳에서 먼저 바뀌었어요. 다시 읽은 뒤 저장해 주세요');
+      throw new StaleVersion('다른 곳에서 먼저 바뀌었어요. 다시 읽은 뒤 저장해 주세요');
     if (fresh) await this.insertRows(spaceMembers, owner.membership);
     if (row) owner.saved(row);
   }

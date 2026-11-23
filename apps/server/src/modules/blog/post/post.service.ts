@@ -12,7 +12,6 @@ import {
   type VersionTarget,
 } from '../../platform';
 import { AppRepository } from '../app/app.repository';
-import type { Menu } from '../menu/menu';
 import { MenuRepository } from '../menu/menu.repository';
 import { Post } from './post';
 import type {
@@ -240,6 +239,22 @@ export class PostService extends EntityService<Post> {
 
   trash(actor: Actor, req: PostVersionInput): Promise<Post> {
     return this.changeAsWriter(actor, req, (post) => post.trash(actor, new Date()));
+  }
+
+  /** 보관함의 일괄 지우기 (2026-11-23): 고른 글을 휴지통으로 (주인만). 없거나 이미 휴지통이면 넘어간다. 보낸 수 */
+  async trashMany(actor: Actor, ids: readonly string[]): Promise<number> {
+    actor.assertOwner();
+    const spaceId = Post.spaceOf(actor);
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const posts = new PostRepository(tx);
+      const live = await posts.lockLive(spaceId, ids);
+      for (const post of live) {
+        post.trash(actor, now);
+        await posts.save(post);
+      }
+      return live.length;
+    });
   }
 
   recover(actor: Actor, req: PostVersionInput): Promise<Post> {

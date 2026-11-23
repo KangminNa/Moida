@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import {
   type Actor,
   type BaseTool,
-  Conflict,
   Database,
   EntityService,
   Idempotency,
   NotFound,
   type Sql,
+  StaleVersion,
   ToolTexts,
 } from '../../platform';
 import { McpToolbox } from '../mcp-toolbox';
@@ -48,7 +48,7 @@ export class ToolTextService extends EntityService<ToolText> {
       const found = await texts.lockByTool(spaceId, req.tool);
       // 콘솔 판이 아직 없으면 화면이 본 version은 0이다
       if (!found && req.version !== 0)
-        throw new Conflict('다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요');
+        throw new StaleVersion('다른 곳에서 먼저 바뀌었어요. 새로 불러온 뒤 다시 해 주세요');
       found?.assertVersion(req.version);
       const text = found ?? ToolText.open(spaceId, req.tool, now);
       const body = { description: req.description, input: req.input };

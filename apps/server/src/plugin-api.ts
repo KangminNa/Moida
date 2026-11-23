@@ -8,6 +8,7 @@
 // 0.7 (2026-11-19): LeasedWork의 관리자가 쓴 지시(ownerText) — browser-tabs의 로그인 카드가 믿는 주소인지 본다
 // 0.8 (2026-11-21): actor.runTask() — 에이전트(작업 토큰)가 부른 도구를 지금 하는 일에 묶는다. 결과 이벤트의 outcome continue —
 //     결재를 기다리던 작업을 다시 대기열로 (browser-tabs의 누르기 계획: 계획을 승인하면 같은 일이 이어서 누른다)
+// 0.10 (2026-11-23): work.sendChat — uses의 chat을 허락받은 쓰기 동작이 관리자의 대화에 말을 넣는다 (ChatSent, messenger-telegram)
 export {
   ActionResult,
   Actor,
@@ -19,6 +20,7 @@ export {
   BaseJob,
   BaseLogin,
   BasePlugin,
+  ChatSent,
   Command,
   Conflict,
   DomainError,

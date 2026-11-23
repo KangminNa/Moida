@@ -5,9 +5,9 @@ import { useCallback, useEffect } from 'react';
 import { useDevices } from '../../_account/live';
 import type { Device } from '../../_account/types';
 import { api } from '../../_lib/client-api';
+import { ago } from '../../_lib/time-ago';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
-import { when } from '../../_task/labels';
 import { useAgents, useAiTools } from '../../_task/live';
 import type { Runner, RunnerList } from '../../_task/types';
 
@@ -159,7 +159,7 @@ function RunnerRow({
           <b>{device.name}</b>
           <small>
             {runner.sandbox ? '샌드박스' : server ? '배포 서버 안' : '내 컴퓨터 등'} · 마지막 연결{' '}
-            {when(runner.lastSeenAt)}
+            {ago(runner.lastSeenAt)}
             {pinned.length > 0 ? ` · 묶인 에이전트: ${pinned.join(', ')}` : ''}
           </small>
         </div>
@@ -172,7 +172,7 @@ function RunnerRow({
           {runner.online ? '연결됨' : '연결 안 됨'}
         </span>
         <span className={runner.accepting ? 'pill strong' : 'pill off'}>
-          {runner.accepting ? '일 받는 중' : '쉬는 중'}
+          {runner.accepting ? '일 받는 중' : '일 받지 않음'}
         </span>
       </div>
       {runner.task ? (

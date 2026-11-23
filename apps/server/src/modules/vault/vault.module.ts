@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { CoreWorkers, EventCatalog, LibraryQuery, Lookups } from '../platform';
+import { CoreWorkers, EventCatalog, LibraryQuery, LibraryTrashService, Lookups } from '../platform';
 import { AppMarkHandler } from './app-mark/app-mark.handler';
 import { AppMarkService } from './app-mark/app-mark.service';
 import { CategoryController } from './category/category.api';
@@ -20,6 +20,7 @@ import { ProjectRuleQuery } from './project/project-rule.query';
 import { ProjectRuleService } from './project/project-rule.service';
 import { RunMemosTool, SaveRunRecordTool } from './session/run-record.tool';
 import { SessionController } from './session/session.api';
+import { TrashSessionsInput } from './session/session.input';
 import { SessionQuery } from './session/session.query';
 import { SessionService } from './session/session.service';
 import {
@@ -41,6 +42,7 @@ import { VaultNotices } from './vault-notices';
 import { VaultSettings } from './vault-settings';
 import { VaultTools } from './vault-tools';
 import { WikiController } from './wiki/wiki.api';
+import { TrashWikisInput } from './wiki/wiki.input';
 import { WikiQuery } from './wiki/wiki.query';
 import { GetWikiTool, SearchWikisTool } from './wiki/wiki.tool';
 import { WikiScoreController } from './wiki-score/wiki-score.api';
@@ -118,6 +120,8 @@ export class VaultModule implements OnModuleInit {
     private readonly wikis: WikiQuery,
     private readonly lookups: Lookups,
     private readonly postWikis: PostWikiQuery,
+    private readonly libraryTrash: LibraryTrashService,
+    private readonly changes: ChangeService,
   ) {}
 
   onModuleInit(): void {
@@ -129,6 +133,13 @@ export class VaultModule implements OnModuleInit {
     // 보관함 (2차 5단계): 세션 · 위키
     this.library.register([SessionQuery.LIBRARY_KIND], (a, f) => this.sessions.library(a, f));
     this.library.register([WikiQuery.LIBRARY_KIND], (a, f) => this.wikis.library(a, f));
+    // 보관함의 일괄 지우기 (2026-11-23): 지금 판을 읽어 한 변경 묶음으로 휴지통에 (되살릴 수 있다)
+    this.libraryTrash.register([SessionQuery.LIBRARY_KIND], async (a, ids) =>
+      this.changes.trashMany(a, TrashSessionsInput.of(await this.sessions.liveVersions(a, ids))),
+    );
+    this.libraryTrash.register([WikiQuery.LIBRARY_KIND], async (a, ids) =>
+      this.changes.trashMany(a, TrashWikisInput.of(await this.wikis.liveVersions(a, ids))),
+    );
     this.workers.on('blog.post.*', this.postMarks);
     // 앱 공개 여부 사본 (스토어 1-2): 방문자 그래프는 앱도 공개인 글만
     this.workers.on(AppMarkHandler.TOPIC, this.appMarks);

@@ -1,0 +1,22 @@
+{
+  "name": "map",
+  "version": "0.1.0",
+  "cairn": ">=0.1",
+  "description": "지도 API를 등록한다. 앱 코드는 cairn.map.create(자리, { places })로 지도를 그리고, 어느 회사 지도인지는 여기서 정한다. 카카오 · 네이버 · 구글 지도는 앱의 도메인으로 연 화면에서만 돌고, 격리된 화면(미리 보기 · 기본 도메인 · 페이지)은 키가 필요 없는 OpenStreetMap으로 그린다",
+  "settings": {
+    "provider": {
+      "label": "지도",
+      "type": "select",
+      "options": ["osm", "kakao", "naver", "google"],
+      "default": "osm",
+      "public": true,
+      "help": "osm: OpenStreetMap(키 없음) · kakao: 카카오맵 · naver: 네이버 지도 · google: 구글 지도"
+    },
+    "key": {
+      "label": "브라우저용 키",
+      "type": "text",
+      "public": true,
+      "help": "방문자의 브라우저가 쓰는 키라 공개돼요. 카카오는 JavaScript 키, 네이버는 Client ID(ncpKeyId), 구글은 Maps JavaScript API 키. 각 회사 콘솔에서 키를 쓸 도메인(앱의 도메인)을 꼭 등록하고, 서버용 비밀 키는 넣지 않아요"
+    }
+  }
+}

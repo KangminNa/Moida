@@ -113,7 +113,7 @@
 }
 ```
 
-- `hosts`는 정확한 호스트 이름만 10개까지 (와일드카드 · IP · 포트 없이). 지시가 바깥 서비스(글꼴 · 지도 · 댓글)를 요구할 때만 더한다.
+- `hosts`는 정확한 호스트 이름만 10개까지 (와일드카드 · IP · 포트 없이). 지시가 바깥 서비스(글꼴 · 댓글)를 요구할 때만 더한다. 지도는 `hosts`에 적지 않고 `cairn.map`을 쓴다 (아래 "지도": 지도 회사의 주소는 Cairn이 열어 준다).
 - `members`: 가입 · 로그인을 받는다 (커뮤니티 앱은 적지 않아도 늘 받는다).
 - `permissions`: 브라우저 권한. `microphone` · `camera` · `geolocation` 가운데 쓰는 것만. 적지 않은 권한은 막힌다.
 - `theme`: Cairn이 그리는 가입 · 로그인 화면에 입힐 색(`#rrggbb`)과 로고(묶음 바로 아래의 파일 이름).
@@ -151,6 +151,28 @@
 - 읽기 규칙에 맞지 않는 줄은 오류 없이 빠져서 온다 (로그인하지 않은 방문자가 `member` · `owner` 표를 읽으면 빈 목록). 쓰기가 실패하면 `Error`를 던진다 (`status` · `code` · `message`): 401은 로그인이 필요하다는 뜻이고, 남의 줄을 고치려 하면 없는 줄(404)이다.
 - 커뮤니티 앱: `cairn.community.topics(cursor?)` · `topic(id)` · `write({ title, body })` · `edit(id, { version, title, body })` · `remove(id, version)` · `comment(topicId, body)` · `removeComment(id, version)` · `report({ topicId | commentId, reason, note? })`. 글 · 댓글은 회원이 쓴 글자다: `textContent`로 넣고 `innerHTML`에 그대로 넣지 않는다 (`topic.html`만 서버가 거른 HTML이다).
 - 처음 채울 내용(레슨 · 단어 목록 같은 `write: "admin"` 표의 줄)은 앱 코드에 넣지 않는다. 답에 "넣을 줄"을 적으면 대표가 승인을 받아 넣는다. 바뀌지 않는 작은 내용은 묶음의 `data.json`에 두어도 된다.
+
+## 지도 (cairn.map, 지도 플러그인)
+
+장소가 나오는 앱(맛집 · 코스 · 매장 · 여행)은 `cairn.map`으로 지도를 그린다. 어느 회사 지도인지(OpenStreetMap · 카카오 · 네이버 · 구글)는 관리자가 지도 플러그인에서 정하고, 앱 코드는 모른다. 지도 회사의 스크립트 · 키를 앱 코드에 직접 넣지 않는다.
+
+```html
+<div id="map" style="height:360px"></div>
+<ol id="places"></ol>
+<script src="_/cairn.js"></script>
+<script>
+  const PLACES = [{ lat: 37.5665, lng: 126.978, name: '서울시청' }];
+  // 목록은 지도와 상관없이 먼저 그린다 (지도를 받지 못해도 읽히게)
+  for (const p of PLACES) document.getElementById('places').append(Object.assign(document.createElement('li'), { textContent: p.name }));
+  cairn.map.create('#map', { places: PLACES, onSelect: (i, p) => console.log(p.name) })
+    .catch(() => document.getElementById('map').remove());
+</script>
+```
+
+- `cairn.map.create(자리, { places, zoom?, onSelect? })` → `{ provider, map, sdk, select(i) }`. 자리에는 높이를 준다. 좌표가 있는 장소만 핀이 되고, 핀을 누르면 이름이 뜨고 `onSelect(i, place)`가 불린다. 목록에서 `select(i)`로 그 핀을 연다.
+- 카카오 · 네이버 · 구글 지도는 그 앱의 도메인으로 연 화면에서만 돈다 (회사 콘솔에 그 도메인을 등록한 키). 미리 보기 · 기본 도메인처럼 격리된 화면에서는 같은 코드가 OpenStreetMap으로 그린다. 고른 회사의 지도를 받지 못해도 OpenStreetMap으로 그리고, 그것도 못 받으면 Error를 던진다: 목록이 남게 한다.
+- 좌표는 확실한 값만 넣는다. 모르면 핀 없이 목록과 지도 앱 링크(이름으로 찾기)만 둔다.
+- 더 꾸미려면 `map` · `sdk`(그 회사 라이브러리)를 쓸 수 있지만, 회사가 바뀌면 그 코드는 돌지 않는다: `provider`를 보고 나눈다.
 
 ## 고치는 법
 

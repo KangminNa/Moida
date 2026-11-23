@@ -1,7 +1,7 @@
 import { ChangeSignal, Conflict, Database, Rule, TableRepository } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { taskEvents, taskRuns, tasks } from '../task.schema';
-import type { OutputRow, TaskRow, TaskRunNew, TaskRunRow } from '../task.tables';
+import type { OutputRow, TaskRow, TaskRunNew, TaskRunRow, TaskStatus } from '../task.tables';
 import { type AfterOrderRow, type AfterSiblingRow, SubtaskAfter } from './subtask-after.policy';
 import { Task } from './task';
 import type { ReportProgressInput } from './task.input';
@@ -12,6 +12,8 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
   /** 한 페이지에 대기 · 실행 · 기다림 중인 일은 하나 (DB의 부분 유일 인덱스) */
   private static readonly ONE_OPEN_PAGE = 'tasks_one_open_page';
   private static readonly ONE_OPEN_APP_CODE = 'tasks_one_open_app_code';
+  /** 작업 기록의 휴지통에 넣을 수 있는 상태 (DB CHECK tasks_trash_finished와 같다) */
+  private static readonly FINISHED: readonly TaskStatus[] = ['done', 'failed', 'cancelled'];
 
   /** 실행 기록이 쌓였다는 신호 (콘솔의 실행 기록 화면이 다시 읽는다) */
   static readonly LOGGED = 'task.event.added';
@@ -379,5 +381,27 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
         AND o.run_id = (
           SELECT id FROM task.task_runs WHERE task_id = ${task.id} ORDER BY seq DESC LIMIT 1)
       ORDER BY o.name`;
+  }
+
+  /**
+   * 끝난 작업을 작업 기록의 휴지통으로 (2026-11-23 일괄 지우기). ids가 null이면 공간의 끝난 작업 모두.
+   * 상태를 바꾸지 않는 목록 표시라 version을 올리지 않는다 (진행 보고처럼). 도는 작업은 넘어간다. 넣은 수
+   */
+  trashFinished(spaceId: string, ids: readonly string[] | null, now: Date): Promise<number> {
+    const where = { space_id: spaceId, status: [...TaskRepository.FINISHED], deleted_at: null };
+    return this.updateRows(
+      tasks,
+      { deleted_at: now },
+      ids === null ? where : { ...where, id: [...ids] },
+    );
+  }
+
+  /** 작업 기록의 휴지통에서 꺼낸다. 꺼낸 수 */
+  restoreTrashed(spaceId: string, ids: readonly string[]): Promise<number> {
+    return this.updateRows(
+      tasks,
+      { deleted_at: null },
+      { space_id: spaceId, id: [...ids], deleted_at: Rule.set },
+    );
   }
 }

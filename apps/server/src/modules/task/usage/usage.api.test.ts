@@ -163,6 +163,8 @@ describe('GET /api/usage', () => {
     const agent = await newAgent({ monthlyLimit: 1000, fiveHourLimit: 500, planStopPercent: 80 });
     assert.deepEqual(await usageOf(agent), {
       id: agent.id,
+      name: '글쓰기',
+      lead: false,
       fiveHourTokens: 0,
       monthTokens: 0,
       fiveHourLimit: 500,

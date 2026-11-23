@@ -5,6 +5,8 @@ import {
   EventCatalog,
   Leases,
   LibraryQuery,
+  LibraryTrashService,
+  PluginChats,
   SecretRotation,
 } from '../platform';
 import { AgentController } from './agent/agent.api';
@@ -27,6 +29,7 @@ import { ChatInspectHandler } from './chat/chat-inspect.handler';
 import { ChatInspectService } from './chat/chat-inspect.service';
 import { ChatResultHandler } from './chat/chat-result.handler';
 import { ChatResultService } from './chat/chat-result.service';
+import { ChatTalk } from './chat/chat-talk';
 import { ChatUpdateHandler } from './chat/chat-update.handler';
 import { ChatUpdateQuery } from './chat/chat-update.query';
 import { ChatUpdateService } from './chat/chat-update.service';
@@ -86,6 +89,7 @@ import { TaskController } from './task/task.api';
 import { TaskQuery } from './task/task.query';
 import { TaskService } from './task/task.service';
 import { TaskRequestedHandler } from './task/task-requested.handler';
+import { TaskTrashService } from './task/task-trash.service';
 import events from './task.events.json';
 import { TaskNotices } from './task-notices';
 import { TaskSettings } from './task-settings';
@@ -109,6 +113,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     AgentService,
     TaskQuery,
     TaskService,
+    TaskTrashService,
     JobService,
     ApprovalQuery,
     ApprovalService,
@@ -233,6 +238,7 @@ export class TaskModule implements OnModuleInit {
     private readonly blobs: BlobStore,
     private readonly outputs: OutputQuery,
     private readonly leaseChecks: Leases,
+    private readonly pluginChats: PluginChats,
     private readonly tasks: TaskQuery,
     private readonly goalRuns: GoalRunHandler,
     private readonly chatResults: ChatResultHandler,
@@ -244,6 +250,8 @@ export class TaskModule implements OnModuleInit {
     private readonly chatContinues: ChatContinueHandler,
     private readonly agentless: AgentlessRequestHandler,
     private readonly library: LibraryQuery,
+    private readonly libraryTrash: LibraryTrashService,
+    private readonly outputService: OutputService,
     private readonly follows: ScheduleFollowHandler,
     private readonly toolPlugs: ExternalToolPlugHandler,
     private readonly externalTools: ExternalToolService,
@@ -290,11 +298,18 @@ export class TaskModule implements OnModuleInit {
     // 기능 패키지의 도구(code-github의 code_credential 등)가 묻는 임대 확인
     this.leaseChecks.register((actor, id) => this.tasks.leasedWork(actor, id));
     this.leaseChecks.registerRecord((actor, id) => this.tasks.recordTarget(actor, id));
+    // 기능 패키지의 대화 입구 (플러그인 API 0.10, 텔레그램): 패키지의 트랜잭션에서 관리자의 대화에 말을 넣는다
+    this.pluginChats.register((sql, spaceId, chatId, requestId, text) =>
+      new ChatTalk(sql).fromPlugin(spaceId, chatId, requestId, text, new Date()),
+    );
     // 결과물이 가리키는 파일: 쓰는 동안 platform이 지우지 않게
     this.blobs.registerUse(['task.outputs.blob_hash'], (actor, hashes) =>
       this.outputs.usedBlobs(actor, hashes),
     );
     // 보관함의 결과물 (2차 5단계)
     this.library.register([OutputQuery.LIBRARY_KIND], (a, f) => this.outputs.library(a, f));
+    this.libraryTrash.register([OutputQuery.LIBRARY_KIND], (a, ids) =>
+      this.outputService.trashMany(a, ids),
+    );
   }
 }

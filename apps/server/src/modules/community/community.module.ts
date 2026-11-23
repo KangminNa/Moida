@@ -1,5 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { CoreWorkers, EventCatalog, HostGate, PasswordHasher } from '../platform';
+import { CoreWorkers, EventCatalog, HostGate, Lookups, PasswordHasher } from '../platform';
 import { CommentController } from './comment/comment.api';
 import { CommentService } from './comment/comment.service';
 import events from './community.events.json';
@@ -64,6 +64,8 @@ export class CommunityModule implements OnModuleInit {
     private readonly workers: CoreWorkers,
     private readonly reported: ReportAddedHandler,
     private readonly tables: AppTablesHandler,
+    private readonly lookups: Lookups,
+    private readonly data: AppDataQuery,
   ) {}
 
   onModuleInit(): void {
@@ -73,5 +75,7 @@ export class CommunityModule implements OnModuleInit {
     this.workers.on(ReportAddedHandler.TOPIC, this.reported);
     // 앱의 보이는 버전이 바뀌면 그 버전이 선언한 표에 맞춘다 (앱 데이터, 스토어 12.4)
     this.workers.on(AppTablesHandler.TOPIC, this.tables);
+    // 남은 회원 · 앱 데이터 (2026-11-23): blog가 앱을 지우기 전에 묻는다. 있으면 지우지 않는다
+    this.lookups.provide('app-holdings', (a, ids) => this.data.holdings(a, ids));
   }
 }

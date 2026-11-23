@@ -40,6 +40,9 @@ export function GoalRunPanel({ id }: { id: string }) {
     );
 
   const stop = () =>
+    window.confirm(
+      '목표 실행을 멈출까요? 도는 회차 작업과 기다리는 승인이 취소되고 되돌릴 수 없어요',
+    ) &&
     action.run(
       'stop',
       () => api<GoalRun>('POST', `/api/goal-runs/${id}/stop`, { version: r.version }),

@@ -16,6 +16,13 @@ export interface ChatSaid {
   data: Record<string, unknown> | null;
 }
 
+/** 끝난 작업이 남기는 소식 (Chat.settled). said: 관리자에게 돌아가는 말이면 task.chat.said에 실을 글 (2026-11-23) */
+export interface SettledLine {
+  kind: ChatUpdateKind;
+  text: string;
+  said?: string;
+}
+
 // 대화의 소식 (task.chat_updates, 2차 1-1 · docs/API설계.md 4장 agent_updates). 무엇이 소식이 되는지 한 곳에서 정한다.
 //   팀원(하위 작업)이 끝남 · 실패 → member_done · member_failed, 회차가 끝남 · 실패 → final · failed,
 //   덧붙인 말에 상대가 답함 → reply, 검토자 짝이 결과를 검토함 → review (2차 2단계),
@@ -81,7 +88,7 @@ export class ChatUpdates {
   }
 
   /** 끝난 작업이 남기는 소식의 종류와 글. 소식이 아니면 null (취소 · 아직 안 끝남) */
-  static settled(place: ChatPlaceRow): { kind: ChatUpdateKind; text: string } | null {
+  static settled(place: ChatPlaceRow): SettledLine | null {
     const result = (place.result ?? {}) as { text?: unknown; error?: unknown };
     const said = typeof result.text === 'string' ? result.text.trim() : '';
     const error = typeof result.error === 'string' ? result.error : '';
@@ -89,7 +96,8 @@ export class ChatUpdates {
     const chat = (place.payload as { chat?: { reply?: unknown; review?: unknown } } | null)?.chat;
     if (place.status === Task.DONE) {
       if (!root) return { kind: 'member_done', text: `${place.title} — ${said || '-'}` };
-      if (chat?.reply) return { kind: ChatUpdates.REPLY, text: said || '-' };
+      if (chat?.reply)
+        return { kind: ChatUpdates.REPLY, text: said || '-', said: ChatUpdates.said(said) };
       // 검토의 답은 JSON 판정이라 소식에는 판정과 까닭 한 줄로 (검증 고리 V)
       if (chat?.review) {
         const line = ChatReview.line(ChatReview.parse(said));
@@ -99,13 +107,22 @@ export class ChatUpdates {
         };
       }
       const path = `/admin/chats/${place.chat_id}`;
-      return { kind: ChatUpdates.FINAL, text: `${ChatUpdates.cut(said || '-', 1700)}\n\n${path}` };
+      return {
+        kind: ChatUpdates.FINAL,
+        text: `${ChatUpdates.cut(said || '-', 1700)}\n\n${path}`,
+        said: ChatUpdates.said(said),
+      };
     }
     if (place.status === Task.FAILED) {
       if (!root) return { kind: 'member_failed', text: `${place.title} — ${error || '-'}` };
-      return { kind: 'failed', text: error || '-' };
+      return { kind: 'failed', text: error || '-', said: ChatUpdates.said(error) };
     }
     return null;
+  }
+
+  /** task.chat.said의 글: 메신저 한 통(4096자)에 제목 · 링크와 함께 들어가게 앞 3500자 */
+  private static said(text: string): string {
+    return ChatUpdates.cut(text || '-', 3500);
   }
 
   private static cut(text: string, max: number): string {

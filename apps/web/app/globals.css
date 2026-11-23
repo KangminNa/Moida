@@ -2325,7 +2325,23 @@ a.chip {
   background: var(--fg);
 }
 
-/* 홈의 사용량. 막대마다 글자 값이 함께 있다 */
+/* 한도가 아니라 전체에서의 몫을 보이는 막대는 옅게 */
+.bar.part i {
+  background: var(--faint);
+}
+
+.usage-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* 사용량: 구독 칸 아래에 일꾼 칸 (좁은 설정 화면이라 나란히 두지 않는다) */
+.usage-cols {
+  display: grid;
+  gap: 18px;
+}
+
+/* 사용량. 막대마다 글자 값이 함께 있다 */
 .usage-agents {
   margin: 0;
   list-style: none;
@@ -4201,4 +4217,23 @@ ul.picked > .chip {
   border-radius: 6px;
   margin-right: 8px;
   vertical-align: -5px;
+}
+
+/* 여럿 고르는 목록 (2026-11-23 일괄 지우기): 줄 앞의 체크 칸 + 줄 */
+.list > .pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+}
+
+.pick-row > .item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 보관함 줄의 고르기 칸과 종류 (2026-11-23 일괄 지우기) */
+.library-pick {
+  gap: 8px;
+  align-self: flex-start;
 }

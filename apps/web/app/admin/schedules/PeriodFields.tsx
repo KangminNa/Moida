@@ -37,6 +37,12 @@ export function periodBody(period: Period) {
     : { mode: period.mode, everyHours: period.everyHours };
 }
 
+/** 이 주기가 하루에 도는 횟수: 매일은 1, N시간마다는 시가 N으로 나누어떨어지는 정각, N분마다는 자정부터 N분 간격 */
+export function runsPerDay(period: Period): number {
+  if (period.mode === 'minutely') return Math.ceil(1440 / period.everyMinutes);
+  return period.mode === 'hourly' ? Math.ceil(24 / period.everyHours) : 1;
+}
+
 // 계기가 "정한 시각"인 레시피의 주기 칸 (매일 정한 시각 · N시간마다 · N분마다). 그리는 조각이라 값은 폼이 든다.
 export function PeriodFields({
   id,

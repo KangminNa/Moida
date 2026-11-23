@@ -35,7 +35,7 @@ export class MenuRepository extends TableRepository<MenuRow, Menu> {
     return this.toEntity(row);
   }
 
-  /** 메뉴에 담긴 글(휴지통 포함) · 페이지 · 호의 수. 비어야 지운다 */
+  /** 메뉴에 담긴 글 · 페이지 · 호의 수. 비어야 지운다 (휴지통의 글은 MenuService가 먼저 메뉴에서 뺀다) */
   async itemsIn(menuId: string): Promise<number> {
     const [row] = await this.sql<{ items: number }[]>`
       SELECT (SELECT count(*) FROM blog.posts WHERE menu_id = ${menuId})::int

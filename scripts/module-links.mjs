@@ -16,6 +16,7 @@ const REGISTRIES = {
     registerRecord: ['provides', 'run-records'],
     forRecord: ['asks', 'run-records'],
   },
+  PluginChats: { register: ['provides', 'plugin-chats'], send: ['asks', 'plugin-chats'] },
   SettingKinds: {
     register: ['provides', 'settings'],
     of: ['asks', 'settings'],

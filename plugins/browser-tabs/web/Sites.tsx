@@ -40,6 +40,12 @@ export function Sites({ call, notify }: Props) {
   }
 
   async function remove(site: Site) {
+    if (
+      !window.confirm(
+        `${site.name} 사이트를 삭제할까요? 이 사이트로 맡겨 둔 일은 실패하고 되돌릴 수 없어요`,
+      )
+    )
+      return;
     const reply = await call('DELETE', `sites/${site.id}`, { version: site.version });
     if (!reply.ok) return notify(reply.message);
     notify('사이트를 삭제했어요');
