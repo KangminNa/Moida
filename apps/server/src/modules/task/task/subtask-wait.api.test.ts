@@ -346,3 +346,96 @@ describe('대화의 일 먼저', () => {
     assert.equal(turn?.priority, 10);
   });
 });
+
+describe('대표 ↔ 일꾼 대화 (2026-11-24)', () => {
+  test('ask_lead → 일꾼은 답을 기다리고 대표를 먼저 깨운다 → reply_worker → 일꾼은 답과 함께 다시, 대표는 라운드를 쓰지 않고 다시 기다린다', async () => {
+    const { lead, members, parent, children } = await delegated(30);
+    const asker = children.get(String((members[0] as Json).id)) as Json;
+    const askerId = String((asker.task as Json).id);
+    const asked = await tool(String(asker.run_token), 'ask_lead', {
+      question: '비교 기간을 1년으로 할까요, 3년으로 할까요? 추천은 3년',
+    });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    assert.deepEqual(asked.body, { asked: true, waiting: true, lead_woken: true });
+    const waiting = await getTask(askerId);
+    assert.deepEqual([waiting.status, waiting.waitReason], ['waiting', 'lead']);
+    assert.equal((await getTask(parent.id)).status, 'queued', '대표를 먼저 깨운다');
+
+    const woken = (await take(1)).get(String(lead.id)) as Json;
+    assert.equal(woken.wake, 'question');
+    const open = (woken.subtask_results as Json[]).find((r) => r.task_id === askerId) as Json;
+    assert.deepEqual(
+      [open.waiting, open.summary],
+      ['lead', '비교 기간을 1년으로 할까요, 3년으로 할까요? 추천은 3년'],
+      '질문이 결과 글 자리에',
+    );
+    const roundsOf = async () =>
+      Number(
+        (
+          await db.sql<
+            { rounds: number }[]
+          >`SELECT rounds FROM task.tasks WHERE id = ${String(parent.id)}`
+        )[0]?.rounds,
+      );
+    const roundsBefore = await roundsOf();
+
+    // 맡긴 일이 아닌 일 · 답을 기다리지 않는 일에는 답하지 못한다
+    const other = String(((children.get(String((members[1] as Json).id)) as Json).task as Json).id);
+    const wrong = await tool(String(woken.run_token), 'reply_worker', {
+      replies: [{ task_id: other, text: '3년' }],
+    });
+    assert.equal(wrong.ok, false, '돌고 있는 일꾼은 답을 기다리지 않는다');
+
+    const replied = await tool(String(woken.run_token), 'reply_worker', {
+      replies: [{ task_id: askerId, text: '3년으로 해요. 2023~2025년 월별 값' }],
+    });
+    assert.equal(replied.ok, true, JSON.stringify(replied.body));
+    assert.deepEqual(replied.body, { replied: 1, waiting: true });
+    const back = await getTask(parent.id);
+    assert.deepEqual(
+      [back.status, back.waitReason],
+      ['waiting', 'subtasks'],
+      '대표는 다시 기다린다',
+    );
+    assert.equal(await roundsOf(), roundsBefore, '대화는 위임 라운드를 쓰지 않는다');
+
+    const again = (await take(1)).get(String((members[0] as Json).id)) as Json;
+    assert.equal((again.task as Json).id, askerId, '일꾼의 일이 답과 함께 다시 온다');
+    const talk = ((again.task as Json).payload as Json).leadTalk as Json;
+    assert.deepEqual(talk.replies, [
+      {
+        q: '비교 기간을 1년으로 할까요, 3년으로 할까요? 추천은 3년',
+        a: '3년으로 해요. 2023~2025년 월별 값',
+      },
+    ]);
+    assert.equal(talk.question, null);
+  });
+
+  test('ask_lead는 대표가 맡긴 일에서만, 일 하나에 3번까지', async () => {
+    const solo = await newAgent('혼자 묻기');
+    ok(
+      await api.request('POST', '/api/tasks', owner, {
+        requestId: randomUUID(),
+        agentId: solo.id,
+        kind: 'general',
+        title: '혼자 하기',
+        instruction: '직접 해 주세요',
+      }),
+      201,
+    );
+    const job = (await take(1)).get(String(solo.id)) as Json;
+    const refused = await tool(String(job.run_token), 'ask_lead', { question: '어떻게 할까요' });
+    assert.equal(refused.ok, false);
+    assert.match(JSON.stringify(refused.body), /대표가 맡긴 일에서만/);
+
+    const { members, children } = await delegated(30);
+    const asker = children.get(String((members[0] as Json).id)) as Json;
+    const askerId = String((asker.task as Json).id);
+    await db.sql`
+      UPDATE task.tasks SET payload = payload || '{"leadTalk":{"asked":3,"question":null,"replies":[]}}'::jsonb
+      WHERE id = ${askerId}`;
+    const fourth = await tool(String(asker.run_token), 'ask_lead', { question: '하나 더' });
+    assert.equal(fourth.ok, false);
+    assert.match(JSON.stringify(fourth.body), /3번까지/);
+  });
+});

@@ -95,7 +95,7 @@ function TokenMeter({
   );
 }
 
-const nameOf = (row: UsageAgent) => (row.lead ? '대표' : row.name);
+const nameOf = (row: UsageAgent) => (row.lead ? `${row.name} (대표)` : row.name);
 const sum = (rows: readonly UsageAgent[], pick: (row: UsageAgent) => number) =>
   rows.reduce((all, row) => all + pick(row), 0);
 

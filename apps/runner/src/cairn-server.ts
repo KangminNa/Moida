@@ -315,6 +315,7 @@ export class CairnServer {
       box: held.box,
       fingerprint: held.fingerprint,
       ...(note ? { note } : {}),
+      ...(held.checks.length > 0 ? { checks: held.checks } : {}),
       image: held.image,
     });
     return { clickId: body.text('click_id'), version: body.number('version') };

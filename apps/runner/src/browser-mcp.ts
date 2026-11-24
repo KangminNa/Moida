@@ -33,6 +33,12 @@ export class BrowsePlan {
 export class BrowserMcp {
   /** AI CLI의 MCP 설정에 쓰는 서버 이름. 격리 검사(ClaudeStream · CodexStream)가 browse 작업에서만 허락한다 */
   static readonly SERVER = 'playwright';
+  /**
+   * AI에게 주지 않는 Playwright MCP 도구 (2026-11-24): 페이지에서 스크립트 돌리기 · 파일 올리기.
+   * 스크립트는 로그인된 페이지에서 마지막 버튼을 대신 누를 수 있고(원칙 7의 멈춤을 건너뜀), 파일 올리기는 작업 폴더의 것을 사이트로 내보낸다.
+   * Claude는 --disallowedTools, Codex는 config.toml의 disabled_tools로 막는다
+   */
+  static readonly BLOCKED_TOOLS: readonly string[] = ['browser_evaluate', 'browser_file_upload'];
   /** 브라우저가 살아 있는지 묻는 시간 */
   static readonly PROBE_MS = 3_000;
 

@@ -30,6 +30,11 @@ export class TaskSignin {
     return typeof payload.code === 'string' ? payload.code : null;
   }
 
+  /** 작업 상세에 보일 payload: 웹 로그인(ai_signin)이면 코드를 뺀다 (Task에서 옮김, 2026-11-24) */
+  static shownOf(kind: string, payload: unknown): unknown {
+    return kind === 'ai_signin' ? TaskSignin.shown(payload) : payload;
+  }
+
   /** 작업 상세에 보일 payload. 코드는 암호문이어도 내보내지 않는다 */
   static shown(payload: unknown): unknown {
     if (typeof payload !== 'object' || payload === null) return payload;

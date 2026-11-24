@@ -29,7 +29,8 @@ export class StopHold {
     if (tab === null) return { error: '멈춘 페이지의 탭을 찾지 못했어요' };
     let held: HeldButton;
     try {
-      held = await this.pages.hold(tab, stop.button as NonNullable<BrowserStop['button']>, signal);
+      const button = stop.button as NonNullable<BrowserStop['button']>;
+      held = await this.pages.hold(tab, button, signal, stop.checks);
     } catch (error) {
       const known = [ButtonProblem, TabUnreadable, BrowserUnavailable].some(
         (t) => error instanceof t,

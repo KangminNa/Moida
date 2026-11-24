@@ -74,8 +74,8 @@ export function LeadCard({
   total: number;
 }) {
   return (
-    <article className="agent" aria-label="대표">
-      <CardTop agent={lead} name="대표" extra={null} work={work} hold={hold} />
+    <article className="agent" aria-label={`대표 ${lead.name}`}>
+      <CardTop agent={lead} name={`${lead.name} · 대표`} extra={null} work={work} hold={hold} />
       <p className="agent-role clamp">대화를 받아 일꾼에게 맡기고 결과를 모아 답해요</p>
       <AgentUsage agent={lead} total={total} />
       <div className="agent-acts">

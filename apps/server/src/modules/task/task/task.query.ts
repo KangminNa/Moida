@@ -24,6 +24,7 @@ import {
   TaskRunView,
   TaskView,
 } from './task.view';
+import { TaskSignin } from './task-signin';
 
 /** 실행 기록의 자리: 맨 위 작업의 줄에 대화 · 목표 실행의 제목과 일한 에이전트를 더한 모양 */
 type RecordRootRow = TaskRow & {
@@ -109,7 +110,7 @@ export class TaskQuery extends BaseQuery {
       WHERE o.task_id = ${req.id} AND o.deleted_at IS NULL ORDER BY o.id`;
     return new TaskDetailView(
       row,
-      Task.shownPayload(row.kind, row.payload),
+      TaskSignin.shownOf(row.kind, row.payload),
       events.map((e) => new TaskEventView(e)),
       goals,
       children.map((c) => new TaskView(c)),
@@ -154,7 +155,7 @@ export class TaskQuery extends BaseQuery {
     const row = await this.row(tasks, { space_id: actor.spaceId, id: taskId });
     if (!row) throw new NotFound('작업을 찾을 수 없어요');
     Task.restore(row).assertHeldBy(actor.id, new Date());
-    const payload = Task.shownPayload(row.kind, row.payload);
+    const payload = TaskSignin.shownOf(row.kind, row.payload);
     return new LeasedWork(
       row.id,
       row.kind,

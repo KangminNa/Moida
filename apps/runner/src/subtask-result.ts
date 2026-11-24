@@ -14,6 +14,7 @@ export class SubtaskResult {
     running: '일하는 중',
     approval: '승인 기다림',
     subtasks: '아래 팀 기다림',
+    lead: '대표의 답 기다림',
   };
 
   constructor(
@@ -79,6 +80,7 @@ export class SubtaskResult {
       deadline: wake === 'deadline',
       helpWake: wake === 'help',
       changeWake: wake === 'change',
+      questionWake: wake === 'question',
       owner,
       open: !owner && results.some((r) => r.open !== null),
       rounds: String(rounds),

@@ -3,8 +3,16 @@ import { type Actor, BaseQuery, Database, Forbidden, NotFound } from '../../plat
 import type { SkillRevisionRow, SkillRow } from '../task.tables';
 import { PromptTemplates } from './prompt-templates';
 import { RepoSkillGateway } from './repo-skill.gateway';
-import { SkillDetailView, SkillListView, SkillRevisionView, SkillSummaryView } from './skill.view';
+import {
+  SkillDetailView,
+  SkillListView,
+  SkillRevisionView,
+  type SkillScoreRow,
+  SkillScoreView,
+  SkillSummaryView,
+} from './skill.view';
 import { SkillFiles } from './skill-files';
+import { SkillScore } from './skill-score.policy';
 
 /** 스킬 줄과 지금 쓰는 콘솔 판의 해시 · 바탕 */
 interface SkillWithActive extends SkillRow {
@@ -48,7 +56,51 @@ export class SkillQuery extends BaseQuery {
       repo.hash,
       repo.toRecord(),
       revisions,
+      (await this.scores(spaceId, name, new Date())).map(
+        (r) => new SkillScoreView(r, SkillScore.settled(r.done + r.failed)),
+      ),
+      { days: SkillScore.DAYS, minFinished: SkillScore.MIN_FINISHED },
     );
+  }
+
+  /**
+   * 버전마다의 성적 (SkillScore): 최근 기간에 이 스킬로 처음 실행한 일을 그 실행의 버전(출처 · 번호 · 해시)으로 묶어
+   * 끝냄 · 실패, 관리자의 수정 요청 · 반려 없이 끝낸 일, 일 하나의 수정 요청 · 반려 · 실행 수, 끝낸 일의 토큰을 센다
+   */
+  private async scores(spaceId: string, name: string, now: Date): Promise<SkillScoreRow[]> {
+    const since = SkillScore.since(now);
+    return this.sql<SkillScoreRow[]>`
+      WITH firsts AS (
+        SELECT DISTINCT ON (r.task_id) r.task_id, r.skill_source, r.skill_revision, r.skill_hash,
+          r.started_at
+        FROM task.task_runs r
+        WHERE r.space_id = ${spaceId} AND r.skill = ${name} AND r.started_at >= ${since}
+        ORDER BY r.task_id, r.seq
+      ), per_task AS (
+        SELECT f.*, t.status,
+          (SELECT count(*) FROM task.task_runs x WHERE x.task_id = f.task_id)::int AS runs,
+          (SELECT count(*) FROM task.approvals a
+            WHERE a.task_id = f.task_id AND NOT a.agent_decided
+              AND a.status IN ('revision_requested', 'rejected')
+              AND a.action <> ALL(${SkillScore.skipped()}::text[]))::int AS sent_back,
+          (SELECT coalesce(sum(e.tokens), 0) FROM task.task_events e
+            WHERE e.task_id = f.task_id)::float8 AS tokens
+        FROM firsts f JOIN task.tasks t ON t.id = f.task_id
+      )
+      SELECT skill_source AS source, skill_revision AS revision, skill_hash AS hash,
+        count(*)::int AS tasks,
+        count(*) FILTER (WHERE status = 'done')::int AS done,
+        count(*) FILTER (WHERE status = 'failed')::int AS failed,
+        count(*) FILTER (WHERE status = 'done' AND sent_back = 0)::int AS first_pass,
+        round(avg(sent_back)::numeric, 2)::float8 AS avg_fixes,
+        round(avg(runs)::numeric, 2)::float8 AS avg_runs,
+        CASE WHEN count(*) FILTER (WHERE status = 'done') > 0 THEN
+          round(sum(tokens) FILTER (WHERE status = 'done') / count(*) FILTER (WHERE status = 'done'))::int
+        END AS tokens_per_done,
+        max(started_at) AS last_used
+      FROM per_task
+      GROUP BY skill_source, skill_revision, skill_hash
+      ORDER BY max(started_at) DESC`;
   }
 
   async revision(actor: Actor, name: string, revision: number): Promise<SkillRevisionView> {

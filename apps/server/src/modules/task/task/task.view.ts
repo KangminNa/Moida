@@ -143,7 +143,7 @@ export class TaskOutputView {
 export class TaskDetailView extends TaskView {
   constructor(
     private readonly detail: Readonly<TaskRow>,
-    /** 상세에 보일 입력. 웹 로그인의 코드는 암호문이어도 뺀다 (Task.shownPayload) */
+    /** 상세에 보일 입력. 웹 로그인의 코드는 암호문이어도 뺀다 (TaskSignin.shownOf) */
     private readonly payload: unknown,
     private readonly events: readonly TaskEventView[],
     /** 회사 목표부터 이 작업의 목표까지. 목표가 없으면 비어 있다 */

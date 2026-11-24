@@ -2458,6 +2458,12 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
         '--proxy-server',
       ]);
       assert.match(String(args[4]), /^http:\/\/127\.0\.0\.1:\d+$/);
+      const argv = seen.argv as string[];
+      assert.deepEqual(
+        argv.slice(argv.indexOf('--disallowedTools') + 1, argv.indexOf('--disallowedTools') + 3),
+        ['mcp__playwright__browser_evaluate', 'mcp__playwright__browser_file_upload'],
+        '페이지에서 스크립트 돌리기 · 파일 올리기는 막는다 (2026-11-24)',
+      );
       assert.match(String(seen.prompt), /# 둘러보기/);
       const [row] =
         await db.sql`SELECT id FROM task.tasks WHERE request_id = ${`browser-tabs:${requestId}`}`;

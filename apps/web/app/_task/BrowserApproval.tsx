@@ -117,6 +117,12 @@ export function ClickTarget({ approval }: { approval: Approval }) {
         <dd>
           {click.role} “{click.name}”{click.nth > 0 ? ` (${click.nth + 1}번째)` : ''}
         </dd>
+        {click.checks.length > 0 && (
+          <>
+            <dt>확인한 내용</dt>
+            <dd>{click.checks.map((c) => `“${c}”`).join(' · ')}</dd>
+          </>
+        )}
         <dt>상태</dt>
         <dd>
           {CLICK_STATUS[click.status] ?? click.status}
@@ -133,9 +139,9 @@ export function ClickTarget({ approval }: { approval: Approval }) {
         </>
       )}
       <p className="note">
-        승인하면 러너가 같은 페이지 · 같은 버튼인지 다시 확인하고 눌러요. 다르면 누르지 않고{' '}
-        <Link href={BROWSER_PAGE}>브라우저 화면</Link>에서 직접 하도록 알려요 · 단계 화면{' '}
-        {click.shots.filter((s) => s.kind === 'step').length}장
+        승인하면 러너가 같은 페이지 · 같은 버튼{click.checks.length > 0 ? ' · 확인한 내용' : ''}
+        인지 다시 확인하고 눌러요. 다르면 누르지 않고 <Link href={BROWSER_PAGE}>브라우저 화면</Link>
+        에서 직접 하도록 알려요 · 단계 화면 {click.shots.filter((s) => s.kind === 'step').length}장
       </p>
     </section>
   );

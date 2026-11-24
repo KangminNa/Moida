@@ -34,7 +34,7 @@ docs/          기획 문서 (기획서 · 서브 나 · 스토어 · 테이블 
 | 명령 | 하는 일 |
 |---|---|
 | `pnpm dev` | Docker Compose로 db → migrate → server(:4000) · worker(일꾼) → web(:3000) |
-| `pnpm check` | Biome 린트 + 타입 검사 + 모듈 경계 검사 + 구조 검사(새 파일 이름, 옆의 API 테스트, 메뉴와 화면, 웹 타입의 출처) + 규칙 검사(웹의 읽기 · 쓰기 훅, `import type`, 파일 길이, 패턴 본보기. 예외 목록 `scripts/ratchet.json`은 줄어들기만 한다) + 안 쓰는 코드 검사(`pnpm deadcode`). 작업을 끝내기 전에 반드시 통과시킨다 |
+| `pnpm check` | Biome 린트 + 타입 검사 + 모듈 경계 검사 + 구조 검사(새 파일 이름, 옆의 API 테스트, 메뉴와 화면, 웹 타입의 출처) + 규칙 검사(웹의 읽기 · 쓰기 훅, `import type`, 파일 길이, 패턴 본보기. 예외 목록 `scripts/ratchet.json`은 줄어들기만 한다) + 스킬 · 지침 검사(스킬 앞부분 · 길이 · 깨진 문서 링크 · 옛 말, `scripts/check-skills.mjs`) + 안 쓰는 코드 검사(`pnpm deadcode`). 작업을 끝내기 전에 반드시 통과시킨다 |
 | `pnpm test` | 테스트 전용 DB(`cairn_test`)를 새로 만들어 단위 + API 테스트, 러너 통합 테스트, 나가는 프록시 시험까지. 개발 DB는 건드리지 않는다. `-- --test-name-pattern=<이름>`으로 골라서 |
 | `pnpm slot <1~9> <스크립트>` | 슬롯별 compose 프로젝트·포트·이미지로 실행 (`test`, `dev`, `db:reset` 등). 작업 트리에서 병렬로 일할 때 쓴다 |
 | `pnpm db:check` | DB의 모듈 경계 (모듈 사이 외래키, 주인 없는 스키마), 표 인터페이스가 DB와 같은지 |

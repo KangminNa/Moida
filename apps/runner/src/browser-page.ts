@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { pause } from './backoff';
 import { BrowserUnavailable, DevToolsSession } from './browser-tabs';
+import { PageChecks } from './page-checks';
 
 /** 서버 브라우저의 탭 하나 (CDP 대상) */
 export class BrowserTab {
@@ -31,6 +32,8 @@ export class HeldButton {
     readonly fingerprint: string,
     /** 멈춘 화면 (JPEG base64) */
     readonly image: string,
+    /** 화면에 있음을 본 글자 (누르기 전 내용 확인, 누르기 직전에 다시 본다) */
+    readonly checks: readonly string[] = [],
   ) {}
 }
 
@@ -86,6 +89,7 @@ type Inspected = {
 // 결재된 클릭의 브라우저 쪽 (2차 3단계, 2026-11-14). AI는 쓰지 않는다: 러너가 CDP로 직접 한다.
 //   붙잡기(hold): AI가 남긴 역할 + 이름으로 접근성 트리(Accessibility.queryAXTree)에서 버튼을 다시 찾고, 보이고 · 켜져 있고 ·
 //     한가운데의 가장 위 요소인지 본 뒤, 지문(주소 · 역할 · 이름 · 순번 · 태그 · type · form action · method · 글자의 sha256)과 화면을 만든다
+//   둘 다 AI가 적은 확인할 글자(check)가 있으면 그 글자가 화면에 있는지도 본다 (PageChecks, 2026-11-24)
 //   누르기(press): 결재 뒤에 같은 탭 · 같은 주소 · 같은 지문 · 가장 위 요소인지 다시 보고, 같을 때만 실제 마우스 이벤트로 누른다.
 //     다르면 누르지 않는다 (changed). 누른 뒤 뜰 때까지(최대 10초) 기다려 결과 화면을 남긴다
 // Playwright의 ref는 그 MCP 세션 안에서만 뜻이 있어 쓰지 않는다. 역할 + 이름은 러너가 다시 찾을 수 있다.
@@ -149,7 +153,12 @@ export class BrowserPages {
   }
 
   /** AI가 멈춘 버튼을 다시 찾아 붙잡을 것을 만든다. 찾지 못하거나 누를 수 없는 상태면 ButtonProblem */
-  async hold(tab: BrowserTab, button: ButtonRef, signal: AbortSignal): Promise<HeldButton> {
+  async hold(
+    tab: BrowserTab,
+    button: ButtonRef,
+    signal: AbortSignal,
+    checks: readonly string[] = [],
+  ): Promise<HeldButton> {
     return this.on(tab, signal, async (s) => {
       await s.send('Page.bringToFront');
       const pageUrl = await BrowserPages.locationOf(s);
@@ -157,10 +166,12 @@ export class BrowserPages {
       if (found === null) throw new ButtonProblem(`버튼이 없어요: ${button.role} "${button.name}"`);
       const problem = BrowserPages.unusable(found);
       if (problem) throw new ButtonProblem(problem);
+      const missing = await PageChecks.onPage(s, checks);
+      if (missing) throw new ButtonProblem(missing);
       const image = await BrowserPages.capture(s);
       if (image === null) throw new ButtonProblem('멈춘 화면을 찍지 못했어요');
       const fingerprint = BrowserPages.fingerprint(pageUrl, button, found);
-      return new HeldButton(tab, pageUrl, button, found.box, fingerprint, image);
+      return new HeldButton(tab, pageUrl, button, found.box, fingerprint, image, checks);
     });
   }
 
@@ -169,7 +180,13 @@ export class BrowserPages {
    * 브라우저에 닿지 못하면(누르기 전) 누르지 않는다 (changed)
    */
   async press(
-    held: { tabId: string; pageUrl: string; button: ButtonRef; fingerprint: string },
+    held: {
+      tabId: string;
+      pageUrl: string;
+      button: ButtonRef;
+      fingerprint: string;
+      checks?: readonly string[];
+    },
     signal: AbortSignal,
   ): Promise<PressResult> {
     const changed = (reason: string, image: string | null = null, url: string | null = null) =>
@@ -194,6 +211,8 @@ export class BrowserPages {
           return changed('버튼이 달라요', await BrowserPages.capture(s), url);
         const problem = BrowserPages.unusable(found);
         if (problem) return changed(problem, await BrowserPages.capture(s), url);
+        const missing = await PageChecks.onPage(s, held.checks ?? []);
+        if (missing) return changed(missing, await BrowserPages.capture(s), url);
         await s.send('Page.enable');
         const started = s.next('Page.frameStartedLoading').then(() => true);
         const loaded = s.next('Page.loadEventFired');

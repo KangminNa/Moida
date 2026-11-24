@@ -78,6 +78,7 @@ import { SkillService } from './skill/skill.service';
 import { AgentlessService } from './task/agentless.service';
 import { AgentlessRequestHandler } from './task/agentless-request.handler';
 import { JobService } from './task/job.service';
+import { LeadTalkService } from './task/lead-talk.service';
 import { LeaseJob } from './task/lease.job';
 import { LessonHandler } from './task/lesson.handler';
 import { LessonQuery } from './task/lesson.query';
@@ -114,6 +115,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     TaskQuery,
     TaskService,
     TaskTrashService,
+    LeadTalkService,
     JobService,
     ApprovalQuery,
     ApprovalService,

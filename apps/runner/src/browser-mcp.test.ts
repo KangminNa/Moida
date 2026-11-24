@@ -179,6 +179,11 @@ describe('브라우저 작업의 설정 (러너)', () => {
       /\[mcp_servers\.playwright\]\ncommand = ".+"\nargs = \[".+cli\.js", "--cdp-endpoint"/,
     );
     assert.match(toml, /shell_tool = false/, '셸은 그대로 꺼져 있다');
+    assert.match(
+      toml,
+      /\nargs = \[.+\]\ndisabled_tools = \["browser_evaluate", "browser_file_upload"\]/,
+      '페이지에서 스크립트 돌리기 · 파일 올리기는 막는다 (2026-11-24)',
+    );
     assert.doesNotMatch(
       CodexCli.configToml(null, browser),
       /playwright/,

@@ -64,7 +64,7 @@ describe('대표 (O-2)', () => {
     const boss = await lead();
     assert.deepEqual(
       [boss.name, 'scopes' in boss, 'reportsTo' in boss, boss.approvalActions],
-      ['대표', false, false, ['browser.site.publish', 'browser.site.login']],
+      ['아리', false, false, ['browser.site.publish', 'browser.site.login']],
     );
     const listed = ok(await api.get('/api/agents', owner)).agents as Json[];
     assert.ok(!listed.some((a) => a.id === boss.id), '일꾼 목록에 보이지 않는다');
@@ -82,7 +82,7 @@ describe('대표 (O-2)', () => {
     );
   });
 
-  test('관리자는 AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만 바꾼다. 이름 · 역할 · 승인 동작 · 러너는 422', async () => {
+  test('관리자는 이름 · AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만 바꾼다. 역할 · 승인 동작 · 러너는 422', async () => {
     const changed = ok(
       await patch({ model: 'opus', effort: 'high', monthlyLimit: 500000, fiveHourLimit: 100000 }),
     );
@@ -90,8 +90,10 @@ describe('대표 (O-2)', () => {
       [changed.model, changed.effort, changed.monthlyLimit, changed.fiveHourLimit],
       ['opus', 'high', 500000, 100000],
     );
+    const named = ok(await patch({ name: '하루' }));
+    assert.equal(named.name, '하루', '대표에게 이름을 붙인다 (2026-11-24)');
+    ok(await patch({ name: '아리' }));
     for (const body of [
-      { name: '사장' },
       { role: '다른 일' },
       { approvalActions: ['blog.post.publish'] },
       { runnerId: null },

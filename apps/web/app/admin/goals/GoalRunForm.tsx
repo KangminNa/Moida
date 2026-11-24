@@ -106,7 +106,7 @@ export function GoalRunForm({
           required
           onChange={(e) => change(() => setAgent(e.target.value))}
         >
-          {lead && <option value={lead.id}>대표</option>}
+          {lead && <option value={lead.id}>{lead.name} (대표)</option>}
           {agents.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}

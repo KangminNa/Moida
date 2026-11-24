@@ -165,6 +165,34 @@ describe('결재된 클릭 (실제 Chromium)', { skip: TestChromium.skip }, () =
     assert.equal(posts.length, before, '어느 경우에도 사이트에 요청이 가지 않았다');
   });
 
+  test('누르기 전 내용 확인: 화면의 글 · 칸의 값에 있는 글자만 붙잡고, 승인 뒤 바뀌었으면 누르지 않는다', async () => {
+    const tab = await filled('/form?e');
+    // 칸에 넣은 값 · 버튼 글자는 화면의 글자다. 공백 · 대소문자는 가리지 않는다
+    const held = await pages.hold(tab, publish, signal(), ['시험  글', '게시']);
+    assert.deepEqual(held.checks, ['시험  글', '게시']);
+    await assert.rejects(pages.hold(tab, publish, signal(), ['홍길동']), (e: unknown) => {
+      assert.ok(e instanceof ButtonProblem);
+      assert.equal(e.message, '화면에 없는 내용: "홍길동"');
+      return true;
+    });
+    // 승인한 뒤 칸의 값이 바뀌었다 (받는 사람 · 금액이 바뀐 것과 같다): 지문은 같아도 누르지 않는다
+    const before = posts.length;
+    await run(tab, "document.querySelector('#title').value = '다른 글'");
+    const result = await pages.press(
+      {
+        tabId: tab.id,
+        pageUrl: held.pageUrl,
+        button: publish,
+        fingerprint: held.fingerprint,
+        checks: held.checks,
+      },
+      signal(),
+    );
+    assert.deepEqual([result.outcome, result.reason], ['changed', '화면에 없는 내용: "시험  글"']);
+    assert.ok(result.image, '그때의 화면을 남긴다');
+    assert.equal(posts.length, before, '사이트에 요청이 가지 않았다');
+  });
+
   test('브라우저에 닿지 못하면 누르지 않는다', async () => {
     const none = new BrowserPages('http://127.0.0.1:1');
     const result = await none.press(

@@ -90,6 +90,8 @@ export class ApprovedClick {
     readonly pageUrl: string,
     readonly button: ButtonRef,
     readonly fingerprint: string,
+    /** 누르기 직전에 화면에 있는지 다시 볼 글자 (누르기 전 내용 확인) */
+    readonly checks: readonly string[],
   ) {}
 
   static from(click: Json): ApprovedClick {
@@ -101,6 +103,7 @@ export class ApprovedClick {
       click.text('page_url'),
       new ButtonRef(click.text('role'), click.text('name'), click.number('nth')),
       click.text('fingerprint'),
+      click.texts('checks'),
     );
   }
 }

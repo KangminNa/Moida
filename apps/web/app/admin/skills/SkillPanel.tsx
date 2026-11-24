@@ -5,6 +5,7 @@ import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import type { SkillDetail, SkillList, SkillSaved } from '../../_task/types';
+import { SkillScores } from './SkillScores';
 
 const CONFLICT = '이미 바뀐 스킬이에요. 최신 내용을 다시 읽었어요';
 
@@ -222,6 +223,7 @@ function SkillEditor({ name, onChanged }: { name: string; onChanged: () => Promi
           </li>
         ))}
       </ol>
+      <SkillScores scores={detail.scores} days={detail.scoreDays} min={detail.scoreMinFinished} />
     </div>
   );
 }

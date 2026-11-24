@@ -9,6 +9,12 @@
 - 맨 위에 `<!doctype html>`, `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`을 둔다. `<title>`은 페이지의 제목.
 - 폰에서 먼저 본다: 한 줄로 읽히게 쌓고, 넓은 화면에서만 나란히 놓는다. 표는 가로로 밀 수 있게 감싼다.
 - 글꼴은 시스템 글꼴을 쓴다 (`font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`). 글꼴 파일을 받아 넣지 않는다.
+- 글: 본문 16px 이상, 줄 간격 1.6~1.8, 한 줄 40자 안팎(`max-width: 40em`), 한글은 `word-break: keep-all`.
+- 읽기 쉽게: 글자 대비 4.5:1 이상(큰 글자 3:1), 색으로만 뜻을 전하지 않는다. 버튼 · 링크마다 `:focus-visible`, 아이콘만 있는 버튼에는 `aria-label`, 누르는 곳은 44px 이상.
+- 움직임은 `transform` · `opacity`만 (`transition: all`과 width · height 움직임 금지), `@media (prefers-reduced-motion: reduce)`에서는 멈춘다.
+- 화면마다 주 동작은 하나, 버튼 말은 "동사 + 대상"("코스 저장"). 오류는 원인과 고치는 법을 그 칸 옆에, 빈 상태에는 안내와 할 수 있는 동작을 둔다.
+- 쓰지 않는 것: 카드 안의 카드, 아이콘 대신 이모지, 그려 넣은 브라우저 · 폰 틀, 제목 위의 작은 라벨, 보라 → 파랑 그라디언트.
+- **지어내지 않는다.** 근거 없는 수치 · 후기 · 로고 · "1만 명이 씀" 띠를 넣지 않고, 실제로 보내지 않는 폼에 "보냈어요"를 띄우지 않는다.
 - 바깥 스크립트 · 스타일(CDN)에 기대지 않는다. 꼭 필요하면 페이지가 그것 없이도 읽히게 만든다.
 - **지도는 예외다.** 장소가 둘 이상 나오는 답(코스 · 맛집 · 여행)이나 지도를 달라는 지시는 [map.md](map.md)의 본보기로 지도를 넣는다. 실제 지도는 밖에서 받지만, 못 받으면 페이지 안에서 그린 약도가 남는다.
 

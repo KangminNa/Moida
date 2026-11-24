@@ -15,6 +15,8 @@ export const TASK_STATUS: Record<string, string> = {
 export const WAIT_LABELS: Record<string, string> = {
   approval: '승인 대기',
   subtasks: '일꾼 기다리는 중',
+  /** 일꾼이 ask_lead로 묻고 대표의 답을 기다림 (2026-11-24 대표 ↔ 일꾼 대화) */
+  lead: '대표의 답 기다림',
 };
 
 /** 작업 상태의 이름. 기다리는 중이면 무엇을 기다리는지까지 */

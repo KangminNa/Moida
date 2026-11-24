@@ -23,6 +23,8 @@ export class SubtaskWait {
   static readonly HELP = 'help';
   /** 관리자가 팀의 판단을 바꿈 (L1 중간 판단 알림): 바꾼 말은 회차의 덧붙인 말로 이 실행에 실린다 */
   static readonly CHANGE = 'change';
+  /** 일꾼이 대표에게 물음 (ask_lead, 2026-11-24 LeadTalk): 그 일꾼은 답을 기다린다 */
+  static readonly QUESTION = 'question';
   /** 도움 요청 한 줄의 앞머리 (실행 기록에서 진행 기록과 구분한다) */
   static readonly HELP_PREFIX = '도움 요청: ';
   /** 일 하나가 청할 수 있는 도움의 수 · 나눌 부분의 길이 */
@@ -46,6 +48,7 @@ export class SubtaskWait {
     owner: '관리자가 지금까지의 결과로 답해 달라고 했어요',
     help: '일꾼이 나눌 부분을 적어 도움을 청해 먼저 깨웠어요 (나머지는 계속 돌아요)',
     change: '관리자가 팀의 판단을 바꿔 먼저 깨웠어요 (나머지는 계속 돌아요)',
+    question: '일꾼이 물어서 먼저 깨웠어요 (그 일꾼은 답을 기다려요)',
   };
 
   /** 기한: 고른 분, 아니면 맡긴 일의 종류로 정한 분 */

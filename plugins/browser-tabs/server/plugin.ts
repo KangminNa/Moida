@@ -2,7 +2,8 @@ import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-
 import { SaveRequests } from './api-tools';
 import { ApprovalDecided, TaskSettled } from './approvals';
 import { BrowserJob, LoginNeeded } from './browse';
-import { ClickDetail, HoldClick, ListClicks, ManualClick, NextClick, SaveClick } from './clicks';
+import { ClickDetail, ListClicks } from './click-reads';
+import { HoldClick, ManualClick, NextClick, SaveClick } from './clicks';
 import { GuardSiteDelegation } from './delegate-guard';
 import { SaveBuild } from './integration-build';
 import {

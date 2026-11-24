@@ -472,6 +472,28 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
     assert.deepEqual([manual.status, manual.reason], ['manual', '콘솔 화면에서 직접 눌렀어요']);
   });
 
+  test('누르기 전 내용 확인 (2026-11-24): 붙잡은 클릭의 확인할 글자가 승인 화면과 누를 러너에게 간다. 5개를 넘으면 받지 않는다', async () => {
+    const { taskId, run } = await siteJob(await newSite());
+    const tooMany = await hold(taskId, { checks: ['a', 'b', 'c', 'd', 'e', 'f'] });
+    assert.equal(tooMany.ok, false);
+    const held = await hold(taskId, { checks: ['홍길동', '50,000원'] });
+    assert.equal(held.ok, true, JSON.stringify(held.body));
+    const clickId = String(held.body.click_id);
+    assert.deepEqual((await clickOf(clickId)).checks, ['홍길동', '50,000원'], '승인 화면에 보인다');
+    const asked = await tool(run, 'request_approval', {
+      request_id: `click-${clickId}`,
+      action: 'browser.site.publish',
+      target_kind: 'browser_click',
+      target_id: clickId,
+      target_version: held.body.version,
+      note: '결제 버튼',
+    });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    await decide(ok(await api.get(`/api/approvals/${asked.body.approval_id}`, owner)), 'approve');
+    const next = (await tool(runner, 'browser_click_next')).body.click as Json;
+    assert.deepEqual(next.checks, ['홍길동', '50,000원'], '누를 러너가 다시 본다');
+  });
+
   test('승인된 클릭을 관리자가 직접 눌렀다고 기록하면 작업이 끝나고, 러너는 그 클릭을 가져가지 않는다', async () => {
     const { taskId, run } = await siteJob(await newSite());
     const { clickId, approval } = await heldClick(taskId, run);

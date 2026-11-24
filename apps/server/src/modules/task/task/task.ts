@@ -14,7 +14,7 @@ import type { Agent } from '../agent/agent';
 import { AiSigninRelayView, AiTestView } from '../ai/ai-login.view';
 import type { Goal } from '../goal/goal';
 import type { OutputRow, TaskEventRow, TaskNew, TaskRow, TaskRunNew } from '../task.tables';
-import { TASK_EVENT_KIND } from '../task.tables';
+import { TASK_EVENT_KIND, type TaskWaitReason } from '../task.tables';
 import { CodeScope } from './code-scope';
 import { DelegationPolicy } from './delegation.policy';
 import {
@@ -25,6 +25,7 @@ import {
   JobView,
   ProgressView,
 } from './job.view';
+import { LeadTalk } from './lead-talk.policy';
 import { MakeMaterials } from './make-materials';
 import { MakeOrder } from './make-order';
 import type { RunRecord } from './run-record';
@@ -161,11 +162,6 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return new Task(row);
   }
 
-  /** 작업 상세에 보일 payload. 웹 로그인의 코드는 암호문이어도 내보내지 않는다 */
-  static shownPayload(kind: string, payload: unknown): unknown {
-    return kind === Task.AI_SIGNIN ? TaskSignin.shown(payload) : payload;
-  }
-
   /** delegate_task의 답: 맡긴 하위 작업들. 위 작업은 하위 작업을 기다린다 */
   static delegatedView(subtasks: readonly Task[]): DelegatedView {
     const rows = subtasks.map((t) => t.row);
@@ -270,16 +266,15 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     return needed === undefined || needed.every((scope) => scopes.includes(scope));
   }
 
-  /** 러너가 로그인 주소를 찾았다 (TaskSignin.withUrl) */
-  showSignin(url: string, userCode: string | null): void {
+  /**
+   * 웹 로그인의 다음 모습: 러너가 찾은 로그인 주소(TaskSignin.withUrl) · 사람이 붙여 넣은 코드(withCode, 암호화한 값,
+   * 러너가 가져갈 때까지만 둔다). 도는 웹 로그인에만
+   */
+  signin(
+    next: (payload: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
+  ): void {
     this.assertSigninRunning();
-    this.putSignin(TaskSignin.withUrl(this.payload, url, userCode));
-  }
-
-  /** 사람이 붙여 넣은 코드를 받는다 (암호화한 값). 러너가 가져갈 때까지만 둔다 */
-  acceptSigninCode(sealedCode: string): void {
-    this.assertSigninRunning();
-    this.putSignin(TaskSignin.withCode(this.payload, sealedCode));
+    this.putSignin(next(this.payload));
   }
 
   /**
@@ -349,11 +344,14 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     if (!this.leaseAlive(now)) throw new RuleViolation('임대가 끝난 작업이에요');
   }
 
-  /** 결재를 기다린다: running → waiting. 임대는 남은 시간까지 두고 늘리지 않으며, 끝나도 되돌리지 않는다 */
-  waitFor(now: Date): void {
+  /**
+   * 결재(또는 대표의 답, ask_lead)를 기다린다: running → waiting. 임대는 남은 시간까지 두고 늘리지 않으며, 끝나도 되돌리지 않는다.
+   * 러너는 진행 보고의 답으로 AI를 끄고 제출하지 않는다
+   */
+  waitFor(now: Date, reason: TaskWaitReason = Task.WAIT_APPROVAL): void {
     if (this.row.status === Task.RUNNING && !this.leaseAlive(now))
       throw new RuleViolation('임대가 끝난 작업이에요');
-    this.move([Task.RUNNING], Task.WAITING, Task.WAIT_APPROVAL);
+    this.move([Task.RUNNING], Task.WAITING, reason);
   }
 
   /** 결재 승인: waiting → running. 임대 없이 실행 결과 이벤트를 기다린다 */
@@ -384,9 +382,9 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * until: 기한 (SubtaskWait, 지나면 다 끝나지 않아도 깨운다). 임대는 결재 대기처럼 남은 시간까지 둔다:
    * 러너는 진행 보고의 답으로 AI를 끄고 제출하지 않는다.
    */
-  waitForSubtasks(note: string, until: Date, now: Date): void {
+  waitForSubtasks(note: string, until: Date, now: Date, round = true): void {
     this.move([Task.RUNNING], Task.WAITING, Task.WAIT_SUBTASKS);
-    this.put('rounds', this.row.rounds + 1);
+    this.put('rounds', this.row.rounds + (round ? 1 : 0));
     this.put('wait_until', until);
     this.log(Task.LOG_WRITE, note, 0, now);
   }
@@ -397,10 +395,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 다시 빌려 가는 일이라 시도 횟수는 새로 센다.
    */
   wakeAfterSubtasks(reason: string, now: Date): void {
-    this.assertWaitingFor(Task.WAIT_SUBTASKS);
-    this.move([Task.WAITING], Task.QUEUED);
-    this.holdLease(null, null);
-    this.put('attempts', 0);
+    this.reopen(Task.WAIT_SUBTASKS);
     this.put('payload', SubtaskWait.woken(this.payload, reason));
     this.log(Task.LOG_READ, SubtaskWait.noteOf(reason), 0, now);
   }
@@ -415,9 +410,9 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 팀원이 나눌 부분을 적어 팀장에게 도움을 청한다 (2026-11-20, SubtaskWait.assertHelpable): 맡긴 일 · 살아 있는 임대 ·
    * 이 에이전트의 일만. 요청은 실행 기록 한 줄로 남아 깨어난 팀장의 진행 기록(subtask_results[].progress)에 보인다
    */
-  askHelp(agentId: string, part: string, now: Date): void {
+  askHelp(agentId: string, line: string, now: Date): void {
     SubtaskWait.assertHelpable(this.row, agentId, this.leaseAlive(now));
-    this.log(Task.LOG_WRITE, SubtaskWait.helpLine(part), 0, now);
+    this.log(Task.LOG_WRITE, line, 0, now);
   }
 
   /**
@@ -435,10 +430,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 다음 실행은 앞 실행을 기억하지 못하므로 결재의 대상을 작업의 대상으로 넘긴다.
    */
   returnForRevision(note: string | null, kind: string, id: string, version: number): void {
-    this.assertWaitingFor(Task.WAIT_APPROVAL);
-    this.move([Task.WAITING], Task.QUEUED);
-    this.holdLease(null, null);
-    this.put('attempts', 0);
+    this.reopen(Task.WAIT_APPROVAL);
     this.put('payload', { ...this.payload, revisionNote: note });
     this.put('target_kind', kind);
     this.put('target_id', id);
@@ -532,6 +524,17 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     else this.fail(stopped ?? '임대가 세 번 끝나 멈췄어요', now);
   }
 
+  /**
+   * waiting(reason) → queued: 다시 빌려 가는 일이라 시도 횟수는 새로 센다. 깨우기 · 고쳐 달라 · 대표의 답(LeadTalkService:
+   * 답을 payload에 쌓은 뒤 부른다). 그 까닭으로 기다리는 일이 아니면 Conflict
+   */
+  reopen(reason: TaskWaitReason): void {
+    this.assertWaitingFor(reason);
+    this.move([Task.WAITING], Task.QUEUED);
+    this.holdLease(null, null);
+    this.put('attempts', 0);
+  }
+
   /** running → queued: 임대를 비우고 까닭을 남긴다. attempts: 다음 시도 횟수 (돌려준 일은 이번 실행을 세지 않는다) */
   private requeue(note: string, now: Date, attempts = this.row.attempts): void {
     this.move([Task.RUNNING], Task.QUEUED);
@@ -612,7 +615,9 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
   /** 하위 작업 하나의 결과. 러너는 결과를 { text }로 낸다 */
   private resultView(agentName: string | null): JobSubtaskResultView {
     const text = this.result?.text;
-    const answer = typeof text === 'string' && text !== '' ? text : null;
+    // 대표의 답을 기다리는 일은 결과 글 대신 그 질문을 싣는다 (waiting: lead, LeadTalk)
+    const answer =
+      typeof text === 'string' && text !== '' ? text : LeadTalk.questionOf(this.payload);
     return new JobSubtaskResultView(this.row, agentName, answer, this.failure);
   }
 
