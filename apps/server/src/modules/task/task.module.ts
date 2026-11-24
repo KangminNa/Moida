@@ -15,6 +15,7 @@ import { AgentService } from './agent/agent.service';
 import { AiLoginController } from './ai/ai-login.api';
 import { AiLoginQuery } from './ai/ai-login.query';
 import { AiLoginService } from './ai/ai-login.service';
+import { ApiConnectorController } from './api-connector/api-connector.api';
 import { ApprovalController } from './approval/approval.api';
 import { ApprovalQuery } from './approval/approval.query';
 import { ApprovalService } from './approval/approval.service';
@@ -93,6 +94,7 @@ import { TaskService } from './task/task.service';
 import { TaskRequestedHandler } from './task/task-requested.handler';
 import { TaskTrashService } from './task/task-trash.service';
 import events from './task.events.json';
+import { TaskConnectors } from './task-connectors';
 import { TaskNotices } from './task-notices';
 import { TaskSettings } from './task-settings';
 import { TaskTools } from './task-tools';
@@ -203,6 +205,8 @@ import { WebPageGateway } from './web/web-page.gateway';
     SettingQuery,
     SettingChangeService,
     SettingApplyHandler,
+    // API 커넥터 · 도구 찾기 (2026-11-24): 정의서 · 서버가 부르기 · 레지스트리 찾기. 목록과 잇기는 TaskConnectors
+    ...TaskConnectors.PROVIDERS,
   ],
   controllers: [
     AgentController,
@@ -220,6 +224,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatController,
     ExternalToolController,
     ExternalToolOAuthController,
+    ApiConnectorController,
     LinkPreviewController,
   ],
   exports: [TaskTools, TaskQuery],

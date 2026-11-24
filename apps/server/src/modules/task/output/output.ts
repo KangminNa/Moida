@@ -38,21 +38,25 @@ export class Output extends TableEntity<OutputRow, OutputNew> {
     );
   }
 
-  /** 주인이 올린 파일 (만들기 일의 재료로 쓰려고). 작업이 만든 것이 아니라 작업 · 실행이 없다 */
+  /**
+   * 주인이 올린 파일 (만들기 일의 재료로 쓰려고): 작업 · 실행이 없다.
+   * API 커넥터가 받은 파일(2026-11-24)은 부른 작업의 실행에 붙는다 (made, 관리자의 시험이면 없다)
+   */
   static upload(
     spaceId: string,
     name: string,
     blob: Blob,
     sniffed: string | null,
     now: Date,
+    made: { taskId: string; runId: string } | null = null,
   ): Output {
     OutputPolicy.assertName(name);
     return new Output(
       {
         id: BaseEntity.newId(),
         space_id: spaceId,
-        task_id: null,
-        run_id: null,
+        task_id: made?.taskId ?? null,
+        run_id: made?.runId ?? null,
         name,
         kind: OutputPolicy.kindOf(name, sniffed),
         mime: OutputPolicy.mimeOf(name, sniffed),

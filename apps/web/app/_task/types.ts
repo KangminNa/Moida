@@ -16,6 +16,11 @@ import type {
   EngineListView,
 } from '../../../server/src/modules/task/ai/ai-login.view';
 import type {
+  ApiCallLineView,
+  ApiCallListView,
+  ApiConnectorListView,
+} from '../../../server/src/modules/task/api-connector/api-connector.view';
+import type {
   ApprovalPageView,
   ApprovalView,
 } from '../../../server/src/modules/task/approval/approval.view';
@@ -101,6 +106,11 @@ export type AgentLead = ReturnType<AgentLeadView['toJSON']>;
 export type ExternalToolList = ReturnType<ExternalToolListView['toJSON']>;
 export type ExternalTool = ExternalToolList['tools'][number];
 /** OAuth 커넥터의 로그인 시작 (C1): 같은 탭으로 열 로그인 서버의 주소 */
+/** API 커넥터 (2026-11-24): 일꾼이 낸 정의서로 붙인 REST API. 키는 넣었는지만 */
+export type ApiConnectorList = ReturnType<ApiConnectorListView['toJSON']>;
+export type ApiConnector = ApiConnectorList['connectors'][number];
+export type ApiCallList = ReturnType<ApiCallListView['toJSON']>;
+export type ApiCallLine = ReturnType<ApiCallLineView['toJSON']>;
 export type ExternalToolOAuthStart = ReturnType<OAuthStartView['toJSON']>;
 export type Schedule = ReturnType<ScheduleView['toJSON']>;
 export type ScheduleList = ReturnType<ScheduleListView['toJSON']>;

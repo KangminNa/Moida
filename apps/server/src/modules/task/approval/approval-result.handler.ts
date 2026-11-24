@@ -24,6 +24,9 @@ export class ApprovalResultHandler extends BaseHandler {
     'blog.issue.publish_failed',
     'task.external_tool.plugged',
     'task.external_tool.plug_failed',
+    'task.api_connector.plugged',
+    'task.api_connector.plug_failed',
+    'task.api_call.ran',
     'plugin.*',
   ];
 

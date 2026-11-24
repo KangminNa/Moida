@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { BaseTool, ToolTextBody } from '../platform';
 import { AiLoginRefreshTool, AiLoginTool, AiSigninTool } from './ai/ai-login.tool';
+import {
+  ApiCallTool,
+  ApiRunTool,
+  ApiToolsTool,
+  ProposeApiTool,
+} from './api-connector/api-connector.tool';
 import { RequestApprovalTool } from './approval/approval.tool';
 import { AskAgentTool } from './chat/chat.tool';
 import { PublishAppTool } from './chat/chat-publish.tool';
@@ -24,6 +30,7 @@ import {
   SubmitResultTool,
 } from './task/task.tool';
 import texts from './task.tools.ko.json';
+import { FindToolTool } from './tool-finder/tool-finder.tool';
 import { ReadUrlTool } from './web/web.tool';
 
 // task가 AI에게 여는 MCP 도구 목록. 새 도구는 여기에만 더한다 (mcp 모듈은 모듈별 목록을 모으기만 한다).
@@ -57,6 +64,11 @@ export class TaskTools {
     AskBriefTool,
     PublishAppTool,
     ProposeToolTool,
+    FindToolTool,
+    ProposeApiTool,
+    ApiToolsTool,
+    ApiRunTool,
+    ApiCallTool,
     GetSettingsTool,
     ProposeSettingTool,
   ] as const;
@@ -91,6 +103,11 @@ export class TaskTools {
     askBrief: AskBriefTool,
     publishApp: PublishAppTool,
     proposeTool: ProposeToolTool,
+    findTool: FindToolTool,
+    proposeApi: ProposeApiTool,
+    apiTools: ApiToolsTool,
+    apiRun: ApiRunTool,
+    apiCall: ApiCallTool,
     getSettings: GetSettingsTool,
     proposeSetting: ProposeSettingTool,
   ) {
@@ -121,6 +138,11 @@ export class TaskTools {
       askBrief,
       publishApp,
       proposeTool,
+      findTool,
+      proposeApi,
+      apiTools,
+      apiRun,
+      apiCall,
       getSettings,
       proposeSetting,
     ];

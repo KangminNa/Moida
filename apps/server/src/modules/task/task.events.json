@@ -144,6 +144,15 @@
     },
     "task.setting.changed": {
       "fields": ["approvalId", "outcome", "error?"]
+    },
+    "task.api_connector.plugged": {
+      "fields": ["connectorId", "approvalId", "outcome"]
+    },
+    "task.api_connector.plug_failed": {
+      "fields": ["connectorId", "approvalId", "outcome", "error"]
+    },
+    "task.api_call.ran": {
+      "fields": ["callId", "approvalId", "outcome"]
     }
   }
 }
