@@ -372,12 +372,12 @@ describe('사이트 도구: 되풀이되는 일 (MCP 3단계)', () => {
     assert.equal(mine, undefined, '표시(괄호 안 글자)가 달라 열쇠가 다르면 세지 않는다');
   });
 
-  test('지시가 같은 모양이면 세 번째에 제안이 열리고, 만들기에 제안을 넘기면 닫힌다', async () => {
+  test('지시가 같은 모양이면 세 번째에 묻지 않고 읽기 도구로 굳히고, 지운 도구는 다시 만들지 않는다', async () => {
     const browseAgent = await newAgent('되풀이 담당 2');
     const site = ok(
       await api.request('POST', `${BASE}/sites`, owner, { ...SITE, name: '되풀이 2' }),
     );
-    for (const code of ['005930', '000660', '035720']) {
+    const repeat = async (code: string) => {
       ok(
         await api.request('POST', `${BASE}/sites/${site.id}/tasks`, owner, {
           requestId: randomUUID(),
@@ -388,33 +388,50 @@ describe('사이트 도구: 되풀이되는 일 (MCP 3단계)', () => {
       await drain();
       const job = await leased('되풀이 2');
       await tool(runner, 'browser_job', { task_id: (job.task as Json).id });
-    }
-    const listed1 = ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] };
-    const open = listed1.suggestions.find((s) => s.siteId === site.id);
-    assert.equal(open?.count, 3);
+    };
+    const mineOf = async () =>
+      (
+        ok(await api.get(`${BASE}/integrations`, owner)) as { integrations: Json[] }
+      ).integrations.filter((t) => t.siteId === site.id);
+    for (const code of ['005930', '000660']) await repeat(code);
+    assert.deepEqual(await mineOf(), [], '두 번까지는 세기만 한다');
+    await repeat('035720');
+    const [made] = await mineOf();
+    assert.match(String(made?.name), /^repeat_quotes_example/);
+    assert.equal(made?.status, 'building');
+    assert.equal(made?.mode, 'read');
+    assert.match(String(made?.hint), /3번 맡은 일이다.*\n지시 예: 035720 오늘 종가 알려줘/s);
+    const listed = ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] };
+    assert.equal(
+      listed.suggestions.find((s) => s.siteId === site.id),
+      undefined,
+      '굳히기 시작했으면 제안은 닫힘 (made)',
+    );
     for (const headers of [{}, writer])
       assert.equal(
         (await api.request('GET', `${BASE}/suggestions`, TestUser.visitor, undefined, headers))
           .status,
         403,
       );
+    // 담당을 정하지 않아 browse 권한이 있는 에이전트가 굳힌다. 시험을 지나면 승인 없이 켜진다 (B0)
+    await drain();
+    const build = await leased(`도구 만들기: 되풀이 2`);
+    const saved = await save(String((build.task as Json).id), [
+      { price: 1 },
+      { price: 2 },
+      { price: 3 },
+    ]);
+    assert.equal(saved.ok, true, JSON.stringify(saved.body));
+    const [on] = await mineOf();
+    assert.equal(on?.status, 'on');
+    // 관리자가 목록에서 지우면 같은 일이 또 되풀이돼도 다시 만들지 않는다
     ok(
-      await api.request('POST', `${BASE}/integrations`, owner, {
-        requestId: randomUUID(),
-        siteId: site.id,
-        name: 'repeat_close',
-        title: '종가',
-        description: '종목 코드로 종가를 읽는다',
-        hint: String(open?.sample),
-        suggestionId: open?.id,
+      await api.request('DELETE', `${BASE}/integrations/${on?.id}`, owner, {
+        version: on?.version,
       }),
     );
-    const listed2 = ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] };
-    assert.equal(
-      listed2.suggestions.find((s) => s.siteId === site.id),
-      undefined,
-      '만들었으면 닫힘',
-    );
+    await repeat('051910');
+    assert.deepEqual(await mineOf(), []);
   });
 });
 

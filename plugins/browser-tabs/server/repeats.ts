@@ -10,9 +10,11 @@ import {
   Rule,
   type Work,
 } from '../../../apps/server/src/plugin-api';
+import { siteToolName } from './api-tools';
+import { requestBuild } from './integrations';
 import { SuggestionListView } from './review-views';
-import { browseSeen, clickPlans, clicks, sites, suggestions } from './schema';
-import type { SiteRow } from './tables';
+import { browseSeen, clickPlans, clicks, integrations, sites, suggestions } from './schema';
+import type { SiteRow, SuggestionRow } from './tables';
 
 // 되풀이되는 일 알아채기 (2026-11-16 MCP 3단계, docs/MCP.md 7장). 사이트 일을 빌릴 때(browser_job) 지시의 열쇠를 남기고,
 // 같은 사이트 · 같은 열쇠의 일이 14일 안에 3번이면 "도구로 만들면 좋을 일"로 제안한다. 열쇠는 지시를 정규화한 sha256:
@@ -20,6 +22,9 @@ import type { SiteRow } from './tables';
 // 제안은 사이트 · 열쇠마다 하나: 도구를 만들었거나(made) 그만 보기(dismissed)면 다시 내지 않는다.
 // 승인한 누르기 계획으로 실제로 누른 일에서 쓰기 API(GET이 아닌 2xx)가 기록되면 되풀이를 기다리지 않고 바로 쓰기 도구를 제안한다
 // (2026-11-21, 까닭은 note에). 쓰기 도구는 만들 때 검토자 짝, 부를 때마다 승인이라 제안이 바로 떠도 원칙 7은 그대로다
+// 되풀이 제안은 묻지 않고 읽기 도구로 굳히기 시작한다 (2026-11-24 사용자 결정 "자주 하는 건 만들고 내가 목록에서 지운다",
+// 설정 autoRepeatTools, 기본 켬). 시험을 지나면 바로 켜지고(B0), 지운 도구는 제안이 made로 남아 다시 만들지 않는다.
+// 쓰기 API가 기록된 제안(note 있음)은 그대로 제안으로 둔다: 쓰기 도구는 검토자를 관리자가 고른다
 
 const WINDOW_DAYS = 14;
 const REPEATS = 3;
@@ -39,13 +44,14 @@ export function repeatKey(instruction: string): string {
 
 /**
  * 사이트 일 하나를 남기고, 되풀이면 제안을 열거나 횟수를 올린다. 같은 작업은 한 번만 센다 (다시 빌려도).
- * 지시가 비면 세지 않는다
+ * 지시가 비면 세지 않는다. auto면 열린 읽기 제안을 바로 도구로 굳히기 시작한다 (buildRepeat)
  */
 export async function noteBrowse(
   work: Work,
   site: Readonly<SiteRow>,
   taskId: string,
   instruction: string,
+  auto: boolean,
 ): Promise<void> {
   if (!instruction.trim()) return;
   if (await work.exists(browseSeen, { task_id: taskId })) return;
@@ -63,8 +69,11 @@ export async function noteBrowse(
   const count = seen?.n ?? 0;
   if (count < REPEATS) return;
   const sample = instruction.trim().slice(0, SAMPLE_MAX);
-  const open = await work.row(suggestions, { site_id: site.id, key });
-  if (!open) {
+  const found = await work.row(suggestions, { site_id: site.id, key });
+  if (found && found.status !== 'open') return;
+  if (found)
+    await work.updateRows(suggestions, { count, sample, last_seen_at: Rule.now }, { id: found.id });
+  else
     await work.insertRows(suggestions, {
       space_id: site.space_id,
       site_id: site.id,
@@ -72,10 +81,39 @@ export async function noteBrowse(
       count,
       sample,
     });
-    return;
-  }
-  if (open.status === 'open')
-    await work.updateRows(suggestions, { count, sample, last_seen_at: Rule.now }, { id: open.id });
+  const open = found ?? (await work.row(suggestions, { site_id: site.id, key }));
+  if (auto && open && !open.note) await buildRepeat(work, site, { ...open, sample });
+}
+
+/**
+ * 되풀이 제안을 읽기 사이트 도구로 굳히기 시작하고 제안을 닫는다 (made). 담당은 browse 권한이 있는 에이전트 아무나 (코어가 고른다).
+ * 그 사이트에 굳히는 중인 도구가 있으면 기다린다: 제안은 열린 채로 두고 다음 되풀이에 다시 본다
+ */
+async function buildRepeat(
+  work: Work,
+  site: Readonly<SiteRow>,
+  open: Readonly<SuggestionRow>,
+): Promise<void> {
+  if (await work.exists(integrations, { site_id: site.id, status: 'building' })) return;
+  const name = await siteToolName(work, site.space_id, site, 'repeat');
+  await work.insertRows(integrations, {
+    space_id: site.space_id,
+    site_id: site.id,
+    name,
+    title: `${site.name}: ${open.sample}`.slice(0, 60),
+    description: `${site.name}에서 되풀이한 일을 AI 없이 하는 읽기 도구`.slice(0, 300),
+    hint: [
+      `14일 안에 같은 모양으로 ${open.count}번 맡은 일이다. 지시마다 달라지는 자리(숫자 · 날짜 · 따옴표 안 값)를 입력 칸으로 만든다.`,
+      `지시 예: ${open.sample}`,
+    ].join('\n'),
+    agent_id: null,
+    mode: 'read',
+    reviewer_id: null,
+  });
+  const row = await work.row(integrations, { space_id: site.space_id, name });
+  if (!row) return;
+  await suggestionMade(work, site.space_id, open.id, row.id);
+  requestBuild(work, site.space_id, row, `repeat:${open.id}`, null);
 }
 
 /** 기록된 요청 중 쓰기(GET · HEAD · OPTIONS가 아닌 2xx)의 "방법 경로" 목록 */

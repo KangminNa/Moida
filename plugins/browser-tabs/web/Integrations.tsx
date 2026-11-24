@@ -56,7 +56,8 @@ export function Integrations({ call, notify }: Props) {
       </div>
       <p className="note">
         에이전트는 사이트에서 정보를 찾을 때 켜진 도구를 먼저 써요. 실패하면 브라우저 담당이
-        대신해요
+        대신해요. 자주 하는 읽기 일과 기록된 API는 저절로 도구가 돼요(repeat_ · api_). 필요 없는
+        도구는 지우면 다시 만들지 않아요
       </p>
       <Suggestions call={call} notify={notify} onPick={setSeed} />
       <IntegrationForm

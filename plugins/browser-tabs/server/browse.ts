@@ -21,6 +21,11 @@ export class BrowserJob extends Command<{ taskId: string }> {
   readonly name = 'job';
   readonly allow = Actor.RUN;
 
+  /** autoRepeatTools: 되풀이되는 읽기 일을 묻지 않고 도구로 굳히는가 (설정, 기본 켬) */
+  constructor(private readonly autoRepeatTools: boolean) {
+    super();
+  }
+
   input(raw: unknown): { taskId: string } {
     return this.fields(raw, (f) => ({ taskId: f.uuid('task_id') }));
   }
@@ -30,7 +35,7 @@ export class BrowserJob extends Command<{ taskId: string }> {
     const place = await placeOf(work, actor, job);
     // 보통 사이트 일이면 되풀이를 센다 (굳히기 · 클릭 고치기는 빼고, 2026-11-16 MCP 3단계)
     if (place.site && !place.held && !place.integration)
-      await noteBrowse(work, place.site, job.id, job.instruction);
+      await noteBrowse(work, place.site, job.id, job.instruction, this.autoRepeatTools);
     const build = place.integration
       ? await buildPartOf(work, place.integration, input.taskId)
       : null;

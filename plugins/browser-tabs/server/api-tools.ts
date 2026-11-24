@@ -45,8 +45,13 @@ function shapeOf(f: RequestFields, name: string): unknown {
   }
 }
 
-/** 사이트 도구의 이름: api_ + 사이트 호스트의 앞 낱말 (같은 이름이 있으면 뒤에 숫자) */
-async function apiNameOf(work: Work, space: string, site: Readonly<SiteRow>): Promise<string> {
+/** 사이트 도구의 이름: 앞말(api · repeat) + _ + 사이트 호스트의 앞 낱말 (같은 이름이 있으면 뒤에 숫자) */
+export async function siteToolName(
+  work: Work,
+  space: string,
+  site: Readonly<SiteRow>,
+  prefix: 'api' | 'repeat',
+): Promise<string> {
   const host = URL.canParse(site.start_url) ? new URL(site.start_url).hostname : 'site';
   const words = host
     .replace(/^www\./, '')
@@ -54,7 +59,7 @@ async function apiNameOf(work: Work, space: string, site: Readonly<SiteRow>): Pr
     .slice(0, 2)
     .join('_')
     .replace(/[^a-z0-9_]/g, '_');
-  const base = `api_${words}`.slice(0, 36);
+  const base = `${prefix}_${words}`.slice(0, 36);
   for (let i = 1; i < 20; i++) {
     const name = i === 1 ? base : `${base}_${i}`;
     if (!(await work.exists(integrations, { space_id: space, name }))) return name;
@@ -141,7 +146,7 @@ export class SaveRequests extends Command<SaveInput> {
       UPDATE browser_tabs.sites SET api_build_at = now()
       WHERE id = ${site.id} AND space_id = ${space} AND api_build_at IS NULL RETURNING id`;
     if (marked.length === 0) return false;
-    const name = await apiNameOf(work, space, site);
+    const name = await siteToolName(work, space, site, 'api');
     await work.insertRows(integrations, {
       space_id: space,
       site_id: site.id,
