@@ -2,6 +2,7 @@
 // 서버·플러그인 테스트(단위 + API)를 돌린다. Docker의 db만 있으면 된다.
 // 연결 명령(packages/cli) 테스트는 DB가 필요 없어 이 컴퓨터에서 바로 돌린다. 러너는 단위 테스트와, 전용 DB로 실제 서버와 붙는 통합 테스트까지.
 // 브라우저 확장(apps/extension)은 단위 테스트와, Playwright · Chromium이 있으면 확장을 올린 브라우저 시험까지 (없으면 건너뛴다).
+// 웹도 Playwright · Chromium이 있으면 앱 도메인의 회원 화면을 브라우저로 본다 (apps/web/e2e).
 //
 //   pnpm test                   전부
 //   pnpm test -- --test-name-pattern=플러그인   이름으로 골라서
@@ -58,6 +59,11 @@ docker([
 execFileSync('pnpm', ['--filter', '@cairn/cli', 'test', ...extra], { cwd: root, stdio: 'inherit' });
 // 웹은 화면 밖의 순수한 규칙만 단위 테스트한다 (돌아갈 주소 등, Node의 타입 지우기로 그대로)
 execFileSync('pnpm', ['--filter', '@cairn/web', 'test', ...extra], { cwd: root, stdio: 'inherit' });
+// 앱 도메인의 회원 화면을 실제 Next(개발 · 운영 빌드)와 Chromium으로 (Playwright가 없으면 건너뛴다)
+execFileSync('pnpm', ['--filter', '@cairn/web', 'test:e2e', ...extra], {
+  cwd: root,
+  stdio: 'inherit',
+});
 execFileSync('pnpm', ['--filter', '@cairn/extension', 'test', ...extra], {
   cwd: root,
   stdio: 'inherit',

@@ -31,9 +31,10 @@
         "app/**/{page,layout,route,manifest}.{ts,tsx}",
         "app/_plugins/slot-types.ts",
         "app/**/*.test.ts",
+        "e2e/*.e2e.mjs",
         "../../plugins/*/web/**/*.{ts,tsx}"
       ],
-      "project": ["app/**/*.{ts,tsx}", "../../plugins/*/web/**/*.{ts,tsx}"]
+      "project": ["app/**/*.{ts,tsx}", "e2e/*.mjs", "../../plugins/*/web/**/*.{ts,tsx}"]
     }
   }
 }

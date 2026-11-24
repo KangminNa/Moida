@@ -70,6 +70,7 @@ paths:
 - 커뮤니티 앱의 목록 · 글은 앱 화면(템플릿) 그대로다. route handler가 `_community/app-screen.ts`로 회원 API(`me` · `topics` · `topics/:id`)를 앱 도메인(`serverFetch`의 `host`)으로 읽어 템플릿 데이터에 더한다(`renderAppScreen`의 `extra`). 앱 도메인으로 온 화면만 회원 쿠키를 넘기고 회원 링크를 연다. 템플릿에는 닉네임과 내 것인지(`mine`)만 싣는다.
 - 가입 · 로그인 · 내 정보 · 글쓰기 · 댓글 · 신고는 고정 화면 `app/(blog)/[app]/%5F/…`(주소 `/_/…`)다. `page.tsx`는 `memberPlace`로 시작한다 (그 앱의 도메인으로 온 요청 · 커뮤니티 앱이 아니면 404). 회원 쓰기는 `memberApi(csrf, …)`로 `X-Cairn-CSRF`를 싣고, 만들기의 `requestId`는 `newRequestId()`(http로 연 시험용 도메인에도 있게). 회원 화면에는 콘솔의 변경 신호(`/api/stream`)가 없어 `useLiveValue`를 쓰지 않는다: 바꾼 뒤에는 `router.refresh()`나 화면을 다시 연다.
 - 앱 도메인의 `/_/…`에는 `proxy.ts`가 화면 머리글을 붙인다 (`isMemberScreen`). 회원 글 본문은 `renderMarkdown(body, { ugc: true })`(바깥 링크에 nofollow ugc).
+- 회원 화면이 브라우저에서 살아 있는지(하이드레이트 · 칸에 쓰면 버튼이 켜짐)는 `apps/web/e2e/member-screens.e2e.mjs`가 가짜 API와 실제 Next(개발 · 운영 빌드)로 본다 (`pnpm --filter @cairn/web test:e2e`). 개발 서버는 HMR 웹소켓이 붙지 않으면 어느 화면도 하이드레이트하지 않는다: 손으로 앱 도메인을 시험할 때 브라우저가 프록시를 거치면(시험용 도메인의 웹소켓이 막힘) 화면이 죽은 것처럼 보인다. `*.localhost` 도메인을 쓰거나 브라우저의 프록시를 끈다 (2026-11-24)
 
 ## 서버와 함께 쓰는 것
 
