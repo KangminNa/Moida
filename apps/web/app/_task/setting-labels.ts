@@ -1,4 +1,5 @@
 import { APP_KIND_LABELS } from '../_blog/labels';
+import { CONTENT_STATE_LABELS } from '../_community/labels';
 
 // 설정 바꾸기 (2026-11-15 C · D)의 화면 문구: 설정 이름, 칸 이름과 값. 결과 카드 · 승인 화면의 바뀔 칸(ChangeLines)이 쓴다
 
@@ -14,6 +15,7 @@ export const SETTING_NAMES: Readonly<Record<string, string>> = {
   tidy: '세션 정리',
   projects: '프로젝트별 모으기',
   plugin: '플러그인',
+  moderation: '신고 검토',
 };
 
 /** 설정 바꾸기의 칸 이름 (서버 Edit의 SETTING.fields, get_settings와 같은 snake_case). 설정이 달라도 같은 이름은 같은 뜻이다 */
@@ -66,11 +68,19 @@ export const SETTING_FIELDS: Readonly<Record<string, string>> = {
   cadence: '정리 주기',
   collect: '모으기',
   menus: '시작 메뉴',
+  app_id: '앱',
+  target: '대상',
+  state: '상태',
+  open_reports: '열린 신고',
+  blocked_until: '차단 끝',
 };
 
 /** 칸마다 따로 읽는 값 (켜고 끔 · 영어 값으로 읽으면 뜻이 틀리는 것). 키는 "칸" 또는 같은 칸 이름이 설정마다 뜻이 다르면 "설정.칸" */
 const SETTING_VALUES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'app.kind': APP_KIND_LABELS,
+  'moderation.state': CONTENT_STATE_LABELS,
+  'moderation.target': { topic: '글', comment: '댓글', member: '회원' },
+  'moderation.blocked_until': { forever: '기한 없음' },
 };
 
 /**

@@ -47,6 +47,19 @@ describe('작업 종류 목록', () => {
       browse: 'cairn-browse',
       code: 'cairn-code',
       make: 'cairn-make',
+      community_review: 'cairn-moderate',
     });
+  });
+
+  test('도구 · 제안할 설정을 좁힌 종류는 신고 검토뿐이다 (2026-11-24, 스토어 3-3)', () => {
+    assert.deepEqual(
+      TaskKinds.toolsOf('community_review'),
+      new Set(['community_case', 'propose_setting']),
+    );
+    assert.deepEqual(TaskKinds.settingsOf('community_review'), ['moderation']);
+    for (const kind of TaskKinds.NAMES.filter((k) => k !== 'community_review')) {
+      assert.equal(TaskKinds.toolsOf(kind), null, kind);
+      assert.equal(TaskKinds.settingsOf(kind), null, kind);
+    }
   });
 });

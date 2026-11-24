@@ -43,7 +43,7 @@ export class SettingChangeService extends BaseService {
   async propose(actor: Actor, req: ProposeSettingInput): Promise<Approval> {
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
     const { spaceId, agentId, taskId } = actor;
-    const reader = await this.settings.reader(actor);
+    const reader = await this.settings.reader(actor, req.setting);
     const earlier = await this.earlier(spaceId, taskId, req.requestId);
     if (earlier) return earlier;
     const kind = this.kinds.of(req.setting);

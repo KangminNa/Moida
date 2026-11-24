@@ -37,11 +37,6 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   static readonly APP_CODE_SHOW = 'blog.app_code.show';
   /** 설정 바꾸기 (2026-11-15 C · D): 바뀔 값은 payload에 (propose_setting이 미리 적용해 보고 올린다). 이름은 platform이 갖는다 */
   static readonly SETTING_CHANGE = SettingKinds.ACTION;
-  /**
-   * 대표(O-2, 대화 상대)가 승인 동작에 넣지 않아도 올리는 동작 (2026-11-15 C): 설정 바꾸기 · 코드 작업 열기.
-   * 대화가 곧 설정 창구라서다. 모두 승인 뒤에만 실행되고, 팀장 · 팀원은 승인 동작에 넣어 준 경우만
-   */
-  static readonly PARTNER_ACTIONS: readonly string[] = [Approval.SETTING_CHANGE, 'code.task.start'];
   /** 대화의 일이어도 카드에 싣지 않고 바로 알리는 동작: 사람이 해야 일이 이어진다 (한도 · 사이트 로그인) */
   static readonly IMMEDIATE: readonly string[] = [Approval.RAISE_LIMIT, 'browser.site.login'];
   private static readonly NOTE_MAX = 4000;
@@ -63,7 +58,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
       throw new RuleViolation(
         '설정 바꾸기는 propose_setting으로 올려요 (바뀔 값을 서버가 미리 해 봐요)',
       );
-    if (!(agent.lead && Approval.PARTNER_ACTIONS.includes(action))) agent.assertMayRequest(action);
+    agent.assertMayRequest(action, task);
     const approval = Approval.pending(
       {
         ...fields,

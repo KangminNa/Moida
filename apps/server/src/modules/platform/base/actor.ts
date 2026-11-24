@@ -120,6 +120,14 @@ export abstract class Actor {
     return null;
   }
 
+  /**
+   * 이 MCP 도구를 보고 부를 수 있는가 (2026-11-24, 스토어 3-3): 작업 종류가 도구 목록을 정한 작업 토큰만 그 목록으로 좁힌다
+   * (커뮤니티 신고 검토: 회원이 쓴 글에 숨은 지시가 있어도 비공개 · 바깥 도구에 닿지 못하게). 권한(allows)과 함께 본다
+   */
+  mayUseTool(_name: string): boolean {
+    return true;
+  }
+
   toJSON(): object {
     return { kind: this.kind, spaceId: this.spaceId, id: this.id };
   }
@@ -176,6 +184,8 @@ export class AgentActor extends Actor {
     private readonly scopes: ReadonlySet<string>,
     /** 이 작업에만 따로 읽기를 허락한 id (주인이 고른 재료). 권한과 함께 토큰에 봉인한다 */
     private readonly reads: ReadonlySet<string> = new Set(),
+    /** 이 작업이 쓸 수 있는 도구 (작업 종류가 정함). null이면 권한대로 모두 */
+    private readonly tools: ReadonlySet<string> | null = null,
   ) {
     super(spaceId, agentId);
   }
@@ -195,8 +205,17 @@ export class AgentActor extends Actor {
       taskId: string;
       scopes: string[];
       reads?: string[];
+      tools?: string[] | null;
     };
-    return new AgentActor(v.spaceId, v.agentId, v.taskId, new Set(v.scopes), new Set(v.reads));
+    const tools = Array.isArray(v.tools) ? new Set(v.tools) : null;
+    return new AgentActor(
+      v.spaceId,
+      v.agentId,
+      v.taskId,
+      new Set(v.scopes),
+      new Set(v.reads),
+      tools,
+    );
   }
 
   get agentId(): string {
@@ -211,6 +230,7 @@ export class AgentActor extends Actor {
       taskId: this.taskId,
       scopes: [...this.scopes],
       reads: [...this.reads],
+      tools: this.tools ? [...this.tools] : null,
     });
     return `${AgentActor.PREFIX}${box.pack(AgentActor.PURPOSE, value, seconds)}`;
   }
@@ -226,6 +246,10 @@ export class AgentActor extends Actor {
   override hasReadGrants(): boolean {
     return this.reads.size > 0;
   }
+  override mayUseTool(name: string): boolean {
+    return this.tools === null || this.tools.has(name);
+  }
+
   override runTask(): string {
     return this.taskId;
   }

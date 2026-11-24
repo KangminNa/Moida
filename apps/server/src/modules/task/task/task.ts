@@ -554,9 +554,10 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
    * 이 작업을 하는 에이전트의 요청자. 그 에이전트의 권한만 담아 작업 토큰이 된다.
    * 만들기 작업이면 주인이 고른 재료 위키에 읽기 허락을 더한다 (get_wiki만 본다)
    */
-  actorFor(agentId: string, scopes: readonly string[]): AgentActor {
-    const reads = [...(this.makeMaterials?.wikis ?? []), ...this.refs.readIds];
-    return new AgentActor(this.row.space_id, agentId, this.id, new Set(scopes), new Set(reads));
+  actorFor(agent: Agent): AgentActor {
+    const reads = new Set([...(this.makeMaterials?.wikis ?? []), ...this.refs.readIds]);
+    const only = TaskKinds.toolsOf(this.row.kind);
+    return new AgentActor(this.row.space_id, agent.id, this.id, new Set(agent.scopes), reads, only);
   }
 
   /** 바꾼 작업 하나. 목록의 한 줄과 같은 모양이고, 화면은 이 version으로 다음 변경을 보낸다 */
@@ -576,8 +577,7 @@ export class Task extends TableEntity<TaskRow, TaskNew> {
     children: readonly Task[],
     skill: JobSkillView | null = null,
   ): JobView {
-    const runToken =
-      agent && this.actorFor(agent.id, agent.scopes).seal(box, Task.RUN_TOKEN_SECONDS);
+    const runToken = agent && this.actorFor(agent).seal(box, Task.RUN_TOKEN_SECONDS);
     return new JobView(
       this.row,
       this.skill,

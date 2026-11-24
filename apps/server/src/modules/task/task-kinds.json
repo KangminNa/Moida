@@ -15,6 +15,12 @@
   },
   "code": { "skill": "cairn-code", "scopes": ["code"], "delegable": true, "sandboxed": true },
   "make": { "skill": "cairn-make", "scopes": ["make"], "delegable": true, "sandboxed": true },
+  "community_review": {
+    "skill": "cairn-moderate",
+    "tools": ["community_case", "propose_setting"],
+    "settings": ["moderation"],
+    "recorded": false
+  },
   "ai_test": { "agentless": true },
   "ai_signin": { "agentless": true },
   "session_note": { "agentless": true },

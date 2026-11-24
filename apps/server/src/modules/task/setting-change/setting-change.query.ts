@@ -13,7 +13,8 @@ import {
   type ToolAnswer,
 } from '../../platform';
 import { Approval } from '../approval/approval';
-import { agents, schedules } from '../task.schema';
+import { TaskKinds } from '../task/task-kinds';
+import { agents, schedules, tasks } from '../task.schema';
 import type { GetSettingsInput } from './setting-change.input';
 import {
   AgentSettingView,
@@ -43,8 +44,16 @@ export class SettingQuery extends BaseQuery {
   }
 
   /** 설정을 읽고 제안해도 되는 에이전트인가. 그렇다면 그 모듈에 넘길 제안자 */
-  async reader(actor: Actor): Promise<SettingActor> {
+  async reader(actor: Actor, setting: string | null = null): Promise<SettingActor> {
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
+    // 정한 설정만 제안하는 일 (2026-11-24, task-kinds.json의 settings: 신고 검토는 moderation만): 그 일의 일꾼이면 그 설정만
+    const task = await this.row(tasks, { space_id: actor.spaceId, id: actor.taskId });
+    const only = task ? TaskKinds.settingsOf(task.kind) : null;
+    if (only !== null) {
+      if (setting === null || !only.includes(setting))
+        throw new Forbidden(Approval.SETTING_CHANGE, `이 일에서는 ${only.join(' · ')}만 제안해요`);
+      return new SettingActor(actor.spaceId, actor.agentId);
+    }
     const me = await this.row(agents, { space_id: actor.spaceId, id: actor.agentId });
     if (!me) throw new Forbidden(Actor.AGENT);
     if (!me.lead && !me.approval_actions.includes(Approval.SETTING_CHANGE))

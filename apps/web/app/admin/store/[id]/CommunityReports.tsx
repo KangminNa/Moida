@@ -13,12 +13,14 @@ import { api } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
 import { useLiveValue } from '../../../_lib/use-live';
 import { CommunityContentActions } from './CommunityContentActions';
+import { CommunityOpinion } from './CommunityOpinion';
 import { CommunityPager } from './CommunityPager';
 
 type ReportState = AdminReport['state'];
 
 // 커뮤니티 › 신고: 기본은 열린 신고 (최근부터 30건). 대상(글 · 댓글)과 까닭 · 메모 · 신고한 회원의 닉네임, 대상에 바로 결정한다.
-// 같은 대상에 신고가 여럿이면 줄마다 보이고, 하나를 정하면 그 대상의 열린 신고가 모두 닫힌다
+// 같은 대상에 신고가 여럿이면 줄마다 보이고, 하나를 정하면 그 대상의 열린 신고가 모두 닫힌다.
+// 일꾼의 검토 제안이 있으면 줄에 AI 의견으로 보이고 여기서 승인한다 (3-3)
 export function CommunityReports({ appId }: { appId: string }) {
   const [state, setState] = useState<ReportState>('open');
   const [cursor, setCursor] = useState<string | null>(null);
@@ -72,6 +74,12 @@ export function CommunityReports({ appId }: { appId: string }) {
                 </small>
                 {r.note && <small>메모: {r.note}</small>}
               </div>
+              {r.state === 'open' && r.target.id && (
+                <CommunityOpinion
+                  targetIds={[r.target.id, r.target.author.id]}
+                  reload={reports.reload}
+                />
+              )}
               {r.state === 'open' && r.target.id && (
                 <CommunityContentActions
                   appId={appId}
