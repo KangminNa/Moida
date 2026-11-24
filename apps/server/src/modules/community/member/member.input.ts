@@ -25,7 +25,7 @@ export class MemberPlace extends BaseRequest {
 }
 
 /**
- * 가입: { loginId, password, nickname, ageConfirmed }. 비밀번호는 앞뒤 공백까지 그대로 받는다.
+ * 가입: { loginId, password, nickname, ageConfirmed, termsVersion, privacyVersion }. 비밀번호는 앞뒤 공백까지 그대로 받는다.
  * 아이디 · 비밀번호 · 닉네임 규칙과 만 14세 확인은 도메인(LoginId · MemberPassword · Member.join)이 본다
  */
 export class JoinInput extends BaseRequest {
@@ -34,6 +34,9 @@ export class JoinInput extends BaseRequest {
     readonly password: string,
     readonly nickname: string,
     readonly ageConfirmed: boolean,
+    /** 동의한 이용약관 · 개인정보처리방침의 버전 (가입 화면이 읽은 것, 3-4) */
+    readonly termsVersion: number,
+    readonly privacyVersion: number,
   ) {
     super();
   }
@@ -47,8 +50,21 @@ export class JoinInput extends BaseRequest {
           f.text('password', 400),
           f.text('nickname', 60),
           f.boolean('ageConfirmed'),
+          f.integer('termsVersion', 1, 1_000_000),
+          f.integer('privacyVersion', 1, 1_000_000),
         ),
     );
+  }
+}
+
+/** 탈퇴: { password }. 지금 비밀번호가 맞아야 한다 (남이 로그인된 브라우저로 탈퇴시키지 못하게) */
+export class LeaveInput extends BaseRequest {
+  private constructor(readonly password: string) {
+    super();
+  }
+
+  static from(raw: unknown): LeaveInput {
+    return BaseRequest.read(raw, (f) => new LeaveInput(f.text('password', 400)));
   }
 }
 

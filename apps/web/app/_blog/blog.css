@@ -603,7 +603,8 @@
 /* 커뮤니티 고정 화면 (스토어 3-2, 앱 도메인의 /_/…): 가입 · 로그인 · 내 정보 · 글쓰기 · 댓글 · 신고 */
 .member-main {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .member-card {
@@ -632,6 +633,43 @@
 .member-hint {
   font-size: 0.875rem;
   color: var(--muted);
+}
+
+/* 회원 화면 아래의 약관 링크 (3-4) */
+.member-legal {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+  font-size: 0.8125rem;
+}
+
+.member-legal a {
+  color: var(--muted);
+}
+
+/* 가입 화면의 약관 (3-4): 접어 두고 펼치면 그 안에서 스크롤 */
+.member-terms summary {
+  cursor: pointer;
+  font-size: 0.9375rem;
+}
+
+.member-terms[open] > :not(summary) {
+  max-height: 320px;
+  overflow: auto;
+}
+
+/* 접어 둔 약관은 작은 글씨로: 본문 크기의 제목이 가입 칸을 밀어내지 않게 */
+.member-terms .prose {
+  font-size: 0.875rem;
+}
+
+.member-terms .prose h1 {
+  font-size: 1.125rem;
+}
+
+.member-terms .prose h2 {
+  font-size: 1rem;
 }
 
 .member-facts {

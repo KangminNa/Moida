@@ -3,6 +3,7 @@ import {
   type Actor,
   AttemptLimiter,
   BaseService,
+  Conflict,
   Database,
   InvalidRequest,
   Lookups,
@@ -10,10 +11,12 @@ import {
   PasswordHasher,
   Unauthenticated,
 } from '../../platform';
+import { TermsQuery } from '../terms/terms.query';
 import { LoginId } from './login-id.policy';
 import { Member } from './member';
 import type {
   JoinInput,
+  LeaveInput,
   LoginInput,
   MemberPlace,
   PasswordInput,
@@ -23,7 +26,7 @@ import { MemberRepository } from './member.repository';
 import { MemberPassword } from './member-password.policy';
 import { MemberSession } from './member-session';
 
-// 회원 쓰기 (스토어 3-1, 아이디 · 비밀번호 가입 2026-11-19): 가입 · 로그인 · 비밀번호 바꾸기 · 닉네임 바꾸기 · 로그아웃 · 마지막 접근.
+// 회원 쓰기 (스토어 3-1, 아이디 · 비밀번호 가입 2026-11-19): 가입(약관 동의, 3-4) · 로그인 · 비밀번호 바꾸기 · 닉네임 바꾸기 · 탈퇴(3-4) · 로그아웃 · 마지막 접근.
 // 해킹에 대비한 규칙 (11.1):
 // - 비밀번호는 scrypt 해시만 둔다 (PasswordHasher). 해시는 느린 일이라 트랜잭션 밖에서 만들고 확인한다
 // - 로그인 실패 문구는 하나다: 아이디가 있는지 알려 주지 않고, 없는 아이디도 같은 시간을 들여 확인한다 (PasswordHasher.verify의 가짜 값)
@@ -62,6 +65,7 @@ export class MemberService extends BaseService {
     db: Database,
     private readonly lookups: Lookups,
     private readonly hasher: PasswordHasher,
+    private readonly terms: TermsQuery,
   ) {
     super(db);
   }
@@ -69,6 +73,7 @@ export class MemberService extends BaseService {
   /** 가입: 회원 + 첫 로그인. 아이디 · 닉네임이 겹치면 409, 한 곳에서 너무 많이 가입하면 429 */
   async join(actor: Actor, place: MemberPlace, req: JoinInput): Promise<Member> {
     await this.assertCommunity(actor, place);
+    await this.assertAgreed(actor, place, req);
     const at = MemberService.placeOf(place);
     this.joins.check(at);
     const loginId = LoginId.clean(req.loginId);
@@ -82,6 +87,7 @@ export class MemberService extends BaseService {
       req.ageConfirmed,
       new Date(),
     );
+    member.agree(req.termsVersion, req.privacyVersion);
     // 규칙을 지난 가입 시도를 센다: 겹치는 아이디로 있는 아이디를 찔러보는 것도 함께 막힌다
     this.joins.fail(at);
     await this.transaction((tx) => new MemberRepository(tx).save(member));
@@ -157,6 +163,29 @@ export class MemberService extends BaseService {
     });
   }
 
+  /**
+   * 탈퇴 (3-4, 그 회원만): 지금 비밀번호가 맞아야 하고(틀리면 로그인처럼 센다) 개인정보를 지우고 모든 로그인을 끝낸다 (Member.leave).
+   * 글 · 댓글은 "탈퇴한 회원"으로 남는다. 차단 중이어도 탈퇴할 수 있다
+   */
+  async leave(actor: Actor, place: MemberPlace, req: LeaveInput): Promise<void> {
+    const me = MemberActor.require(actor, place.appId);
+    const who = `${place.appId}:${me.id}`;
+    this.byLogin.check(who);
+    const current = await this.transaction((tx) =>
+      new MemberRepository(tx).load(place.appId, me.id ?? ''),
+    );
+    if (!(await this.hasher.verify(req.password, current.passwordHash))) {
+      this.byLogin.fail(who);
+      throw new InvalidRequest(new Map([['password', '비밀번호가 맞지 않아요']]));
+    }
+    await this.transaction(async (tx) => {
+      const members = new MemberRepository(tx);
+      const member = await members.lock(place.appId, current.id);
+      member.leave(new Date());
+      await members.save(member);
+    });
+  }
+
   /** 로그아웃: 이 브라우저의 로그인을 끝낸다. 쿠키가 없으면 할 일이 없다 */
   async logout(token: string | null): Promise<void> {
     if (!token) return;
@@ -179,6 +208,18 @@ export class MemberService extends BaseService {
   /** 시도를 세는 곳: 앱마다 따로 센다 (한 앱이 막혀도 다른 앱은 그대로) */
   private static placeOf(place: MemberPlace): string {
     return `${place.appId}:${AttemptLimiter.place(place.ip)}`;
+  }
+
+  /**
+   * 가입 화면이 읽은 약관이 지금 공개된 버전인가 (3-4). 둘 중 하나라도 공개 전이면 가입을 받지 않고(관리자가 먼저 공개),
+   * 가입 화면을 연 뒤 새 버전이 올라왔으면 다시 읽고 동의하게 한다 (409)
+   */
+  private async assertAgreed(actor: Actor, place: MemberPlace, req: JoinInput): Promise<void> {
+    const now = await this.terms.versions(actor, place.appId);
+    if (now.get('terms') == null || now.get('privacy') == null)
+      throw new Conflict('아직 약관이 공개되지 않아 가입할 수 없어요');
+    if (now.get('terms') !== req.termsVersion || now.get('privacy') !== req.privacyVersion)
+      throw new Conflict('약관이 바뀌었어요. 다시 읽고 동의해 주세요');
   }
 
   private assertCommunity(actor: Actor, place: MemberPlace): Promise<void> {

@@ -103,6 +103,15 @@ before(async () => {
   owner = await api.signIn();
   db = api.service(Database);
   worker = api.service(OutboxWorker);
+  // 기기 연결(OAuth)은 사이트 주소가 있어야 한다: 이 파일만 돌려도 되게 이 서버의 주소로 정한다
+  const space = ok(await api.get('/api/space'));
+  ok(
+    await api.request('PUT', '/api/space', owner, {
+      name: space.name || '돌무더기',
+      siteUrl: api.baseUrl,
+      version: space.version,
+    }),
+  );
   runner = await api.connectDevice(owner, 'setting-runner');
   const { devices } = ok(await api.get('/api/devices', owner));
   const device = (devices as Json[]).find((d) => d.name === 'setting-runner') as Json;
@@ -852,5 +861,52 @@ describe('설정 바꾸기: 앱 데이터 (앱 플랫폼, 스토어 12.4)', () =
     );
     // 넣은 결과(community.setting.changed)를 받아 기다리던 작업이 끝난다 (ApprovalResultHandler)
     assert.equal(ok(await api.get(`/api/tasks/${job.task.id}`, owner)).status, 'done');
+  });
+});
+
+describe('설정 바꾸기: 약관 (스토어 3-4)', () => {
+  test('일꾼이 약관의 새 버전을 제안하면 승인 뒤에 공개되고 기록은 approved, 그사이 관리자가 고쳤으면 실패한다', async () => {
+    const mark = randomUUID().slice(0, 6);
+    const site = await CommunitySite.open(api, owner, `terms-${mark}`);
+    let { token } = await partner();
+    const { terms } = await call(token, 'get_settings', { kind: 'terms' });
+    assert.equal(
+      (terms as Json[]).filter((t) => t.app_id === site.appId).length,
+      2,
+      '이용약관 · 개인정보처리방침의 지금 버전',
+    );
+    const propose = (body: string) =>
+      tool(token, 'propose_setting', {
+        request_id: randomUUID(),
+        note: '연락처를 채움',
+        setting: 'terms',
+        op: 'update',
+        target_id: site.appId,
+        fields: { app_id: site.appId, kind: 'terms', body },
+      });
+    assert.equal((await propose('')).ok, false, '빈 약관은 미리 해 보기에서 막힌다');
+    const made = await propose('# 이용약관\n\n문의: 운영자');
+    assert.equal(made.ok, true, JSON.stringify(made.body));
+    assert.equal(ok(await site.at('/api/community/terms/terms')).version, 1, '승인 전에는 그대로');
+    await decide(made.body.approval_id);
+    const now = ok(await site.at('/api/community/terms/terms'));
+    assert.deepEqual([now.version, now.body], [2, '# 이용약관\n\n문의: 운영자']);
+    const admin = ok(await api.get(`/api/community/admin/${site.appId}/terms`, owner));
+    const first = (admin.items as Json[])[0];
+    assert.equal((first?.current as Json | undefined)?.approved, true);
+
+    // 승인하면 기다리던 작업이 끝나 그 작업 토큰도 끝난다: 다음 제안은 새 일에서
+    token = (await partner()).token;
+    const late = await propose('# 이용약관\n\n늦은 제안');
+    assert.equal(late.ok, true);
+    ok(
+      await api.request('POST', `/api/community/admin/${site.appId}/terms/terms`, owner, {
+        version: 2,
+        body: '# 관리자가 고침',
+      }),
+      201,
+    );
+    await decide(late.body.approval_id);
+    assert.equal(ok(await site.at('/api/community/terms/terms')).body, '# 관리자가 고침');
   });
 });

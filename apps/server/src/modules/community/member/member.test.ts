@@ -31,6 +31,9 @@ function row(more: Partial<MemberRow> = {}): MemberRow {
     renamed_at: null,
     last_seen_at: null,
     version: 1,
+    terms_version: 1,
+    privacy_version: 1,
+    left_at: null,
     ...more,
   };
 }

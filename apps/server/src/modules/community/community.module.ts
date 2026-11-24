@@ -22,6 +22,10 @@ import { ReviewQuery } from './moderation/review.query';
 import { CommunityCaseTool } from './moderation/review.tool';
 import { ReportController } from './report/report.api';
 import { ReportService } from './report/report.service';
+import { TermsAdminController, TermsController } from './terms/terms.api';
+import { TermsQuery } from './terms/terms.query';
+import { TermsService } from './terms/terms.service';
+import { TermsDraftGateway } from './terms/terms-draft.gateway';
 import { TopicController } from './topic/topic.api';
 import { TopicQuery } from './topic/topic.query';
 import { TopicService } from './topic/topic.service';
@@ -50,6 +54,9 @@ import { TopicService } from './topic/topic.service';
     ReviewQuery,
     CommunityCaseTool,
     CommunityTools,
+    TermsQuery,
+    TermsService,
+    { provide: TermsDraftGateway, useFactory: () => TermsDraftGateway.fromEnv() },
   ],
   controllers: [
     MemberController,
@@ -59,6 +66,8 @@ import { TopicService } from './topic/topic.service';
     ModerationController,
     AppDataController,
     AppDataAdminController,
+    TermsController,
+    TermsAdminController,
   ],
   exports: [CommunityTools],
 })

@@ -73,7 +73,7 @@ export function CommunityTopics({ appId }: { appId: string }) {
                 <small>
                   {CONTENT_STATE_LABELS[t.state]}
                   {t.hiddenBy ? ` (${HIDDEN_BY[t.hiddenBy] ?? t.hiddenBy})` : ''} ·{' '}
-                  {t.author.nickname}({t.author.loginId}) · 댓글 {t.comments}
+                  {t.author.nickname}({t.author.loginId ?? '탈퇴'}) · 댓글 {t.comments}
                   {t.openReports > 0 ? ` · 열린 신고 ${t.openReports}` : ''} ·{' '}
                   {formatDate(t.createdAt)}
                 </small>
@@ -138,7 +138,7 @@ function TopicDetail({
             <li key={c.id} className="list-cell stack">
               <p className="community-body">{c.body}</p>
               <small>
-                {c.author.nickname}({c.author.loginId}) · {CONTENT_STATE_LABELS[c.state]}
+                {c.author.nickname}({c.author.loginId ?? '탈퇴'}) · {CONTENT_STATE_LABELS[c.state]}
                 {c.openReports > 0 ? ` · 열린 신고 ${c.openReports}` : ''} ·{' '}
                 {formatDate(c.createdAt)}
               </small>

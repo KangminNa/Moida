@@ -69,7 +69,7 @@ export function CommunityReports({ appId }: { appId: string }) {
                 {r.target.kind === 'comment' && <small>{r.target.excerpt}</small>}
                 <small>
                   {REPORT_REASON_LABELS[r.reason]} · 신고 {r.reporter.nickname} · 쓴 회원{' '}
-                  {r.target.author.nickname}({r.target.author.loginId}) ·{' '}
+                  {r.target.author.nickname}({r.target.author.loginId ?? '탈퇴'}) ·{' '}
                   {CONTENT_STATE_LABELS[r.target.state]} · {formatDate(r.createdAt)}
                 </small>
                 {r.note && <small>메모: {r.note}</small>}

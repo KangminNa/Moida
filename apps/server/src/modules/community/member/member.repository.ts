@@ -41,9 +41,9 @@ export class MemberRepository extends TableRepository<MemberRow, Member> {
     if (session?.isNew) await this.insertRows(memberSessions, session.unsaved);
   }
 
-  /** 아이디로 그 앱의 회원 (로그인). lock: 로그인을 열 때 */
+  /** 아이디로 그 앱의 회원 (로그인). 탈퇴한 회원은 없는 것과 같다. lock: 로그인을 열 때 */
   findByLogin(appId: string, loginId: string, lock = false): Promise<Member | null> {
-    return this.findOne({ app_id: appId, login_id: loginId }, { lock });
+    return this.findOne({ app_id: appId, login_id: loginId, left_at: null }, { lock });
   }
 
   /** 로그아웃: 그 세션을 끝낸다 */

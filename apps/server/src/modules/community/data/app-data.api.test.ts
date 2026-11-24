@@ -301,7 +301,10 @@ describe('버전이 바뀌면', () => {
       'members.json',
       'schema.sql',
       'tables.json',
+      'terms/privacy-v1.md',
+      'terms/terms-v1.md',
     ]);
+    assert.match(files.get('terms/terms-v1.md') ?? '', /^<!-- terms 버전 1 · [\s\S]*테스트 약관/);
     assert.match(files.get('schema.sql') ?? '', /CREATE TABLE "progress" \([\s\S]*"streak" bigint/);
     assert.match(
       files.get('data.sql') ?? '',
@@ -309,6 +312,14 @@ describe('버전이 바뀌면', () => {
     );
     const members = (JSON.parse(files.get('members.json') ?? '{}') as { members: Json[] }).members;
     assert.deepEqual(members.map((m) => m.login_id).sort(), ['ann_learner', 'bob_learner']);
+    assert.deepEqual(
+      members.map((m) => [m.terms_version, m.privacy_version, m.left_at]),
+      [
+        [1, 1, null],
+        [1, 1, null],
+      ],
+      '동의한 약관 버전과 탈퇴 여부가 함께 실린다',
+    );
     assert.equal((await api.get(admin('/export'))).status, 403);
   });
 });

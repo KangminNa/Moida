@@ -2,6 +2,7 @@ import type {
   DecisionAction,
   ReportReason,
   ReportState,
+  TermKind,
   TopicState,
 } from '../../../server/src/modules/community/community.tables';
 
@@ -39,4 +40,10 @@ export const DECISION_ACTION_LABELS: Record<DecisionAction, string> = {
   block: '차단',
   unblock: '차단 풀기',
   reset_password: '비밀번호 초기화',
+};
+
+/** 약관의 이름 (3-4) */
+export const TERM_LABELS: Record<TermKind, string> = {
+  terms: '이용약관',
+  privacy: '개인정보처리방침',
 };

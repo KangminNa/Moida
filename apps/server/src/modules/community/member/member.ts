@@ -61,6 +61,38 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
     return new Member(row);
   }
 
+  /** 탈퇴한 회원이 글 · 댓글 · 관리 화면에 보이는 이름 (Nickname이 회원에게는 막는다) */
+  static readonly LEFT_NAME = '탈퇴한 회원';
+
+  /**
+   * 가입할 때 동의한 약관 버전 (3-4). 동의는 그때 공개된 버전이어야 한다: Service가 TermsQuery.versions와 맞춰 본다
+   * (가입 화면을 연 뒤 약관이 바뀌었으면 409로 다시 읽게)
+   */
+  agree(termsVersion: number, privacyVersion: number): void {
+    this.put('terms_version', termsVersion);
+    this.put('privacy_version', privacyVersion);
+  }
+
+  /**
+   * 탈퇴 (3-4, 원칙 2의 예외: 개인정보보호법). 아이디 · 비밀번호 해시 · 닉네임 · 차단 메모 · 마지막 접근을 지우고 모든 로그인을 끝낸다.
+   * 줄은 남긴다: 글 · 댓글 · 신고 · 결정 기록이 회원 id를 가리킨다 (글은 "탈퇴한 회원"으로 보인다).
+   * 아이디 'left:<id>' · 빈 해시 · 겹침 열쇠 'left:<id>'는 DB CHECK가 탈퇴한 줄에만 받는다. 이미 탈퇴했으면 409
+   */
+  leave(now: Date): void {
+    if (this.row.left_at) throw new Conflict('이미 탈퇴한 회원이에요');
+    const gone = `left:${this.id}`;
+    this.put('left_at', now);
+    this.put('login_id', gone);
+    this.put('password_hash', '');
+    this.put('nickname', Member.LEFT_NAME);
+    this.put('nickname_key', gone);
+    this.put('block_note', null);
+    this.put('renamed_at', null);
+    this.put('last_seen_at', null);
+    this.endingSessions = true;
+    this.keptSession = null;
+  }
+
   /** 비밀번호 해시 (로그인 · 비밀번호 바꾸기에서 Service가 확인한다) */
   get passwordHash(): string {
     return this.row.password_hash;

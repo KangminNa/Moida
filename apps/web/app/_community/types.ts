@@ -16,6 +16,10 @@ import type {
   MemberResetView,
 } from '../../../server/src/modules/community/moderation/moderation.view';
 import type {
+  TermsAdminView,
+  TermView,
+} from '../../../server/src/modules/community/terms/terms.view';
+import type {
   TopicListView,
   TopicSavedView,
   TopicView,
@@ -31,6 +35,11 @@ export type TopicList = ReturnType<TopicListView['toJSON']>;
 /** GET /api/community/topics/:id (보이는 댓글과 함께) */
 export type TopicDetail = ReturnType<TopicView['toJSON']>;
 export type TopicSaved = ReturnType<TopicSavedView['toJSON']>;
+/** GET /api/community/terms/:kind: 공개된 약관 (3-4) */
+export type Term = ReturnType<TermView['toJSON']>;
+/** GET /api/community/admin/:appId/terms: 약관 둘의 지금 버전과 초안 */
+export type TermsAdmin = ReturnType<TermsAdminView['toJSON']>;
+export type TermsAdminItem = TermsAdmin['items'][number];
 
 // 관리자 화면 (앱 관리의 커뮤니티 탭, 3-1c 관리 API)
 
