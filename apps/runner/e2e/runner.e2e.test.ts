@@ -1425,7 +1425,11 @@ describe('코드 작업 (작업 공간)', () => {
       const checks = resultOf(task).checks as Json[];
       assert.deepEqual(
         checks.map((c) => [c.name, c.ok, c.retried]),
-        ['결과물 파일', '앱 코드 묶음', '템플릿 문법', '데이터 이름'].map((n) => [n, true, false]),
+        ['결과물 파일', '앱 코드 묶음', '디자인 기준', '템플릿 문법', '데이터 이름'].map((n) => [
+          n,
+          true,
+          false,
+        ]),
       );
       const bodies = events(task).map((e) => String(e.body));
       assert.ok(bodies.includes('고칠 앱 코드(시작 코드)를 받았어요'), bodies.join(' | '));
