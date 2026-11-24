@@ -9,7 +9,7 @@ import { type LeadBody, LeadForm } from './LeadForm';
 // 대표 (O-2): 모든 대화를 받아 일꾼에게 나눠 맡기는 에이전트. 첫 대화에서 생긴다 (2026-11-21 팀 없는 에이전트).
 // 에이전트 화면에는 맨 앞에 보이기만 하고 여기서 바꾼다 (AI 도구 · 모델 · 생각 강도 · 한도 · 검토자)
 export function LeadPanel() {
-  const lead = useLead();
+  const lead = useLead({ usage: true });
   const agents = useAgents();
   const save = useAction();
   const boss = lead.data?.lead ?? null;

@@ -45,7 +45,7 @@ export class AgentQuery extends BaseQuery {
       SELECT a.*, (
         SELECT coalesce(sum(e.tokens), 0)::bigint
         FROM task.task_events e JOIN task.tasks t ON t.id = e.task_id
-        WHERE t.agent_id = a.id AND e.at >= date_trunc('month', now())
+        WHERE t.agent_id = a.id AND e.tokens > 0 AND e.at >= date_trunc('month', now())
       ) AS used,
       (SELECT count(*)::int FROM task.schedules s WHERE s.agent_id = a.id) AS schedules
       FROM task.agents a
@@ -62,7 +62,7 @@ export class AgentQuery extends BaseQuery {
       SELECT a.*, (
         SELECT coalesce(sum(e.tokens), 0)::bigint
         FROM task.task_events e JOIN task.tasks t ON t.id = e.task_id
-        WHERE t.agent_id = a.id AND e.at >= date_trunc('month', now())
+        WHERE t.agent_id = a.id AND e.tokens > 0 AND e.at >= date_trunc('month', now())
       ) AS used
       FROM task.agents a
       WHERE a.space_id = ${actor.requireSpace()} AND a.lead AND a.deleted_at IS NULL`;

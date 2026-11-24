@@ -9,10 +9,13 @@ import { APPROVAL_TOPICS, countOf, readPages, useAgents } from '../../_task/live
 import { ApprovalPill } from '../../_task/parts';
 import type { ApprovalPage } from '../../_task/types';
 import { useWaitingChanges } from '../../_vault/live';
+import { ApprovalBoard } from './ApprovalBoard';
 import { WikiProposals } from './WikiProposals';
 
 const ALL = 'all';
-const DEFAULT = 'pending';
+/** 칸반 (2026-11-24): 승인 대기를 할 일로 나눈 열. 승인 화면을 열면 처음 보인다 */
+const BOARD = 'board';
+const DEFAULT = BOARD;
 /** 위키 제안: 작업 승인이 아니라 vault의 검토 대기 변경이다 */
 const WIKI = 'wiki';
 const FILTERS: readonly string[] = [...Object.keys(APPROVAL_STATUS), ALL];
@@ -27,16 +30,24 @@ function mergePages(before: ApprovalPage, more: ApprovalPage): ApprovalPage {
 export function ApprovalsList({ children }: { children: ReactNode }) {
   const asked = useSearchParams().get('status');
   const filter = asked === WIKI || (asked && FILTERS.includes(asked)) ? asked : DEFAULT;
+  const { id } = useParams<{ id?: string }>();
   const waiting = useWaitingChanges();
 
   return (
     <>
       <nav className="chips" aria-label="승인 상태">
+        <Link
+          className="chip"
+          href="/admin/approvals"
+          aria-current={filter === BOARD ? 'true' : undefined}
+        >
+          칸반
+        </Link>
         {FILTERS.map((s) => (
           <Link
             key={s}
             className="chip"
-            href={s === DEFAULT ? '/admin/approvals' : `/admin/approvals?status=${s}`}
+            href={`/admin/approvals?status=${s}`}
             aria-current={filter === s ? 'true' : undefined}
           >
             {APPROVAL_STATUS[s] ?? '전체'}
@@ -52,6 +63,17 @@ export function ApprovalsList({ children }: { children: ReactNode }) {
       </nav>
       {filter === WIKI ? (
         <WikiProposals />
+      ) : filter === BOARD ? (
+        id ? (
+          <div className="split-detail">
+            <Link className="ghost" style={{ alignSelf: 'flex-start' }} href="/admin/approvals">
+              칸반
+            </Link>
+            {children}
+          </div>
+        ) : (
+          <ApprovalBoard />
+        )
       ) : (
         <TaskApprovals filter={filter}>{children}</TaskApprovals>
       )}
@@ -63,7 +85,7 @@ export function ApprovalsList({ children }: { children: ReactNode }) {
 function TaskApprovals({ filter, children }: { filter: string; children: ReactNode }) {
   const { id } = useParams<{ id?: string }>();
   const router = useRouter();
-  const query = filter === DEFAULT ? '' : `?status=${filter}`;
+  const query = `?status=${filter}`;
   const pages = useRef(1);
   const seen = useRef(filter);
   if (seen.current !== filter) {

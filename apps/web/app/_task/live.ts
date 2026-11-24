@@ -38,13 +38,13 @@ export const CHAT_TOPICS = ['task.chat.changed', 'task.task.changed'];
 const CHAT_NEWS_TOPICS = ['task.chat.updated'];
 /** 대화 목록 (왼쪽 칸): 상태(질문 · 승인)가 소식 · 승인으로도 바뀐다 */
 export const CHAT_LIST_TOPICS = [...CHAT_TOPICS, ...CHAT_NEWS_TOPICS, 'task.approval.*'];
-/** 대화 하나: 진행 기록(생각 중… 줄) · 소식 · 승인까지 따라간다 */
-export const CHAT_DETAIL_TOPICS = [
-  ...CHAT_TOPICS,
-  ...CHAT_NEWS_TOPICS,
-  'task.event.added',
-  'task.approval.*',
-];
+/**
+ * 대화 하나: 소식 · 승인까지 따라간다. 진행 기록(생각 중… 줄)은 CHAT_LOG_TOPICS로 이 대화에서 도는 작업의 것만
+ * (2026-11-24 속도: 공간의 어느 작업이든 기록이 쌓일 때마다 대화 전체를 다시 읽었다)
+ */
+export const CHAT_DETAIL_TOPICS = [...CHAT_TOPICS, ...CHAT_NEWS_TOPICS, 'task.approval.*'];
+/** 실행 기록이 쌓임 (신호의 id는 작업) */
+export const CHAT_LOG_TOPICS = ['task.event.added'];
 /** 실행 기록이 쌓이면 사용량이 바뀐다 */
 export const AGENT_TOPICS = ['task.agent.changed', 'task.event.added'];
 /** 외부 도구 (2차 7단계): AI의 제안 · 승인으로 붙음 · 실패 */
@@ -72,10 +72,19 @@ export function useAgents() {
   return useLiveValue('agents', () => api<AgentList>('GET', '/api/agents'), AGENT_TOPICS);
 }
 
-/** 공간의 대표 (O-2): 대화의 상대. 목록(useAgents)에는 없다. 첫 대화 전이면 lead가 null */
-export function useLead() {
-  return useLiveValue('agent-lead', () => api<AgentLead>('GET', '/api/agents/lead'), AGENT_TOPICS);
+/**
+ * 공간의 대표 (O-2): 대화의 상대. 목록(useAgents)에는 없다. 첫 대화 전이면 lead가 null.
+ * 이번 달 사용량까지 따라가려면 usage (설정 › AI의 대표 칸). 아니면 설정이 바뀔 때만 다시 읽는다
+ */
+export function useLead({ usage = false }: { usage?: boolean } = {}) {
+  return useLiveValue(
+    'agent-lead',
+    () => api<AgentLead>('GET', '/api/agents/lead'),
+    usage ? AGENT_TOPICS : LEAD_TOPICS,
+  );
 }
+/** 대표의 설정 · 상태가 바뀜 */
+const LEAD_TOPICS = ['task.agent.changed'];
 
 /** 외부 도구 목록 (설정 › 외부 도구, 에이전트 폼의 허락 칸) */
 export function useExternalTools() {

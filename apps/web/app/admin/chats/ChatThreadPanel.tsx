@@ -7,9 +7,9 @@ import { useMe } from '../../_account/live';
 import { useApps } from '../../_blog/live';
 import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
-import { useLiveValue } from '../../_lib/use-live';
+import { useLive, useLiveValue } from '../../_lib/use-live';
 import { scheduleLabel, tokens } from '../../_task/labels';
-import { CHAT_DETAIL_TOPICS, useLead } from '../../_task/live';
+import { CHAT_DETAIL_TOPICS, CHAT_LOG_TOPICS, useLead } from '../../_task/live';
 import type { Chat, ChatDetail, ChatNews, OutputSaved } from '../../_task/types';
 import { STORE_HREF } from '../menu';
 import { ChatBriefForm } from './ChatBriefForm';
@@ -38,6 +38,9 @@ export function ChatThreadPanel({ id }: { id: string }) {
     () => api<ChatDetail>('GET', `/api/chats/${id}`),
     CHAT_DETAIL_TOPICS,
   );
+  // 진행 기록은 이 대화에서 도는 작업(회차 · 덧붙인 말의 답 · 그 아래)의 것만 다시 읽는다. 새 하위 작업은
+  // 작업 신호(task.task.changed)로 다시 읽어 목록에 들어온다
+  useLive(CHAT_LOG_TOPICS, detail.reload, detail.data?.team.map((t) => t.taskId) ?? []);
   const me = useMe();
   const apps = useApps();
   const sending = useAction();

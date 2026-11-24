@@ -162,7 +162,10 @@ export class ChatUpdateQuery extends BaseQuery {
            WHERE t.space_id = c.space_id AND t.request_id = ANY(
              SELECT ${prefix} || c.id || ':' || c.turns || x FROM unnest(${['', ...replies]}::text[]) AS x)
            UNION ALL
-           SELECT t.id, t.status FROM task.tasks t JOIN tree ON t.parent_id = tree.id
+           -- 하위 작업은 부모마다 색인(tasks_parent_idx)으로 찾는다. 그냥 JOIN하면 대화마다 작업 전체를 훑어 해시로 잇는다
+           -- (OFFSET 0이 LATERAL을 펼치지 못하게 막는다, 2026-11-24 속도: 대화 40개에 148ms → 1ms)
+           SELECT k.id, k.status FROM tree CROSS JOIN LATERAL (
+             SELECT x.id, x.status FROM task.tasks x WHERE x.parent_id = tree.id OFFSET 0) k
          ) SELECT count(*) FROM tree WHERE status = ANY(${ChatUpdateQuery.OPEN as string[]}::text[])) AS active
       FROM task.chats c
       LEFT JOIN task.agents a ON a.id = c.agent_id

@@ -84,7 +84,7 @@ export class SkillQuery extends BaseQuery {
               AND a.status IN ('revision_requested', 'rejected')
               AND a.action <> ALL(${SkillScore.skipped()}::text[]))::int AS sent_back,
           (SELECT coalesce(sum(e.tokens), 0) FROM task.task_events e
-            WHERE e.task_id = f.task_id)::float8 AS tokens
+            WHERE e.task_id = f.task_id AND e.tokens > 0)::float8 AS tokens
         FROM firsts f JOIN task.tasks t ON t.id = f.task_id
       )
       SELECT skill_source AS source, skill_revision AS revision, skill_hash AS hash,

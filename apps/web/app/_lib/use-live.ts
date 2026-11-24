@@ -66,20 +66,28 @@ function matches(patterns: readonly string[], topic: string): boolean {
 }
 
 /**
- * 맞는 신호가 오면 onChange를 부른다. id를 주면 그 대상의 신호만 본다.
+ * 맞는 신호가 오면 onChange를 부른다. id를 주면 그 대상의 신호만 본다 (목록이면 그 가운데 하나, 빈 목록이면 다시 연결될 때만).
  * 첫 신호 뒤 REREAD_MS마다 한 번씩 부른다: 신호가 끊임없이 와도 화면이 멈추지 않게 (끝나기를 기다리지 않는다).
  */
-export function useLive(topics: readonly string[], onChange: () => void, id?: string): void {
+export function useLive(
+  topics: readonly string[],
+  onChange: () => void,
+  id?: string | readonly string[],
+): void {
   const latest = useRef(onChange);
   useEffect(() => {
     latest.current = onChange;
   });
   const key = topics.join(' ');
+  const one = typeof id === 'string' ? id : '';
+  const many = typeof id === 'object' ? id.join(' ') : null;
   useEffect(() => {
     const patterns = key.split(' ');
+    const list = many === null ? null : new Set(many.split(' ').filter(Boolean));
+    const wanted = (target: string) => (list ? list.has(target) : !one || target === one);
     let timer: ReturnType<typeof setTimeout> | null = null;
     const remove = stream.add((signal) => {
-      if (signal && !(matches(patterns, signal.topic) && (!id || signal.id === id))) return;
+      if (signal && !(matches(patterns, signal.topic) && wanted(signal.id))) return;
       timer ??= setTimeout(() => {
         timer = null;
         latest.current();
@@ -89,7 +97,7 @@ export function useLive(topics: readonly string[], onChange: () => void, id?: st
       remove();
       if (timer) clearTimeout(timer);
     };
-  }, [key, id]);
+  }, [key, one, many]);
 }
 
 /** 화면이 읽은 값 하나. data는 다시 읽는 동안에도 앞의 값을 둔다 */
