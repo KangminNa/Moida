@@ -21,7 +21,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm boundaries && pnpm structure && pnpm deadcode",
     "deadcode": "knip --no-progress",
     "boundaries": "node scripts/check-boundaries.mjs",
-    "structure": "node scripts/check-structure.mjs && node scripts/check-rules.mjs",
+    "structure": "node scripts/check-structure.mjs && node scripts/check-rules.mjs && node scripts/check-skills.mjs",
     "test": "node scripts/test.mjs",
     "slot": "node scripts/slot.mjs",
     "db:check": "node scripts/check-boundaries.mjs --db && node scripts/db-rows.mjs --check",

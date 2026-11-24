@@ -222,6 +222,12 @@ export class ClaudeCli implements AiTool {
       ...(workspace.skillReady ? [ClaudeCli.SKILL_TOOL] : []),
       ...(this.shell ? ClaudeCli.CODE_TOOLS : []),
       ...(this.web ? [ClaudeCli.WEB_TOOL] : []),
+      ...(this.browser
+        ? [
+            '--disallowedTools',
+            ...BrowserMcp.BLOCKED_TOOLS.map((t) => `mcp__${BrowserMcp.SERVER}__${t}`),
+          ]
+        : []),
       // 코드 러너 칸의 결과물 폴더는 저장소(작업 폴더) 밖이라 따로 열어 준다. 값을 여럿 받는 옵션이라 다음 옵션 앞에 둔다
       ...(workspace.outputsStage === null ? [] : ['--add-dir', workspace.outputsDir]),
       ...(workspace.inputsDir === null ? [] : ['--add-dir', workspace.inputsDir]),

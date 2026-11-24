@@ -126,6 +126,7 @@ export class CodexCli implements AiTool {
         `[mcp_servers.${BrowserMcp.SERVER}]`,
         `command = ${JSON.stringify(browser.command)}`,
         `args = [${browser.args.map((a) => JSON.stringify(a)).join(', ')}]`,
+        `disabled_tools = [${BrowserMcp.BLOCKED_TOOLS.map((t) => JSON.stringify(t)).join(', ')}]`,
       );
     if (mcpUrl !== null)
       tools.forEach((tool, i) => {
