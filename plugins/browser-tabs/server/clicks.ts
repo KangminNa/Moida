@@ -34,6 +34,9 @@ const CLICKING_MS = 2 * 60 * 1000;
 const ROLES = /^[a-z]{1,40}$/;
 const TAB_ID = /^[A-Za-z0-9]{1,64}$/;
 const SPAN = 100_000;
+/** 누르기 전 확인할 글자: 5개까지, 하나에 100자 (러너의 BrowserStop과 같다) */
+const CHECKS_MAX = 5;
+const CHECK_LENGTH = 100;
 
 /** 화면이 본 판 */
 const versionOf = (f: RequestFields) => f.integer('version', 1, 2_147_483_647);
@@ -49,6 +52,8 @@ type HoldInput = {
   box: { x: number; y: number; width: number; height: number };
   fingerprint: string;
   note: string | null;
+  /** 누르기 전 내용 확인: 러너가 화면에 있음을 본 글자 (2026-11-24). 누르기 직전에 다시 본다 */
+  checks: readonly string[];
   image: string;
 };
 
@@ -83,6 +88,7 @@ export class HoldClick extends Command<HoldInput> {
         },
         fingerprint,
         note: f.optionalText('note', 500),
+        checks: f.optionalTextList('checks', CHECKS_MAX, CHECK_LENGTH) ?? [],
         image: imageOf(f, 'image', true) ?? '',
       };
     });
@@ -111,6 +117,7 @@ export class HoldClick extends Command<HoldInput> {
       box: input.box,
       fingerprint: input.fingerprint,
       note: input.note,
+      checks: [...input.checks],
     });
     const held = (await work.row(clicks, { task_id: input.taskId, status: 'held' })) as ClickRow;
     await addShot(
@@ -291,57 +298,5 @@ export class ManualClick extends Command<{ id: string; version: number; done: bo
     if (row.status === 'approved' && row.approval_id)
       clickDone(work, space, row.approval_id, input.done ? null : why);
     return new ClickView((await work.row(clicks, { id: row.id })) as ClickRow, null);
-  }
-}
-
-/** GET /api/p/browser-tabs/clicks?status=: 최근 클릭 (관리자) */
-export class ListClicks extends Read<{ status: string | null }> {
-  static readonly LIMIT = 50;
-  readonly name = 'listClicks';
-  readonly allow = Operation.OWNER;
-
-  input(raw: unknown): { status: string | null } {
-    return this.fields(raw, (f) => ({ status: f.optionalText('status', 20) }));
-  }
-
-  async run(work: Work, actor: Actor, input: { status: string | null }): Promise<ClickListView> {
-    const space = actor.requireSpace();
-    // 값 목록 밖의 상태에 맞는 클릭은 없다 (CHECK)
-    const status = CLICK_STATUS.find((s) => s === input.status);
-    if (input.status !== null && !status) return new ClickListView([]);
-    const rows = await work.rows(
-      clicks,
-      { space_id: space, status: Rule.maybe(status) },
-      { order: ['id desc'], limit: ListClicks.LIMIT },
-    );
-    const names = new Map(
-      (await work.rows(sites, { space_id: space })).map((s) => [s.id, s.name] as const),
-    );
-    return new ClickListView(rows.map((r) => new ClickView(r, names.get(r.site_id) ?? null)));
-  }
-}
-
-/** GET /api/p/browser-tabs/clicks/:id: 클릭 하나와 멈춘 화면 · 누른 뒤 화면, 그 작업의 화면 목록 (관리자. 결재 화면이 그린다) */
-export class ClickDetail extends Read<{ id: string }> {
-  readonly name = 'click';
-  readonly allow = Operation.OWNER;
-
-  input(raw: unknown): { id: string } {
-    return this.fields(raw, (f) => ({ id: f.uuid('id') }));
-  }
-
-  async run(work: Work, actor: Actor, input: { id: string }): Promise<ClickDetailView> {
-    const space = actor.requireSpace();
-    const row = await work.row(clicks, { id: input.id, space_id: space });
-    if (!row) throw new NotFound('없는 클릭이에요');
-    const site = await work.row(sites, { id: row.site_id, space_id: space });
-    const before = await work.row(shots, { click_id: row.id, kind: 'before' });
-    const after = await work.row(shots, { click_id: row.id, kind: ['after', 'changed'] });
-    return new ClickDetailView(
-      new ClickView(row, site?.name ?? null),
-      before,
-      after,
-      await shotsOf(work, space, row.task_id),
-    );
   }
 }

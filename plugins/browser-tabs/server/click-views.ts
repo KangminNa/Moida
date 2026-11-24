@@ -123,6 +123,7 @@ export class NextClickView {
             name: r.name,
             nth: r.nth,
             fingerprint: r.fingerprint,
+            checks: r.checks,
           }
         : null,
     };
@@ -221,6 +222,8 @@ export class ClickView {
         height: Number(box?.height ?? 0),
       },
       note: r.note,
+      /** 누르기 전 확인한 내용 (화면의 글자. 누르기 직전에 다시 본다) */
+      checks: r.checks,
       status: r.status,
       reason: r.reason,
       afterUrl: r.after_url,

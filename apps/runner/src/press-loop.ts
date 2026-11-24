@@ -82,6 +82,7 @@ export class PressLoop {
                   pageUrl: held.pageUrl,
                   button: order.button,
                   fingerprint: held.fingerprint,
+                  checks: held.checks,
                 },
                 signal,
               )

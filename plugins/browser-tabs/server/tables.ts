@@ -62,6 +62,7 @@ export interface ClickRow {
   clicked_at: Date | null;
   version: number;
   plan_id: string | null;
+  checks: readonly string[];
 }
 export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'page_url' | 'role' | 'name'>;
 

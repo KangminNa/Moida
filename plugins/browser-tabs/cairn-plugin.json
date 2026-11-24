@@ -381,6 +381,12 @@
             "maxLength": 500,
             "description": "AI가 남긴 말 (무엇을 채웠는지)"
           },
+          "checks": {
+            "type": "array",
+            "maxItems": 5,
+            "items": { "type": "string", "maxLength": 100 },
+            "description": "누르기 전 확인한 화면의 글자 (받는 사람 · 금액 · 제목 같은 것). 러너가 누르기 직전에 다시 본다"
+          },
           "image": {
             "type": "string",
             "maxLength": 409604,

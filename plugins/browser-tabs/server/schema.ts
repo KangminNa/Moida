@@ -61,6 +61,7 @@ export const clicks = browserTabsSchema.table('clicks', {
   clicked_at: timestamp('clicked_at', { withTimezone: true }),
   version: integer('version').notNull(),
   plan_id: uuid('plan_id'),
+  checks: text('checks').array().notNull(),
 });
 
 /** browser_tabs.endpoints */
