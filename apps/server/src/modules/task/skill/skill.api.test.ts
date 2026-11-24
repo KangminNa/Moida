@@ -395,4 +395,62 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
     assert.equal((await runsOf((job.task as Json).id))[0]?.agentRevision, 2);
     assert.equal((await api.get(`/api/agents/${agent.id}/revisions`)).status, 403, '방문자');
   });
+  test('스킬 버전 성적표 (2026-11-24): 버전마다 끝냄 · 한 번에 통과 · 고쳐 달라 · 토큰을 세고, 끝난 일이 적으면 판단 보류', async () => {
+    const before = await detail('cairn-write');
+    const saved = ok(
+      await save(
+        'cairn-write',
+        edited(before.repo as Json, `성적표 ${randomUUID()}`),
+        Number(before.version),
+      ),
+      201,
+    );
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i += 1) ids.push(String(((await lease()).task as Json).id));
+    const [first, second, third] = ids;
+    await db.sql`
+      UPDATE task.tasks SET status = 'done', finished_at = now(), lease_until = NULL, leased_by = NULL
+      WHERE id IN ${db.sql([String(first), String(second)])}`;
+    await db.sql`
+      UPDATE task.tasks SET status = 'failed', finished_at = now(), lease_until = NULL, leased_by = NULL
+      WHERE id = ${String(third)}`;
+    await db.sql`
+      INSERT INTO task.task_events (task_id, kind, body, tokens)
+      VALUES (${String(first)}, 'result', '', 100), (${String(second)}, 'result', '', 300)`;
+    // 관리자가 두 번째 일을 한 번 고쳐 달라고 했다 (검수자가 정한 것 · 결과 카드 고르기는 세지 않는다)
+    const space = (await db.sql`SELECT space_id FROM task.tasks WHERE id = ${String(second)}`)[0]
+      ?.space_id;
+    await db.sql`
+      INSERT INTO task.approvals (space_id, task_id, action, target_kind, target_id, target_version,
+        status, decided_at)
+      VALUES (${space}, ${String(second)}, 'blog.post.publish', 'post', ${randomUUID()}, 1,
+        'revision_requested', now()),
+        (${space}, ${String(second)}, 'task.chat.result', 'chat_turn', ${randomUUID()}, 1,
+        'revision_requested', now())`;
+
+    const after = await detail('cairn-write');
+    assert.deepEqual([after.scoreDays, after.scoreMinFinished], [30, 5]);
+    const scores = after.scores as Json[];
+    const mine = scores.find((s) => s.source === 'console' && s.revision === saved.revision);
+    assert.deepEqual(mine && { ...mine, lastUsed: undefined, hash: undefined }, {
+      source: 'console',
+      revision: saved.revision,
+      hash: undefined,
+      tasks: 3,
+      done: 2,
+      failed: 1,
+      firstPass: 1,
+      avgFixes: 0.33,
+      avgRuns: 1,
+      tokensPerDone: 200,
+      lastUsed: undefined,
+      settled: false,
+    });
+    assert.equal(mine?.hash, after.hash, '그 버전의 해시');
+    assert.equal(scores[0], mine, '최근 쓴 버전부터');
+    assert.ok(
+      scores.some((s) => s.source === 'repo'),
+      '앞 테스트가 저장소 버전으로도 빌렸다',
+    );
+  });
 });
