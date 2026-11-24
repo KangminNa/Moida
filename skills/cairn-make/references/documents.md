@@ -51,6 +51,8 @@ wb.save("요약.xlsx")
 
 ## 도표 (matplotlib)
 
+고르는 법은 [html.md](html.md)의 "표"와 같다: 값 하나는 큰 숫자, 범주 7개가 넘으면 표, 파이 · 도넛 대신 가로 누적 막대, 막대는 0에서, y축 하나, 강조 계열 하나만 색.
+
 ```python
 import matplotlib
 matplotlib.use("Agg")
