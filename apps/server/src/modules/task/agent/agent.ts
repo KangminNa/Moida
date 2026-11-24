@@ -4,11 +4,13 @@ import {
   DomainEvent,
   Forbidden,
   RuleViolation,
+  SettingKinds,
   TableEntity,
   type Unchecked,
 } from '../../platform';
 import type { Runner } from '../runner/runner';
 import { JobTeamMemberView } from '../task/job.view';
+import { type TaskKind, TaskKinds } from '../task/task-kinds';
 import { AGENT_TOOL, type AgentNew, type AgentRevisionNew, type AgentRow } from '../task.tables';
 import { AgentUsageView } from '../usage/usage.view';
 import { AgentSavedView } from './agent.view';
@@ -357,7 +359,11 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   }
 
   /** 이 에이전트가 결재를 올릴 수 있는 동작인가. 주인이 정해 둔 동작만 */
-  assertMayRequest(action: string): void {
+  assertMayRequest(action: string, task: { is(kind: TaskKind): boolean } | null = null): void {
+    // 설정을 정해 둔 일(task-kinds.json의 settings, 신고 검토)은 그 일꾼이 설정 바꾸기를 올린다
+    // (어느 설정인지는 SettingQuery.reader가 막았다)
+    if (task !== null && action === SettingKinds.ACTION && TaskKinds.proposes(task)) return;
+    if (this.row.lead && AgentLead.PARTNER_ACTIONS.includes(action)) return;
     if (!this.row.approval_actions.includes(action))
       throw new Forbidden(action, `이 에이전트에게 맡기지 않은 동작이에요: ${action}`);
   }

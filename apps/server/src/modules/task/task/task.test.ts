@@ -37,6 +37,8 @@ const LATER = new Date(NOW.getTime() + Task.LEASE_MS + 1);
 const RUNNER = 'runner-1';
 const POST = '00000000-0000-7000-8000-0000000000a1';
 const AGENT = 'agent-1';
+/** 작업 토큰을 만들 에이전트 (id · 권한만 본다) */
+const agentOf = (scopes: string[]) => ({ id: AGENT, scopes }) as unknown as Agent;
 
 function queued(): Task {
   return Task.open(
@@ -226,7 +228,7 @@ describe('작업 토큰', () => {
   const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
 
   test('에이전트의 권한만 담는다', () => {
-    const actor = running().actorFor(AGENT, ['write']);
+    const actor = running().actorFor(agentOf(['write']));
     const token = actor.seal(box, Task.RUN_TOKEN_SECONDS);
     assert.equal(AgentActor.isToken(token), true);
     const opened = AgentActor.open(box, token);
@@ -238,7 +240,7 @@ describe('작업 토큰', () => {
   });
 
   test('다른 서버 키나 고친 토큰은 풀리지 않는다', () => {
-    const token = running().actorFor(AGENT, []).seal(box, 60);
+    const token = running().actorFor(agentOf([])).seal(box, 60);
     const other = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
     assert.equal(AgentActor.open(other, token), null);
     assert.equal(AgentActor.open(box, `${token.slice(0, -2)}xx`), null);
@@ -531,12 +533,17 @@ describe('만들기 작업 (결과물 2차)', () => {
     const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
     const task = make({ make: { outputs: [OUT], wikis: [WIKI] } });
     task.lease(RUNNER, AGENT, NOW);
-    const opened = AgentActor.open(box, task.actorFor(AGENT, ['make']).seal(box, 60));
+    const opened = AgentActor.open(box, task.actorFor(agentOf(['make'])).seal(box, 60));
     assert.equal(opened?.mayRead(WIKI), true);
     assert.equal(opened?.mayRead(OUT), false, '결과물은 러너가 받는다');
     assert.equal(opened?.hasReadGrants(), true);
     assert.equal(opened?.canSeePrivate(), false);
-    const plain = AgentActor.open(box, running().actorFor(AGENT, ['write']).seal(box, 60));
+    const plain = AgentActor.open(
+      box,
+      running()
+        .actorFor(agentOf(['write']))
+        .seal(box, 60),
+    );
     assert.equal(plain?.hasReadGrants(), false);
     assert.equal(plain?.mayRead(WIKI), false);
   });

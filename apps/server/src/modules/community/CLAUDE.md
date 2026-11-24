@@ -23,6 +23,7 @@
 - `comment/`: 댓글(`Comment`). 보이는 글에만 달고(트랜잭션 전에 `TopicQuery.assertOpen`), 고치지 않는다(1차). `api/community/topics/:id/comments`(달기) · `api/community/comments/:id`(지우기, `CommentController`)
 - `report/`: 신고(`Report`, 3-1c). 보이는 글 · 보이는 글의 보이는 댓글 하나에, 한 회원이 한 번(DB 부분 유일 색인 → 409), 내 것 422, 시간당 `WriteLimits.REPORTS_PER_HOUR`(429), 차단 403. 대상은 트랜잭션 전에 `TopicQuery.authorOf`로 읽고, 트랜잭션에서 신고한 회원 행을 잠근 뒤 센다. 저장하며 `community.report.added`. `api/community/reports`(`ReportController`, 회원만)
 - `moderation/`: 관리 (3-1c). 가림 규칙 `Moderation`(임시 가림 기준 `HIDE_AT` 3명 · 결정 뒤의 상태 · 신고를 닫는 값 · 메모), 결정 기록 `Decision`(+ `decisions` 표, 추가만, 이벤트 `community.content.hidden` · `content.decided` · `member.decided`). `ModerationService`: `hideByReports`(일꾼: `ReportAddedHandler`가 `community.report.added`를 받아 대상을 잠그고 `decided_at` 뒤 서로 다른 회원의 열린 신고를 세어 가림) · `decide`(관리자: 가림 · 되돌림 · 내림, 열린 신고를 닫음) · `block` · `unblock` · `resetPassword`(임시 비밀번호 `MemberPassword.temporary`, 해시는 트랜잭션 밖, 모든 로그인을 끝냄, 답 `Member.resetView`에 한 번만). `ModerationQuery`: 관리 읽기(글 · 글 하나 · 신고 · 회원 · 결정 기록, 모든 상태, 쓴 회원의 아이디까지). `api/community/admin/:appId/…`(`ModerationController`, 관리자만, 기본 도메인에서만, 앱은 Lookups `community-app`으로 공간의 커뮤니티 앱인지)
+- 신고 검토 (3-3, 2026-11-24, 스토어 11.7): `hideByReports`가 신고마다 검토 일을 요청한다 (`ReviewRequest`: `task.task.requested`, kind `community_review`, requestId는 대상 · 관리자가 마지막으로 정한 때마다 하나, 담당 없음, 지시는 대상 id뿐). 일꾼은 MCP `community_case`(`ReviewQuery.caseOf`: 대상 · 쓴 회원(닉네임 · 지난 가림 · 내림 · 차단 수, 아이디 없음) · 신고(신고한 회원 없음))로 읽고 설정 제안 `moderation`(`ModerationChange`: 글 · 댓글 `state` · `open_reports` 0, 회원 `blocked_until`)을 올린다. 지금 값은 `ReviewQuery.settingNow`, 미리 해 보기 · 승인 뒤 적용은 `ModerationService.rehearseSetting` · `applySetting`(관리자 결정과 같은 `contentIn` · `memberIn`, 기록 `by_kind` approved · by_id 승인한 관리자, 마이그레이션 `community_decision_approved`). `get_settings moderation`은 열린 신고가 있는 대상(`ReviewQuery.queue`). 도구 목록은 `community-tools.ts`(`CommunityTools`, 설명 `community.tools.ko.json`, mcp 모듈이 모은다)
 - `community-notices.ts`(`CommunityNotices`): 신고로 가림(즉시, 관리자가 그 대상을 정하면 읽음) · 새 신고(묶어서, 앱마다 한 알림). 주소는 앱 관리의 커뮤니티 탭(`/admin/store/<앱>?tab=community`, 화면은 3-2)
 - `guard/member.guard.ts`: 커뮤니티 컨트롤러에만 붙는 요청자 정하기. 앱 도메인 요청(platform `HostGate`의 `appId`)에서만 회원 쿠키를 읽어 `MemberActor`로. 쓰기는 cross-site 403 · Origin이 있으면 그 앱 도메인 · 회원 쿠키를 실었으면 `X-Cairn-CSRF`(`MemberCsrf`, 서버 키 `member-csrf` HMAC)
 - 모든 회원 API는 앱 도메인의 공개된 커뮤니티 앱에서만: 요청이 온 곳은 `MemberPlace`(앱 id · 출처 · IP, 기본 도메인이면 404), 공개된 커뮤니티 앱인지는 blog가 주는 Lookups `community-app`으로 (아니면 404)
@@ -38,7 +39,7 @@
 - 같은 모듈의 묶음 넘나들기 (객체설계 4장 예외): 글 · 댓글 · 신고를 쓰는 `TopicService` · `CommentService` · `ReportService`는 쓴 회원의 행을 `MemberRepository.lock`으로 잠근다 (같은 회원의 쓰기를 줄 세워 한도를 정확히 세려고, 회원 행은 바꾸지 않는다). 잠그는 순서는 회원 → 글 · 댓글 · 신고. `ModerationService`는 결정 하나에 대상(글 · 댓글 · 회원) · 열린 신고 · 결정 기록을 한 트랜잭션에서 쓴다 (잠그는 순서는 대상 → 신고)
 
 ## 공개 API (`index.ts`)
-`CommunityModule`
+`CommunityModule`, `CommunityTools`(MCP 도구 목록, mcp 모듈이 모은다)
 
 ## 내보내는 이벤트
 칸의 원본은 `community.events.json`.
@@ -49,7 +50,8 @@
 | `community.content.hidden` | `appId, decisionId, reports, topicId, commentId`. 신고가 쌓여 시스템이 임시로 가림 (관리자 즉시 알림) |
 | `community.content.decided` | `appId, decisionId, action, topicId, commentId`. 관리자가 글 · 댓글을 정함 (가림 알림을 읽음으로) |
 | `community.member.decided` | `appId, decisionId, action, memberId`. 관리자가 회원을 차단 · 풀기 · 비밀번호 초기화 |
-| `community.setting.changed` | 승인된 설정 제안(`app_data`)을 반영함 (task가 결과 카드에 잇는다) |
+| `community.setting.changed` | 승인된 설정 제안(`app_data` · `moderation`)을 반영함 (task가 결재 · 결과 카드에 잇는다) |
+| `task.task.requested` (task의 주제) | 신고 검토 일 요청 (`ReviewRequest`, 3-3) |
 
 ## 받는 이벤트
 - `community.report.added`(자기 이벤트): 대상의 신고를 세어 임시로 가린다 (`ReportAddedHandler`). 두 번 받아도 한 번만 가린다

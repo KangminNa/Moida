@@ -52,7 +52,7 @@ export type CommentNew = Partial<CommentRow> & Pick<CommentRow, 'id' | 'topic_id
 export const DECISION_ACTION = ['hide', 'show', 'remove', 'block', 'unblock', 'reset_password'] as const;
 export type DecisionAction = (typeof DECISION_ACTION)[number];
 /** community.decisions.by_kind (값 목록 CHECK) */
-export const DECISION_BY_KIND = ['system', 'owner'] as const;
+export const DECISION_BY_KIND = ['system', 'owner', 'approved'] as const;
 export type DecisionByKind = (typeof DECISION_BY_KIND)[number];
 /** community.decisions */
 export interface DecisionRow {

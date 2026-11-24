@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BlogTools } from '../blog';
+import { CommunityTools } from '../community';
 import {
   type BaseTool,
   PackageService,
@@ -31,11 +32,12 @@ export class McpToolbox {
     vault: VaultTools,
     blog: BlogTools,
     task: TaskTools,
+    community: CommunityTools,
     private readonly registry: PluginRegistry,
     private readonly packages: PackageService,
   ) {
-    this.tools = [...vault.tools, ...blog.tools, ...task.tools];
-    this.texts = ToolTexts.of(vault.texts, blog.texts, task.texts);
+    this.tools = [...vault.tools, ...blog.tools, ...task.tools, ...community.tools];
+    this.texts = ToolTexts.of(vault.texts, blog.texts, task.texts, community.texts);
     // 설명서가 코드와 맞지 않으면 서버가 뜨지 않는다: 설명 없는 도구 · 칸이 AI에게 나가지 않게
     const problems = this.texts.problems(this.tools);
     if (problems.length > 0)

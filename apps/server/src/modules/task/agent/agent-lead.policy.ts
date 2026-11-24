@@ -1,4 +1,4 @@
-import { RuleViolation, type Unchecked } from '../../platform';
+import { RuleViolation, SettingKinds, type Unchecked } from '../../platform';
 import type { AgentRow } from '../task.tables';
 import type { Agent } from './agent';
 
@@ -11,6 +11,11 @@ import type { Agent } from './agent';
 export class AgentLead {
   /** 대표의 첫 이름 (마이그레이션 20261124100000이 옛 대표 "대표"도 이 이름으로 바꿨다) */
   static readonly DEFAULT_NAME = '아리';
+  /**
+   * 대표가 승인 동작에 넣지 않아도 올리는 동작 (2026-11-15 C): 설정 바꾸기 · 코드 작업 열기.
+   * 대화가 곧 설정 창구라서다. 모두 승인 뒤에만 실행되고, 일꾼은 승인 동작에 넣어 준 경우만 (Agent.assertMayRequest)
+   */
+  static readonly PARTNER_ACTIONS: readonly string[] = [SettingKinds.ACTION, 'code.task.start'];
   /** 새 대표의 칸 (마이그레이션 20261118160000과 같은 값, 이름은 DEFAULT_NAME). 도구는 만들 때 서버의 로그인으로 고른다 */
   static readonly FIELDS: Readonly<Partial<Unchecked<AgentRow>>> = {
     name: AgentLead.DEFAULT_NAME,

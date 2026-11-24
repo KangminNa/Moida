@@ -48,7 +48,7 @@ export class McpEndpoint {
       { capabilities: { tools: {} }, instructions: this.instructions },
     );
     const tools = this.toolsNow();
-    const visible = tools.filter((t) => t.allows(actor));
+    const visible = tools.filter((t) => actor.mayUseTool(t.name) && t.allows(actor));
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       trace?.called('tools/list');
       const described = await this.describe(actor, visible);
@@ -73,7 +73,8 @@ export class McpEndpoint {
       const tool = tools.find((t) => t.name === request.params.name);
       trace?.called(request.params.name);
       try {
-        if (!tool) throw new Forbidden('tool', `${request.params.name} 도구가 없어요`);
+        if (!tool || !actor.mayUseTool(tool.name))
+          throw new Forbidden('tool', `${request.params.name} 도구가 없어요`);
         if (!tool.allows(actor)) throw new Forbidden(tool.scope);
         const result = (await tool.handle(actor, request.params.arguments ?? {}, site)).toJSON();
         return {

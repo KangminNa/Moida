@@ -5,6 +5,7 @@ import { CommentService } from './comment/comment.service';
 import events from './community.events.json';
 import { CommunityNotices } from './community-notices';
 import { CommunitySettings } from './community-settings';
+import { CommunityTools } from './community-tools';
 import { AppDataAdminController, AppDataController } from './data/app-data.api';
 import { AppDataQuery } from './data/app-data.query';
 import { AppDataService } from './data/app-data.service';
@@ -17,6 +18,8 @@ import { ModerationController } from './moderation/moderation.api';
 import { ModerationQuery } from './moderation/moderation.query';
 import { ModerationService } from './moderation/moderation.service';
 import { ReportAddedHandler } from './moderation/report-added.handler';
+import { ReviewQuery } from './moderation/review.query';
+import { CommunityCaseTool } from './moderation/review.tool';
 import { ReportController } from './report/report.api';
 import { ReportService } from './report/report.service';
 import { TopicController } from './topic/topic.api';
@@ -44,6 +47,9 @@ import { TopicService } from './topic/topic.service';
     AppDataService,
     AppTablesHandler,
     CommunitySettings,
+    ReviewQuery,
+    CommunityCaseTool,
+    CommunityTools,
   ],
   controllers: [
     MemberController,
@@ -54,6 +60,7 @@ import { TopicService } from './topic/topic.service';
     AppDataController,
     AppDataAdminController,
   ],
+  exports: [CommunityTools],
 })
 export class CommunityModule implements OnModuleInit {
   /** 앱 도메인에서 여는 경로: /api/community 아래, 관리자 경로(admin/)만 빼고 쓰기까지 */

@@ -44,7 +44,10 @@
       "registries": { "provides": ["settings"] },
       "lookups": { "provides": ["app-holdings"], "asks": ["app", "community-app", "member-app"] }
     },
-    "mcp": { "dependsOn": ["platform", "account", "vault", "blog", "task"], "schemas": ["mcp"] }
+    "mcp": {
+      "dependsOn": ["platform", "account", "vault", "blog", "task", "community"],
+      "schemas": ["mcp"]
+    }
   },
   "frameworkPackages": ["@nestjs/common", "@nestjs/core", "node:"],
   "libraryHome": "platform/base"
