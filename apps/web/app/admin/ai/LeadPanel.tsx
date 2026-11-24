@@ -30,7 +30,7 @@ export function LeadPanel() {
   return (
     <>
       <header className="page-head">
-        <h2>대표</h2>
+        <h2>대표{boss ? ` · ${boss.name}` : ''}</h2>
         {boss && boss.usedThisMonth > 0 && (
           <small className="label-mono">
             {boss.monthlyLimit === null

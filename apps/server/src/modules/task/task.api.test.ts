@@ -1237,7 +1237,7 @@ describe('위임', () => {
     const back = (await take()) as Awaited<ReturnType<typeof take>> & Json;
     assert.equal(back.task.id, parent.id);
     assert.equal(back.agent.id, lead.id);
-    assert.equal(back.agent.name, '대표');
+    assert.equal(back.agent.name, '아리');
     assert.equal(back.wake, 'all', '모두 끝나 깼다');
     assert.deepEqual(
       (back.subtask_results as Json[])

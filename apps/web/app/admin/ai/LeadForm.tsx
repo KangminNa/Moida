@@ -17,6 +17,8 @@ function limitOf(text: string, max = Number.MAX_SAFE_INTEGER): number | null | u
 
 /** 대표의 고치기 본문 (PATCH /api/agents/:id). 서버가 받는 칸은 이것뿐이다 (AgentLead) */
 export type LeadBody = Runtime & {
+  /** 대표의 이름 (2026-11-24): 관리자가 대화에서 부르는 이름 */
+  name: string;
   tool: string;
   monthlyLimit: number | null;
   fiveHourLimit: number | null;
@@ -28,7 +30,7 @@ export type LeadBody = Runtime & {
   secondInspectorId: string | null;
 };
 
-// 대표의 설정 (O-2, 설정 › AI): AI 도구 · 모델 · 생각 강도 · 한도 · 검토자 · 검수 승인. 이름 · 역할 · 권한은 서버가 정한다
+// 대표의 설정 (O-2, 설정 › AI): 이름 · AI 도구 · 모델 · 생각 강도 · 한도 · 검토자 · 검수 승인. 역할 · 권한은 서버가 정한다
 export function LeadForm({
   lead,
   agents,
@@ -45,6 +47,7 @@ export function LeadForm({
 }) {
   const id = useId();
   const engines = useEngines();
+  const [name, setName] = useState(lead.name);
   const [tool, setTool] = useState<string>(lead.tool);
   const [runtime, setRuntime] = useState<Runtime>({ model: lead.model, effort: lead.effort });
   const [reviewerId, setReviewerId] = useState(lead.reviewerId ?? '');
@@ -62,13 +65,20 @@ export function LeadForm({
     const fiveHourLimit = limitOf(fiveHour);
     const planStopPercent = limitOf(planStop, 100);
     setProblems({
+      ...(name.trim() === '' ? { name: '이름을 적어 주세요' } : {}),
       ...(monthlyLimit === undefined ? { limit: '1 이상의 정수를 입력해 주세요' } : {}),
       ...(fiveHourLimit === undefined ? { fiveHour: '1 이상의 정수를 입력해 주세요' } : {}),
       ...(planStopPercent === undefined ? { planStop: '1~100 사이의 정수를 입력해 주세요' } : {}),
     });
-    if (monthlyLimit === undefined || fiveHourLimit === undefined || planStopPercent === undefined)
+    if (
+      name.trim() === '' ||
+      monthlyLimit === undefined ||
+      fiveHourLimit === undefined ||
+      planStopPercent === undefined
+    )
       return;
     onSubmit({
+      name: name.trim(),
       tool,
       model: runtime.model.trim(),
       effort: runtime.effort,
@@ -83,6 +93,18 @@ export function LeadForm({
 
   return (
     <form className="panel" onSubmit={submit} aria-label="대표 설정">
+      <div className="field">
+        <label htmlFor={`${id}-name`}>이름</label>
+        <input
+          id={`${id}-name`}
+          className="input"
+          value={name}
+          maxLength={60}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <small>대화에서 이 이름으로 불러요</small>
+        {problems.name && <p className="error">{problems.name}</p>}
+      </div>
       <div className="field">
         <label htmlFor={`${id}-tool`}>AI 도구</label>
         <select

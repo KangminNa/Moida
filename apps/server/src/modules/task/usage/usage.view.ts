@@ -46,7 +46,7 @@ export class AgentUsageView {
     return {
       id: r.id,
       name: r.name,
-      /** 대표인가 (화면은 이름 대신 "대표"로 보여 준다. 대표는 에이전트 목록에 없다) */
+      /** 대표인가 (화면은 "이름 (대표)"로 보여 준다, 2026-11-24. 대표는 에이전트 목록에 없다) */
       lead: r.lead,
       fiveHourTokens: this.fiveHourTokens,
       monthTokens: this.monthTokens,

@@ -4,16 +4,20 @@ import type { Agent } from './agent';
 
 // 대표 (O-2, docs/서브나.md 14장, 기획서 결정 2026-11-18): 공간마다 숨은 에이전트 하나 (agents.lead).
 // 모든 대화 · 대화로 보내는 스케줄 · 기기의 ask_agent를 받아 일꾼 누구에게나 나눠 맡긴다 (2026-11-21 팀 없는 에이전트).
-// 일꾼 목록 · 설정 읽기에 보이지 않고, 지울 수 없다. 이름 · 역할은 서버가 정하고, 권한은 다른 에이전트와 같다 (전부, 비공개도 읽는다).
-// 관리자가 고치는 칸은 AI 도구 · 모델 · 생각 강도 · 한도뿐이다 (검토자 짝은 pairReviewer로 따로)
+// 일꾼 목록 · 설정 읽기에 보이지 않고, 지울 수 없다. 역할은 서버가 정하고, 권한은 다른 에이전트와 같다 (전부, 비공개도 읽는다).
+// 이름 (2026-11-24, 사용자 결정 "대표에게도 이름을"): 처음은 DEFAULT_NAME, 관리자가 바꾼다. 관리자는 이 이름으로 부르며 대화한다.
+// 관리자가 고치는 칸은 이름 · AI 도구 · 모델 · 생각 강도 · 한도뿐이다 (검토자 짝은 pairReviewer로 따로)
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. Agent와 AgentRepository가 쓴다
 export class AgentLead {
-  /** 새 대표의 칸 (마이그레이션 20261118160000과 같은 값). 도구는 만들 때 서버의 로그인으로 고른다 */
+  /** 대표의 첫 이름 (마이그레이션 20261124100000이 옛 대표 "대표"도 이 이름으로 바꿨다) */
+  static readonly DEFAULT_NAME = '아리';
+  /** 새 대표의 칸 (마이그레이션 20261118160000과 같은 값, 이름은 DEFAULT_NAME). 도구는 만들 때 서버의 로그인으로 고른다 */
   static readonly FIELDS: Readonly<Partial<Unchecked<AgentRow>>> = {
-    name: '대표',
+    name: AgentLead.DEFAULT_NAME,
     role: '대화를 받아 일꾼에게 나눠 맡기고 결과를 모은다',
   };
   private static readonly EDITABLE: readonly string[] = [
+    'name',
     'tool',
     'model',
     'effort',
@@ -27,7 +31,7 @@ export class AgentLead {
     const fixed = Object.keys(changes).filter((key) => !AgentLead.EDITABLE.includes(key));
     if (fixed.length > 0 || runnerGiven)
       throw new RuleViolation(
-        `대표는 AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만 바꿔요: ${[...fixed, ...(runnerGiven ? ['runner_id'] : [])].join(', ')}`,
+        `대표는 이름 · AI 도구 · 모델 · 생각 강도 · 한도 · 검토자만 바꿔요: ${[...fixed, ...(runnerGiven ? ['runner_id'] : [])].join(', ')}`,
       );
   }
 
