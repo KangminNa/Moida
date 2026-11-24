@@ -106,7 +106,7 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
           coalesce(sum(e.tokens), 0)::float8 AS tokens
         FROM task.tasks t
         LEFT JOIN LATERAL (
-          SELECT sum(tokens) AS tokens FROM task.task_events WHERE task_id = t.id
+          SELECT sum(tokens) AS tokens FROM task.task_events WHERE task_id = t.id AND tokens > 0
         ) e ON true
         WHERE t.space_id = ${spaceId} AND t.agent_id IS NOT NULL AND t.finished_at >= ${since}
         GROUP BY t.agent_id
@@ -204,7 +204,8 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
     const [row] = await this.sql<{ used: number }[]>`
       SELECT coalesce(sum(e.tokens), 0)::bigint AS used
       FROM task.task_events e JOIN task.tasks t ON t.id = e.task_id
-      WHERE t.agent_id = ${agentId} AND e.at >= date_trunc('month', ${now}::timestamptz)`;
+      WHERE t.agent_id = ${agentId} AND e.tokens > 0
+        AND e.at >= date_trunc('month', ${now}::timestamptz)`;
     return row?.used ?? 0;
   }
 }

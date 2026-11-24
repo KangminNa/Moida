@@ -38,7 +38,7 @@ export class Listener {
       idle_timeout: null,
       max_lifetime: null,
       fetch_types: false,
-      connection: Database.LIMITS,
+      connection: Database.SESSION,
       onclose: () => this.schedule(),
       onnotify: (from: string, payload: string) => {
         if (from === channel && !this.stopped) onMessage(payload);
@@ -114,6 +114,11 @@ export class Database implements OnApplicationShutdown {
     /** 트랜잭션을 연 채 60초 쉬면 끊어 잠금을 푼다 */
     idle_in_transaction_session_timeout: 60_000,
   } as const;
+  /**
+   * 연결마다 거는 값: 시간 제한(LIMITS)과 JIT 끄기 (2026-11-24 속도). 모으는 쿼리(토큰 합계 · 성적표)마다 JIT 컴파일에
+   * 300ms 넘게 쓰고 실행은 몇 ms라 짧은 쿼리가 많은 이 서버에서는 손해다 (같은 쿼리가 켜면 389ms, 끄면 24ms, 실행 기록 39만 줄)
+   */
+  static readonly SESSION = { ...Database.LIMITS, jit: 'off' } as const;
   /** 시간 제한에 걸린 오류의 코드: 잠금 대기(lock_not_available), 긴 쿼리(query_canceled) */
   private static readonly TIMED_OUT: readonly string[] = ['55P03', '57014'];
   /** bigint도 number로 읽는다. 쓰는 값(토큰 수, 파일 크기, 순번)은 안전한 정수 범위 안이다 */
@@ -130,7 +135,7 @@ export class Database implements OnApplicationShutdown {
     this.sql = postgres(url, {
       max: 10,
       types: { bigint: Database.BIGINT },
-      connection: Database.LIMITS,
+      connection: Database.SESSION,
     });
   }
 

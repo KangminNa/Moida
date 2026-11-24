@@ -80,22 +80,30 @@ export class ChatQuery extends BaseQuery {
     const [chat] = await this.sql<ChatRow[]>`
       SELECT * FROM task.chats WHERE space_id = ${spaceId} AND id = ${req.id} AND deleted_at IS NULL`;
     if (!chat) throw new NotFound('대화를 찾을 수 없어요');
-    const [partner] = await this.sql<ChatPartnerRow[]>`
-      SELECT name, status, deleted_at FROM task.agents WHERE id = ${chat.agent_id}`;
     const ids = ChatRequest.turns(chat.id, chat.turns - ChatQuery.TURNS + 1, chat.turns);
-    const turns = await this.turns(spaceId, ids);
-    const [board] = await this.updates.ownerBoard(actor, chat.id);
+    // 서로 기다리지 않는 읽기는 함께 보낸다 (2026-11-24 속도: 차례로 열 번 넘게 왕복하던 것)
+    const [[partner], views, [board], news, automations, card, team, tokens] = await Promise.all([
+      this.sql<ChatPartnerRow[]>`
+        SELECT name, status, deleted_at FROM task.agents WHERE id = ${chat.agent_id}`,
+      this.turns(spaceId, ids).then((turns) => this.views(turns)),
+      this.updates.ownerBoard(actor, chat.id),
+      this.news(chat.id),
+      this.automations(spaceId, chat.id),
+      this.card(chat),
+      this.team(spaceId, chat.id),
+      this.tokens(spaceId, chat.id),
+    ]);
     // 맡을 에이전트를 묻는 질문은 O-2에서 없앴다 (상대는 늘 대표). 칸은 O-3에서 지운다
     return new ChatDetailView(
       chat,
       partner ?? null,
-      await this.views(turns),
+      views,
       board ?? null,
-      await this.news(chat.id),
-      await this.automations(spaceId, chat.id),
-      await this.card(chat),
-      await this.team(spaceId, chat.id),
-      await this.tokens(spaceId, chat.id),
+      news,
+      automations,
+      card,
+      team,
+      tokens,
     );
   }
 
@@ -119,7 +127,7 @@ export class ChatQuery extends BaseQuery {
         t.agent_id, a.name AS agent, sum(e.tokens)::bigint AS tokens
       FROM tree
       JOIN task.tasks t ON t.id = tree.id
-      JOIN task.task_events e ON e.task_id = tree.id
+      JOIN task.task_events e ON e.task_id = tree.id AND e.tokens > 0
       LEFT JOIN task.agents a ON a.id = t.agent_id
       GROUP BY 1, t.agent_id, a.name
       HAVING sum(e.tokens) > 0`;
@@ -130,17 +138,21 @@ export class ChatQuery extends BaseQuery {
     spaceId: string,
     chatIds: readonly string[],
   ): Promise<Map<string, number>> {
+    // 대화마다 request_id의 앞부분 범위(`chat:<대화>:` 이상 `chat:<대화>;` 미만, ';'는 ':' 다음 글자)로 색인
+    // tasks_request_prefix를 탄다. 예전처럼 split_part로 거르면 공간의 작업 전부를 훑는다 (2026-11-24 속도)
+    const turn = ChatRequest.TURN_PREFIX;
+    const route = ChatRequest.ROUTE_PREFIX;
     const rows = await this.sql<{ chat_id: string; tokens: string }[]>`
       WITH RECURSIVE tree AS (
-        SELECT id, split_part(request_id, ':', 2) AS chat_id FROM task.tasks
-        WHERE space_id = ${spaceId}
-          AND (request_id LIKE ${`${ChatRequest.TURN_PREFIX}%`} OR request_id LIKE ${`${ChatRequest.ROUTE_PREFIX}%`})
-          AND split_part(request_id, ':', 2) = ANY(${chatIds as string[]}::text[])
+        SELECT t.id, c.id AS chat_id FROM unnest(${chatIds as string[]}::text[]) AS c(id)
+        JOIN task.tasks t ON t.space_id = ${spaceId}
+          AND ((t.request_id ~>=~ (${turn} || c.id || ':') AND t.request_id ~<~ (${turn} || c.id || ';'))
+            OR (t.request_id ~>=~ (${route} || c.id || ':') AND t.request_id ~<~ (${route} || c.id || ';')))
         UNION ALL
-        SELECT c.id, tree.chat_id FROM task.tasks c JOIN tree ON c.parent_id = tree.id
+        SELECT x.id, tree.chat_id FROM task.tasks x JOIN tree ON x.parent_id = tree.id
       )
       SELECT tree.chat_id, sum(e.tokens)::bigint AS tokens
-      FROM tree JOIN task.task_events e ON e.task_id = tree.id
+      FROM tree JOIN task.task_events e ON e.task_id = tree.id AND e.tokens > 0
       GROUP BY tree.chat_id`;
     return new Map(rows.map((r) => [r.chat_id, Number(r.tokens)]));
   }
