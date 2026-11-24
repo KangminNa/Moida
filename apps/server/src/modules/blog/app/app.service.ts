@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import {
   type Actor,
+  ApprovedActor,
   BlobStore,
   Conflict,
   Database,
   EntityService,
+  Forbidden,
   HostGate,
   Idempotency,
   Lookups,
@@ -19,7 +21,7 @@ import {
 import { MenuRepository } from '../menu/menu.repository';
 import { PageRepository } from '../page/page.repository';
 import { PostRepository } from '../post/post.repository';
-import type { App } from './app';
+import { App } from './app';
 import type {
   CheckDomainInput,
   CreateAppInput,
@@ -89,6 +91,26 @@ export class AppService extends EntityService<App> {
   checkDomain(actor: Actor, req: CheckDomainInput): Promise<App> {
     const proof = new AppDomainProof(this.box);
     return this.changeAsOwner(actor, req, (app) => app.confirmDomain(proof, req.token, new Date()));
+  }
+
+  /**
+   * 관리자가 대화에서 요청한 배포 (2026-11-24, 원칙 7의 예외): task가 관리자의 말을 확인하고 바로 승인한 결재 blog.app.publish가 온다.
+   * 범위가 ship이면 비공개 앱을 공개로 바꾼다. 없는 앱 · 이미 공개면 그대로 (두 번 받아도 같다). 빠진 점은 task가 먼저 짚었다
+   */
+  async publishApproved(actor: Actor, appId: string, ship: boolean): Promise<void> {
+    if (!(actor instanceof ApprovedActor) || actor.action !== App.PUBLISH_ACTION)
+      throw new Forbidden('approved', '승인한 공개만 할 수 있어요');
+    if (!ship) return;
+    const spaceId = actor.requireSpace();
+    const opened = await this.transaction(async (tx) => {
+      const apps = this.store(tx);
+      const app = await apps.lockOrNull(spaceId, appId);
+      if (app === null || !app.publishAsked(new Date())) return false;
+      await apps.save(app);
+      return true;
+    });
+    // 공개 앱의 도메인 목록이 바뀐다 (앱 도메인으로 여는 화면)
+    if (opened) this.gate.stale();
   }
 
   /** 설정 바꾸기 제안의 미리 해 보기: 같은 줄(AppEdit)을 지나고 저장하지 않는다 */

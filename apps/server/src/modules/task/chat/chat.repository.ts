@@ -13,6 +13,9 @@ import { type ChatPlaceRow, ChatUpdates } from './chat-update.policy';
 export class ChatRepository extends TableRepository<ChatRow, Chat> {
   protected readonly table = chats;
   protected readonly noun = '대화';
+  /** 콘솔이 보내는 요청 id (crypto.randomUUID). 기능 패키지는 이 모양을 쓰지 못한다 (ChatTalk.fromPlugin) */
+  static readonly CONSOLE_REQUEST =
+    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
   protected toEntity(row: ChatRow): Chat {
     return Chat.restore(row);
@@ -44,6 +47,23 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
       SELECT id, agent_id, status, result FROM task.tasks
       WHERE space_id = ${spaceId} AND request_id = ANY(${ids}::text[])
       ORDER BY request_id`;
+  }
+
+  /**
+   * 관리자가 콘솔에서 이 대화로 보낸 말 (2026-11-24 OwnerAsk): 회차 · 덧붙인 말의 답 작업의 지시 중 요청 id가 콘솔의 UUID인 것만.
+   * 기기(via) · 서버가 연 회차(fix) · 자동화(schedule:) · 기능 패키지(텔레그램 telegram:, 패키지는 UUID 모양을 쓰지 못한다)는 빠진다
+   */
+  async ownerWords(spaceId: string, chatId: string, since: Date): Promise<string[]> {
+    const prefix = `${ChatRequest.TURN_PREFIX}${chatId}:`;
+    const rows = await this.sql<Pick<TaskRow, 'instruction'>[]>`
+      SELECT instruction FROM task.tasks
+      WHERE space_id = ${spaceId} AND request_id LIKE ${`${prefix}%`}
+        AND substr(request_id, ${prefix.length + 1}) ~ '^[0-9]+(:reply:[0-9]+)?$'
+        AND payload->'chat'->>'via' IS NULL AND payload->'chat'->>'fix' IS NULL
+        AND payload->'chat'->>'requestId' ~ ${ChatRepository.CONSOLE_REQUEST}
+        AND created_at >= ${since}
+      ORDER BY created_at DESC LIMIT 50`;
+    return rows.map((r) => r.instruction);
   }
 
   /** 이 회차 작업에 쌓인 그 종류의 소식 수 (덧붙인 말 · post_update의 한도) */

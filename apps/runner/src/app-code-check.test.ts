@@ -8,6 +8,7 @@ import { AgentUser } from './agent-user';
 import { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
 import type { CairnServer } from './cairn-server';
+import { DesignCheck } from './design-check';
 import { Job } from './job';
 import { Json } from './json';
 import { MakeStage } from './make-stage';
@@ -35,7 +36,9 @@ const codeOf = (files: object[], hosts: string[] = []) =>
       hosts,
     }),
   ) as AppCodeBase;
-const short = (checks: readonly StageCheck[]) => checks.map((c) => [c.name, c.ok, c.how]);
+// 디자인 기준 검사는 design-check.test에서 본다: 여기 본보기 코드는 화면 조각이라 viewport · lang이 없다
+const short = (checks: readonly StageCheck[]) =>
+  checks.filter((c) => c.name !== DesignCheck.NAME).map((c) => [c.name, c.ok, c.how]);
 
 /** 테스트용 zip 만들기: 파일마다 deflate (packed가 false면 그대로 담는다). 러너에는 zip을 쓰는 코드가 없다 */
 function zipOf(files: Readonly<Record<string, string>>, packed = true): Buffer {

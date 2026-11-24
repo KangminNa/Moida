@@ -3,6 +3,7 @@ import type { AgentUser, FolderEntry } from './agent-user';
 import type { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
 import type { CairnServer } from './cairn-server';
+import { DesignCheck } from './design-check';
 import type { Job } from './job';
 import {
   MaterialBroken,
@@ -285,18 +286,20 @@ export class MakeStage implements SandboxStage {
   }
 
   /**
-   * 앱 코드 일에서 AI가 낸 파일: 크기와, 템플릿 · cairn.json의 글. 글은 agent 권한으로 읽는다 (AI가 둔 링크를 러너가 따라가지 않게).
+   * 앱 코드 일에서 AI가 낸 파일: 크기와, 템플릿 · CSS · cairn.json의 글. 글은 agent 권한으로 읽는다 (AI가 둔 링크를 러너가 따라가지 않게).
    * 한도를 넘는 글은 null (검사가 떨어진다)
    */
   private async madeCode(dir: string, files: readonly FolderEntry[]): Promise<AppCodeEntry[]> {
     const made: AppCodeEntry[] = [];
     for (const { name, size } of files) {
       const path = join(dir, name);
-      const max = AppCodeCheck.isTemplate(name)
-        ? AppCodeCheck.TEMPLATE_BYTES_MAX
-        : name === AppCodeCheck.MANIFEST
-          ? MakeStage.MANIFEST_MAX
-          : -1;
+      // CSS도 글로 읽는다: 디자인 기준 검사가 색 토큰 · 포커스 · 움직임을 본다
+      const max =
+        AppCodeCheck.isTemplate(name) || DesignCheck.isStyle(name)
+          ? AppCodeCheck.TEMPLATE_BYTES_MAX
+          : name === AppCodeCheck.MANIFEST
+            ? MakeStage.MANIFEST_MAX
+            : -1;
       const text = max < 0 ? null : await this.agent.readFile(path, max);
       made.push(new AppCodeEntry(name, size, text));
     }

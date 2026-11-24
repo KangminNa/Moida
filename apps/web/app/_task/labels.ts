@@ -54,6 +54,8 @@ export const SETTING_CHANGE = 'task.setting.change';
 export const START_CODE = 'code.task.start';
 /** 앱 코드 공개 (스토어 1-6b): 대화의 만들기 일이 낸 확인 대기 버전. 대상은 앱, 판은 버전 번호 (서버의 Approval.APP_CODE_SHOW) */
 export const SHOW_APP_CODE = 'blog.app_code.show';
+/** 대화에서 요청한 배포 (2026-11-24): 관리자가 대화에 쓴 배포 · 수정 요청을 대표가 인용해 바로 승인된 기록 (서버의 Approval.PUBLISH_APP) */
+export const PUBLISH_APP = 'blog.app.publish';
 /** 목표 실행의 승인: 다음 회차로 갈지, 목표 실행을 완료로 닫을지 (서버의 Approval.GOAL_*) */
 export const GOAL_CONTINUE = 'task.goal.continue';
 export const GOAL_COMPLETE = 'task.goal.complete';
@@ -77,6 +79,7 @@ export const ACTION_LABELS: Record<string, string> = {
   [SETTING_CHANGE]: '설정 바꾸기',
   [START_CODE]: '코드 작업 열기',
   [SHOW_APP_CODE]: '앱 코드 공개',
+  [PUBLISH_APP]: '대화로 배포',
   [RAISE_LIMIT]: '한도 변경',
   [GOAL_CONTINUE]: '목표 실행 중간 승인',
   [GOAL_COMPLETE]: '목표 실행 최종 승인',

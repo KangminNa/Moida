@@ -10,6 +10,7 @@ import {
 } from '../../platform';
 import type { Agent } from '../agent/agent';
 import { AgentRepository } from '../agent/agent.repository';
+import { AppApproval } from '../approval/app-approval.policy';
 import { Approval } from '../approval/approval';
 import { ApprovalRepository } from '../approval/approval.repository';
 import { OutputRepository } from '../output/output.repository';
@@ -186,7 +187,7 @@ export class ChatResultService extends BaseService {
 
   /**
    * 대화의 만들기 일이 낸 앱 코드가 확인 대기 버전이 됐다 (blog.app_code.added, 스토어 1-6b): 그 대화의 결과 카드에
-   * 공개 승인(Approval.forAppCode)을 싣는다. 결재 요청이 다시 settle을 불러 카드에 실린다. 대화의 일이 아니거나
+   * 공개 승인(AppApproval.forAppCode)을 싣는다. 관리자가 이 대화에서 그 앱의 배포 · 수정을 요청했으면 바로 승인한다. 결재 요청이 다시 settle을 불러 카드에 실린다. 대화의 일이 아니거나
    * 바로 보인 버전(비공개 앱)이면 아무것도 하지 않는다 (알림과 코드 탭이 맡는다). 같은 버전이 두 번 와도 결재는 하나
    */
   async offerAppCode(actor: Actor, spaceId: string, req: AppCodeAddedInput): Promise<void> {
@@ -206,8 +207,12 @@ export class ChatResultService extends BaseService {
         ChatResultService.APP_CODE,
       );
       if (await once.previous()) return;
-      const approval = Approval.forAppCode(spaceId, chat.id, chat.partnerId, req, now);
-      await new ApprovalRepository(tx).save(approval);
+      const approval = AppApproval.forAppCode(spaceId, chat.id, chat.partnerId, req, now);
+      // 관리자가 이 대화에서 그 앱의 배포 · 수정을 요청했으면 (24시간 안) 기다리지 않고 바로 반영한다 (2026-11-24)
+      const approvals = new ApprovalRepository(tx);
+      const asked = await approvals.askedFor(chat.id, req.appId, AppApproval.askedSince(now));
+      if (asked !== null) approval.grantAsked(chat.partnerId, asked, now);
+      await approvals.save(approval);
       await once.remember({ approvalId: approval.id });
     });
   }

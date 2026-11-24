@@ -13,6 +13,7 @@ import { App } from './app/app';
 import { AppController, AppDomainController } from './app/app.api';
 import { AppQuery } from './app/app.query';
 import { AppService } from './app/app.service';
+import { AppPublishHandler } from './app/app-publish.handler';
 import { AppCodeController, AppSiteController } from './app-code/app-code.api';
 import { AppCodeQuery } from './app-code/app-code.query';
 import { AppCodeService } from './app-code/app-code.service';
@@ -97,6 +98,7 @@ import { PublishApprovedHandler } from './post/publish-approved.handler';
     AppCodeUploadTool,
     AppCodeBuiltHandler,
     AppCodeShowHandler,
+    AppPublishHandler,
     { provide: AppStarterGateway, useFactory: () => AppStarterGateway.fromEnv() },
   ],
   controllers: [
@@ -134,6 +136,7 @@ export class BlogModule implements OnModuleInit {
     private readonly apps: AppQuery,
     private readonly appCodeBuilt: AppCodeBuiltHandler,
     private readonly appCodeShow: AppCodeShowHandler,
+    private readonly appPublish: AppPublishHandler,
     private readonly appCode: AppCodeQuery,
     private readonly lookups: Lookups,
     private readonly gate: HostGate,
@@ -149,6 +152,8 @@ export class BlogModule implements OnModuleInit {
     // 앱 코드를 고친 만들기 작업 (스토어 1-6, task가 보낸다)
     this.workers.on(AppCodeBuiltHandler.TOPIC, this.appCodeBuilt);
     this.workers.on(AppCodeShowHandler.TOPIC, this.appCodeShow);
+    // 관리자가 대화에서 요청한 배포 (2026-11-24, task가 바로 승인한 결재)
+    this.workers.on(AppPublishHandler.TOPIC, this.appPublish);
     // 보관함 (2차 5단계): 페이지 · 글 · 읽은 글(소재의 링크)
     this.library.register([PageQuery.LIBRARY_KIND], (a, f) => this.pages.library(a, f));
     this.library.register([PostQuery.LIBRARY_KIND], (a, f) => this.posts.library(a, f));
@@ -177,6 +182,7 @@ export class BlogModule implements OnModuleInit {
     // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
     this.checks.register(PostPublish.ACTION, (a, id) => this.posts.publishProblem(a, id));
     this.checks.register(Issue.ACTION, (a, id) => this.issues.publishProblem(a, id));
+    this.checks.register(App.PUBLISH_ACTION, (a, id) => this.apps.publishProblem(a, id));
     // 파일을 가리키는 칸: 쓰는 동안 platform이 파일을 지우지 않게
     this.blobs.registerUse(
       ['blog.assets.blob_hash', 'blog.posts.cover_blob_hash'],

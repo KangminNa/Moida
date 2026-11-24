@@ -68,6 +68,30 @@ export class ApprovalRepository extends TableRepository<ApprovalRow, Approval> {
     );
   }
 
+  /** 이 대화에서 관리자가 그 앱의 배포 · 수정을 요청한 마지막 말 (since 뒤, AppApproval.ownerAsked). 없으면 null */
+  async askedFor(chatId: string, appId: string, since: Date): Promise<string | null> {
+    const [row] = await this.sql<{ quote: string | null }[]>`
+      SELECT payload->>'quote' AS quote FROM task.approvals
+      WHERE chat_id = ${chatId} AND action = ${Approval.PUBLISH_APP} AND target_id = ${appId}
+        AND status = ${Approval.APPROVED} AND decided_at >= ${since}
+      ORDER BY decided_at DESC LIMIT 1`;
+    return row?.quote ?? null;
+  }
+
+  /** 이 대화에서 기다리는 그 앱의 코드 공개 중 아직 카드에 실리지 않은 것 (카드에 실린 것은 카드에서 정한다) */
+  lockUncardedAppCode(chatId: string, appId: string): Promise<readonly Approval[]> {
+    return this.find(
+      {
+        chat_id: chatId,
+        action: Approval.APP_CODE_SHOW,
+        target_id: appId,
+        status: Approval.PENDING,
+        card_id: null,
+      },
+      { order: ['id'], lock: true },
+    );
+  }
+
   /**
    * 같은 대상에 검수자가 고쳐 달라고 한 앞 결재들 (검수의 회수와 앞 의견, 2026-11-20 ChatInspect). 오래된 것부터.
    * 같은 대화 · 동작 · 대상이면 같은 일로 본다 (글은 고쳐 다시 올려도 같은 글, 앱 화면은 같은 앱)

@@ -106,6 +106,9 @@ export class ChatTalk {
     message: string,
     now: Date,
   ): Promise<ChatSent> {
+    // 콘솔의 요청 id 모양(UUID)은 관리자가 콘솔에서 보낸 말의 표시다 (OwnerAsk): 패키지는 자기 접두어를 쓴다 (telegram:)
+    if (new RegExp(ChatRepository.CONSOLE_REQUEST).test(requestId))
+      throw new RuleViolation('기능 패키지의 대화 요청 id는 패키지 이름으로 시작해요');
     const chats = new ChatRepository(this.tx);
     const before = await chats.findByRequest(spaceId, requestId);
     if (before) return new ChatSent(before.id, before.turns, false);
