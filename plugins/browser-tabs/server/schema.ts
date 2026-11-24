@@ -150,6 +150,8 @@ export const reads = browserTabsSchema.table('reads', {
   requested_at: timestamp('requested_at', { withTimezone: true }).notNull(),
   read_at: timestamp('read_at', { withTimezone: true }),
   version: integer('version').notNull(),
+  agent_id: uuid('agent_id'),
+  request_id: text('request_id'),
 });
 
 /** browser_tabs.runs */

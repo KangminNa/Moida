@@ -1,4 +1,5 @@
 import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-api';
+import { AskPageReads, PageReadResults } from './agent-reads';
 import { SaveRequests } from './api-tools';
 import { ApprovalDecided, TaskSettled } from './approvals';
 import { BrowserJob, LoginNeeded } from './browse';
@@ -68,6 +69,8 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new RequestRead(),
       new PendingReads(),
       new SaveRead(),
+      new AskPageReads(),
+      new PageReadResults(),
       new ListSites(),
       new AgentSites(),
       new CreateSite(),
