@@ -35,6 +35,8 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   static readonly CHAT = 'chat';
   /** 앱 코드의 확인 대기 버전 공개 (스토어 1-6b): 실행은 blog가 한다 (AppCodeShowHandler) */
   static readonly APP_CODE_SHOW = 'blog.app_code.show';
+  /** 관리자가 대화에서 요청한 앱 공개 · 반영 (2026-11-24, AppApproval.ownerAsked). 실행은 blog */
+  static readonly PUBLISH_APP = 'blog.app.publish';
   /** 설정 바꾸기 (2026-11-15 C · D): 바뀔 값은 payload에 (propose_setting이 미리 적용해 보고 올린다). 이름은 platform이 갖는다 */
   static readonly SETTING_CHANGE = SettingKinds.ACTION;
   /** 대화의 일이어도 카드에 싣지 않고 바로 알리는 동작: 사람이 해야 일이 이어진다 (한도 · 사이트 로그인) */
@@ -59,7 +61,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
         '설정 바꾸기는 propose_setting으로 올려요 (바뀔 값을 서버가 미리 해 봐요)',
       );
     agent.assertMayRequest(action, task);
-    const approval = Approval.pending(
+    const approval = Approval.open(
       {
         ...fields,
         space_id: task.spaceId,
@@ -79,7 +81,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   /** 에이전트가 한 달 한도를 넘겼다. 작업에 묶이지 않는 결재라 대상은 에이전트 자신이다 */
   static raiseLimit(agent: Agent, usedThisMonth: number, now: Date): Approval {
-    return Approval.pending(
+    return Approval.open(
       {
         space_id: agent.spaceId,
         task_id: null,
@@ -99,7 +101,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
    * 작업에 묶이지 않는다 (회차 작업은 이미 끝났다). 대상은 실행이고, 결정은 task 모듈의 GoalRunService가 받는다
    */
   static forGoalRun(run: GoalRun, action: string, note: string, now: Date): Approval {
-    return Approval.pending(
+    return Approval.open(
       {
         space_id: run.spaceId,
         task_id: null,
@@ -122,7 +124,7 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     turn: number,
     now: Date,
   ): Approval {
-    return Approval.pending(
+    return Approval.open(
       {
         space_id: spaceId,
         task_id: null,
@@ -137,39 +139,12 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
     );
   }
 
-  /**
-   * 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 (서버가 올린다, 스토어 1-6b): 그 대화의 결과 카드에 실려
-   * 고르면 그 버전이 공개된다. 작업은 이미 끝나 작업에 묶이지 않는다. 대상은 앱, 판은 버전 번호
-   */
-  static forAppCode(
-    spaceId: string,
-    chatId: string,
-    agentId: string,
-    target: { appId: string; name: string; seq: number },
-    now: Date,
-  ): Approval {
-    return Approval.pending(
-      {
-        space_id: spaceId,
-        task_id: null,
-        agent_id: agentId,
-        action: Approval.APP_CODE_SHOW,
-        target_kind: 'app',
-        target_id: target.appId,
-        target_version: target.seq,
-        note: Approval.cleanNote(`${target.name} 버전 ${target.seq}`),
-        chat_id: chatId,
-      },
-      now,
-    );
-  }
-
   static restore(row: ApprovalRow): Approval {
     return new Approval(row);
   }
 
-  /** 아직 아무도 정하지 않은 결재. 요청 이벤트를 함께 남긴다 (알림 · 결과 카드가 받는다) */
-  private static pending(fields: Omit<ApprovalNew, 'id'>, now: Date): Approval {
+  /** 아직 아무도 정하지 않은 결재. 요청 이벤트를 함께 남긴다 (알림 · 결과 카드가 받는다). 앱의 결재는 AppApproval이 연다 */
+  static open(fields: Omit<ApprovalNew, 'id'>, now: Date): Approval {
     const approval = new Approval(
       {
         ...fields,
@@ -310,6 +285,12 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   approve(deciderId: string, note: string | null, now: Date): void {
     this.close(Approval.APPROVED, deciderId, note, now);
     this.announce('task.approval.granted');
+  }
+
+  /** 관리자가 대화에 직접 쓴 말을 근거로 대표가 승인한다 (2026-11-24 원칙 7의 예외, OwnerAsk). 사람의 클릭이 아니라 agent_decided */
+  grantAsked(leadId: string, quote: string, now: Date): void {
+    this.put('agent_decided', true);
+    this.approve(leadId, `대화에서 관리자가 요청: «${quote}»`, now);
   }
 
   reject(deciderId: string, note: string | null, now: Date): void {

@@ -3,6 +3,7 @@ import type { BaseTool, ToolTextBody } from '../platform';
 import { AiLoginRefreshTool, AiLoginTool, AiSigninTool } from './ai/ai-login.tool';
 import { RequestApprovalTool } from './approval/approval.tool';
 import { AskAgentTool } from './chat/chat.tool';
+import { PublishAppTool } from './chat/chat-publish.tool';
 import {
   AgentUpdatesTool,
   AskBriefTool,
@@ -54,6 +55,7 @@ export class TaskTools {
     PostUpdateTool,
     SetDeliverTool,
     AskBriefTool,
+    PublishAppTool,
     ProposeToolTool,
     GetSettingsTool,
     ProposeSettingTool,
@@ -87,6 +89,7 @@ export class TaskTools {
     postUpdate: PostUpdateTool,
     setDeliver: SetDeliverTool,
     askBrief: AskBriefTool,
+    publishApp: PublishAppTool,
     proposeTool: ProposeToolTool,
     getSettings: GetSettingsTool,
     proposeSetting: ProposeSettingTool,
@@ -116,6 +119,7 @@ export class TaskTools {
       postUpdate,
       setDeliver,
       askBrief,
+      publishApp,
       proposeTool,
       getSettings,
       proposeSetting,

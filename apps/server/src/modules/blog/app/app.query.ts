@@ -118,6 +118,18 @@ export class AppQuery extends BaseQuery {
   }
 
   /**
+   * 대화에서 요청한 배포 전에 빠진 점 (platform ActionChecks, 2026-11-24 blog.app.publish): 없는 앱 · 도메인을 확인하지 않은 커뮤니티.
+   * 요청한 에이전트의 공간에서 찾는다. 빠진 점이 없으면 null
+   */
+  async publishProblem(actor: Actor, appId: string): Promise<string | null> {
+    const app = await this.row(apps, { space_id: actor.requireSpace(), id: appId });
+    if (!app) return '없는 앱이에요';
+    if (app.visibility !== App.PUBLIC && app.kind === App.COMMUNITY && !app.domain_checked_at)
+      return '커뮤니티는 도메인 연결을 확인한 뒤에 공개할 수 있어요 (앱 관리 › 설정의 도메인)';
+    return null;
+  }
+
+  /**
    * 회원을 받는 앱 (Lookups 'member-app', 스토어 12.3): 커뮤니티 앱이거나 보이는 코드의 선언서에 members가 참인 앱.
    * 관리자는 공간의 그런 앱, 그 밖은 공개했고 도메인 연결을 확인한 앱만 (회원 가입 · 로그인은 앱 도메인에서만 된다)
    */

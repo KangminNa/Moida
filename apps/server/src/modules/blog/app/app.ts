@@ -26,6 +26,8 @@ export class App extends TableEntity<AppRow, AppNew> {
   static readonly PAGE: AppKind = 'page';
   /** 커뮤니티 (스토어 3-1): 회원 · 글 · 댓글은 community 모듈에 있다. 메뉴 · 블로그 글 · 페이지를 두지 않고 지우지 않는다 */
   static readonly COMMUNITY: AppKind = 'community';
+  /** 관리자가 대화에서 요청한 배포 (2026-11-24, task가 바로 승인한 결재로 온다: AppPublishHandler) */
+  static readonly PUBLISH_ACTION = 'blog.app.publish';
   static readonly NAME_MAX = 40;
   static readonly SLUG_MIN = 2;
   static readonly SLUG_MAX = 30;
@@ -208,6 +210,13 @@ export class App extends TableEntity<AppRow, AppNew> {
       throw new RuleViolation('커뮤니티는 도메인 연결을 확인한 뒤에 공개할 수 있어요');
     this.put('updated_at', now);
     if (this.row.visibility !== before.visibility) this.record(this.changed(false));
+  }
+
+  /** 대화에서 요청한 배포: 비공개면 공개로 (규칙은 관리자의 공개와 같다: 커뮤니티는 도메인 확인 뒤). 바꿨으면 true */
+  publishAsked(now: Date): boolean {
+    if (this.row.visibility === App.PUBLIC) return false;
+    this.edit({ visibility: App.PUBLIC }, now);
+    return true;
   }
 
   /** 방문자 첫 화면(/)으로 고정하거나 푼다 (스토어 2단계). 공개 앱만. 공간에 하나인지는 AppService가 다른 앱을 풀어 지킨다 */

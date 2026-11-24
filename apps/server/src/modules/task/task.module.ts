@@ -27,6 +27,7 @@ import { ChatCardHandler } from './chat/chat-card.handler';
 import { ChatContinueHandler } from './chat/chat-continue.handler';
 import { ChatInspectHandler } from './chat/chat-inspect.handler';
 import { ChatInspectService } from './chat/chat-inspect.service';
+import { ChatPublishService } from './chat/chat-publish.service';
 import { ChatResultHandler } from './chat/chat-result.handler';
 import { ChatResultService } from './chat/chat-result.service';
 import { ChatTalk } from './chat/chat-talk';
@@ -157,6 +158,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatService,
     // 대화의 소식 (2차 1-1): 끝난 작업 → 소식(ChatUpdateHandler), agent_updates · post_update
     ChatUpdateService,
+    ChatPublishService,
     ChatUpdateQuery,
     ChatUpdateHandler,
     // 결과 결재 (2차 2단계): 가라앉은 회차 → 검사 · 검토 · 결과 카드, 카드의 수정 요청 · 반려 → 멈추고 다음 회차
