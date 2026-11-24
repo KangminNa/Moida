@@ -28,6 +28,9 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/community/me': 404,
   'GET /api/community/topics': 404,
   'GET /api/community/topics/:id': 404,
+  // 스토어 3-4: 약관은 앱 도메인에서만 (회원 화면 /_/terms · /_/privacy), 관리는 관리자만
+  'GET /api/community/terms/:kind': 404,
+  'GET /api/community/admin/:appId/terms': 403,
   // 스토어 3-1c: 커뮤니티 관리는 관리자만 (기본 도메인에서)
   'GET /api/community/admin/:appId/topics': 403,
   'GET /api/community/admin/:appId/topics/:id': 403,

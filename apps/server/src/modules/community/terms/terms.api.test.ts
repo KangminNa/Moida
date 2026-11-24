@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { Database } from '../modules/platform';
-import { ApiClient, type ApiResult, TestUser } from './api-client';
-import { CommunitySite } from './community-site';
+import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
+import { CommunitySite } from '../../../testing/community-site';
+import { Database } from '../../platform';
 
 // 약관 · 가입 동의 · 탈퇴 (2026-11-24, 스토어 3-4): 약관은 앱마다 둘(terms · privacy), 추가만 하는 버전.
 // 둘 다 공개돼야 가입을 받고, 가입은 그때의 버전에 동의한다. 탈퇴하면 개인정보를 지우고 글은 "탈퇴한 회원"으로 남는다

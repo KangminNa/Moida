@@ -109,7 +109,8 @@ export class AppDataQuery extends BaseQuery {
 
   /**
    * 관리자: 앱의 데이터와 회원을 한 묶음으로 (스토어 12.5). tables.json(선언) · schema.sql(CREATE TABLE) · data.sql(INSERT) ·
-   * members.json(아이디 · 닉네임 · 비밀번호 해시 · 가입한 때). schema.sql · data.sql은 어느 Postgres에나 들어간다
+   * members.json(아이디 · 닉네임 · 비밀번호 해시 · 가입한 때 · 동의한 약관 버전 · 탈퇴한 때) · terms/<종류>-v<버전>.md(약관의 모든 버전, 3-4).
+   * schema.sql · data.sql은 어느 Postgres에나 들어간다. 탈퇴한 회원은 지운 값(left:<id>) 그대로 실린다
    */
   async export(actor: Actor, req: AdminAppInput, now: Date): Promise<AppDataExport> {
     await this.assertOwned(actor, req.appId);
@@ -139,9 +140,21 @@ export class AppDataQuery extends BaseQuery {
       zip.add('data.sql', `${data.join('\n')}\n`);
     });
     const members = await this.sql<Record<string, unknown>[]>`
-      SELECT id, login_id, nickname, password_hash, joined_at, blocked_until
+      SELECT id, login_id, nickname, password_hash, joined_at, blocked_until,
+             terms_version, privacy_version, left_at
       FROM community.members WHERE app_id = ${req.appId} ORDER BY id`;
     zip.add('members.json', JSON.stringify({ members }, null, 2));
+    // 약관은 모든 버전 (스토어 3-4): 회원마다 동의한 버전(terms_version · privacy_version)을 맞춰 볼 수 있게
+    const terms = await this.sql<
+      { kind: string; version: number; body: string; created_at: Date }[]
+    >`
+      SELECT kind, version, body, created_at FROM community.terms
+      WHERE app_id = ${req.appId} ORDER BY kind, version`;
+    for (const t of terms)
+      zip.add(
+        `terms/${t.kind}-v${t.version}.md`,
+        `<!-- ${t.kind} 버전 ${t.version} · ${t.created_at.toISOString()} -->\n\n${t.body}\n`,
+      );
     return new AppDataExport(`app-data-${now.toISOString().slice(0, 10)}.zip`, zip.toBuffer());
   }
 

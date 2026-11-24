@@ -104,7 +104,7 @@ export function CommunityMembers({ appId }: { appId: string }) {
               <li key={m.id} className="list-cell stack">
                 <div className="item-main">
                   <b>
-                    {m.nickname} <small>({m.loginId})</small>
+                    {m.nickname} <small>({m.loginId ?? '탈퇴'})</small>
                     {blocked && <span className="pill on">차단</span>}
                   </b>
                   <small>

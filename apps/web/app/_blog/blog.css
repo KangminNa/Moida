@@ -634,6 +634,30 @@
   color: var(--muted);
 }
 
+/* 회원 화면 아래의 약관 링크 (3-4) */
+.member-legal {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+  font-size: 0.8125rem;
+}
+
+.member-legal a {
+  color: var(--muted);
+}
+
+/* 가입 화면의 약관 (3-4): 접어 두고 펼치면 그 안에서 스크롤 */
+.member-terms summary {
+  cursor: pointer;
+  font-size: 0.9375rem;
+}
+
+.member-terms[open] > :not(summary) {
+  max-height: 320px;
+  overflow: auto;
+}
+
 .member-facts {
   display: grid;
   grid-template-columns: max-content 1fr;

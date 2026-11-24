@@ -4,8 +4,13 @@ import type { CommentRow, DecisionRow, MemberRow, ReportRow, TopicRow } from '..
 // 비밀번호 해시 · 세션은 어디에도 싣지 않는다. 임시 비밀번호는 초기화한 응답 한 번에만
 
 /** 쓴 회원 (관리자에게는 아이디까지) */
+/** 탈퇴한 회원은 아이디를 지워 'left:<id>'만 남는다 (Member.leave, 3-4): 관리 화면에는 아이디 없음(null)으로 */
+function loginOf(loginId: string): string | null {
+  return loginId.startsWith('left:') ? null : loginId;
+}
+
 function author(id: string, nickname: string, loginId: string) {
-  return { id, nickname, loginId };
+  return { id, nickname, loginId: loginOf(loginId) };
 }
 
 /** 관리자가 정한 뒤의 글 · 댓글 (POST …/decide) */
@@ -192,7 +197,7 @@ export class AdminMemberView {
     const r = this.r;
     return {
       id: r.id,
-      loginId: r.login_id,
+      loginId: loginOf(r.login_id),
       nickname: r.nickname,
       joinedAt: r.joined_at.toISOString(),
       lastSeenAt: r.last_seen_at?.toISOString() ?? null,

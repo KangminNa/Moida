@@ -892,7 +892,8 @@ describe('설정 바꾸기: 약관 (스토어 3-4)', () => {
     const now = ok(await site.at('/api/community/terms/terms'));
     assert.deepEqual([now.version, now.body], [2, '# 이용약관\n\n문의: 운영자']);
     const admin = ok(await api.get(`/api/community/admin/${site.appId}/terms`, owner));
-    assert.equal(((admin.items as Json[])[0]?.current as Json).approved, true);
+    const first = (admin.items as Json[])[0];
+    assert.equal((first?.current as Json | undefined)?.approved, true);
 
     // 승인하면 기다리던 작업이 끝나 그 작업 토큰도 끝난다: 다음 제안은 새 일에서
     token = (await partner()).token;

@@ -5,9 +5,10 @@ import {
   signedIn,
   writeNotice,
 } from '../../../../_community/member-page';
+import { LeavePanel } from './LeavePanel';
 import { MePanel } from './MePanel';
 
-// 내 정보 (스토어 3-2, 앱 도메인의 /_/me): 닉네임 · 비밀번호 바꾸기, 로그아웃, 가입 대기 · 차단 안내
+// 내 정보 (스토어 3-2, 앱 도메인의 /_/me): 닉네임 · 비밀번호 바꾸기, 로그아웃, 가입 대기 · 차단 안내, 탈퇴 (3-4)
 export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ app: string }> };
@@ -27,6 +28,7 @@ export default async function MePage({ params }: Props) {
         member={member}
         notice={writeNotice(member, true)}
       />
+      <LeavePanel csrf={place.csrf} community={place.app.kind === 'community'} />
     </MemberFrame>
   );
 }

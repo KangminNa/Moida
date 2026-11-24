@@ -18,6 +18,7 @@ import { AppOverview } from './AppOverview';
 import { AppPosts } from './AppPosts';
 import { AppSettings } from './AppSettings';
 import { CommunityMembers } from './CommunityMembers';
+import { CommunityTerms } from './CommunityTerms';
 
 export type AppTab =
   | 'overview'
@@ -160,7 +161,12 @@ export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
           <AppMenus app={app} />
         ))}
       {tab === 'posts' && <AppPosts app={app} />}
-      {tab === 'members' && <CommunityMembers appId={app.id} />}
+      {tab === 'members' && (
+        <>
+          <CommunityTerms appId={app.id} />
+          <CommunityMembers appId={app.id} />
+        </>
+      )}
       {tab === 'code' && <AppCodeTab app={app} />}
       {tab === 'data' && <AppDataTab app={app} />}
       {tab === 'settings' && <AppSettings app={app} onChanged={apps.reload} />}

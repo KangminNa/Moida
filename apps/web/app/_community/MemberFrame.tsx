@@ -60,6 +60,10 @@ export function MemberFrame({
           <h1>{title}</h1>
           {children}
         </section>
+        <nav className="member-legal" aria-label="약관">
+          <a href="/_/terms">이용약관</a>
+          <a href="/_/privacy">개인정보처리방침</a>
+        </nav>
       </main>
     </div>
   );

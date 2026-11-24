@@ -6,7 +6,7 @@ import { hostOf } from '../_blog/request-host';
 import type { PublicApp } from '../_blog/types';
 import { serverGet } from '../_lib/server-api';
 import { blockNotice, waitNotice } from './member-state';
-import type { MemberMe, MemberSelf, TopicDetail } from './types';
+import type { MemberMe, MemberSelf, Term, TopicDetail } from './types';
 
 // 고정 화면(/_/…, 스토어 3-2)의 서버 쪽 준비. 회원 API는 앱 도메인에서만 열리므로 화면도 그 도메인으로 온 요청에서만 연다:
 // 기본 도메인의 /<앱>/_/…와 회원을 받지 않는 앱의 도메인은 없는 주소(404). 가입 · 로그인 · 내 정보는 회원을 받는 모든 앱
@@ -70,4 +70,9 @@ export async function memberTitle(rawApp: string, label: string): Promise<{ titl
     true,
   );
   return { title: app ? `${label} · ${app.name}` : label };
+}
+
+/** 공개된 약관 하나 (3-4): 가입 화면의 동의 칸 · /_/terms · /_/privacy. 아직 없으면 null */
+export function termOf(place: MemberPlace, kind: Term['kind']): Promise<Term | null> {
+  return serverGet<Term>(`/api/community/terms/${kind}`, false, place.host);
 }
