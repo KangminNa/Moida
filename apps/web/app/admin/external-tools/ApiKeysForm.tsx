@@ -33,14 +33,13 @@ export function ApiKeysForm({
     <form className="stack" onSubmit={submit}>
       {connector.keys.map((k) => (
         <label key={k.name} className="field">
-          <span>
-            {k.name} {k.set ? '(넣음, 바꾸려면 새 값)' : ''}
-          </span>
+          <span>{k.name}</span>
           <input
             className="input"
             type="password"
             autoComplete="off"
             maxLength={KEY_MAX}
+            placeholder={k.set ? '넣어 둠 · 바꿀 때만 새 값' : '서비스에서 받은 키'}
             value={values[k.name] ?? ''}
             onChange={(e) => {
               onEdit();
@@ -49,6 +48,7 @@ export function ApiKeysForm({
           />
         </label>
       ))}
+      <small>넣은 값은 서버가 잠그고 다시 보이지 않아요. AI도 보지 못해요</small>
       {problem && <p className="error">{problem}</p>}
       <div className="row">
         <button type="submit" className="cta small" disabled={busy}>

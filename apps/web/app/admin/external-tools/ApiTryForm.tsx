@@ -22,7 +22,7 @@ export function ApiTryForm({
   onEdit: () => void;
 }) {
   const [operation, setOperation] = useState(connector.operations[0]?.name ?? '');
-  const [input, setInput] = useState('{}');
+  const [input, setInput] = useState(() => templateOf(connector.operations[0]?.fields ?? []));
   const [bad, setBad] = useState<string | null>(null);
   const requestId = useRef<string | null>(null);
   const chosen = connector.operations.find((o) => o.name === operation);
@@ -67,7 +67,13 @@ export function ApiTryForm({
         <select
           className="input"
           value={operation}
-          onChange={(e) => change(() => setOperation(e.target.value))}
+          onChange={(e) =>
+            change(() => {
+              setOperation(e.target.value);
+              const next = connector.operations.find((o) => o.name === e.target.value);
+              setInput(templateOf(next?.fields ?? []));
+            })
+          }
         >
           {connector.operations.map((o) => (
             <option key={o.name} value={o.name}>
@@ -93,4 +99,9 @@ export function ApiTryForm({
       </div>
     </form>
   );
+}
+
+/** 동작의 입력 칸으로 채운 빈 틀 ({"prompt": ""}) */
+function templateOf(fields: readonly string[]): string {
+  return JSON.stringify(Object.fromEntries(fields.map((f) => [f, ''])), null, 2);
 }

@@ -15,6 +15,8 @@ function operationsOf(spec: unknown) {
     effect: String(o.effect ?? ''),
     method: String(o.method ?? ''),
     path: String(o.path ?? ''),
+    /** 입력 칸 이름 (시험의 입력 틀) */
+    fields: Object.keys((o.input as Record<string, unknown> | undefined) ?? {}),
   }));
 }
 

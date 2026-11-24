@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../_lib/client-api';
 import { ago } from '../../_lib/time-ago';
@@ -155,6 +156,12 @@ export function ApiConnectorPanel() {
                 )}
                 {c.lastError && <small className="error">마지막 실패: {c.lastError}</small>}
                 {c.note && <small className="clamp">제안한 까닭: {c.note}</small>}
+                {c.status === 'proposed' && (
+                  <small>
+                    승인을 기다려요: <Link href="/admin/approvals">승인</Link>에서 정하면 켜지고, 그
+                    뒤 키를 넣어요
+                  </small>
+                )}
                 {open?.id === c.id && open.what === 'keys' && (
                   <ApiKeysForm
                     connector={c}
@@ -248,15 +255,19 @@ function RecentCalls({ connector }: { connector: ApiConnector }) {
         <li key={r.id} className="list-cell">
           <small>
             {ago(r.createdAt)} · {r.operation} · {CALL_STATE[r.status] ?? r.status}
-            {r.tried ? ' · 시험' : ''}
+            {r.tried ? ' · 관리자 시험' : ''}
             {r.outputIds.length > 0 ? ` · 파일 ${r.outputIds.length}개 (결과물)` : ''}
           </small>
-          {r.error && <small className="error">{r.error}</small>}
-          {r.answer !== null && (
-            <pre className="mono clamp">{JSON.stringify(r.answer, null, 2).slice(0, 600)}</pre>
-          )}
+          {r.error && <p className="error">{r.error}</p>}
+          {r.answer !== null && <code className="mono clamp">{oneLine(r.answer)}</code>}
         </li>
       ))}
     </ul>
   );
+}
+
+/** 답을 한 줄로 (200자) */
+function oneLine(answer: unknown): string {
+  const text = JSON.stringify(answer);
+  return text.length > 200 ? `${text.slice(0, 200)}…` : text;
 }
