@@ -1,5 +1,6 @@
 import type { AppCodeBase } from './app-code-base';
 import { AppManifestCheck } from './app-manifest-check';
+import { DesignCheck } from './design-check';
 import { StageCheck } from './stage-check';
 
 /** 검사할 파일 하나: 앞 코드의 것이거나 AI가 낸 것. text는 읽은 글(템플릿 · cairn.json)만, 못 읽었으면 null */
@@ -80,6 +81,9 @@ export class AppCodeCheck {
     for (const f of made) all.set(f.name, f);
     const fixed = AppManifestCheck.isStatic(all.get(AppCodeCheck.MANIFEST)?.text ?? null);
     const checks = [AppCodeCheck.bundle([...all.values()], made, fixed, base.kind)];
+    // 디자인 기준 (references/design.md): 낸 HTML · CSS가 있을 때만
+    const design = DesignCheck.check(made, [...all.values()]);
+    if (design) checks.push(design);
     // 정적 앱의 HTML은 템플릿이 아니다: 문법 · 데이터 이름을 보지 않는다
     const templates = fixed ? [] : made.filter((f) => AppCodeCheck.isTemplate(f.name));
     if (templates.length === 0) return checks;

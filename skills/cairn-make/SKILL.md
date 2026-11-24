@@ -20,6 +20,11 @@ description: 코드 러너 칸에서 발표 · 표 · 문서 · 도표 · 영상
 - **띄운 것을 남기지 않는다.** LibreOffice(`soffice`)는 변환마다 끝나기를 기다린다. 서버 · 감시 모드는 끄고 끝낸다.
 - **발행 · 전송을 하지 않는다.** 만든 파일은 Cairn 안에만 남는다. 올리기는 러너가 한다.
 
+## 화면은 디자인 기준으로
+
+웹 페이지 · 앱 화면을 만들거나 고칠 때는 **먼저 [references/design.md](references/design.md)를 읽는다**: 목적에 맞는 스타일 하나를 고르고, 정해진 이름의 토큰(색 · 간격 · 글자 · 모서리)을 채우고, 체크리스트를 지킨다. 색 · 크기를 화면 코드에 직접 적지 않는다.
+앱 코드는 러너가 "디자인 기준" 검사(대비 · viewport · lang · 포커스 · 작은 글자 · alt · 움직임)로 본다.
+
 ## 형식은 HTML이 기본
 
 발표 자료 · 표(엑셀) · 문서(보고서)는 **HTML 파일 하나**로 낸다: [references/html.md](references/html.md)의 본보기를 복사해 내용만 바꾼다.
@@ -39,6 +44,7 @@ description: 코드 러너 칸에서 발표 · 표 · 문서 · 도표 · 영상
 | 받은 영상 편집 (자르기 · 무음 빼기 · 세로로 · 자막 · 소리) | ffmpeg · ffprobe | [references/video.md](references/video.md)의 "받은 영상 편집" |
 | 웹 페이지 (index.html) | 손으로 쓰는 HTML · CSS · JS | [references/page.md](references/page.md) |
 | 앱 코드 (스토어의 앱 화면) | Mustache 템플릿 · CSS · JS | [references/app-code.md](references/app-code.md) |
+| 화면의 디자인 (웹 페이지 · 앱 화면 모두) | 스타일 하나 + 토큰 + 체크리스트 | [references/design.md](references/design.md) |
 | PDF로 · 미리 보기 | `soffice --headless --convert-to pdf` · `pdftoppm -png` | [references/slides.md](references/slides.md) |
 
 한글 글꼴은 **Noto Sans CJK KR**(본문) · **Noto Serif CJK KR**(제목에 쓸 수 있음)이다. 글꼴을 정하지 않으면 한글이 □로 깨질 수 있다.
