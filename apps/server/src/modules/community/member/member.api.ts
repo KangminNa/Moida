@@ -8,7 +8,14 @@ import {
 } from '../../platform';
 import { MemberGuard } from '../guard/member.guard';
 import type { Member } from './member';
-import { JoinInput, LoginInput, MemberPlace, PasswordInput, RenameInput } from './member.input';
+import {
+  JoinInput,
+  LeaveInput,
+  LoginInput,
+  MemberPlace,
+  PasswordInput,
+  RenameInput,
+} from './member.input';
 import { MemberQuery } from './member.query';
 import { MemberService } from './member.service';
 import type { MemberMeView, MemberSelfView } from './member.view';
@@ -22,6 +29,8 @@ import { MemberSession } from './member-session';
 //   POST  api/community/logout         로그아웃
 //   PATCH api/community/me             닉네임 바꾸기
 //   PATCH api/community/me/password    비밀번호 바꾸기 (다른 로그인은 모두 끝난다)
+//   POST  api/community/me/leave       탈퇴 { password }: 개인정보를 지우고 모든 로그인을 끝낸다 (3-4, 글은 "탈퇴한 회원"으로 남는다)
+//   가입은 { …, termsVersion, privacyVersion }: 지금 공개된 약관 버전이어야 한다 (3-4, 아니면 409)
 // 가입 · 로그인 화면은 웹의 고정 화면이다 (3-2)
 @Controller('api/community')
 @UseGuards(MemberGuard)
@@ -93,6 +102,18 @@ export class MemberController {
       PasswordInput.from(body),
       Cookies.read(req, MemberSession.COOKIE),
     );
+  }
+
+  @Post('me/leave')
+  @HttpCode(204)
+  async leave(
+    @CurrentActor() actor: Actor,
+    @Body() body: unknown,
+    @Req() req: HttpRequest,
+    @Res({ passthrough: true }) res: HttpResponse,
+  ): Promise<void> {
+    await this.members.leave(actor, MemberPlace.from(req), LeaveInput.from(body));
+    Cookies.clear(res, MemberSession.COOKIE);
   }
 
   /** 가입 · 로그인한 브라우저에 새 회원 쿠키 (Domain 없이 이 앱 도메인에만) */

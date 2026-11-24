@@ -61,6 +61,9 @@ export class DomainErrorFilter extends BaseExceptionFilter {
 
   private recordDenied(error: DomainError, request: HttpRequest | undefined): void {
     if (!request || error.recorded || !DomainErrorFilter.DENIED.includes(error.status)) return;
+    // 앱 도메인의 요청(회원 · 방문자)은 남기지 않는다: 보안 기록은 IP를 90일 두는데, 회원의 IP는 저장하지 않는다 (스토어 3-4 · 11.0).
+    // 관리 API · 콘솔은 앱 도메인에서 열리지 않아(HostGate) 관리자 쪽 기록은 줄지 않는다
+    if (request.appHost) return;
     const path = String(request.originalUrl ?? '').split('?')[0] ?? '';
     if (!DomainErrorFilter.WATCHED.test(path)) return;
     const credential = request.headers.authorization

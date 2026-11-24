@@ -2,7 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { AppTableReadRule, AppTableWriteRule, CommentHiddenBy, CommentState, DecisionAction, DecisionByKind, ReportReason, ReportState, TopicHiddenBy, TopicState } from './community.tables';
+import type { AppTableReadRule, AppTableWriteRule, CommentHiddenBy, CommentState, DecisionAction, DecisionByKind, ReportReason, ReportState, TermByKind, TermKind, TopicHiddenBy, TopicState } from './community.tables';
 
 const communitySchema = pgSchema('community');
 
@@ -79,6 +79,9 @@ export const members = communitySchema.table('members', {
   login_id: text('login_id').notNull(),
   password_hash: text('password_hash').notNull(),
   password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
+  terms_version: integer('terms_version'),
+  privacy_version: integer('privacy_version'),
+  left_at: timestamp('left_at', { withTimezone: true }),
 });
 
 /** community.reports */
@@ -94,6 +97,18 @@ export const reports = communitySchema.table('reports', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   closed_at: timestamp('closed_at', { withTimezone: true }),
   version: integer('version').notNull(),
+});
+
+/** community.terms */
+export const terms = communitySchema.table('terms', {
+  id: uuid('id').notNull(),
+  app_id: uuid('app_id').notNull(),
+  kind: text('kind').$type<TermKind>().notNull(),
+  version: integer('version').notNull(),
+  body: text('body').notNull(),
+  by_kind: text('by_kind').$type<TermByKind>().notNull(),
+  by_id: uuid('by_id'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 /** community.topic_revisions */

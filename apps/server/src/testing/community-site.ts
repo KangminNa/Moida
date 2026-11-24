@@ -22,6 +22,9 @@ export class CommunitySite {
   ) {}
 
   /** 공개된 커뮤니티 앱 하나 (도메인은 모든 공간에서 하나라 부르는 쪽이 이 실행의 표시를 붙인다) */
+  /** link가 공개하는 약관의 버전 (가입할 때 동의하는 값) */
+  static readonly AGREED = { termsVersion: 1, privacyVersion: 1 };
+
   static async open(api: ApiClient, owner: TestUser, slug: string): Promise<CommunitySite> {
     const host = `${slug}.example.com`;
     const made = await api.request('POST', '/api/apps', owner, {
@@ -115,6 +118,16 @@ export class CommunitySite {
       assert.equal(done.status, 200, done.text);
       return done.json();
     };
+    // 약관 둘을 먼저 공개한다: 공개 전이면 가입을 받지 않는다 (3-4). 가입은 CommunitySite.AGREED에 동의한다
+    for (const kind of ['terms', 'privacy']) {
+      const published = await api.request(
+        'POST',
+        `/api/community/admin/${app.id}/terms/${kind}`,
+        owner,
+        { version: 0, body: `# ${kind}\n\n테스트 약관` },
+      );
+      assert.equal(published.status, 201, published.text);
+    }
     const set = await expect(
       api.request('PATCH', `/api/apps/${app.id}`, owner, { version: app.version, domain: host }),
     );
@@ -170,7 +183,13 @@ export class CommunitySite {
     const n = CommunitySite.places;
     const res = await this.at('/api/community/join', {
       method: 'POST',
-      body: { loginId, password: '오늘은 비가 와서 집에 있다', nickname, ageConfirmed: true },
+      body: {
+        loginId,
+        password: '오늘은 비가 와서 집에 있다',
+        nickname,
+        ageConfirmed: true,
+        ...CommunitySite.AGREED,
+      },
       headers: { 'x-forwarded-for': `10.30.${Math.floor(n / 250)}.${(n % 250) + 1}` },
     });
     assert.equal(res.status, 201, res.text);

@@ -97,6 +97,9 @@ export interface MemberRow {
   login_id: string;
   password_hash: string;
   password_changed_at: Date;
+  terms_version: number | null;
+  privacy_version: number | null;
+  left_at: Date | null;
 }
 export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at' | 'login_id' | 'password_hash' | 'password_changed_at'>;
 
@@ -121,6 +124,25 @@ export interface ReportRow {
   version: number;
 }
 export type ReportNew = Partial<ReportRow> & Pick<ReportRow, 'id' | 'app_id' | 'member_id' | 'reason'>;
+
+/** community.terms.kind (값 목록 CHECK) */
+export const TERM_KIND = ['terms', 'privacy'] as const;
+export type TermKind = (typeof TERM_KIND)[number];
+/** community.terms.by_kind (값 목록 CHECK) */
+export const TERM_BY_KIND = ['owner', 'approved'] as const;
+export type TermByKind = (typeof TERM_BY_KIND)[number];
+/** community.terms */
+export interface TermRow {
+  id: string;
+  app_id: string;
+  kind: TermKind;
+  version: number;
+  body: string;
+  by_kind: TermByKind;
+  by_id: string | null;
+  created_at: Date;
+}
+export type TermNew = Partial<TermRow> & Pick<TermRow, 'id' | 'app_id' | 'kind' | 'version' | 'body' | 'by_kind'>;
 
 /** community.topic_revisions */
 export interface TopicRevisionRow {

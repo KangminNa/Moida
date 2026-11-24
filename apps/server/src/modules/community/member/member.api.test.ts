@@ -72,7 +72,11 @@ async function freshHost(): Promise<string> {
 function join(body: Json, host = HOST, ip = nextIp()): Promise<ApiResult> {
   return at(
     '/api/community/join',
-    { method: 'POST', body: { ageConfirmed: true, ...body }, headers: { 'x-forwarded-for': ip } },
+    {
+      method: 'POST',
+      body: { ageConfirmed: true, ...CommunitySite.AGREED, ...body },
+      headers: { 'x-forwarded-for': ip },
+    },
     host,
   );
 }
