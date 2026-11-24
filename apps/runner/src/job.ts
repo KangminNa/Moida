@@ -2,6 +2,7 @@ import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
 import { JobAfter } from './job-after';
+import { JobLeadReplies } from './job-lead-replies';
 import { JobLineage } from './job-lineage';
 import { JobPlan } from './job-plan';
 import { JobRefs, type RefPhotos } from './job-refs';
@@ -144,10 +145,11 @@ export class Job {
     readonly wake: string | null = null,
     /** 팀장이 맡긴 일인가 (payload.delegatedBy). 아래 팀이 없으면 일이 클 때 ask_help로 도움을 청한다 (2026-11-20) */
     readonly delegated = false,
-    /** 이 일에서 set_plan으로 정한 계획 (payload.plan, 2026-11-20). 정하지 않았으면 null */
-    readonly plan: JobPlan | null = null,
-    /** 앞 단계의 결과 (payload.afterResults, D2 순서가 있는 위임). 앞 단계 없이 맡긴 일이면 null */
-    readonly after: JobAfter | null = null,
+    /**
+     * 지시문에 더할 payload의 단락 (있는 것만, 이 순서로): set_plan으로 정한 계획(JobPlan, 2026-11-20) · 앞 단계의 결과
+     * (JobAfter, D2 순서가 있는 위임) · 대표의 답(JobLeadReplies, 2026-11-24 대표 ↔ 일꾼 대화)
+     */
+    readonly notes: readonly (JobPlan | JobAfter | JobLeadReplies)[] = [],
   ) {}
 
   static from(raw: Json): Job {
@@ -193,8 +195,9 @@ export class Job {
       agent.flag('lead'),
       raw.optionalText('wake'),
       Boolean(payload.optionalText('delegatedBy')),
-      JobPlan.from(payload),
-      JobAfter.from(payload),
+      [JobPlan.from(payload), JobAfter.from(payload), JobLeadReplies.from(payload)].flatMap(
+        (p) => p ?? [],
+      ),
     );
   }
 
@@ -264,8 +267,7 @@ export class Job {
       this.lead,
       this.wake,
       this.delegated,
-      this.plan,
-      this.after,
+      this.notes,
     );
   }
 
@@ -346,7 +348,7 @@ export class Job {
     if (this.goalChain.length > 0)
       parts.push(prompts.fill('goal', { chain: this.goalChain.join(' › ') }));
     if (this.revisionNote) parts.push(prompts.fill('revision', { note: this.revisionNote }));
-    for (const p of [this.plan, this.after]) if (p) parts.push(p.part(prompts));
+    for (const note of this.notes) parts.push(note.part(prompts));
     if (this.subtaskResults.length > 0)
       parts.push(SubtaskResult.part(prompts, this.subtaskResults, this.wake, this.roundsLeft));
     if (this.brief) parts.push(this.brief);

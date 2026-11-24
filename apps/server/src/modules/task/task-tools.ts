@@ -15,6 +15,7 @@ import { InboxTool } from './inbox/inbox.tool';
 import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
 import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
 import { AskHelpTool, DelegateTaskTool, SetPlanTool, WaitSubtasksTool } from './task/delegate.tool';
+import { AskLeadTool, ReplyWorkerTool } from './task/lead-talk.tool';
 import {
   NextJobsTool,
   ReleaseJobTool,
@@ -37,6 +38,8 @@ export class TaskTools {
     DelegateTaskTool,
     WaitSubtasksTool,
     AskHelpTool,
+    AskLeadTool,
+    ReplyWorkerTool,
     SetPlanTool,
     AiLoginTool,
     AiLoginRefreshTool,
@@ -68,6 +71,8 @@ export class TaskTools {
     delegateTask: DelegateTaskTool,
     waitSubtasks: WaitSubtasksTool,
     askHelp: AskHelpTool,
+    askLead: AskLeadTool,
+    replyWorker: ReplyWorkerTool,
     setPlan: SetPlanTool,
     aiLogin: AiLoginTool,
     aiLoginRefresh: AiLoginRefreshTool,
@@ -95,6 +100,8 @@ export class TaskTools {
       delegateTask,
       waitSubtasks,
       askHelp,
+      askLead,
+      replyWorker,
       setPlan,
       aiLogin,
       aiLoginRefresh,

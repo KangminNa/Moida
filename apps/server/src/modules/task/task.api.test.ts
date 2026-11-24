@@ -928,6 +928,8 @@ describe('작업 토큰', () => {
       'delegate_task',
       'wait_subtasks',
       'ask_help',
+      'ask_lead',
+      'reply_worker',
       'set_plan',
       'read_url',
       'post_update',

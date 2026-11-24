@@ -227,7 +227,7 @@ export class TaskService extends BaseService {
       const parentId = await tasks.parentOf(taskId);
       const parent = parentId === null ? null : await tasks.lockById(parentId);
       const task = await tasks.lock(spaceId, taskId);
-      task.askHelp(agentId, req.part, now);
+      task.askHelp(agentId, SubtaskWait.helpLine(req.part), now);
       await tasks.save(task);
       if (!parent?.waitingForSubtasks) return new HelpAskedView(false);
       parent.wakeAfterSubtasks(SubtaskWait.HELP, now);

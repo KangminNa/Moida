@@ -438,7 +438,7 @@ export type TaskRunNew = Partial<TaskRunRow> & Pick<TaskRunRow, 'id' | 'space_id
 export const TASK_STATUS = ['queued', 'running', 'waiting', 'done', 'failed', 'cancelled'] as const;
 export type TaskStatus = (typeof TASK_STATUS)[number];
 /** task.tasks.wait_reason (값 목록 CHECK) */
-export const TASK_WAIT_REASON = ['approval', 'subtasks'] as const;
+export const TASK_WAIT_REASON = ['approval', 'subtasks', 'lead'] as const;
 export type TaskWaitReason = (typeof TASK_WAIT_REASON)[number];
 /** task.tasks */
 export interface TaskRow {

@@ -12,6 +12,7 @@ import { AgentRepository } from '../agent/agent.repository';
 import { RunnerRepository } from '../runner/runner.repository';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
+import { TaskSignin } from '../task/task-signin';
 import { AiLogin } from './ai-login';
 import type {
   AiLoginInput,
@@ -136,7 +137,7 @@ export class AiLoginService extends BaseService {
       const tool = task.signinTool;
       if (tool === null || tool !== req.tool || !Engines.of(tool).login.pastesCode)
         throw new RuleViolation('코드를 붙여 넣는 로그인이 아니에요');
-      task.acceptSigninCode(sealed);
+      task.signin((p) => TaskSignin.withCode(p, sealed));
       await tasks.save(task);
       return task;
     });
@@ -171,7 +172,8 @@ export class AiLoginService extends BaseService {
         const login = Engines.of(tool).login;
         login.assertUrl(req.url);
         login.assertUserCode(req.userCode);
-        task.showSignin(req.url, req.userCode);
+        const url = req.url;
+        task.signin((p) => TaskSignin.withUrl(p, url, req.userCode));
       }
       if (req.credential !== null) {
         Engines.of(tool).login.assertCredential(req.credential);
