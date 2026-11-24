@@ -37,6 +37,15 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   /** 이 동작은 서버가 한도를 넘었을 때만 올린다 */
   private static readonly SERVER_ACTION = 'task.agent.raise_limit';
   /** 새 에이전트의 처음 승인 동작: 모든 일꾼이 브라우저를 써서 사이트 클릭 · 로그인 승인을 올린다 (2026-11-21) */
+  /**
+   * 어느 에이전트나 올리는 결재 (2026-11-24 도구를 찾아 붙이기): 도구 붙이기 제안 · API 커넥터 · API 부르기.
+   * 붙이고 부르는 것은 관리자의 승인이 정하므로 승인 동작 목록으로 막지 않는다 (API 커넥터 둘은 서버만 올린다, ApiApproval)
+   */
+  private static readonly ANY_ACTIONS: readonly string[] = [
+    'task.tool.plug',
+    'task.api.plug',
+    'task.api.call',
+  ];
   private static readonly BROWSE_ACTIONS: readonly string[] = [
     'browser.site.publish',
     'browser.site.login',
@@ -364,6 +373,7 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
     // (어느 설정인지는 SettingQuery.reader가 막았다)
     if (task !== null && action === SettingKinds.ACTION && TaskKinds.proposes(task)) return;
     if (this.row.lead && AgentLead.PARTNER_ACTIONS.includes(action)) return;
+    if (Agent.ANY_ACTIONS.includes(action)) return;
     if (!this.row.approval_actions.includes(action))
       throw new Forbidden(action, `이 에이전트에게 맡기지 않은 동작이에요: ${action}`);
   }

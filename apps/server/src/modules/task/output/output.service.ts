@@ -151,6 +151,37 @@ export class OutputService extends EntityService<Output> {
     });
   }
 
+  /**
+   * 일꾼: API 커넥터가 받은 파일 하나를 결과물로 (2026-11-24, ApiCallJob). 부른 작업의 실행에 붙인다(관리자의 시험이면 없음).
+   * 주인의 올리기와 같이 흘려 저장하고 짧은 트랜잭션에서 공간 한도를 다시 센다
+   */
+  async keepFetched(
+    actor: Actor,
+    spaceId: string,
+    made: { taskId: string; runId: string } | null,
+    name: string,
+    body: AsyncIterable<Uint8Array>,
+  ): Promise<Output> {
+    actor.assertOwnerOrSystem();
+    OutputPolicy.assertName(name);
+    let sniffed: string | null = null;
+    const blob = await this.blobs.saveStream(body, OutputPolicy.FILE_MAX, (head) => {
+      sniffed = FileSniff.mimeOf(head);
+      return OutputPolicy.mimeOf(name, sniffed);
+    });
+    if (blob.size === 0) throw new RuleViolation('빈 파일이에요');
+    const freeBytes = await this.blobs.freeBytes();
+    const now = new Date();
+    return this.transaction(async (tx) => {
+      const store = new OutputRepository(tx);
+      await store.lockSpace(spaceId);
+      this.policy.assertRoom(await store.usedBytes(spaceId), freeBytes + blob.size, blob.size);
+      const output = Output.upload(spaceId, name, blob, sniffed, now, made);
+      await store.save(output);
+      return output;
+    });
+  }
+
   /** 휴지통으로 (30일 뒤 일꾼이 지운다) */
   trash(actor: Actor, req: OutputActionInput): Promise<Output> {
     return this.changeAsOwner(actor, req, (output) => output.trash(new Date()));

@@ -1,4 +1,5 @@
 import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-api';
+import { AskPageReads, PageReadResults } from './agent-reads';
 import { SaveRequests } from './api-tools';
 import { ApprovalDecided, TaskSettled } from './approvals';
 import { BrowserJob, LoginNeeded } from './browse';
@@ -61,11 +62,15 @@ export default class BrowserTabsPlugin extends BasePlugin {
     const autoRepair = cairn.settings().get('autoRepair') !== 'false';
     // 사이트 일에서 기록한 API로 사이트 도구를 저절로 만드는가 (설정 autoApiTools, 기본 켬, 2026-11-19 B3)
     const autoApiTools = cairn.settings().get('autoApiTools') !== 'false';
+    // 되풀이되는 읽기 일을 묻지 않고 사이트 도구로 굳히는가 (설정 autoRepeatTools, 기본 켬, 2026-11-24). 싫은 도구는 관리자가 지운다
+    const autoRepeatTools = cairn.settings().get('autoRepeatTools') !== 'false';
     for (const operation of [
       new ListReads(),
       new RequestRead(),
       new PendingReads(),
       new SaveRead(),
+      new AskPageReads(),
+      new PageReadResults(),
       new ListSites(),
       new AgentSites(),
       new CreateSite(),
@@ -74,7 +79,7 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new RequestBrowse(),
       new RequestExplore(),
       new ClearSession(screen),
-      new BrowserJob(),
+      new BrowserJob(autoRepeatTools),
       new LoginNeeded(),
       new LoginCard(logins),
       new SendLogin(logins),

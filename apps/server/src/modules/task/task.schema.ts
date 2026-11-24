@@ -2,7 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { bigint, boolean, customType, integer, jsonb, pgSchema, real, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolAuth, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
+import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApiCallEffect, ApiCallHeldReason, ApiCallStatus, ApiConnectorStatus, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolAuth, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const xid8Column = customType<{ data: string }>({ dataType: () => 'xid8' });
@@ -56,6 +56,59 @@ export const aiLogins = taskSchema.table('ai_logins', {
   last_error: text('last_error'),
   version: integer('version').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
+/** task.api_calls */
+export const apiCalls = taskSchema.table('api_calls', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  connector_id: uuid('connector_id').notNull(),
+  operation: text('operation').notNull(),
+  effect: text('effect').$type<ApiCallEffect>().notNull(),
+  task_id: uuid('task_id'),
+  run_id: uuid('run_id'),
+  agent_id: uuid('agent_id'),
+  request_id: text('request_id').notNull(),
+  input: jsonb('input').notNull(),
+  status: text('status').$type<ApiCallStatus>().notNull(),
+  held_reason: text('held_reason').$type<ApiCallHeldReason>(),
+  approval_id: uuid('approval_id'),
+  answer: jsonb('answer'),
+  vars: jsonb('vars').notNull(),
+  file_urls: text('file_urls').array().notNull(),
+  output_ids: uuid('output_ids').array().notNull(),
+  error: text('error'),
+  polls: integer('polls').notNull(),
+  next_at: timestamp('next_at', { withTimezone: true }),
+  give_up_at: timestamp('give_up_at', { withTimezone: true }),
+  version: integer('version').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  finished_at: timestamp('finished_at', { withTimezone: true }),
+});
+
+/** task.api_connectors */
+export const apiConnectors = taskSchema.table('api_connectors', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  name: text('name').notNull(),
+  title: text('title').notNull(),
+  base: text('base').notNull(),
+  spec: jsonb('spec').notNull(),
+  pending_spec: jsonb('pending_spec'),
+  history: jsonb('history').notNull(),
+  secret: byteaColumn('secret'),
+  nonce: byteaColumn('nonce'),
+  status: text('status').$type<ApiConnectorStatus>().notNull(),
+  daily_max: integer('daily_max').notNull(),
+  source: jsonb('source').notNull(),
+  note: text('note').notNull(),
+  proposed_by: uuid('proposed_by'),
+  last_used_at: timestamp('last_used_at', { withTimezone: true }),
+  last_error: text('last_error'),
+  version: integer('version').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 
 /** task.approvals */

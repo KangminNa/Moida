@@ -9,6 +9,7 @@ import type {
   AgentLead,
   AgentList,
   AiTools,
+  ApiConnectorList,
   ApprovalPage,
   ChatList,
   Engine,
@@ -94,6 +95,16 @@ export function useExternalTools() {
     EXTERNAL_TOOL_TOPICS,
   );
 }
+
+/** API 커넥터 목록 (설정 › 커넥터, 2026-11-24). 제안 · 승인 · 부르기가 바뀌면 다시 읽는다 */
+export function useApiConnectors() {
+  return useLiveValue(
+    'api-connectors',
+    () => api<ApiConnectorList>('GET', '/api/api-connectors'),
+    API_CONNECTOR_TOPICS,
+  );
+}
+const API_CONNECTOR_TOPICS = ['task.api_connector.*', 'task.api_call.*', 'task.approval.*'];
 
 /** AI 도구마다의 로그인 상태. 연결 확인과 웹 로그인은 작업으로 돌아서 작업이 바뀔 때 다시 읽는다 */
 export function useAiTools() {

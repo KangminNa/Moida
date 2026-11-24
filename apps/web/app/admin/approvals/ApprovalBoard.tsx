@@ -5,10 +5,12 @@ import { ago } from '../../_lib/time-ago';
 import { useLiveValue } from '../../_lib/use-live';
 import {
   actionLabel,
+  CALL_API,
   GOAL_COMPLETE,
   GOAL_CONTINUE,
   LOGIN_SITE,
   MERGE_PULL,
+  PLUG_API,
   PLUG_TOOL,
   PUBLISH_POST,
   PUBLISH_SITE,
@@ -40,9 +42,21 @@ const COLUMNS: readonly { key: string; title: string; actions: readonly string[]
   {
     key: 'out',
     title: '내보내기 · 실행',
-    actions: [PUBLISH_POST, PUBLISH_ISSUE, SHOW_APP_CODE, PUBLISH_SITE, MERGE_PULL, START_CODE],
+    actions: [
+      PUBLISH_POST,
+      PUBLISH_ISSUE,
+      SHOW_APP_CODE,
+      PUBLISH_SITE,
+      MERGE_PULL,
+      START_CODE,
+      CALL_API,
+    ],
   },
-  { key: 'setting', title: '설정 바꾸기', actions: [SETTING_CHANGE, PLUG_TOOL, RAISE_LIMIT] },
+  {
+    key: 'setting',
+    title: '설정 바꾸기',
+    actions: [SETTING_CHANGE, PLUG_TOOL, PLUG_API, RAISE_LIMIT],
+  },
   { key: 'mine', title: '직접 할 것', actions: [LOGIN_SITE, GOAL_CONTINUE, GOAL_COMPLETE] },
 ];
 

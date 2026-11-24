@@ -1244,3 +1244,98 @@ describe('브라우저 일의 위임', () => {
     assert.match(String(refused.body.message), /대표만 일꾼에게 맡길 수 있어요/);
   });
 });
+
+describe('일꾼의 화면 읽기 browser_read (2026-11-24)', () => {
+  /** 일반 일을 맡기고 빌려 그 작업 토큰을 받는다 */
+  async function runTokenOf(agent: string): Promise<string> {
+    const mark = randomUUID().slice(0, 8);
+    ok(
+      await api.request('POST', '/api/tasks', owner, {
+        requestId: randomUUID(),
+        agentId: agent,
+        title: `청약 조사 ${mark}`,
+        instruction: '오늘 청약 공고',
+      }),
+      201,
+    );
+    return String((await leased(mark)).run_token);
+  }
+
+  test('일꾼이 주소들을 맡기면 러너가 빈 창(blank)으로 읽고, 맡긴 일꾼만 결과를 받는다', async () => {
+    const run = await runTokenOf(agentId);
+    const urls = ['https://apply.example/notice?page=1', 'https://apply.example/notice?page=2'];
+    const requestId = randomUUID();
+    const asked = await tool(run, 'browser_read', { request_id: requestId, urls });
+    assert.equal(asked.ok, true, JSON.stringify(asked.body));
+    const items = asked.body.reads as Json[];
+    assert.deepEqual(
+      items.map((r) => [r.url, r.status]),
+      urls.map((u) => [u, 'requested']),
+    );
+    assert.equal(items[0]?.text, undefined, '맡길 때는 id와 상태만');
+    const again = await tool(run, 'browser_read', { request_id: requestId, urls });
+    assert.deepEqual(
+      (again.body.reads as Json[]).map((r) => r.id),
+      items.map((r) => r.id),
+      '같은 request_id는 한 번',
+    );
+
+    const pending = await tool(runner, 'browser_tab_pending');
+    const mine = (pending.body.reads as Json[]).filter((r) => items.some((i) => i.id === r.id));
+    assert.deepEqual(
+      mine.map((r) => r.blank),
+      [true, true],
+      '일꾼의 읽기는 로그인 없는 빈 창으로',
+    );
+    ok(await api.request('POST', `${BASE}/reads`, owner, { url: 'https://owner.example/' }));
+    const ownerRead = ((await tool(runner, 'browser_tab_pending')).body.reads as Json[]).find(
+      (r) => r.url === 'https://owner.example/',
+    );
+    assert.equal(ownerRead?.blank, false, '관리자의 읽기는 로그인된 프로필 그대로');
+
+    const ids = items.map((r) => String(r.id));
+    assert.equal(
+      (await tool(runner, 'browser_tab_save', { id: ids[0], title: '공고', body: '1페이지 공고' }))
+        .ok,
+      true,
+    );
+    const half = await tool(run, 'browser_read_result', { ids, wait_seconds: 0 });
+    assert.deepEqual(
+      (half.body.reads as Json[]).map((r) => r.status),
+      ['done', 'requested'],
+    );
+    assert.match(String(half.body.note), /다시 불러요/);
+    await tool(runner, 'browser_tab_save', { id: ids[1], error: '주소를 열지 못했어요' });
+    const done = await tool(run, 'browser_read_result', { ids, wait_seconds: 5 });
+    const [first, second] = done.body.reads as Json[];
+    assert.equal(first?.text, '1페이지 공고');
+    assert.equal(first?.title, '공고');
+    assert.equal(first?.truncated, false);
+    assert.equal(second?.status, 'failed');
+    assert.equal(second?.error, '주소를 열지 못했어요');
+
+    // 다른 일꾼은 남의 읽기를 보지 못한다 (빈 목록)
+    const stranger = await runTokenOf(await newAgent('다른 일꾼'));
+    const peek = await tool(stranger, 'browser_read_result', { ids, wait_seconds: 0 });
+    assert.deepEqual(peek.body.reads, []);
+  });
+
+  test('주소 모양 · 개수를 거르고, 기기 토큰은 부르지 못한다', async () => {
+    const run = await runTokenOf(agentId);
+    for (const urls of [[], ['ftp://files.example/a'], ['https://me:pw@site.example/']]) {
+      const refused = await tool(run, 'browser_read', { request_id: randomUUID(), urls });
+      assert.equal(refused.ok, false, JSON.stringify(urls));
+    }
+    const many = Array.from({ length: 11 }, (_, i) => `https://site.example/${i}`);
+    assert.equal(
+      (await tool(run, 'browser_read', { request_id: randomUUID(), urls: many })).ok,
+      false,
+    );
+    assert.equal((await tool(run, 'browser_read_result', { ids: ['not-a-uuid'] })).ok, false);
+    const device = await tool(runner, 'browser_read', {
+      request_id: randomUUID(),
+      urls: ['https://site.example/'],
+    });
+    assert.equal(device.ok, false, '러너 기기는 일꾼의 읽기를 맡기지 못한다');
+  });
+});

@@ -5,10 +5,12 @@ import {
   BaseService,
   Forbidden,
   Idempotency,
+  RuleViolation,
   type Sql,
   SystemActor,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
+import { ApiApproval } from '../api-connector/api-approval.policy';
 import { ChatResult } from '../chat/chat-result.policy';
 import { OutputRepository } from '../output/output.repository';
 import type { Task } from '../task/task';
@@ -33,6 +35,8 @@ export class ApprovalService extends BaseService {
     actor.assertCan(Actor.AGENT);
     if (!(actor instanceof AgentActor) || !actor.spaceId) throw new Forbidden(Actor.AGENT);
     const { spaceId, agentId, taskId } = actor;
+    if (ApiApproval.SERVER_ONLY.includes(req.fields.action))
+      throw new RuleViolation(`${req.fields.action}는 서버가 올려요 (propose_api · api_run)`);
     const now = new Date();
     return this.transaction(async (tx) => {
       const approvals = new ApprovalRepository(tx);

@@ -48,6 +48,10 @@ export const LOGGED_IN_NOTE = '로그인했어요';
 export const MERGE_PULL = 'code.pr.merge';
 /** 외부 도구 꽂기 (2차 7단계): AI가 제안한 도구를 붙이는 승인. 승인하면 켜고 제안한 에이전트에 붙인다 */
 export const PLUG_TOOL = 'task.tool.plug';
+/** API 커넥터 (2026-11-24): 일꾼이 낸 정의서로 REST API를 붙이거나 새 버전으로 바꾸는 승인 (서버가 올린다) */
+export const PLUG_API = 'task.api.plug';
+/** API 커넥터의 부르기 한 번: 바깥에 남기는 동작이거나 하루 한도를 넘었다 */
+export const CALL_API = 'task.api.call';
 /** 설정 바꾸기 (2026-11-15 C): AI가 propose_setting으로 올린 바꿀 값. 승인하면 서버가 바꾼다 */
 export const SETTING_CHANGE = 'task.setting.change';
 /** 코드 작업 열기 (2026-11-15 C, code-github 패키지): 승인하면 그 저장소에 코드 작업이 시작된다 */
@@ -76,6 +80,8 @@ export const ACTION_LABELS: Record<string, string> = {
   [LOGIN_SITE]: '로그인 필요',
   [MERGE_PULL]: 'PR 머지',
   [PLUG_TOOL]: '커넥터 붙이기',
+  [PLUG_API]: 'API 커넥터 붙이기',
+  [CALL_API]: 'API 부르기',
   [SETTING_CHANGE]: '설정 바꾸기',
   [START_CODE]: '코드 작업 열기',
   [SHOW_APP_CODE]: '앱 코드 공개',
@@ -94,6 +100,8 @@ export const TARGET_LABELS: Record<string, string> = {
   post: '글',
   agent: '에이전트',
   browser_site: '사이트',
+  api_connector: 'API 커넥터',
+  api_call: 'API 부르기',
   browser_click: '브라우저 버튼',
   browser_click_plan: '누르기 계획',
   pull_request: 'PR',

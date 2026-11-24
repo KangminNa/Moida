@@ -350,9 +350,16 @@ export class CairnServer {
   }
 
   /** 읽어 달라는 브라우저 탭 주소들 (browser-tabs 패키지). 패키지가 꺼져 있으면 도구가 없어 ToolRefused */
-  async pendingTabs(stop: AbortSignal): Promise<readonly { id: string; url: string }[]> {
+  /** 읽어 달라는 주소들. blank면 일꾼의 읽기라 로그인 없는 새 빈 컨텍스트에서 내부 주소를 막고 읽는다 */
+  async pendingTabs(
+    stop: AbortSignal,
+  ): Promise<readonly { id: string; url: string; blank: boolean }[]> {
     const body = await this.mcp.call('browser_tab_pending', {}, 0, stop);
-    return body.list('reads').map((r) => ({ id: r.text('id'), url: r.text('url') }));
+    return body.list('reads').map((r) => ({
+      id: r.text('id'),
+      url: r.text('url'),
+      blank: r.flag('blank'),
+    }));
   }
 
   /** 읽은 탭을 남긴다. 읽지 못했으면 error만 */

@@ -70,6 +70,73 @@ export interface AiLoginRow {
 }
 export type AiLoginNew = Partial<AiLoginRow> & Pick<AiLoginRow, 'id' | 'space_id' | 'tool' | 'secret' | 'nonce'>;
 
+/** task.api_calls.effect (값 목록 CHECK) */
+export const API_CALL_EFFECT = ['read', 'spend', 'write'] as const;
+export type ApiCallEffect = (typeof API_CALL_EFFECT)[number];
+/** task.api_calls.status (값 목록 CHECK) */
+export const API_CALL_STATUS = ['held', 'running', 'polling', 'fetching', 'done', 'failed', 'refused'] as const;
+export type ApiCallStatus = (typeof API_CALL_STATUS)[number];
+/** task.api_calls.held_reason (값 목록 CHECK) */
+export const API_CALL_HELD_REASON = ['write', 'limit'] as const;
+export type ApiCallHeldReason = (typeof API_CALL_HELD_REASON)[number];
+/** task.api_calls */
+export interface ApiCallRow {
+  id: string;
+  space_id: string;
+  connector_id: string;
+  operation: string;
+  effect: ApiCallEffect;
+  task_id: string | null;
+  run_id: string | null;
+  agent_id: string | null;
+  request_id: string;
+  input: unknown;
+  status: ApiCallStatus;
+  held_reason: ApiCallHeldReason | null;
+  approval_id: string | null;
+  answer: unknown | null;
+  vars: unknown;
+  file_urls: readonly string[];
+  output_ids: readonly string[];
+  error: string | null;
+  polls: number;
+  next_at: Date | null;
+  give_up_at: Date | null;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+  finished_at: Date | null;
+}
+export type ApiCallNew = Partial<ApiCallRow> & Pick<ApiCallRow, 'id' | 'space_id' | 'connector_id' | 'operation' | 'effect' | 'request_id' | 'status'>;
+
+/** task.api_connectors.status (값 목록 CHECK) */
+export const API_CONNECTOR_STATUS = ['proposed', 'active', 'off'] as const;
+export type ApiConnectorStatus = (typeof API_CONNECTOR_STATUS)[number];
+/** task.api_connectors */
+export interface ApiConnectorRow {
+  id: string;
+  space_id: string;
+  name: string;
+  title: string;
+  base: string;
+  spec: unknown;
+  pending_spec: unknown | null;
+  history: unknown;
+  secret: Buffer | null;
+  nonce: Buffer | null;
+  status: ApiConnectorStatus;
+  daily_max: number;
+  source: unknown;
+  note: string;
+  proposed_by: string | null;
+  last_used_at: Date | null;
+  last_error: string | null;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+}
+export type ApiConnectorNew = Partial<ApiConnectorRow> & Pick<ApiConnectorRow, 'id' | 'space_id' | 'name' | 'title' | 'base' | 'spec'>;
+
 /** task.approvals.status (값 목록 CHECK) */
 export const APPROVAL_STATUS = ['pending', 'revision_requested', 'approved', 'rejected', 'cancelled'] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUS)[number];

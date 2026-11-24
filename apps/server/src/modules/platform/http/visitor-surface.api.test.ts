@@ -92,6 +92,9 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/devices': 403,
   'GET /api/events/failed': 403,
   'GET /api/external-tools': 403,
+  // API 커넥터 (2026-11-24): 관리자만
+  'GET /api/api-connectors': 403,
+  'GET /api/api-connectors/:id/calls': 403,
   // OAuth 커넥터의 돌아오는 곳 (C1): 관리자의 브라우저만. 방문자는 403
   'GET /api/external-tools/oauth/callback': 403,
   'GET /api/goals': 403,

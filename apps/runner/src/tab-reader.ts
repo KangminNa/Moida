@@ -1,6 +1,7 @@
 import { Backoff, pause } from './backoff';
 import { type BrowserTabs, BrowserUnavailable, TabUnreadable } from './browser-tabs';
 import type { CairnServer } from './cairn-server';
+import { ExploreProxy } from './explore-proxy';
 import { AccessDenied, ToolRefused } from './mcp-client';
 import type { RunLog } from './redactor';
 
@@ -8,13 +9,19 @@ import type { RunLog } from './redactor';
 // 읽어 달라는 주소를 받아(browser_tab_pending) 브라우저 탭으로 열어 읽고 남긴다(browser_tab_save).
 // 작업 대기열(next_jobs)과 따로 돈다: 탭 읽기는 AI를 부르지 않아 일과 한도를 나눠 쓰지 않는다.
 // 로그에는 요청 id와 주소의 호스트만 남긴다 (경로 · 내용은 남기지 않는다).
+// 일꾼의 읽기(blank, 2026-11-24 browser_read)는 로그인 없는 새 빈 컨텍스트에서 내부 주소를 막는 프록시로만 나간다.
+// 일꾼이 결과를 기다리므로 자주 묻고, 한 번에 READ_AT_ONCE개씩 함께 읽는다.
 export class TabReader {
-  /** 읽을 것이 없을 때 다시 묻는 간격 */
-  static readonly IDLE_MS = 15_000;
+  /** 읽을 것이 없을 때 다시 묻는 간격 (일꾼이 browser_read_result로 기다린다) */
+  static readonly IDLE_MS = 3_000;
+  /** 함께 여는 탭 수 */
+  static readonly READ_AT_ONCE = 3;
   /** 패키지가 꺼져 있을 때 (도구가 없을 때) 다시 묻는 간격 */
   static readonly OFF_MS = 300_000;
   private readonly backoff = new Backoff(5_000, 300_000);
   private off = false;
+  /** 일꾼의 읽기가 나가는 프록시 (처음 쓸 때 띄우고 run이 끝나면 닫는다) */
+  private proxy: Promise<ExploreProxy> | null = null;
 
   constructor(
     private readonly server: CairnServer,
@@ -25,13 +32,34 @@ export class TabReader {
   /** stop까지 돈다. 토큰이 거절되면 AccessDenied를 그대로 던진다 (러너가 다시 연결한다) */
   async run(stop: AbortSignal): Promise<void> {
     this.log.info('브라우저 탭 읽기를 켰어요');
+    try {
+      await this.loop(stop);
+    } finally {
+      const proxy = this.proxy;
+      this.proxy = null;
+      await proxy?.then((p) => p.close()).catch(() => undefined);
+    }
+  }
+
+  private async loop(stop: AbortSignal): Promise<void> {
     while (!stop.aborted) {
       try {
         const asked = await this.server.pendingTabs(stop);
         if (this.off) this.log.info('브라우저 탭 패키지가 켜져 있어요. 읽기를 시작해요');
         this.off = false;
         this.backoff.reset();
-        for (const tab of asked) await this.readOne(tab.id, tab.url, stop);
+        for (let i = 0; i < asked.length; i += TabReader.READ_AT_ONCE) {
+          // 함께 연 탭이 모두 끝난 뒤에 실패를 던진다 (도는 탭을 두고 다시 물으면 같은 주소를 두 번 연다)
+          const settled = await Promise.allSettled(
+            asked
+              .slice(i, i + TabReader.READ_AT_ONCE)
+              .map(async (tab) =>
+                this.readOne(tab.id, tab.url, tab.blank ? await this.proxyUrl() : null, stop),
+              ),
+          );
+          const failed = settled.find((r) => r.status === 'rejected');
+          if (failed) throw failed.reason;
+        }
         if (asked.length === 0) await pause(TabReader.IDLE_MS, stop);
       } catch (error) {
         if (stop.aborted) break;
@@ -51,14 +79,25 @@ export class TabReader {
     }
   }
 
+  /** 함께 읽는 탭들이 한 프록시를 나눠 쓴다 (띄우는 중인 것을 함께 기다린다) */
+  private async proxyUrl(): Promise<string> {
+    this.proxy ??= ExploreProxy.start();
+    return (await this.proxy).url;
+  }
+
   /**
    * 하나를 읽어 남긴다. 페이지를 읽지 못했으면 그 이유를 남긴다 (같은 주소를 계속 다시 열지 않게).
    * 브라우저에 닿지 못하면(BrowserUnavailable) 남기지 않고 그대로 던져 run이 기다렸다 다시 한다
    */
-  private async readOne(id: string, url: string, stop: AbortSignal): Promise<void> {
+  private async readOne(
+    id: string,
+    url: string,
+    proxy: string | null,
+    stop: AbortSignal,
+  ): Promise<void> {
     const host = TabReader.hostOf(url);
     try {
-      const text = await this.browser.read(url, stop);
+      const text = await this.browser.read(url, stop, proxy);
       await this.server.saveTab(id, { title: text.title, body: text.body });
       this.log.info(`브라우저 탭을 읽었어요: ${host} (${text.body.length}자)`);
     } catch (error) {

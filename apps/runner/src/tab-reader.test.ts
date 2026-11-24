@@ -11,8 +11,8 @@ import { TabReader } from './tab-reader';
 type Saved = { id: string; read: object };
 
 function fakes(
-  answers: (() => readonly { id: string; url: string }[])[],
-  read: (url: string) => TabText,
+  answers: (() => readonly { id: string; url: string; blank?: boolean }[])[],
+  read: (url: string, proxy: string | null) => TabText,
 ) {
   const saved: Saved[] = [];
   const stopper = new AbortController();
@@ -30,8 +30,8 @@ function fakes(
     },
   } as unknown as CairnServer;
   const browser = {
-    async read(url: string) {
-      return read(url);
+    async read(url: string, _stop: AbortSignal, proxy: string | null) {
+      return read(url, proxy);
     },
   } as unknown as BrowserTabs;
   return { saved, stopper, reader: new TabReader(server, browser, new RunLog(new Redactor([]))) };
@@ -88,5 +88,27 @@ describe('TabReader', () => {
     const text = TabText.of('가'.repeat(400), '나'.repeat(TabText.BODY_MAX + 10));
     assert.equal(text.title.length, TabText.TITLE_MAX);
     assert.equal(text.body.length, TabText.BODY_MAX);
+  });
+
+  test('일꾼의 읽기(blank)만 내부 주소를 막는 프록시로 읽고, 함께 읽는 탭은 한 프록시를 나눠 쓴다', async () => {
+    const proxies: (string | null)[] = [];
+    const { saved, stopper, reader } = fakes(
+      [
+        () => [
+          { id: 'a', url: 'https://owner.example/', blank: false },
+          { id: 'b', url: 'https://one.example/', blank: true },
+          { id: 'c', url: 'https://two.example/', blank: true },
+        ],
+      ],
+      (_url, proxy) => {
+        proxies.push(proxy);
+        return TabText.of('t', 'b');
+      },
+    );
+    await reader.run(stopper.signal);
+    assert.equal(saved.length, 3);
+    assert.equal(proxies[0], null, '관리자의 읽기는 프록시 없이');
+    assert.match(String(proxies[1]), /^http:\/\/127\.0\.0\.1:\d+$/);
+    assert.equal(proxies[1], proxies[2], '한 프록시를 나눠 쓴다');
   });
 });
