@@ -43,7 +43,7 @@ export class AppIconFile {
 export class AppDomainProofAnswer {
   constructor(
     private readonly token: string,
-    /** 읽어도 되는 출처: 사이트 주소. 정하기 전이면 null (아무 출처도 읽지 못한다) */
+    /** 읽어도 되는 출처: 요청이 사이트 주소에서 왔을 때 그 출처. 아니면 null (아무 출처도 읽지 못한다) */
     readonly allowOrigin: string | null,
   ) {}
 
@@ -170,14 +170,17 @@ export class AppQuery extends BaseQuery {
 
   /**
    * 도메인 연결 확인 값 (스토어 3-0): 앱 도메인으로 온 요청이면 그 도메인을 가진 앱의 값. 기본 도메인 · 모르는 도메인이면 404.
-   * 비공개 앱의 도메인도 답한다: 공개하기 전에 연결을 확인하게. 값으로는 앱이 무엇인지 알 수 없다 (AppDomainProof)
+   * 비공개 앱의 도메인도 답한다: 공개하기 전에 연결을 확인하게. 값으로는 앱이 무엇인지 알 수 없다 (AppDomainProof).
+   * 읽어도 되는 출처(CORS)는 요청이 사이트 주소에서 왔을 때만 싣는다 (2026-11-25): 누구나 앱 도메인에 GET 한 번으로
+   * 그 앱을 올린 사이트(콘솔이 있는 곳)를 알아내지 못하게
    */
   async domainProof(_actor: Actor, req: DomainProofInput): Promise<AppDomainProofAnswer> {
     const row = req.host === null ? null : await this.row(apps, { domain: req.host });
     if (!row?.domain) throw new NotFound('없는 주소예요');
+    const site = await this.gate.siteOrigin();
     return new AppDomainProofAnswer(
       new AppDomainProof(this.box).tokenOf(row.id, row.domain),
-      await this.gate.siteOrigin(),
+      site !== null && req.origin === site ? site : null,
     );
   }
 

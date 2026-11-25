@@ -143,7 +143,18 @@ describe('앱 도메인으로 온 요청 (HostGate)', () => {
     const proof = await viaHost('/.well-known/cairn-domain', domain);
     assert.equal(proof.status, 200, proof.text);
     assert.match(String(proof.json().token), /^[\w-]{40,}$/);
-    assert.match(proof.header('access-control-allow-origin') ?? '', /^http:\/\/127\.0\.0\.1:\d+$/);
+    // 출처는 사이트에서 온 요청에만 알려 준다: GET 한 번으로 콘솔이 있는 사이트를 알아내지 못하게 (2026-11-25)
+    assert.equal(proof.header('access-control-allow-origin'), null, 'Origin 없는 요청');
+    const other = await api.viaHost('/.well-known/cairn-domain', domain, {
+      headers: { origin: 'https://attacker.example' },
+    });
+    assert.equal(other.header('access-control-allow-origin'), null, '다른 출처');
+    const site = new URL(api.baseUrl).origin;
+    const fromSite = await api.viaHost('/.well-known/cairn-domain', domain, {
+      headers: { origin: site },
+    });
+    assert.equal(fromSite.header('access-control-allow-origin'), site, '사이트 화면이 읽을 때');
+    assert.equal(fromSite.header('vary'), 'Origin');
     const again = await viaHost('/.well-known/cairn-domain', domain, { forwarded: true });
     assert.equal(again.json().token, proof.json().token, '같은 앱 · 도메인이면 같은 값');
   });
