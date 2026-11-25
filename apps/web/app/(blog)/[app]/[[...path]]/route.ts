@@ -12,6 +12,7 @@ import { cairnAnswer } from '../../../_blog/cairn-client';
 import { withConsoleLink } from '../../../_blog/console-link';
 import { slugFrom } from '../../../_blog/format';
 import { mapFor, mapHosts } from '../../../_blog/map-config';
+import { mapSearchAnswer } from '../../../_blog/map-search';
 import { hostOf, originOf } from '../../../_blog/request-host';
 import { brokenAnswer, missingAnswer, unreachableAnswer } from '../../../_blog/site-answer';
 import type {
@@ -54,6 +55,9 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   // 미리 보기 주소 아래의 화면 데이터 (/<앱>/~<토큰>/_/data, cairn.data): 그 토큰의 버전 그대로
   if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'data')
     return appDataAnswer(request, app, ticket);
+  // 미리 보기 주소 아래의 장소 · 주소 찾기 (/<앱>/~<토큰>/_/map/<동작>, cairn.map.search): 토큰과 상관없이 같은 찾기
+  if (ticket !== null && parts.length === 3 && parts[0] === '_' && parts[1] === 'map')
+    return mapSearchAnswer(request, parts[2] ?? '');
   if (parts[0] === 'files' && parts.length === 2) {
     // 없으면 화면으로 넘긴다: 정적 앱의 files/ 폴더일 수 있다 (그 밖에는 화면이 404를 낸다)
     const found = await file(request, app, parts[1] ?? '', ticket);

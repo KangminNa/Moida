@@ -32,28 +32,38 @@ export class PackageService extends BaseService {
     method: string,
     path: string,
     raw: object,
+    place: string | null = null,
   ): Promise<ToolAnswer> {
     const at = this.registry.operationAt(plugin, method, path);
     if (!at) throw new NotFound(`없는 경로예요: ${method} /api/p/${plugin}/${path}`);
-    return this.run(actor, at.found, { ...raw, ...at.params });
+    return this.run(actor, at.found, { ...raw, ...at.params }, place);
   }
 
-  /** 동작 하나를 순서대로 돌린다 */
-  async run(actor: Actor, found: PackageOperation, raw: unknown): Promise<ToolAnswer> {
+  /** 동작 하나를 순서대로 돌린다. place: REST로 온 요청의 곳 (플러그인 API 0.11, MCP는 null) */
+  async run(
+    actor: Actor,
+    found: PackageOperation,
+    raw: unknown,
+    place: string | null = null,
+  ): Promise<ToolAnswer> {
     const { operation, manifest } = found;
     operation.check(actor);
     const input = operation.input(raw);
     const emits = (name: string) => manifest.emits(name);
     const leased = (id: string) => this.leases.of(actor, id);
     if (!operation.writes)
-      return operation.run(new Work(this.db.sql, manifest.schema, emits, leased), actor, input);
+      return operation.run(
+        new Work(this.db.sql, manifest.schema, emits, leased, null, place),
+        actor,
+        input,
+      );
     return this.transaction(async (tx) => {
       // 대화 입구 (0.10): 허락받은 쓰기 동작만, 같은 트랜잭션에서
       const chat = manifest.allows('chat')
         ? (spaceId: string, chatId: string | null, requestId: string, text: string) =>
             this.chats.send(tx, spaceId, chatId, requestId, text)
         : null;
-      const work = new Work(tx, manifest.schema, emits, leased, chat);
+      const work = new Work(tx, manifest.schema, emits, leased, chat, place);
       const answer = await operation.run(work, actor, input);
       await new Outbox(tx).publish(work.events);
       return answer;

@@ -9,11 +9,13 @@
 // 0.8 (2026-11-21): actor.runTask() — 에이전트(작업 토큰)가 부른 도구를 지금 하는 일에 묶는다. 결과 이벤트의 outcome continue —
 //     결재를 기다리던 작업을 다시 대기열로 (browser-tabs의 누르기 계획: 계획을 승인하면 같은 일이 이어서 누른다)
 // 0.10 (2026-11-23): work.sendChat — uses의 chat을 허락받은 쓰기 동작이 관리자의 대화에 말을 넣는다 (ChatSent, messenger-telegram)
+// 0.11 (2026-11-25): work.place · AttemptLimiter · TooManyRequests — 방문자가 부르는 동작이 곳(IP)마다 횟수를 센다 (map의 찾기)
 export {
   ActionResult,
   Actor,
   ArchiveFile,
   type ArchiveRestoreService,
+  AttemptLimiter,
   BaseAction,
   BaseGateway,
   BaseHandler,
@@ -42,6 +44,7 @@ export {
   SystemActor,
   TableColumns,
   type ToolAnswer,
+  TooManyRequests,
   ValueList,
   VisitorActor,
   type Where,

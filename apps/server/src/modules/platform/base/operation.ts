@@ -93,6 +93,11 @@ export class Work extends TableWriter {
       Promise.reject(new Error('임대를 확인할 수 없어요')),
     /** 대화 입구 (플러그인 API 0.10). 목록 파일의 uses에 chat이 없으면 null */
     private readonly chat: ChatPort | null = null,
+    /**
+     * 부른 곳 (플러그인 API 0.11): REST로 온 요청의 IP를 한 곳으로 묶은 열쇠 (IPv6는 /64, AttemptLimiter.place).
+     * 방문자가 부르는 동작이 곳마다 횟수를 셀 때 쓴다. MCP · 이벤트로 돈 일은 null
+     */
+    readonly place: string | null = null,
   ) {
     super();
   }

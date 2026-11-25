@@ -1,19 +1,31 @@
 {
-  "$comment": "지도 회사 정보 한 파일 (docs/지도.md MP-1). 웹(_blog/map-config.ts · cairn-map.ts)이 읽고, 서버 AppManifest · 러너 AppManifestCheck의 sdkHosts는 테스트가 이 파일과 맞춰 본다. 키 이름 · 주소가 바뀌면 여기만 고친다",
+  "$comment": "지도 회사 정보 한 파일 (docs/지도.md MP-1 · MP-2). 웹(_blog/map-config.ts · cairn-map.ts)과 이 플러그인의 서버(server/)가 읽고, 서버 AppManifest · 러너 AppManifestCheck의 sdkHosts는 테스트가 이 파일과 맞춰 본다. 키 이름 · 주소가 바뀌면 여기만 고친다",
   "providers": {
     "kakao": {
       "label": "카카오맵",
       "keySetting": "kakaoJsKey",
       "script": "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey={key}",
       "sdkHosts": ["dapi.kakao.com", "t1.daumcdn.net"],
-      "hosts": ["dapi.kakao.com", "t1.daumcdn.net"]
+      "hosts": ["dapi.kakao.com", "t1.daumcdn.net"],
+      "search": {
+        "keySetting": "kakaoRestKey",
+        "places": true,
+        "dailyDefault": 50000,
+        "attribution": "카카오"
+      }
     },
     "naver": {
       "label": "네이버 지도",
       "keySetting": "naverClientId",
       "script": "https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={key}",
       "sdkHosts": ["oapi.map.naver.com", "openapi.map.naver.com"],
-      "hosts": ["oapi.map.naver.com", "nrbe.map.naver.net", "kr-col-ext.nelo.navercorp.com"]
+      "hosts": ["oapi.map.naver.com", "nrbe.map.naver.net", "kr-col-ext.nelo.navercorp.com"],
+      "search": {
+        "keySetting": "naverClientSecret",
+        "places": false,
+        "dailyDefault": 1000,
+        "attribution": "NAVER"
+      }
     },
     "google": {
       "label": "구글 지도",
@@ -25,7 +37,13 @@
         "maps.gstatic.com",
         "fonts.googleapis.com",
         "fonts.gstatic.com"
-      ]
+      ],
+      "search": {
+        "keySetting": "googleServerKey",
+        "places": true,
+        "dailyDefault": 100,
+        "attribution": "Google"
+      }
     }
   },
   "leaflet": {

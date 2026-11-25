@@ -1,8 +1,8 @@
 {
   "name": "map",
-  "version": "0.2.0",
-  "cairn": ">=0.1",
-  "description": "지도 API를 등록한다. 앱 코드는 cairn.map.create(자리, { places })로 지도를 그리고, 어느 회사 지도인지는 여기서 정한다. 회사마다 키 이름 · 스크립트 주소는 providers.json 한 곳에 있다. 카카오 · 네이버 · 구글 지도는 앱의 도메인으로 연 화면에서만 돌고, 격리된 화면(미리 보기 · 기본 도메인 · 페이지)은 키가 필요 없는 OpenStreetMap으로 그린다",
+  "version": "0.3.0",
+  "cairn": ">=0.11",
+  "description": "지도 API를 등록한다. 앱 코드는 cairn.map.create(자리, { places })로 지도를 그리고 cairn.map.search · geocode · reverse로 장소 · 주소를 찾는다. 어느 회사 지도인지는 여기서 정한다 (회사마다 키 이름 · 주소는 providers.json). 브라우저용 키는 공개 값, 찾기용 서버 키는 암호화해 서버에만 둔다. 카카오 · 네이버 · 구글 지도는 앱의 도메인으로 연 화면에서만 돌고, 격리된 화면(미리 보기 · 기본 도메인 · 페이지)은 키가 필요 없는 OpenStreetMap으로 그린다",
   "settings": {
     "provider": {
       "label": "지도",
@@ -37,6 +37,40 @@
       "default": "osm",
       "public": true,
       "help": "osm: OpenStreetMap 공식 타일 (출처 표시 · 대량 사용 금지 정책) · carto: CARTO Voyager (무료 조건은 CARTO 약관을 확인해요)"
+    },
+    "searchProvider": {
+      "label": "장소 · 주소 찾기",
+      "type": "select",
+      "options": ["none", "kakao", "naver", "google"],
+      "default": "none",
+      "help": "앱의 cairn.map.search · geocode · reverse가 쓸 회사. none이면 찾기를 쓰지 않아요. 서버가 아래 서버 키로 대신 불러요 (키는 브라우저에 가지 않아요). 네이버는 주소 찾기만 돼요(장소 이름 찾기는 없음). 구글은 약관상 구글 지도와 함께일 때만 써요"
+    },
+    "kakaoRestKey": {
+      "label": "카카오 REST API 키",
+      "type": "secret",
+      "help": "카카오 개발자 콘솔의 REST API 키 (로컬 API). 서버에서만 써요"
+    },
+    "naverClientSecret": {
+      "label": "네이버 Client Secret",
+      "type": "secret",
+      "help": "NAVER Cloud Maps 애플리케이션의 Client Secret (Geocoding · Reverse Geocoding을 고른 것). Client ID는 위의 네이버 Client ID를 함께 써요"
+    },
+    "googleServerKey": {
+      "label": "구글 서버용 API 키",
+      "type": "secret",
+      "help": "Geocoding API · Places API(New)만 허용한 서버용 키. 브라우저용 키와 다른 키를 써요"
+    },
+    "dailyLimit": {
+      "label": "하루 찾기 한도",
+      "type": "text",
+      "help": "서버가 하루(UTC)에 회사를 부르는 횟수 상한. 비우면 회사마다 무료량의 절반쯤 (카카오 50000 · 네이버 1000 · 구글 100). 같은 질문 10분 안의 다시 묻기는 세지 않아요"
     }
-  }
+  },
+  "server": "server/plugin.ts",
+  "api": {
+    "GET /search": "search",
+    "GET /geocode": "geocode",
+    "GET /reverse": "reverse"
+  },
+  "uses": ["api"]
 }
