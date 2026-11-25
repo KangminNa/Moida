@@ -156,3 +156,9 @@ COPY --from=egress-build /repo/apps/egress/dist /app
 USER node
 EXPOSE 3128
 CMD ["node", "main.js"]
+
+# 기본 단계 (target 없이 `docker build .`로 지을 때 마지막 단계가 이미지가 된다). Cairn은 컨테이너 여럿
+# (db · migrate · server · worker · web · runner)이 함께 도는 구성이라 이미지 하나로 띄우지 않는다.
+# 마지막 단계가 나가는 프록시(egress, 포트 3128)면 그것만 떠서 허용 목록 파일이 없다며 엉뚱하게 실패하므로, 안내만 하고 끝낸다
+FROM node:24-bookworm-slim AS usage
+CMD ["node", "-e", "console.error('Cairn은 docker compose로 띄워요: .env에 COMPOSE_FILE=docker-compose.prod.yml을 두고 docker compose up -d --build (README의 설치). 이미지 하나로는 돌지 않아요.\\nCairn runs with docker compose (see README), not as a single container.'); process.exit(1)"]
