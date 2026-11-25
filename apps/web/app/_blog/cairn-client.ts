@@ -11,6 +11,9 @@ import type { MapChoice } from './map-config';
 //   cairn.from('표').insert({…}) · .update(id, {…}) · .delete(id)
 //   cairn.community.topics(cursor?) · topic(id) · write({title, body}) · edit(id, {version, title, body}) · remove(id, version)
 //                  · comment(topicId, body) · removeComment(id, version) · report({topicId | commentId, reason, note?})
+//   cairn.page                         이 화면 주소의 데이터 (화면에 실려 온 cairn-data 블록, 없으면 null)
+//   cairn.data(주소?, 다음 쪽?)          → 그 주소의 데이터 (약속 cairn: 1). '' 첫 화면 · 'posts/<글>' · 'm/<메뉴>' · 'm/<메뉴>/<번호>'.
+//                                       다른 공개 앱의 글이면 { redirect }만 온다 (2026-11-25, 스토어 14장 A3: 템플릿 없이 글 · 메뉴 · 호를 그린다)
 //   cairn.map.provider · cairn.map.create(자리, { places })   지도 (지도 플러그인, 약속은 cairn-map.ts)
 // 실패하면 Error를 던진다 (status · code가 붙는다). 쓰기 확인 값(CSRF)은 스크립트가 me에서 읽어 싣는다.
 // 브라우저에서 그대로 도는 글자다: 빌드를 거치지 않는다
@@ -97,8 +100,28 @@ const SOURCE = String.raw`(() => {
     removeComment: (id, version) => call('DELETE', '/comments/' + id, { version }),
     report: (report) => call('POST', '/reports', report),
   };
+  // 화면에 실려 온 데이터 (정적 앱 · 템플릿 앱 모두). 앱의 주소 앞부분(base)도 여기서 안다
+  const page = (() => {
+    try {
+      const block = document.getElementById('cairn-data');
+      return block ? JSON.parse(block.textContent || 'null') : null;
+    } catch {
+      return null;
+    }
+  })();
+  async function data(path, cursor) {
+    const base = page && typeof page.base === 'string' && page.base !== '/' ? page.base : '';
+    const params = new URLSearchParams({ path: String(path || '').replace(/^\/+/, '') });
+    if (cursor) params.set('cursor', cursor);
+    const res = await fetch(base + '/_/data?' + params, { credentials: 'omit' });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body) throw fail((body && body.message) || '읽지 못했어요', res.status, 'data');
+    return body.redirect ? { redirect: body.redirect } : body.data;
+  }
   window.cairn = {
     open: OPEN,
+    page,
+    data,
     me,
     login: (back) => go('login', back),
     join: (back) => go('join', back),

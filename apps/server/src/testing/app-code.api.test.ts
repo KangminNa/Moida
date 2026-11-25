@@ -616,6 +616,10 @@ describe('정적 앱 ("render": "static")', () => {
       'index.html',
       '확장자 없는 없는 주소는 첫 화면 (앱 안의 화면 전환)',
     );
+    // 데이터는 그 주소의 것 (2026-11-25 스토어 14 A3): 첫 화면은 home, 페이지 앱의 다른 주소는 view, 앱 JS가 맡는 깊은 주소는 missing
+    assert.equal((home.data as Json).screen, 'home');
+    assert.equal(((await at('about')).data as Json).screen, 'view');
+    assert.equal(((await at('places/3')).data as Json).screen, 'missing');
     const missing = await at('assets/none.png');
     assert.deepEqual([missing.status, (missing.static as Json).file], [404, null]);
 

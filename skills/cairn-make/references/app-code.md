@@ -44,7 +44,9 @@
 - `.html`에 Mustache를 쓰지 않는다 (`{{ }}`는 글자 그대로 나간다). 문법 · 데이터 이름 검사도 없다.
 - 폴더를 쓸 수 있다: 파일 500개 · 합쳐 20MB · HTML 하나 1MB · 경로는 파일까지 여섯 마디 · 300자. 점으로 시작하는 이름은 쓸 수 없다.
 - **주소는 모두 상대 주소로 쓴다** (`assets/app.js` · `./about/` · `../`). 웹이 HTML마다 `<base>`를 넣어 그 파일이 있는 폴더를 기준으로 풀리게 한다. `/`로 시작하는 주소는 앱 밖(사이트의 뿌리)을 가리켜 깨진다: 미리 보기 주소에는 토큰이 들어 있고, 앱 주소는 `/<앱>` 아래다. 빌드 도구를 쓰면 기준 주소를 상대로 둔다 (Vite는 `base: './'`). `<base>`를 직접 넣지 않는다.
-- 데이터는 템플릿 앱과 같은 블록 하나로 온다: `JSON.parse(document.getElementById('cairn-data').textContent)` (첫 화면의 데이터: `app` · `site` · `apps` · `menus` · `pages` · `base`). `{{base}}` · `{{files}}`는 없다.
+- 데이터는 템플릿 앱과 같은 블록 하나로 **그 주소의 것**이 온다: `cairn.page`(`<script src="_/cairn.js">`를 실으면) 또는 `JSON.parse(document.getElementById('cairn-data').textContent)`. 첫 화면은 `screen: 'home'`, 글 주소(`posts/<글>`)는 `post`(본문은 거른 `post.html`), 메뉴(`m/<메뉴>`) · 호(`m/<메뉴>/<번호>`)는 `menu` · `issue`, 앱 JS가 맡는 깊은 주소는 `missing`이다. `{{base}}` · `{{files}}`는 없고 앱 주소 앞부분은 `base`다.
+- 화면을 바꾸지 않고 다른 주소의 데이터가 필요하면 `await cairn.data('posts/<글>')` · `cairn.data('m/<메뉴>', 다음 쪽 커서)` · `cairn.data('')`(첫 화면). 글 · 메뉴 · 호는 템플릿 없이 이것으로 그린다. 다른 공개 앱의 글이면 `{ redirect }`만 온다. 방문자 데이터라 초안은 없고, 미리 보기 · 기본 도메인에서도 된다.
+- 스크립트를 돌리지 않는 검색 로봇을 위해 웹이 그 주소의 제목 · 본문 · 글 링크를 `<noscript>`로 더한다. 앱이 따로 할 것은 없다.
 - 같은 묶음의 파일은 `fetch('data.json')`으로 읽을 수 있다 (모듈 스크립트 · 글꼴도 된다). 바깥 호스트는 `hosts`에 적은 것만 열린다. 쿠키 · `localStorage` · 서비스 워커 · 회원 · 데이터는 그 앱의 도메인으로 연 공개 화면에서만 된다 (아래 "회원 · 데이터 · 권한").
 - **내는 법**: 폴더가 없으면 파일을 결과물 폴더에 그대로 둔다 (앞 코드 위에 얹힌다). 폴더가 있으면 묶음 전체를 `app.zip` 하나로 낸다: `python3 -c "import shutil; shutil.make_archive('<결과물 폴더>/app', 'zip', 'dist')"`. zip 안이 새 버전의 전부다: zip에 없는 글 파일은 사라지고, 지시문에 "그대로 남아요"라고 적힌 파일(내용 없이 이름만 받은 그림 · 큰 파일)은 zip에 없어도 남는다. `app.zip`과 함께 둔 다른 파일은 묶음에 들지 않는다.
 - zip 안에 `cairn.json`(`"render": "static"`)과 `index.html`이 꼭 있어야 한다. 블로그 · 매거진 앱은 정적 앱이 될 수 없다 (글 · 메뉴 화면이 템플릿이다). 커뮤니티 앱을 정적 앱으로 만들면 글 목록 · 글 · 쓰기 화면을 `cairn.community`로 직접 그린다.
@@ -88,7 +90,7 @@
 
 ## 스크립트
 
-- 같은 데이터가 `<script id="cairn-data" type="application/json">`으로 페이지에 실린다: `JSON.parse(document.getElementById('cairn-data').textContent)`.
+- 같은 데이터가 `<script id="cairn-data" type="application/json">`으로 페이지에 실린다: `JSON.parse(document.getElementById('cairn-data').textContent)` (cairn.js를 실으면 `cairn.page`). 다른 주소의 데이터는 `cairn.data(주소, 커서?)`.
 - 화면이 열리는 곳은 둘이다.
   - **그 앱의 도메인으로 연 공개 화면**: 보통 웹 페이지처럼 열린다. 쿠키 · `localStorage` · IndexedDB · 서비스 워커를 쓰고, 회원 · 데이터(`cairn.js`)가 돈다.
   - **미리 보기 · 기본 도메인의 `/<앱>`**: 격리되어 열린다 (출처 없는 문서). 쿠키 · 저장소 · 회원 · 데이터를 쓸 수 없다. 관리자가 공개 전에 보는 화면이 이쪽이라, 로그인 없이도 첫 화면이 그려지게 만든다 (`cairn.open`이 거짓이면 안내를 보인다).

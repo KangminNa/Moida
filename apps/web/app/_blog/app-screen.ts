@@ -1,5 +1,6 @@
 import Mustache from 'mustache';
 import { renderMarkdown } from '../_lib/markdown';
+import { fallbackOf } from './app-fallback';
 import { formatDate } from './format';
 import type { AppScreen, AppScreenData } from './types';
 
@@ -99,9 +100,23 @@ export function renderStaticScreen(
   const root = data.base === '/' ? '' : data.base;
   const folder = file.includes('/') ? `${file.slice(0, file.lastIndexOf('/'))}/` : '';
   const href = `${root}/${encodeURI(folder)}`.replace(/"/g, '%22');
-  const added = `<base href="${href}">${dataBlock(enrich(data, {}, siteName, ticket))}`;
+  const full = enrich(data, {}, siteName, ticket);
+  const added = `<base href="${href}">${dataBlock(full)}`;
   const at = OPENING.exec(html)?.[0].length ?? 0;
-  return `${html.slice(0, at)}${added}${html.slice(at)}`;
+  const page = `${html.slice(0, at)}${added}${html.slice(at)}`;
+  // 검색용 기본 HTML: </body> 앞에 (없으면 끝에)
+  const fallback = fallbackOf(full);
+  const end = page.search(/<\/body>/i);
+  return end >= 0 ? `${page.slice(0, end)}${fallback}${page.slice(end)}` : `${page}${fallback}`;
+}
+
+/** 앱 JS가 _/data로 받는 데이터: 화면에 싣는 데이터 블록과 같은 모양 (글 본문은 html, 날짜 글자, 사이트 이름) */
+export function visitorData(
+  data: AppScreenData,
+  siteName: string,
+  ticket: string | null,
+): Record<string, unknown> {
+  return enrich(data, {}, siteName, ticket);
 }
 
 /**
