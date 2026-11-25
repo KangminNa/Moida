@@ -132,6 +132,24 @@ export class CheckExternalToolInput extends BaseRequest {
   }
 }
 
+/** 바뀐 도구 목록 승인 (C3): 화면이 본 바뀐 때(changedAt). 그사이 또 바뀌었으면 409 */
+export class ApproveCatalogInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly changedAt: Date,
+  ) {
+    super();
+  }
+
+  static from(id: string, raw: unknown): ApproveCatalogInput {
+    return BaseRequest.read({ ...(raw as object), id }, (f) => {
+      const changedAt = f.optionalDate('changedAt');
+      if (changedAt === null) f.reject('changedAt', '본 바뀐 때(changedAt)를 보내 주세요');
+      return new ApproveCatalogInput(f.uuid('id'), changedAt ?? new Date(0));
+    });
+  }
+}
+
 /** 끝난 작업 (task.task.changed): 커넥터 확인이면 결과를, 에이전트의 일이면 커넥터 사용을 적는다 */
 export class ToolTaskInput extends BaseRequest {
   private constructor(readonly taskId: string) {

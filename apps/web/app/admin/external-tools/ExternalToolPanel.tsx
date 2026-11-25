@@ -6,7 +6,13 @@ import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useExternalTools } from '../../_task/live';
 import type { ExternalTool, ExternalToolOAuthStart } from '../../_task/types';
-import { ConnectorHealth, checkable, connectorState, oauthReturn } from './ConnectorHealth';
+import {
+  CatalogDrift,
+  ConnectorHealth,
+  checkable,
+  connectorState,
+  oauthReturn,
+} from './ConnectorHealth';
 import { type ExternalToolBody, ExternalToolForm } from './ExternalToolForm';
 
 const NEW = 'new';
@@ -72,6 +78,24 @@ export function ExternalToolPanel({
       tool.id,
       () => api('PATCH', `/api/external-tools/${tool.id}`, { enabled: on, version: tool.version }),
       { done: `${tool.title} ${on ? '켬' : '끔'}`, reload: tools.reload, conflict: CONFLICT },
+    );
+  }
+
+  /** 바뀐 도구 목록 승인 (C3): 본 바뀐 때와 함께. 그사이 또 바뀌었으면 409로 다시 읽는다 */
+  function approveCatalog(tool: ExternalTool) {
+    if (
+      !window.confirm(
+        `${tool.title}의 바뀐 도구를 승인할까요? 승인하면 일꾼이 다시 이 커넥터를 써요`,
+      )
+    )
+      return;
+    void action.run(
+      tool.id,
+      () =>
+        api('POST', `/api/external-tools/${tool.id}/catalog/approve`, {
+          changedAt: tool.catalogChangedAt,
+        }),
+      { done: `${tool.title} 바뀐 도구 승인됨`, reload: tools.reload },
     );
   }
 
@@ -185,6 +209,7 @@ export function ExternalToolPanel({
                   </small>
                   {t.note && <small className="clamp">제안한 까닭: {t.note}</small>}
                   <ConnectorHealth tool={t} />
+                  <CatalogDrift tool={t} />
                   {secretFor === t.id && (
                     <form className="row" onSubmit={(e) => putSecret(e, t)}>
                       <input
@@ -209,6 +234,16 @@ export function ExternalToolPanel({
                   {secretFor === t.id && token.problem && <p className="error">{token.problem}</p>}
                 </div>
                 <div className="row">
+                  {t.catalogPending && (
+                    <button
+                      type="button"
+                      className="cta small"
+                      disabled={action.busy === t.id}
+                      onClick={() => approveCatalog(t)}
+                    >
+                      바뀐 도구 승인
+                    </button>
+                  )}
                   {checkable(t) && (
                     <button
                       type="button"

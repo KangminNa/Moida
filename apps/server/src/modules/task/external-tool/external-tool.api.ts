@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/com
 import { type Actor, CurrentActor } from '../../platform';
 import type { TaskView } from '../task/task.view';
 import {
+  ApproveCatalogInput,
   CheckExternalToolInput,
   CreateExternalToolInput,
   ExternalToolSecretInput,
@@ -47,6 +48,17 @@ export class ExternalToolController {
   @HttpCode(202)
   async check(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<TaskView> {
     return (await this.checks.check(actor, CheckExternalToolInput.from(id))).view();
+  }
+
+  /** 바뀐 도구 목록 승인 (C3): 본 바뀐 때(changedAt)와 함께. 그사이 또 바뀌었으면 409 */
+  @Post(':id/catalog/approve')
+  @HttpCode(204)
+  async approveCatalog(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<void> {
+    await this.checks.approveCatalog(actor, ApproveCatalogInput.from(id, body));
   }
 
   @Post(':id/secret')

@@ -56,7 +56,7 @@ export class ExternalToolQuery extends BaseQuery {
     const now = new Date();
     return rows
       .map((r) => ExternalTool.restore(r))
-      .filter((t) => t.ready(now))
+      .filter((t) => t.usable(now))
       .map((t) => t.jobView(this.box));
   }
 

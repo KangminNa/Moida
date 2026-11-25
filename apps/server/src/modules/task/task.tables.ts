@@ -250,6 +250,8 @@ export interface ExternalToolRow {
   token_expires_at: Date | null;
   token_refresh_at: Date | null;
   oauth_error: string | null;
+  catalog_pending: unknown | null;
+  catalog_changed_at: Date | null;
 }
 export type ExternalToolNew = Partial<ExternalToolRow> & Pick<ExternalToolRow, 'id' | 'space_id' | 'name' | 'title' | 'url'>;
 

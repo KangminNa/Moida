@@ -52,7 +52,7 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
       SELECT a.id AS agent_id, coalesce(w.open, 0) AS open, coalesce(w.done, 0) AS done,
         coalesce(w.failed, 0) AS failed, coalesce(b.revised, 0) AS revised,
         ARRAY(SELECT e.name FROM task.external_tools e
-              WHERE e.space_id = a.space_id AND e.status = 'active' AND e.name = ANY(a.external_tools)
+              WHERE e.space_id = a.space_id AND e.status = 'active' AND e.catalog_pending IS NULL AND e.name = ANY(a.external_tools)
               ORDER BY e.name) AS connectors
       FROM task.agents a
       LEFT JOIN work w ON w.agent_id = a.id

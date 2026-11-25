@@ -14,6 +14,8 @@ export class TaskNotices implements OnModuleInit {
   /** 잇달아 실패해 끈 레시피 (2026-11-20 자동화 건강 검사, 바로 알림) */
   static readonly SCHEDULE_STOPPED = 'task.schedule.stopped';
   static readonly CHAT_ANSWERED = 'task.chat.answered';
+  /** 커넥터의 도구가 바뀌어 멈춤 (C3, 2026-11-25): ExternalToolCheckService가 같은 트랜잭션에서 Notices.post로 */
+  static readonly CONNECTOR_CHANGED = 'task.connector.changed';
   private static readonly APPROVAL_ENDED = [
     'task.approval.granted',
     'task.approval.rejected',
@@ -82,6 +84,9 @@ export class TaskNotices implements OnModuleInit {
     );
     this.catalog.define(
       new NoticeKind(TaskNotices.SCHEDULE_STOPPED, '자동화 멈춤', NoticeKind.IMMEDIATE),
+    );
+    this.catalog.define(
+      new NoticeKind(TaskNotices.CONNECTOR_CHANGED, '커넥터 도구 바뀜', NoticeKind.IMMEDIATE),
     );
   }
 }

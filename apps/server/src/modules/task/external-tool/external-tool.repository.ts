@@ -42,11 +42,63 @@ export class ExternalToolRepository extends TableRepository<ExternalToolRow, Ext
     error: string | null,
     at: Date,
   ): Promise<void> {
+    // 받은 목록은 승인한 목록이 되고, 기다리던 바뀐 목록은 비운다 (C3: 바뀐 것이 사라졌거나 빠지기만 했다)
+    const accepted =
+      catalog === null
+        ? this.sql`catalog = catalog`
+        : this
+            .sql`catalog = ${this.sql.json(catalog as never)}, catalog_pending = NULL, catalog_changed_at = NULL`;
     await this.sql`
       UPDATE task.external_tools
-      SET checked_at = ${at}, check_error = ${error},
-        catalog = ${catalog === null ? this.sql`catalog` : this.sql`${this.sql.json(catalog as never)}`}
+      SET checked_at = ${at}, check_error = ${error}, ${accepted}
       WHERE space_id = ${spaceId} AND id = ${toolId} AND (checked_at IS NULL OR checked_at <= ${at})`;
+  }
+
+  /**
+   * 승인한 목록과 다른 목록을 받았다 (C3 바뀜 감지, 2026-11-25): 승인한 목록은 두고 새 목록을 기다리게 둔다.
+   * 기다리던 목록과 같으면 처음 바뀐 때를 그대로 둔다. 새로 기다리게 됐으면 true (알림을 한 번만)
+   */
+  async holdCatalog(
+    spaceId: string,
+    toolId: string,
+    catalog: readonly ToolLine[],
+    at: Date,
+  ): Promise<boolean> {
+    const json = this.sql.json(catalog as never);
+    const rows = await this.sql<{ fresh: boolean }[]>`
+      UPDATE task.external_tools t
+      SET checked_at = ${at}, check_error = NULL, catalog_pending = ${json},
+        catalog_changed_at = CASE WHEN t.catalog_pending = ${json}::jsonb THEN t.catalog_changed_at ELSE ${at} END
+      FROM (SELECT id, catalog_pending FROM task.external_tools
+            WHERE space_id = ${spaceId} AND id = ${toolId} FOR UPDATE) before
+      WHERE t.id = before.id AND (t.checked_at IS NULL OR t.checked_at <= ${at})
+      RETURNING before.catalog_pending IS DISTINCT FROM ${json}::jsonb AS fresh`;
+    return rows[0]?.fresh ?? false;
+  }
+
+  /** 승인한 도구 목록 (C3: 새로 받은 목록과 비교한다). 없는 커넥터면 null */
+  async approvedCatalog(
+    spaceId: string,
+    toolId: string,
+  ): Promise<{ catalog: unknown; title: string } | null> {
+    const [row] = await this.sql<{ catalog: unknown; title: string }[]>`
+      SELECT catalog, title FROM task.external_tools
+      WHERE space_id = ${spaceId} AND id = ${toolId} FOR UPDATE`;
+    return row ?? null;
+  }
+
+  /**
+   * 관리자가 바뀐 도구 목록을 승인했다 (C3): 기다리던 목록을 승인한 목록으로. 관리자가 본 바뀐 때(changedAt)와
+   * 같을 때만 (그사이 또 바뀌었으면 0줄). 적었으면 true
+   */
+  async approveCatalog(spaceId: string, toolId: string, changedAt: Date): Promise<boolean> {
+    const rows = await this.sql`
+      UPDATE task.external_tools
+      SET catalog = catalog_pending, catalog_pending = NULL, catalog_changed_at = NULL
+      WHERE space_id = ${spaceId} AND id = ${toolId} AND catalog_pending IS NOT NULL
+        AND catalog_changed_at = ${changedAt}
+      RETURNING id`;
+    return rows.length > 0;
   }
 
   /** 에이전트의 일에서 부른 커넥터 (이름으로). 마지막 사용 · 실패만 앞으로 민다. version · updated_at은 그대로 */
