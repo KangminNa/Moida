@@ -216,7 +216,7 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     ) as AppCodeBase;
   const tail = (checks: readonly StageCheck[]) => checks[0]?.tail ?? '';
 
-  test('정적 앱의 HTML은 템플릿으로 보지 않는다. 페이지 · 커뮤니티 앱에서만, 폴더는 정적 앱만', () => {
+  test('정적 앱의 HTML은 템플릿으로 보지 않는다. 어느 종류의 앱이든, 폴더는 정적 앱만', () => {
     const empty = page([]);
     const made = [
       new AppCodeEntry('index.html', 200, '<div id="app">{{ count }}</div>{{#broken'),
@@ -231,7 +231,7 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     const again = AppCodeCheck.checks(before, [new AppCodeEntry('index.html', 10, '{{#x')]);
     assert.deepEqual(short(again), [[AppCodeCheck.BUNDLE, true, '2개 · 40B']]);
 
-    assert.match(tail(AppCodeCheck.checks(codeOf([]), made)), /페이지 · 커뮤니티 앱에서만/);
+    assert.equal(AppCodeCheck.checks(codeOf([]), made)[0]?.ok, true, '블로그 앱도 정적 앱이 된다');
     assert.match(
       tail(AppCodeCheck.checks(empty, [new AppCodeEntry('cairn.json', 20, '{"render":"server"}')])),
       /render\)은 template · static/,
@@ -522,7 +522,7 @@ describe('앱 코드 일 (MakeStage)', () => {
       );
       assert.equal(done.note, '만들었어요');
 
-      // app.zip을 내면 zip 안을 묶음 전체로 본다 (블로그 앱에는 정적 앱을 둘 수 없다)
+      // app.zip을 내면 zip 안을 묶음 전체로 본다 (블로그 앱도 정적 앱이 된다, 2026-11-25 A4)
       const zip = zipOf({
         'index.html': '<p>지도</p>',
         'assets/app.js': 'console.log(1)',
@@ -531,8 +531,7 @@ describe('앱 코드 일 (MakeStage)', () => {
       await writeFile(join(room.outputsDir, 'app.zip'), zip);
       const packed = await stage.check();
       const bundle = packed.find((c) => c.name === AppCodeCheck.BUNDLE);
-      assert.deepEqual([bundle?.ok, bundle?.how], [false, '문제 1개']);
-      assert.match(bundle?.tail ?? '', /페이지 · 커뮤니티 앱에서만/);
+      assert.equal(bundle?.ok, true, bundle?.tail);
       // zip 안이 묶음 전체라 디자인 문서도 zip 안에 있어야 한다
       assert.match(
         packed.find((c) => c.name === DesignDocCheck.NAME)?.tail ?? '',

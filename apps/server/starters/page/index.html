@@ -3,17 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{title}}</title>
-<link rel="icon" href="{{#app.iconUrl}}{{app.iconUrl}}{{/app.iconUrl}}{{^app.iconUrl}}{{files}}/icon.svg{{/app.iconUrl}}">
-<link rel="stylesheet" href="{{files}}/style.css">
+<title>앱</title>
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-{{! 페이지 앱의 시작 코드: 블로그 틀(머리 · 메뉴 · 꼬리) 없는 빈 화면이다. 이 앱이 하는 일에 맞게 처음부터 만든다.
-    다른 화면은 이름.html 파일을 더하면 앱 주소 뒤의 /이름 이 된다 }}
+<!-- 새 앱의 시작 코드 (2026-11-25 A4): 틀 없는 빈 정적 앱이다. 화면은 스킬 cairn-make의 디자인 조사(design.md)대로 처음부터 만든다.
+     데이터는 웹이 <head>에 싣는 cairn-data 블록(그 주소의 것)에서 읽는다 -->
 <main class="screen">
-  <h1>{{app.name}}</h1>
-  {{#app.description}}<p class="lead">{{app.description}}</p>{{/app.description}}
+  <h1 id="name"></h1>
+  <p class="lead" id="description" hidden></p>
+  <p class="muted">화면을 준비하고 있어요</p>
 </main>
-{{#others.length}}<a class="all-apps" href="{{site.home}}">모든 앱</a>{{/others.length}}
+<a class="all-apps" id="all-apps" hidden>모든 앱</a>
+<script>
+  (function () {
+    var block = document.getElementById('cairn-data');
+    var data = block ? JSON.parse(block.textContent) : {};
+    var app = data.app || {};
+    document.title = app.name || '앱';
+    document.getElementById('name').textContent = app.name || '';
+    var description = document.getElementById('description');
+    if (app.description) {
+      description.textContent = app.description;
+      description.hidden = false;
+    }
+    if (app.iconUrl) document.querySelector('link[rel=icon]').href = app.iconUrl;
+    var all = document.getElementById('all-apps');
+    if (data.others && data.others.length && data.site && data.site.home) {
+      all.href = data.site.home;
+      all.hidden = false;
+    }
+  })();
+</script>
 </body>
 </html>

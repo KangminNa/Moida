@@ -347,7 +347,7 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
 });
 
 describe('페이지 앱 (P1, 2026-11-20): 블로그 틀 없는 화면 · 화면마다 템플릿 · 페이지가 화면', () => {
-  test('시작 코드는 블로그 틀 없는 빈 화면이고, /<앱>/<이름>은 앱 코드의 <이름>.html이다', async () => {
+  test('시작 코드는 틀 없는 빈 정적 앱이고 (2026-11-25 A4), /<앱>/<이름>은 앱 코드의 <이름>.html이다', async () => {
     const app = await newApp(`page-p1-${mark}`, 'page');
     const starter = ok(await screen(String(app.slug), '', {}, owner));
     // 비공개 앱은 관리자를 미리 보기 토큰으로 보낸다: 시작 코드는 코드 탭에서 본다
@@ -355,8 +355,8 @@ describe('페이지 앱 (P1, 2026-11-20): 블로그 틀 없는 화면 · 화면�
     const files = ((await code(app)).files as Json[]).map((f) => f.name).sort();
     assert.deepEqual(
       files,
-      ['icon.svg', 'index.html', 'style.css'],
-      '머리 · 메뉴 · 꼬리 · 글 목록 없음',
+      ['cairn.json', 'icon.svg', 'index.html', 'style.css'],
+      '머리 · 메뉴 · 꼬리 · 글 목록 없음, 정적 앱 선언',
     );
 
     // 비공개 앱의 새 버전은 바로 보인다. 공개한 뒤 방문자가 화면마다 다른 템플릿을 본다
@@ -419,9 +419,14 @@ describe('페이지 앱 (P1, 2026-11-20): 블로그 틀 없는 화면 · 화면�
       file: 'data.json',
       base: `/${slug}`,
     });
-    assert.equal(ok(await screen(slug, 'a/b')).status, 404, '페이지의 파일은 한 칸짜리 주소');
+    const deep = ok(await screen(slug, 'a/b'));
+    assert.deepEqual(
+      [deep.page, (deep.static as Json).file],
+      [null, 'index.html'],
+      '페이지의 파일은 한 칸짜리 주소: 더 깊으면 앱 코드(정적 시작 코드의 첫 화면)',
+    );
 
-    // 페이지를 비공개로 돌리면 앱 코드(시작 코드)가 화면이다
+    // 페이지를 비공개로 돌리면 앱 코드(정적 시작 코드)가 화면이다
     const now = (ok(await api.get('/api/pages', owner)).pages as Json[]).find(
       (p) => p.id === page.id,
     ) as Json;
@@ -431,10 +436,8 @@ describe('페이지 앱 (P1, 2026-11-20): 블로그 틀 없는 화면 · 화면�
         visibility: 'private',
       }),
     );
-    assert.deepEqual(
-      [ok(await screen(slug)).page, ok(await screen(slug)).template],
-      [null, 'index.html'],
-    );
+    const starter = ok(await screen(slug));
+    assert.deepEqual([starter.page, (starter.static as Json).file], [null, 'index.html']);
     ok(
       await api.request('PATCH', `/api/pages/${page.id}`, owner, {
         version: Number(now.version) + 1,
@@ -579,7 +582,7 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
 });
 
 // 정적 앱 (스토어 9.13, 2026-11-21 "템플릿 없는 자유로운 앱"): cairn.json에 "render": "static"이면 템플릿을 거치지 않고
-// 묶음의 파일을 그대로 내보낸다. 폴더가 든 이름 · 앱 안의 화면 전환(없는 주소 → index.html), 페이지 앱에서만
+// 묶음의 파일을 그대로 내보낸다. 폴더가 든 이름 · 앱 안의 화면 전환(없는 주소 → index.html). 어느 종류의 앱이든 (2026-11-25 A4)
 describe('정적 앱 ("render": "static")', () => {
   const STATIC = JSON.stringify({ cairn: 1, render: 'static' });
   const site = {
@@ -652,11 +655,10 @@ describe('정적 앱 ("render": "static")', () => {
     assert.ok(names.includes('assets/img/pin.svg'), names.join());
   });
 
-  test('규칙: 페이지 앱에서만, 폴더는 정적 앱만, 모르는 render · 너무 깊은 폴더 · 숨김 파일은 422', async () => {
+  test('규칙: 블로그 앱도 정적 앱이 된다, 폴더는 정적 앱만, 모르는 render · 너무 깊은 폴더 · 숨김 파일은 422', async () => {
     const blog = await newApp(`static-b-${mark}`);
     const onBlog = await upload(blog, zipOf({ 'index.html': 'x', 'cairn.json': STATIC }));
-    assert.equal(onBlog.status, 422, onBlog.text);
-    assert.match(onBlog.text, /페이지 앱에서만/);
+    assert.equal(onBlog.status, 201, onBlog.text);
     const page = await newApp(`static-c-${mark}`, 'page');
     const folders = await upload(
       page,
@@ -697,10 +699,10 @@ describe('정적 앱 ("render": "static")', () => {
     assert.ok(next.includes('assets/photo.png'), `받지 못한 파일은 남는다: ${next.join()}`);
     assert.ok(!next.includes('dist.txt'), `zip에 없는 글 파일은 사라진다: ${next.join()}`);
 
-    // 블로그 앱에 정적 묶음을 내면 버전을 만들지 않고 알린다
+    // 블로그 앱도 정적 묶음이 버전이 된다 (2026-11-25 A4)
     const blog = await newApp(`static-e-${mark}`);
     await build(blog, { 'app.zip': zipOf(site) });
-    assert.equal((await code(blog)).latest, 0);
+    assert.equal((await code(blog)).latest, 1);
   });
 });
 

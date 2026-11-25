@@ -24,7 +24,7 @@ class TemplateScan {
 //   템플릿 문법 (Mustache: 여닫는 짝 · 없는 조각 · {{{ }}}는 html 값에만 · 구분자 바꾸기 금지)
 //   데이터 이름 (약속 cairn: 1에 없는 이름은 빈 칸으로 그려진다)
 // 정적 앱 (cairn.json의 "render": "static", 스토어 9.13)은 템플릿이 아니라 파일 그대로 나가므로 묶음 규칙만 본다
-// (500개 · 경로 여섯 마디 · HTML 하나 1MB · 페이지 · 커뮤니티 앱에서만). 선언서(cairn.json)의 모양은 AppManifestCheck가 본다. 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
+// (500개 · 경로 여섯 마디 · HTML 하나 1MB, 어느 종류의 앱이든). 선언서(cairn.json)의 모양은 AppManifestCheck가 본다. 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
 // 떨어지면 JobRun이 AI에게 한 번 더 맡긴다 (검증 고리 V). 그래도 묶음 · 문법이 틀리면 MakeStage가 일을 실패로 끝낸다:
 // 서버는 Mustache를 읽지 않아 틀린 템플릿도 버전이 되고, 비공개 앱은 바로 방문자(관리자)에게 보이기 때문이다.
 // 러너에는 런타임 의존 패키지가 없어 Mustache 라이브러리 대신 태그만 훑는다 (웹은 mustache 4로 그린다).
@@ -38,8 +38,6 @@ export class AppCodeCheck {
   static readonly STATIC_FILES_MAX = 500;
   static readonly DEPTH_MAX = 6;
   static readonly PATH_MAX = 300;
-  /** 정적 앱으로 만들 수 있는 종류 (서버의 AppCodeBundle.STATIC_KINDS) */
-  private static readonly STATIC_KINDS: readonly string[] = ['page', 'community'];
   static readonly BYTES_MAX = 20 * 1024 * 1024;
   static readonly TEMPLATE_BYTES_MAX = 1024 * 1024;
   /** 검사 이름: 일을 실패로 끝낼 것(묶음 · 문법)과 알리기만 할 것(이름) */
@@ -177,15 +175,13 @@ export class AppCodeCheck {
     const max = fixed ? AppCodeCheck.STATIC_FILES_MAX : AppCodeCheck.FILES_MAX;
     if (all.length > max) problems.push(`파일은 ${max}개까지예요 (모두 ${all.length}개)`);
     if (bytes > AppCodeCheck.BYTES_MAX) problems.push('파일은 합쳐 20MB까지예요');
-    if (fixed) problems.push(...AppCodeCheck.staticProblems(all, pages, kind));
+    if (fixed) problems.push(...AppCodeCheck.staticProblems(all, pages));
     else {
       if (pages.reduce((sum, f) => sum + f.size, 0) > AppCodeCheck.TEMPLATE_BYTES_MAX)
         problems.push('템플릿(.html)은 합쳐 1MB까지예요');
       const nested = all.find((f) => f.name.includes('/'));
       if (nested)
-        problems.push(
-          `폴더는 정적 앱만 써요: ${nested.name} (cairn.json에 "render": "static", 페이지 · 커뮤니티 앱에서만)`,
-        );
+        problems.push(`폴더는 정적 앱만 써요: ${nested.name} (cairn.json에 "render": "static")`);
     }
     if (!all.some((f) => f.name === AppCodeCheck.ENTRY))
       problems.push(
@@ -204,11 +200,8 @@ export class AppCodeCheck {
   private static staticProblems(
     all: readonly AppCodeEntry[],
     pages: readonly AppCodeEntry[],
-    kind: string,
   ): string[] {
     const problems: string[] = [];
-    if (!AppCodeCheck.STATIC_KINDS.includes(kind))
-      problems.push('정적 앱("render": "static")은 페이지 · 커뮤니티 앱에서만 돼요');
     const big = pages.find((f) => f.size > AppCodeCheck.TEMPLATE_BYTES_MAX);
     if (big) problems.push(`HTML 파일 하나는 1MB까지예요: ${big.name}`);
     const bad = all.find((f) => {
