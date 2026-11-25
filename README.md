@@ -205,6 +205,108 @@ pnpm install-code        # 설치 코드. http://localhost:3000/install 에 넣�
 
 작업을 끝내기 전에 `pnpm check`와 `pnpm test`를 돌립니다. 명령 전체와 저장소 구조는 [AGENTS.md](AGENTS.md)에 있습니다.
 
+## 기술 구조
+
+### 실행 단위
+
+```mermaid
+flowchart LR
+  subgraph 바깥
+    B[브라우저<br/>콘솔 · 앱 화면]
+    T[내 컴퓨터의 AI 도구<br/>Claude Code · Codex]
+    X[브라우저 확장]
+  end
+  P[리버스 프록시<br/>TLS · 앱 도메인]
+  W[web<br/>Next.js App Router]
+  S[server<br/>NestJS · REST · MCP]
+  K[worker<br/>같은 서버 코드 · outbox · 마감 작업]
+  D[(Postgres 17<br/>pgvector · pg_bigm)]
+  F[(blobs<br/>내용 주소 파일)]
+  R[runner<br/>AI CLI로 일하기]
+  E[egress<br/>허용 목록 프록시]
+  BR[server browser<br/>Chromium · CDP]
+
+  B --> P --> W
+  T -- MCP --> P
+  X -- MCP --> P
+  W -- "/api · /mcp · /oauth" --> S
+  S --> D
+  K --> D
+  S --> F
+  R -- "MCP · 작업 토큰" --> S
+  R -- 코드 러너 칸 --> E
+  R -- CDP --> BR
+```
+
+| 단위 | 위치 | 하는 일 | DB에 닿나 |
+|---|---|---|---|
+| web | `apps/web` | 콘솔(`app/admin`) · 앱 화면(`app/(blog)/[app]`, route handler가 템플릿을 채워 격리 머리글과 함께) · 회원 고정 화면(`/_/…`). 서버 API만 부른다 | 아니오 |
+| server | `apps/server` | REST(`/api`) · MCP(`/mcp`) · OAuth. 도메인 규칙과 승인의 최종 판단 | 예 |
+| worker | `apps/server` (같은 이미지) | outbox 이벤트 받기 · 반복 · 마감 작업. LISTEN 신호와 타이머로만 깬다 | 예 |
+| runner | `apps/runner` | 서버에서 일을 빌려(lease) AI CLI로 처리하고 결과를 올린다. 서버의 별도 컨테이너나 내 컴퓨터에서 돈다 | 아니오 (MCP만) |
+| egress | `apps/egress` | 코드 러너 칸이 나가는 길. `egress/allow.txt`의 호스트로만 HTTPS 터널 | 아니오 |
+| extension · cli | `apps/extension` · `packages/cli` | 웹 AI 대화 모으기 · 맡기기, `cairn connect` · `cairn app deploy` | 아니오 (MCP · REST) |
+| plugins | `plugins/*` | 코어를 고치지 않는 기능 (지도 · 텔레그램 · 서버 브라우저 · GitHub 연동 …). 서버는 `plugin-api`만, 화면은 react만 가져온다 | 자기 스키마만 |
+
+원본은 Postgres 하나입니다. md · zip은 내보내기 형식이고, 파일(사진 · 결과물 · 앱 코드)은 해시로 가리키는 blobs에 둡니다.
+
+### 서버 도메인 (모듈 = 스키마)
+
+| 모듈 | 스키마 | 하는 일 | 데이터 묶음 (폴더) |
+|---|---|---|---|
+| platform | `platform` | 공통 기반. DB · 기반 클래스 · 요청자(Actor) · outbox · 변경 신호 · 파일 · 보관 형식 · 플러그인 · 알림 · 보안 기록. 비즈니스 규칙 없음 | archive · notice · plugin · security · setting · stream · worker … |
+| account | `account` | 공간 · 관리자 로그인 · 기기 · 토큰. Guard가 요청마다 Actor를 만든다 | space · owner · device · guard |
+| vault | `vault` | AI 작업 세션과 지식 그래프. 세션 · 위키 판 쌓기 · 연결선 · 정리 · 되돌리기 | session · wiki · edge · category · change · tidy · graph … |
+| blog | `blog` · `work` | 스토어의 앱과 글 엔진. 앱 · 앱 코드 버전 · 글 · 메뉴 · 호 · 페이지 · 소재 | app · app-code · post · menu · issue · page · basket · asset |
+| task | `task` | 에이전트가 일하고 관리자가 승인하는 구조. 작업 · 대화 · 승인 · 러너 · 스케줄 · 결과물 · 커넥터 · 스킬 | task · chat · approval · agent · runner · schedule · output · external-tool … |
+| community | `community` | 앱의 회원 · 글 · 댓글 · 신고 · 약관 · 앱 데이터(앱마다 `app_<id>` 스키마, 행 수준 보안) | member · topic · comment · report · moderation · terms · data |
+| mcp | `mcp` | AI 도구의 입구. 각 모듈의 `*.tool.ts`를 모아 열고, 도구 설명의 버전을 둔다 | tool-text |
+
+모듈 사이는 이렇게만 잇습니다 (`pnpm check`의 경계 검사 · `pnpm db:check`가 지킨다).
+
+```mermaid
+flowchart TB
+  mcp --> account & vault & blog & task & community
+  blog -. "Lookups: wiki · session" .-> vault
+  blog -. "Lookups: app-holdings" .-> community
+  community -. "Lookups: app · member-app" .-> blog
+  task -. "Lookups: app · ActionChecks" .-> blog
+  task -. "SettingKinds: 대화로 바꾸는 설정" .-> account & vault & blog & community
+  vault & blog -. "Leases: 일 임대 확인" .-> task
+  account & vault & blog & task & community --> platform
+```
+
+- **import**는 `platform`만 (mcp는 입구라 모든 모듈의 `index.ts`). 다른 모듈의 표에 SQL을 쓰지 않고, 모듈 사이 외래키가 없다.
+- **읽기**는 platform의 등록부(`Lookups` · `ActionChecks` · `Leases` · `SettingKinds`)로 묻는다. 누가 주고 누가 묻는지는 `apps/server/modules.json`에 적고 검사가 코드와 맞춰 본다.
+- **후속 일**은 이벤트(outbox)로 알린다. 이벤트 이름 · 칸은 모듈마다 `<모듈>.events.json`.
+
+### 서버 코드의 계층
+
+```
+진입   Controller(*.api.ts) · Tool(*.tool.ts) · Guard · View(*.view.ts)
+  ↓    Input 하나 만들기 → Service · Query 메서드 하나 → View
+응용   Input(*.input.ts) · Service(쓰기, 트랜잭션 하나) · Query(읽기, Actor로 공개 범위를 거른다)
+  ↓
+도메인 Entity(규칙 · 상태 변화) · Policy(판단) · Actor(누가)
+  ↑
+저장   Repository(표 하나, 조건 규칙) · Gateway(바깥 서비스)
+```
+
+데이터 묶음(항상 같이 바뀌는 데이터) 하나가 폴더 하나이고, 쓰기는 Service 하나 · 읽기는 Query 하나에 모읍니다. 표의 칸을 아는 곳은 생성 파일(`<모듈>.tables.ts` · `schema.ts`) · Entity의 `RULES` · Input의 `COLUMNS` · View의 `toJSON`뿐입니다. 자세한 것은 [객체 설계](docs/객체설계.md).
+
+### 흐름 둘
+
+**대화로 일을 맡기면**
+1. 콘솔 → `POST /api/chats/:id/messages` → task가 회차 작업을 만든다 (같은 트랜잭션에 outbox 이벤트)
+2. 러너가 MCP로 일을 빌린다(lease, 작업 토큰). 작업 토큰은 그 일의 종류가 허락한 도구만 본다 (`task-kinds.json`)
+3. 대표가 일꾼에게 나눠 맡기고(위임), 일꾼들이 결과(`submit_result`)를 올린다. 러너가 먼저 결과 모양을 검사한다
+4. 결과는 카드 한 장(승인 대기)이 된다. 관리자가 고르고 승인하면 이벤트로 그 동작을 가진 모듈이 반영한다 (발행 · 앱 공개 · 설정 바꾸기)
+
+**방문자가 앱 화면을 열면**
+1. 브라우저 → `/<앱>/…` (앱 도메인이면 `proxy.ts`가 그 경로로 넘긴다) → web의 route handler
+2. web → `GET /api/apps/site/:slug/screen` → 서버가 공개 범위를 거른 데이터 · 앱 코드의 템플릿을 준다
+3. web이 Mustache로 채우고 격리 머리글(sandbox · CSP)과 함께 보낸다. 앱 JS는 `cairn.js`로만 서버에 닿는다: 화면 데이터 · 지도 찾기는 앱 주소 아래 `/_/data` · `/_/map/…`, 회원 · 앱 데이터는 앱 도메인에서 서버가 열어 둔 `/api/community/…`(`HostGate`)뿐이고 콘솔 API는 막혀 있다
+
 ## AI에게 맡기는 규칙: 모델과 런타임
 
 Cairn에서 일하는 것은 AI(Claude · Codex)지만, 그 AI가 무엇을 지켜야 하는지는 두 곳에 나눠 둡니다.
