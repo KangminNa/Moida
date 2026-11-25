@@ -135,6 +135,7 @@ export class AppSiteQuery extends BaseQuery {
   private static staticFile(code: AppCodeFiles, path: readonly string[]): string | null {
     const named = path.join('/');
     if (named === '') return PageFiles.ENTRY;
+    if (named === AppCodeBundle.DESIGN) return null;
     if (code.files.find(named)) return named;
     const index = `${named}/${PageFiles.ENTRY}`;
     if (code.files.find(index)) return index;
@@ -161,7 +162,11 @@ export class AppSiteQuery extends BaseQuery {
   /** 파일 하나 (HTML은 내보내지 않는다: 채우지 않은 템플릿이 그대로 보이지 않게. 정적 앱의 HTML도 화면으로만 나간다) */
   async file(actor: Actor, req: AppFileInput, now: Date): Promise<AppFileAnswer> {
     const found = await this.visible(actor, req.slug, req.ticket, now);
-    if (found instanceof AppScreenRedirectView || req.isTemplate)
+    if (
+      found instanceof AppScreenRedirectView ||
+      req.isTemplate ||
+      req.name === AppCodeBundle.DESIGN
+    )
       throw new NotFound('없는 파일이에요');
     const { app, ticket } = found;
     const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);

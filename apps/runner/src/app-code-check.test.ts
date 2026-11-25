@@ -9,6 +9,7 @@ import { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
 import type { CairnServer } from './cairn-server';
 import { DesignCheck } from './design-check';
+import { DesignDocCheck } from './design-doc-check';
 import { Job } from './job';
 import { Json } from './json';
 import { MakeStage } from './make-stage';
@@ -36,9 +37,11 @@ const codeOf = (files: object[], hosts: string[] = []) =>
       hosts,
     }),
   ) as AppCodeBase;
-// 디자인 기준 검사는 design-check.test에서 본다: 여기 본보기 코드는 화면 조각이라 viewport · lang이 없다
+// 디자인 기준 · 디자인 문서 검사는 design-check.test · design-doc-check.test에서 본다: 여기 본보기 코드는 화면 조각이다
 const short = (checks: readonly StageCheck[]) =>
-  checks.filter((c) => c.name !== DesignCheck.NAME).map((c) => [c.name, c.ok, c.how]);
+  checks
+    .filter((c) => c.name !== DesignCheck.NAME && c.name !== DesignDocCheck.NAME)
+    .map((c) => [c.name, c.ok, c.how]);
 
 /** 테스트용 zip 만들기: 파일마다 deflate (packed가 false면 그대로 담는다). 러너에는 zip을 쓰는 코드가 없다 */
 function zipOf(files: Readonly<Record<string, string>>, packed = true): Buffer {
@@ -500,6 +503,11 @@ describe('앱 코드 일 (MakeStage)', () => {
       assert.match(failed.note, /템플릿 문법 검사에 떨어져 새 버전을 만들지 않았어요/);
 
       await writeFile(join(room.outputsDir, 'list.html'), '{{#posts}}<b>{{title}}</b>{{/posts}}');
+      // 화면을 낸 앱 코드 일은 디자인 문서도 낸다 (2026-11-25)
+      await writeFile(
+        join(room.outputsDir, 'design.md'),
+        '## 한 줄\n블로그\n## 참고한 곳\n- https://a.example/\n- https://b.example/\n## 방향\n조용함\n## 토큰\n:root {}',
+      );
       const fixed = await stage.check();
       assert.equal(
         fixed.every((c) => c.ok),
@@ -522,8 +530,14 @@ describe('앱 코드 일 (MakeStage)', () => {
       });
       await writeFile(join(room.outputsDir, 'app.zip'), zip);
       const packed = await stage.check();
-      assert.deepEqual(short(packed).at(-1), [AppCodeCheck.BUNDLE, false, '문제 1개']);
-      assert.match(packed.at(-1)?.tail ?? '', /페이지 · 커뮤니티 앱에서만/);
+      const bundle = packed.find((c) => c.name === AppCodeCheck.BUNDLE);
+      assert.deepEqual([bundle?.ok, bundle?.how], [false, '문제 1개']);
+      assert.match(bundle?.tail ?? '', /페이지 · 커뮤니티 앱에서만/);
+      // zip 안이 묶음 전체라 디자인 문서도 zip 안에 있어야 한다
+      assert.match(
+        packed.find((c) => c.name === DesignDocCheck.NAME)?.tail ?? '',
+        /design\.md가 없어요/,
+      );
       await writeFile(join(room.outputsDir, 'app.zip'), 'zip이 아닌 글');
       assert.match((await stage.check()).at(-1)?.tail ?? '', /app\.zip을 읽지 못했어요/);
     } finally {

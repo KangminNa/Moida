@@ -10,6 +10,8 @@ import { type AppCodeRender, AppManifest } from './app-manifest';
 export class AppCodeBundle {
   /** 묶음의 설정 파일. 없으면 바깥 주소 없음 */
   static readonly MANIFEST = 'cairn.json';
+  /** 앱의 디자인 문서 (2026-11-25, 스킬 cairn-make의 design-research.md): 일꾼이 읽고 고치는 파일이라 방문자에게 내보내지 않는다 */
+  static readonly DESIGN = 'design.md';
   /** 버전 하나의 크기 합 · 템플릿(.html)의 크기 합 */
   static readonly BYTES_MAX = 20 * 1024 * 1024;
   static readonly TEMPLATE_BYTES_MAX = 1024 * 1024;

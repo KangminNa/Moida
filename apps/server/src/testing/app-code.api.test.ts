@@ -587,6 +587,7 @@ describe('정적 앱 ("render": "static")', () => {
     'assets/app.js': 'console.log("app")',
     'assets/img/pin.svg': '<svg xmlns="http://www.w3.org/2000/svg"/>',
     'about/index.html': '<html><head></head><body>소개</body></html>',
+    'design.md': '# 디자인 문서: 지도\n## 참고한 곳\n- https://maps.example/',
     'cairn.json': STATIC,
   };
 
@@ -631,6 +632,12 @@ describe('정적 앱 ("render": "static")', () => {
     assert.equal((await api.get(`/api/apps/site/${slug}/files/assets/img/pin.svg`)).status, 200);
     for (const path of ['index.html', 'about/index.html', 'assets/.env', 'assets/none.js'])
       assert.equal((await api.get(`/api/apps/site/${slug}/files/${path}`)).status, 404, path);
+    // 디자인 문서는 일꾼의 것이라 방문자에게 내보내지 않는다 (2026-11-25): 파일로도 화면으로도
+    assert.equal((await api.get(`/api/apps/site/${slug}/files/design.md`)).status, 404);
+    assert.deepEqual(
+      [(await at('design.md')).status, ((await at('design.md')).static as Json).file],
+      [404, null],
+    );
 
     const detail = await code(app);
     assert.deepEqual((detail.files as Json[]).map((f) => f.name).sort(), Object.keys(site).sort());

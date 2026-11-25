@@ -1,6 +1,7 @@
 import type { AppCodeBase } from './app-code-base';
 import { AppManifestCheck } from './app-manifest-check';
 import { DesignCheck } from './design-check';
+import { DesignDocCheck } from './design-doc-check';
 import { StageCheck } from './stage-check';
 
 /** 검사할 파일 하나: 앞 코드의 것이거나 AI가 낸 것. text는 읽은 글(템플릿 · cairn.json)만, 못 읽었으면 null */
@@ -84,6 +85,9 @@ export class AppCodeCheck {
     // 디자인 기준 (references/design.md): 낸 HTML · CSS가 있을 때만
     const design = DesignCheck.check(made, [...all.values()]);
     if (design) checks.push(design);
+    // 디자인 문서 (references/design-research.md): 화면을 냈으면 묶음에 design.md가 있어야 한다
+    const doc = DesignDocCheck.check(made, [...all.values()]);
+    if (doc) checks.push(doc);
     // 정적 앱의 HTML은 템플릿이 아니다: 문법 · 데이터 이름을 보지 않는다
     const templates = fixed ? [] : made.filter((f) => AppCodeCheck.isTemplate(f.name));
     if (templates.length === 0) return checks;
@@ -118,7 +122,7 @@ export class AppCodeCheck {
 
   /**
    * app.zip을 낸 일: zip 안이 묶음 전체다 (스토어 9.13). 앞 코드에서 내용을 받지 못한 파일(그림 · 큰 파일)은 zip에 없어도
-   * 서버가 남긴다. entries: zip 안의 파일 (cairn.json만 글까지). 읽지 못한 zip이면 null
+   * 서버가 남긴다. entries: zip 안의 파일 (cairn.json · design.md만 글까지). 읽지 못한 zip이면 null
    */
   static packed(base: AppCodeBase, entries: readonly AppCodeEntry[] | null): StageCheck[] {
     const zip = AppCodeCheck.PACKED;
@@ -142,7 +146,15 @@ export class AppCodeCheck {
       : [
           `${zip}은 정적 앱의 묶음 전체예요. zip 안의 cairn.json에 "render": "static"을 넣어요 (템플릿 앱은 바뀐 파일만 그대로 내요)`,
         ];
-    return [AppCodeCheck.bundle([...kept, ...entries], entries, fixed, base.kind, extra)];
+    const checks = [AppCodeCheck.bundle([...kept, ...entries], entries, fixed, base.kind, extra)];
+    const doc = DesignDocCheck.check(entries, [
+      ...base.files
+        .map((f) => new AppCodeEntry(f.name, f.size, f.text))
+        .filter((f) => !inside.has(f.name)),
+      ...entries,
+    ]);
+    if (doc) checks.push(doc);
+    return checks;
   }
 
   /** 일을 실패로 끝낼 검사(묶음 · 문법)가 떨어졌는가 */

@@ -4,7 +4,7 @@
 
 ## 모양
 
-- **디자인은 [design.md](design.md)의 기준을 따른다**: 스타일 하나 고르기 → `:root` 토큰 채우기 → 체크리스트. 아래는 페이지에서 더 지킬 것이다.
+- **디자인은 [design.md](design.md)의 기준을 따른다**: 같은 분야의 잘 만든 화면 한두 곳을 먼저 보고 방향 정하기 → `:root` 토큰 채우기 → 체크리스트. 아래는 페이지에서 더 지킬 것이다.
 - **파일 하나가 기본.** `<style>`과 `<script>`를 `index.html` 안에 넣는다. 그림이 꼭 필요하면 옆에 나란히 두고 `<img src="map.png">`처럼 상대 경로로 잇는다.
 - 하위 폴더(`assets/…`)는 쓸 수 없다. 파일 이름에 `/`를 넣지 않는다. 파일은 100개까지.
 - 맨 위에 `<!doctype html>`, `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`을 둔다. `<title>`은 페이지의 제목.

@@ -20,10 +20,16 @@ description: 코드 러너 칸에서 발표 · 표 · 문서 · 도표 · 영상
 - **띄운 것을 남기지 않는다.** LibreOffice(`soffice`)는 변환마다 끝나기를 기다린다. 서버 · 감시 모드는 끄고 끝낸다.
 - **발행 · 전송을 하지 않는다.** 만든 파일은 Cairn 안에만 남는다. 올리기는 러너가 한다.
 
-## 화면은 디자인 기준으로
+## 화면은 참고한 디자인으로
 
-웹 페이지 · 앱 화면을 만들거나 고칠 때는 **먼저 [references/design.md](references/design.md)를 읽는다**: 목적에 맞는 스타일 하나를 고르고, 정해진 이름의 토큰(색 · 간격 · 글자 · 모서리)을 채우고, 체크리스트를 지킨다. 색 · 크기를 화면 코드에 직접 적지 않는다.
-앱 코드는 러너가 "디자인 기준" 검사(대비 · viewport · lang · 포커스 · 작은 글자 · alt · 움직임)로 본다.
+정해 둔 틀(스타일 · 시작 코드)에서 고르지 않는다. 웹 페이지 · 앱 화면을 만들거나 고칠 때는 **먼저 [references/design.md](references/design.md)를 읽는다.**
+
+- **새 앱**(받은 코드에 `design.md`가 없다)은 [references/design-research.md](references/design-research.md)대로 같은 분야의 잘 만든 화면 3~5곳을 찾아 보고(`browser_read`의 화면 그림), 이 앱만의 디자인 문서 `design.md`를 쓴 뒤 그대로 만든다.
+- `design.md`가 있는 앱은 조사하지 않고 그 문서의 방향 · 토큰대로 고친다.
+- 정해진 이름의 토큰(색 · 간격 · 글자 · 모서리)을 채우고 체크리스트를 지킨다. 색 · 크기를 화면 코드에 직접 적지 않는다.
+- 참고하되 베끼지 않는다: 로고 · 상표 · 문구 · 사진 · 그림 · 코드는 가져오지 않는다.
+
+앱 코드는 러너가 "디자인 기준" 검사(디자인 문서 · 대비 · viewport · lang · 포커스 · 작은 글자 · alt · 움직임)로 본다.
 
 ## 형식은 HTML이 기본
 
@@ -44,7 +50,8 @@ description: 코드 러너 칸에서 발표 · 표 · 문서 · 도표 · 영상
 | 받은 영상 편집 (자르기 · 무음 빼기 · 세로로 · 자막 · 소리) | ffmpeg · ffprobe | [references/video.md](references/video.md)의 "받은 영상 편집" |
 | 웹 페이지 (index.html) | 손으로 쓰는 HTML · CSS · JS | [references/page.md](references/page.md) |
 | 앱 코드 (스토어의 앱 화면) | Mustache 템플릿 · CSS · JS | [references/app-code.md](references/app-code.md) |
-| 화면의 디자인 (웹 페이지 · 앱 화면 모두) | 스타일 하나 + 토큰 + 체크리스트 | [references/design.md](references/design.md) |
+| 화면의 디자인 (웹 페이지 · 앱 화면 모두) | 디자인 문서 + 토큰 + 체크리스트 | [references/design.md](references/design.md) |
+| 새 앱의 디자인 조사 | 웹 검색 · `browser_read` 화면 그림 · `design.md` | [references/design-research.md](references/design-research.md) |
 | PDF로 · 미리 보기 | `soffice --headless --convert-to pdf` · `pdftoppm -png` | [references/slides.md](references/slides.md) |
 
 한글 글꼴은 **Noto Sans CJK KR**(본문) · **Noto Serif CJK KR**(제목에 쓸 수 있음)이다. 글꼴을 정하지 않으면 한글이 □로 깨질 수 있다.
