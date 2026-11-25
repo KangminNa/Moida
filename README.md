@@ -211,7 +211,7 @@ pnpm install-code        # 설치 코드. http://localhost:3000/install 에 넣�
 
 ```mermaid
 flowchart LR
-  subgraph 바깥
+  subgraph outside [바깥]
     B[브라우저<br/>콘솔 · 앱 화면]
     T[내 컴퓨터의 AI 도구<br/>Claude Code · Codex]
     X[브라우저 확장]
