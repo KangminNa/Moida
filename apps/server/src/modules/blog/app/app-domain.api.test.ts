@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { Database, HostGate } from '../../platform';
 import { ApiClient, ApiResult, TestUser } from '../../../testing/api-client';
+import { Database, HostGate } from '../../platform';
 
 // 앱마다 도메인 (스토어 3-0, docs/스토어.md 11장): 도메인 정하기(관리자) · 앱 도메인으로 온 요청(HostGate) ·
 // 연결 확인(/.well-known/cairn-domain → domain/check) · 도메인으로 여는 앱 목록 · 화면의 주소 기준과 보내기.
@@ -295,9 +295,10 @@ describe('사이트 주소의 도메인 (2026-11-25)', () => {
       gate.stale();
     };
     const app = ok(await patch(await newApp(`site-${mark}`), { visibility: 'public' }));
+    const appId = String(app.id);
     const db = api.service(Database);
     await setSite(`https://${site}`);
-    await db.sql`UPDATE blog.apps SET domain = ${site}, domain_checked_at = now() WHERE id = ${String(app.id)}`;
+    await db.sql`UPDATE blog.apps SET domain = ${site}, domain_checked_at = now() WHERE id = ${appId}`;
     try {
       const listed = ok(await api.get('/api/apps/domains')).domains as Json[];
       assert.equal(
@@ -305,7 +306,7 @@ describe('사이트 주소의 도메인 (2026-11-25)', () => {
         false,
       );
     } finally {
-      await db.sql`UPDATE blog.apps SET domain = NULL, domain_checked_at = NULL WHERE id = ${String(app.id)}`;
+      await db.sql`UPDATE blog.apps SET domain = NULL, domain_checked_at = NULL WHERE id = ${appId}`;
       await setSite(space.siteUrl ?? null);
     }
   });
