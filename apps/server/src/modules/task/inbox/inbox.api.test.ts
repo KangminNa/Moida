@@ -63,8 +63,11 @@ describe('inbox', () => {
       (await db.sql<{ id: string }[]>`SELECT id FROM account.spaces LIMIT 1`)[0]?.id,
     );
     const before = await inbox(reader);
-    const approvalId = randomUUID();
-    const inChat = randomUUID();
+    // 목록은 id(UUIDv7, 시간 순) 내림차순의 최근 몇 개다: 시험의 결재도 시간 순 id여야 다른 시험이 남긴 결재 뒤로 밀리지 않는다
+    const ids = await db.sql<{ id: string }[]>`
+      SELECT platform.uuid_v7()::text AS id FROM generate_series(1, 2)`;
+    const approvalId = String(ids[0]?.id);
+    const inChat = String(ids[1]?.id);
     const chatId = randomUUID();
     await db.sql`
       INSERT INTO task.chats (id, space_id, title, request_id, pending)
