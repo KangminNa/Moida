@@ -142,12 +142,16 @@ export class CheckDomainInput extends BaseRequest {
 
 /** GET /.well-known/cairn-domain: 앱 도메인으로 온 요청의 도메인 (HostGate가 적는다). 기본 도메인이면 null (Query가 404) */
 export class DomainProofInput extends BaseRequest {
-  private constructor(readonly host: string | null) {
+  private constructor(
+    readonly host: string | null,
+    /** 요청의 Origin 머리글 (브라우저가 다른 출처에서 읽을 때만 붙인다). 없으면 null */
+    readonly origin: string | null,
+  ) {
     super();
   }
 
-  static from(appHost: string | undefined): DomainProofInput {
-    return new DomainProofInput(appHost ?? null);
+  static from(appHost: string | undefined, origin: unknown): DomainProofInput {
+    return new DomainProofInput(appHost ?? null, typeof origin === 'string' ? origin : null);
   }
 }
 

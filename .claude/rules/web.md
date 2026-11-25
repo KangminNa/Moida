@@ -53,6 +53,11 @@ paths:
 - ★ 새 탭은 늘 `target="_blank" rel="noopener noreferrer"`: 열린 쪽이 연 창(콘솔)을 바꿔치기하지 못하고, 주소가 Referer로 새지 않게. 코드로 열 때는 `window.open(주소, '_blank', 'noopener,noreferrer')`.
 - 글 · AI 답(마크다운)의 http · https 링크는 `renderMarkdown`이 새 탭으로 그린다 (`_lib/markdown.ts`).
 
+## 대화 화면 나누기 (2026-11-25)
+
+- 대화 목록의 대화를 끌어 대화 화면에 놓거나 줄 끝의 "옆에 열기"로 오른쪽에 그 대화를 연다 (`admin/chats/ChatPanes.tsx`). 옆 대화는 주소의 `?side=<id>`(`chat-panes.ts`)라 새로고침 · 뒤로 가기가 되고, 다른 대화로 옮겨도 옆 칸은 그대로다. 너비만 이 브라우저(localStorage)에 기억한다. 폰 폭에서는 나누지 않는다.
+- 칸마다 따로 내린다 (`.chat-pane`가 내리는 곳). 대화 화면 안의 것은 `.console-page`가 아니라 칸 안에 붙는다. 칸이 좁으면 일꾼 칸(`.chat-team`)을 숨긴다 (컨테이너 쿼리)
+
 ## 대화의 사진 (2026-11-19)
 
 - 사진은 따로 올리는 길이 없다: 파일 올리기(`POST /api/outputs/files`)로 결과물이 되고 참조(`image`)로 붙는다. 사진인지는 서버가 앞부분으로 알아본 형식(`chat-photos.ts`의 `PHOTO_TYPES`)으로 정한다.
@@ -63,7 +68,7 @@ paths:
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`). 서버가 `page`를 주면(앱 코드를 공개하지 않은 페이지 앱의 공개 페이지가 화면, 스토어 9.11.4) 템플릿 없이 그 페이지의 파일(`/api/pages/site/<페이지>/<파일>`)을 서버의 머리글 그대로 흘려보내고, 첫 화면은 `/<앱>/index.html`로 넘긴다 (페이지 안의 상대 경로가 맞게).
 - 웹의 최상위 경로를 더하면 `next.config.ts`의 `WEB_ROUTES`에도 적는다 (화면 머리글이 붙는 목록, 구조 검사가 본다). 앱 주소에는 Cairn 화면 머리글을 붙이지 않는다.
 - `mustache`는 `_blog/app-screen.ts`에서만 가져온다 (규칙 검사).
-- 관리자가 연 앱 화면(기본 도메인 · 미리 보기 새 탭)에는 서버가 준 `console`(콘솔의 앱 관리 주소)로 "콘솔로" 링크를 붙인다 (`_blog/console-link.ts`, 2026-11-25). 그 답은 `private, no-store`, 콘솔의 미리 보기 틀(`Sec-Fetch-Dest: iframe`) 안에서는 붙이지 않는다. 앱 도메인에는 콘솔 쿠키가 없어 보이지 않는다
+- 관리자가 연 앱 화면(기본 도메인 · 미리 보기 새 탭)에는 서버가 준 `console`(콘솔의 앱 관리 주소)로 "콘솔로" 링크를 붙인다 (`_blog/console-link.ts`, 2026-11-25). 그 답은 `private, no-store`, 콘솔의 미리 보기 틀(`Sec-Fetch-Dest: iframe`) 안에서는 붙이지 않는다. 앱 도메인에는 콘솔 쿠키가 없어 보이지 않는다. 앱 도메인에서 콘솔로 보내는 길은 만들지 않는다 (GET 한 번으로 콘솔이 있는 사이트를 드러내지 않게, 2026-11-25). 콘솔은 사이트 주소의 `/admin`
 - 앱 도메인 (스토어 3-0): `proxy.ts`가 연결을 확인한 앱 도메인의 요청을 `/<앱>/…`로 넘긴다(`_blog/app-domains.ts`, 30초 기억). 앱 화면은 방문자가 연 호스트(`_blog/request-host.ts`)를 서버에 넘기고, 앱 링크는 서버가 준 `url`(확인한 도메인이면 그 도메인)로 건다. `next.config`의 머리글은 들어온 경로로 붙어 앱 화면의 격리 머리글을 덮으므로, 앱 도메인에서 앱 화면이 되는 경로(`/` · `/posts` · `/m`)의 화면 머리글은 `proxy.ts`가 기본 도메인에서만 붙인다 (`_lib/screen-headers.ts`). 웹에 그런 경로를 더하면 `APP_SCREEN_ROOTS`에도 적는다
 
 ## 커뮤니티 화면 (스토어 3-2)

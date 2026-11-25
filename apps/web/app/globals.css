@@ -3451,6 +3451,115 @@ ul.picked > .chip {
   font-size: 0.8125rem;
 }
 
+/* 대화 화면 나누기 (2026-11-25): 대화 목록의 대화를 끌어 놓으면 오른쪽에 그 대화. 칸마다 따로 내린다.
+   칸이 하나여도 이 틀이 내리는 곳이라 머리 줄(chat-top) · 입력 칸(chat-compose)이 칸 안에 붙는다 */
+.chat-panes {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  container: chat-pane / inline-size;
+}
+
+.chat-pane.side {
+  flex: 0 0 50%;
+  background: var(--bg);
+}
+
+.chat-pane-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 0;
+  background: var(--bg);
+}
+
+/* 옆 칸에서는 머리 줄이 위 단추 줄 아래에 붙는다 */
+.chat-pane.side .chat-top {
+  top: 46px;
+}
+
+.chat-pane-divider {
+  flex: none;
+  width: 9px;
+  margin: 0 -4px;
+  z-index: 7;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat;
+}
+
+.chat-pane-divider:hover,
+.chat-pane-divider:focus-visible {
+  background: linear-gradient(var(--accent), var(--accent)) center / 3px 100% no-repeat;
+  outline: none;
+}
+
+.chat-drop {
+  position: absolute;
+  inset: 12px 12px 12px 50%;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--raised);
+  box-shadow: var(--float-1);
+  color: var(--muted);
+  font-size: 0.875rem;
+  pointer-events: none;
+}
+
+/* 대화 목록 한 줄과 "옆에 열기" 단추 (줄에 올리거나 키보드로 닿았을 때만 보인다) */
+.chat-row {
+  position: relative;
+}
+
+.chat-row .chat-link {
+  cursor: pointer;
+}
+
+.chat-beside {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  opacity: 0;
+  background: var(--raised);
+}
+
+.chat-row:hover .chat-beside,
+.chat-beside:focus-visible {
+  opacity: 1;
+}
+
+/* 칸이 좁으면 대화 옆의 "일꾼이 동시에 일하는 중" 칸을 숨긴다 (나눈 화면) */
+@container chat-pane (max-width: 1000px) {
+  .chat-team {
+    display: none;
+  }
+}
+
+/* 폰 폭에서는 나누지 않는다: 옆 칸 · 구분선 · 옆에 열기를 그리지 않는다 */
+@media (max-width: 760px) {
+  .chat-pane.side,
+  .chat-pane-divider,
+  .chat-beside,
+  .chat-drop {
+    display: none;
+  }
+}
+
 /* 대화와 오른쪽 "일꾼이 동시에 일하는 중" 칸 (2026-11-15 화면 정리). 칸이 없으면 대화가 가운데에 선다 */
 .chat-split {
   display: flex;

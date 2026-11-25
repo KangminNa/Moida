@@ -31,7 +31,14 @@ const TURN_OPEN = ['queued', 'running', 'waiting'];
 // 일꾼이 일하는 동안에는 오른쪽에 "일꾼이 동시에 일하는 중" 칸이 붙는다 (ChatTeamPanel, 좁은 화면에서는 숨긴다).
 // 상대는 늘 대표 (O-2): 대표가 일꾼에게 나눠 맡기고, 승인은 결과 카드 하나로 정한다 (2차 2단계).
 // 일하는 중에도 보낸다: 덧붙인 말이 되고 대표가 짧게 답한다 (2차 1-1). 신호가 오면 다시 읽는다
-export function ChatThreadPanel({ id }: { id: string }) {
+export function ChatThreadPanel({
+  id,
+  onGone,
+}: {
+  id: string;
+  /** 휴지통으로 보낸 뒤: 옆 칸이면 칸만 닫는다 (없으면 대화 첫 화면으로) */
+  onGone?: () => void;
+}) {
   // 대상(id)으로 거르지 않는다: 신호의 대상은 회차 작업 · 승인이라 대화 id가 아니다
   const detail = useLiveValue(
     `chat:${id}`,
@@ -142,7 +149,9 @@ export function ChatThreadPanel({ id }: { id: string }) {
       conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요',
       reload: detail.reload,
     });
-    if (reply?.ok) router.replace('/admin');
+    if (!reply?.ok) return;
+    if (onGone) onGone();
+    else router.replace('/admin');
   };
 
   /** 일꾼을 기다리는 작업을 지금까지의 결과로 마무리하게 깨운다 (일꾼 기다리기) */

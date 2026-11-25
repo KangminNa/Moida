@@ -159,7 +159,11 @@ export class AppDomainController {
     @Req() req: HttpRequest,
     @Res({ passthrough: true }) res: HttpResponse,
   ): Promise<AppDomainProofAnswer> {
-    const answer = await this.query.domainProof(actor, DomainProofInput.from(req.appHost));
+    const answer = await this.query.domainProof(
+      actor,
+      DomainProofInput.from(req.appHost, req.headers.origin),
+    );
+    res.setHeader('Vary', 'Origin');
     if (answer.allowOrigin) res.setHeader('Access-Control-Allow-Origin', answer.allowOrigin);
     return answer;
   }

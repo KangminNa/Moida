@@ -1,8 +1,11 @@
 'use client';
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CHAT_NEEDS_ME, CHAT_STATE, tokens } from '../_task/labels';
 import { useChats } from '../_task/live';
 import type { ChatSummary } from '../_task/types';
+import { Icon } from '../_ui/Icon';
+import { CHAT_DRAG, mainChatOf, sideChatOf, withSide } from './chats/chat-panes';
 import { CHATS_HREF } from './menu';
 
 /** 목록에 표시를 다는 상태 (끝난 대화는 표시 없이) */
@@ -10,10 +13,16 @@ const MARKED = ['asking', 'working', 'waiting_approval', 'failed'];
 
 // 대화 옆 칸의 목록 (2차 1-5, ChatGPT · Claude 같은 모양): 날짜별 대화. 위의 새 대화 · 접기 단추는 콘솔 틀이 그린다.
 // 나에게 온 것(승인 · O-2 전에 맡기 전으로 남은 대화)은 채운 표시, 일하는 중 · 실패는 테두리 표시. 누가 맡았는지는 대화 안에서만 보인다.
-// 맨 아래는 대화 휴지통 (2026-11-19 휴지통 A)
+// 맨 아래는 대화 휴지통 (2026-11-19 휴지통 A).
+// 줄을 끌어 대화 화면에 놓거나 줄 끝의 단추로 그 대화를 옆에 연다 (2026-11-25 화면 나누기, ChatPanes).
+// 옆에 연 대화가 있으면 다른 대화로 옮겨도 옆 칸은 그대로 둔다
 export function ChatNav({ pathname }: { pathname: string | null }) {
   const list = useChats();
   const chats = list.data?.chats ?? null;
+  const router = useRouter();
+  const here = usePathname() ?? CHATS_HREF;
+  const side = sideChatOf(useSearchParams().get('side'), mainChatOf(here));
+  const besideHere = (id: string) => sideChatOf(id, mainChatOf(here)) !== null;
   return (
     <nav className="chat-nav" aria-label="대화">
       {list.error && <p className="error">{list.error}</p>}
@@ -28,21 +37,37 @@ export function ChatNav({ pathname }: { pathname: string | null }) {
             {rows.map((c) => {
               const href = `${CHATS_HREF}/${c.id}`;
               return (
-                <a
-                  key={c.id}
-                  className="chat-link"
-                  href={href}
-                  aria-current={pathname === href ? 'page' : undefined}
-                  title={c.title}
-                >
-                  <span className="clamp-1">{c.title}</span>
-                  {c.tokens > 0 && <small title="이 대화가 쓴 토큰">{tokens(c.tokens)} 토큰</small>}
-                  {MARKED.includes(c.state) && (
-                    <span className={CHAT_NEEDS_ME.includes(c.state) ? 'pill on' : 'pill'}>
-                      {CHAT_STATE[c.state] ?? c.state}
-                    </span>
+                <div key={c.id} className="chat-row">
+                  <a
+                    className="chat-link"
+                    href={withSide(href, sideChatOf(side, c.id))}
+                    aria-current={pathname === href ? 'page' : undefined}
+                    title={c.title}
+                    draggable
+                    onDragStart={(e) => e.dataTransfer.setData(CHAT_DRAG, c.id)}
+                  >
+                    <span className="clamp-1">{c.title}</span>
+                    {c.tokens > 0 && (
+                      <small title="이 대화가 쓴 토큰">{tokens(c.tokens)} 토큰</small>
+                    )}
+                    {MARKED.includes(c.state) && (
+                      <span className={CHAT_NEEDS_ME.includes(c.state) ? 'pill on' : 'pill'}>
+                        {CHAT_STATE[c.state] ?? c.state}
+                      </span>
+                    )}
+                  </a>
+                  {besideHere(c.id) && side !== c.id && (
+                    <button
+                      type="button"
+                      className="icon-button chat-beside"
+                      aria-label={`${c.title} 옆에 열기`}
+                      title="옆에 열기 (끌어서 놓아도 돼요)"
+                      onClick={() => router.push(withSide(here, c.id))}
+                    >
+                      <Icon name="panel" />
+                    </button>
                   )}
-                </a>
+                </div>
               );
             })}
           </section>

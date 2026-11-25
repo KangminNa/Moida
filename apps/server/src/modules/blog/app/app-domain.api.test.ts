@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, ApiResult, TestUser } from '../../../testing/api-client';
+import { Database, HostGate } from '../../platform';
 
 // 앱마다 도메인 (스토어 3-0, docs/스토어.md 11장): 도메인 정하기(관리자) · 앱 도메인으로 온 요청(HostGate) ·
 // 연결 확인(/.well-known/cairn-domain → domain/check) · 도메인으로 여는 앱 목록 · 화면의 주소 기준과 보내기.
@@ -142,7 +143,18 @@ describe('앱 도메인으로 온 요청 (HostGate)', () => {
     const proof = await viaHost('/.well-known/cairn-domain', domain);
     assert.equal(proof.status, 200, proof.text);
     assert.match(String(proof.json().token), /^[\w-]{40,}$/);
-    assert.match(proof.header('access-control-allow-origin') ?? '', /^http:\/\/127\.0\.0\.1:\d+$/);
+    // 출처는 사이트에서 온 요청에만 알려 준다: GET 한 번으로 콘솔이 있는 사이트를 알아내지 못하게 (2026-11-25)
+    assert.equal(proof.header('access-control-allow-origin'), null, 'Origin 없는 요청');
+    const other = await api.viaHost('/.well-known/cairn-domain', domain, {
+      headers: { origin: 'https://attacker.example' },
+    });
+    assert.equal(other.header('access-control-allow-origin'), null, '다른 출처');
+    const site = new URL(api.baseUrl).origin;
+    const fromSite = await api.viaHost('/.well-known/cairn-domain', domain, {
+      headers: { origin: site },
+    });
+    assert.equal(fromSite.header('access-control-allow-origin'), site, '사이트 화면이 읽을 때');
+    assert.equal(fromSite.header('vary'), 'Origin');
     const again = await viaHost('/.well-known/cairn-domain', domain, { forwarded: true });
     assert.equal(again.json().token, proof.json().token, '같은 앱 · 도메인이면 같은 값');
   });
@@ -272,6 +284,41 @@ describe('커뮤니티 앱의 공개와 화면 (스토어 3-2)', () => {
     for (const path of ['t/not-an-id', `t/${id}/more`, 'posts/hello', 'm/posts']) {
       const missing = ok(await screen(path));
       assert.deepEqual([missing.status, missing.template], [404, '404.html'], path);
+    }
+  });
+});
+
+describe('사이트 주소의 도메인 (2026-11-25)', () => {
+  test('앱에 사이트 주소와 같은 도메인이 남아 있어도 앱 도메인 목록에 없다: 웹이 콘솔까지 그 앱으로 넘기지 않게', async () => {
+    // 정하는 길(PATCH)은 사이트 주소의 도메인을 422로 막는다. 사이트 주소를 정하기 전에 연결한 도메인처럼 DB에 바로 둔다
+    const site = domainOf('site');
+    const space = ok(await api.get('/api/space', owner));
+    const gate = api.service(HostGate);
+    const setSite = async (siteUrl: unknown) => {
+      const now = ok(await api.get('/api/space', owner));
+      ok(
+        await api.request('PUT', '/api/space', owner, {
+          name: now.name,
+          siteUrl,
+          version: now.version,
+        }),
+      );
+      gate.stale();
+    };
+    const app = ok(await patch(await newApp(`site-${mark}`), { visibility: 'public' }));
+    const appId = String(app.id);
+    const db = api.service(Database);
+    await setSite(`https://${site}`);
+    await db.sql`UPDATE blog.apps SET domain = ${site}, domain_checked_at = now() WHERE id = ${appId}`;
+    try {
+      const listed = ok(await api.get('/api/apps/domains')).domains as Json[];
+      assert.equal(
+        listed.some((d) => d.domain === site),
+        false,
+      );
+    } finally {
+      await db.sql`UPDATE blog.apps SET domain = NULL, domain_checked_at = NULL WHERE id = ${appId}`;
+      await setSite(space.siteUrl ?? null);
     }
   });
 });
