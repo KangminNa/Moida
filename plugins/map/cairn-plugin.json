@@ -1,8 +1,8 @@
 {
   "name": "map",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "cairn": ">=0.1",
-  "description": "지도 API를 등록한다. 앱 코드는 cairn.map.create(자리, { places })로 지도를 그리고, 어느 회사 지도인지는 여기서 정한다. 카카오 · 네이버 · 구글 지도는 앱의 도메인으로 연 화면에서만 돌고, 격리된 화면(미리 보기 · 기본 도메인 · 페이지)은 키가 필요 없는 OpenStreetMap으로 그린다",
+  "description": "지도 API를 등록한다. 앱 코드는 cairn.map.create(자리, { places })로 지도를 그리고, 어느 회사 지도인지는 여기서 정한다. 회사마다 키 이름 · 스크립트 주소는 providers.json 한 곳에 있다. 카카오 · 네이버 · 구글 지도는 앱의 도메인으로 연 화면에서만 돌고, 격리된 화면(미리 보기 · 기본 도메인 · 페이지)은 키가 필요 없는 OpenStreetMap으로 그린다",
   "settings": {
     "provider": {
       "label": "지도",
@@ -10,13 +10,33 @@
       "options": ["osm", "kakao", "naver", "google"],
       "default": "osm",
       "public": true,
-      "help": "osm: OpenStreetMap(키 없음) · kakao: 카카오맵 · naver: 네이버 지도 · google: 구글 지도"
+      "help": "osm: OpenStreetMap(키 없음) · kakao: 카카오맵 · naver: 네이버 지도 · google: 구글 지도. 고른 회사의 브라우저용 키가 비어 있으면 OpenStreetMap으로 그려요"
     },
-    "key": {
-      "label": "브라우저용 키",
+    "kakaoJsKey": {
+      "label": "카카오 JavaScript 키",
       "type": "text",
       "public": true,
-      "help": "방문자의 브라우저가 쓰는 키라 공개돼요. 카카오는 JavaScript 키, 네이버는 Client ID(ncpKeyId), 구글은 Maps JavaScript API 키. 각 회사 콘솔에서 키를 쓸 도메인(앱의 도메인)을 꼭 등록하고, 서버용 비밀 키는 넣지 않아요"
+      "help": "카카오 개발자 콘솔의 JavaScript 키 (REST API 키 아님). 방문자의 브라우저가 쓰는 공개 값이라, 콘솔의 JavaScript SDK 도메인에 앱의 도메인을 꼭 등록해요"
+    },
+    "naverClientId": {
+      "label": "네이버 Client ID",
+      "type": "text",
+      "public": true,
+      "help": "NAVER Cloud Maps 애플리케이션의 Client ID (Client Secret 아님). Dynamic Map을 고르고 Web 서비스 URL에 앱의 도메인을 꼭 등록해요"
+    },
+    "googleBrowserKey": {
+      "label": "구글 브라우저용 API 키",
+      "type": "text",
+      "public": true,
+      "help": "Maps JavaScript API만 허용하고 HTTP referrer 제한에 앱의 도메인을 건 키. 서버용 키는 넣지 않아요"
+    },
+    "osmTiles": {
+      "label": "키 없는 지도의 타일",
+      "type": "select",
+      "options": ["osm", "carto"],
+      "default": "osm",
+      "public": true,
+      "help": "osm: OpenStreetMap 공식 타일 (출처 표시 · 대량 사용 금지 정책) · carto: CARTO Voyager (무료 조건은 CARTO 약관을 확인해요)"
     }
   }
 }

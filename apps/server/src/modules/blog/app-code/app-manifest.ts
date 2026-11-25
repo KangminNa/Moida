@@ -144,7 +144,8 @@ export class AppManifest {
 
   /**
    * 지도 회사의 스크립트 호스트 (2026-11-25): 앱이 지도 SDK와 키를 직접 넣지 않고 cairn.map을 쓰게 바깥 주소에 받지 않는다.
-   * 키는 관리자가 지도 플러그인에 넣고, 웹이 화면마다 회사의 호스트를 연다 (apps/web의 map-config.ts와 같은 목록)
+   * 키는 관리자가 지도 플러그인에 넣고, 웹이 화면마다 회사의 호스트를 연다. 목록은 plugins/map/providers.json의 sdkHosts와 같다
+   * (서버는 src 밖을 가져오지 않아 옮겨 적고, app-manifest.test.ts가 그 파일과 맞춰 본다)
    */
   private static readonly MAP_HOSTS: readonly string[] = [
     'dapi.kakao.com',

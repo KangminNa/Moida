@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -18,6 +19,15 @@ import { Redactor, RunLog } from './redactor';
 import { RunnerConfig } from './runner-config';
 import type { StageCheck } from './stage-check';
 import { ZipIndex } from './zip-index';
+
+/** 지도 플러그인의 회사 스크립트 호스트 (plugins/map/providers.json의 sdkHosts) */
+const mapSdkHosts = (): string[] => {
+  const file = resolve(__dirname, '../../../plugins/map/providers.json');
+  const spec = JSON.parse(readFileSync(file, 'utf8')) as {
+    providers: Record<string, { sdkHosts: string[] }>;
+  };
+  return Object.values(spec.providers).flatMap((p) => p.sdkHosts);
+};
 
 // 앱 코드를 고치는 만들기 일 (스토어 1-6c): 지금 코드 받기(app_code_base) · 지시 단락 · 묶음과 템플릿 검사.
 
@@ -189,6 +199,14 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
       manifest('{"cairn":1,"hosts":["dapi.kakao.com"]}'),
       /지도는 cairn\.map으로/,
       '지도 회사의 스크립트를 직접 넣지 않는다 (2026-11-25)',
+    );
+    // 거절하는 호스트는 지도 플러그인의 회사 목록(providers.json의 sdkHosts) 전부다 (docs/지도.md MP-1)
+    for (const host of mapSdkHosts())
+      assert.match(manifest(JSON.stringify({ cairn: 1, hosts: [host] })), /cairn\.map/, host);
+    assert.equal(
+      manifest('{"cairn":1,"hosts":["fonts.googleapis.com"]}'),
+      '',
+      '글꼴은 막지 않는다',
     );
     assert.match(manifest('{"cairn":2}'), /데이터 약속\(cairn\)은 1/);
     assert.match(manifest('nope'), /JSON이 아니에요/);

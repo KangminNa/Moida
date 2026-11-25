@@ -13,12 +13,13 @@ const SOURCE = String.raw`(() => {
   const fail = (message) => Object.assign(new Error(message), { status: 0, code: 'map' });
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
   const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet';
-  const OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
   const loaded = {};
   const once = (name, make) => loaded[name] || (loaded[name] = make().catch((e) => { delete loaded[name]; throw e; }));
   const tag = (name, attrs) => new Promise((resolve, reject) => {
     const el = document.createElement(name);
     if (attrs.integrity) el.crossOrigin = 'anonymous';
+    // 지도 회사 · 타일은 어디서 왔는지(출처만)를 본다: 미리 보기 주소의 토큰은 경로에 있어 출처만 보내면 새지 않는다
+    el.referrerPolicy = 'strict-origin';
     Object.assign(el, attrs);
     el.onload = () => resolve();
     el.onerror = () => reject(fail('지도 라이브러리를 받지 못했어요'));
@@ -28,28 +29,28 @@ const SOURCE = String.raw`(() => {
     promise,
     new Promise((_, reject) => setTimeout(() => reject(fail('지도 라이브러리가 늦어요')), 10000)),
   ]);
-  const key = encodeURIComponent(MAP.key);
+  // 회사 스크립트 주소는 키를 넣어 웹이 준다 (plugins/map/providers.json). 카카오는 autoload=false 뒤 load, 구글은 callback
   const kits = {
     osm: () => once('osm', () => Promise.all([
       tag('link', { rel: 'stylesheet', href: LEAFLET + '.css', integrity: 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=' }),
       tag('script', { src: LEAFLET + '.js', integrity: 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=' }),
     ]).then(() => window.L)),
     kakao: () => once('kakao', () =>
-      tag('script', { src: 'https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey=' + key })
+      tag('script', { src: MAP.script })
         .then(() => new Promise((resolve) => window.kakao.maps.load(() => resolve(window.kakao.maps))))),
-    naver: () => once('naver', () =>
-      tag('script', { src: 'https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=' + key }).then(() => window.naver.maps)),
+    naver: () => once('naver', () => tag('script', { src: MAP.script }).then(() => window.naver.maps)),
     google: () => once('google', () => new Promise((resolve, reject) => {
       window.__cairnMapReady = () => resolve(window.google.maps);
-      tag('script', { src: 'https://maps.googleapis.com/maps/api/js?loading=async&callback=__cairnMapReady&key=' + key }).catch(reject);
+      tag('script', { src: MAP.script }).catch(reject);
     })),
   };
   const draws = {
     osm(L, el, places, pick, zoom) {
       const map = L.map(el, { scrollWheelZoom: false });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd', maxZoom: 20,
-        attribution: OSM + ' &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
+      // 타일은 관리자가 고른 것 (providers.json의 tiles). 출처 표시는 지도 위에 남긴다 (OSM 타일 정책)
+      L.tileLayer(MAP.tiles.url, {
+        subdomains: MAP.tiles.subdomains || 'abc', maxZoom: MAP.tiles.maxZoom,
+        attribution: MAP.tiles.attribution, referrerPolicy: 'strict-origin',
       }).addTo(map);
       const pins = places.map((p, i) => L.marker([p.lat, p.lng], { title: p.name || '' })
         .addTo(map).bindPopup(esc(p.name)).on('click', () => pick(i)));
@@ -146,7 +147,7 @@ const SOURCE = String.raw`(() => {
 })();
 `;
 
-/** cairn.map의 글자. 이 화면에서 쓸 지도(회사 · 브라우저용 키)를 넣는다 */
+/** cairn.map의 글자. 이 화면에서 쓸 지도(회사 · 키를 넣은 스크립트 주소 · 타일)를 넣는다 */
 export function cairnMapScript(choice: MapChoice): string {
   return SOURCE.replace('__MAP__', JSON.stringify(choice).replace(/</g, '\\u003c'));
 }

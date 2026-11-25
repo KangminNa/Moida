@@ -1,0 +1,48 @@
+{
+  "$comment": "지도 회사 정보 한 파일 (docs/지도.md MP-1). 웹(_blog/map-config.ts · cairn-map.ts)이 읽고, 서버 AppManifest · 러너 AppManifestCheck의 sdkHosts는 테스트가 이 파일과 맞춰 본다. 키 이름 · 주소가 바뀌면 여기만 고친다",
+  "providers": {
+    "kakao": {
+      "label": "카카오맵",
+      "keySetting": "kakaoJsKey",
+      "script": "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey={key}",
+      "sdkHosts": ["dapi.kakao.com", "t1.daumcdn.net"],
+      "hosts": ["dapi.kakao.com", "t1.daumcdn.net"]
+    },
+    "naver": {
+      "label": "네이버 지도",
+      "keySetting": "naverClientId",
+      "script": "https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={key}",
+      "sdkHosts": ["oapi.map.naver.com", "openapi.map.naver.com"],
+      "hosts": ["oapi.map.naver.com", "nrbe.map.naver.net", "kr-col-ext.nelo.navercorp.com"]
+    },
+    "google": {
+      "label": "구글 지도",
+      "keySetting": "googleBrowserKey",
+      "script": "https://maps.googleapis.com/maps/api/js?loading=async&callback=__cairnMapReady&key={key}",
+      "sdkHosts": ["maps.googleapis.com", "maps.gstatic.com"],
+      "hosts": [
+        "maps.googleapis.com",
+        "maps.gstatic.com",
+        "fonts.googleapis.com",
+        "fonts.gstatic.com"
+      ]
+    }
+  },
+  "leaflet": {
+    "hosts": ["unpkg.com"]
+  },
+  "tiles": {
+    "osm": {
+      "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "subdomains": "",
+      "maxZoom": 19,
+      "attribution": "&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener noreferrer\">OpenStreetMap</a>"
+    },
+    "carto": {
+      "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      "subdomains": "abcd",
+      "maxZoom": 20,
+      "attribution": "&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener noreferrer\">OpenStreetMap</a> &copy; <a href=\"https://carto.com/attributions\" target=\"_blank\" rel=\"noopener noreferrer\">CARTO</a>"
+    }
+  }
+}

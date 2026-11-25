@@ -4,7 +4,10 @@
 // 서버와 달리 앞 버전과 견주지 않는다 (칸의 타입 바꾸기는 서버가 거절하고 그 까닭이 알림으로 간다).
 // biome-ignore lint/complexity/noStaticOnlyClass: 규칙과 그 한도를 한 이름 아래에 둔다
 export class AppManifestCheck {
-  /** 지도 회사의 스크립트 호스트 (서버 AppManifest.MAP_HOSTS와 같다): 지도는 cairn.map으로 */
+  /**
+   * 지도 회사의 스크립트 호스트: 지도는 cairn.map으로. plugins/map/providers.json의 sdkHosts와 같다
+   * (러너 이미지에는 plugins/가 없어 옮겨 적고, app-code-check.test.ts가 그 파일과 맞춰 본다)
+   */
   private static readonly MAP_HOSTS: readonly string[] = [
     'dapi.kakao.com',
     't1.daumcdn.net',
