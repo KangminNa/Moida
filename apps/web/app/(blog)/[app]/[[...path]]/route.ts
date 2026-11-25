@@ -9,6 +9,7 @@ import {
   renderStaticScreen,
 } from '../../../_blog/app-screen';
 import { cairnAnswer } from '../../../_blog/cairn-client';
+import { withConsoleLink } from '../../../_blog/console-link';
 import { slugFrom } from '../../../_blog/format';
 import { mapFor, mapHosts } from '../../../_blog/map-config';
 import { hostOf, originOf } from '../../../_blog/request-host';
@@ -175,8 +176,7 @@ async function screen(
     null,
     shown.open ? shown.permissions : null,
   );
-  headers.set('Content-Type', 'text/html; charset=utf-8');
-  return new Response(html, { status, headers });
+  return htmlAnswer(request, html, status, headers, shown.console);
 }
 
 /**
@@ -219,6 +219,23 @@ async function staticScreen(
     site.own,
     shown.open ? shown.permissions : null,
   );
+  return htmlAnswer(request, html, 200, headers, shown.console);
+}
+
+/**
+ * 그린 앱 화면 HTML. 관리자가 연 화면이면 "콘솔로" 링크를 붙이고, 사람마다 다른 답이라 공용 캐시에 두지 않는다
+ * (콘솔의 미리 보기 틀 안에서는 붙이지 않는다: Sec-Fetch-Dest가 iframe)
+ */
+function htmlAnswer(
+  request: NextRequest,
+  html: string,
+  status: number,
+  headers: Headers,
+  consolePath: string | null,
+): Response {
   headers.set('Content-Type', 'text/html; charset=utf-8');
-  return new Response(html, { status: 200, headers });
+  if (consolePath === null) return new Response(html, { status, headers });
+  headers.set('Cache-Control', 'private, no-store');
+  const framed = request.headers.get('sec-fetch-dest') === 'iframe';
+  return new Response(withConsoleLink(html, consolePath, framed), { status, headers });
 }

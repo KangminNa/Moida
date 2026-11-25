@@ -92,6 +92,9 @@ export class AppSiteQuery extends BaseQuery {
     const access = {
       open: own && ticket === null && app.domain_checked_at !== null,
       permissions: manifest.permissions,
+      // 관리자가 연 화면(쿠키가 실리는 기본 도메인 · 미리 보기)에는 콘솔로 돌아가는 길을 준다 (2026-11-25 사용자 요청)
+      console:
+        actor.kind === 'owner' && actor.spaceId === app.space_id ? `/admin/store/${app.id}` : null,
     };
     // 정적 앱 (스토어 9.13): 주소는 묶음의 파일이다. 데이터는 그 주소의 것 (앱 JS가 읽는다, 2026-11-25 스토어 14 A3:
     // 글 · 메뉴 · 호 주소면 그 글 · 메뉴 · 호, 앱 안의 화면 주소면 데이터의 screen이 missing이고 앱 JS가 그린다)

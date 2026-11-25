@@ -273,6 +273,8 @@ export class AppScreenDataView {
 export interface AppScreenAccess {
   open: boolean;
   permissions: readonly string[];
+  /** 관리자가 연 화면이면 콘솔의 이 앱 관리 주소 (웹이 화면에 "콘솔로" 링크를 붙인다), 방문자면 null */
+  console: string | null;
 }
 
 /** 화면 하나: 템플릿(.html 전부) · 고른 템플릿 · 바깥 주소 · 데이터. 앱 안의 없는 주소는 status 404 */
@@ -299,6 +301,7 @@ export class AppScreenView {
       hosts: [...this.hosts],
       open: this.access.open,
       permissions: [...this.access.permissions],
+      console: this.access.console,
       data: this.data.toJSON(),
       redirect: null,
       page: null,
@@ -331,6 +334,7 @@ export class AppScreenStaticView {
       hosts: [...this.hosts],
       open: this.access.open,
       permissions: [...this.access.permissions],
+      console: this.access.console,
       data: this.data === null ? null : this.data.toJSON(),
       redirect: null,
       page: null,
