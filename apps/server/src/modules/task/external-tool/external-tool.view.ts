@@ -36,6 +36,14 @@ export class ExternalToolView {
       catalog: Array.isArray(r.catalog)
         ? (r.catalog as { name: string; description: string }[])
         : [],
+      /**
+       * 도구가 바뀌어 승인을 기다리는 새 목록 (C3, 2026-11-25). 있으면 이 커넥터는 일에 붙지 않는다.
+       * 승인할 때 catalogChangedAt을 그대로 보낸다
+       */
+      catalogPending: Array.isArray(r.catalog_pending)
+        ? (r.catalog_pending as { name: string; description: string }[])
+        : null,
+      catalogChangedAt: r.catalog_changed_at?.toISOString() ?? null,
       /** 마지막 확인 · 실패 까닭 (성공이면 null) */
       checkedAt: r.checked_at?.toISOString() ?? null,
       checkError: r.check_error,

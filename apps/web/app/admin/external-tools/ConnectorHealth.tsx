@@ -8,6 +8,7 @@ import type { ExternalTool } from '../../_task/types';
 export function connectorState(tool: ExternalTool, checking: boolean): string {
   if (tool.status === 'proposed') return '제안 · 승인 대기';
   if (tool.status === 'off') return '꺼짐';
+  if (tool.catalogPending) return '도구 바뀜 · 승인 필요';
   if (tool.oauth?.needsLogin) return '로그인 필요';
   if (tool.headerName && !tool.hasSecret) return '토큰 필요';
   if (checking) return '확인 중';
@@ -77,5 +78,48 @@ export function ConnectorHealth({ tool }: { tool: ExternalTool }) {
         </details>
       )}
     </>
+  );
+}
+
+/**
+ * 도구가 바뀌어 멈춘 커넥터의 바뀐 점 (C3, 2026-11-25): 승인한 목록과 기다리는 새 목록을 비교한다.
+ * 새 도구 · 설명이 바뀐 도구는 AI에게 다른 일을 시키는 글일 수 있어 읽고 승인한다 (서버 ToolCatalog.drift와 같은 비교)
+ */
+export function CatalogDrift({ tool }: { tool: ExternalTool }) {
+  if (!tool.catalogPending) return null;
+  const before = new Map(tool.catalog.map((c) => [c.name, c.description]));
+  const names = new Set(tool.catalogPending.map((c) => c.name));
+  const added = tool.catalogPending.filter((c) => !before.has(c.name));
+  const changed = tool.catalogPending.filter(
+    (c) => before.has(c.name) && before.get(c.name) !== c.description,
+  );
+  const removed = tool.catalog.filter((c) => !names.has(c.name));
+  return (
+    <div className="note stack" role="status">
+      <b>
+        도구가 바뀌어 일에 붙이지 않음
+        {tool.catalogChangedAt ? ` · ${when(tool.catalogChangedAt)}` : ''}
+      </b>
+      <ul className="connector-tools">
+        {added.map((c) => (
+          <li key={`+${c.name}`}>
+            새 도구 <code>{c.name}</code>
+            {c.description && <small> {c.description}</small>}
+          </li>
+        ))}
+        {changed.map((c) => (
+          <li key={`~${c.name}`}>
+            설명 바뀜 <code>{c.name}</code>
+            <small> 전: {before.get(c.name) || '(없음)'}</small>
+            <small> 후: {c.description || '(없음)'}</small>
+          </li>
+        ))}
+        {removed.map((c) => (
+          <li key={`-${c.name}`}>
+            빠짐 <code>{c.name}</code>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

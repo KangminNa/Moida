@@ -190,6 +190,14 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   }
 
   /**
+   * 에이전트의 일에 붙일 수 있는가: ready이고 도구가 바뀌어 승인을 기다리지 않는다 (C3, 2026-11-25).
+   * 연결 확인은 기다리는 동안에도 한다 (ready): 바뀐 것이 되돌아오면 확인이 기다림을 푼다
+   */
+  usable(now: Date): boolean {
+    return this.ready(now) && (this.row.catalog_pending ?? null) === null;
+  }
+
+  /**
    * 연결 확인 일 하나 (tool_check, 2026-11-15 MCP 1단계). 에이전트 없이 러너가 원격 MCP에 붙어 tools/list를 받고,
    * 결과는 ExternalToolTaskHandler가 이 도구에 적는다. 붙일 수 없는 도구(꺼짐 · 제안 · 토큰 없음)는 확인하지 않는다
    */
@@ -211,6 +219,12 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
     this.accept(changes, ExternalTool.RULES);
     this.settle();
     if (this.row.auth !== auth || this.row.url !== url) this.signOut();
+    // 다른 서버면 승인한 도구 목록도 처음부터: 다음 확인의 목록이 그대로 승인한 목록이 된다 (관리자가 바꾼 주소)
+    if (this.row.url !== url) {
+      this.put('catalog', []);
+      this.put('catalog_pending', null);
+      this.put('catalog_changed_at', null);
+    }
     this.put('updated_at', now);
   }
 

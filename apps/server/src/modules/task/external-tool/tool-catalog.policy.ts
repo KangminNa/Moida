@@ -2,6 +2,12 @@
 export type ToolLine = { name: string; description: string };
 /** 에이전트의 일 하나에서 커넥터 하나를 부른 수 (러너의 submit_result.result.connector_calls) */
 export type ToolCalls = { name: string; calls: number; failures: number; error: string | null };
+/** 승인한 도구 목록과 새로 받은 목록의 차이 (C3 바뀜 감지) */
+export type ToolDrift = {
+  added: ToolLine[];
+  changed: { name: string; before: string; after: string }[];
+  removed: string[];
+};
 
 // 커넥터의 도구 목록과 사용 기록 (2026-11-15 MCP 1단계, docs/MCP.md). 러너가 보낸 값이라 믿지 않는 입력으로 거른다:
 // 모양이 틀린 줄은 버리고, 개수 · 길이를 자른다. 비밀값은 러너가 지운 뒤 보낸다 (오류 글에 토큰이 남지 않게)
@@ -63,6 +69,35 @@ export class ToolCatalog {
       const said = failed > 0 && typeof error === 'string' ? ToolCatalog.errorOf(error) : null;
       return [{ name, calls: count, failures: failed, error: said }];
     });
+  }
+
+  /**
+   * 승인한 목록(before)과 새로 받은 목록(after)의 차이 (C3, 2026-11-25). 둘 다 저장된 값이라 다시 거른다
+   */
+  static drift(before: unknown, after: unknown): ToolDrift {
+    const was = new Map(ToolCatalog.of({ tools: before }).map((t) => [t.name, t.description]));
+    const now = ToolCatalog.of({ tools: after });
+    const names = new Set(now.map((t) => t.name));
+    return {
+      added: now.filter((t) => !was.has(t.name)),
+      changed: now.flatMap((t) => {
+        const old = was.get(t.name);
+        return old === undefined || old === t.description
+          ? []
+          : [{ name: t.name, before: old, after: t.description }];
+      }),
+      removed: [...was.keys()].filter((name) => !names.has(name)),
+    };
+  }
+
+  /**
+   * 새 목록을 승인 없이 받아도 되는가: 처음 받은 목록(승인한 목록이 비었음)이거나 도구가 빠지기만 했다.
+   * 새 도구 · 설명이 바뀐 도구가 있으면 관리자가 보고 승인해야 한다 (연결 뒤 설명을 바꿔 AI에게 다른 일을 시키는 공격)
+   */
+  static acceptable(before: unknown, after: unknown): boolean {
+    if (ToolCatalog.of({ tools: before }).length === 0) return true;
+    const drift = ToolCatalog.drift(before, after);
+    return drift.added.length === 0 && drift.changed.length === 0;
   }
 
   /** 지시문에 싣는 줄: "search — 문서 찾기" */

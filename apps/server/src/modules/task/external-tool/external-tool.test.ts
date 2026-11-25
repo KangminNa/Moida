@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { RuleViolation, SecretBox } from '../../platform';
 import { Agent } from '../agent/agent';
-import type { AgentRow } from '../task.tables';
+import type { AgentRow, ExternalToolRow } from '../task.tables';
 import { ExternalTool } from './external-tool';
 import { ExternalToolUrl } from './external-tool-url.policy';
 
@@ -136,5 +136,17 @@ describe('에이전트의 외부 도구 칸', () => {
     const agent = agentWith(['read_public'], ['notion', 'linear']);
     agent.unplugTool('notion');
     assert.deepEqual(agent.externalTools, ['linear']);
+  });
+
+  test('도구가 바뀌어 승인을 기다리면 (C3) 확인은 하지만 일에는 붙이지 않는다', () => {
+    const row = ExternalTool.open('space', 'held', fields, NOW).unsaved as ExternalToolRow;
+    const held = ExternalTool.restore({
+      ...row,
+      catalog_pending: [{ name: 'search', description: '바뀜' }],
+      catalog_changed_at: NOW,
+    });
+    assert.equal(held.ready(NOW), true);
+    assert.equal(held.usable(NOW), false);
+    assert.equal(ExternalTool.restore(row).usable(NOW), true);
   });
 });

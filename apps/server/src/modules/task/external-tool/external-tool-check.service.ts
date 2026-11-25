@@ -1,9 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseService, Database, type Sql } from '../../platform';
+import {
+  type Actor,
+  BaseService,
+  Conflict,
+  Database,
+  NoticeKind,
+  Notices,
+  type Sql,
+} from '../../platform';
 import { Task } from '../task/task';
 import { TaskRepository } from '../task/task.repository';
+import { TaskNotices } from '../task-notices';
 import { ExternalTool } from './external-tool';
-import type { CheckExternalToolInput, ToolTaskInput } from './external-tool.input';
+import type {
+  ApproveCatalogInput,
+  CheckExternalToolInput,
+  ToolTaskInput,
+} from './external-tool.input';
 import { ExternalToolQuery } from './external-tool.query';
 import { ExternalToolRepository } from './external-tool.repository';
 import { ToolCatalog } from './tool-catalog.policy';
@@ -61,7 +74,14 @@ export class ExternalToolCheckService extends BaseService {
         const toolId = (done.payload as { toolId?: unknown } | null)?.toolId;
         if (typeof toolId !== 'string') return;
         const { catalog, error } = ToolCatalog.checked(done.status === Task.DONE, done.result);
-        await tools.noteCheck(spaceId, toolId, catalog, error, at);
+        const approved = catalog === null ? null : await tools.approvedCatalog(spaceId, toolId);
+        if (catalog !== null && approved && !ToolCatalog.acceptable(approved.catalog, catalog)) {
+          // C3 바뀜 감지: 새 도구 · 설명이 바뀐 도구가 있으면 관리자가 승인할 때까지 일에 붙이지 않는다
+          if (await tools.holdCatalog(spaceId, toolId, catalog, at))
+            await new Notices(tx).post(
+              ExternalToolCheckService.heldNotice(spaceId, toolId, approved.title),
+            );
+        } else await tools.noteCheck(spaceId, toolId, catalog, error, at);
         await tools.announce(ExternalTool.noted(spaceId, { toolId }));
         return;
       }
@@ -72,6 +92,36 @@ export class ExternalToolCheckService extends BaseService {
       await tools.noteUsage(spaceId, calls, at);
       await tools.announce(ExternalTool.noted(spaceId, { names: calls.map((c) => c.name) }));
     });
+  }
+
+  /**
+   * 바뀐 도구 목록 승인 (C3, 관리자만). 화면이 본 바뀐 때와 지금이 다르면(그사이 또 바뀜 · 이미 승인함) 409
+   */
+  async approveCatalog(actor: Actor, req: ApproveCatalogInput): Promise<void> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    await this.transaction(async (tx) => {
+      const tools = new ExternalToolRepository(tx);
+      await tools.load(spaceId, req.id);
+      if (!(await tools.approveCatalog(spaceId, req.id, req.changedAt)))
+        throw new Conflict('그사이 도구 목록이 또 바뀌었거나 이미 승인했어요. 다시 확인해 주세요');
+      await tools.announce(ExternalTool.noted(spaceId, { toolId: req.id }));
+      await new Notices(tx).settle(spaceId, `connector-changed:${req.id}`, new Date());
+    });
+  }
+
+  /** 도구가 바뀌어 멈춘 커넥터 (바로 알림) */
+  private static heldNotice(spaceId: string, toolId: string, title: string) {
+    return {
+      space_id: spaceId,
+      kind: TaskNotices.CONNECTOR_CHANGED,
+      severity: NoticeKind.IMMEDIATE,
+      title: `${title}: 도구가 바뀌어 멈췄어요`,
+      body: '바뀐 도구 · 설명을 보고 승인하면 다시 써요',
+      link: '/admin/external-tools',
+      group_key: `connector-changed:${toolId}`,
+      data: { toolId },
+    };
   }
 
   private async enqueue(tx: Sql, tool: ExternalTool, now: Date): Promise<Task> {

@@ -203,6 +203,8 @@ export const externalTools = taskSchema.table('external_tools', {
   token_expires_at: timestamp('token_expires_at', { withTimezone: true }),
   token_refresh_at: timestamp('token_refresh_at', { withTimezone: true }),
   oauth_error: text('oauth_error'),
+  catalog_pending: jsonb('catalog_pending'),
+  catalog_changed_at: timestamp('catalog_changed_at', { withTimezone: true }),
 });
 
 /** task.goal_rounds */
