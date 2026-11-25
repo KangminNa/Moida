@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ChangeLines } from '../../_task/ChangeLines';
-import { actionLabel, DELIVER_LABELS, SHOW_APP_CODE } from '../../_task/labels';
-import { OutputOpen } from '../../_task/parts';
-import type { ChatCard } from '../../_task/types';
-import { STORE_HREF } from '../menu';
+import { ChangeLines } from './ChangeLines';
 import { ChatCardReview, checksLine } from './ChatCardReview';
+import { actionLabel, DELIVER_LABELS, SHOW_APP_CODE } from './labels';
+import { OutputOpen } from './parts';
+import type { ChatCard } from './types';
 
-// 결과 카드 (2차 2단계): 항목(결과물 · 동작)마다 고르고, 승인(고른 개수) · 수정 요청 · 반려.
+// 결과 카드 (2차 2단계): 대화 화면과 승인 화면(칸반에서 연 승인, 2026-11-25)이 함께 쓴다. 항목(결과물 · 동작)마다 고르고, 승인(고른 개수) · 수정 요청 · 반려.
 // 승인하면 고른 동작은 실행되고 고르지 않은 동작은 반려, 고르지 않은 결과물은 휴지통(30일). 수정 요청은 메모가 다음 회차로.
 // 고른 것 · 메모는 이 폼의 상태다. 결정은 패널이 보낸다 (카드가 바뀌면 key로 새로 그린다).
 // 검증 고리 V: 검토자가 고르지 말라고 한 항목은 처음부터 풀어 두고, 고칠 것이 남았으면 메모에 미리 채운다
@@ -86,7 +85,7 @@ export function ChatCardForm({
                   // 앱 코드 공개: 그 버전을 격리된 미리 보기로 (스토어 1-6b)
                   <Link
                     className="ghost"
-                    href={`${STORE_HREF}/${item.targetId}/code/${item.targetVersion}`}
+                    href={`/admin/store/${item.targetId}/code/${item.targetVersion}`}
                   >
                     미리 보기
                   </Link>

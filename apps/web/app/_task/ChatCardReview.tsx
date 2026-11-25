@@ -1,5 +1,5 @@
-import type { ChatCard } from '../../_task/types';
-import { Icon } from '../../_ui/Icon';
+import { Icon } from '../_ui/Icon';
+import type { ChatCard } from './types';
 
 // 결과 카드의 검증 (검증 고리 V): 검토자 짝의 판정 · 완료 조건 체크리스트 · 고칠 것, 서버가 다시 맡긴 횟수.
 // 판정을 읽지 못한 답(unknown)은 글 그대로 보인다. 완료 조건마다 1~5점이 있으면 함께 (2026-11-20 점수로 판정)
