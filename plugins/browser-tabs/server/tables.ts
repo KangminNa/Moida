@@ -170,6 +170,8 @@ export interface ReadRow {
   version: number;
   agent_id: string | null;
   request_id: string | null;
+  want_shot: boolean;
+  shot: Buffer | null;
 }
 export type ReadNew = Partial<ReadRow> & Pick<ReadRow, 'id' | 'space_id' | 'url'>;
 

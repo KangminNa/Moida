@@ -118,6 +118,21 @@ describe('BrowserTabs: 자바스크립트로 그리는 페이지 · 일꾼의 �
     );
   });
 
+  test('shot이면 넓은 화면의 첫 화면을 JPEG로 함께 뜬다 (한도 안)', async () => {
+    const read = await new BrowserTabs(endpoint).read(
+      spaUrl(),
+      new AbortController().signal,
+      null,
+      true,
+    );
+    assert.match(read.body, /공고 1/);
+    assert.ok(read.shot, '그림이 있다');
+    assert.equal(read.shot.subarray(0, 3).toString('hex'), 'ffd8ff');
+    assert.ok(read.shot.length <= BrowserTabs.SHOT_MAX);
+    const plain = await new BrowserTabs(endpoint).read(spaUrl(), new AbortController().signal);
+    assert.equal(plain.shot, null, '달라고 하지 않으면 뜨지 않는다');
+  });
+
   test('일꾼의 빈 창은 내부 주소(이 러너 · 내부망)를 열지 못한다', async () => {
     const guard = await ExploreProxy.start();
     try {

@@ -7,8 +7,16 @@ import type { Actor } from './actor';
 // site는 블로그의 사이트 주소(예: https://blog.example.com). 응답에 관리 화면 링크를 넣을 때 쓴다.
 // 사이트 주소는 account 모듈이 가지고 있어서, 도구가 있는 모듈 대신 MCP 입구(mcp 모듈)가 읽어 넘긴다.
 /** 도구의 답. View처럼 toJSON으로 내보낼 모양을 정한다 (MCP는 snake_case) */
+/** 도구의 답에 함께 싣는 그림 하나 (MCP image content, base64). 글(JSON)에는 싣지 않는다 */
+export interface ToolImage {
+  readonly data: string;
+  readonly mimeType: string;
+}
+
 export interface ToolAnswer {
   toJSON(): object;
+  /** 함께 볼 그림 (있을 때만, 2026-11-25 browser_read의 화면 그림): AI가 그림으로 본다 */
+  images?(): readonly ToolImage[];
 }
 
 export abstract class BaseTool {
