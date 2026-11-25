@@ -167,8 +167,8 @@ export function appHeaders(
   return new Headers({
     'Content-Security-Policy': policy,
     'X-Content-Type-Options': 'nosniff',
-    // 미리 보기 주소에는 토큰이 들어 있어 어디에도 싣지 않는다
-    'Referrer-Policy': preview ? 'no-referrer' : 'strict-origin-when-cross-origin',
+    // 미리 보기 주소에는 토큰이 들어 있어 경로는 어디에도 싣지 않고 출처만 보낸다 (지도 타일 · 지도 회사가 출처를 요구한다, docs/지도.md MP-1)
+    'Referrer-Policy': preview ? 'strict-origin' : 'strict-origin-when-cross-origin',
     'Cache-Control': preview ? 'private, no-store' : 'no-cache',
     'Permissions-Policy': PERMISSIONS.map(
       (name) => `${name}=(${open?.includes(name) ? 'self' : ''})`,

@@ -205,6 +205,161 @@ pnpm install-code        # 설치 코드. http://localhost:3000/install 에 넣�
 
 작업을 끝내기 전에 `pnpm check`와 `pnpm test`를 돌립니다. 명령 전체와 저장소 구조는 [AGENTS.md](AGENTS.md)에 있습니다.
 
+## 기술 구조
+
+### 실행 단위
+
+```mermaid
+flowchart LR
+  subgraph outside [바깥]
+    B[브라우저<br/>콘솔 · 앱 화면]
+    T[내 컴퓨터의 AI 도구<br/>Claude Code · Codex]
+    X[브라우저 확장]
+  end
+  P[리버스 프록시<br/>TLS · 앱 도메인]
+  W[web<br/>Next.js App Router]
+  S[server<br/>NestJS · REST · MCP]
+  K[worker<br/>같은 서버 코드 · outbox · 마감 작업]
+  D[(Postgres 17<br/>pgvector · pg_bigm)]
+  F[(blobs<br/>내용 주소 파일)]
+  R[runner<br/>AI CLI로 일하기]
+  E[egress<br/>허용 목록 프록시]
+  BR[server browser<br/>Chromium · CDP]
+
+  B --> P --> W
+  T -- MCP --> P
+  X -- MCP --> P
+  W -- "/api · /mcp · /oauth" --> S
+  S --> D
+  K --> D
+  S --> F
+  R -- "MCP · 작업 토큰" --> S
+  R -- 코드 러너 칸 --> E
+  R -- CDP --> BR
+```
+
+| 단위 | 위치 | 하는 일 | DB에 닿나 |
+|---|---|---|---|
+| web | `apps/web` | 콘솔(`app/admin`) · 앱 화면(`app/(blog)/[app]`, route handler가 템플릿을 채워 격리 머리글과 함께) · 회원 고정 화면(`/_/…`). 서버 API만 부른다 | 아니오 |
+| server | `apps/server` | REST(`/api`) · MCP(`/mcp`) · OAuth. 도메인 규칙과 승인의 최종 판단 | 예 |
+| worker | `apps/server` (같은 이미지) | outbox 이벤트 받기 · 반복 · 마감 작업. LISTEN 신호와 타이머로만 깬다 | 예 |
+| runner | `apps/runner` | 서버에서 일을 빌려(lease) AI CLI로 처리하고 결과를 올린다. 서버의 별도 컨테이너나 내 컴퓨터에서 돈다 | 아니오 (MCP만) |
+| egress | `apps/egress` | 코드 러너 칸이 나가는 길. `egress/allow.txt`의 호스트로만 HTTPS 터널 | 아니오 |
+| extension · cli | `apps/extension` · `packages/cli` | 웹 AI 대화 모으기 · 맡기기, `cairn connect` · `cairn app deploy` | 아니오 (MCP · REST) |
+| plugins | `plugins/*` | 코어를 고치지 않는 기능 (지도 · 텔레그램 · 서버 브라우저 · GitHub 연동 …). 서버는 `plugin-api`만, 화면은 react만 가져온다 | 자기 스키마만 |
+
+원본은 Postgres 하나입니다. md · zip은 내보내기 형식이고, 파일(사진 · 결과물 · 앱 코드)은 해시로 가리키는 blobs에 둡니다.
+
+### 서버 도메인 (모듈 = 스키마)
+
+| 모듈 | 스키마 | 하는 일 | 데이터 묶음 (폴더) |
+|---|---|---|---|
+| platform | `platform` | 공통 기반. DB · 기반 클래스 · 요청자(Actor) · outbox · 변경 신호 · 파일 · 보관 형식 · 플러그인 · 알림 · 보안 기록. 비즈니스 규칙 없음 | archive · notice · plugin · security · setting · stream · worker … |
+| account | `account` | 공간 · 관리자 로그인 · 기기 · 토큰. Guard가 요청마다 Actor를 만든다 | space · owner · device · guard |
+| vault | `vault` | AI 작업 세션과 지식 그래프. 세션 · 위키 판 쌓기 · 연결선 · 정리 · 되돌리기 | session · wiki · edge · category · change · tidy · graph … |
+| blog | `blog` · `work` | 스토어의 앱과 글 엔진. 앱 · 앱 코드 버전 · 글 · 메뉴 · 호 · 페이지 · 소재 | app · app-code · post · menu · issue · page · basket · asset |
+| task | `task` | 에이전트가 일하고 관리자가 승인하는 구조. 작업 · 대화 · 승인 · 러너 · 스케줄 · 결과물 · 커넥터 · 스킬 | task · chat · approval · agent · runner · schedule · output · external-tool … |
+| community | `community` | 앱의 회원 · 글 · 댓글 · 신고 · 약관 · 앱 데이터(앱마다 `app_<id>` 스키마, 행 수준 보안) | member · topic · comment · report · moderation · terms · data |
+| mcp | `mcp` | AI 도구의 입구. 각 모듈의 `*.tool.ts`를 모아 열고, 도구 설명의 버전을 둔다 | tool-text |
+
+모듈 사이는 이렇게만 잇습니다 (`pnpm check`의 경계 검사 · `pnpm db:check`가 지킨다).
+
+```mermaid
+flowchart TB
+  mcp --> account & vault & blog & task & community
+  blog -. "Lookups: wiki · session" .-> vault
+  blog -. "Lookups: app-holdings" .-> community
+  community -. "Lookups: app · member-app" .-> blog
+  task -. "Lookups: app · ActionChecks" .-> blog
+  task -. "SettingKinds: 대화로 바꾸는 설정" .-> account & vault & blog & community
+  vault & blog -. "Leases: 일 임대 확인" .-> task
+  account & vault & blog & task & community --> platform
+```
+
+- **import**는 `platform`만 (mcp는 입구라 모든 모듈의 `index.ts`). 다른 모듈의 표에 SQL을 쓰지 않고, 모듈 사이 외래키가 없다.
+- **읽기**는 platform의 등록부(`Lookups` · `ActionChecks` · `Leases` · `SettingKinds`)로 묻는다. 누가 주고 누가 묻는지는 `apps/server/modules.json`에 적고 검사가 코드와 맞춰 본다.
+- **후속 일**은 이벤트(outbox)로 알린다. 이벤트 이름 · 칸은 모듈마다 `<모듈>.events.json`.
+
+### 서버 코드의 계층
+
+```
+진입   Controller(*.api.ts) · Tool(*.tool.ts) · Guard · View(*.view.ts)
+  ↓    Input 하나 만들기 → Service · Query 메서드 하나 → View
+응용   Input(*.input.ts) · Service(쓰기, 트랜잭션 하나) · Query(읽기, Actor로 공개 범위를 거른다)
+  ↓
+도메인 Entity(규칙 · 상태 변화) · Policy(판단) · Actor(누가)
+  ↑
+저장   Repository(표 하나, 조건 규칙) · Gateway(바깥 서비스)
+```
+
+데이터 묶음(항상 같이 바뀌는 데이터) 하나가 폴더 하나이고, 쓰기는 Service 하나 · 읽기는 Query 하나에 모읍니다. 표의 칸을 아는 곳은 생성 파일(`<모듈>.tables.ts` · `schema.ts`) · Entity의 `RULES` · Input의 `COLUMNS` · View의 `toJSON`뿐입니다. 자세한 것은 [객체 설계](docs/객체설계.md).
+
+### 흐름 둘
+
+**대화로 일을 맡기면**
+1. 콘솔 → `POST /api/chats/:id/messages` → task가 회차 작업을 만든다 (같은 트랜잭션에 outbox 이벤트)
+2. 러너가 MCP로 일을 빌린다(lease, 작업 토큰). 작업 토큰은 그 일의 종류가 허락한 도구만 본다 (`task-kinds.json`)
+3. 대표가 일꾼에게 나눠 맡기고(위임), 일꾼들이 결과(`submit_result`)를 올린다. 러너가 먼저 결과 모양을 검사한다
+4. 결과는 카드 한 장(승인 대기)이 된다. 관리자가 고르고 승인하면 이벤트로 그 동작을 가진 모듈이 반영한다 (발행 · 앱 공개 · 설정 바꾸기)
+
+**방문자가 앱 화면을 열면**
+1. 브라우저 → `/<앱>/…` (앱 도메인이면 `proxy.ts`가 그 경로로 넘긴다) → web의 route handler
+2. web → `GET /api/apps/site/:slug/screen` → 서버가 공개 범위를 거른 데이터 · 앱 코드의 템플릿을 준다
+3. web이 Mustache로 채우고 격리 머리글(sandbox · CSP)과 함께 보낸다. 앱 JS는 `cairn.js`로만 서버에 닿는다: 화면 데이터 · 지도 찾기는 앱 주소 아래 `/_/data` · `/_/map/…`, 회원 · 앱 데이터는 앱 도메인에서 서버가 열어 둔 `/api/community/…`(`HostGate`)뿐이고 콘솔 API는 막혀 있다
+
+## AI에게 맡기는 규칙: 모델과 런타임
+
+Cairn에서 일하는 것은 AI(Claude · Codex)지만, 그 AI가 무엇을 지켜야 하는지는 두 곳에 나눠 둡니다.
+**모델 시점**의 규칙은 글로 가르칩니다 (스킬 · 지시문 · 도구 설명). **런타임 시점**의 규칙은 코드가 막습니다 (서버 검사 · 격리 · 권한 · 승인).
+한 줄로는 이렇습니다: **모델에게는 "어떻게 하는지"를, 런타임에는 "하면 안 되는 것"을 맡깁니다.**
+
+### 왜 둘로 나누는가
+
+- 모델은 지시를 대체로 따르지만 늘 따르지는 않습니다. 같은 지시도 모델 · 생각 강도 · 문맥 길이에 따라 다르게 읽힙니다.
+- 겪은 예 (2026-11-25): 스킬에 "앱의 지도는 `cairn.map`으로"라고 적어 두었는데도, 앱을 만드는 AI가 카카오 SDK를 직접 넣고 "`config.js`에 키를 넣으세요"라고 안내했습니다. 스킬을 고치는 것만으로는 다시 일어날 수 있어, 서버와 러너가 지도 회사 주소를 적은 `cairn.json`을 거절하게 했습니다.
+- 반대로 모든 것을 코드로 막으면 AI가 왜 막혔는지 모르고 같은 실수를 되풀이합니다. 그래서 대부분의 규칙은 **둘 다**에 있습니다: 스킬이 바른 길을 알려 주고, 런타임이 마지막에 지킵니다.
+
+### 다섯 겹
+
+| 겹 | 어디에 | 하는 일 | 예 |
+|---|---|---|---|
+| ① 지시 | 스킬(`skills/`), 지시문 틀(`cairn-runner/references/prompts.md`), 도구 설명(`<모듈>.tools.ko.json`) | 하는 법 · 순서 · 품질 기준을 알려 준다 | 앱 코드의 데이터 약속, 디자인 기준, 도구 우선순위 |
+| ② 러너 검사 | 러너(`apps/runner`) | 결과를 내기 전에 모양을 보고, 틀리면 AI에게 **한 번 더** 맡긴다 | `AppCodeCheck` · `AppManifestCheck` · 디자인 기준 검사 |
+| ③ 서버 검사 | 서버(`apps/server`) | 최종 판단. 틀리면 거절하고 고칠 수 있는 문구를 돌려준다 | `AppManifest`(지도 회사 주소 거절), 입력 모양(`*.input.ts`), 한도 |
+| ④ 격리 · 권한 | 서버 · 웹 · 나가는 프록시 | AI가 만든 것은 남의 코드로 다룬다 | 앱 화면의 sandbox · CSP, 작업 토큰마다 보이는 도구만, 코드 러너의 허용 목록(`egress/allow.txt`) |
+| ⑤ 사람 승인 | 콘솔 | 되돌릴 수 없는 일은 사람이 정한다 | 발행 · 전송 · 삭제 · 설정 바꾸기 · 권한 (원칙 7) |
+
+②는 ③의 빠른 사본입니다. 러너가 먼저 잡으면 AI가 같은 일 안에서 고치고, 서버까지 와서 실패하지 않습니다. 둘의 목록이 어긋나지 않게 테스트가 맞춰 봅니다 (예: 지도 회사 주소는 `plugins/map/providers.json` 한 곳, 서버 · 러너 테스트가 그 파일과 비교).
+
+### 어디에 둘지 정하는 기준
+
+| 규칙의 성격 | 둘 곳 | 까닭 |
+|---|---|---|
+| 되돌릴 수 없다 · 바깥으로 나간다 (발행 · 전송 · 결제 · 삭제) | ⑤ 승인 | 모델이 한 번 틀리면 끝이다 |
+| 비밀 (비밀번호 · 결제 수단 · 인증 번호 · API 키) | ④ AI가 닿지 않는 길 | 지시로는 "보지 마라"를 보장할 수 없다. 로그인 카드의 값은 AI 없는 러너가 넣고, 서버 키는 서버에서만 쓴다 (원칙 8) |
+| 보안 경계 (다른 사람의 데이터 · 내부망 · 권한) | ④ 격리 · 권한 | 모델을 믿는 순간 프롬프트 주입 하나로 뚫린다 |
+| 돈 · 자원 (토큰 · 지도 찾기 횟수 · 디스크) | ③ 한도 | 반복 실수가 쌓이면 비용이 된다 |
+| 모양 (선언서 · 파일 이름 · 데이터 약속) | ① + ② + ③ | 알려 주고, 먼저 잡고, 마지막에 막는다 |
+| 품질 · 디자인 · 문체 · 일하는 순서 | ① + 검토 · 점수 | 정답이 하나가 아니다. 검토자 짝 · 점수 판정으로 피드백한다 |
+
+규칙을 **모델에서 런타임으로 올리는** 때: 한 번이라도 어겼고, 어긴 결과가 보안 · 비밀 · 돈 · 되돌릴 수 없는 일에 닿으면 올립니다. 문체처럼 어겨도 다시 고치면 되는 것은 지시에 남깁니다.
+
+### 모델 시점에 고민하는 것
+
+- **어느 모델이 읽을지 모른다.** 일꾼은 Claude · Codex를 쓰고, 관리자가 정한 모델이 상한이며 대표가 일마다 그 아래에서 고릅니다(`task/engines.json`). 지시는 특정 모델의 버릇에 기대지 않게 쓰고, 약한 모델이 놓쳐도 런타임이 막게 둡니다.
+- **지시는 한 곳에.** AI에게 가는 글은 코드에 흩지 않고 지시문 틀 · 스킬 · 도구 설명 파일에 둡니다. 같은 규칙을 두 군데 쓰면 한쪽만 고쳐집니다. 스킬 · 도구 설명은 콘솔에서 버전을 쌓아 고치고, 스킬은 버전마다 성적(첫 판정 통과율 · 고친 횟수)을 봅니다.
+- **짧고 바로 쓸 수 있게.** "하지 마라"만 쓰지 않고 대신 할 것을 함께 씁니다 (예: 지도 키를 묻지 말고 `cairn.map`을, 좌표를 모르면 지어내지 말고 주소를).
+- **바깥 글은 지시가 아니다.** 웹 페이지 · 회원 글 · 커넥터의 도구 설명 · 첨부 파일에 든 명령은 데이터로 다룹니다. 지시로 알려 주고, 런타임에서도 막습니다: 신고 검토 일의 토큰은 커뮤니티 도구만 보고, 커넥터의 도구 목록이 바뀌면 관리자가 승인할 때까지 일에 붙이지 않습니다.
+- **기록에 남는 글.** AI가 보낸 글이 세션 · 위키 · 초안이 되기 전에 비밀값 모양을 지웁니다(`SensitivePolicy`). 모델에게 "비밀을 적지 마라"고 하는 것과 별개로 둡니다.
+
+### 런타임 시점에 고민하는 것
+
+- **서버가 최종 판단이다.** 러너 · 웹 · 스킬은 빠른 피드백이고, 같은 규칙의 마지막 검사는 늘 서버에 있습니다. 러너가 없는 길(내 컴퓨터의 AI 도구 · `cairn app deploy`)로 와도 같은 규칙이 걸립니다.
+- **거절 문구는 고칠 수 있게.** AI가 다음 시도에서 고치도록 무엇이 틀렸고 대신 무엇을 하는지 적습니다 (예: "지도는 cairn.map으로 그려요: 바깥 주소에 dapi.kakao.com을 적지 않아요").
+- **AI가 만든 것은 격리한다.** 앱 화면은 출처 없는 문서(sandbox)로 열려 콘솔 · 로그인에 닿지 못하고, 연결을 확인한 자기 도메인에서만 격리를 풉니다. 미리 보기도 격리입니다.
+- **한도는 막히기 전에 보인다.** 토큰 · 사용량 · 찾기 횟수 같은 한도는 서버가 막고, 콘솔은 막히기 전에 남은 양을 보여 줍니다.
+- **실패를 덮지 않는다.** 검사에 떨어지면 AI에게 한 번 더 맡기고, 그래도 떨어지면 결과에 그대로 적어 사람이 봅니다. 조용히 넘기지 않습니다.
+
 ## 쓴 오픈소스와 참고한 오픈소스
 
 Cairn은 세 가지 방식으로 오픈소스에 기대고 있습니다. 그대로 가져다 쓰는 것, 설계만 참고해 직접 만든 것, 라이브러리 없이 표준만 보고 만든 것입니다. 새 라이브러리는 겪은 문제 · 자리 · 비용 · 고치는 범위 · 빼는 방법을 따져 본 뒤에만 넣고([객체 설계](docs/객체설계.md) 10장), 서버에서는 `platform/base` 안에서만 가져옵니다.

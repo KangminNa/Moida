@@ -233,6 +233,12 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
       [home.status, home.seq, home.template, home.redirect],
       [200, 0, 'index.html', null],
     );
+    // 콘솔로 돌아가는 주소는 관리자가 연 화면에만 (2026-11-25)
+    assert.equal(home.console, null);
+    assert.equal(
+      ok(await screen(String(app.slug), '', {}, owner)).console,
+      `/admin/store/${app.id}`,
+    );
     const templates = home.templates as Record<string, string>;
     assert.ok(templates['header.html']?.includes('{{app.name}}'), Object.keys(templates).join());
     // 탭 아이콘: 앱 아이콘, 없으면 종류의 기본 icon.svg
@@ -284,6 +290,8 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
     const token = String(sent.redirect).split('/')[2]?.slice(1) ?? '';
     const preview = ok(await screen(String(app.slug), '', { ticket: token }));
     assert.equal((preview.data as Json).base, `/${app.slug}/~${token}`);
+    // 토큰만 가진 사람에게는 콘솔 주소를 주지 않는다
+    assert.equal(preview.console, null);
     assert.deepEqual(
       ((preview.data as Json).posts as Json[]).map((p) => p.title),
       [`숨은 글 ${mark}`],
@@ -469,6 +477,13 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
       'style.css': 'p{color:red}',
       'cairn.json': JSON.stringify({ cairn: 1, hosts: ['fonts.googleapis.com'] }),
     };
+    // 지도 회사의 스크립트는 바깥 주소에 받지 않는다: 지도는 cairn.map (2026-11-25)
+    const kakao = await upload(
+      app,
+      zipOf({ ...files, 'cairn.json': JSON.stringify({ cairn: 1, hosts: ['dapi.kakao.com'] }) }),
+    );
+    assert.equal(kakao.status, 422, kakao.text);
+    assert.match(kakao.text, /cairn\.map/);
     const state = ok(await upload(app, zipOf(files)), 201);
     assert.deepEqual([state.current, state.pending, state.latest], [null, 1, 1]);
     // 방문자는 아직 시작 코드

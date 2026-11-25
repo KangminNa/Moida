@@ -9,8 +9,10 @@ import {
   renderStaticScreen,
 } from '../../../_blog/app-screen';
 import { cairnAnswer } from '../../../_blog/cairn-client';
+import { withConsoleLink } from '../../../_blog/console-link';
 import { slugFrom } from '../../../_blog/format';
 import { mapFor, mapHosts } from '../../../_blog/map-config';
+import { mapSearchAnswer } from '../../../_blog/map-search';
 import { hostOf, originOf } from '../../../_blog/request-host';
 import { brokenAnswer, missingAnswer, unreachableAnswer } from '../../../_blog/site-answer';
 import type {
@@ -53,6 +55,9 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   // 미리 보기 주소 아래의 화면 데이터 (/<앱>/~<토큰>/_/data, cairn.data): 그 토큰의 버전 그대로
   if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'data')
     return appDataAnswer(request, app, ticket);
+  // 미리 보기 주소 아래의 장소 · 주소 찾기 (/<앱>/~<토큰>/_/map/<동작>, cairn.map.search): 토큰과 상관없이 같은 찾기
+  if (ticket !== null && parts.length === 3 && parts[0] === '_' && parts[1] === 'map')
+    return mapSearchAnswer(request, parts[2] ?? '');
   if (parts[0] === 'files' && parts.length === 2) {
     // 없으면 화면으로 넘긴다: 정적 앱의 files/ 폴더일 수 있다 (그 밖에는 화면이 404를 낸다)
     const found = await file(request, app, parts[1] ?? '', ticket);
@@ -175,8 +180,7 @@ async function screen(
     null,
     shown.open ? shown.permissions : null,
   );
-  headers.set('Content-Type', 'text/html; charset=utf-8');
-  return new Response(html, { status, headers });
+  return htmlAnswer(request, html, status, headers, shown.console);
 }
 
 /**
@@ -219,6 +223,23 @@ async function staticScreen(
     site.own,
     shown.open ? shown.permissions : null,
   );
+  return htmlAnswer(request, html, 200, headers, shown.console);
+}
+
+/**
+ * 그린 앱 화면 HTML. 관리자가 연 화면이면 "콘솔로" 링크를 붙이고, 사람마다 다른 답이라 공용 캐시에 두지 않는다
+ * (콘솔의 미리 보기 틀 안에서는 붙이지 않는다: Sec-Fetch-Dest가 iframe)
+ */
+function htmlAnswer(
+  request: NextRequest,
+  html: string,
+  status: number,
+  headers: Headers,
+  consolePath: string | null,
+): Response {
   headers.set('Content-Type', 'text/html; charset=utf-8');
-  return new Response(html, { status: 200, headers });
+  if (consolePath === null) return new Response(html, { status, headers });
+  headers.set('Cache-Control', 'private, no-store');
+  const framed = request.headers.get('sec-fetch-dest') === 'iframe';
+  return new Response(withConsoleLink(html, consolePath, framed), { status, headers });
 }

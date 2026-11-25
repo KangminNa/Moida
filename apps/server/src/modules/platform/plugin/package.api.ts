@@ -1,5 +1,6 @@
 import { All, Body, Controller, Param, Query, Req } from '@nestjs/common';
 import type { Actor } from '../base/actor';
+import { AttemptLimiter } from '../base/attempt-limiter';
 import type { ToolAnswer } from '../base/base-tool';
 import { CurrentActor } from '../http/current-actor';
 import type { HttpRequest } from '../http/http-types';
@@ -23,6 +24,15 @@ export class PackageController {
   ): Promise<ToolAnswer> {
     const path = Array.isArray(rest) ? rest.join('/') : String(rest ?? '');
     const fromBody = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
-    return this.packages.call(actor, plugin, request.method, path, { ...query, ...fromBody });
+    // 부른 곳 (플러그인 API 0.11): 방문자가 부르는 동작이 곳마다 횟수를 센다 (앞단 프록시 · 웹이 넘긴 주소, trust proxy)
+    const place = request.ip ? AttemptLimiter.place(request.ip) : null;
+    return this.packages.call(
+      actor,
+      plugin,
+      request.method,
+      path,
+      { ...query, ...fromBody },
+      place,
+    );
   }
 }
