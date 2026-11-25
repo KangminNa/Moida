@@ -4,6 +4,7 @@ import {
   NotFound,
   Operation,
   Read,
+  type RequestFields,
   Rule,
   RuleViolation,
   type Work,
@@ -22,6 +23,21 @@ const FAILED = 'failed';
 /** GET /api/p/browser-tabs/reads: 최근 요청과 결과 (주인) */
 export class ListReads extends Read<null> {
   static readonly LIMIT = 50;
+  private static readonly COLUMNS = [
+    'id',
+    'space_id',
+    'url',
+    'status',
+    'title',
+    'body',
+    'error',
+    'requested_at',
+    'read_at',
+    'version',
+    'agent_id',
+    'request_id',
+    'want_shot',
+  ] as const;
   readonly name = 'list';
   readonly allow = Operation.OWNER;
 
@@ -33,9 +49,10 @@ export class ListReads extends Read<null> {
     const rows = await work.rows(
       reads,
       { space_id: actor.requireSpace() },
-      { order: ['id desc'], limit: ListReads.LIMIT },
+      // 화면 그림(shot)은 목록에 싣지 않는다 (줄마다 280KB까지)
+      { order: ['id desc'], limit: ListReads.LIMIT, columns: ListReads.COLUMNS },
     );
-    return new ReadListView(rows.map((r) => new ReadView(r)));
+    return new ReadListView(rows.map((r) => new ReadView({ ...r, shot: null })));
   }
 }
 
@@ -77,7 +94,16 @@ export class PendingReads extends Read<null> {
   }
 }
 
-type SaveInput = { id: string; title: string | null; body: string | null; error: string | null };
+type SaveInput = {
+  id: string;
+  title: string | null;
+  body: string | null;
+  error: string | null;
+  shot: Buffer | null;
+};
+
+/** 화면 그림의 한도 (표의 CHECK와 같다: MCP 본문 512KB 안에 글과 함께 든다) */
+const SHOT_MAX = 280 * 1024;
 
 /** MCP browser_tab_save: 읽은 결과를 남긴다 (러너). 요청 하나에 한 번만 */
 export class SaveRead extends Command<SaveInput> {
@@ -90,17 +116,38 @@ export class SaveRead extends Command<SaveInput> {
       title: f.optionalText('title', 300),
       body: f.optionalText('body', 200_000),
       error: f.optionalText('error', 500),
+      shot: shotOf(f),
     }));
   }
 
   async run(work: Work, actor: Actor, input: SaveInput): Promise<SavedView> {
     const status = input.error ? FAILED : DONE;
+    const shot = input.error ? null : input.shot;
     const saved = await work.updateRows(
       reads,
-      { status, title: input.title, body: input.body, error: input.error, read_at: Rule.now },
+      {
+        status,
+        title: input.title,
+        body: input.body,
+        error: input.error,
+        ...(shot ? { shot } : {}),
+        read_at: Rule.now,
+      },
       { id: input.id, space_id: actor.requireSpace(), status: REQUESTED },
     );
     if (saved === 0) throw new NotFound('기다리는 요청이 아니에요 (없거나 이미 남겼어요)');
     return new SavedView(input.id, status);
   }
+}
+
+/** 화면 그림 칸 (base64 JPEG · PNG, SHOT_MAX까지): 형식은 앞부분으로만 본다 */
+function shotOf(f: RequestFields): Buffer | null {
+  const text = f.optionalText('shot', Math.ceil((SHOT_MAX * 4) / 3) + 4);
+  if (text === null) return null;
+  const bytes = Buffer.from(text, 'base64');
+  const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const png = bytes.subarray(0, 4).toString('hex') === '89504e47';
+  if (!jpeg && !png) f.reject('shot', 'JPEG · PNG 그림의 base64예요');
+  if (bytes.length > SHOT_MAX) f.reject('shot', `그림은 ${SHOT_MAX / 1024}KB까지예요`);
+  return bytes;
 }

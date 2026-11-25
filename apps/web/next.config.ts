@@ -1,20 +1,10 @@
 import type { NextConfig } from 'next';
+import { devOrigins } from './app/_lib/dev-origins';
 import { APP_SCREEN_ROOTS, SCREEN_HEADERS } from './app/_lib/screen-headers';
 
 // 외부 주소는 하나: /api · /mcp · /oauth · /.well-known · /pages 는 서버로, 나머지는 웹.
 // 운영에서는 리버스 프록시가 나누고, 웹 하나만 열어 둔 개발 환경에서는 여기서 서버로 넘긴다.
 const server = process.env.API_URL ?? 'http://localhost:4000';
-
-// 개발 서버(next dev)는 localhost가 아닌 주소에서 온 개발용 요청(/_next/hmr 등)을 막고, 막히면 화면의 JS가 돌지 않는다.
-// 테스트 서버처럼 도메인으로 여는 개발 서버를 위해 사람이 여는 웹 주소(CAIRN_WEB_URL)의 호스트를 허락한다.
-// 운영 빌드(next start)에는 상관없는 설정이다.
-function devOrigins(): string[] {
-  try {
-    return process.env.CAIRN_WEB_URL ? [new URL(process.env.CAIRN_WEB_URL).hostname] : [];
-  } catch {
-    return [];
-  }
-}
 
 // 개발 서버는 정해 둔 주소가 아니면 화면 스크립트를 막아서, 127.0.0.1로 열면 버튼이 눌리지 않는다.
 // 사이트 주소의 쓰기 확인도 한 주소만 받으므로 다른 이름으로 열지 않게 정해 둔 주소로 보낸다.
@@ -88,7 +78,7 @@ const config: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
-  allowedDevOrigins: devOrigins(),
+  allowedDevOrigins: devOrigins(process.env),
   async redirects() {
     return localHostRedirect();
   },

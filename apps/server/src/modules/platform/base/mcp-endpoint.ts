@@ -76,9 +76,16 @@ export class McpEndpoint {
         if (!tool || !actor.mayUseTool(tool.name))
           throw new Forbidden('tool', `${request.params.name} 도구가 없어요`);
         if (!tool.allows(actor)) throw new Forbidden(tool.scope);
-        const result = (await tool.handle(actor, request.params.arguments ?? {}, site)).toJSON();
+        const answer = await tool.handle(actor, request.params.arguments ?? {}, site);
+        const result = answer.toJSON();
+        // 그림은 글 뒤에 image로 (structuredContent에는 싣지 않는다: 글 크기가 커지지 않게)
+        const images = (answer.images?.() ?? []).map((i) => ({
+          type: 'image' as const,
+          data: i.data,
+          mimeType: i.mimeType,
+        }));
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }, ...images],
           structuredContent: result as Record<string, unknown>,
         };
       } catch (error) {

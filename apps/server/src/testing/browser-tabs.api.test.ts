@@ -1320,6 +1320,68 @@ describe('일꾼의 화면 읽기 browser_read (2026-11-24)', () => {
     assert.deepEqual(peek.body.reads, []);
   });
 
+  test('shot이면 러너가 남긴 화면 그림이 결과 답 뒤에 image로 붙는다 (글에는 싣지 않는다)', async () => {
+    const run = await runTokenOf(agentId);
+    const asked = await tool(run, 'browser_read', {
+      request_id: randomUUID(),
+      urls: ['https://bakery.example/', 'https://cafe.example/'],
+      shot: true,
+    });
+    const ids = (asked.body.reads as Json[]).map((r) => String(r.id));
+    const pending = ((await tool(runner, 'browser_tab_pending')).body.reads as Json[]).filter((r) =>
+      ids.includes(String(r.id)),
+    );
+    assert.deepEqual(
+      pending.map((r) => r.shot),
+      [true, true],
+    );
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70]);
+    const [first, second] = ids;
+    assert.equal(
+      (
+        await tool(runner, 'browser_tab_save', {
+          id: first,
+          title: '빵',
+          body: '빵집',
+          shot: jpeg.toString('base64'),
+        })
+      ).ok,
+      true,
+    );
+    const bad = await tool(runner, 'browser_tab_save', {
+      id: second,
+      title: '카페',
+      body: '카페',
+      shot: Buffer.from('그림 아님').toString('base64'),
+    });
+    assert.equal(bad.ok, false, '그림이 아니면 받지 않는다');
+    assert.equal(
+      (await tool(runner, 'browser_tab_save', { id: second, title: '카페', body: '카페' })).ok,
+      true,
+    );
+
+    const res = await api.mcp(run, 'tools/call', {
+      name: 'browser_read_result',
+      arguments: { ids, wait_seconds: 0 },
+    });
+    const result = res.json().result as {
+      content: { type: string; text?: string; data?: string; mimeType?: string }[];
+      structuredContent: Json;
+    };
+    assert.deepEqual(
+      (result.structuredContent.reads as Json[]).map((r) => r.shot),
+      [true, false],
+    );
+    const images = result.content.filter((c) => c.type === 'image');
+    assert.deepEqual(images, [
+      { type: 'image', data: jpeg.toString('base64'), mimeType: 'image/jpeg' },
+    ]);
+    assert.doesNotMatch(String(result.content[0]?.text), /\/9j\//, '그림은 글(JSON)에 싣지 않는다');
+    // 관리자 목록에는 그림을 싣지 않는다
+    const listed = ok(await api.get(`${BASE}/reads`, owner)) as { reads: Json[] };
+    assert.ok(listed.reads.every((r) => !('shot' in r)));
+  });
+
   test('주소 모양 · 개수를 거르고, 기기 토큰은 부르지 못한다', async () => {
     const run = await runTokenOf(agentId);
     for (const urls of [[], ['ftp://files.example/a'], ['https://me:pw@site.example/']]) {

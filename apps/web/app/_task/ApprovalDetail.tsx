@@ -16,6 +16,7 @@ import {
   PullTarget,
 } from './ApprovalTargets';
 import { ClickTarget, LoginDecide, LoginTarget, PlanTarget } from './BrowserApproval';
+import { ChatCardApproval } from './ChatCardApproval';
 import {
   APPROVE_LABELS,
   actionLabel,
@@ -151,11 +152,8 @@ function Loaded({
       ) : a.target.kind === GOAL_RUN ? (
         <GoalRunTarget approval={a} />
       ) : a.target.kind === 'chat' ? (
-        // 결과 카드 (2차 2단계): 정하는 것은 대화에서만 (항목을 골라야 해서, 2차 1-5). 여기서는 그 대화로 간다
-        <p className="note">
-          대화의 결과 카드 ·{' '}
-          <Link href={`/admin/chats/${a.target.id}`}>대화에서 항목 골라 정하기</Link>
-        </p>
+        // 결과 카드 (2차 2단계): 항목을 골라 여기서 정한다 (2026-11-25, 칸반에서 대화로 가지 않게)
+        <ChatCardApproval approval={a} />
       ) : (
         <OtherTarget approval={a} />
       )}

@@ -93,7 +93,8 @@ export class AppSiteQuery extends BaseQuery {
       open: own && ticket === null && app.domain_checked_at !== null,
       permissions: manifest.permissions,
     };
-    // 정적 앱 (스토어 9.13): 주소는 묶음의 파일이다. 데이터는 첫 화면의 것 하나 (앱 JS가 읽는다)
+    // 정적 앱 (스토어 9.13): 주소는 묶음의 파일이다. 데이터는 그 주소의 것 (앱 JS가 읽는다, 2026-11-25 스토어 14 A3:
+    // 글 · 메뉴 · 호 주소면 그 글 · 메뉴 · 호, 앱 안의 화면 주소면 데이터의 screen이 missing이고 앱 JS가 그린다)
     if (manifest.render === AppCodeBundle.STATIC) {
       const file = AppSiteQuery.staticFile(code, req.path);
       const text =
@@ -102,9 +103,9 @@ export class AppSiteQuery extends BaseQuery {
           : null;
       if (text === null)
         return new AppScreenStaticView(code.seq, file, null, manifest.hosts, null, access);
-      const home = await this.screens.screen(actor, app, base, site, [], null);
-      if (home instanceof AppScreenRedirectView) return home;
-      return new AppScreenStaticView(code.seq, file, text, manifest.hosts, home, access);
+      const data = await this.screens.screen(actor, app, base, site, req.path, req.cursor);
+      if (data instanceof AppScreenRedirectView) return data;
+      return new AppScreenStaticView(code.seq, file, text, manifest.hosts, data, access);
     }
     const data = await this.screens.screen(actor, app, base, site, req.path, req.cursor);
     if (data instanceof AppScreenRedirectView) return data;
@@ -135,6 +136,7 @@ export class AppSiteQuery extends BaseQuery {
   private static staticFile(code: AppCodeFiles, path: readonly string[]): string | null {
     const named = path.join('/');
     if (named === '') return PageFiles.ENTRY;
+    if (named === AppCodeBundle.DESIGN) return null;
     if (code.files.find(named)) return named;
     const index = `${named}/${PageFiles.ENTRY}`;
     if (code.files.find(index)) return index;
@@ -161,7 +163,11 @@ export class AppSiteQuery extends BaseQuery {
   /** 파일 하나 (HTML은 내보내지 않는다: 채우지 않은 템플릿이 그대로 보이지 않게. 정적 앱의 HTML도 화면으로만 나간다) */
   async file(actor: Actor, req: AppFileInput, now: Date): Promise<AppFileAnswer> {
     const found = await this.visible(actor, req.slug, req.ticket, now);
-    if (found instanceof AppScreenRedirectView || req.isTemplate)
+    if (
+      found instanceof AppScreenRedirectView ||
+      req.isTemplate ||
+      req.name === AppCodeBundle.DESIGN
+    )
       throw new NotFound('없는 파일이에요');
     const { app, ticket } = found;
     const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);

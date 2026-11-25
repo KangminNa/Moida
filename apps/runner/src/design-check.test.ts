@@ -23,31 +23,15 @@ describe('디자인 기준 검사', () => {
     assert.equal(DesignCheck.check([file('cairn.json', '{}')], []), null);
   });
 
-  test('스킬의 스타일 표 값은 모두 대비 4.5:1을 넘는다 (문서와 검사가 어긋나지 않게)', () => {
+  test('스킬의 토큰 본보기(3장)는 밝은 · 어두운 화면 모두 대비 4.5:1을 넘는다 (문서와 검사가 어긋나지 않게)', () => {
     const doc = readFileSync(
       resolve(__dirname, '../../../skills/cairn-make/references/design.md'),
       'utf8',
     );
-    const rows = doc
-      .split('\n')
-      .filter((l) => /^\| (tool|reading|data|shop|play|board) \| `#/.test(l));
-    assert.equal(rows.length, 6);
-    for (const row of rows) {
-      const cells = row
-        .split('|')
-        .slice(2, 9)
-        .map((c) => [...c.matchAll(/#[0-9a-f]{6}/g)].map((m) => m[0]));
-      for (const mode of [0, 1]) {
-        const [bg, surface, fg, muted, , accent, accentFg] = cells.map((c) => c[mode] ?? '');
-        const css = `:root { --bg: ${bg}; --surface: ${surface}; --fg: ${fg}; --muted: ${muted}; --accent: ${accent}; --accent-fg: ${accentFg}; }`;
-        const check = DesignCheck.check([file('style.css', css)], []);
-        assert.equal(
-          check?.ok,
-          true,
-          `${row.slice(0, 12)} ${mode ? '어두운' : '밝은'}: ${check?.tail}`,
-        );
-      }
-    }
+    const css = /```css\n([\s\S]*?)```/.exec(doc)?.[1] ?? '';
+    assert.match(css, /--accent-fg/);
+    const check = DesignCheck.check([file('style.css', css)], []);
+    assert.equal(check?.ok, true, check?.tail);
   });
 
   test('어긋난 것을 고칠 줄로 알려 준다', () => {

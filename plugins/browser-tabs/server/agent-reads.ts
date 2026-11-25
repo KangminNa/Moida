@@ -24,7 +24,7 @@ const QUEUE_MAX = 40;
 const KEEP_DAYS = 7;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type AskInput = { requestId: string; urls: readonly string[] };
+type AskInput = { requestId: string; urls: readonly string[]; shot: boolean };
 type ResultInput = { ids: readonly string[]; waitSeconds: number };
 
 /** 열어도 되는 주소의 모양 (http · https, 아이디 · 비밀번호 없음). 내부 주소는 러너의 프록시가 막는다 */
@@ -46,7 +46,9 @@ export class AskPageReads extends Command<AskInput> {
     return this.fields(raw, (f) => {
       const urls = f.optionalTextList('urls', URLS_MAX, URL_MAX) ?? [];
       if (urls.length === 0) f.reject('urls', '읽을 주소를 하나 이상 주세요');
-      return { requestId: f.text('request_id', 100), urls };
+      const shot =
+        (raw as { shot?: unknown } | null)?.shot === undefined ? false : f.boolean('shot');
+      return { requestId: f.text('request_id', 100), urls, shot };
     });
   }
 
@@ -78,6 +80,7 @@ export class AskPageReads extends Command<AskInput> {
         url,
         agent_id: agent,
         request_id: keys[i],
+        want_shot: input.shot,
       })),
     );
     return new PageReadListView(

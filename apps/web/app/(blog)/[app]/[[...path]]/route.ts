@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import type { SpaceInfo } from '../../../_account/types';
+import { appDataAnswer } from '../../../_blog/app-data';
 import { appOfHost } from '../../../_blog/app-domains';
 import {
   appHeaders,
@@ -49,6 +50,9 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   // 미리 보기 주소 아래의 cairn.js (/<앱>/~<토큰>/_/cairn.js): 닫힌 스크립트 (미리 보기는 격리한다, 스토어 12.2)
   if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'cairn.js')
     return cairnAnswer(false, await mapFor(false));
+  // 미리 보기 주소 아래의 화면 데이터 (/<앱>/~<토큰>/_/data, cairn.data): 그 토큰의 버전 그대로
+  if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'data')
+    return appDataAnswer(request, app, ticket);
   if (parts[0] === 'files' && parts.length === 2) {
     // 없으면 화면으로 넘긴다: 정적 앱의 files/ 폴더일 수 있다 (그 밖에는 화면이 404를 낸다)
     const found = await file(request, app, parts[1] ?? '', ticket);

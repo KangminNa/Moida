@@ -353,19 +353,20 @@ export class CairnServer {
   /** 읽어 달라는 주소들. blank면 일꾼의 읽기라 로그인 없는 새 빈 컨텍스트에서 내부 주소를 막고 읽는다 */
   async pendingTabs(
     stop: AbortSignal,
-  ): Promise<readonly { id: string; url: string; blank: boolean }[]> {
+  ): Promise<readonly { id: string; url: string; blank: boolean; shot: boolean }[]> {
     const body = await this.mcp.call('browser_tab_pending', {}, 0, stop);
     return body.list('reads').map((r) => ({
       id: r.text('id'),
       url: r.text('url'),
       blank: r.flag('blank'),
+      shot: r.flag('shot'),
     }));
   }
 
   /** 읽은 탭을 남긴다. 읽지 못했으면 error만 */
   async saveTab(
     id: string,
-    read: { title: string; body: string } | { error: string },
+    read: { title: string; body: string; shot?: string } | { error: string },
   ): Promise<void> {
     await this.mcp.call('browser_tab_save', { id, ...read });
   }

@@ -14,7 +14,7 @@
 //   [fake:runs=<파일>]  뜰 때마다 그 파일에 한 줄을 더한다 (일 하나에 몇 번 떴는지)
 //   [fake:fix-hang]     검사에 떨어져 다시 맡긴 실행에서만 끝나지 않는다
 //   [fake:make]         만들기 작업: "# 재료"의 파일 폴더와 위키(get_wiki)를 읽어 결과물 폴더에 발표.pptx를 둔다
-//   [fake:app]          앱 코드 일: "# 고칠 앱"의 폴더에서 index.html을 읽어 한 줄을 더해 결과물 폴더에 낸다 (바뀐 파일만)
+//   [fake:app]          앱 코드 일: "# 고칠 앱"의 폴더에서 index.html을 읽어 한 줄을 더해 결과물 폴더에 낸다 (바뀐 파일만, design.md도)
 //   [fake:app-broken]   앱 코드 일: 닫지 않은 섹션이 든 list.html도 낸다. [fake:app-fix]가 있으면 다시 맡긴 실행에서 고쳐 낸다
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
@@ -499,6 +499,22 @@ if (has('make')) {
 if (has('app') || has('app-broken')) {
   const outputs = /만들면 (\S+) 바로 아래에 둡니다/.exec(prompt)?.[1];
   const code = /글 파일은 (\S+)에 있어요/.exec(prompt)?.[1];
+  // 디자인 문서 (2026-11-25): 화면을 내는 앱 코드 일은 묶음에 design.md가 있어야 한다
+  writeFileSync(
+    join(outputs, 'design.md'),
+    [
+      '# 디자인 문서: 시험 앱',
+      '## 한 줄',
+      '시험하는 사람이 화면을 본다 / 화면: 첫 화면',
+      '## 참고한 곳',
+      '- 예시 하나 · https://one.example/ · 2026-11-25: 가져온 점 목록 / 하지 않을 점 없음',
+      '- 예시 둘 · https://two.example/ · 2026-11-25: 가져온 점 여백 / 하지 않을 점 없음',
+      '## 방향',
+      '조용한 회색.',
+      '## 토큰',
+      ':root { --bg: #ffffff; --fg: #17181c; }',
+    ].join('\n'),
+  );
   if (has('app')) {
     const index = readFileSync(join(code, 'index.html'), 'utf8');
     writeFileSync(

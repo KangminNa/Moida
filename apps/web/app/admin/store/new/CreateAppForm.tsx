@@ -1,7 +1,6 @@
 'use client';
 
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { APP_KIND_LABELS } from '../../../_blog/labels';
 import type { AdminApp, PageList } from '../../../_blog/types';
 
 /** 칸의 길이 (서버 App의 값과 같다) */
@@ -10,6 +9,17 @@ const SLUG_MAX = 30;
 const DESCRIPTION_MAX = 200;
 /** 서버가 받는 아이콘 형식 (UploadIconInput). SVG는 받지 않는다 */
 const ICON_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
+
+/**
+ * 쓸 기능 → 앱 종류 (서버 blog.tables의 APP_KIND). 종류는 화면에 내세우지 않는다 (2026-11-25 A4: 앱은 하나,
+ * 화면은 모두 앱 코드). 글 · 호 · 회원처럼 Cairn이 주는 기능이 필요할 때만 고른다
+ */
+const FEATURES: readonly [AdminApp['kind'], string, string][] = [
+  ['page', '화면만', '도구 · 소개 · 대시보드처럼 앱 코드가 전부인 앱'],
+  ['blog', '글', '글 · 메뉴 · RSS. 글은 버전으로 남고 공개는 승인 뒤'],
+  ['magazine', '호', '호 단위로 글을 묶어 한 번에 발행'],
+  ['community', '회원 글 · 댓글', '가입 · 글 · 댓글 · 신고. 도메인을 연결해야 공개'],
+];
 
 /** 만들 때 보내는 본문 (POST /api/apps). requestId는 패널이 붙인다 */
 export type CreateAppBody = {
@@ -21,11 +31,11 @@ export type CreateAppBody = {
   pageId?: string;
 };
 
-// 앱 만들기 시트 (스토어 1-5, 시안 3번): 아이콘 · 이름 · 주소 · 설명, 블로그는 시작 메뉴, 페이지 앱은 앱이 될 페이지(없어도 됨: 화면은 앱 코드, 스토어 2-6).
-// 비공개로 만들어진다. 앱의 일은 대표가 받아 일꾼에게 맡긴다 (2026-11-21 팀 없는 에이전트).
-// 저장(만들기 → 아이콘 올리기)은 패널이 한다.
+// 앱 만들기 시트 (스토어 1-5 → 2026-11-25 A4 앱 하나로): 이름 · 주소 · 무엇을 하는 앱인지 · 쓸 기능 · 아이콘.
+// 종류를 고르는 카드는 없다: 화면은 모두 앱 코드이고, 새 앱은 빈 정적 앱에서 시작해 대화에서 맡기면 일꾼이
+// 참고할 화면을 찾아 디자인 문서를 쓰고 만든다 (스킬 cairn-make). 글은 시작 메뉴, 화면만이면 앱이 될 페이지(없어도 됨).
+// 비공개로 만들어진다. 저장(만들기 → 아이콘 올리기)은 패널이 한다.
 export function CreateAppForm({
-  kind,
   origin,
   pages,
   busy,
@@ -34,7 +44,6 @@ export function CreateAppForm({
   onEdit,
   onClose,
 }: {
-  kind: AdminApp['kind'];
   /** 공개 주소 앞부분 (사이트 주소) */
   origin: string;
   /** 앱 밖의 페이지 (페이지 앱이 될 수 있는 것) */
@@ -47,6 +56,7 @@ export function CreateAppForm({
   onClose: () => void;
 }) {
   const id = useId();
+  const [kind, setKind] = useState<AdminApp['kind']>('page');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
@@ -80,8 +90,8 @@ export function CreateAppForm({
   }
 
   return (
-    <form className="panel stack" onSubmit={submit} aria-label={`${APP_KIND_LABELS[kind]} 만들기`}>
-      <b>{APP_KIND_LABELS[kind]} 만들기</b>
+    <form className="panel stack" onSubmit={submit} aria-label="새 앱 만들기">
+      <b>새 앱</b>
       <div className="field">
         <label htmlFor={`${id}-name`}>이름</label>
         <input
@@ -90,7 +100,7 @@ export function CreateAppForm({
           value={name}
           required
           maxLength={NAME_MAX}
-          placeholder="예: 요리 블로그"
+          placeholder="예: 동네 빵집"
           onChange={(e) => edit(() => setName(e.target.value))}
         />
       </div>
@@ -113,16 +123,34 @@ export function CreateAppForm({
         <small>영어 소문자 · 숫자 · 하이픈. admin · api · login 같은 이름은 못 씀</small>
       </div>
       <div className="field">
-        <label htmlFor={`${id}-description`}>설명 (공개 첫 화면에 보임)</label>
+        <label htmlFor={`${id}-description`}>무엇을 하는 앱인지 (공개 첫 화면에 보임)</label>
         <input
           id={`${id}-description`}
           className="input"
           value={description}
           maxLength={DESCRIPTION_MAX}
-          placeholder="예: 집에서 만든 레시피와 다녀온 맛집 기록"
+          placeholder="예: 오늘 나온 빵과 여는 시간을 보고 예약"
           onChange={(e) => edit(() => setDescription(e.target.value))}
         />
       </div>
+      <fieldset className="field chips">
+        <legend>쓸 기능</legend>
+        <div className="row">
+          {FEATURES.map(([value, label, help]) => (
+            <button
+              key={value}
+              type="button"
+              className="chip"
+              aria-pressed={kind === value}
+              title={help}
+              onClick={() => edit(() => setKind(value))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <small>{FEATURES.find(([value]) => value === kind)?.[2]} · 나중에 바꿀 수 없음</small>
+      </fieldset>
       {kind === 'blog' && (
         <div className="field">
           <label htmlFor={`${id}-menus`}>시작 메뉴 (쉼표로 나눔, 5개까지)</label>
@@ -158,7 +186,7 @@ export function CreateAppForm({
         </div>
       )}
       <div className="field">
-        <span>아이콘 (공개 첫 화면의 앱 목록에 보임, 없으면 종류 아이콘)</span>
+        <span>아이콘 (공개 첫 화면의 앱 목록에 보임)</span>
         <label className="ghost file-pick">
           {icon ? icon.name : '그림 올리기'}
           <input
@@ -169,7 +197,10 @@ export function CreateAppForm({
           />
         </label>
       </div>
-      <p className="note">비공개로 만들어짐 · 앱 관리에서 공개로 바꿈</p>
+      <p className="note">
+        비공개로 만들어짐 · 화면은 대화에서 "이 앱 화면 만들어 줘"로 맡김 (참고할 화면을 찾아
+        디자인부터)
+      </p>
       {problem && <p className="error">{problem}</p>}
       <div className="row">
         <button type="button" className="ghost" onClick={onClose}>

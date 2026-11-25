@@ -11,8 +11,8 @@ import { TabReader } from './tab-reader';
 type Saved = { id: string; read: object };
 
 function fakes(
-  answers: (() => readonly { id: string; url: string; blank?: boolean }[])[],
-  read: (url: string, proxy: string | null) => TabText,
+  answers: (() => readonly { id: string; url: string; blank?: boolean; shot?: boolean }[])[],
+  read: (url: string, proxy: string | null, shot: boolean) => TabText,
 ) {
   const saved: Saved[] = [];
   const stopper = new AbortController();
@@ -30,8 +30,8 @@ function fakes(
     },
   } as unknown as CairnServer;
   const browser = {
-    async read(url: string, _stop: AbortSignal, proxy: string | null) {
-      return read(url, proxy);
+    async read(url: string, _stop: AbortSignal, proxy: string | null, shot = false) {
+      return read(url, proxy, shot);
     },
   } as unknown as BrowserTabs;
   return { saved, stopper, reader: new TabReader(server, browser, new RunLog(new Redactor([]))) };
@@ -110,5 +110,20 @@ describe('TabReader', () => {
     assert.equal(proxies[0], null, '관리자의 읽기는 프록시 없이');
     assert.match(String(proxies[1]), /^http:\/\/127\.0\.0\.1:\d+$/);
     assert.equal(proxies[1], proxies[2], '한 프록시를 나눠 쓴다');
+  });
+
+  test('shot을 달라고 한 일꾼의 읽기는 그림을 base64로 함께 남기고, 일꾼의 글은 줄여 남긴다', async () => {
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]);
+    const { saved, stopper, reader } = fakes(
+      [() => [{ id: 'a', url: 'https://design.example/', blank: true, shot: true }]],
+      (_url, _proxy, shot) =>
+        TabText.of('디자인', '가'.repeat(TabReader.AGENT_BODY_MAX + 5)).withShot(
+          shot ? jpeg : null,
+        ),
+    );
+    await reader.run(stopper.signal);
+    const read = saved[0]?.read as { body: string; shot?: string };
+    assert.equal(read.shot, jpeg.toString('base64'));
+    assert.equal(read.body.length, TabReader.AGENT_BODY_MAX);
   });
 });

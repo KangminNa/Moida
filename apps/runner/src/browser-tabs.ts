@@ -8,7 +8,13 @@ export class TabText {
   constructor(
     readonly title: string,
     readonly body: string,
+    /** 첫 화면 그림 (JPEG, 일꾼이 shot을 달라고 했을 때만) */
+    readonly shot: Buffer | null = null,
   ) {}
+
+  withShot(shot: Buffer | null): TabText {
+    return new TabText(this.title, this.body, shot);
+  }
 
   static of(title: unknown, body: unknown): TabText {
     return new TabText(
@@ -128,6 +134,11 @@ export class BrowserTabs {
   static readonly SETTLE_MS = 800;
   /** 글자가 늘지 않기를 기다리는 가장 긴 시간 */
   static readonly SETTLE_MAX_MS = 10_000;
+  /** 화면 그림 (일꾼의 shot): 넓은 화면 첫 화면, JPEG 화질은 차례로 낮춘다. 한도는 서버의 browser_tab_save와 같다 */
+  static readonly SHOT_SCREEN = { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false };
+  static readonly SHOT_QUALITY: readonly number[] = [70, 45];
+  static readonly SHOT_MAX = 280 * 1024;
+  private static readonly SHOT_SETTLE_MS = 300;
   /** 탭에서 돌리는 읽기: 제목과 보이는 글자 */
   private static readonly READ =
     '({ title: document.title, body: document.body ? document.body.innerText : "" })';
@@ -145,14 +156,19 @@ export class BrowserTabs {
    * 이 읽기의 기다림(fetch · 타이머)은 읽기마다 따로 둔 신호에 걸고 끝나면 끊는다: 러너의 stop은 오래 살아서
    * 거기에 걸면 리스너와 30초 타이머가 남는다 (멈출 때 프로세스가 그만큼 늦게 끝난다)
    */
-  async read(url: string, stop: AbortSignal, proxy: string | null = null): Promise<TabText> {
+  async read(
+    url: string,
+    stop: AbortSignal,
+    proxy: string | null = null,
+    shot = false,
+  ): Promise<TabText> {
     if (!/^https?:\/\//i.test(url)) throw new TabUnreadable('http · https 주소만 읽어요');
     const reading = new AbortController();
     const cut = () => reading.abort();
     if (stop.aborted) cut();
     else stop.addEventListener('abort', cut, { once: true });
     try {
-      return await this.readIn(url, reading.signal, proxy);
+      return await this.readIn(url, reading.signal, proxy, shot);
     } finally {
       stop.removeEventListener('abort', cut);
       reading.abort();
@@ -160,7 +176,12 @@ export class BrowserTabs {
   }
 
   /** proxy가 있으면 새 빈 컨텍스트(쿠키 없음)를 그 프록시로 열어 읽고 컨텍스트째 지운다 */
-  private async readIn(url: string, stop: AbortSignal, proxy: string | null): Promise<TabText> {
+  private async readIn(
+    url: string,
+    stop: AbortSignal,
+    proxy: string | null,
+    shot: boolean,
+  ): Promise<TabText> {
     const room = proxy ? await BlankRoom.open(this.endpoint, proxy, stop) : null;
     let target: { id: string; socket: string } | null = null;
     let session: DevToolsSession | null = null;
@@ -168,6 +189,8 @@ export class BrowserTabs {
       target = room ? await room.newTab() : await this.newTab(stop);
       session = await DevToolsSession.open(target.socket, stop);
       await session.send('Page.enable');
+      // 그림을 뜰 때는 넓은 화면 크기로 연다 (디자인을 보는 첫 화면)
+      if (shot) await session.send('Emulation.setDeviceMetricsOverride', BrowserTabs.SHOT_SCREEN);
       const loaded = session.next('Page.loadEventFired');
       const went = await session.send('Page.navigate', { url });
       if (typeof went.errorText === 'string' && went.errorText)
@@ -181,12 +204,25 @@ export class BrowserTabs {
       });
       const value = (read.result as { value?: { title?: unknown; body?: unknown } } | undefined)
         ?.value;
-      return TabText.of(value?.title, value?.body);
+      const text = TabText.of(value?.title, value?.body);
+      return shot ? text.withShot(await this.shot(session, stop)) : text;
     } finally {
       session?.close();
       if (room) await room.close();
       else if (target) await this.closeTab(target.id);
     }
+  }
+
+  /** 맨 위로 올려 첫 화면을 JPEG로 뜬다. 한도를 넘으면 화질을 낮춰 한 번 더, 그래도 넘으면 null */
+  private async shot(session: DevToolsSession, stop: AbortSignal): Promise<Buffer | null> {
+    await session.send('Runtime.evaluate', { expression: 'window.scrollTo(0, 0)' });
+    await pause(BrowserTabs.SHOT_SETTLE_MS, stop);
+    for (const quality of BrowserTabs.SHOT_QUALITY) {
+      const taken = await session.send('Page.captureScreenshot', { format: 'jpeg', quality });
+      const bytes = Buffer.from(String(taken.data ?? ''), 'base64');
+      if (bytes.length > 0 && bytes.length <= BrowserTabs.SHOT_MAX) return bytes;
+    }
+    return null;
   }
 
   /** 아래로 내리며 글자 수가 두 번 내리 그대로일 때까지 기다린다 (SETTLE_MAX_MS까지) */

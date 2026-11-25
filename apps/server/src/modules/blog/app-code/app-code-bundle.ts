@@ -6,10 +6,12 @@ import { type AppCodeRender, AppManifest } from './app-manifest';
 // 페이지와 같아 PageFiles를 그대로 쓰고, 앱 코드만의 규칙을 더한다: 크기 한도와 cairn.json(바깥 주소 목록).
 // 템플릿(.html)은 웹이 Mustache로 채워 그린다. 코드는 우리 서버에서 실행되지 않는다.
 // 정적 앱 (스토어 9.13, 2026-11-21 사용자 결정 "템플릿 없는 자유로운 앱"): cairn.json에 "render": "static"이면 템플릿을 거치지 않고
-// 파일 그대로 내보낸다. 폴더가 든 이름(`assets/app.js`) · 파일 500개까지, 페이지 앱에서만. 버전 · 확인 대기 · 격리는 같다.
+// 파일 그대로 내보낸다. 폴더가 든 이름(`assets/app.js`) · 파일 500개까지, 어느 종류의 앱이든 (2026-11-25 A4). 버전 · 확인 대기 · 격리는 같다.
 export class AppCodeBundle {
   /** 묶음의 설정 파일. 없으면 바깥 주소 없음 */
   static readonly MANIFEST = 'cairn.json';
+  /** 앱의 디자인 문서 (2026-11-25, 스킬 cairn-make의 design-research.md): 일꾼이 읽고 고치는 파일이라 방문자에게 내보내지 않는다 */
+  static readonly DESIGN = 'design.md';
   /** 버전 하나의 크기 합 · 템플릿(.html)의 크기 합 */
   static readonly BYTES_MAX = 20 * 1024 * 1024;
   static readonly TEMPLATE_BYTES_MAX = 1024 * 1024;
@@ -20,12 +22,6 @@ export class AppCodeBundle {
   static readonly TEMPLATED: AppCodeRender = AppManifest.TEMPLATED;
   static readonly STATIC: AppCodeRender = AppManifest.STATIC;
   private static readonly COMMUNITY = 'community';
-  /**
-   * 정적 앱이 되는 종류: 페이지 앱과 커뮤니티 앱 (커뮤니티는 앱 JS가 글을 회원 API로 읽어 그린다, 스토어 12.6).
-   * 블로그 · 매거진의 글 화면은 템플릿이 그린다
-   */
-  private static readonly STATIC_KINDS: readonly string[] = ['page', AppCodeBundle.COMMUNITY];
-
   private constructor(
     readonly files: PageFiles,
     /** 선언서 (cairn.json. 없으면 AppManifest.NONE) */
@@ -47,8 +43,6 @@ export class AppCodeBundle {
 
   /** 이 묶음을 그 종류의 앱에 둘 수 있는가. 아니면 RuleViolation */
   assertFits(kind: string): void {
-    if (this.render === AppCodeBundle.STATIC && !AppCodeBundle.STATIC_KINDS.includes(kind))
-      throw new RuleViolation('파일 그대로 내보내는 앱("render": "static")은 페이지 앱에서만 돼요');
     this.manifest.assertFits(kind, AppCodeBundle.COMMUNITY);
   }
 

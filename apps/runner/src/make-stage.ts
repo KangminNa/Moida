@@ -4,6 +4,7 @@ import type { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
 import type { CairnServer } from './cairn-server';
 import { DesignCheck } from './design-check';
+import { DesignDocCheck } from './design-doc-check';
 import type { Job } from './job';
 import {
   MaterialBroken,
@@ -279,7 +280,11 @@ export class MakeStage implements SandboxStage {
           new AppCodeEntry(
             e.name,
             e.size,
-            e.name === manifest ? zip.text(manifest, MakeStage.MANIFEST_MAX) : null,
+            e.name === manifest
+              ? zip.text(manifest, MakeStage.MANIFEST_MAX)
+              : e.name === DesignDocCheck.FILE
+                ? zip.text(e.name, DesignDocCheck.BYTES_MAX)
+                : null,
           ),
       ),
     );
@@ -299,7 +304,9 @@ export class MakeStage implements SandboxStage {
           ? AppCodeCheck.TEMPLATE_BYTES_MAX
           : name === AppCodeCheck.MANIFEST
             ? MakeStage.MANIFEST_MAX
-            : -1;
+            : name === DesignDocCheck.FILE
+              ? DesignDocCheck.BYTES_MAX
+              : -1;
       const text = max < 0 ? null : await this.agent.readFile(path, max);
       made.push(new AppCodeEntry(name, size, text));
     }

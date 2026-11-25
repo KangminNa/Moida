@@ -16,6 +16,8 @@ export class TabReader {
   static readonly IDLE_MS = 3_000;
   /** 함께 여는 탭 수 */
   static readonly READ_AT_ONCE = 3;
+  /** 일꾼의 읽기로 남기는 글자 수 */
+  static readonly AGENT_BODY_MAX = 40_000;
   /** 패키지가 꺼져 있을 때 (도구가 없을 때) 다시 묻는 간격 */
   static readonly OFF_MS = 300_000;
   private readonly backoff = new Backoff(5_000, 300_000);
@@ -54,7 +56,7 @@ export class TabReader {
             asked
               .slice(i, i + TabReader.READ_AT_ONCE)
               .map(async (tab) =>
-                this.readOne(tab.id, tab.url, tab.blank ? await this.proxyUrl() : null, stop),
+                this.readOne(tab, tab.blank ? await this.proxyUrl() : null, stop),
               ),
           );
           const failed = settled.find((r) => r.status === 'rejected');
@@ -90,15 +92,21 @@ export class TabReader {
    * 브라우저에 닿지 못하면(BrowserUnavailable) 남기지 않고 그대로 던져 run이 기다렸다 다시 한다
    */
   private async readOne(
-    id: string,
-    url: string,
+    tab: { id: string; url: string; blank: boolean; shot: boolean },
     proxy: string | null,
     stop: AbortSignal,
   ): Promise<void> {
+    const { id, url } = tab;
     const host = TabReader.hostOf(url);
     try {
-      const text = await this.browser.read(url, stop, proxy);
-      await this.server.saveTab(id, { title: text.title, body: text.body });
+      const text = await this.browser.read(url, stop, proxy, tab.shot);
+      // 일꾼의 읽기는 글을 줄인다: 일꾼은 30,000자까지만 받고, 그림과 함께 MCP 본문(512KB) 안에 들어야 한다
+      const body = tab.blank ? text.body.slice(0, TabReader.AGENT_BODY_MAX) : text.body;
+      await this.server.saveTab(id, {
+        title: text.title,
+        body,
+        ...(text.shot ? { shot: text.shot.toString('base64') } : {}),
+      });
       this.log.info(`브라우저 탭을 읽었어요: ${host} (${text.body.length}자)`);
     } catch (error) {
       if (stop.aborted || !(error instanceof TabUnreadable)) throw error;

@@ -3,7 +3,7 @@
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { TableColumns } from '../../../apps/server/src/plugin-api';
 
-const { customType, integer, jsonb, pgSchema, text, timestamp, uuid } = TableColumns;
+const { boolean, customType, integer, jsonb, pgSchema, text, timestamp, uuid } = TableColumns;
 import type { ClickPlanStatus, ClickStatus, IntegrationMode, IntegrationReviewVerdict, IntegrationStatus, ReadStatus, RunErrorKind, RunStatus, ShotKind, ShotMime, SuggestionStatus } from './tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
@@ -152,6 +152,8 @@ export const reads = browserTabsSchema.table('reads', {
   version: integer('version').notNull(),
   agent_id: uuid('agent_id'),
   request_id: text('request_id'),
+  want_shot: boolean('want_shot').notNull(),
+  shot: byteaColumn('shot'),
 });
 
 /** browser_tabs.runs */
