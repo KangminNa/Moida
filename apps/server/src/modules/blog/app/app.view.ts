@@ -140,17 +140,10 @@ export class PublicAppListView {
 
 /** 도메인으로 여는 공개 앱 (GET /api/apps/domains, 스토어 3-0): 웹이 요청의 Host로 앱을 고른다 */
 export class AppDomainListView {
-  constructor(
-    private readonly rows: readonly Readonly<Pick<AppRow, 'domain' | 'slug'>>[],
-    /** 사이트 주소의 출처 (정하기 전이면 null): 앱 도메인의 /admin을 이 출처의 콘솔로 보낸다 (2026-11-25) */
-    private readonly site: string | null,
-  ) {}
+  constructor(private readonly rows: readonly Readonly<Pick<AppRow, 'domain' | 'slug'>>[]) {}
 
   toJSON() {
-    return {
-      site: this.site,
-      domains: this.rows.map((r) => ({ domain: r.domain ?? '', slug: r.slug })),
-    };
+    return { domains: this.rows.map((r) => ({ domain: r.domain ?? '', slug: r.slug })) };
   }
 }
 

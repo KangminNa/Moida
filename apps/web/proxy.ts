@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { appOfHost, consoleUrlFor } from './app/_blog/app-domains';
+import { appOfHost } from './app/_blog/app-domains';
 import { hostOf } from './app/_blog/request-host';
 import { RETURN_HEADER } from './app/_lib/return-path';
 import { isAppScreenRoot, isMemberScreen, SCREEN_HEADERS } from './app/_lib/screen-headers';
@@ -9,8 +9,6 @@ import { isAppScreenRoot, isMemberScreen, SCREEN_HEADERS } from './app/_lib/scre
 //    그래서 앱 도메인에서는 앱 화면 · 앱 파일 · 앱 RSS만 열리고, 콘솔 · 로그인 같은 웹의 화면은 그 앱 안의 없는 주소가 된다.
 //    /api · /.well-known · /_next는 여기를 지나지 않는다 (서버로 넘기거나 Next가 낸다. 앱 도메인의 /api는 서버의 HostGate가 거른다).
 //    /mcp · /oauth도 앱 도메인에서는 그 앱 안의 없는 주소가 된다 (기본 도메인에서는 그대로 서버로 넘어간다).
-//    예외 하나: 콘솔 주소(/admin, /admin/…)의 GET은 사이트 주소의 같은 경로로 보낸다 (303, 2026-11-25). 콘솔은 어느 도메인에서나 /admin.
-//    관리자인지는 여기서 보지 않는다 (앱 도메인에는 관리자 쿠키가 없다): 누가 열든 같은 답이고, 로그인 확인은 사이트의 콘솔이 한다
 //    앱 도메인의 응답에는 화면 머리글을 붙이지 않는다: 앱 화면이 붙이는 격리 머리글(sandbox CSP)이 그대로 가야 한다.
 // 2. 기본 도메인의 첫 화면(/) · /posts · /m에 화면 머리글을 붙인다 (screen-headers.ts: next.config가 아니라 여기서 붙이는 까닭).
 // 3. 콘솔(/admin) 요청에 지금 주소를 머리글로 붙인다 (웹 UX U2). 콘솔 틀(admin/layout)은 서버에서 그려 지금 주소를 모르는데,
@@ -24,11 +22,6 @@ export async function proxy(request: NextRequest) {
     // 이미 앱 주소로 넘어온 요청이면 그대로: Next가 rewrite를 밖으로 다시 보내면(개발 서버를 127.0.0.1에 묶었을 때
     // nextUrl은 localhost로 바뀌어 출처가 달라진다) 같은 요청이 이 proxy를 한 번 더 지난다
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return NextResponse.next();
-    const consoleUrl =
-      request.method === 'GET' || request.method === 'HEAD'
-        ? await consoleUrlFor(pathname, search)
-        : null;
-    if (consoleUrl !== null) return NextResponse.redirect(consoleUrl, 303);
     const url = request.nextUrl.clone();
     url.pathname = `${prefix}${pathname === '/' ? '' : pathname}`;
     const res = NextResponse.rewrite(url);

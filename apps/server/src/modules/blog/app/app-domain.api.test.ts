@@ -300,12 +300,11 @@ describe('사이트 주소의 도메인 (2026-11-25)', () => {
     await setSite(`https://${site}`);
     await db.sql`UPDATE blog.apps SET domain = ${site}, domain_checked_at = now() WHERE id = ${appId}`;
     try {
-      const list = ok(await api.get('/api/apps/domains'));
+      const listed = ok(await api.get('/api/apps/domains')).domains as Json[];
       assert.equal(
-        (list.domains as Json[]).some((d) => d.domain === site),
+        listed.some((d) => d.domain === site),
         false,
       );
-      assert.equal(list.site, `https://${site}`, '앱 도메인의 /admin을 보낼 사이트 출처');
     } finally {
       await db.sql`UPDATE blog.apps SET domain = NULL, domain_checked_at = NULL WHERE id = ${appId}`;
       await setSite(space.siteUrl ?? null);
