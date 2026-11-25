@@ -157,7 +157,8 @@ export class AppQuery extends BaseQuery {
    * 도메인으로 여는 앱 (누구나, 웹이 Host로 앱을 고른다): 공개 앱 가운데 연결을 확인한 도메인만.
    * 확인 전 도메인 · 비공개 앱의 도메인은 없다 (그 도메인의 화면은 없는 주소와 같다).
    * 사이트 주소의 호스트는 앱 도메인으로 치지 않는다 (서버의 HostGate와 같은 규칙): 사이트 주소를 정하기 전에 같은 도메인을
-   * 앱에 연결했어도, 웹이 콘솔(/admin) · 로그인까지 그 앱 안으로 넘겨 콘솔에 들어가지 못하게 되지 않게 (2026-11-25)
+   * 앱에 연결했어도, 웹이 콘솔(/admin) · 로그인까지 그 앱 안으로 넘겨 콘솔에 들어가지 못하게 되지 않게 (2026-11-25).
+   * 사이트 주소의 출처도 함께 준다: 웹이 앱 도메인의 /admin을 그 출처의 콘솔로 보낸다 (콘솔은 어느 도메인에서나 /admin)
    */
   async domains(_actor: Actor): Promise<AppDomainListView> {
     const site = await this.gate.siteHost();
@@ -165,7 +166,10 @@ export class AppQuery extends BaseQuery {
       SELECT domain, slug FROM blog.apps
       WHERE visibility = ${App.PUBLIC} AND domain IS NOT NULL AND domain_checked_at IS NOT NULL
       ORDER BY domain`;
-    return new AppDomainListView(rows.filter((r) => r.domain !== site));
+    return new AppDomainListView(
+      rows.filter((r) => r.domain !== site),
+      await this.gate.siteOrigin(),
+    );
   }
 
   /**
