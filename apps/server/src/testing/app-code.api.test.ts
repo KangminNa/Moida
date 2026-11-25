@@ -469,6 +469,13 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
       'style.css': 'p{color:red}',
       'cairn.json': JSON.stringify({ cairn: 1, hosts: ['fonts.googleapis.com'] }),
     };
+    // 지도 회사의 스크립트는 바깥 주소에 받지 않는다: 지도는 cairn.map (2026-11-25)
+    const kakao = await upload(
+      app,
+      zipOf({ ...files, 'cairn.json': JSON.stringify({ cairn: 1, hosts: ['dapi.kakao.com'] }) }),
+    );
+    assert.equal(kakao.status, 422, kakao.text);
+    assert.match(kakao.text, /cairn\.map/);
     const state = ok(await upload(app, zipOf(files)), 201);
     assert.deepEqual([state.current, state.pending, state.latest], [null, 1, 1]);
     // 방문자는 아직 시작 코드

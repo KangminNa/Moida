@@ -185,6 +185,11 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
       manifest('{"cairn":1,"hosts":["*.example.com","10.0.0.1"]}').split('\n').length,
       2,
     );
+    assert.match(
+      manifest('{"cairn":1,"hosts":["dapi.kakao.com"]}'),
+      /지도는 cairn\.map으로/,
+      '지도 회사의 스크립트를 직접 넣지 않는다 (2026-11-25)',
+    );
     assert.match(manifest('{"cairn":2}'), /데이터 약속\(cairn\)은 1/);
     assert.match(manifest('nope'), /JSON이 아니에요/);
     assert.match(manifest(null), /읽지 못했어요/);

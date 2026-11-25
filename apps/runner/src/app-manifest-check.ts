@@ -4,6 +4,15 @@
 // 서버와 달리 앞 버전과 견주지 않는다 (칸의 타입 바꾸기는 서버가 거절하고 그 까닭이 알림으로 간다).
 // biome-ignore lint/complexity/noStaticOnlyClass: 규칙과 그 한도를 한 이름 아래에 둔다
 export class AppManifestCheck {
+  /** 지도 회사의 스크립트 호스트 (서버 AppManifest.MAP_HOSTS와 같다): 지도는 cairn.map으로 */
+  private static readonly MAP_HOSTS: readonly string[] = [
+    'dapi.kakao.com',
+    't1.daumcdn.net',
+    'oapi.map.naver.com',
+    'openapi.map.naver.com',
+    'maps.googleapis.com',
+    'maps.gstatic.com',
+  ];
   static readonly FILE = 'cairn.json';
   static readonly STATIC = 'static';
   static readonly HOSTS_MAX = 10;
@@ -57,6 +66,10 @@ export class AppManifestCheck {
         if (typeof host !== 'string' || !AppManifestCheck.HOST.test(host))
           problems.push(
             `바깥 주소는 정확한 호스트 이름만 (와일드카드 · IP · 포트 없이): ${String(host)}`,
+          );
+        else if (AppManifestCheck.MAP_HOSTS.includes(host.toLowerCase()))
+          problems.push(
+            `지도는 cairn.map으로 그려요 (키는 관리자가 지도 플러그인에 넣어요): 바깥 주소에 ${host}을 적지 않고, 지도 회사의 스크립트 · 키 · config.js를 넣지 않아요`,
           );
     if (members !== undefined && typeof members !== 'boolean')
       problems.push('회원(members)은 true · false로 적어요');

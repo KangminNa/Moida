@@ -142,6 +142,19 @@ export class AppManifest {
     };
   }
 
+  /**
+   * 지도 회사의 스크립트 호스트 (2026-11-25): 앱이 지도 SDK와 키를 직접 넣지 않고 cairn.map을 쓰게 바깥 주소에 받지 않는다.
+   * 키는 관리자가 지도 플러그인에 넣고, 웹이 화면마다 회사의 호스트를 연다 (apps/web의 map-config.ts와 같은 목록)
+   */
+  private static readonly MAP_HOSTS: readonly string[] = [
+    'dapi.kakao.com',
+    't1.daumcdn.net',
+    'oapi.map.naver.com',
+    'openapi.map.naver.com',
+    'maps.googleapis.com',
+    'maps.gstatic.com',
+  ];
+
   private static hostsOf(hosts: unknown): readonly string[] {
     if (!Array.isArray(hosts) || hosts.length > AppManifest.HOSTS_MAX)
       throw new RuleViolation(`바깥 주소(hosts)는 ${AppManifest.HOSTS_MAX}개까지의 목록이에요`);
@@ -150,6 +163,11 @@ export class AppManifest {
         throw new RuleViolation(
           `바깥 주소는 정확한 호스트 이름만 적어요 (와일드카드 · IP · 포트 없이): ${String(host)}`,
         );
+    const map = (hosts as string[]).find((h) => AppManifest.MAP_HOSTS.includes(h.toLowerCase()));
+    if (map)
+      throw new RuleViolation(
+        `지도는 cairn.map으로 그려요 (키는 지도 플러그인에): 바깥 주소에 ${map}을 적지 않아요`,
+      );
     return [...new Set(hosts as string[])];
   }
 
