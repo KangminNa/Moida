@@ -11,6 +11,7 @@ import { useToast } from '../_ui/useToast';
 import { useWaitingChanges } from '../_vault/live';
 import { ChatNav } from './ChatNav';
 import { ConsoleDock } from './ConsoleDock';
+import { ChatPanes } from './chats/ChatPanes';
 import { NEW_CHAT, placeOf, SIDE_COOKIE } from './menu';
 import { SectionTabs } from './SectionTabs';
 import { ConsoleFoot, SettingsNav } from './SettingsNav';
@@ -156,7 +157,7 @@ export function AdminShell({
               current={place.page?.href ?? null}
             />
           )}
-          <div className="console-page">{children}</div>
+          <div className="console-page">{chat ? <ChatPanes>{children}</ChatPanes> : children}</div>
         </main>
       </div>
       {toast && (
