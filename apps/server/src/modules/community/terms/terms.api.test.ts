@@ -5,8 +5,8 @@ import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client
 import { CommunitySite } from '../../../testing/community-site';
 import { Database } from '../../platform';
 
-// 약관 · 가입 동의 · 탈퇴 (2026-11-24, 스토어 3-4): 약관은 앱마다 둘(terms · privacy), 추가만 하는 버전.
-// 둘 다 공개돼야 가입을 받고, 가입은 그때의 버전에 동의한다. 탈퇴하면 개인정보를 지우고 글은 "탈퇴한 회원"으로 남는다
+// 약관 · 가입 동의 (2026-11-24, 스토어 3-4 · 스토어 계정 2026-11-26): 약관은 공간(스토어)의 공통 약관 둘과 앱마다 둘(terms · privacy), 추가만 하는 버전.
+// 공통 약관이 공개돼야 가입을 받고, 앱의 약관은 공개했을 때만 그 앱에 참여할 때 동의한다. 동의는 그때의 버전이어야 한다 (탈퇴는 account.api.test)
 
 type Json = Record<string, unknown>;
 
@@ -15,7 +15,6 @@ let owner: TestUser;
 let db: Database;
 let site: CommunitySite;
 const mark = randomUUID().slice(0, 6);
-const PASSWORD = '오늘은 비가 와서 집에 있다';
 
 function ok(res: ApiResult, status = 200): Json {
   assert.equal(res.status, status, res.text);
@@ -69,7 +68,7 @@ before(async () => {
 after(() => api.close());
 
 describe('약관 (스토어 3-4)', () => {
-  test('공개 전: 관리 화면은 초안(앱 이름)과 ready false, 회원 화면은 404, 가입은 409', async () => {
+  test('앱 약관 없이: 관리 화면은 초안(앱 이름)과 ready false, 회원 화면은 404, 가입은 공통 약관만으로 된다', async () => {
     const bare = await bareApp(`bare-${mark}`);
     const admin = ok(await api.get(`/api/community/admin/${bare.id}/terms`, owner));
     assert.equal(admin.ready, false);
@@ -84,14 +83,27 @@ describe('약관 (스토어 3-4)', () => {
     assert.match(String(items[0]?.draft), new RegExp(`빈 약관 bare-${mark} 이용약관`));
     assert.equal((await api.get(`/api/community/admin/${bare.id}/terms`)).status, 403);
     assert.equal((await api.viaHost('/api/community/terms/terms', bare.host)).status, 404);
-    CommunitySite.mailbox(api);
-    const joined = await api.viaHost('/api/community/join/code', bare.host, {
-      method: 'POST',
-      body: { email: CommunitySite.emailOf(`bare${mark}`) },
-      headers: { origin: `http://${bare.host}` },
+    assert.equal((await api.viaHost('/api/community/terms/store/terms', bare.host)).status, 200);
+    const { appTermsVersion, appPrivacyVersion, ...store } = CommunitySite.AGREED;
+    const withApp = await joinAt(bare.host, `bareapp${mark}`, `빈앱${mark}`);
+    assert.equal(withApp.status, 409, '공개하지 않은 앱 약관에 동의할 수 없다');
+    const joined = await joinAt(bare.host, `bare${mark}`, `빈약관${mark}`, {
+      ...store,
+      appTermsVersion: null,
+      appPrivacyVersion: null,
     });
-    assert.equal(joined.status, 409, joined.text);
-    assert.match(joined.text, /아직 약관이 공개되지 않아/);
+    assert.equal(joined.status, 201, joined.text);
+  });
+
+  test('공통 약관: 관리자만 · 기본 도메인에서, 앱 도메인의 회원 화면에서 읽는다', async () => {
+    const admin = ok(await api.get('/api/community/admin/terms', owner));
+    assert.equal(admin.ready, true);
+    assert.match(String((admin.items as Json[])[0]?.draft), /이 사이트 이용약관/);
+    assert.equal((await api.get('/api/community/admin/terms')).status, 403);
+    assert.equal((await site.at('/api/community/admin/terms')).status, 404);
+    const shown = ok(await site.at('/api/community/terms/store/privacy'));
+    assert.equal(shown.kind, 'privacy');
+    assert.equal((await site.at('/api/community/terms/store/rules')).status, 400);
   });
 
   test('새 버전은 본 버전 다음으로만: 낡은 버전이면 409, 공개된 것은 마지막 버전', async () => {
@@ -112,13 +124,11 @@ describe('약관 (스토어 3-4)', () => {
     assert.equal((await api.request('POST', path, owner, { version: 2, body: '' })).status, 400);
     assert.equal((await site.at('/api/community/terms/rules')).status, 400);
 
-    // 가입 화면을 연 뒤 약관이 바뀌었으면 다시 읽게 한다 (개인정보처리방침은 이제 2)
-    const sent = await site.at('/api/community/join/code', {
-      method: 'POST',
-      body: { email: CommunitySite.emailOf(`late${mark}`) },
-    });
+    // 가입 화면을 연 뒤 약관이 바뀌었으면 다시 읽게 한다 (이 앱의 개인정보처리방침은 이제 2)
+    const email = CommunitySite.emailOf(`late${mark}`);
+    const sent = await site.at('/api/community/join/code', { method: 'POST', body: { email } });
     assert.equal(sent.status, 204, sent.text);
-    const code = CommunitySite.mailbox(api).codeFor(CommunitySite.emailOf(`late${mark}`));
+    const code = CommunitySite.mailbox(api).codeFor(email);
     const old = await joinAt(
       site.host,
       `late${mark}`,
@@ -132,83 +142,14 @@ describe('약관 (스토어 3-4)', () => {
       site.host,
       `late${mark}`,
       `늦은회원${mark}`,
-      { termsVersion: 1, privacyVersion: 2 },
+      { ...CommunitySite.AGREED, appPrivacyVersion: 2 },
       code,
     );
     assert.equal(fresh.status, 201, fresh.text);
     const [row] = await db.sql<{ terms_version: number; privacy_version: number }[]>`
-      SELECT terms_version, privacy_version FROM community.members
-      WHERE app_id = ${site.appId} AND email = ${CommunitySite.emailOf(`late${mark}`)}`;
+      SELECT m.terms_version, m.privacy_version FROM community.members m
+      JOIN community.accounts a ON a.id = m.account_id
+      WHERE m.app_id = ${site.appId} AND a.email = ${email}`;
     assert.deepEqual([row?.terms_version, row?.privacy_version], [1, 2], '동의한 버전을 남긴다');
-  });
-});
-
-describe('탈퇴 (스토어 3-4)', () => {
-  test('비밀번호가 맞아야 하고, 탈퇴하면 개인정보를 지우고 모든 로그인이 끝나며 글은 "탈퇴한 회원"으로 남는다', async () => {
-    // 3-4 앞 단계에서 개인정보처리방침이 2가 되어 가입 도우미(AGREED)가 맞지 않는다: 버전을 맞춰 가입한다
-    const email = CommunitySite.emailOf(`bye${mark}`);
-    const joined = await joinAt(site.host, `bye${mark}`, `떠날회원${mark}`, {
-      termsVersion: 1,
-      privacyVersion: 2,
-    });
-    assert.equal(joined.status, 201, joined.text);
-    const me = new TestUser(joined.cookies());
-    await db.sql`
-      UPDATE community.members SET joined_at = joined_at - interval '10 minutes'
-      WHERE app_id = ${site.appId} AND email = ${email}`;
-    const topic = ok(
-      await site.write(me, 'POST', '/api/community/topics', {
-        requestId: randomUUID(),
-        title: '떠나기 전 글',
-        body: '남는 글',
-      }),
-      201,
-    );
-    const other = await site.at('/api/community/login', {
-      method: 'POST',
-      body: { login: email, password: PASSWORD },
-    });
-    const elsewhere = new TestUser(other.cookies());
-
-    const wrong = await site.write(me, 'POST', '/api/community/me/leave', {
-      password: '틀린 비밀번호입니다',
-    });
-    assert.equal(wrong.status, 400, wrong.text);
-    const left = await site.write(me, 'POST', '/api/community/me/leave', { password: PASSWORD });
-    assert.equal(left.status, 204, left.text);
-
-    assert.equal(ok(await site.at('/api/community/me', { as: me })).member, null);
-    assert.equal(
-      ok(await site.at('/api/community/me', { as: elsewhere })).member,
-      null,
-      '다른 로그인도 끝난다',
-    );
-    const again = await site.at('/api/community/login', {
-      method: 'POST',
-      body: { login: email, password: PASSWORD },
-    });
-    assert.equal(again.status, 401);
-    const [row] = await db.sql<Json[]>`
-      SELECT id, login_id, email, password_hash, nickname, nickname_key, left_at, block_note, last_seen_at
-      FROM community.members WHERE app_id = ${site.appId} AND left_at IS NOT NULL`;
-    assert.deepEqual(
-      [row?.login_id, row?.email, row?.password_hash, row?.nickname, row?.nickname_key],
-      [`left:${row?.id}`, null, '', '탈퇴한 회원', `left:${row?.id}`],
-    );
-    const shown = ok(await site.at(`/api/community/topics/${topic.id}`));
-    assert.equal((shown.author as Json).nickname, '탈퇴한 회원');
-    assert.equal(shown.title, '떠나기 전 글', '글은 남는다');
-
-    // 같은 메일 · 닉네임은 다시 쓸 수 있다 (지운 정보를 남기지 않는다), "탈퇴"가 든 닉네임은 막는다
-    const back = await joinAt(site.host, `bye${mark}`, `떠날회원${mark}`, {
-      termsVersion: 1,
-      privacyVersion: 2,
-    });
-    assert.equal(back.status, 201, back.text);
-    const fake = await joinAt(site.host, `fake${mark}`, '탈퇴한 회원', {
-      termsVersion: 1,
-      privacyVersion: 2,
-    });
-    assert.equal(fake.status, 422);
   });
 });

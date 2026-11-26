@@ -28,12 +28,13 @@ export class TermsService extends BaseService {
     super(db);
   }
 
-  /** 관리자: 본 버전(version, 처음이면 0) 다음 버전을 올린다. 그사이 다른 버전이 올라왔으면 409 */
+  /** 관리자: 본 버전(version, 처음이면 0) 다음 버전을 올린다 (appId가 null이면 공간의 공통 약관). 그사이 다른 버전이 올라왔으면 409 */
   async publish(actor: Actor, req: TermPublishInput): Promise<TermView> {
     actor.assertOwner();
-    await this.assertApp(actor, req.appId);
+    const owner = req.appId === null ? { spaceId: actor.requireSpace() } : { appId: req.appId };
+    if (req.appId !== null) await this.assertApp(actor, req.appId);
     return this.transaction(async (tx) => {
-      const term = await TermsService.publishIn(tx, req.appId, req.kind, req.body, {
+      const term = await TermsService.publishIn(tx, owner, req.kind, req.body, {
         before: req.version,
         by: 'owner',
         byId: actor.id,
@@ -47,7 +48,15 @@ export class TermsService extends BaseService {
     SettingActor.spaceOf(actor);
     const proposed = TermsChange.of(change);
     await this.assertApp(actor, proposed.appId);
-    Term.publish(proposed.appId, proposed.kind, 0, proposed.body, 'approved', null, new Date());
+    Term.publish(
+      { appId: proposed.appId },
+      proposed.kind,
+      0,
+      proposed.body,
+      'approved',
+      null,
+      new Date(),
+    );
   }
 
   /** 승인한 제안: 결재마다 한 번, 지금 버전 다음으로. 제안한 뒤 관리자가 고쳤으면(본문이 다르면) 실패로 끝난다 */
@@ -62,9 +71,9 @@ export class TermsService extends BaseService {
       change.key,
       async (tx) => {
         // 제안할 때 본 본문 그대로인가: 그사이 관리자가 고쳤으면 덮지 않고 실패로 끝낸다 (원칙 3)
-        const now = await new TermRepository(tx).latest(proposed.appId, proposed.kind);
+        const now = await new TermRepository(tx).latest({ appId: proposed.appId }, proposed.kind);
         change.assertUnchanged(now ? now.settingValues() : null);
-        await TermsService.publishIn(tx, proposed.appId, proposed.kind, proposed.body, {
+        await TermsService.publishIn(tx, { appId: proposed.appId }, proposed.kind, proposed.body, {
           before: now?.version ?? 0,
           by: 'approved',
           byId: actor.id,
@@ -76,15 +85,15 @@ export class TermsService extends BaseService {
   /** 새 버전 한 줄: before(본 버전, 처음이면 0)가 지금 버전이어야 한다 */
   private static async publishIn(
     tx: Sql,
-    appId: string,
+    owner: { appId: string } | { spaceId: string },
     kind: TermKind,
     body: string,
     how: { before: number; by: TermByKind; byId: string | null },
   ): Promise<Term> {
     const terms = new TermRepository(tx);
-    const now = (await terms.latest(appId, kind))?.version ?? 0;
+    const now = (await terms.latest(owner, kind))?.version ?? 0;
     if (how.before !== now) throw new StaleVersion(`약관이 그사이 버전 ${now}로 바뀌었어요`);
-    const term = Term.publish(appId, kind, now, body, how.by, how.byId, new Date());
+    const term = Term.publish(owner, kind, now, body, how.by, how.byId, new Date());
     await terms.save(term);
     return term;
   }

@@ -134,7 +134,11 @@ describe('어디서 열리는가', () => {
     await newApp('community', `shut-${mark}`, `shut-${mark}.example.com`, false);
     assert.equal((await at('/api/community/me', {}, `blog-${mark}.example.com`)).status, 404);
     assert.equal((await at('/api/community/me', {}, `shut-${mark}.example.com`)).status, 404);
-    assert.deepEqual(ok(await at('/api/community/me')), { member: null, csrf: null });
+    assert.deepEqual(ok(await at('/api/community/me')), {
+      account: null,
+      member: null,
+      csrf: null,
+    });
   });
 
   test('관리자 경로(/api/community/admin)와 다른 관리 API는 앱 도메인에서 404', async () => {
@@ -151,15 +155,16 @@ describe('메일 인증 가입', () => {
     assert.match(mail?.subject ?? '', new RegExp(`^\\[앱 town-${mark}\\] 가입 인증코드 \\d{6}$`));
     const res = await join({ email, code: mailbox.codeFor(email), nickname: '마을사람' });
     const self = ok(res, 201);
-    assert.equal(self.email, email);
-    assert.equal(self.loginId, null);
+    assert.equal((self.account as Json).email, email);
+    assert.equal((self.account as Json).loginId, CommunitySite.loginIdOf(email));
+    assert.equal((self.member as Json).nickname, '마을사람');
     assert.ok(res.cookies().cairn_member);
     assert.doesNotMatch(res.text, /scrypt/);
     const me = ok(await at('/api/community/me', { as: new TestUser(res.cookies()) }));
     assert.equal((me.member as Json).nickname, '마을사람');
     assert.equal(typeof me.csrf, 'string');
     const [row] = await api.service(Database).sql<Json[]>`
-      SELECT * FROM community.members WHERE app_id = ${appId} AND email = ${email}`;
+      SELECT * FROM community.accounts WHERE email = ${email}`;
     assert.doesNotMatch(JSON.stringify(row), new RegExp(mailbox.codeFor(email)));
   });
 
@@ -247,6 +252,7 @@ describe('로그인', () => {
     const res = await login('LOGIN_OK@example.com', PASSWORD);
     const self = ok(res);
     assert.equal(self.email, CommunitySite.emailOf('login_ok'));
+    assert.equal(self.loginId, CommunitySite.loginIdOf(CommunitySite.emailOf('login_ok')));
     assert.ok(res.cookies().cairn_member);
     const wrong = await login(CommunitySite.emailOf('login_ok'), '틀린 비밀번호입니다');
     const missing = await login(CommunitySite.emailOf('nobody_here'), PASSWORD);
@@ -255,15 +261,19 @@ describe('로그인', () => {
     assert.equal(wrong.json().message, missing.json().message);
   });
 
-  test('메일 인증 가입 전에 아이디로 가입한 회원은 아이디로 그대로 로그인한다', async () => {
+  test('아이디로 로그인한다: 메일 없이 옮겨 온 옛 계정은 needs로 빈 메일 · 약관을 알리고, 참여 전이라 member는 null', async () => {
     const hash = await api.service(PasswordHasher).hash(PASSWORD);
     await api.service(Database).sql`
-      INSERT INTO community.members
-        (id, app_id, login_id, password_hash, password_changed_at, nickname, nickname_key, age_confirmed_at)
-      VALUES (${randomUUID()}, ${appId}, 'old_villager', ${hash}, now(), '옛회원', '옛회원', now())`;
-    const self = ok(await login('Old_Villager', PASSWORD));
+      INSERT INTO community.accounts (space_id, login_id, password_hash, password_changed_at, age_confirmed_at)
+      SELECT DISTINCT space_id, 'old_villager', ${hash}, now(), now() FROM community.terms WHERE space_id IS NOT NULL LIMIT 1`;
+    const res = await login('Old_Villager', PASSWORD);
+    const self = ok(res);
     assert.equal(self.loginId, 'old_villager');
     assert.equal(self.email, null);
+    assert.deepEqual(self.needs, ['email', 'terms']);
+    const me = ok(await at('/api/community/me', { as: new TestUser(res.cookies()) }));
+    assert.equal((me.account as Json).loginId, 'old_villager');
+    assert.equal(me.member, null);
   });
 
   test('틀린 로그인은 메일마다 15분에 5번까지, 넘으면 맞는 비밀번호도 429', async () => {

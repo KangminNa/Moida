@@ -11,16 +11,13 @@ import { Nickname } from './nickname.policy';
 
 const NOW = new Date('2026-11-19T00:00:00Z');
 const DAY = 86_400_000;
-const HASH = 'scrypt$15$8$1$c2FsdA==$aGFzaA==';
 const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
 
 function row(more: Partial<MemberRow> = {}): MemberRow {
   return {
     id: 'm1',
     app_id: 'a1',
-    login_id: 'villager',
-    password_hash: HASH,
-    password_changed_at: NOW,
+    account_id: 'acc1',
     nickname: '마을사람',
     nickname_key: '마을사람',
     age_confirmed_at: NOW,
@@ -33,7 +30,6 @@ function row(more: Partial<MemberRow> = {}): MemberRow {
     terms_version: 1,
     privacy_version: 1,
     left_at: null,
-    email: null,
     ...more,
   };
 }
@@ -86,49 +82,27 @@ describe('Nickname', () => {
 });
 
 describe('Member', () => {
-  test('가입: 만 14세 확인이 있어야 하고, 첫 로그인을 함께 연다', () => {
-    assert.throws(
-      () => Member.join('a1', 'v@example.com', HASH, '마을사람', false, NOW),
-      /만 14세/,
-    );
-    const member = Member.join('a1', 'v@example.com', HASH, '마을사람', true, NOW);
-    assert.equal(typeof member.startedSession?.token, 'string');
+  test('앱 참여: 계정의 만 14세 확인을 옮겨 적고, 가입 대기가 끝나는 때를 보인다', () => {
+    const member = Member.enter('a1', 'acc1', '마을사람', NOW, NOW);
+    assert.equal(member.accountId, 'acc1');
     const view = member.view().toJSON() as Record<string, unknown>;
-    assert.equal(view.email, 'v@example.com');
-    assert.equal(view.loginId, null);
-    assert.equal(member.loginName, 'v');
-    assert.equal('passwordHash' in view || JSON.stringify(view).includes('scrypt'), false);
+    assert.equal('email' in view || 'loginId' in view, false);
     assert.equal(view.writableAt, new Date(NOW.getTime() + Member.JOIN_WAIT_MS).toISOString());
   });
 
   test('닉네임은 처음엔 바로, 그 뒤로는 7일에 한 번', () => {
-    const member = Member.join('a1', 'v@example.com', HASH, '처음이름', true, NOW);
+    const member = Member.enter('a1', 'acc1', '처음이름', NOW, NOW);
     member.rename('두번째', new Date(NOW.getTime() + DAY));
     assert.throws(() => member.rename('세번째', new Date(NOW.getTime() + 3 * DAY)), /7일에 한 번/);
     member.rename('세번째', new Date(NOW.getTime() + 9 * DAY));
   });
 
-  test('비밀번호를 바꾸면 지금 로그인만 남길 세션으로 적는다', () => {
+  test('앱에서 나가면 계정 연결과 닉네임을 지우고, 두 번은 409', () => {
     const member = Member.restore(row());
-    assert.equal(member.sessionToKeep, null);
-    member.changePassword('scrypt$new', 'keep-hash', NOW);
-    assert.equal(member.passwordHash, 'scrypt$new');
-    assert.equal(member.sessionToKeep, 'keep-hash');
-  });
-
-  test('메일로 비밀번호를 다시 정하면 모든 로그인을 끝낸다', () => {
-    const member = Member.restore(row({ login_id: null, email: 'v@example.com' }));
-    member.setPasswordByMail('scrypt$new', NOW);
-    assert.equal(member.passwordHash, 'scrypt$new');
-    assert.equal(member.endsSessions, true);
-    assert.equal(member.sessionToKeep, null);
-  });
-
-  test('탈퇴하면 메일도 지운다', () => {
-    const member = Member.restore(row({ login_id: null, email: 'v@example.com' }));
     member.leave(NOW);
-    assert.equal(member.loginName, 'left:m1');
-    assert.equal(member.view().toJSON().email, null);
+    assert.equal(member.accountId, null);
+    assert.equal(member.nickname, Member.LEFT_NAME);
+    assert.throws(() => member.leave(NOW), /이미 나간/);
   });
 
   test('차단 중이면 403 (날짜와 함께), 지나면 된다', () => {

@@ -1,131 +1,74 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   type Actor,
-  AttemptLimiter,
   BaseService,
+  Conflict,
   Database,
-  EmailAddress,
   InvalidRequest,
   Lookups,
   MemberActor,
   PasswordHasher,
-  Unauthenticated,
 } from '../../platform';
-import type { Member } from './member';
-import type {
-  LeaveInput,
-  LoginInput,
-  MemberPlace,
-  PasswordInput,
-  RenameInput,
-} from './member.input';
+import { AccountRepository } from '../account/account.repository';
+import { TermsQuery } from '../terms/terms.query';
+import { TermsConsent } from '../terms/terms-consent.policy';
+import { Member } from './member';
+import type { EnterInput, LeaveInput, MemberPlace, RenameInput } from './member.input';
 import { MemberRepository } from './member.repository';
-import { MemberPassword } from './member-password.policy';
-import { MemberSession } from './member-session';
 
-// 회원 쓰기 (스토어 3-1): 로그인 · 비밀번호 바꾸기 · 닉네임 바꾸기 · 탈퇴(3-4) · 로그아웃 · 마지막 접근.
-// 가입 · 비밀번호 다시 정하기는 메일 인증코드로 (MemberMailService, 2026-11-26). 로그인은 메일 + 비밀번호, 전에 아이디로 가입한 회원은 아이디 + 비밀번호
-// 해킹에 대비한 규칙 (11.1):
-// - 비밀번호는 scrypt 해시만 둔다 (PasswordHasher). 해시는 느린 일이라 트랜잭션 밖에서 만들고 확인한다
-// - 로그인 실패 문구는 하나다: 메일 · 아이디가 있는지 알려 주지 않고, 없어도 같은 시간을 들여 확인한다 (PasswordHasher.verify의 가짜 값)
-// - 틀린 시도는 메일 · 아이디마다 · 곳(IP, IPv6는 /64)마다 센다 (서버 메모리에만, IP는 저장하지 않는다). 넘으면 429
-// - 가입 직후에는 글 · 댓글을 바로 쓰지 못한다 (Member.JOIN_WAIT_MS)
-// - 가입 · 로그인할 때마다 새 세션 토큰. 비밀번호를 바꾸면 지금 로그인 말고 다른 로그인은 모두 끝난다
-// 모두 앱 도메인의 공개된 커뮤니티 앱에서만 (Lookups 'member-app': 커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3)
+// 앱 회원 쓰기 (스토어 3-1, 스토어 계정 2026-11-26): 로그인한 계정의 앱 참여 · 닉네임 바꾸기 · 이 앱에서 나가기.
+// 가입(계정 + 첫 앱 참여)은 AccountMailService, 로그인 · 비밀번호 · 계정 탈퇴는 AccountService.
+// 모두 앱 도메인의 회원을 받는 공개 앱에서만 (Lookups 'member-app': 커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3)
 @Injectable()
 export class MemberService extends BaseService {
-  /** 틀린 로그인: 한 아이디에 15분에 5번, 한 곳에서 15분에 20번 */
-  static readonly TRIES_PER_LOGIN = 5;
-  static readonly TRIES_PER_PLACE = 20;
-  static readonly TRY_WINDOW_MS = 15 * 60_000;
-  private static readonly WRONG = '메일이나 비밀번호가 맞지 않아요';
-  private static readonly TOUCHED_MAX = 10_000;
-  private readonly logger = new Logger('회원');
-  /** 마지막 접근을 적은 때 (세션 해시 → ms). 요청마다 쓰지 않게 */
-  private readonly touched = new Map<string, number>();
-  private readonly byLogin = new AttemptLimiter(
-    MemberService.TRIES_PER_LOGIN,
-    MemberService.TRY_WINDOW_MS,
-  );
-  private readonly byPlace = new AttemptLimiter(
-    MemberService.TRIES_PER_PLACE,
-    MemberService.TRY_WINDOW_MS,
-  );
-
   constructor(
     db: Database,
     private readonly lookups: Lookups,
     private readonly hasher: PasswordHasher,
+    private readonly terms: TermsQuery,
   ) {
     super(db);
   }
 
-  /** 로그인: 새 세션. 틀리면 401 (메일 · 아이디가 없어도 같은 문구 · 같은 시간), 많이 틀리면 429 */
-  async login(actor: Actor, place: MemberPlace, req: LoginInput): Promise<Member> {
-    await this.assertCommunity(actor, place);
-    const who = `${place.appId}:${req.login}`;
-    const at = MemberService.placeOf(place);
-    this.byPlace.check(at);
-    this.byLogin.check(who);
-    const email = EmailAddress.looksLike(req.login) ? EmailAddress.clean(req.login) : null;
-    const found = await this.transaction(async (tx) => {
-      const members = new MemberRepository(tx);
-      if (email) return members.findByEmail(place.appId, email);
-      if (EmailAddress.looksLike(req.login)) return null;
-      return members.findByLogin(place.appId, req.login);
-    });
-    if (!(await this.hasher.verify(req.password, found?.passwordHash ?? null)) || !found) {
-      this.byPlace.fail(at);
-      this.byLogin.fail(who);
-      throw new Unauthenticated(MemberService.WRONG);
-    }
-    return this.transaction(async (tx) => {
-      const members = new MemberRepository(tx);
-      const member = await members.lock(place.appId, found.id);
-      member.startSession(new Date());
-      await members.save(member);
-      return member;
-    });
-  }
-
   /**
-   * 비밀번호 바꾸기 (그 회원만): 지금 비밀번호가 맞아야 하고(틀리면 로그인처럼 센다), 새 비밀번호는 같은 규칙.
-   * 이 브라우저(token) 말고 다른 로그인은 모두 끝난다
+   * 앱 참여: 로그인한 계정이 이 앱의 회원이 된다 (닉네임은 이 앱의 것). 이 앱이 약관을 공개했으면 그 버전에 동의하고,
+   * 계정이 아직 공통 약관에 동의하지 않았으면(옮겨 온 옛 계정) 그 버전도. 이미 참여했으면 409. 잠그는 순서는 계정 → 회원
    */
-  async changePassword(
-    actor: Actor,
-    place: MemberPlace,
-    req: PasswordInput,
-    token: string | null,
-  ): Promise<void> {
-    const me = MemberActor.require(actor, place.appId);
-    if (!token) throw new Unauthenticated('로그인이 필요해요');
-    const who = `${place.appId}:${me.id}`;
-    this.byLogin.check(who);
-    const current = await this.transaction((tx) =>
-      new MemberRepository(tx).load(place.appId, me.id ?? ''),
-    );
-    if (!(await this.hasher.verify(req.current, current.passwordHash))) {
-      this.byLogin.fail(who);
-      throw new InvalidRequest(new Map([['current', '지금 비밀번호가 맞지 않아요']]));
-    }
-    MemberPassword.check(req.next, current.loginName, current.nickname);
-    const hash = await this.hasher.hash(req.next);
-    await this.transaction(async (tx) => {
-      const members = new MemberRepository(tx);
-      const member = await members.lock(place.appId, current.id);
-      member.changePassword(hash, MemberSession.hash(token), new Date());
-      await members.save(member);
+  async enter(actor: Actor, place: MemberPlace, req: EnterInput): Promise<Member> {
+    const me = MemberActor.requireAccount(actor, place.appId);
+    await this.assertApp(actor, place);
+    if (me.id !== null) throw new Conflict('이미 참여한 앱이에요');
+    const store = await this.terms.versions(actor, { spaceId: place.spaceId });
+    const app = await this.terms.versions(actor, { appId: place.appId });
+    return this.transaction(async (tx) => {
+      const accounts = new AccountRepository(tx);
+      const account = await accounts.lock(place.spaceId, me.accountId);
+      TermsConsent.check(store, app, req.agreement, !account.agreed);
+      const now = new Date();
+      if (!account.agreed) {
+        account.agree(req.agreement.termsVersion ?? 0, req.agreement.privacyVersion ?? 0);
+        await accounts.save(account);
+      }
+      const member = Member.enter(
+        place.appId,
+        account.id,
+        req.nickname,
+        account.ageConfirmedAt,
+        now,
+      );
+      member.agree(req.agreement.appTermsVersion, req.agreement.appPrivacyVersion);
+      await new MemberRepository(tx).save(member);
+      return member;
     });
   }
 
   /** 닉네임 바꾸기 (그 회원만) */
   async rename(actor: Actor, place: MemberPlace, req: RenameInput): Promise<Member> {
     const me = MemberActor.require(actor, place.appId);
-    await this.assertCommunity(actor, place);
+    await this.assertApp(actor, place);
     return this.transaction(async (tx) => {
       const members = new MemberRepository(tx);
-      const member = await members.lock(place.appId, me.id ?? '');
+      const member = await members.lock(place.appId, me.id);
       member.assertVersion(req.version);
       member.rename(req.nickname, new Date());
       await members.save(member);
@@ -134,53 +77,25 @@ export class MemberService extends BaseService {
   }
 
   /**
-   * 탈퇴 (3-4, 그 회원만): 지금 비밀번호가 맞아야 하고(틀리면 로그인처럼 센다) 개인정보를 지우고 모든 로그인을 끝낸다 (Member.leave).
-   * 글 · 댓글은 "탈퇴한 회원"으로 남는다. 차단 중이어도 탈퇴할 수 있다
+   * 이 앱에서 나가기 (그 회원만, 3-4): 계정 비밀번호가 맞아야 한다. 이 앱의 닉네임 · 계정 연결을 지우고(Member.leave)
+   * 글 · 댓글은 "탈퇴한 회원"으로 남는다. 계정과 로그인은 그대로다 (다른 앱은 계속 쓴다). 차단 중이어도 나갈 수 있다
    */
   async leave(actor: Actor, place: MemberPlace, req: LeaveInput): Promise<void> {
     const me = MemberActor.require(actor, place.appId);
-    const who = `${place.appId}:${me.id}`;
-    this.byLogin.check(who);
-    const current = await this.transaction((tx) =>
-      new MemberRepository(tx).load(place.appId, me.id ?? ''),
+    const account = await this.transaction((tx) =>
+      new AccountRepository(tx).load(place.spaceId, me.accountId),
     );
-    if (!(await this.hasher.verify(req.password, current.passwordHash))) {
-      this.byLogin.fail(who);
+    if (!(await this.hasher.verify(req.password, account.passwordHash)))
       throw new InvalidRequest(new Map([['password', '비밀번호가 맞지 않아요']]));
-    }
     await this.transaction(async (tx) => {
       const members = new MemberRepository(tx);
-      const member = await members.lock(place.appId, current.id);
+      const member = await members.lock(place.appId, me.id);
       member.leave(new Date());
       await members.save(member);
     });
   }
 
-  /** 로그아웃: 이 브라우저의 로그인을 끝낸다. 쿠키가 없으면 할 일이 없다 */
-  async logout(token: string | null): Promise<void> {
-    if (!token) return;
-    await this.transaction((tx) =>
-      new MemberRepository(tx).endSession(MemberSession.hash(token), new Date()),
-    );
-  }
-
-  /** 마지막 접근 (MemberGuard). 5분에 한 번만 적고, 실패해도 요청은 막지 않는다 */
-  async seen(token: string, now: Date): Promise<void> {
-    const hash = MemberSession.hash(token);
-    if (now.getTime() - (this.touched.get(hash) ?? 0) < MemberSession.SEEN_MS) return;
-    if (this.touched.size > MemberService.TOUCHED_MAX) this.touched.clear();
-    this.touched.set(hash, now.getTime());
-    await this.transaction((tx) => new MemberRepository(tx).touchSession(hash, now)).catch(
-      (error: unknown) => this.logger.error(`마지막 접근을 적지 못했어요: ${String(error)}`),
-    );
-  }
-
-  /** 시도를 세는 곳: 앱마다 따로 센다 (한 앱이 막혀도 다른 앱은 그대로) */
-  private static placeOf(place: MemberPlace): string {
-    return `${place.appId}:${AttemptLimiter.place(place.ip)}`;
-  }
-
-  private assertCommunity(actor: Actor, place: MemberPlace): Promise<void> {
+  private assertApp(actor: Actor, place: MemberPlace): Promise<void> {
     return this.lookups.assertVisible('member-app', actor, [place.appId], '없는 주소예요');
   }
 }

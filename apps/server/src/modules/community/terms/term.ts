@@ -2,7 +2,7 @@ import { BaseEntity, RuleViolation, TableEntity } from '../../platform';
 import type { TermByKind, TermKind, TermNew, TermRow } from '../community.tables';
 import { TermView } from './terms.view';
 
-// 앱의 약관 한 버전 (community.terms, 스토어 3-4): 이용약관(terms) · 개인정보처리방침(privacy). 추가만 한다:
+// 약관 한 버전 (community.terms, 스토어 3-4): 앱의 약관(app_id) 또는 공간(스토어)의 공통 약관(space_id, 2026-11-26): 이용약관(terms) · 개인정보처리방침(privacy). 추가만 한다:
 // 지난 버전에 동의한 회원이 있어 고치지 않고 새 버전을 쌓는다. 공개된 것은 늘 마지막 버전이다.
 // 쓰는 사람은 관리자뿐이다 (콘솔에서 바로 · AI 제안을 승인해서): 회원에게 보이는 약속이라 AI가 바로 바꾸지 않는다 (원칙 7)
 export class Term extends TableEntity<TermRow, TermNew> {
@@ -13,7 +13,7 @@ export class Term extends TableEntity<TermRow, TermNew> {
    * 본문은 마크다운, 앞뒤 공백을 빼고 1~MAX자
    */
   static publish(
-    appId: string,
+    owner: { appId: string } | { spaceId: string },
     kind: TermKind,
     before: number,
     body: string,
@@ -27,7 +27,8 @@ export class Term extends TableEntity<TermRow, TermNew> {
     return new Term(
       {
         id: BaseEntity.newId(),
-        app_id: appId,
+        app_id: 'appId' in owner ? owner.appId : null,
+        space_id: 'spaceId' in owner ? owner.spaceId : null,
         kind,
         version: before + 1,
         body: clean,

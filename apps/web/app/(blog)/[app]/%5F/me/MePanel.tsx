@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { formatDate } from '../../../../_blog/format';
 import { memberApi } from '../../../../_community/member-api';
-import type { MemberSelf } from '../../../../_community/types';
+import type { AccountSelf, MemberSelf } from '../../../../_community/types';
 import type { ApiReply } from '../../../../_lib/client-api';
 import { useAction } from '../../../../_lib/use-action';
 
@@ -14,14 +14,17 @@ const MISMATCH: ApiReply<null> = {
   error: { code: 'mismatch', message: '새 비밀번호 확인이 맞지 않아요' },
 };
 
-// 내 정보: 아이디 · 가입일, 닉네임 바꾸기(7일에 한 번), 비밀번호 바꾸기(다른 로그인은 끝난다), 로그아웃.
+// 내 정보: 계정(아이디 · 메일)과 이 앱 참여일, 이 앱의 닉네임 바꾸기(7일에 한 번),
+// 계정 비밀번호 바꾸기(모든 앱의 다른 로그인은 끝난다), 로그아웃.
 // 동작마다 오류를 제자리에 보이게 useAction을 따로 둔다 (web 규칙)
 export function MePanel({
   csrf,
+  account,
   member,
   notice,
 }: {
   csrf: string | null;
+  account: AccountSelf;
   member: MemberSelf;
   notice: string | null;
 }) {
@@ -67,9 +70,11 @@ export function MePanel({
     <div className="member-form">
       {notice && <p className="note">{notice}</p>}
       <dl className="member-facts">
-        <dt>{member.email ? '메일' : '아이디'}</dt>
-        <dd>{member.email ?? member.loginId}</dd>
-        <dt>가입</dt>
+        <dt>아이디</dt>
+        <dd>{account.loginId ?? '아직 없어요'}</dd>
+        <dt>메일</dt>
+        <dd>{account.email ?? '아직 없어요'}</dd>
+        <dt>이 앱 참여</dt>
         <dd>{formatDate(member.joinedAt)}</dd>
       </dl>
 
@@ -116,7 +121,10 @@ export function MePanel({
             autoComplete="new-password"
             required
           />
-          <small>10자 이상. 바꾸면 이 브라우저 말고 다른 곳의 로그인은 끝나요</small>
+          <small>
+            10자 이상. 이 사이트의 모든 앱에 쓰는 비밀번호예요. 바꾸면 이 브라우저 말고 다른 곳의
+            로그인은 끝나요
+          </small>
         </label>
         <label className="field">
           <span>새 비밀번호 확인</span>

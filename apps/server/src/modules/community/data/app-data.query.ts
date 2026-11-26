@@ -140,9 +140,11 @@ export class AppDataQuery extends BaseQuery {
       zip.add('data.sql', `${data.join('\n')}\n`);
     });
     const members = await this.sql<Record<string, unknown>[]>`
-      SELECT id, login_id, email, nickname, password_hash, joined_at, blocked_until,
-             terms_version, privacy_version, left_at
-      FROM community.members WHERE app_id = ${req.appId} ORDER BY id`;
+      SELECT m.id, m.account_id, a.login_id, a.email, m.nickname, a.password_hash, m.joined_at,
+             m.blocked_until, m.terms_version AS app_terms_version, m.privacy_version AS app_privacy_version,
+             a.terms_version, a.privacy_version, m.left_at
+      FROM community.members m LEFT JOIN community.accounts a ON a.id = m.account_id
+      WHERE m.app_id = ${req.appId} ORDER BY m.id`;
     zip.add('members.json', JSON.stringify({ members }, null, 2));
     // 약관은 모든 버전 (스토어 3-4): 회원마다 동의한 버전(terms_version · privacy_version)을 맞춰 볼 수 있게
     const terms = await this.sql<

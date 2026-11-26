@@ -326,16 +326,20 @@ export class VisitorActor extends Actor {
 }
 
 /**
- * 커뮤니티 회원 (스토어 3-1, 원칙 10): 앱 하나의 회원이고 권한이 없다. 관리 확인(assertOwner · assertCan)은 모두 막힌다.
- * 앱 도메인의 /api/community에서 회원 쿠키로만 생긴다 (community MemberGuard). 공간이 없어 다른 모듈의 읽기에는 방문자와 같다
+ * 커뮤니티 회원 (스토어 3-1, 원칙 10): 앱 도메인에 로그인한 스토어 계정이고 권한이 없다. 관리 확인(assertOwner · assertCan)은 모두 막힌다.
+ * 앱 도메인의 /api/community에서 회원 쿠키로만 생긴다 (community MemberGuard). 공간이 없어 다른 모듈의 읽기에는 방문자와 같다.
+ * 계정은 공간(스토어)에 하나이고 앱의 회원은 그 계정의 "앱 참여"다 (2026-11-26): 로그인했지만 이 앱에 아직 참여하지 않았으면 id는 null
  */
 export class MemberActor extends Actor {
   readonly kind = 'member';
 
   constructor(
-    /** 이 회원이 든 앱 */
+    /** 이 로그인이 열린 앱 (그 앱 도메인) */
     readonly appId: string,
-    memberId: string,
+    /** 이 앱의 회원 (참여 전이면 null) */
+    memberId: string | null,
+    /** 로그인한 스토어 계정 */
+    readonly accountId: string,
   ) {
     super(null, memberId);
   }
@@ -344,8 +348,15 @@ export class MemberActor extends Actor {
     return false;
   }
 
-  /** 이 앱의 회원이면 그 회원, 아니면 401 */
-  static require(actor: Actor, appId: string): MemberActor {
+  /** 이 앱의 회원이면 그 회원, 아니면 401 (로그인했어도 이 앱에 참여하지 않았으면) */
+  static require(actor: Actor, appId: string): MemberActor & { readonly id: string } {
+    const me = MemberActor.requireAccount(actor, appId);
+    if (me.id === null) throw new Unauthenticated('이 앱에 참여해야 해요');
+    return me as MemberActor & { readonly id: string };
+  }
+
+  /** 이 앱 도메인에 로그인한 계정이면 그 요청자 (앱 참여는 묻지 않는다), 아니면 401 */
+  static requireAccount(actor: Actor, appId: string): MemberActor {
     if (actor instanceof MemberActor && actor.appId === appId) return actor;
     throw new Unauthenticated('로그인이 필요해요');
   }

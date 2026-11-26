@@ -41,8 +41,16 @@ export class CommunitySite {
   ) {}
 
   /** 공개된 커뮤니티 앱 하나 (도메인은 모든 공간에서 하나라 부르는 쪽이 이 실행의 표시를 붙인다) */
-  /** link가 공개하는 약관의 버전 (가입할 때 동의하는 값) */
-  static readonly AGREED = { termsVersion: 1, privacyVersion: 1 };
+  /**
+   * 가입할 때 동의하는 약관 버전: 공통 약관(스토어, 테스트 서버마다 처음 link가 공개)과 이 앱의 약관(link가 공개).
+   * 테스트는 한 DB · 한 공간을 함께 쓴다: 공통 약관의 새 버전을 올리는 테스트는 끝에 되돌릴 수 없으니 버전을 직접 읽는다
+   */
+  static readonly AGREED = {
+    termsVersion: 1,
+    privacyVersion: 1,
+    appTermsVersion: 1,
+    appPrivacyVersion: 1,
+  };
 
   static async open(api: ApiClient, owner: TestUser, slug: string): Promise<CommunitySite> {
     const host = `${slug}.example.com`;
@@ -137,7 +145,19 @@ export class CommunitySite {
       assert.equal(done.status, 200, done.text);
       return done.json();
     };
-    // 약관 둘을 먼저 공개한다: 공개 전이면 가입을 받지 않는다 (3-4). 가입은 CommunitySite.AGREED에 동의한다
+    // 공통 약관(스토어)이 없으면 공개한다: 공개 전이면 가입을 받지 않는다 (2026-11-26). 다른 테스트가 먼저 올렸으면 그대로
+    const store = (await api.get('/api/community/admin/terms', owner)).json().items as {
+      kind: string;
+      current: unknown;
+    }[];
+    for (const line of store.filter((l) => l.current === null)) {
+      const res = await api.request('POST', `/api/community/admin/terms/${line.kind}`, owner, {
+        version: 0,
+        body: `# 공통 ${line.kind}\n\n테스트 약관`,
+      });
+      assert.ok(res.status === 201 || res.status === 409, res.text);
+    }
+    // 이 앱의 약관 둘도 공개한다. 가입은 CommunitySite.AGREED에 동의한다
     for (const kind of ['terms', 'privacy']) {
       const published = await api.request(
         'POST',
@@ -198,16 +218,42 @@ export class CommunitySite {
    * ready면 가입 직후 대기(5분)가 지난 것처럼 가입한 때를 앞으로 당긴다 (테스트에서 5분을 기다리지 않으려고 DB에 바로 쓴다)
    */
   async member(name: string, nickname: string, ready = true): Promise<TestUser> {
-    const res = await CommunitySite.join(this.api, this.host, {
-      email: CommunitySite.emailOf(name),
-      nickname,
-    });
-    assert.equal(res.status, 201, res.text);
+    const email = CommunitySite.emailOf(name);
+    const res = await CommunitySite.join(this.api, this.host, { email, nickname });
+    let user: TestUser;
+    if (res.status === 201) user = new TestUser(res.cookies());
+    else {
+      // 같은 메일의 계정이 이미 있다 (다른 앱에서 가입): 로그인하고 이 앱에 참여한다
+      assert.match(res.text, /인증코드/, res.text);
+      user = await this.enter(email, nickname);
+    }
     if (ready)
       await this.api.service(Database).sql`
         UPDATE community.members SET joined_at = joined_at - interval '10 minutes'
-        WHERE app_id = ${this.appId} AND email = ${CommunitySite.emailOf(name)}`;
-    return new TestUser(res.cookies());
+        WHERE app_id = ${this.appId}
+          AND account_id = (SELECT id FROM community.accounts WHERE email = ${email})`;
+    return user;
+  }
+
+  /** 이미 있는 계정으로 이 앱 도메인에 로그인하고 이 앱에 참여한다 (스토어 계정, 2026-11-26) */
+  async enter(login: string, nickname: string): Promise<TestUser> {
+    const signed = await this.at('/api/community/login', {
+      method: 'POST',
+      body: { login, password: CommunitySite.PASSWORD },
+      headers: { 'x-forwarded-for': CommunitySite.nextPlace() },
+    });
+    assert.equal(signed.status, 200, signed.text);
+    const user = new TestUser(signed.cookies());
+    const { termsVersion, privacyVersion, ...app } = CommunitySite.AGREED;
+    const entered = await this.write(user, 'POST', '/api/community/enter', { nickname, ...app });
+    assert.equal(entered.status, 201, entered.text);
+    return user;
+  }
+
+  /** 테스트 메일의 아이디 (메일의 @ 앞을 아이디 규칙에 맞게: 영문 소문자로 시작하는 4~20자) */
+  static loginIdOf(email: string): string {
+    const local = (email.split('@')[0] ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    return `u${local}`.padEnd(4, '_').slice(0, 20);
   }
 
   /** 가입 시도 한 번: 그 메일로 코드를 받고(받지 못하면 code로 준 값) 가입한다. 곳(IP)은 매번 다르게 (가입 제한) */
@@ -220,6 +266,7 @@ export class CommunitySite {
     const box = CommunitySite.mailbox(api);
     const headers = { origin: `http://${host}`, 'x-forwarded-for': ip };
     let code = body.code;
+    let known = false;
     if (code === undefined) {
       const sent = await api.viaHost('/api/community/join/code', host, {
         method: 'POST',
@@ -227,13 +274,16 @@ export class CommunitySite {
         headers,
       });
       assert.equal(sent.status, 204, sent.text);
-      code = box.codeFor(String(body.email).trim().toLowerCase());
+      const address = String(body.email).trim().toLowerCase();
+      known = /이미 가입한/.test(box.to(address).at(-1)?.subject ?? '');
+      code = known ? '000000' : box.codeFor(address);
     }
     return api.viaHost('/api/community/join', host, {
       method: 'POST',
       body: {
         password: CommunitySite.PASSWORD,
         ageConfirmed: true,
+        loginId: CommunitySite.loginIdOf(String(body.email)),
         ...CommunitySite.AGREED,
         ...body,
         code,

@@ -8,12 +8,22 @@ import { TermsService } from './terms.service';
 import type { TermsAdminView, TermView } from './terms.view';
 
 // 약관 (스토어 3-4).
-//   GET  api/community/terms/:kind              공개된 약관 (terms · privacy). 앱 도메인에서 누구나, 없으면 404
+//   GET  api/community/terms/:kind              이 앱의 공개된 약관 (terms · privacy). 앱 도메인에서 누구나, 없으면 404
+//   GET  api/community/terms/store/:kind        공간(스토어)의 공통 약관 (2026-11-26, 가입할 때 동의한다)
 // 회원 화면 /_/terms · /_/privacy와 가입 화면의 동의 칸이 읽는다
 @Controller('api/community/terms')
 @UseGuards(MemberGuard)
 export class TermsController {
   constructor(private readonly query: TermsQuery) {}
+
+  @Get('store/:kind')
+  store(
+    @CurrentActor() actor: Actor,
+    @Param('kind') kind: string,
+    @Req() req: HttpRequest,
+  ): Promise<TermView> {
+    return this.query.published(actor, MemberPlace.from(req), TermKindInput.from(kind).kind, true);
+  }
 
   @Get(':kind')
   published(
@@ -21,7 +31,33 @@ export class TermsController {
     @Param('kind') kind: string,
     @Req() req: HttpRequest,
   ): Promise<TermView> {
-    return this.query.published(actor, MemberPlace.from(req), TermKindInput.from(kind).kind);
+    return this.query.published(actor, MemberPlace.from(req), TermKindInput.from(kind).kind, false);
+  }
+}
+
+// 공통 약관 관리 (2026-11-26, 스토어 계정). 관리자만, 기본 도메인에서만.
+//   GET  api/community/admin/terms        공간의 이용약관 · 개인정보처리방침의 지금 버전과 초안. 둘 다 공개돼야 가입을 받는다 (ready)
+//   POST api/community/admin/terms/:kind  { version, body } 새 버전 공개
+@Controller('api/community/admin/terms')
+export class StoreTermsAdminController {
+  constructor(
+    private readonly query: TermsQuery,
+    private readonly terms: TermsService,
+  ) {}
+
+  @Get()
+  list(@CurrentActor() actor: Actor): Promise<TermsAdminView> {
+    return this.query.admin(actor, null);
+  }
+
+  @Post(':kind')
+  @HttpCode(201)
+  publish(
+    @CurrentActor() actor: Actor,
+    @Param('kind') kind: string,
+    @Body() body: unknown,
+  ): Promise<TermView> {
+    return this.terms.publish(actor, TermPublishInput.forStore(kind, body));
   }
 }
 

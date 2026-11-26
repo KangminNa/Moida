@@ -6,17 +6,18 @@ import { hostOf } from '../_blog/request-host';
 import type { PublicApp } from '../_blog/types';
 import { serverGet } from '../_lib/server-api';
 import { blockNotice, waitNotice } from './member-state';
-import type { MemberMe, MemberSelf, Term, TopicDetail } from './types';
+import type { AccountSelf, MemberMe, MemberSelf, Term, TopicDetail } from './types';
 
 // 고정 화면(/_/…, 스토어 3-2)의 서버 쪽 준비. 회원 API는 앱 도메인에서만 열리므로 화면도 그 도메인으로 온 요청에서만 연다:
 // 기본 도메인의 /<앱>/_/…와 회원을 받지 않는 앱의 도메인은 없는 주소(404). 가입 · 로그인 · 내 정보는 회원을 받는 모든 앱
 // (커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3), 글쓰기 · 댓글 · 신고는 커뮤니티 앱만. 앱 도메인의 브라우저 쿠키는 그 도메인의
 // 회원 쿠키뿐이라 그대로 넘겨 이 브라우저의 회원과 쓰기 확인 값(csrf)을 읽는다
 
-/** 고정 화면 하나의 바탕: 앱 · 이 브라우저의 회원 · 쓰기 확인 값 */
+/** 고정 화면 하나의 바탕: 앱 · 이 브라우저에 로그인한 계정 · 그 계정의 이 앱 회원(참여 전이면 null) · 쓰기 확인 값 */
 export type MemberPlace = {
   app: PublicApp;
   host: string;
+  account: AccountSelf | null;
   member: MemberSelf | null;
   csrf: string | null;
 };
@@ -30,7 +31,7 @@ export async function memberPlace(rawApp: string): Promise<MemberPlace> {
     serverGet<PublicApp>(`/api/apps/by-slug/${encodeURIComponent(slug)}`, true),
   ]);
   if (!me || !app || !app.members) notFound();
-  return { app, host, member: me.member, csrf: me.csrf };
+  return { app, host, account: me.account, member: me.member, csrf: me.csrf };
 }
 
 /** 커뮤니티 앱만 여는 화면 (글쓰기 · 댓글 · 신고): 회원만 받는 다른 앱에서는 없는 주소 (스토어 12.3) */
@@ -40,10 +41,20 @@ export async function communityPlace(rawApp: string): Promise<MemberPlace> {
   return place;
 }
 
-/** 회원만 여는 화면: 로그인하지 않았으면 로그인 화면으로 (돌아올 곳은 이 화면) */
+/**
+ * 회원만 여는 화면: 로그인하지 않았으면 로그인 화면으로, 로그인했지만 이 앱에 참여하지 않았으면 참여 화면으로
+ * (돌아올 곳은 이 화면)
+ */
 export function signedIn(place: MemberPlace, back: string): MemberSelf {
-  if (!place.member) redirect(`/_/login?return=${encodeURIComponent(back)}`);
+  if (!place.member)
+    redirect(`${place.account ? '/_/enter' : '/_/login'}?return=${encodeURIComponent(back)}`);
   return place.member;
+}
+
+/** 계정이 필요한 화면 (내 정보): 회원이면 계정도 있다. 로그인이 끝났으면 로그인 화면으로 */
+export function signedAccount(place: MemberPlace, back: string): AccountSelf {
+  if (!place.account) redirect(`/_/login?return=${encodeURIComponent(back)}`);
+  return place.account;
 }
 
 /** 쓰기 안내: 차단이 먼저, 그다음 가입 대기 (글 · 댓글). 쓸 수 있으면 null */
@@ -72,7 +83,30 @@ export async function memberTitle(rawApp: string, label: string): Promise<{ titl
   return { title: app ? `${label} · ${app.name}` : label };
 }
 
-/** 공개된 약관 하나 (3-4): 가입 화면의 동의 칸 · /_/terms · /_/privacy. 아직 없으면 null */
-export function termOf(place: MemberPlace, kind: Term['kind']): Promise<Term | null> {
-  return serverGet<Term>(`/api/community/terms/${kind}`, false, place.host);
+/**
+ * 공개된 약관 하나 (3-4): 가입 · 참여 화면의 동의 칸 · /_/terms · /_/privacy. 아직 없으면 null.
+ * store면 공간(스토어)의 공통 약관 (2026-11-26, 가입할 때 한 번 동의), 아니면 이 앱의 약관 (공개했을 때만 참여할 때 동의)
+ */
+export function termOf(
+  place: MemberPlace,
+  kind: Term['kind'],
+  store = false,
+): Promise<Term | null> {
+  return serverGet<Term>(`/api/community/terms/${store ? 'store/' : ''}${kind}`, false, place.host);
+}
+
+/** 가입 · 참여 화면이 읽는 약관 넷: 공통 약관 둘과 이 앱의 약관 둘 */
+export async function termsOf(place: MemberPlace): Promise<{
+  terms: Term | null;
+  privacy: Term | null;
+  appTerms: Term | null;
+  appPrivacy: Term | null;
+}> {
+  const [terms, privacy, appTerms, appPrivacy] = await Promise.all([
+    termOf(place, 'terms', true),
+    termOf(place, 'privacy', true),
+    termOf(place, 'terms'),
+    termOf(place, 'privacy'),
+  ]);
+  return { terms, privacy, appTerms, appPrivacy };
 }

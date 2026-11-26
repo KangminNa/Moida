@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { memberApi } from '../../../../_community/member-api';
-import type { MemberSelf } from '../../../../_community/types';
+import type { AccountSelf } from '../../../../_community/types';
 import { useAction } from '../../../../_lib/use-action';
 
-// 로그인: 메일 + 비밀번호 (2026-11-26, 전에 아이디로 가입했으면 아이디). 틀리면 서버가 늘 같은 문구로 답한다
-// (메일이 있는지 알려 주지 않는다), 여러 번 틀리면 잠시 막힌다
+// 로그인: 메일이나 아이디 + 비밀번호 (스토어 계정, 2026-11-26). 이 사이트의 다른 앱에서 가입한 계정도 그대로 쓴다.
+// 틀리면 서버가 늘 같은 문구로 답한다 (계정이 있는지 알려 주지 않는다), 여러 번 틀리면 잠시 막힌다.
+// 로그인한 뒤에는 참여 화면을 거친다: 이 앱에 이미 참여했으면 그 화면이 돌아갈 곳으로 바로 보낸다
 export function LoginPanel({ csrf, returnTo }: { csrf: string | null; returnTo: string }) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -16,15 +17,15 @@ export function LoginPanel({ csrf, returnTo }: { csrf: string | null; returnTo: 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const reply = await action.run('login', () =>
-      memberApi<MemberSelf>(csrf, 'POST', 'login', { login, password }),
+      memberApi<AccountSelf>(csrf, 'POST', 'login', { login, password }),
     );
-    if (reply?.ok) window.location.replace(returnTo);
+    if (reply?.ok) window.location.replace(`/_/enter?return=${encodeURIComponent(returnTo)}`);
   }
 
   return (
     <form className="member-form" onSubmit={submit}>
       <label className="field">
-        <span>메일</span>
+        <span>메일 또는 아이디</span>
         <input
           className="input"
           value={login}
@@ -34,7 +35,7 @@ export function LoginPanel({ csrf, returnTo }: { csrf: string | null; returnTo: 
           spellCheck={false}
           required
         />
-        <small>전에 아이디로 가입했으면 아이디</small>
+        <small>이 사이트의 다른 앱에서 가입했어도 같은 계정으로 로그인해요</small>
       </label>
       <label className="field">
         <span>비밀번호</span>

@@ -6,8 +6,6 @@ import type { MemberSelf } from './types.ts';
 const NOW = Date.parse('2026-11-19T03:00:00.000Z');
 const member = {
   id: 'm1',
-  loginId: 'reader',
-  email: null,
   nickname: '읽는사람',
   joinedAt: '2026-11-19T02:58:00.000Z',
   writableAt: '2026-11-19T03:03:00.000Z',

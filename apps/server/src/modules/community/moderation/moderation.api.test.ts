@@ -60,7 +60,9 @@ async function reportBy(loginIds: readonly string[], target: object): Promise<vo
 
 async function memberLine(loginId: string): Promise<Json> {
   const items = ok(await admin('/members')).items as Json[];
-  const found = items.find((m) => m.loginId === CommunitySite.emailOf(loginId));
+  const found = items.find(
+    (m) => m.loginId === CommunitySite.loginIdOf(CommunitySite.emailOf(loginId)),
+  );
   assert.ok(found, JSON.stringify(items.slice(0, 3)));
   return found;
 }
@@ -97,7 +99,10 @@ describe('신고로 임시 가림', () => {
     const hidden = ok(await admin('/topics?state=hidden')).items as Json[];
     const line = hidden.find((x) => x.id === t.id) as Json;
     assert.deepEqual([line.state, line.hiddenBy, line.openReports], ['hidden', 'reports', 3]);
-    assert.deepEqual((line.author as Json).loginId, CommunitySite.emailOf('mod_writer'));
+    assert.deepEqual(
+      (line.author as Json).loginId,
+      CommunitySite.loginIdOf(CommunitySite.emailOf('mod_writer')),
+    );
     const [decision] = ok(await admin('/decisions')).items as Json[];
     assert.ok(decision);
     assert.deepEqual(
@@ -246,7 +251,7 @@ describe('회원 차단 · 비밀번호 초기화', () => {
     const line = await memberLine('forgot_one');
     const reset = ok(await decide(`/members/${line.id}/reset-password`, { version: line.version }));
     assert.match(String(reset.password), /^[a-z2-9]{16}$/);
-    assert.equal(reset.loginId, CommunitySite.emailOf('forgot_one'));
+    assert.equal(reset.loginId, CommunitySite.loginIdOf(CommunitySite.emailOf('forgot_one')));
     assert.equal('password' in (await memberLine('forgot_one')), false);
     assert.equal(ok(await site.at('/api/community/me', { as: m })).member, null);
     const login = (password: string) =>
