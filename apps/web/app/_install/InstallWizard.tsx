@@ -2,8 +2,6 @@
 
 import { useCallback, useState } from 'react';
 import type { Device, InstallStatus, Owner, SpaceInfo } from '../_account/types';
-import { makeIntroApp } from '../_blog/intro-app';
-import { newRequestId } from '../_community/request-id';
 import { api, describe } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
 import { MoidaMark } from '../_ui/MoidaMark';
@@ -65,8 +63,6 @@ export function InstallWizard({
                     // 계정을 만든 순간 공간이 생겼으므로, 블로그 정보를 새로 받아 버전을 맞춘다
                     const fresh = await api<SpaceInfo>('GET', '/api/space');
                     if (fresh.ok) setInfo(fresh.data);
-                    // 첫 화면은 소개 페이지로 시작한다 (스토어에서 지우거나 바꿀 수 있다). 실패해도 설치는 이어 간다
-                    await makeIntroApp(newRequestId());
                     setLogin(name);
                     setStep(2);
                   }}
