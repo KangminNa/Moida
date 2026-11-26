@@ -4,7 +4,9 @@ import type { BrowserSlot } from './browser-slot';
 import { BrowserUnavailable } from './browser-tabs';
 import type { LoginCalls, LoginOutcome, QueuedLogin } from './login-calls';
 import { LoginForm, LoginFormProblemOnPage } from './login-form';
+import { LoginFormRef } from './login-form-ref';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
+import { ProviderLogin } from './provider-login';
 import type { RunLog } from './redactor';
 
 // 로그인 카드의 러너 쪽 (2026-11-19 사용자 결정, 원칙 8을 바꿈). 서버 브라우저가 있는 서버 러너만, AI 없이 돈다.
@@ -69,9 +71,9 @@ export class LoginRunner {
       login.values.clear();
     }
     this.log.info(
-      result.outcome === 'submitted'
-        ? `로그인 카드의 값을 넣고 눌렀어요: ${login.siteId} (${host})`
-        : `로그인 카드의 값을 넣지 않았어요: ${login.siteId} (${host}) — ${result.reason}`,
+      result.outcome === 'failed'
+        ? `로그인 카드: 하지 못했어요 (${login.kind}): ${login.siteId} (${host}) — ${result.reason}`
+        : `로그인 카드: ${result.outcome === 'opened' ? '간편 로그인 단추를 눌렀어요' : '값을 넣고 눌렀어요'} (${login.kind}): ${login.siteId} (${host})`,
     );
     for (let tries = 1; ; tries++) {
       try {
@@ -99,6 +101,26 @@ export class LoginRunner {
     if (!LoginForm.safeOrigin(login.pageUrl)) return failed('https 주소가 아니라 넣지 않았어요');
     const origin = new URL(login.pageUrl).origin;
     try {
+      if (login.kind === 'social') return await this.social(login, origin, stop);
+      if (!login.form) return failed('넣을 칸이 없어요');
+      if (login.kind === 'provider') {
+        // 간편 로그인 회사의 화면: 고정 목록의 호스트이고, 그 화면이 지금 열려 있을 때만 (새로 열지 않는다)
+        const provider = Object.keys(LoginFormRef.PROVIDERS).find((p) =>
+          LoginFormRef.providerHost(p, login.pageUrl),
+        );
+        const tabs = await this.pages.tabs(stop);
+        const tab = provider
+          ? tabs.find((t) => URL.canParse(t.url) && new URL(t.url).origin === origin)
+          : undefined;
+        if (!tab) return failed('간편 로그인 화면이 닫혔어요. 다시 간편 로그인을 눌러 주세요');
+        await LoginForm.check(tab, login.form, stop);
+        const afterUrl = await LoginForm.submit(tab, origin, login.form, login.values, stop);
+        // 로그인하면 새 창이 닫히기도 한다: 그러면 사이트의 탭을 찍는다
+        const image =
+          (await this.pages.shot(tab, stop).catch(() => null)) ??
+          (await this.siteShot(login, stop));
+        return { outcome: 'submitted', reason: null, afterUrl, image };
+      }
       const tab = await this.tabOf(login.pageUrl, origin, stop);
       await LoginForm.check(tab, login.form, stop);
       const afterUrl = await LoginForm.submit(tab, origin, login.form, login.values, stop);
@@ -109,6 +131,42 @@ export class LoginRunner {
         return failed(error.message);
       throw error;
     }
+  }
+
+  /** 간편 로그인 단추를 누르고, 그 회사의 화면이 열리면 그 화면과 칸(찾으면)을 남긴다 */
+  private async social(
+    login: QueuedLogin,
+    origin: string,
+    stop: AbortSignal,
+  ): Promise<LoginOutcome> {
+    const button = login.social;
+    if (!button) throw new LoginFormProblemOnPage('누를 간편 로그인 단추가 없어요');
+    const tab = await this.tabOf(login.pageUrl, origin, stop);
+    const pressedUrl = await LoginForm.press(tab, origin, button, stop);
+    const opened = await ProviderLogin.tab(this.pages, button.provider, stop);
+    if (!opened) {
+      // 이미 그 회사에 로그인돼 있으면 바로 사이트로 돌아온다: 그 화면을 보이고 관리자가 "로그인했어요"
+      const image = await this.pages.shot(tab, stop).catch(() => null);
+      return { outcome: 'opened', reason: null, afterUrl: pressedUrl, image, providerForm: null };
+    }
+    const image = await this.pages.shot(opened, stop).catch(() => null);
+    const providerForm = await ProviderLogin.form(opened, button.provider, stop).catch(() => null);
+    const checked = providerForm
+      ? await LoginForm.check(opened, providerForm.form, stop).then(
+          () => providerForm,
+          () => null,
+        )
+      : null;
+    return { outcome: 'opened', reason: null, afterUrl: opened.url, image, providerForm: checked };
+  }
+
+  /** 사이트 출처의 탭 그림 (간편 로그인 창이 닫힌 뒤) */
+  private async siteShot(login: QueuedLogin, stop: AbortSignal): Promise<string | null> {
+    const tabs = await this.pages.tabs(stop).catch(() => []);
+    const site = tabs.find(
+      (t) => URL.canParse(t.url) && login.siteOrigins.includes(new URL(t.url).origin),
+    );
+    return site ? this.pages.shot(site, stop).catch(() => null) : null;
   }
 
   /** 로그인 화면의 탭: 같은 출처의 탭이 있으면 그것(관리자가 보던 로그인 화면), 없으면 그 주소를 새 탭으로 연다 */

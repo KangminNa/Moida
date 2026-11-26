@@ -1,22 +1,32 @@
-import { LoginFormRef } from './login-form-ref';
+import { LoginFormRef, SocialLoginRef } from './login-form-ref';
 import type { McpClient } from './mcp-client';
+import type { ProviderForm } from './provider-login';
 
-/** 관리자가 로그인 카드에 넣은 로그인 하나 (browser_login_next). 값은 그 사이트의 칸에만 넣고 어디에도 남기지 않는다 */
+/**
+ * 관리자가 로그인 카드에서 한 것 하나 (browser_login_next). 값은 그 화면의 칸에만 넣고 어디에도 남기지 않는다.
+ *   values: 사이트의 칸에 넣고 로그인 단추 누르기 · social: 간편 로그인 단추 누르기 (2026-11-26) ·
+ *   provider: 간편 로그인 회사(고정 목록)의 화면 칸에 넣고 누르기 (pageUrl은 그 회사의 로그인 화면)
+ */
 export type QueuedLogin = {
+  kind: 'values' | 'social' | 'provider';
   siteId: string;
   siteName: string;
   pageUrl: string;
-  form: LoginFormRef;
+  form: LoginFormRef | null;
+  social: SocialLoginRef | null;
+  /** 사이트의 허용 출처 (간편 로그인 창이 닫힌 뒤 사이트 탭을 찾을 때) */
+  siteOrigins: string[];
   /** 칸 종류 → 값 */
   values: Map<string, string>;
 };
 
-/** 넣고 누른 결과 (browser_login_save) */
+/** 넣고 누른 결과 (browser_login_save). opened: 간편 로그인 단추를 눌러 그 회사의 화면이 열림 (칸을 찾았으면 providerForm) */
 export type LoginOutcome = {
-  outcome: 'submitted' | 'failed';
+  outcome: 'submitted' | 'opened' | 'failed';
   reason: string | null;
   afterUrl: string | null;
   image: string | null;
+  providerForm?: ProviderForm | null;
 };
 
 /**
@@ -51,23 +61,29 @@ export class LoginCalls {
     const body = await this.mcp.call('browser_login_next', {}, 0, stop);
     if (!body.field('login')) return null;
     const login = body.child('login');
-    const values = new Map<string, string>();
+    const kind = login.text('kind') || 'values';
+    const base = {
+      siteId: login.text('site_id'),
+      siteName: login.text('site_name'),
+      pageUrl: login.text('page_url'),
+      siteOrigins: [...login.texts('origins')],
+      values: new Map<string, string>(),
+    };
+    if (kind === 'social') {
+      const s = login.child('social');
+      const social = new SocialLoginRef(s.text('provider'), s.text('role'), s.text('name'));
+      return { ...base, kind: 'social', form: null, social };
+    }
     const fields = login.list('fields').map((f) => {
-      values.set(f.text('kind'), f.text('value'));
+      base.values.set(f.text('kind'), f.text('value'));
       return { kind: f.text('kind'), role: f.text('role'), name: f.text('name') };
     });
     const submit = login.child('submit');
     const form = LoginFormRef.parse({
       fields,
       submit: { role: submit.text('role'), name: submit.text('name') },
-    }) as LoginFormRef;
-    return {
-      siteId: login.text('site_id'),
-      siteName: login.text('site_name'),
-      pageUrl: login.text('page_url'),
-      form,
-      values,
-    };
+    });
+    return { ...base, kind: kind === 'provider' ? 'provider' : 'values', form, social: null };
   }
 
   async save(siteId: string, result: LoginOutcome): Promise<void> {
@@ -77,6 +93,15 @@ export class LoginCalls {
       ...(result.reason ? { reason: result.reason.slice(0, 300) } : {}),
       ...(result.afterUrl ? { after_url: result.afterUrl.slice(0, 2000) } : {}),
       ...(result.image ? { image: result.image } : {}),
+      ...(result.providerForm
+        ? {
+            provider_form: {
+              provider: result.providerForm.provider,
+              page_url: result.providerForm.pageUrl.slice(0, 2000),
+              ...result.providerForm.form.toJSON(),
+            },
+          }
+        : {}),
     });
   }
 }

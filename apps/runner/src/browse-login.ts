@@ -95,8 +95,7 @@ export class BrowseLogin {
     if (new URL(tab.url).origin !== new URL(url).origin)
       return { form: null, problem: '로그인 화면이 다른 주소로 열렸어요' };
     try {
-      await LoginForm.check(tab, form, signal);
-      return { form, problem: null };
+      return { form: await LoginForm.check(tab, form, signal), problem: null };
     } catch (error) {
       return { form: null, problem: (error as Error).message };
     }
