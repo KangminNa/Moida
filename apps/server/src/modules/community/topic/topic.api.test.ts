@@ -155,7 +155,7 @@ describe('쓰기 규칙 (WriteLimits)', () => {
     await api.service(Database).sql`
       UPDATE community.members SET blocked_until = now() + interval '1 day'
       WHERE app_id = ${site.appId}
-        AND account_id = (SELECT id FROM community.accounts WHERE email = 'blocked_one@example.com')`;
+        AND account_id = (SELECT id FROM community.accounts WHERE email = ${CommunitySite.emailOf('blocked_one')})`;
     assert.match((await post(bad, '막힌 뒤', '본문 2')).text, /차단된 회원/);
     const del = await site.write(bad, 'DELETE', `/api/community/topics/${saved.id}`, {
       version: saved.version,
