@@ -4,8 +4,9 @@ import { ScreenPicture } from './ScreenPicture';
 import { ScreenStatus } from './ScreenStatus';
 
 // 서버 브라우저 화면 (2026-11-14): 영상 없이 HTTPS로 화면 그림을 받고, 클릭 · 글자 · 키를 보낸다.
-// 열려 있고 이 탭이 보일 때만 1초마다 새로 그린다 (그림 하나는 수십 KB). 동작을 보내면 곧 다시 그린다.
-// 지금 상태를 한 줄로 보인다: 보는 중 · 멈춤(이 창이 가려짐) · 꺼짐(이유). 꺼져 있으면 10초마다만 다시 묻는다.
+// 그림은 서버가 탭에 붙어 받아 두는 흘려보내기(2026-11-26)에서 온다: "받은 마지막 번호(after)보다 새 그림"을 묻고,
+// 답이 오면 바로 다시 묻는다. 화면이 바뀌는 만큼 그림이 오고, 그대로면 서버가 몇 초 기다렸다 그림 없이 답한다.
+// 열려 있고 이 탭이 보일 때만 묻는다. 지금 상태를 한 줄로 보인다: 보는 중 · 멈춤(이 창이 가려짐) · 꺼짐(이유). 꺼져 있으면 10초마다만 다시 묻는다.
 // 그림과 입력은 ScreenPicture.tsx. 보내기는 차례대로 한다: 빠르게 쳐도 순서가 섞이지 않는다.
 //
 // 두 자리에서 쓴다:
@@ -14,13 +15,22 @@ import { ScreenStatus } from './ScreenStatus';
 //     탭 고르기 · 주소 칸은 없고, 페이지 전체를 카드 폭에 맞춰 보이며 "크게 보기"로 화면을 채운다
 
 type Tab = { id: string; title: string; url: string };
+/** 서버의 답: 새 그림이 없으면(화면 그대로) seq · image · 크기가 null */
+type Reply = {
+  tabs: Tab[];
+  tab: string;
+  seq: number | null;
+  image: string | null;
+  width: number | null;
+  height: number | null;
+};
 type Shot = { tabs: Tab[]; tab: string; image: string; width: number; height: number };
 
-/** 새로 그리는 간격. 서버 브라우저에 닿지 않으면 길게 */
-const EVERY_MS = 1000;
+/** 이 창이 가려져 있을 때 다시 볼 간격, 서버 브라우저에 닿지 않을 때 다시 물을 간격 */
+const HIDDEN_MS = 1000;
+/** 그림을 받은 뒤 다음 물음까지 가장 짧은 간격: 움직이는 페이지(영상 · 광고)에서 1초에 10장을 넘지 않게 */
+const MIN_MS = 100;
 const OFF_MS = 10_000;
-/** 동작을 보낸 뒤 다시 그리기까지 (연달아 칠 때 한 번만) */
-const AFTER_MS = 250;
 /** 위 · 아래 버튼 한 번에 굴리는 양 (CSS 픽셀) */
 const SCROLL = 400;
 
@@ -53,32 +63,42 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
   const [lost, setLost] = useState(false);
   // 고른 탭. 비우면 서버가 맨 앞 탭을 그린다
   const tab = useRef<string | null>(null);
+  // 받은 마지막 그림의 번호 (탭을 바꾸면 0: 그 탭의 첫 그림부터)
+  const seen = useRef(0);
   const queue = useRef<Promise<void>>(Promise.resolve());
-  const redraw = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pinUrl = pin?.url ?? null;
 
   const draw = useCallback(async () => {
-    const read = () =>
-      call('GET', tab.current ? `screen?tab=${encodeURIComponent(tab.current)}` : 'screen');
+    const read = () => {
+      const query = new URLSearchParams({ after: String(seen.current) });
+      if (tab.current) query.set('tab', tab.current);
+      return call('GET', `screen?${query}`);
+    };
     let reply = await read();
     if (!reply.ok) {
       setProblem(reply.message);
       return false;
     }
-    let next = reply.data as Shot;
+    let next = reply.data as Reply;
     if (pinUrl && tab.current === null) {
       // 처음 한 번: 로그인하라고 열어 둔 탭을 찾아 앞으로 가져온다. 못 찾으면 맨 앞 탭을 그대로 보인다
       const found = pinnedTab(next.tabs, pinUrl);
       setLost(found === null);
       if (found && found.id !== next.tab) {
         tab.current = found.id;
+        seen.current = 0;
         await call('POST', 'screen/control', { tab: found.id, type: 'activate' });
         reply = await read();
-        if (reply.ok) next = reply.data as Shot;
+        if (reply.ok) next = reply.data as Reply;
       }
     }
+    if (next.tab !== tab.current) seen.current = 0;
     tab.current = next.tab;
-    setShot(next);
+    const { image, width, height, seq } = next;
+    if (image !== null && width !== null && height !== null && seq !== null) {
+      seen.current = seq;
+      setShot({ tabs: next.tabs, tab: next.tab, image, width, height });
+    } else setShot((now) => (now ? { ...now, tabs: next.tabs, tab: next.tab } : now));
     setProblem(null);
     return true;
   }, [call, pinUrl]);
@@ -87,10 +107,15 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
     if (!open) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // 답을 받자마자 다시 묻는다 (서버가 새 그림이 올 때까지 잡고 있다). 가려져 있으면 쉬고, 닿지 않으면 길게 쉰다
     const loop = async () => {
       setHidden(document.hidden);
-      const reached = document.hidden ? true : await draw();
-      if (!stopped) timer = setTimeout(loop, reached ? EVERY_MS : OFF_MS);
+      if (document.hidden) {
+        if (!stopped) timer = setTimeout(loop, HIDDEN_MS);
+        return;
+      }
+      const reached = await draw();
+      if (!stopped) timer = setTimeout(loop, reached ? MIN_MS : OFF_MS);
     };
     void loop();
     return () => {
@@ -109,7 +134,7 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
     return () => window.removeEventListener('keydown', close);
   }, [large]);
 
-  /** 동작을 차례대로 보내고, 다 보낸 뒤 곧 다시 그린다 */
+  /** 동작을 차례대로 보낸다. 바뀐 화면은 흘려보내기로 곧 온다 */
   const send = useCallback(
     (body: Record<string, unknown>) => {
       queue.current = queue.current.then(async () => {
@@ -117,10 +142,8 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
         const reply = await call('POST', 'screen/control', { tab: tab.current, ...body });
         if (!reply.ok) setProblem(reply.message);
       });
-      clearTimeout(redraw.current);
-      redraw.current = setTimeout(() => void queue.current.then(draw), AFTER_MS);
     },
-    [call, draw],
+    [call],
   );
 
   function go(e: FormEvent) {
@@ -131,6 +154,7 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
 
   function pick(id: string) {
     tab.current = id;
+    seen.current = 0;
     send({ type: 'activate' });
   }
 

@@ -41,7 +41,7 @@ const KEYS: Record<string, { code: number; text?: string }> = {
   ArrowRight: { code: 39 },
 };
 
-type Send = (method: string, params?: object) => Promise<Record<string, unknown>>;
+export type Send = (method: string, params?: object) => Promise<Record<string, unknown>>;
 
 export class BrowserScreenGateway extends BaseGateway {
   /** 보낼 수 있는 키 이름 (입력 검사가 쓴다) */
@@ -104,6 +104,21 @@ export class BrowserScreenGateway extends BaseGateway {
     });
   }
 
+  /** 탭 목록과 고른 탭 (고른 탭이 없거나 닫혔으면 맨 앞 탭). 화면 흘려보내기(ScreenCastGateway)가 그림 없이 쓴다 */
+  pick(wanted: string | null): Promise<{ tabs: ScreenTab[]; tab: string }> {
+    return this.call(async (signal) => {
+      const tabs = await this.tabs(await this.base(), signal);
+      const tab = tabs.find((t) => t.id === wanted) ?? tabs[0];
+      if (!tab) throw new Error('열린 탭이 없어요');
+      return { tabs, tab: tab.id };
+    });
+  }
+
+  /** 조종 중계의 주소 (호스트:포트). 화면 흘려보내기가 탭에 오래 붙을 때 쓴다 */
+  address(): Promise<string> {
+    return this.base();
+  }
+
   /** 탭 하나에 동작을 보낸다 */
   control(tab: string, action: ScreenAction): Promise<void> {
     return this.call(async (signal) => {
@@ -160,7 +175,8 @@ export class BrowserScreenGateway extends BaseGateway {
     return host === d || host.endsWith(`.${d}`);
   }
 
-  private static async act(send: Send, action: ScreenAction): Promise<void> {
+  /** 붙어 있는 탭에 동작 하나를 보낸다 (화면 흘려보내기도 같은 동작을 쓴다) */
+  static async act(send: Send, action: ScreenAction): Promise<void> {
     switch (action.type) {
       case 'click': {
         const at = { x: action.x, y: action.y };

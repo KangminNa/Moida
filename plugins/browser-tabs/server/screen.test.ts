@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { InvalidRequest } from '../../../apps/server/src/plugin-api';
 import { FakeCdp } from './fake-cdp';
-import { ScreenControl } from './screen';
+import { ScreenControl, ScreenRead } from './screen';
 import { BrowserScreenGateway } from './screen.gateway';
+import { ScreenCastGateway } from './screen-cast.gateway';
 
 // 콘솔에서 서버 브라우저를 보고 누르기 (2026-11-14): 가짜 CDP로 무엇을 보내는지 본다.
 // 진짜 Chromium(화면 있는 모드)으로는 캡처 · 클릭 · 한글 입력 · Enter · 스크롤 · 이동 · 뒤로를 따로 확인했다.
@@ -99,7 +100,9 @@ describe('서버 브라우저 화면', () => {
 });
 
 describe('화면 동작의 입력', () => {
-  const control = new ScreenControl(new BrowserScreenGateway('127.0.0.1', 1));
+  const offline = new BrowserScreenGateway('127.0.0.1', 1);
+  const control = new ScreenControl(new ScreenCastGateway(offline));
+  const read = new ScreenRead(offline, new ScreenCastGateway(offline));
   const bad = (raw: object, field: string) =>
     assert.throws(
       () => control.input(raw),
@@ -121,5 +124,15 @@ describe('화면 동작의 입력', () => {
     bad({ tab: A, type: 'navigate', url: 'javascript:alert(1)' }, 'url');
     bad({ tab: '../json', type: 'back' }, 'tab');
     bad({ tab: A, type: 'click', x: -1, y: 0 }, 'x');
+  });
+
+  test('화면 읽기: after는 주소의 글자로 온 0 이상의 정수, 없으면 0 (첫 그림부터)', () => {
+    assert.deepEqual(read.input({}), { tab: null, after: 0 });
+    assert.deepEqual(read.input({ tab: A, after: '42' }), { tab: A, after: 42 });
+    for (const after of ['-1', 'x'])
+      assert.throws(
+        () => read.input({ after }),
+        (e: unknown) => e instanceof InvalidRequest && JSON.stringify(e).includes('after'),
+      );
   });
 });

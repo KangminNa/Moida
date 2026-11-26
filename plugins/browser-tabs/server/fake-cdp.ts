@@ -19,7 +19,23 @@ export class FakeCdp {
     { id: 'D'.repeat(32), type: 'page', title: '둘째 탭', url: 'https://example.org/' },
   ];
 
+  /** 흘려보내기를 시작하면 그림을 보내는가 (false면 가려진 탭처럼 보내지 않는다) */
+  screencast = true;
+  private frames = 0;
+
   private constructor(private readonly server: Server) {}
+
+  /** 흘려보낸 그림 하나 (Page.screencastFrame 이벤트). 그림 글자는 몇 번째인지 */
+  private pushFrame(socket: Duplex): void {
+    if (!this.screencast) return;
+    this.frames += 1;
+    const params = {
+      data: Buffer.from(`frame-${this.frames}`).toString('base64'),
+      sessionId: this.frames,
+      metadata: { deviceWidth: 1280.4, deviceHeight: 720, pageScaleFactor: 1, offsetTop: 0 },
+    };
+    socket.write(FakeCdp.frame(JSON.stringify({ method: 'Page.screencastFrame', params })));
+  }
 
   static async start(): Promise<FakeCdp> {
     const server = createServer();
@@ -75,6 +91,13 @@ export class FakeCdp {
         socket.write(
           FakeCdp.frame(JSON.stringify({ id: message.id, ...FakeCdp.answer(message.method) })),
         );
+        // 흘려보내기: 시작하면 그림 하나, 받았다는 답(ack)마다 다음 그림 하나 (screencast 켤 때만)
+        if (this.screencast && message.method === 'Page.startScreencast') this.pushFrame(socket);
+        if (
+          message.method === 'Input.dispatchMouseEvent' &&
+          message.params.type === 'mouseReleased'
+        )
+          this.pushFrame(socket);
       }
     });
     socket.on('error', () => undefined);

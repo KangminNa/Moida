@@ -1,4 +1,5 @@
-import type { ScreenShot } from './screen.gateway';
+import type { ScreenTab } from './screen.gateway';
+import type { CastFrame } from './screen-cast.gateway';
 import type { ReadRow, SiteRow } from './tables';
 
 // 이 패키지가 내보내는 모양. 보는 사람마다 나눈다: 콘솔(주인)은 camelCase, 러너(MCP)는 snake_case.
@@ -159,11 +160,23 @@ export class ClearedView {
 
 /** 서버 브라우저의 화면 (관리자): 탭 목록, 그린 탭, JPEG(base64), 클릭 좌표의 기준 크기 */
 export class ScreenView {
-  constructor(private readonly shot: ScreenShot) {}
+  constructor(
+    private readonly tabs: readonly ScreenTab[],
+    private readonly tab: string,
+    /** 새 그림. null이면 받은 그림 그대로 (화면이 바뀌지 않았다) */
+    private readonly frame: CastFrame | null,
+  ) {}
 
   toJSON() {
-    const s = this.shot;
-    return { tabs: s.tabs, tab: s.tab, image: s.image, width: s.width, height: s.height };
+    const f = this.frame;
+    return {
+      tabs: this.tabs,
+      tab: this.tab,
+      seq: f?.seq ?? null,
+      image: f?.image ?? null,
+      width: f?.width ?? null,
+      height: f?.height ?? null,
+    };
   }
 }
 

@@ -26,6 +26,7 @@ import { ReviewMaterial, SaveReview } from './reviews';
 import { NextRun, SaveRun } from './run-queue';
 import { ScreenControl, ScreenRead } from './screen';
 import { BrowserScreenGateway } from './screen.gateway';
+import { ScreenCastGateway } from './screen-cast.gateway';
 import { ListShots, SaveShot, ShotDetail } from './shots';
 import { SiteResult, SiteRun, SiteTools } from './site-runs';
 import {
@@ -56,6 +57,7 @@ export default class BrowserTabsPlugin extends BasePlugin {
     // 위임 지킴이 (플러그인 API 0.9): 켜진 사이트 도구가 있는 사이트의 browse 위임은 도구를 먼저 쓰게 거절한다
     cairn.guardDelegate('browser_site', new GuardSiteDelegation());
     const screen = new BrowserScreenGateway();
+    const cast = new ScreenCastGateway(screen);
     // 로그인 카드의 값: 이 프로세스의 메모리에만 (DB에 남기지 않는다, 2026-11-19)
     const logins = new LoginInbox();
     // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 autoRepair, 기본 켬)
@@ -99,8 +101,8 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new SaveShot(),
       new ListShots(),
       new ShotDetail(),
-      new ScreenRead(screen),
-      new ScreenControl(screen),
+      new ScreenRead(screen, cast),
+      new ScreenControl(cast),
       new ListIntegrations(),
       new IntegrationDetail(),
       new BuildIntegration(),
