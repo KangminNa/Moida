@@ -101,7 +101,7 @@ export function LibraryPanel() {
     });
     if (
       !window.confirm(
-        `${picked.length}개를 휴지통으로 보낼까요? 각 화면의 휴지통에서 되살릴 수 있어요. 스크랩은 바로 지워지고, 페이지는 페이지 화면에서 지워요`,
+        `${picked.length}개를 휴지통으로 보낼까요? 각 화면의 휴지통에서 되살릴 수 있어요. 스크랩은 바로 지워지고 페이지는 페이지 화면에서 지워요`,
       )
     )
       return;

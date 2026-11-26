@@ -63,7 +63,7 @@ export function OutputSharePanel({
   }
 
   const end = (share: OutputShare) => {
-    if (!window.confirm('공유를 끌까요? 이 링크는 다시 켤 수 없고, 새로 만들면 주소가 달라져요'))
+    if (!window.confirm('공유를 끌까요? 이 링크는 다시 켤 수 없어요. 새로 만들면 주소가 달라져요'))
       return;
     void action.run(
       share.id,

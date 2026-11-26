@@ -331,7 +331,7 @@ function ScoreList({ openId }: { openId: string | null }) {
   return (
     <>
       <p className="note">
-        쓰일수록 오르고, 쓰이지 않으면 {board.data.halfLifeDays}일마다 반으로 줄어요
+        쓰일수록 오르고 쓰이지 않으면 {board.data.halfLifeDays}일마다 반으로 줄어요
       </p>
       {board.data.groups.map((g) => (
         <section key={g.categoryId ?? 'none'} className="stack" aria-label={g.name ?? '미분류'}>

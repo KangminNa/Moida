@@ -214,7 +214,7 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
     <section className="panel" aria-label="브라우저 화면">
       <b>화면</b>
       <p className="note">
-        화면을 누르면 그 자리를 클릭하고, 이어서 키보드로 치면 서버 브라우저에 들어가요 (한글 · 붙여
+        화면을 누르면 그 자리를 클릭하고 이어서 키보드로 치면 서버 브라우저에 들어가요 (한글 · 붙여
         넣기 · Enter · Tab 포함). 휠로 스크롤해요. 사이트 로그인과, 승인된 클릭이 바뀌어 누르지 못한
         것은 여기서 직접 해요
       </p>

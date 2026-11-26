@@ -161,7 +161,7 @@ export function ExternalToolPanel({
       <header className="page-head">
         <div>
           <h1>커넥터</h1>
-          <p>바깥 서비스의 MCP. 에이전트 화면에서 허락한 에이전트의 일에만 붙고, 일할 때 먼저 씀</p>
+          <p>바깥 서비스의 MCP. 에이전트 화면에서 허락한 에이전트의 일에만 붙고 일할 때 먼저 씀</p>
         </div>
         {open !== NEW && (
           <button type="button" className="cta small" onClick={() => setOpen(NEW)}>

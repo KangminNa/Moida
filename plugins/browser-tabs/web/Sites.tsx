@@ -194,7 +194,7 @@ function SiteItem({
             rows={8}
             value={instruction}
             placeholder={
-              '채울 제목과 본문을 여기에 적어 주세요.\n마지막 버튼 앞에서 멈추고, 승인하면 러너가 같은 버튼인지 확인하고 눌러요'
+              '채울 제목과 본문을 여기에 적어 주세요.\n마지막 버튼 앞에서 멈춰요. 승인하면 러너가 같은 버튼인지 확인하고 눌러요'
             }
             onChange={(e) => setInstruction(e.target.value)}
           />

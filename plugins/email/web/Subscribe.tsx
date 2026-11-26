@@ -72,7 +72,7 @@ function MailLink({ action, token }: { action: 'confirm' | 'unsubscribe'; token:
           <p className="store-desc">
             {confirm
               ? '아래 단추를 누르면 새 글 소식 메일을 받기 시작해요.'
-              : '아래 단추를 누르면 새 글 소식 메일을 그만 받고, 메일 주소를 바로 지워요.'}
+              : '아래 단추를 누르면 새 글 소식 메일을 그만 받고 메일 주소를 바로 지워요.'}
           </p>
           <button type="button" className="store-open cta" disabled={busy} onClick={go}>
             {confirm ? '구독 확인' : '구독 해지'}

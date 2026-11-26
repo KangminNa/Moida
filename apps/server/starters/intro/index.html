@@ -372,7 +372,7 @@ svg text { font-family: var(--ui); }
       <div class="mark" id="mark"><span class="mark-text">MOIDA</span><canvas id="mark-canvas"></canvas></div>
       <p class="hint" id="hint" aria-hidden="true">글자를 눌러 보세요</p>
       <p class="naming"><b>Moida</b>로 운영해요. Moida = '모이다', 흩어진 것이 한곳에 모여요.</p>
-      <h1>흩어진 AI 작업을 모아, 사이트로 운영하는 오픈소스</h1>
+      <h1>흩어진 AI 작업을 모아 사이트로 운영하는 오픈소스</h1>
       <div class="actions"><a class="btn primary" href="#try">맡겨 보기</a><a class="btn" href="#run">직접 설치하기</a></div>
       </div>
       <aside class="launcher" id="apps" aria-labelledby="apps-title">
@@ -457,7 +457,7 @@ svg text { font-family: var(--ui); }
           <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6"/></svg><b>내 규칙</b></span><span class="face back">스킬 · 지시문을 버전으로 쌓고, 버전마다 성적을 봐요</span></span></button>
           <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>검증</b></span><span class="face back">완료 조건을 먼저 정하고, 다른 일꾼이 점수 4점 넘어야 통과</span></span></button>
           <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h16"/><path d="M7 18V9M12 18V5M17 18v-6"/></svg><b>한도</b></span><span class="face back">모델 상한 · 하루 한도 · 대화마다 토큰을 내가 정하고 봐요</span></span></button>
-          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg><b>배움</b></span><span class="face back">내 피드백을 모아 대표가 배우고, 매주 팀을 점검해 제안해요</span></span></button>
+          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg><b>배움</b></span><span class="face back">수정 요청 메모가 쌓이면 대표가 모아 다음 일에 반영해요</span></span></button>
         </div>
       </div>
       <p class="cap" id="fit-cap" aria-live="polite"></p>
@@ -945,7 +945,7 @@ document.querySelectorAll('.tile').forEach((t) => t.addEventListener('click', ()
       { x: 90, y: 190, w: 110, m: [200, 40, 110], t: '나', c: 'me', say: '<b>나</b>: 대화 한 곳에서 목적만 말하고, 결과 카드를 승인해요' },
       { x: 300, y: 190, w: 150, m: [200, 140, 170], t: '대표', s: '내 기억 · 규칙', c: 'lead', say: '<b>대표</b>: 내 기억과 규칙을 들고, 일을 나누고, 받을 결과를 정해요' },
       { x: 560, y: 70, w: 160, m: [105, 260, 175], t: '일꾼', s: 'Claude · 글', c: '', say: '<b>일꾼</b>: 모두 같은 일꾼이에요. 일마다 상한 안에서 모델을 골라요' },
-      { x: 560, y: 150, w: 160, m: [295, 260, 175], t: '일꾼', s: 'Codex · 코드', c: '', say: '<b>일꾼</b>: 코드는 샌드박스 칸에서, 허용한 곳으로만 나가요' },
+      { x: 560, y: 150, w: 160, m: [295, 260, 175], t: '일꾼', s: 'Codex · 코드', c: '', say: '<b>일꾼</b>: 코드는 샌드박스에서 돌고 허용한 곳으로만 나가요' },
       { x: 560, y: 230, w: 160, m: [105, 345, 175], t: '일꾼', s: '브라우저', c: '', say: '<b>일꾼</b>: 서버 브라우저로 보고, 누르기 전에 확인을 받아요' },
       { x: 560, y: 310, w: 160, m: [295, 345, 175], t: '검토 일꾼', s: '4점 기준', c: '', say: '<b>검토 일꾼</b>: 다른 일꾼이 완료 조건마다 점수를 매겨요' },
       { x: 840, y: 190, w: 170, m: [200, 480, 190], t: '결과 카드', s: '승인 하나', c: 'lead', say: '<b>결과 카드</b>: 공개 · 전송 · 삭제는 내가 승인해야 실행돼요' },

@@ -131,7 +131,7 @@ export function LoginFields({
       {fields.length > 0 && (
         <p className="note">
           {provider && <b>{PROVIDERS[provider.provider] ?? provider.provider} 계정 · </b>}
-          <b>{origin}</b>의 로그인 칸으로만 가요. AI는 보지 않고, 어디에도 남지 않아요
+          <b>{origin}</b>의 로그인 칸으로만 가요. AI는 보지 않고 어디에도 남지 않아요
         </p>
       )}
       {fields.map((f) => {
