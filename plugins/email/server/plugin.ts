@@ -22,7 +22,7 @@ export default class EmailPlugin extends BasePlugin {
     const mail = NoticeMail.of(settings);
     const password = settings.get('password') ?? '';
     const port = Number(settings.get('port') || 465);
-    const host = (settings.get('host') ?? '').trim() || 'smtp.gmail.com';
+    const host = SmtpGateway.hostOf(settings.get('host') ?? '');
     const smtp =
       mail && password && Number.isInteger(port) && port > 0 && port < 65536
         ? new SmtpGateway(host, port, mail.from, password)

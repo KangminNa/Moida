@@ -104,6 +104,20 @@ export class SmtpGateway extends BaseGateway {
     super();
   }
 
+  /**
+   * 설정 칸의 SMTP 서버를 호스트 이름만으로 (2026-11-26): "https://mail.example.com/" · "smtps://…:465"처럼
+   * 주소째 넣어도 이름만 남긴다. 그대로 넘기면 DNS가 "https://…"를 찾다 ENOTFOUND로 실패한다
+   */
+  static hostOf(raw: string): string {
+    const name = raw
+      .trim()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+      .split(/[/?#]/)[0]
+      ?.replace(/:\d+$/, '')
+      .toLowerCase();
+    return name || 'smtp.gmail.com';
+  }
+
   /** 메일 서버가 거절한 답을 알아볼 수 있는 글로 (535: 로그인 거절) */
   static problem(code: number, text: string): Error {
     if (code === 535 || code === 534)

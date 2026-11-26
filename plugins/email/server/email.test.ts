@@ -77,6 +77,19 @@ describe('MailMessage', () => {
 });
 
 describe('SmtpGateway', () => {
+  test('SMTP 서버 칸은 주소째 넣어도 호스트 이름만 쓴다 (https:// · 경로 · 포트를 떼고, 비면 Gmail)', () => {
+    for (const raw of [
+      'mail.example.com',
+      ' https://mail.example.com ',
+      'https://Mail.Example.com/',
+      'smtps://mail.example.com:465',
+      'mail.example.com:465/x?y',
+    ])
+      assert.equal(SmtpGateway.hostOf(raw), 'mail.example.com', raw);
+    assert.equal(SmtpGateway.hostOf(''), 'smtp.gmail.com');
+    assert.equal(SmtpGateway.hostOf('https://'), 'smtp.gmail.com');
+  });
+
   test('로그인하고 한 통 보낸다: 받는 주소 · 제목 · 본문의 콘솔 링크', async () => {
     await gateway().send(
       mail.notice('승인 요청: 글 공개', '비공개 내용', '/admin/approvals'),
