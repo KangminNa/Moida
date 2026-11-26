@@ -21,7 +21,7 @@
       "dependsOn": ["platform"],
       "schemas": ["blog", "work"],
       "lookups": {
-        "provides": ["app", "community-app", "member-app"],
+        "provides": ["app", "app-id", "app-url", "community-app", "member-app"],
         "asks": ["wiki", "session", "app-holdings"]
       },
       "registries": {

@@ -22,7 +22,7 @@ export { BaseDueJob } from './base/base-due-job';
 export { BaseEntity } from './base/base-entity';
 export { BaseGateway } from './base/base-gateway';
 export { BaseHandler } from './base/base-handler';
-export { BaseJob } from './base/base-job';
+export { BaseJob, type OwnCall } from './base/base-job';
 export { BaseLogin, LoginIdentity } from './base/base-login';
 export { BaseQuery } from './base/base-query';
 export { BaseRepository } from './base/base-repository';

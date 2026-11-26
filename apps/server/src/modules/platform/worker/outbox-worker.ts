@@ -6,6 +6,7 @@ import { Database, type Listener } from '../base/database';
 import { DomainEvent } from '../base/event';
 import { Outbox } from '../base/outbox';
 import { Trace } from '../base/trace';
+import { Lookups } from '../directory/lookups';
 import { FailedEvent } from '../failed-event/failed-event';
 import { Notices } from '../notice/notices';
 import type { OutboxRow } from '../platform.tables';
@@ -65,8 +66,10 @@ export class OutboxWorker implements OnApplicationShutdown {
     leases: Leases = new Leases(),
     /** 이벤트로 도는 패키지 동작의 대화 입구 (플러그인 API 0.10): task가 등록한 것과 같은 하나 */
     chats: PluginChats = new PluginChats(),
+    /** 패키지 동작의 코어 읽기 (플러그인 API 0.13): 모듈이 등록한 것과 같은 하나 */
+    lookups: Lookups = new Lookups(),
   ) {
-    this.packages = new PackageService(db, registry, leases, chats);
+    this.packages = new PackageService(db, registry, leases, chats, lookups);
   }
 
   /** 듣기를 시작한다. 들으면(onReady) 한 번 다 돈다. 처음 듣기가 실패해도 한 번은 돌고, 듣기는 뒤에서 다시 시도된다 */
@@ -152,12 +155,21 @@ export class OutboxWorker implements OnApplicationShutdown {
     this.runningJobs.add(key);
     const trace = BaseEntity.newId();
     try {
-      await Trace.run(trace, () => scheduled.job.run());
+      await Trace.run(trace, () =>
+        scheduled.job.run((name, input) => this.own(scheduled, name, input)),
+      );
     } catch (error) {
       this.logger.warn(`${trace} ${key} 실패: ${(error as Error).message}`);
     } finally {
       this.runningJobs.delete(key);
     }
+  }
+
+  /** 기능 패키지의 반복 작업이 자기 동작을 서버 자신으로 부른다 (플러그인 API 0.13). 코어의 반복 작업에는 없다 */
+  private own(scheduled: ScheduledJob, name: string, input: object): Promise<unknown> {
+    const found = this.registry.ownOperation(scheduled.plugin, name);
+    if (!found) throw new Error(`${scheduled.plugin}에 없는 동작이에요: ${name}`);
+    return this.packages.run(new SystemActor(), found, input);
   }
 
   /** 마감 작업 하나를 돌리고 돌려준 시각에 다시 잡는다. 도는 중에 다시 깨우면 끝난 뒤 한 번 더 돈다 */

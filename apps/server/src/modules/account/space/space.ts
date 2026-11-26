@@ -1,5 +1,6 @@
 import { BaseEntity, type ColumnRules, RuleViolation, TableEntity } from '../../platform';
 import type { SpaceNew, SpaceRow } from '../account.tables';
+import type { RenameSpaceInput } from './space.input';
 import { type LoadedSpace, SpaceSettingView, SpaceView } from './space.view';
 
 // 블로그 공간 하나: 이름·소개와 사이트 주소(방문자가 들어오는 바깥 주소), 앱 연결 허용. 지금은 공간이 하나뿐이다.
@@ -41,6 +42,10 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
       [SpaceView.DESCRIPTION]: view.description || null,
       [SpaceView.SITE_URL]: view.siteUrl,
       [SpaceView.HOSTED_APPS]: view.hostedApps || null,
+      [SpaceView.TAGLINE]: view.tagline || null,
+      [SpaceView.ABOUT]: view.about || null,
+      [SpaceView.HIGHLIGHTS]: view.highlights || null,
+      [SpaceView.NAMING]: view.naming || null,
     };
   }
 
@@ -53,6 +58,19 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
   describe(description: string, siteUrl: string | null): void {
     const site = siteUrl === null ? {} : { [SpaceView.SITE_URL]: Space.address(siteUrl) };
     this.settings = { ...this.settings, [SpaceView.DESCRIPTION]: description.trim(), ...site };
+  }
+
+  /** 스토어 첫 화면의 한 줄 소개 · 소개 글 · 한눈에 · 이름의 뜻 (2026-11-26). null이면 그대로 둔다, 빈 글이면 지운다 */
+  introduce(intro: RenameSpaceInput): void {
+    const set = (key: string, value: string | null) =>
+      value === null ? {} : { [key]: value.trim() };
+    this.settings = {
+      ...this.settings,
+      ...set(SpaceView.TAGLINE, intro.tagline),
+      ...set(SpaceView.ABOUT, intro.about),
+      ...set(SpaceView.HIGHLIGHTS, intro.highlights),
+      ...set(SpaceView.NAMING, intro.naming),
+    };
   }
 
   /** 로고: platform.blobs에 저장한 그림의 해시. null이면 뺀다 (화면은 Cairn 표시로 돌아간다) */

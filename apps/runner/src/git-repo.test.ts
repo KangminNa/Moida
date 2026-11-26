@@ -59,7 +59,7 @@ describe('러너의 깨끗한 clone', () => {
     });
     const files = await repo.apply(patch, false);
     assert.deepEqual([...files].sort(), ['src/a.ts', 'src/b.bin']);
-    const head = await repo.commit('cairn: 고침\n\n요약', '코드 담당 (Cairn)');
+    const head = await repo.commit('cairn: 고침\n\n요약', '코드 담당 (Moida)');
     await repo.push(`cairn/${TASK}`, null);
     assert.equal(server.head('app', `cairn/${TASK}`), head);
     assert.equal(server.show('app', `cairn/${TASK}`, 'src/a.ts'), 'export const a = 2;\n');

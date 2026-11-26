@@ -149,7 +149,11 @@ export class PluginContext {
   addOperation(operation: Operation): void {
     const routed = [...this.manifest.api.values()].includes(operation.name);
     const tooled = [...this.manifest.tools.values()].some((t) => t.operation === operation.name);
-    if (!routed && !tooled)
+    // 반복 작업만 부르는 동작 (0.13): 서버 자신만(SYSTEM) 부를 수 있고, 반복 작업을 허락받은 패키지에만
+    const jobOnly =
+      operation.allow === Operation.SYSTEM &&
+      [...this.manifest.uses].some((u) => u.startsWith('job:'));
+    if (!routed && !tooled && !jobOnly)
       throw new Error(`목록 파일의 api · tools가 가리키지 않는 동작이에요: ${operation.name}`);
     if (routed) this.require('api');
     for (const [tool, spec] of this.manifest.tools)

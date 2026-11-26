@@ -90,7 +90,7 @@ class LoopbackCallback {
       const ok = url.searchParams.has('code');
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(
-        `<!doctype html><meta charset="utf-8"><title>Cairn</title><p>${ok ? `${kind.label}를 연결했어요. 이 창을 닫아도 돼요.` : '연결하지 못했어요. 터미널을 봐 주세요.'}</p>`,
+        `<!doctype html><meta charset="utf-8"><title>Moida</title><p>${ok ? `${kind.label}를 연결했어요. 이 창을 닫아도 돼요.` : '연결하지 못했어요. 터미널을 봐 주세요.'}</p>`,
       );
       deliver(url.searchParams);
     });

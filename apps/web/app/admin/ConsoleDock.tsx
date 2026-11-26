@@ -21,14 +21,14 @@ export function ConsoleDock({
 }) {
   return (
     <nav className="dock" aria-label="화면">
-      <a className="dock-brand" href={CHAT_HREF} title={siteName || 'Cairn'}>
+      <a className="dock-brand" href={CHAT_HREF} title={siteName || 'Moida'}>
         {logoUrl ? (
           // biome-ignore lint/performance/noImgElement: 작은 로고 하나라 Next의 이미지 최적화를 거치지 않는다
-          <img className="brand-logo" src={logoUrl} alt={siteName || 'Cairn'} />
+          <img className="brand-logo" src={logoUrl} alt={siteName || 'Moida'} />
         ) : (
           <>
             <CairnMark />
-            <span className="sr">{siteName || 'Cairn'}</span>
+            <span className="sr">{siteName || 'Moida'}</span>
           </>
         )}
       </a>

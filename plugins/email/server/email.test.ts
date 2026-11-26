@@ -50,9 +50,9 @@ after(() => smtp.close());
 describe('MailMessage', () => {
   test('긴 한국어 제목은 75자 이하 encoded-word 여러 개로 접고, 풀면 그대로다', () => {
     const subject =
-      '[Cairn] 승인 요청: 매거진 3호 발행을 기다려요 · 표지와 목차를 확인해 주세요'.repeat(2);
+      '[Moida] 승인 요청: 매거진 3호 발행을 기다려요 · 표지와 목차를 확인해 주세요'.repeat(2);
     const data = new MailMessage(USER, 'admin@mail.example', subject, '본문').render(
-      'Cairn',
+      'Moida',
       new Date(0),
     );
     const raw = data.split('\r\n\r\n')[0] ?? '';
@@ -68,7 +68,7 @@ describe('MailMessage', () => {
       RuleViolation,
     );
     const data = new MailMessage(USER, 'a@b.example', '제목\r\nBcc: x@y.example', '본문').render(
-      'Cairn',
+      'Moida',
       new Date(0),
     );
     assert.equal(header(data, 'Bcc'), '');
@@ -80,14 +80,14 @@ describe('SmtpGateway', () => {
   test('로그인하고 한 통 보낸다: 받는 주소 · 제목 · 본문의 콘솔 링크', async () => {
     await gateway().send(
       mail.notice('승인 요청: 글 공개', '비공개 내용', '/admin/approvals'),
-      'Cairn',
+      'Moida',
       new Date(),
     );
     const sent = smtp.mails.at(-1);
     assert.ok(sent);
     assert.equal(sent.from, USER);
     assert.equal(sent.to, 'admin@mail.example');
-    assert.equal(decode(header(sent.data, 'Subject')), '[Cairn] 승인 요청: 글 공개');
+    assert.equal(decode(header(sent.data, 'Subject')), '[Moida] 승인 요청: 글 공개');
     const text = body(sent.data);
     assert.match(text, /https:\/\/cairn\.example\/admin\/approvals/);
     assert.doesNotMatch(text, /비공개 내용/, '본문 싣기를 켜지 않으면 제목 · 링크만');
@@ -104,7 +104,7 @@ describe('SmtpGateway', () => {
   test('로그인 거절(535)은 앱 비밀번호를 알려 주고, 비밀번호를 오류 글에 싣지 않는다', async () => {
     const before = smtp.mails.length;
     await assert.rejects(
-      gateway('wrong-password').send(mail.test(), 'Cairn', new Date()),
+      gateway('wrong-password').send(mail.test(), 'Moida', new Date()),
       (e: Error) => {
         assert.match(e.message, /앱 비밀번호/);
         assert.doesNotMatch(e.message, /wrong-password/);
@@ -116,7 +116,7 @@ describe('SmtpGateway', () => {
 
   test('받는 사람을 거절하면 메일 서버의 번호와 글로 실패한다', async () => {
     const blocked = new NoticeMail(USER, 'nobody@blocked.example', 'https://cairn.example', false);
-    await assert.rejects(gateway().send(blocked.test(), 'Cairn', new Date()), /550/);
+    await assert.rejects(gateway().send(blocked.test(), 'Moida', new Date()), /550/);
   });
 });
 
@@ -127,12 +127,12 @@ describe('NoticeMail · NoticeSentHandler', () => {
     assert.equal(NoticeMail.of(settings({ user: USER, siteUrl: 'https://a.example' }))?.to, USER);
   });
 
-  test('링크는 이 Cairn 안의 경로만, 본문은 켰을 때만', () => {
-    const outside = body(mail.notice('제목', '', '//evil.example/x').render('Cairn', new Date()));
+  test('링크는 이 Moida 안의 경로만, 본문은 켰을 때만', () => {
+    const outside = body(mail.notice('제목', '', '//evil.example/x').render('Moida', new Date()));
     assert.match(outside, /https:\/\/cairn\.example\/admin\r\n/);
     const detailed = new NoticeMail(USER, USER, 'https://cairn.example', true);
     assert.match(
-      body(detailed.notice('제목', '자세한 글', '/admin').render('Cairn', new Date())),
+      body(detailed.notice('제목', '자세한 글', '/admin').render('Moida', new Date())),
       /자세한 글/,
     );
   });
@@ -150,6 +150,6 @@ describe('NoticeMail · NoticeSentHandler', () => {
     await new NoticeSentHandler(gateway(), mail).handle(event('platform.plugin.changed'));
     await new NoticeSentHandler(null, null).handle(event(NoticeSentHandler.TOPIC));
     assert.equal(smtp.mails.length, before + 1);
-    assert.equal(decode(header(smtp.mails.at(-1)?.data ?? '', 'Subject')), '[Cairn] 작업 실패');
+    assert.equal(decode(header(smtp.mails.at(-1)?.data ?? '', 'Subject')), '[Moida] 작업 실패');
   });
 });

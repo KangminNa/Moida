@@ -14,7 +14,7 @@ export class NewsState extends DeviceState {
   }
 
   get lines(): string[] {
-    const line = { ours: '있음', other: '사용자의 것 (Cairn 소식 없음)', none: '없음' }[
+    const line = { ours: '있음', other: '사용자의 것 (Moida 소식 없음)', none: '없음' }[
       this.statusLine
     ];
     return [
@@ -52,10 +52,10 @@ export class NewsSetup extends DeviceSetup {
     t.done(hookAdded ? '훅 · 말을 걸 때마다 팀 소식을 덧붙여요' : '훅 · 이미 있음');
     if (statusLine === 'other') {
       t.say(
-        '상태 줄이 이미 있어 그대로 뒀어요. Cairn 소식을 함께 보려면 지금 상태 줄 명령에 이 출력을 더해요:',
+        '상태 줄이 이미 있어 그대로 뒀어요. Moida 소식을 함께 보려면 지금 상태 줄 명령에 이 출력을 더해요:',
       );
       t.say(`  ${this.command('status')}`);
-    } else t.done(statusLine === 'added' ? '상태 줄 · Cairn · 진행 · 소식' : '상태 줄 · 이미 있음');
+    } else t.done(statusLine === 'added' ? '상태 줄 · Moida · 진행 · 소식' : '상태 줄 · 이미 있음');
     return hookAdded || statusLine === 'added';
   }
 

@@ -1,6 +1,6 @@
 import { SchedulesPanel } from './SchedulesPanel';
 
-export const metadata = { title: '스케줄 · Cairn', robots: { index: false } };
+export const metadata = { title: '스케줄 · Moida', robots: { index: false } };
 
 // 스케줄: 정한 시각에 작업을 만든다. 에이전트 화면에서 오면 그 에이전트가 담당인 것만 (주소의 agent).
 export default async function SchedulesPage({

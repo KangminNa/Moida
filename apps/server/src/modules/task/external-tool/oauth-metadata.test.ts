@@ -124,7 +124,7 @@ describe('동적 등록 (RFC 7591)', () => {
 
   test('공개 클라이언트로 등록하고 client_id만 쓴다', () => {
     assert.deepEqual(OAuthMetadata.registration(server, REDIRECT), {
-      client_name: 'Cairn',
+      client_name: 'Moida',
       redirect_uris: [REDIRECT],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],

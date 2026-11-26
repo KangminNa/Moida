@@ -11,7 +11,7 @@ import { SIDE_COOKIE } from './menu';
 // 콘솔은 주인만. 로그인하지 않았으면 로그인한 뒤 보던 주소로 돌아온다 (지금 주소는 proxy.ts가 머리글로 붙인다, 웹 UX U2).
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: '콘솔 · Cairn', robots: { index: false } };
+export const metadata = { title: '콘솔 · Moida', robots: { index: false } };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const [owner, space, plugins] = await Promise.all([

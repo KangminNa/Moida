@@ -82,11 +82,18 @@ export class RenameSpaceInput extends BaseRequest {
     readonly description: string,
     readonly siteUrl: string | null,
     readonly version: number,
+    /** 스토어 첫 화면의 한 줄 소개 · 소개 글 (2026-11-26). 보내지 않으면 null: 그대로 둔다 */
+    readonly tagline: string | null = null,
+    readonly about: string | null = null,
+    readonly highlights: string | null = null,
+    /** 이름의 뜻: 회사 · 팀 이름을 왜 그렇게 지었는지 짧게 */
+    readonly naming: string | null = null,
   ) {
     super();
   }
 
   static from(raw: unknown): RenameSpaceInput {
+    const given = (key: string) => (raw as Record<string, unknown> | null)?.[key] !== undefined;
     return BaseRequest.read(
       raw,
       (f) =>
@@ -95,6 +102,10 @@ export class RenameSpaceInput extends BaseRequest {
           f.optionalText('description', 300) ?? '',
           f.optionalText('siteUrl', 300),
           f.version(),
+          given('tagline') ? (f.optionalText('tagline', 120) ?? '') : null,
+          given('about') ? (f.optionalText('about', 3000) ?? '') : null,
+          given('highlights') ? (f.optionalText('highlights', 1500) ?? '') : null,
+          given('naming') ? (f.optionalText('naming', 300) ?? '') : null,
         ),
     );
   }

@@ -13,7 +13,7 @@ import { CliError, Terminal } from './terminal';
 
 // 작업하는 컴퓨터의 AI 도구를 Cairn 블로그에 연결하는 명령. 저장소에서는 `pnpm cairn …`, npm 배포 뒤에는 npx로 부른다.
 // ChatGPT·Claude 앱(웹·데스크톱 채팅)은 이 명령이 아니라 블로그 관리 화면의 기기 시트 안내를 따른다.
-const HELP = `cairn: 작업하는 컴퓨터의 AI 도구를 Cairn 블로그에 연결한다
+const HELP = `cairn: 작업하는 컴퓨터의 AI 도구를 Moida 블로그에 연결한다
 
   cairn connect <블로그 주소> [--tool claude-code|codex] [--review-with claude|codex|gemini] [--yes]
       스킬 · 검토자 넣기 + MCP 등록 + 로그인 + 연결 확인

@@ -65,6 +65,7 @@ const WEB_ROUTES = [
   'mcp',
   'oauth',
   'posts',
+  'store',
 ];
 // 콘솔(/admin)만 다른 창과의 연결을 끊는다 (Cross-Origin-Opener-Policy, 웹 보안 S2): AI가 만든 페이지 · 앱 화면은 링크를
 // 격리 밖의 새 창으로 열 수 있어(allow-popups-to-escape-sandbox), 연 쪽이 그 창(콘솔)을 가짜 화면으로 바꿔치기할 수 있다.

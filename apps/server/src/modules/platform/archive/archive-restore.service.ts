@@ -99,7 +99,7 @@ export class ArchiveRestoreService extends BaseService {
     const format = ArchiveRestoreService.formatOf(head);
     if (format > ArchiveQuery.FORMAT)
       throw new RuleViolation(
-        `더 새로운 형식이에요 (형식 ${format}, 이 Cairn은 ${ArchiveQuery.FORMAT}까지). Cairn을 올린 뒤 복원해 주세요`,
+        `더 새로운 형식이에요 (형식 ${format}, 이 Moida는 ${ArchiveQuery.FORMAT}까지). Moida를 올린 뒤 복원해 주세요`,
       );
   }
 
@@ -122,7 +122,7 @@ export class ArchiveRestoreService extends BaseService {
       for (const [name, count] of await part.existing(tx)) found.set(name, count);
     if (found.size > 0)
       throw new RuleViolation(
-        `빈 Cairn에만 복원할 수 있어요. 지금 ${ArchiveReport.describe(found)}가 있어요`,
+        `빈 Moida에만 복원할 수 있어요. 지금 ${ArchiveReport.describe(found)}가 있어요`,
       );
   }
 

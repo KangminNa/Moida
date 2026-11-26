@@ -14,7 +14,7 @@ const CAIRN_ICON = '/cairn.svg';
 export async function generateMetadata() {
   const space = await serverGet<SpaceInfo>('/api/space', true);
   return {
-    title: 'Cairn',
+    title: 'Moida',
     description: '내 서버에서 도는 Personal AI OS. AI 세션, 작업, 블로그를 한곳에서',
     icons: { icon: space?.logoUrl ?? CAIRN_ICON },
   };

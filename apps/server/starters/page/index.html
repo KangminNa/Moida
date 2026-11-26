@@ -30,8 +30,8 @@
     }
     if (app.iconUrl) document.querySelector('link[rel=icon]').href = app.iconUrl;
     var all = document.getElementById('all-apps');
-    if (data.others && data.others.length && data.site && data.site.home) {
-      all.href = data.site.home;
+    if (data.others && data.others.length && data.site && data.site.store) {
+      all.href = data.site.store;
       all.hidden = false;
     }
   })();

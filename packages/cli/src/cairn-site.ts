@@ -46,11 +46,11 @@ export class CairnSite {
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     if (!res.ok) {
       if (body && typeof body.message === 'string') throw new CliError(body.message);
-      throw new CliError(`Cairn 블로그가 아니에요: ${this.origin} (${res.status})`);
+      throw new CliError(`Moida 블로그가 아니에요: ${this.origin} (${res.status})`);
     }
     const resource = typeof body?.resource === 'string' ? body.resource : '';
     if (body?.resource_name !== 'Cairn' || !resource.endsWith('/mcp'))
-      throw new CliError(`Cairn 블로그가 아니에요: ${this.origin}`);
+      throw new CliError(`Moida 블로그가 아니에요: ${this.origin}`);
     return new SiteAddress(resource.slice(0, -'/mcp'.length), resource);
   }
 

@@ -54,7 +54,7 @@ export class Connection {
     const about = await this.request(`${origin}/.well-known/oauth-protected-resource/mcp`);
     const mcp = typeof about.resource === 'string' ? about.resource : '';
     if (about.resource_name !== 'Cairn' || !mcp.endsWith('/mcp'))
-      throw new Problem(`Cairn 블로그가 아니에요: ${origin}`);
+      throw new Problem(`Moida 블로그가 아니에요: ${origin}`);
     const site = mcp.slice(0, -'/mcp'.length);
     if (new URL(site).origin !== origin)
       throw new Problem(`블로그의 사이트 주소로 연결해 주세요: ${site}`);

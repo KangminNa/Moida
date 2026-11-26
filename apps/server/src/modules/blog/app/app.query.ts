@@ -118,6 +118,32 @@ export class AppQuery extends BaseQuery {
   }
 
   /**
+   * 다른 곳이 platform Lookups 'app-url'로 묻는 공개 앱의 바깥 주소 (2026-11-26, 플러그인 email의 새 글 링크):
+   * 확인한 도메인이면 https://<도메인>/, 아니면 /<주소> (PublicAppView의 url과 같은 규칙). 공개 앱만, 관리자도 같다
+   */
+  async urls(_actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const rows = await this.sql<Pick<AppRow, 'id' | 'slug' | 'domain' | 'domain_checked_at'>[]>`
+      SELECT id, slug, domain, domain_checked_at FROM blog.apps
+      WHERE id = ANY(${ids as string[]}::uuid[]) AND visibility = ${App.PUBLIC}`;
+    return new Map(
+      rows.map((r) => [
+        r.id,
+        r.domain && r.domain_checked_at ? `https://${r.domain}/` : `/${r.slug}`,
+      ]),
+    );
+  }
+
+  /**
+   * 다른 곳이 platform Lookups 'app-id'로 묻는 공개 앱의 id (2026-11-26, 플러그인 email의 구독 신청): 주소(slug) → id.
+   * 방문자 응답에는 앱 id를 싣지 않아 화면은 주소로 가리킨다. 공개 앱만
+   */
+  async idsBySlug(_actor: Actor, slugs: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const rows = await this.sql<Pick<AppRow, 'id' | 'slug'>[]>`
+      SELECT id, slug FROM blog.apps WHERE slug = ANY(${slugs as string[]}::text[]) AND visibility = ${App.PUBLIC}`;
+    return new Map(rows.map((r) => [r.slug, r.id]));
+  }
+
+  /**
    * 대화에서 요청한 배포 전에 빠진 점 (platform ActionChecks, 2026-11-24 blog.app.publish): 없는 앱 · 도메인을 확인하지 않은 커뮤니티.
    * 요청한 에이전트의 공간에서 찾는다. 빠진 점이 없으면 null
    */

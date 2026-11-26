@@ -122,7 +122,7 @@ describe('연결하기', () => {
     assert.equal(store.items.connection, undefined);
   });
 
-  it('Cairn이 아니거나 사이트 주소가 다르면 멈춘다', async () => {
+  it('Moida가 아니거나 사이트 주소가 다르면 멈춘다', async () => {
     await assert.rejects(
       connection(
         new MemoryStore(),
@@ -132,7 +132,7 @@ describe('연결하기', () => {
     );
     await assert.rejects(
       connection(new MemoryStore(), fakeBlog({ resource: `${SITE}/other` })).connect(SITE),
-      /Cairn 블로그가 아니에요/,
+      /Moida 블로그가 아니에요/,
     );
   });
 

@@ -1,9 +1,13 @@
 {
   "name": "email",
-  "version": "0.1.0",
-  "cairn": ">=0.12",
-  "description": "콘솔의 알림(승인 요청 · 작업 실패 · 자동화 멈춤 …)을 관리자의 메일로도 보낸다. Gmail 같은 메일 회사의 SMTP(465, TLS)로 보내고, 푸시와 같은 때 · 같은 묶음으로 간다. 메일에는 제목과 콘솔 링크만 싣고 승인은 콘솔에서 한다",
+  "version": "0.2.0",
+  "cairn": ">=0.13",
+  "description": "콘솔의 알림을 관리자 메일로 보내고, 방문자가 스토어 첫 화면에서 앱의 새 글 소식을 메일로 구독한다. Gmail 같은 메일 회사의 SMTP(465, TLS)로 보낸다. 구독은 확인 메일의 링크를 눌러야 시작되고(두 번 확인), 메일마다 해지 링크가 있다. 새 글 소식은 관리자가 콘솔(운영 › 메일 구독)에서 보내기를 눌러야 나간다",
+  "schema": "email",
   "server": "server/plugin.ts",
+  "web": {
+    "store.after": "web/Subscribe.tsx"
+  },
   "settings": {
     "host": {
       "label": "SMTP 서버",
@@ -35,7 +39,7 @@
       "help": "알림을 받을 관리자의 메일 주소. 비우면 보내는 계정으로 보내요"
     },
     "siteUrl": {
-      "label": "이 Cairn의 바깥 주소",
+      "label": "이 Moida의 바깥 주소",
       "type": "text",
       "required": true,
       "help": "메일 안 콘솔 링크의 앞부분 (예: https://blog.example.com)"
@@ -45,7 +49,46 @@
       "type": "boolean",
       "default": "false",
       "help": "끄면 제목과 링크만 보내요. 메일은 메일 회사를 거치므로 대화의 답 같은 내용은 싣지 않는 편이 안전해요"
+    },
+    "subscriptions": {
+      "label": "스토어에 구독 칸 보이기",
+      "type": "boolean",
+      "default": "false",
+      "public": true,
+      "help": "켜면 스토어 첫 화면 아래에 '새 글을 메일로 받기' 칸이 보여요. 테스트 메일이 잘 가는지 확인한 뒤 켜요"
+    },
+    "dailyMax": {
+      "label": "하루에 보내는 메일 수 상한",
+      "type": "text",
+      "default": "300",
+      "help": "구독 확인 · 새 글 소식 메일을 합친 수. Gmail은 하루 약 500통까지라 그보다 낮게 둬요"
     }
   },
-  "uses": ["event:platform.notice.sent", "action:test"]
+  "api": {
+    "POST /subscribe": "subscribe",
+    "POST /confirm/:token": "confirm",
+    "POST /unsubscribe/:token": "unsubscribe",
+    "GET /overview": "overview",
+    "POST /subscribers/:id/remove": "removeSubscriber",
+    "POST /sends/:id/start": "startSend",
+    "POST /sends/:id/cancel": "cancelSend"
+  },
+  "menu": {
+    "group": "운영",
+    "name": "메일 구독",
+    "icon": "bell",
+    "page": "web/MailPage.tsx"
+  },
+  "uses": [
+    "table",
+    "api",
+    "menu",
+    "lookup:app",
+    "lookup:app-id",
+    "lookup:app-url",
+    "event:platform.notice.sent",
+    "event:blog.post.published",
+    "job:deliver",
+    "action:test"
+  ]
 }

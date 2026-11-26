@@ -151,7 +151,7 @@ describe('브라우저 푸시 (/api/push)', () => {
     assert.match(String(got?.headers.authorization), new RegExp(`^vapid t=[^,]+, k=${publicKey}$`));
     assert.equal(got?.headers['content-encoding'], 'aes128gcm');
     assert.equal(got?.headers.ttl, String(24 * 60 * 60));
-    assert.equal(open(got?.body as Buffer, b).title, 'Cairn 알림 시험');
+    assert.equal(open(got?.body as Buffer, b).title, 'Moida 알림 시험');
 
     const missing = await api.request('POST', '/api/push/test', owner, {
       endpoint: `${origin}/push/none`,

@@ -54,7 +54,7 @@ if (!runner) {
 const guide = read(join(skillDir, 'references', 'reviewers.md'));
 const part = (title) => guide.split(/^## /m).find((s) => s.startsWith(title)) ?? '';
 const instruction = [
-  '너는 Cairn 세션 노트의 검토자다. 아래 표준 입력의 자료만 보고 검토한다. 파일을 만들거나 고치지 않는다.',
+  '너는 Moida 세션 노트의 검토자다. 아래 표준 입력의 자료만 보고 검토한다. 파일을 만들거나 고치지 않는다.',
   `## ${part('공통 규칙')}`,
   `## ${part(kind === 'fact' ? '사실 검토' : '경계 검토')}`,
   '결과는 공통 규칙의 모양으로만 쓴다.',

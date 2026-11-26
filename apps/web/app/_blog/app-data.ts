@@ -54,6 +54,6 @@ export async function appDataAnswer(
   if (answer.page !== null) return json(404, { message: '이 앱은 페이지가 화면이에요' }, ticket);
   if (!answer.data) return json(404, { message: '데이터가 없는 주소예요' }, ticket);
   const space = await serverGet<SpaceInfo>('/api/space', true);
-  const data = visitorData(answer.data, space?.name || 'Cairn', ticket);
+  const data = visitorData(answer.data, space?.name || 'Moida', ticket);
   return json(200, { data, redirect: null }, ticket);
 }

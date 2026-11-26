@@ -15,7 +15,7 @@ export async function GET(request: Request): Promise<Response> {
     serverGet<PublicAppList>('/api/apps', true),
   ]);
   if (!space || !list || !apps) return new Response('', { status: 503 });
-  const name = space.name || 'Cairn';
+  const name = space.name || 'Moida';
   const site = (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
   return rssResponse({
     title: name,

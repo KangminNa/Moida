@@ -46,7 +46,7 @@ export function InstallWizard({
       <header className="top">
         <a className="brand" href="/" aria-label="홈">
           <CairnMark />
-          Cairn
+          Moida
         </a>
       </header>
       <main className="center">
@@ -144,7 +144,7 @@ function CodeStep({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={verify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <CairnMark size={64} stack />
-      <h1>내 서버에 Cairn을 설치해요</h1>
+      <h1>내 서버에 Moida를 설치해요</h1>
       <p>
         서버를 가진 사람인지 확인할게요. 서버 로그에 나온 설치 코드를 넣어 주세요. 터미널에서{' '}
         <code>pnpm install-code</code>로도 볼 수 있어요.

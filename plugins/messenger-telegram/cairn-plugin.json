@@ -13,7 +13,7 @@
       "help": "텔레그램 @BotFather에서 /newbot으로 만든 봇의 토큰"
     },
     "siteUrl": {
-      "label": "이 Cairn의 바깥 주소",
+      "label": "이 Moida의 바깥 주소",
       "type": "text",
       "required": true,
       "help": "https://로 시작하는 주소 (예: https://blog.example.com). 텔레그램이 이 주소로 메시지를 보내고, 답장의 링크도 이 주소예요"

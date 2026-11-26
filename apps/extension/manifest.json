@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Cairn",
+  "name": "Moida",
   "version": "0.1.0",
-  "description": "웹 AI 대화를 Cairn에 모으고, 보는 페이지를 보관하거나 맡겨요",
+  "description": "웹 AI 대화를 Moida에 모으고, 보는 페이지를 보관하거나 맡겨요",
   "minimum_chrome_version": "116",
   "background": { "service_worker": "src/background.js", "type": "module" },
-  "action": { "default_title": "Cairn", "default_popup": "src/popup/popup.html" },
+  "action": { "default_title": "Moida", "default_popup": "src/popup/popup.html" },
   "permissions": ["storage", "identity", "alarms", "activeTab", "scripting"],
   "optional_host_permissions": [
     "https://*/*",

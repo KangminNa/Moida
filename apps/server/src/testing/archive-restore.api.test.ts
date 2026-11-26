@@ -35,7 +35,7 @@ function ok(res: ApiResult, status = 200): Json {
 }
 
 /** 새 DB와 새 사진 폴더로 뜬 Cairn 하나 (설치까지 끝남) */
-class Cairn {
+class Moida {
   private constructor(
     readonly database: FreshDatabase,
     readonly blobs: string,
@@ -43,7 +43,7 @@ class Cairn {
     readonly owner: TestUser,
   ) {}
 
-  static async boot(name: string): Promise<Cairn> {
+  static async boot(name: string): Promise<Moida> {
     const database = await FreshDatabase.create(`cairn_restore_${name}`);
     const blobs = await mkdtemp(join(tmpdir(), 'cairn-restore-'));
     const before = process.env.CAIRN_BLOBS_DIR;
@@ -62,7 +62,7 @@ class Cairn {
         version,
       }),
     );
-    return new Cairn(database, blobs, api, owner);
+    return new Moida(database, blobs, api, owner);
   }
 
   async close(): Promise<void> {
@@ -246,7 +246,7 @@ class Seed {
 const seed = new Seed();
 
 /** 공개·비공개 wiki, 세션, 지운 선, 공개 · 비공개 앱, 임시·공개·링크만 글, 사진까지 진짜 길로 채운다 */
-async function fill(c: Cairn): Promise<void> {
+async function fill(c: Moida): Promise<void> {
   const { api, owner } = c;
   const device = await api.connectDevice(owner, 'source-laptop');
   const tidy = await c.tidyDevice('source-tidy');
@@ -479,21 +479,21 @@ function assertSameFiles(actual: readonly ArchiveFile[], wanted: readonly Archiv
     assert.equal(file.isPrivateArea(), expected.get(file.path)?.isPrivateArea(), file.path);
 }
 
-let source: Cairn;
-let target: Cairn;
+let source: Moida;
+let target: Moida;
 let exported: readonly ArchiveFile[];
 let tampered: readonly ArchiveFile[];
-const opened: Cairn[] = [];
+const opened: Moida[] = [];
 
-const boot = async (name: string): Promise<Cairn> => {
-  const cairn = await Cairn.boot(name);
+const boot = async (name: string): Promise<Moida> => {
+  const cairn = await Moida.boot(name);
   opened.push(cairn);
   return cairn;
 };
 
 before(async () => {
-  source = await Cairn.boot('source');
-  target = await Cairn.boot('target');
+  source = await Moida.boot('source');
+  target = await Moida.boot('target');
   await fill(source);
   exported = await source.files();
   const wiki = pathOf(exported, seed.aiWiki);
@@ -559,7 +559,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
   test('더 새로운 형식은 멈춘다', async () => {
     await refuses(
       swap(exported, 'cairn.json', () => '{"format":2,"generator":"cairn"}'),
-      /더 새로운 형식이에요 \(형식 2, 이 Cairn은 1까지\)/,
+      /더 새로운 형식이에요 \(형식 2, 이 Moida는 1까지\)/,
     );
     await refuses(
       swap(exported, pathOf(exported, seed.aiWiki), (t) =>
@@ -724,7 +724,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
   });
 });
 
-describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기', () => {
+describe('왕복: 내보내기 → 빈 Moida에 복원 → 다시 내보내기', () => {
   let report: ArchiveReport;
   let again: readonly ArchiveFile[];
   let tidy: string;
@@ -793,26 +793,26 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
   });
 
   test('칸·해시·찾기용 글이 원본의 지금 판과 같다', async () => {
-    const wikis = (c: Cairn) => c.sql`
+    const wikis = (c: Moida) => c.sql`
       SELECT w.node_id, w.head_text, r.sections, r.section_hashes, r.content_hash
       FROM vault.wikis w JOIN vault.wiki_revisions r ON r.id = w.head_revision_id
       JOIN vault.nodes n ON n.id = w.node_id WHERE n.deleted_at IS NULL ORDER BY w.node_id`;
     assert.deepEqual([...(await wikis(target))], [...(await wikis(source))]);
 
-    const sessions = (c: Cairn) => c.sql`
+    const sessions = (c: Moida) => c.sql`
       SELECT s.node_id, s.head_title, s.head_text, r.sections, r.section_hashes, r.content_hash, r.body_md
       FROM vault.sessions s JOIN vault.session_revisions r ON r.id = s.head_revision_id
       WHERE s.node_id <> ${seed.tricky} ORDER BY s.node_id`;
     assert.deepEqual([...(await sessions(target))], [...(await sessions(source))]);
 
-    const posts = (c: Cairn) => c.sql`
+    const posts = (c: Moida) => c.sql`
       SELECT id, slug, status, title, excerpt, head_text, tags, align, main_wiki_id, published_at
       FROM blog.posts WHERE deleted_at IS NULL ORDER BY id`;
     assert.deepEqual([...(await posts(target))], [...(await posts(source))]);
   });
 
   test('원문과 노트 없는 세션이 돌아온다 (번호 · 내용 · 해시 · 시각, 노트를 쓴 원문 번호)', async () => {
-    const texts = (c: Cairn) => c.sql`
+    const texts = (c: Moida) => c.sql`
       SELECT id, session_id, seq, text, content_hash, created_at
       FROM vault.session_transcripts ORDER BY session_id, seq`;
     const restored = [...(await texts(target))];
@@ -822,7 +822,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
       SELECT array_agg(DISTINCT actor_type) AS kinds, bool_and(redactions IS NULL) AS clean
       FROM vault.session_transcripts`;
     assert.deepEqual([by?.kinds, by?.clean], [['system'], true]);
-    const sessions = async (c: Cairn) =>
+    const sessions = async (c: Moida) =>
       (
         await c.sql`
           SELECT node_id, head_title, head_revision_id IS NULL AS noteless, revision_count,
@@ -855,7 +855,7 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
   });
 
   test('공개 범위와 사람이 고친 표시가 돌아온다', async () => {
-    const pins = (c: Cairn) => c.sql`
+    const pins = (c: Moida) => c.sql`
       SELECT node_id, visibility, origin, pinned_sections FROM vault.wikis ORDER BY node_id`;
     const live = (await pins(source)).filter((r) =>
       [seed.openWiki, seed.privateWiki, seed.aiWiki].includes(String(r.node_id)),
@@ -868,13 +868,13 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
       SELECT pinned_sections, wiki_id FROM vault.sessions WHERE node_id = ${seed.session}`;
     assert.deepEqual(session?.pinned_sections, ['#wiki']);
     assert.equal(session?.wiki_id, seed.openWiki);
-    const categories = (c: Cairn) => c.sql`
+    const categories = (c: Moida) => c.sql`
       SELECT node_id, name, slug, color, description, sort, origin, pinned FROM vault.categories ORDER BY node_id`;
     assert.deepEqual([...(await categories(target))], [...(await categories(source))]);
   });
 
   test('선의 출처·고정·지운 흔적이 돌아온다', async () => {
-    const edges = (c: Cairn) => c.sql`
+    const edges = (c: Moida) => c.sql`
       SELECT e.id, e.src, e.dst, e.kind, e.weight, e.origin, e.pinned, e.deleted_at, e.deleted_by_type
       FROM vault.edges e
       JOIN vault.nodes a ON a.id = e.src AND a.deleted_at IS NULL
@@ -1014,9 +1014,9 @@ describe('왕복: 내보내기 → 빈 Cairn에 복원 → 다시 내보내기',
     const before = await target.rows();
     await assert.rejects(
       target.restores.preview(system, exported),
-      /빈 Cairn에만 복원할 수 있어요. 지금 카테고리 2개 · wiki 4개 · 세션 7개 · 앱 2개 · 글 5개가 있어요/,
+      /빈 Moida에만 복원할 수 있어요. 지금 카테고리 2개 · wiki 4개 · 세션 7개 · 앱 2개 · 글 5개가 있어요/,
     );
-    await assert.rejects(target.restore(exported), /빈 Cairn에만/);
+    await assert.rejects(target.restore(exported), /빈 Moida에만/);
     assert.equal(await target.rows(), before);
   });
 
@@ -1110,7 +1110,7 @@ describe('두 복원이 겹치면', () => {
     const results = await Promise.allSettled([cairn.restore(exported), cairn.restore(exported)]);
     assert.deepEqual(results.map((r) => r.status).sort(), ['fulfilled', 'rejected']);
     const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
-    assert.match(failed.reason.message, /빈 Cairn에만/);
+    assert.match(failed.reason.message, /빈 Moida에만/);
     assertSameFiles(await cairn.files(), exported);
   });
 
@@ -1304,7 +1304,7 @@ describe('다른 묶음', () => {
 });
 
 describe('cairn-admin restore (표준 입력의 zip)', () => {
-  const admin = (cairn: Cairn, args: readonly string[], input: Buffer) =>
+  const admin = (cairn: Moida, args: readonly string[], input: Buffer) =>
     spawnSync('node', ['-r', '@swc-node/register', 'src/main.cli.ts', 'restore', ...args], {
       input,
       encoding: 'utf8',
@@ -1341,7 +1341,7 @@ describe('cairn-admin restore (표준 입력의 zip)', () => {
 
     const twice = admin(cairn, ['--apply'], zip);
     assert.equal(twice.status, 1);
-    assert.match(twice.stderr, /빈 Cairn에만/);
+    assert.match(twice.stderr, /빈 Moida에만/);
   });
 });
 
@@ -1357,7 +1357,7 @@ describe('sync-github: 저장소에서 복원', () => {
   let fake: FakeGithub;
   let apiUrl: string;
 
-  const connect = async (cairn: Cairn): Promise<void> => {
+  const connect = async (cairn: Moida): Promise<void> => {
     const { api, owner } = cairn;
     ok(await api.request('POST', '/api/plugins/sync-github/enable', owner));
     ok(
@@ -1366,7 +1366,7 @@ describe('sync-github: 저장소에서 복원', () => {
       }),
     );
   };
-  const run = (cairn: Cairn, action: string) =>
+  const run = (cairn: Moida, action: string) =>
     cairn.api.request('POST', `/api/plugins/sync-github/actions/${action}`, cairn.owner);
 
   before(async () => {
@@ -1380,13 +1380,13 @@ describe('sync-github: 저장소에서 복원', () => {
   });
   after(() => fake.stop());
 
-  test('빈 Cairn의 동기화는 백업을 지우지 않고 복원을 가리킨다', async () => {
+  test('빈 Moida의 동기화는 백업을 지우지 않고 복원을 가리킨다', async () => {
     const cairn = await boot('plugin');
     await connect(cairn);
     const backup = fake.filesAt('main');
     const refused = ok(await run(cairn, 'sync-now'));
     assert.equal(refused.ok, false);
-    assert.match(String(refused.message), /비어 있는 Cairn이라 동기화를 멈췄어요/);
+    assert.match(String(refused.message), /비어 있는 Moida라 동기화를 멈췄어요/);
     assert.match(String(refused.details), /restore-preview/);
     assert.deepEqual(fake.filesAt('main'), backup);
 
@@ -1409,7 +1409,7 @@ describe('sync-github: 저장소에서 복원', () => {
 
     const twice = await run(cairn, 'restore');
     assert.equal(twice.status, 422);
-    assert.match(twice.text, /빈 Cairn에만/);
+    assert.match(twice.text, /빈 Moida에만/);
     const visitor = await cairn.api.request('POST', '/api/plugins/sync-github/actions/restore');
     assert.equal(visitor.status, 403);
   });

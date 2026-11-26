@@ -7,16 +7,25 @@ import type { SpaceRow } from '../account.tables';
 /** 공간 한 줄과 함께 읽은 설정들 (키 → 값) */
 export type LoadedSpace = SpaceRow & { settings: Readonly<Record<string, unknown>> | null };
 
-/** 대화로 바꾸는 사이트 (2026-11-15 D, get_settings site). MCP라 snake_case, 이름 · 소개만 */
+/** 설정 표의 글 값 하나 (없거나 글이 아니면 '') */
+function textOf(row: Readonly<LoadedSpace> | null, key: string): string {
+  const value = row?.settings?.[key];
+  return typeof value === 'string' ? value : '';
+}
+
+/** 대화로 바꾸는 사이트 (2026-11-15 D, get_settings site). MCP라 snake_case, 이름 · 소개 · 스토어 소개 */
 export class SpaceSettingView {
   constructor(private readonly row: Readonly<LoadedSpace>) {}
 
   toJSON() {
-    const description = this.row.settings?.[SpaceView.DESCRIPTION];
     return {
       version: this.row.version,
       name: this.row.name,
-      description: typeof description === 'string' ? description : '',
+      description: textOf(this.row, SpaceView.DESCRIPTION),
+      tagline: textOf(this.row, SpaceView.TAGLINE),
+      about: textOf(this.row, SpaceView.ABOUT),
+      highlights: textOf(this.row, SpaceView.HIGHLIGHTS),
+      naming: textOf(this.row, SpaceView.NAMING),
     };
   }
 }
@@ -26,6 +35,13 @@ export class SpaceView {
   static readonly DESCRIPTION = 'blog.description';
   static readonly SITE_URL = 'site.url';
   static readonly HOSTED_APPS = 'connect.hosted_apps';
+  /** 스토어 첫 화면의 한 줄 소개 (큰 글씨, 2026-11-26) */
+  static readonly TAGLINE = 'store.tagline';
+  /** 스토어 첫 화면의 소개 글: 회사 · 프로젝트가 무엇이고 무엇을 하려는지 (마크다운, 2026-11-26) */
+  static readonly ABOUT = 'store.about';
+  /** 스토어 첫 화면의 "한눈에": 하는 일을 한 줄에 하나씩 ("제목: 설명", 2026-11-26) */
+  static readonly HIGHLIGHTS = 'store.highlights';
+  static readonly NAMING = 'store.naming';
 
   constructor(
     private readonly row: Readonly<LoadedSpace> | null,
@@ -35,6 +51,22 @@ export class SpaceView {
 
   get description(): string {
     return this.text(SpaceView.DESCRIPTION) ?? '';
+  }
+
+  get tagline(): string {
+    return textOf(this.row, SpaceView.TAGLINE);
+  }
+
+  get about(): string {
+    return textOf(this.row, SpaceView.ABOUT);
+  }
+
+  get highlights(): string {
+    return textOf(this.row, SpaceView.HIGHLIGHTS);
+  }
+
+  get naming(): string {
+    return textOf(this.row, SpaceView.NAMING);
   }
 
   get siteUrl(): string | null {
@@ -60,6 +92,10 @@ export class SpaceView {
     return {
       name: this.row?.name ?? '',
       description: this.description,
+      tagline: this.tagline,
+      about: this.about,
+      highlights: this.highlights,
+      naming: this.naming,
       siteUrl: this.siteUrl,
       installed: this.installed,
       version: this.row?.version ?? 0,

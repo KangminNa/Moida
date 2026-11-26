@@ -80,6 +80,7 @@ export class SpaceService extends BaseService {
     const space = await this.change(actor, req.version, (space) => {
       space.edit(req.changes);
       space.describe(req.description, req.siteUrl);
+      space.introduce(req);
     });
     this.gate.stale();
     return space;

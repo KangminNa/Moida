@@ -13,10 +13,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'Cairn', body: event.data ? event.data.text() : '' };
+    data = { title: 'Moida', body: event.data ? event.data.text() : '' };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Cairn', {
+    self.registration.showNotification(data.title || 'Moida', {
       body: data.body || '',
       tag: data.tag || undefined,
       data: { link: data.link || '/admin' },

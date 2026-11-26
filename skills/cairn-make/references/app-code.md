@@ -14,7 +14,7 @@
 | 매거진의 호 하나 | `/<앱>/m/<메뉴>/<번호>` | `issue.html` |
 | 커뮤니티의 글 하나 | `/<앱>/t/<글 id>` | `topic.html` |
 | 페이지 앱의 다른 화면 | `/<앱>/<이름>` (영문 소문자 · 숫자 · `-`, `index` · `404` 빼고) | `<이름>.html` (없으면 404) |
-| 앱 안의 없는 주소 | | `404.html` (없으면 Cairn의 404) |
+| 앱 안의 없는 주소 | | `404.html` (없으면 Moida의 404) |
 
 - `index.html`은 꼭 있어야 한다. 다른 템플릿은 없어도 된다.
 - 화면의 디자인은 [design.md](design.md)의 기준(스타일 · 토큰 · 체크리스트), 글 · 지어내지 않기 규칙은 [page.md](page.md)의 "모양"과 같다. 러너가 "디자인 기준" 검사로 본다.
@@ -70,7 +70,7 @@
 | `view` | 페이지 앱의 다른 화면 | 주소의 이름 (`/<앱>/<이름>`). 그 밖은 null |
 | `title` | 모두 | 이 화면의 제목 (`<title>`에) |
 | `base` · `files` | 모두 | 앱 첫 화면 주소 · 이 묶음의 파일 주소 앞부분 |
-| `site` | 모두 | `{ name, home, loginUrl, graphUrl }` (`graphUrl`은 공개 글이 없으면 null) |
+| `site` | 모두 | `{ name, home, store, loginUrl, graphUrl }` (`graphUrl`은 공개 글이 없으면 null. "모든 앱" 링크는 `store`: 첫 화면이 앱 하나로 고정돼도 늘 앱 목록) |
 | `app` | 모두 | `{ name, description, kind, url, iconUrl, rssUrl }` (`iconUrl`이 없으면 `{{files}}/icon.svg`. `head`에 탭 아이콘 `<link rel="icon">`으로 둔다) |
 | `apps` · `others` | 모두 | 공개 앱 `[{ name, url, iconUrl, current }]`, `others`는 이 앱을 뺀 것 |
 | `menus` | 모두 | `[{ name, url, kind, active }]` |
@@ -82,7 +82,7 @@
 | `pages` | 페이지 앱 첫 화면 · 페이지 메뉴 | `[{ title, url, date, dateText }]` |
 | `isTopic` · `topic` | 커뮤니티 글 하나 | `{ title, html, url, date, dateText, edited, author: { nickname }, mine, editUrl, commentUrl, reportUrl, comments: [{ body, date, dateText, author: { nickname }, mine, reportUrl }] }` (`html`은 회원 글을 거른 HTML이라 `{{{ }}}`, 댓글 `body`는 글자라 `{{ }}`. `editUrl`은 내 글일 때만, 내 것에는 `reportUrl`이 없다) |
 | `topics` · `more` | 커뮤니티 첫 화면 | `[{ title, excerpt, url, date, dateText, author: { nickname }, comments }]` 30개씩 · 다음 쪽 `{ url }` 또는 null |
-| `community` | 커뮤니티 모든 화면 | `{ open, member: { nickname } \| null, joinUrl, loginUrl, meUrl, writeUrl }`. 회원 화면(가입 · 로그인 · 글쓰기 · 댓글 · 신고 · 내 정보)은 Cairn이 그리는 고정 화면이고 템플릿은 이 주소로 링크만 건다. 앱 도메인이 아니면(미리 보기) `open`이 거짓이고 주소는 null |
+| `community` | 커뮤니티 모든 화면 | `{ open, member: { nickname } \| null, joinUrl, loginUrl, meUrl, writeUrl }`. 회원 화면(가입 · 로그인 · 글쓰기 · 댓글 · 신고 · 내 정보)은 Moida가 그리는 고정 화면이고 템플릿은 이 주소로 링크만 건다. 앱 도메인이 아니면(미리 보기) `open`이 거짓이고 주소는 null |
 
 - `date`는 ISO 시각, `dateText`는 웹이 만든 한국어 날짜 (`2026년 11월 18일`).
 - 없는 이름은 빈 칸으로 그려진다. 러너의 검사가 약속에 없는 이름을 알려 준다.
@@ -98,7 +98,7 @@
 
 ## cairn.json (앱의 선언서)
 
-앱이 Cairn에게 바라는 것을 적는 한 장이다. 없으면 템플릿 앱이고 바깥 주소 · 회원 · 표가 없다.
+앱이 Moida에게 바라는 것을 적는 한 장이다. 없으면 템플릿 앱이고 바깥 주소 · 회원 · 표가 없다.
 
 ```json
 {
@@ -116,10 +116,10 @@
 }
 ```
 
-- `hosts`는 정확한 호스트 이름만 10개까지 (와일드카드 · IP · 포트 없이). 지시가 바깥 서비스(글꼴 · 댓글)를 요구할 때만 더한다. 지도는 `hosts`에 적지 않고 `cairn.map`을 쓴다 (아래 "지도": 지도 회사의 주소는 Cairn이 열어 준다).
+- `hosts`는 정확한 호스트 이름만 10개까지 (와일드카드 · IP · 포트 없이). 지시가 바깥 서비스(글꼴 · 댓글)를 요구할 때만 더한다. 지도는 `hosts`에 적지 않고 `cairn.map`을 쓴다 (아래 "지도": 지도 회사의 주소는 Moida가 열어 준다).
 - `members`: 가입 · 로그인을 받는다 (커뮤니티 앱은 적지 않아도 늘 받는다).
 - `permissions`: 브라우저 권한. `microphone` · `camera` · `geolocation` 가운데 쓰는 것만. 적지 않은 권한은 막힌다.
-- `theme`: Cairn이 그리는 가입 · 로그인 화면에 입힐 색(`#rrggbb`)과 로고(묶음 바로 아래의 파일 이름).
+- `theme`: Moida가 그리는 가입 · 로그인 화면에 입힐 색(`#rrggbb`)과 로고(묶음 바로 아래의 파일 이름).
 - `tables`: 이 앱의 데이터. 아래 "회원 · 데이터 · 권한".
 - 틀린 선언서는 러너의 묶음 검사에 떨어진다.
 
@@ -137,20 +137,20 @@
 | 부르는 것 | 하는 일 |
 |---|---|
 | `await cairn.me()` | `{ member: { nickname } \| null }` |
-| `cairn.login(돌아올 곳?)` · `cairn.join(돌아올 곳?)` | Cairn의 로그인 · 가입 화면으로 간다. 끝나면 돌아온다 |
+| `cairn.login(돌아올 곳?)` · `cairn.join(돌아올 곳?)` | Moida의 로그인 · 가입 화면으로 간다. 끝나면 돌아온다 |
 | `await cairn.logout()` | 로그아웃 |
 | `await cairn.from('scores').select().order('xp', 'desc').limit(10)` | `{ rows, more }`. 조건: `.eq` · `.neq` · `.gt` · `.gte` · `.lt` · `.lte`(칸, 값), 내 줄만: `.mine()`, 다음 쪽: `.offset(n)` (한 번에 100줄까지) |
 | `await cairn.from('progress').insert({ lesson: 'a1', xp: 10 })` | 줄 하나를 넣고 그 줄을 돌려준다 |
 | `await cairn.from('progress').update(id, { xp: 20 })` · `.delete(id)` | 줄 하나를 고친다 · 지운다 |
 
-- 줄마다 Cairn이 붙이는 칸: `id` · `owner`(넣은 회원) · `created_at` · `updated_at`. 이 이름은 선언하지 않는다.
+- 줄마다 Moida가 붙이는 칸: `id` · `owner`(넣은 회원) · `created_at` · `updated_at`. 이 이름은 선언하지 않는다.
 - 칸의 타입: `text`(1만 자) · `int` · `number` · `bool` · `time`(ISO 시각) · `json`(16KB). 표 20개 · 표마다 칸 30개까지. 이름은 영문 소문자로 시작하는 소문자 · 숫자 · `_`.
 - 읽기 규칙 `read`: `anyone`(누구나) · `member`(로그인한 회원) · `owner`(넣은 회원 자신) · `admin`(콘솔에서만).
 - 쓰기 규칙 `write`: `member`(회원이면 넣고, 고치기 · 지우기는 자기 줄만) · `owner`(같다: 자기 줄만) · `admin`(화면에서는 못 쓴다. 관리자가 콘솔에서, 일꾼이 승인받아 넣는다).
 - 규칙은 서버(DB의 줄 단위 규칙)가 지킨다. 화면에서 감추는 것으로 대신하지 않는다. 순위표처럼 모두가 보는 값은 따로 `read: "anyone"` 표에 둔다 (`owner` 표는 남이 읽지 못한다).
 - 표와 칸은 더하기만 한다. 칸의 타입은 바꿀 수 없다 (새 이름으로 더한다). 선언에서 뺀 표 · 칸의 데이터는 지워지지 않고 남는다.
 - 회원 한 명이 표 하나에 넣는 줄은 1,000개까지, 표 하나는 10만 줄까지다. 자주 바뀌는 값은 줄을 새로 넣지 않고 `update`로 고친다.
-- 비밀번호 · 가입 폼은 앱 코드에 두지 않는다: `cairn.login()` · `cairn.join()`이 Cairn의 화면으로 보낸다 (원칙 8).
+- 비밀번호 · 가입 폼은 앱 코드에 두지 않는다: `cairn.login()` · `cairn.join()`이 Moida의 화면으로 보낸다 (원칙 8).
 - 읽기 규칙에 맞지 않는 줄은 오류 없이 빠져서 온다 (로그인하지 않은 방문자가 `member` · `owner` 표를 읽으면 빈 목록). 쓰기가 실패하면 `Error`를 던진다 (`status` · `code` · `message`): 401은 로그인이 필요하다는 뜻이고, 남의 줄을 고치려 하면 없는 줄(404)이다.
 - 커뮤니티 앱: `cairn.community.topics(cursor?)` · `topic(id)` · `write({ title, body })` · `edit(id, { version, title, body })` · `remove(id, version)` · `comment(topicId, body)` · `removeComment(id, version)` · `report({ topicId | commentId, reason, note? })`. 글 · 댓글은 회원이 쓴 글자다: `textContent`로 넣고 `innerHTML`에 그대로 넣지 않는다 (`topic.html`만 서버가 거른 HTML이다).
 - 처음 채울 내용(레슨 · 단어 목록 같은 `write: "admin"` 표의 줄)은 앱 코드에 넣지 않는다. 답에 "넣을 줄"을 적으면 대표가 승인을 받아 넣는다. 바뀌지 않는 작은 내용은 묶음의 `data.json`에 두어도 된다.

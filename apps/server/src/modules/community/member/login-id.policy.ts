@@ -10,6 +10,7 @@ export class LoginId {
   private static readonly RESERVED_PREFIXES: readonly string[] = [
     'admin',
     'cairn',
+    'moida',
     'manager',
     'moderator',
     'official',

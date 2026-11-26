@@ -4,8 +4,8 @@ import type { MetadataRoute } from 'next';
 // 열면 콘솔로 간다. 색은 디자인의 흰 바탕 · 검은 글자와 같게 둔다 (CSS 토큰은 여기서 읽을 수 없다).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Cairn',
-    short_name: 'Cairn',
+    name: 'Moida',
+    short_name: 'Moida',
     start_url: '/admin',
     scope: '/',
     display: 'standalone',

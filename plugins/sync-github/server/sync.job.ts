@@ -35,7 +35,7 @@ export class SyncJob extends BaseJob {
     }
     const all = await this.readArchive();
     if (lineage.hasContent() && !all.some((f) => ArchiveFile.holdsContent(f.path))) {
-      return ActionResult.failed('비어 있는 Cairn이라 동기화를 멈췄어요', [
+      return ActionResult.failed('비어 있는 Moida라 동기화를 멈췄어요', [
         '그대로 맞추면 저장소의 백업이 지워져요',
         '복원: pnpm plugin sync-github restore-preview, 그다음 pnpm plugin sync-github restore',
         '일부러 비운 거라면 저장소의 보관 파일을 직접 지워 주세요',

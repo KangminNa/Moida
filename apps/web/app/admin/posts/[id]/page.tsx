@@ -9,7 +9,7 @@ import type { LinkedPost } from '../post-settings';
 // 글 편집기 (/admin/posts/new: 새 글, /admin/posts/<id>: 고쳐 쓰기). 주인만.
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: '글 쓰기 · Cairn', robots: { index: false } };
+export const metadata = { title: '글 쓰기 · Moida', robots: { index: false } };
 
 export default async function EditPost({
   params,

@@ -4,7 +4,7 @@ import { MailMessage } from './mail-message';
 // 본문은 관리자가 "알림 본문도 싣기"를 켰을 때만. 승인 단추는 두지 않는다 (승인은 콘솔에서, 원칙 7).
 export class NoticeMail {
   /** 보내는 사람 이름 */
-  static readonly NAME = 'Cairn';
+  static readonly NAME = 'Moida';
 
   constructor(
     /** 보내는 계정 */
@@ -32,7 +32,45 @@ export class NoticeMail {
     const path = /^\/(?!\/)[^\s]*$/.test(link) ? link : '/admin';
     const lines = [title, ...(this.detail && body ? ['', body] : []), '', `${this.site}${path}`];
     lines.push('', '알림 설정은 콘솔 › 설정 › 알림에서 바꿔요.');
-    return new MailMessage(this.from, this.to, `[Cairn] ${title}`, lines.join('\n'));
+    return new MailMessage(this.from, this.to, `[Moida] ${title}`, lines.join('\n'));
+  }
+
+  /** 구독 확인 메일 (두 번 확인): 스토어 화면의 확인 단추로 가는 링크. 신청하지 않았으면 무시하면 7일 뒤 지워진다 */
+  confirm(address: string, token: string, apps: readonly string[]): MailMessage {
+    const names = apps.join(', ');
+    return new MailMessage(
+      this.from,
+      address,
+      `[${names}] 구독 확인`,
+      [
+        `${names}의 새 글을 메일로 받으려면 아래 링크에서 구독을 확인해 주세요.`,
+        '',
+        `${this.site}/store?mail=confirm&token=${token}`,
+        '',
+        '신청하지 않았다면 이 메일을 무시하세요. 확인하지 않은 신청은 7일 뒤 지워져요.',
+      ].join('\n'),
+    );
+  }
+
+  /** 새 글 소식: 글 링크와 해지 링크 (본문 · 원클릭 해지 머리글 RFC 8058) */
+  post(address: string, token: string, app: string, title: string, link: string): MailMessage {
+    return new MailMessage(
+      this.from,
+      address,
+      `[${app}] ${title}`,
+      [
+        `${app}에 새 글이 올라왔어요.`,
+        '',
+        title,
+        link,
+        '',
+        `그만 받으려면: ${this.site}/store?mail=unsubscribe&token=${token}`,
+      ].join('\n'),
+      [
+        ['List-Unsubscribe', `<${this.site}/api/p/email/unsubscribe/${token}>`],
+        ['List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'],
+      ],
+    );
   }
 
   /** 설정을 마친 뒤 확인하는 메일 */
@@ -40,7 +78,7 @@ export class NoticeMail {
     return new MailMessage(
       this.from,
       this.to,
-      '[Cairn] 테스트 메일',
+      '[Moida] 테스트 메일',
       ['이 메일이 보이면 알림 메일 설정을 마쳤어요.', '', `${this.site}/admin`].join('\n'),
     );
   }

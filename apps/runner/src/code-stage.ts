@@ -252,7 +252,7 @@ export class CodeStage implements SandboxStage {
 
     const head = await repo.commit(
       [`cairn: ${this.job.title}`.slice(0, 72), '', brief || '(요약 없음)'].join('\n'),
-      `${this.job.agentName || '에이전트'} (Cairn)`,
+      `${this.job.agentName || '에이전트'} (Moida)`,
     );
     const pushed = await this.push(repo, spec.branch, signal);
     if (pushed !== null) return failed(this.clean(pushed));
@@ -340,7 +340,7 @@ export class CodeStage implements SandboxStage {
         spec.branch,
         spec.base,
         `cairn: ${this.job.title}`.slice(0, 120),
-        `${report.text()}\n\n---\nCairn 작업 ${this.job.taskId}가 연 PR이에요. 머지는 Cairn 결재 뒤에 해요.`,
+        `${report.text()}\n\n---\nMoida 작업 ${this.job.taskId}가 연 PR이에요. 머지는 Moida 결재 뒤에 해요.`,
         signal,
       );
     } catch (error) {
@@ -360,7 +360,7 @@ export class CodeStage implements SandboxStage {
       this.approval = { pullId: saved.pullId, version: saved.version, note };
       return pull;
     } catch (error) {
-      return `PR을 열었지만 Cairn에 남기지 못했어요 (${pull.url}): ${(error as Error).message}`;
+      return `PR을 열었지만 Moida에 남기지 못했어요 (${pull.url}): ${(error as Error).message}`;
     }
   }
 

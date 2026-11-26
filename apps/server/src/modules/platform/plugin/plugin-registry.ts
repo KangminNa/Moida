@@ -207,6 +207,14 @@ export class PluginRegistry {
     return this.loginMethods.find((l) => l.name === name) ?? null;
   }
 
+  /** 그 패키지의 동작 하나 (반복 작업이 자기 동작을 부를 때, 플러그인 API 0.13). 동작 중인 패키지만 */
+  ownOperation(plugin: string, name: string): PackageOperation | null {
+    return (
+      this.packageOperations.find((o) => o.manifest.name === plugin && o.operation.name === name) ??
+      null
+    );
+  }
+
   /**
    * 기능 패키지의 경로에 맞는 동작과 경로의 값(:id 등). 동작 중인 패키지만 찾는다.
    * route: 목록 파일 api의 열쇠("GET /reads/:id"), path: /api/p/<이름> 뒤의 경로

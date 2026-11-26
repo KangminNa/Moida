@@ -89,7 +89,7 @@ export function chatReportHtml(detail: ChatDetail, turn: ChatTurn, site: string)
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} · ${turn.turn}번째</title><style>${STYLE}</style></head>
 <body><article class="report">
-<p class="kicker">Cairn · 대화 결과</p>
+<p class="kicker">Moida · 대화 결과</p>
 <h1>${title}</h1>
 <p class="meta">${turn.turn}번째 회차 · ${esc(partner)} · ${esc(when)}</p>
 <h2>맡긴 일</h2><p class="ask">${esc(turn.message)}</p>

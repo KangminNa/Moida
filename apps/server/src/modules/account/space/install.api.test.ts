@@ -154,6 +154,10 @@ describe('블로그 정보', () => {
     assert.deepEqual(res.json(), {
       name: '돌무더기',
       description: '작업 기록',
+      tagline: '',
+      about: '',
+      highlights: '',
+      naming: '',
       siteUrl: 'https://blog.example.com',
       installed: true,
       version: version + 1,
@@ -173,6 +177,49 @@ describe('블로그 정보', () => {
     assert.equal(res.status, 200);
     assert.equal(res.json().description, '');
     assert.equal(res.json().siteUrl, 'https://blog.example.com');
+  });
+
+  test('스토어 소개(한 줄 · 글): 보내면 저장해 방문자도 보고, 보내지 않으면 그대로 (2026-11-26)', async () => {
+    const put = async (body: Record<string, unknown>) => {
+      const { version } = (await api.get('/api/space')).json() as { version: number };
+      const res = await api.request('PUT', '/api/space', owner, {
+        name: '돌무더기',
+        version,
+        ...body,
+      });
+      assert.equal(res.status, 200, res.text);
+      return res.json() as { tagline: string; about: string };
+    };
+    const saved = await put({
+      tagline: '  여러 사이트를 함께 운영해요 ',
+      about: '## 하는 일\n- 블로그',
+    });
+    assert.equal(saved.tagline, '여러 사이트를 함께 운영해요');
+    const seen = (await api.get('/api/space')).json() as { tagline: string; about: string };
+    assert.deepEqual(
+      [seen.tagline, seen.about],
+      ['여러 사이트를 함께 운영해요', '## 하는 일\n- 블로그'],
+    );
+    assert.equal(
+      (await put({ description: '작업 기록' })).about,
+      '## 하는 일\n- 블로그',
+      '보내지 않으면 그대로',
+    );
+    const lines = await put({ highlights: '오픈소스: 누구나 받아 쓴다\n여러 사이트: 한 서버에서' });
+    assert.equal(
+      (lines as { highlights?: string }).highlights,
+      '오픈소스: 누구나 받아 쓴다\n여러 사이트: 한 서버에서',
+    );
+    const named = await put({ naming: '모이다에서 왔다' });
+    assert.equal((named as { naming?: string }).naming, '모이다에서 왔다');
+    assert.equal((await put({ tagline: '', about: '' })).tagline, '', '빈 글이면 지운다');
+    const { version } = (await api.get('/api/space')).json() as { version: number };
+    const long = await api.request('PUT', '/api/space', owner, {
+      name: '돌무더기',
+      version,
+      tagline: 'x'.repeat(121),
+    });
+    assert.equal(long.status, 400);
   });
 
   test('주소 모양이 아니면 422, 그사이 바뀐 것을 모르고 저장하면 409', async () => {

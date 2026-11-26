@@ -149,7 +149,7 @@ export class AppManifestCheck {
     for (const [column, type] of listed) {
       if (!AppManifestCheck.NAME.test(column) || AppManifestCheck.BUILT_IN.includes(column))
         problems.push(
-          `쓸 수 없는 칸 이름이에요: ${table}.${column} (${AppManifestCheck.BUILT_IN.join(' · ')}는 Cairn이 붙여요)`,
+          `쓸 수 없는 칸 이름이에요: ${table}.${column} (${AppManifestCheck.BUILT_IN.join(' · ')}는 Moida가 붙여요)`,
         );
       else if (typeof type !== 'string' || !AppManifestCheck.TYPES.includes(type))
         problems.push(

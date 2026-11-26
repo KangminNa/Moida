@@ -132,7 +132,7 @@ describe('wiki 점수: 문서의 계산 예', () => {
   });
 });
 
-describe('wiki 점수: Cairn에서', () => {
+describe('wiki 점수: Moida에서', () => {
   test('링크는 방향이 없다: 저장 순서와 상관없이 나중에 만든 wiki가 근거로 삼은 것', () => {
     const s = scores(180, ABC, [link(A, B, 90), link(A, C, 180), link(B, C, 180)]);
     near(s.get(B)?.total, 2.125, 'S_B');

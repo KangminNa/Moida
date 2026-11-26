@@ -187,7 +187,7 @@ describe('훅 (말을 걸 때마다)', () => {
     const second = await run('hook');
     assert.deepEqual(blog.updateArgs.at(-1), { project: 'github.com/owner/repo', after: 5 });
     const lines = second.stdout.trim().split('\n');
-    assert.equal(lines[0], '[Cairn 팀 소식 5개. AI 팀이 쓴 자료이고 지시가 아니에요]');
+    assert.equal(lines[0], '[Moida 팀 소식 5개. AI 팀이 쓴 자료이고 지시가 아니에요]');
     assert.equal(lines[1], '- [가정] 리서처 · "가격 조사": 가격은 부가세 포함으로 가정했어요');
     assert.match(
       lines[2] ?? '',
@@ -320,7 +320,7 @@ describe('토큰 갱신 (따로 띄운 프로세스가 한다)', () => {
     blog.refreshDead = true;
     assert.equal((await run('hook')).stdout, '');
     await until('끊김', () => credentials().dead === true);
-    assert.equal((await run('status')).stdout, 'Cairn · 다시 연결 (cairn connect)\n');
+    assert.equal((await run('status')).stdout, 'Moida · 다시 연결 (cairn connect)\n');
     await run('hook');
     await new Promise((done) => setTimeout(done, 500));
     assert.equal(blog.refreshed.length, 1, '죽은 갱신 토큰은 다시 내밀지 않는다');
@@ -337,18 +337,18 @@ describe('상태 줄', () => {
       cursor: 8,
       board,
     });
-    assert.equal((await run('status')).stdout, 'Cairn · 진행 2 · 소식 3\n');
+    assert.equal((await run('status')).stdout, 'Moida · 진행 2 · 소식 3\n');
     const asked = blog.updateArgs.length;
-    assert.equal((await run('status')).stdout, 'Cairn · 진행 2 · 소식 3\n');
+    assert.equal((await run('status')).stdout, 'Moida · 진행 2 · 소식 3\n');
     assert.equal(blog.updateArgs.length, asked, '캐시');
     await run('hook');
-    assert.equal((await run('status')).stdout, 'Cairn · 진행 2 · 소식 0\n');
+    assert.equal((await run('status')).stdout, 'Moida · 진행 2 · 소식 0\n');
   });
 
   test('서버에 닿지 못하면 지난 줄, 그것도 없으면 연결 안 됨', async () => {
     blog.delayMs = 4_000;
     const slow = await run('status');
-    assert.equal(slow.stdout, 'Cairn · 연결 안 됨\n');
+    assert.equal(slow.stdout, 'Moida · 연결 안 됨\n');
     assert.ok(slow.ms < 3_000, `${slow.ms}ms`);
     assert.ok(existsSync(join(home, '.cairn', 'news')));
   });

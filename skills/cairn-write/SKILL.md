@@ -1,7 +1,7 @@
 ---
 name: cairn-write
 cairn-where: runner
-description: Cairn 블로그의 초안을 쓰고 주인에게 공개 결재를 올린다. 러너가 draft_post 작업을 맡겼을 때 쓴다. 소재와 저장된 세션에서 읽은 내용만으로 초안을 저장한다. 사람이 직접 부르는 스킬이 아니다.
+description: Moida 블로그의 초안을 쓰고 주인에게 공개 결재를 올린다. 러너가 draft_post 작업을 맡겼을 때 쓴다. 소재와 저장된 세션에서 읽은 내용만으로 초안을 저장한다. 사람이 직접 부르는 스킬이 아니다.
 ---
 
 # cairn-write
