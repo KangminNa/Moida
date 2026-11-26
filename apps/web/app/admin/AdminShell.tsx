@@ -38,7 +38,7 @@ export function AdminShell({
   /** 화면에 보일 이름 (정한 이름, 없으면 아이디) */
   ownerName: string;
   siteName: string;
-  /** 사이트 로고. 없으면 Cairn 표시 */
+  /** 사이트 로고. 없으면 Moida 표식 */
   logoUrl: string | null;
   /** 사이트 정보 (설정 › 사이트). 사이트 주소와 다른 주소로 열었으면 바꿀지 묻는다 */
   space: SpaceInfo | null;

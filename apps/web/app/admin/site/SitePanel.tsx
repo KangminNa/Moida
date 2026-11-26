@@ -6,7 +6,7 @@ import type { SpaceInfo } from '../../_account/types';
 import { useApps } from '../../_blog/live';
 import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
-import { CairnMark } from '../../_ui/CairnMark';
+import { MoidaMark } from '../../_ui/MoidaMark';
 import { useNotify } from '../../_ui/notify';
 import { BlogForm } from './BlogForm';
 
@@ -82,7 +82,7 @@ export function SitePanel({ space: first }: { space: SpaceInfo }) {
               // biome-ignore lint/performance/noImgElement: 작은 로고 하나라 Next의 이미지 최적화를 거치지 않는다
               <img src={space.logoUrl} alt="지금 로고" />
             ) : (
-              <CairnMark size={36} />
+              <MoidaMark size={36} />
             )}
           </div>
           <div className="plugin-head">

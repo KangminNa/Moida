@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { LoginMethod } from '../_account/types';
 import { api } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
-import { CairnMark } from '../_ui/CairnMark';
+import { MoidaMark } from '../_ui/MoidaMark';
 
 // 로그인 카드. 켜진 로그인 플러그인(GitHub 등)의 버튼이 아래에 붙는다.
 export function LoginForm({
@@ -38,13 +38,13 @@ export function LoginForm({
     <>
       <header className="top">
         <a className="brand" href="/" aria-label="홈">
-          <CairnMark />
+          <MoidaMark />
           Moida
         </a>
       </header>
       <main className="center">
         <form className="panel-card" onSubmit={submit} aria-label="로그인">
-          <CairnMark size={56} stack />
+          <MoidaMark size={56} gather />
           <h1>로그인</h1>
           <label className="field">
             <span>아이디</span>

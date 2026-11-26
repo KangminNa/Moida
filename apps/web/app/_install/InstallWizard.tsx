@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import type { Device, InstallStatus, Owner, SpaceInfo } from '../_account/types';
 import { api, describe } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
-import { CairnMark } from '../_ui/CairnMark';
+import { MoidaMark } from '../_ui/MoidaMark';
 import { useToast } from '../_ui/useToast';
 import { DevicesPanel } from '../admin/devices/DevicesPanel';
 import { PluginsPanel } from '../admin/plugins/PluginsPanel';
@@ -45,7 +45,7 @@ export function InstallWizard({
     <>
       <header className="top">
         <a className="brand" href="/" aria-label="홈">
-          <CairnMark />
+          <MoidaMark />
           Moida
         </a>
       </header>
@@ -143,7 +143,7 @@ function CodeStep({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={verify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <CairnMark size={64} stack />
+      <MoidaMark size={64} gather />
       <h1>내 서버에 Moida를 설치해요</h1>
       <p>
         서버를 가진 사람인지 확인할게요. 서버 로그에 나온 설치 코드를 넣어 주세요. 터미널에서{' '}
@@ -288,7 +288,7 @@ function DeviceStep({
 function NotOwner() {
   return (
     <>
-      <CairnMark size={64} stack />
+      <MoidaMark size={64} gather />
       <h1>이미 설치된 블로그예요</h1>
       <p>로그인하면 남은 설정(사이트 정보, 플러그인)을 이어서 할 수 있어요.</p>
       <a className="cta" href="/login?return=/install">

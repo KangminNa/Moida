@@ -5,7 +5,7 @@ import type { Consent, ConsentResult } from '../_account/types';
 import { api } from '../_lib/client-api';
 import { SCOPE_LABELS } from '../_lib/types';
 import { useAction } from '../_lib/use-action';
-import { CairnMark } from '../_ui/CairnMark';
+import { MoidaMark } from '../_ui/MoidaMark';
 
 // 기기 연결 승인 카드. 연결하면 AI 도구가 기다리는 주소로 돌아가고, 도구가 토큰을 받아 붙는다.
 // ChatGPT·Claude 앱의 연결이면 남이 만든 링크로 그 사람의 앱에 블로그를 내주지 않게 한 번 더 알린다.
@@ -40,13 +40,13 @@ export function ConsentCard({
     <>
       <header className="top">
         <a className="brand" href="/" aria-label="홈">
-          <CairnMark />
+          <MoidaMark />
           Moida
         </a>
       </header>
       <main className="center">
         <section className="panel-card" aria-label="기기 연결">
-          <CairnMark size={56} stack />
+          <MoidaMark size={56} gather />
           {consent ? (
             <>
               <h1>{consent.clientName}를 연결할까요?</h1>

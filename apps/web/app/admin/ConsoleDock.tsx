@@ -1,5 +1,5 @@
-import { CairnMark } from '../_ui/CairnMark';
 import { Icon } from '../_ui/Icon';
+import { MoidaMark } from '../_ui/MoidaMark';
 import { APPROVALS_HREF, CHAT_HREF, DOCK, SETTINGS_SECTION } from './menu';
 import { NotificationBell } from './NotificationBell';
 
@@ -27,7 +27,7 @@ export function ConsoleDock({
           <img className="brand-logo" src={logoUrl} alt={siteName || 'Moida'} />
         ) : (
           <>
-            <CairnMark />
+            <MoidaMark />
             <span className="sr">{siteName || 'Moida'}</span>
           </>
         )}
