@@ -6,10 +6,16 @@ import type { MemberMe, TopicDetail } from './types.ts';
 const OPEN = { base: '/', open: true, here: '/t/a1' };
 const PREVIEW = { base: '/town/~tk', open: false, here: '/town/~tk/t/a1' };
 const me = {
-  member: {
-    id: 'm1',
+  account: {
+    id: 'a9',
     loginId: 'reader',
     email: null,
+    joinedAt: '2026-11-19T00:00:00.000Z',
+    needs: ['email'],
+    version: 1,
+  },
+  member: {
+    id: 'm1',
     nickname: '읽는사람',
     joinedAt: '2026-11-19T00:00:00.000Z',
     writableAt: '2026-11-19T00:05:00.000Z',

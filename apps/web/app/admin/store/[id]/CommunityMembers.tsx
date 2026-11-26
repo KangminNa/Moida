@@ -20,7 +20,7 @@ const BLOCK_DAYS: readonly [number | null, string][] = [
 const DAY_MS = 86_400_000;
 const CONFLICT = '그사이 바뀌었어요. 다시 읽었어요';
 
-// 커뮤니티 › 회원: 아이디 · 닉네임 · 가입 · 마지막 접근 · 쓴 수 · 차단. 차단(기간) · 풀기 · 비밀번호 초기화.
+// 커뮤니티 › 회원: 계정의 아이디(없으면 메일) · 이 앱의 닉네임 · 참여 · 마지막 접근 · 쓴 수 · 차단. 차단(이 앱에서만, 기간) · 풀기 · 비밀번호 초기화(계정).
 // 임시 비밀번호는 초기화한 답에만 있어 이 화면에 한 번 보이고 닫으면 다시 볼 수 없다 (회원에게 직접 전한다)
 export function CommunityMembers({ appId }: { appId: string }) {
   const [cursor, setCursor] = useState<string | null>(null);
@@ -56,7 +56,11 @@ export function CommunityMembers({ appId }: { appId: string }) {
   }
 
   async function resetPassword(m: AdminMember) {
-    if (!window.confirm(`${m.nickname}의 비밀번호를 초기화할까요? 그 회원의 모든 로그인이 끝나요`))
+    if (
+      !window.confirm(
+        `${m.nickname}의 비밀번호를 초기화할까요? 이 사이트의 계정 비밀번호라 모든 앱의 로그인이 끝나요`,
+      )
+    )
       return;
     const reply = await action.run(
       `${m.id}:reset`,

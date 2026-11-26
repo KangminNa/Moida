@@ -141,10 +141,6 @@ export class ModerationController {
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<MemberResetView> {
-    const member = await this.moderation.resetPassword(
-      actor,
-      MemberDecideInput.from(appId, id, body),
-    );
-    return member.resetView();
+    return this.moderation.resetPassword(actor, MemberDecideInput.from(appId, id, body));
   }
 }

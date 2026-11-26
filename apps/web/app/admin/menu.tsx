@@ -120,6 +120,7 @@ export const MENU = [
       { href: '/admin/site', name: '사이트', icon: 'site' },
       { href: '/admin/notices', name: '알림', icon: 'bell' },
       { href: '/admin/account', name: '계정', icon: 'user' },
+      { href: '/admin/members', name: '회원 계정', icon: 'team' },
       { href: '/admin/security', name: '보안', icon: 'lock' },
     ],
   },

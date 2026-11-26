@@ -1,8 +1,13 @@
 import type {
+  AccountAdminView,
+  AccountSuspendedView,
+} from '../../../server/src/modules/community/account/account.view';
+import type {
   AppRowsView,
   AppTablesView,
 } from '../../../server/src/modules/community/data/app-data.view';
 import type {
+  AccountSelfView,
   MemberMeView,
   MemberSelfView,
 } from '../../../server/src/modules/community/member/member.view';
@@ -27,9 +32,11 @@ import type {
 
 // 커뮤니티의 응답 모양 (스토어 3-2). 서버 view에서 만든다 (web 규칙: 손으로 적지 않는다)
 
-/** GET /api/community/me: 이 브라우저의 회원 (없으면 null)과 쓰기 확인 값 */
+/** GET /api/community/me: 이 브라우저에 로그인한 스토어 계정 · 이 앱의 회원(참여 전이면 null)과 쓰기 확인 값 */
 export type MemberMe = ReturnType<MemberMeView['toJSON']>;
 export type MemberSelf = ReturnType<MemberSelfView['toJSON']>;
+/** 스토어 계정 (2026-11-26): 메일 · 아이디 · 채우지 않은 것(needs) */
+export type AccountSelf = ReturnType<AccountSelfView['toJSON']>;
 /** GET /api/community/topics */
 export type TopicList = ReturnType<TopicListView['toJSON']>;
 /** GET /api/community/topics/:id (보이는 댓글과 함께) */
@@ -53,6 +60,11 @@ export type AdminReport = AdminReportPage['items'][number];
 export type AdminMemberPage = AdminPage<AdminMemberView>;
 export type AdminMember = AdminMemberPage['items'][number];
 export type DecisionPage = AdminPage<DecisionView>;
+/** GET /api/community/admin/accounts: 공간의 스토어 계정 목록 (설정 › 회원 계정) */
+export type AccountPage = AdminPage<AccountAdminView>;
+export type AccountLine = AccountPage['items'][number];
+/** 계정 정지 · 풀기의 답 */
+export type AccountSuspended = ReturnType<AccountSuspendedView['toJSON']>;
 /** 비밀번호 초기화의 답: 임시 비밀번호는 이 응답에만 */
 export type MemberReset = ReturnType<MemberResetView['toJSON']>;
 

@@ -29,7 +29,7 @@ import {
 } from './moderation.view';
 
 /** 쓴 회원의 닉네임 · 아이디와 열린 신고 수를 더한 줄 */
-type Authored = { nickname: string; login_id: string; open_reports: number };
+type Authored = { nickname: string; login_id: string | null; open_reports: number };
 
 // 커뮤니티 관리 읽기 (스토어 3-1c): 관리자만, 기본 도메인에서. 앱은 공간의 커뮤니티 앱이어야 한다 (Lookups 'member-app': 커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3).
 // 모든 상태(가림 · 내림 · 지움 포함)를 보이고, 쓴 회원의 아이디 · 열린 신고 수 · 정할 때 쓸 version을 싣는다.
@@ -59,10 +59,11 @@ export class ModerationQuery extends BaseQuery {
         Authored & { comments: number })[]
     >`
       SELECT t.id, t.member_id, t.title, left(t.body, 400) AS body, t.state, t.hidden_by, t.created_at,
-        t.version, m.nickname, coalesce(m.login_id, m.email) AS login_id,
+        t.version, m.nickname, coalesce(a.login_id, a.email) AS login_id,
         (SELECT count(*) FROM community.reports r WHERE r.topic_id = t.id AND r.state = 'open') AS open_reports,
         (SELECT count(*) FROM community.comments c WHERE c.topic_id = t.id) AS comments
       FROM community.topics t JOIN community.members m ON m.id = t.member_id
+      LEFT JOIN community.accounts a ON a.id = m.account_id
       WHERE t.app_id = ${req.appId} ${state === null ? this.sql`` : this.sql`AND t.state = ${state}`}
         ${this.after('t', req.cursor)}
       ORDER BY t.id DESC LIMIT ${ModerationQuery.PAGE + 1}`;
@@ -90,9 +91,10 @@ export class ModerationQuery extends BaseQuery {
         Authored)[]
     >`
       SELECT t.id, t.member_id, t.title, t.body, t.state, t.hidden_by, t.revisions, t.created_at,
-        t.edited_at, t.decided_at, t.version, m.nickname, coalesce(m.login_id, m.email) AS login_id,
+        t.edited_at, t.decided_at, t.version, m.nickname, coalesce(a.login_id, a.email) AS login_id,
         (SELECT count(*) FROM community.reports r WHERE r.topic_id = t.id AND r.state = 'open') AS open_reports
       FROM community.topics t JOIN community.members m ON m.id = t.member_id
+      LEFT JOIN community.accounts a ON a.id = m.account_id
       WHERE t.app_id = ${req.appId} AND t.id = ${req.id}`;
     if (!topic) throw new NotFound('없는 글이에요');
     const comments = await this.sql<
@@ -102,9 +104,10 @@ export class ModerationQuery extends BaseQuery {
       > &
         Authored)[]
     >`
-      SELECT c.id, c.member_id, c.body, c.state, c.hidden_by, c.created_at, c.version, m.nickname, coalesce(m.login_id, m.email) AS login_id,
+      SELECT c.id, c.member_id, c.body, c.state, c.hidden_by, c.created_at, c.version, m.nickname, coalesce(a.login_id, a.email) AS login_id,
         (SELECT count(*) FROM community.reports r WHERE r.comment_id = c.id AND r.state = 'open') AS open_reports
       FROM community.comments c JOIN community.members m ON m.id = c.member_id
+      LEFT JOIN community.accounts a ON a.id = m.account_id
       WHERE c.topic_id = ${topic.id} ORDER BY c.id LIMIT ${ModerationQuery.COMMENTS}`;
     return new AdminTopicView(
       topic,
@@ -128,7 +131,7 @@ export class ModerationQuery extends BaseQuery {
         target_version: number;
         author_id: string;
         author_nickname: string;
-        author_login_id: string;
+        author_login_id: string | null;
       })[]
     >`
       SELECT r.id, r.topic_id, r.comment_id, r.reason, r.note, r.state, r.created_at, r.closed_at,
@@ -137,13 +140,14 @@ export class ModerationQuery extends BaseQuery {
         left(coalesce(c.body, t.body), 400) AS excerpt,
         coalesce(c.state, t.state) AS target_state,
         coalesce(c.version, t.version) AS target_version,
-        au.id AS author_id, au.nickname AS author_nickname, coalesce(au.login_id, au.email) AS author_login_id
+        au.id AS author_id, au.nickname AS author_nickname, coalesce(aa.login_id, aa.email) AS author_login_id
       FROM community.reports r
       JOIN community.members rep ON rep.id = r.member_id
       LEFT JOIN community.topics t ON t.id = r.topic_id
       LEFT JOIN community.comments c ON c.id = r.comment_id
       LEFT JOIN community.topics ct ON ct.id = c.topic_id
       JOIN community.members au ON au.id = coalesce(t.member_id, c.member_id)
+      LEFT JOIN community.accounts aa ON aa.id = au.account_id
       WHERE r.app_id = ${req.appId} AND r.state = ${state} ${this.after('r', req.cursor)}
       ORDER BY r.id DESC LIMIT ${ModerationQuery.PAGE + 1}`;
     return this.page(rows, (r) => new AdminReportView(r));
@@ -155,21 +159,19 @@ export class ModerationQuery extends BaseQuery {
     const rows = await this.sql<
       (Pick<
         MemberRow,
-        | 'id'
-        | 'login_id'
-        | 'nickname'
-        | 'joined_at'
-        | 'last_seen_at'
-        | 'blocked_until'
-        | 'password_changed_at'
-        | 'version'
-      > & { topics: number; comments: number })[]
+        'id' | 'nickname' | 'joined_at' | 'last_seen_at' | 'blocked_until' | 'version'
+      > & {
+        login_id: string | null;
+        password_changed_at: Date | null;
+        topics: number;
+        comments: number;
+      })[]
     >`
-      SELECT m.id, coalesce(m.login_id, m.email) AS login_id, m.nickname, m.joined_at, m.last_seen_at, m.blocked_until,
-        m.password_changed_at, m.version,
+      SELECT m.id, coalesce(a.login_id, a.email) AS login_id, m.nickname, m.joined_at, m.last_seen_at, m.blocked_until,
+        a.password_changed_at, m.version,
         (SELECT count(*) FROM community.topics t WHERE t.member_id = m.id) AS topics,
         (SELECT count(*) FROM community.comments c WHERE c.member_id = m.id) AS comments
-      FROM community.members m
+      FROM community.members m LEFT JOIN community.accounts a ON a.id = m.account_id
       WHERE m.app_id = ${req.appId} ${this.after('m', req.cursor)}
       ORDER BY m.id DESC LIMIT ${ModerationQuery.PAGE + 1}`;
     return this.page(rows, (r) => new AdminMemberView(r));

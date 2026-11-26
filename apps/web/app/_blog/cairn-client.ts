@@ -5,7 +5,7 @@ import type { MapChoice } from './map-config';
 // (앱 도메인에서는 /_/cairn.js, 기본 도메인 · 미리 보기에서는 /<앱>/_/cairn.js: <base> 덕에 같은 상대 주소다).
 // 앱은 Cairn의 주소 · 응답 모양을 직접 알지 않고 이 약속만 쓴다:
 //   cairn.open                         이 화면이 격리를 푼 화면인가 (그 앱의 도메인으로 연 공개 화면). 거짓이면 회원 · 데이터를 쓰지 못한다
-//   cairn.me()                         → { member: { nickname, … } | null }
+//   cairn.me()                         → { member: { nickname, loginId, … } | null }  (loginId: 스토어 계정의 아이디, 2026-11-26)
 //   cairn.login(돌아올 곳?) · cairn.join(돌아올 곳?) · cairn.logout()     가입 · 로그인은 Cairn의 고정 화면이 한다 (비밀번호는 앱 코드를 거치지 않는다)
 //   cairn.from('표').select().eq('칸', 값).order('칸', 'desc').limit(10)   → { rows, more }  (조건: eq neq gt gte lt lte, 내 줄만: .mine())
 //   cairn.from('표').insert({…}) · .update(id, {…}) · .delete(id)
@@ -54,7 +54,8 @@ const SOURCE = String.raw`(() => {
     if (!OPEN) return { member: null };
     const data = await call('GET', '/me');
     csrf = data.csrf || '';
-    return { member: data.member };
+    const member = data.member && Object.assign({}, data.member, { loginId: data.account && data.account.loginId });
+    return { member };
   }
   const go = (screen, back) => {
     const to = back || location.pathname + location.search;

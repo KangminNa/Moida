@@ -27,7 +27,7 @@
       "label": "SMTP 서버",
       "type": "text",
       "default": "smtp.gmail.com",
-      "help": "Gmail은 smtp.gmail.com, 네이버는 smtp.naver.com"
+      "help": "https:// 없이 이름만 (예: smtp.gmail.com, smtp.naver.com, mail.example.com)"
     },
     "port": {
       "label": "SMTP 포트",

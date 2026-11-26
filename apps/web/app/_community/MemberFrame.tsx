@@ -28,7 +28,7 @@ export function MemberFrame({
   title: string;
   children: ReactNode;
 }) {
-  const { app, member } = place;
+  const { app, account, member } = place;
   const style = themeStyle(app.theme);
   const logo = app.theme?.logo ? `/files/${encodeURIComponent(app.theme.logo)}` : null;
   return (
@@ -47,6 +47,8 @@ export function MemberFrame({
         <nav aria-label="회원">
           {member ? (
             <a href="/_/me">{member.nickname}</a>
+          ) : account ? (
+            <a href="/_/enter">참여</a>
           ) : (
             <>
               <a href="/_/login">로그인</a>

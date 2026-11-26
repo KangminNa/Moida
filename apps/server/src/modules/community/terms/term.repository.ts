@@ -21,14 +21,21 @@ export class TermRepository extends TableRepository<TermRow, Term> {
     try {
       await super.save(term);
     } catch (error) {
-      if (Database.isUniqueViolation(error, 'terms_version_key'))
+      if (
+        Database.isUniqueViolation(error, 'terms_version_key') ||
+        Database.isUniqueViolation(error, 'terms_store_version_key')
+      )
         throw new Conflict('그사이 약관의 새 버전이 올라왔어요. 다시 읽고 고쳐 주세요');
       throw error;
     }
   }
 
-  /** 앱 · 종류의 마지막(공개된) 버전 */
-  latest(appId: string, kind: TermKind): Promise<Term | null> {
-    return this.findOne({ app_id: appId, kind }, { order: ['version desc'], limit: 1 });
+  /** 앱 · 종류의 마지막(공개된) 버전 (공통 약관은 owner가 { spaceId }) */
+  latest(owner: { appId: string } | { spaceId: string }, kind: TermKind): Promise<Term | null> {
+    const where =
+      'appId' in owner
+        ? { app_id: owner.appId, kind }
+        : { app_id: null, space_id: owner.spaceId, kind };
+    return this.findOne(where, { order: ['version desc'], limit: 1 });
   }
 }

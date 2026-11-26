@@ -9,7 +9,7 @@ function loginOf(loginId: string | null): string | null {
   return !loginId || loginId.startsWith('left:') ? null : loginId;
 }
 
-function author(id: string, nickname: string, loginId: string) {
+function author(id: string, nickname: string, loginId: string | null) {
   return { id, nickname, loginId: loginOf(loginId) };
 }
 
@@ -33,20 +33,23 @@ export class MemberDecidedView {
   }
 }
 
-/** 비밀번호 초기화의 답: 임시 비밀번호는 이 응답에만 있다 (저장하지 않는다). 관리자가 회원에게 직접 전한다 */
+/**
+ * 비밀번호 초기화의 답: 임시 비밀번호는 이 응답에만 있다 (저장하지 않는다). 관리자가 회원에게 직접 전한다.
+ * 비밀번호는 그 회원의 스토어 계정의 것이라 모든 앱에 쓰인다. loginId: 계정의 아이디(없으면 메일)
+ */
 export class MemberResetView {
   constructor(
-    private readonly r: Pick<MemberRow, 'id' | 'login_id' | 'email' | 'version'>,
+    private readonly r: Pick<MemberRow, 'id' | 'version'>,
+    private readonly loginId: string | null,
     private readonly password: string,
   ) {}
 
   toJSON() {
-    const r = this.r;
     return {
-      id: r.id,
-      loginId: r.login_id ?? r.email,
+      id: this.r.id,
+      loginId: this.loginId,
       password: this.password,
-      version: r.version,
+      version: this.r.version,
     };
   }
 }
@@ -57,7 +60,7 @@ export class AdminTopicLineView {
     private readonly r: Pick<
       TopicRow,
       'id' | 'member_id' | 'title' | 'body' | 'state' | 'hidden_by' | 'created_at' | 'version'
-    > & { nickname: string; login_id: string; open_reports: number; comments: number },
+    > & { nickname: string; login_id: string | null; open_reports: number; comments: number },
   ) {}
 
   toJSON() {
@@ -83,7 +86,7 @@ export class AdminCommentView {
     private readonly r: Pick<
       CommentRow,
       'id' | 'member_id' | 'body' | 'state' | 'hidden_by' | 'created_at' | 'version'
-    > & { nickname: string; login_id: string; open_reports: number },
+    > & { nickname: string; login_id: string | null; open_reports: number },
   ) {}
 
   toJSON() {
@@ -117,7 +120,7 @@ export class AdminTopicView {
       | 'edited_at'
       | 'decided_at'
       | 'version'
-    > & { nickname: string; login_id: string; open_reports: number },
+    > & { nickname: string; login_id: string | null; open_reports: number },
     private readonly comments: readonly AdminCommentView[],
   ) {}
 
@@ -155,7 +158,7 @@ export class AdminReportView {
       target_version: number;
       author_id: string;
       author_nickname: string;
-      author_login_id: string;
+      author_login_id: string | null;
     },
   ) {}
 
@@ -187,15 +190,13 @@ export class AdminMemberView {
   constructor(
     private readonly r: Pick<
       MemberRow,
-      | 'id'
-      | 'login_id'
-      | 'nickname'
-      | 'joined_at'
-      | 'last_seen_at'
-      | 'blocked_until'
-      | 'password_changed_at'
-      | 'version'
-    > & { topics: number; comments: number },
+      'id' | 'nickname' | 'joined_at' | 'last_seen_at' | 'blocked_until' | 'version'
+    > & {
+      login_id: string | null;
+      password_changed_at: Date | null;
+      topics: number;
+      comments: number;
+    },
   ) {}
 
   toJSON() {
@@ -207,7 +208,7 @@ export class AdminMemberView {
       joinedAt: r.joined_at.toISOString(),
       lastSeenAt: r.last_seen_at?.toISOString() ?? null,
       blockedUntil: r.blocked_until?.toISOString() ?? null,
-      passwordChangedAt: r.password_changed_at.toISOString(),
+      passwordChangedAt: r.password_changed_at?.toISOString() ?? null,
       topics: Number(r.topics),
       comments: Number(r.comments),
       version: r.version,

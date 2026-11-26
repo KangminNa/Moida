@@ -244,7 +244,8 @@ describe('DB가 거른다 (행 수준 보안)', () => {
     const schema = `app_${site.appId.replaceAll('-', '')}`;
     const seen = await db.transaction(async (tx) => {
       const [me] = await tx<{ id: string }[]>`
-        SELECT id FROM community.members WHERE app_id = ${site.appId} AND email = 'ann_learner@example.com'`;
+        SELECT m.id FROM community.members m JOIN community.accounts a ON a.id = m.account_id
+        WHERE m.app_id = ${site.appId} AND a.email = 'ann_learner@example.com'`;
       await tx`SELECT set_config('cairn.member', ${me?.id ?? ''}, true)`;
       await tx.unsafe('SET LOCAL ROLE cairn_app');
       const rows = await tx.unsafe(`SELECT score FROM "${schema}"."progress"`);

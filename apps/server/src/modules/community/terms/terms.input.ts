@@ -23,7 +23,8 @@ export class TermKindInput extends BaseRequest {
  */
 export class TermPublishInput extends BaseRequest {
   private constructor(
-    readonly appId: string,
+    /** 공통 약관이면 null (관리자의 공간) */
+    readonly appId: string | null,
     readonly kind: TermKind,
     readonly version: number,
     readonly body: string,
@@ -38,6 +39,21 @@ export class TermPublishInput extends BaseRequest {
       (f) =>
         new TermPublishInput(
           f.uuid('appId'),
+          which,
+          f.integer('version', 0, 1_000_000),
+          f.text('body', 60_000),
+        ),
+    );
+  }
+
+  /** 공통 약관 (스토어, 2026-11-26): 앱 없이 관리자의 공간에 */
+  static forStore(kind: string, raw: unknown): TermPublishInput {
+    const which = TermKindInput.from(kind).kind;
+    return BaseRequest.read(
+      raw,
+      (f) =>
+        new TermPublishInput(
+          null,
           which,
           f.integer('version', 0, 1_000_000),
           f.text('body', 60_000),

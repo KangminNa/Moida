@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   type Actor,
   BaseService,
+  Conflict,
   Database,
   Lookups,
   NotFound,
@@ -12,6 +13,7 @@ import {
   SettingOutcome,
   type Sql,
 } from '../../platform';
+import { AccountRepository } from '../account/account.repository';
 import { Comment } from '../comment/comment';
 import { CommentRepository } from '../comment/comment.repository';
 import type { DecisionAction } from '../community.tables';
@@ -25,6 +27,7 @@ import { Decision } from './decision';
 import { DecisionRepository } from './decision.repository';
 import type { DecideInput, MemberDecideInput, ReportedInput } from './moderation.input';
 import { Moderation } from './moderation.policy';
+import type { MemberResetView } from './moderation.view';
 import { ModerationChange } from './moderation-change';
 import { ReviewRequest } from './review-request';
 
@@ -98,16 +101,30 @@ export class ModerationService extends BaseService {
   }
 
   /**
-   * 관리자가 비밀번호를 초기화한다: 임시 비밀번호를 만들어 해시만 저장하고 모든 로그인을 끝낸다.
-   * 임시 비밀번호는 답(Member.resetView)에 한 번만 싣는다. 해시는 느려서 트랜잭션 밖에서 만든다
+   * 관리자가 비밀번호를 초기화한다: 그 회원의 스토어 계정에 임시 비밀번호를 만들어 해시만 저장하고 모든 앱의 로그인을 끝낸다.
+   * 임시 비밀번호는 답(MemberResetView)에 한 번만 싣는다. 해시는 느려서 트랜잭션 밖에서 만든다. 잠그는 순서는 회원 → 계정
    */
-  async resetPassword(actor: Actor, req: MemberDecideInput): Promise<Member> {
+  async resetPassword(actor: Actor, req: MemberDecideInput): Promise<MemberResetView> {
     actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    await this.assertApp(actor, req.appId);
     const temporary = MemberPassword.temporary();
     const hash = await this.hasher.hash(temporary);
-    return this.onMember(actor, req, 'reset_password', (member, now) =>
-      member.resetPassword(hash, temporary, now),
-    );
+    return this.transaction(async (tx) => {
+      const members = new MemberRepository(tx);
+      const member = await members.lock(req.appId, req.id);
+      member.assertVersion(req.version);
+      if (member.accountId === null) throw new Conflict('앱에서 나간 회원이에요');
+      const accounts = new AccountRepository(tx);
+      const account = await accounts.lock(spaceId, member.accountId);
+      const now = new Date();
+      account.resetPassword(hash, now);
+      await accounts.save(account);
+      await new DecisionRepository(tx).save(
+        Decision.member(spaceId, req.appId, member.id, 'reset_password', actor.id, req.note, now),
+      );
+      return member.resetView(account.loginName, temporary);
+    });
   }
 
   private async onMember(

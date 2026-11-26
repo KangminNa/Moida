@@ -2,6 +2,38 @@
 // 표 하나에 인터페이스 하나. 칼럼 이름은 DB 그대로다.
 // <이름>New는 새 행에 꼭 적어야 하는 칸이고, 나머지는 DB가 채운다.
 
+/** community.account_sessions */
+export interface AccountSessionRow {
+  id: string;
+  token_hash: string;
+  created_at: Date;
+  expires_at: Date;
+  last_seen_at: Date | null;
+  ended_at: Date | null;
+  account_id: string;
+  app_id: string;
+}
+export type AccountSessionNew = Partial<AccountSessionRow> & Pick<AccountSessionRow, 'id' | 'token_hash' | 'expires_at' | 'account_id' | 'app_id'>;
+
+/** community.accounts */
+export interface AccountRow {
+  id: string;
+  space_id: string;
+  login_id: string | null;
+  email: string | null;
+  password_hash: string;
+  password_changed_at: Date;
+  age_confirmed_at: Date;
+  terms_version: number | null;
+  privacy_version: number | null;
+  suspended_until: Date | null;
+  joined_at: Date;
+  last_seen_at: Date | null;
+  left_at: Date | null;
+  version: number;
+}
+export type AccountNew = Partial<AccountRow> & Pick<AccountRow, 'id' | 'space_id' | 'password_hash' | 'password_changed_at' | 'age_confirmed_at'>;
+
 /** community.app_tables.read_rule (값 목록 CHECK) */
 export const APP_TABLE_READ_RULE = ['anyone', 'member', 'owner', 'admin'] as const;
 export type AppTableReadRule = (typeof APP_TABLE_READ_RULE)[number];
@@ -69,18 +101,6 @@ export interface DecisionRow {
 }
 export type DecisionNew = Partial<DecisionRow> & Pick<DecisionRow, 'id' | 'app_id' | 'action' | 'by_kind'>;
 
-/** community.member_sessions */
-export interface MemberSessionRow {
-  id: string;
-  member_id: string;
-  token_hash: string;
-  created_at: Date;
-  expires_at: Date;
-  last_seen_at: Date | null;
-  ended_at: Date | null;
-}
-export type MemberSessionNew = Partial<MemberSessionRow> & Pick<MemberSessionRow, 'id' | 'member_id' | 'token_hash' | 'expires_at'>;
-
 /** community.members */
 export interface MemberRow {
   id: string;
@@ -94,15 +114,12 @@ export interface MemberRow {
   renamed_at: Date | null;
   last_seen_at: Date | null;
   version: number;
-  login_id: string | null;
-  password_hash: string;
-  password_changed_at: Date;
   terms_version: number | null;
   privacy_version: number | null;
   left_at: Date | null;
-  email: string | null;
+  account_id: string | null;
 }
-export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at' | 'password_hash' | 'password_changed_at'>;
+export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at'>;
 
 /** community.reports.reason (값 목록 CHECK) */
 export const REPORT_REASON = ['spam', 'abuse', 'illegal', 'privacy', 'other'] as const;
@@ -135,15 +152,16 @@ export type TermByKind = (typeof TERM_BY_KIND)[number];
 /** community.terms */
 export interface TermRow {
   id: string;
-  app_id: string;
+  app_id: string | null;
   kind: TermKind;
   version: number;
   body: string;
   by_kind: TermByKind;
   by_id: string | null;
   created_at: Date;
+  space_id: string | null;
 }
-export type TermNew = Partial<TermRow> & Pick<TermRow, 'id' | 'app_id' | 'kind' | 'version' | 'body' | 'by_kind'>;
+export type TermNew = Partial<TermRow> & Pick<TermRow, 'id' | 'kind' | 'version' | 'body' | 'by_kind'>;
 
 /** community.topic_revisions */
 export interface TopicRevisionRow {

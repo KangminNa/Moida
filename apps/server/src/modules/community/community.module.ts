@@ -1,5 +1,9 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { CoreWorkers, EventCatalog, HostGate, Lookups, PasswordHasher } from '../platform';
+import { AccountAdminController, AccountController } from './account/account.api';
+import { AccountQuery } from './account/account.query';
+import { AccountService } from './account/account.service';
+import { AccountMailService } from './account/account-mail.service';
 import { CommentController } from './comment/comment.api';
 import { CommentService } from './comment/comment.service';
 import events from './community.events.json';
@@ -14,7 +18,6 @@ import { MemberGuard } from './guard/member.guard';
 import { MemberController } from './member/member.api';
 import { MemberQuery } from './member/member.query';
 import { MemberService } from './member/member.service';
-import { MemberMailService } from './member/member-mail.service';
 import { ModerationController } from './moderation/moderation.api';
 import { ModerationQuery } from './moderation/moderation.query';
 import { ModerationService } from './moderation/moderation.service';
@@ -23,7 +26,11 @@ import { ReviewQuery } from './moderation/review.query';
 import { CommunityCaseTool } from './moderation/review.tool';
 import { ReportController } from './report/report.api';
 import { ReportService } from './report/report.service';
-import { TermsAdminController, TermsController } from './terms/terms.api';
+import {
+  StoreTermsAdminController,
+  TermsAdminController,
+  TermsController,
+} from './terms/terms.api';
 import { TermsQuery } from './terms/terms.query';
 import { TermsService } from './terms/terms.service';
 import { TermsDraftGateway } from './terms/terms-draft.gateway';
@@ -39,7 +46,9 @@ import { TopicService } from './topic/topic.service';
     { provide: PasswordHasher, useValue: new PasswordHasher() },
     MemberQuery,
     MemberService,
-    MemberMailService,
+    AccountService,
+    AccountMailService,
+    AccountQuery,
     MemberGuard,
     TopicQuery,
     TopicService,
@@ -61,6 +70,7 @@ import { TopicService } from './topic/topic.service';
     { provide: TermsDraftGateway, useFactory: () => TermsDraftGateway.fromEnv() },
   ],
   controllers: [
+    AccountController,
     MemberController,
     TopicController,
     CommentController,
@@ -69,6 +79,8 @@ import { TopicService } from './topic/topic.service';
     AppDataController,
     AppDataAdminController,
     TermsController,
+    StoreTermsAdminController,
+    AccountAdminController,
     TermsAdminController,
   ],
   exports: [CommunityTools],

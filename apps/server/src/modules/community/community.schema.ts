@@ -6,6 +6,36 @@ import type { AppTableReadRule, AppTableWriteRule, CommentHiddenBy, CommentState
 
 const communitySchema = pgSchema('community');
 
+/** community.account_sessions */
+export const accountSessions = communitySchema.table('account_sessions', {
+  id: uuid('id').notNull(),
+  token_hash: text('token_hash').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+  last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
+  ended_at: timestamp('ended_at', { withTimezone: true }),
+  account_id: uuid('account_id').notNull(),
+  app_id: uuid('app_id').notNull(),
+});
+
+/** community.accounts */
+export const accounts = communitySchema.table('accounts', {
+  id: uuid('id').notNull(),
+  space_id: uuid('space_id').notNull(),
+  login_id: text('login_id'),
+  email: text('email'),
+  password_hash: text('password_hash').notNull(),
+  password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
+  age_confirmed_at: timestamp('age_confirmed_at', { withTimezone: true }).notNull(),
+  terms_version: integer('terms_version'),
+  privacy_version: integer('privacy_version'),
+  suspended_until: timestamp('suspended_until', { withTimezone: true }),
+  joined_at: timestamp('joined_at', { withTimezone: true }).notNull(),
+  last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
+  left_at: timestamp('left_at', { withTimezone: true }),
+  version: integer('version').notNull(),
+});
+
 /** community.app_tables */
 export const appTables = communitySchema.table('app_tables', {
   id: uuid('id').notNull(),
@@ -52,17 +82,6 @@ export const decisions = communitySchema.table('decisions', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
-/** community.member_sessions */
-export const memberSessions = communitySchema.table('member_sessions', {
-  id: uuid('id').notNull(),
-  member_id: uuid('member_id').notNull(),
-  token_hash: text('token_hash').notNull(),
-  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
-  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
-  last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
-  ended_at: timestamp('ended_at', { withTimezone: true }),
-});
-
 /** community.members */
 export const members = communitySchema.table('members', {
   id: uuid('id').notNull(),
@@ -76,13 +95,10 @@ export const members = communitySchema.table('members', {
   renamed_at: timestamp('renamed_at', { withTimezone: true }),
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
   version: integer('version').notNull(),
-  login_id: text('login_id'),
-  password_hash: text('password_hash').notNull(),
-  password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
   terms_version: integer('terms_version'),
   privacy_version: integer('privacy_version'),
   left_at: timestamp('left_at', { withTimezone: true }),
-  email: text('email'),
+  account_id: uuid('account_id'),
 });
 
 /** community.reports */
@@ -103,13 +119,14 @@ export const reports = communitySchema.table('reports', {
 /** community.terms */
 export const terms = communitySchema.table('terms', {
   id: uuid('id').notNull(),
-  app_id: uuid('app_id').notNull(),
+  app_id: uuid('app_id'),
   kind: text('kind').$type<TermKind>().notNull(),
   version: integer('version').notNull(),
   body: text('body').notNull(),
   by_kind: text('by_kind').$type<TermByKind>().notNull(),
   by_id: uuid('by_id'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  space_id: uuid('space_id'),
 });
 
 /** community.topic_revisions */
