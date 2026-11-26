@@ -12,7 +12,7 @@ type Props = {
   onSaved: (space: SpaceInfo) => void;
 };
 
-// 사이트 이름·소개·주소. 설치 마법사의 3단계와 콘솔의 사이트 메뉴가 함께 쓴다.
+// 사이트 이름·소개·스토어 소개(한 줄 · 글)·주소. 설치 마법사의 3단계와 콘솔의 사이트 메뉴가 함께 쓴다.
 // version을 함께 보내서, 다른 곳에서 먼저 바꿨으면 덮지 않고 알린다.
 export function BlogForm(props: Props) {
   return props.space.version > 0 ? <SpaceForm {...props} /> : <UnsavedSpaceForm {...props} />;
@@ -29,6 +29,8 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
   const save = useAction();
   const [name, setName] = useState(space.name);
   const [description, setDescription] = useState(space.description);
+  const [tagline, setTagline] = useState(space.tagline);
+  const [about, setAbout] = useState(space.about);
   const [siteUrl, setSiteUrl] = useState(space.siteUrl ?? '');
   const [version, setVersion] = useState(space.version);
 
@@ -41,7 +43,15 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
     event.preventDefault();
     const reply = await save.run(
       'save',
-      () => api<SpaceInfo>('PUT', '/api/space', { name, description, siteUrl, version }),
+      () =>
+        api<SpaceInfo>('PUT', '/api/space', {
+          name,
+          description,
+          tagline,
+          about,
+          siteUrl,
+          version,
+        }),
       { conflict: '다른 곳에서 먼저 바뀌었어요. 화면을 새로 고친 뒤 다시 저장해 주세요' },
     );
     if (!reply?.ok) return;
@@ -59,7 +69,7 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
           maxLength={80}
           required
           onChange={(e) => setName(e.target.value)}
-          placeholder="예: 개발 기록"
+          placeholder="예: 회사 이름"
         />
       </label>
       <label className="field">
@@ -71,6 +81,33 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="한두 줄로 (비워도 돼요)"
         />
+      </label>
+      <label className="field">
+        <span>한 줄 소개</span>
+        <input
+          className="input"
+          value={tagline}
+          maxLength={120}
+          onChange={(e) => setTagline(e.target.value)}
+          placeholder="예: 우리가 만드는 사이트들을 한곳에서"
+        />
+        <small>스토어 첫 화면에 크게 보여요 (비워도 돼요)</small>
+      </label>
+      <label className="field">
+        <span>회사 · 프로젝트 소개</span>
+        <textarea
+          className="input"
+          rows={6}
+          value={about}
+          maxLength={3000}
+          onChange={(e) => setAbout(e.target.value)}
+          placeholder={
+            '무엇을 하려는 곳인지, 어떤 사이트를 왜 운영하는지 (마크다운)\n\n## 하는 일\n- …'
+          }
+        />
+        <small>
+          스토어 첫 화면의 "소개"에 보여요. 마크다운으로 제목 · 목록 · 링크를 쓸 수 있어요
+        </small>
       </label>
       <label className="field">
         <span>사이트 주소</span>

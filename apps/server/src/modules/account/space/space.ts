@@ -41,6 +41,8 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
       [SpaceView.DESCRIPTION]: view.description || null,
       [SpaceView.SITE_URL]: view.siteUrl,
       [SpaceView.HOSTED_APPS]: view.hostedApps || null,
+      [SpaceView.TAGLINE]: view.tagline || null,
+      [SpaceView.ABOUT]: view.about || null,
     };
   }
 
@@ -53,6 +55,15 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
   describe(description: string, siteUrl: string | null): void {
     const site = siteUrl === null ? {} : { [SpaceView.SITE_URL]: Space.address(siteUrl) };
     this.settings = { ...this.settings, [SpaceView.DESCRIPTION]: description.trim(), ...site };
+  }
+
+  /** 스토어 첫 화면의 한 줄 소개 · 소개 글 (2026-11-26). null이면 그대로 둔다, 빈 글이면 지운다 */
+  introduce(tagline: string | null, about: string | null): void {
+    this.settings = {
+      ...this.settings,
+      ...(tagline === null ? {} : { [SpaceView.TAGLINE]: tagline.trim() }),
+      ...(about === null ? {} : { [SpaceView.ABOUT]: about.trim() }),
+    };
   }
 
   /** 로고: platform.blobs에 저장한 그림의 해시. null이면 뺀다 (화면은 Cairn 표시로 돌아간다) */
