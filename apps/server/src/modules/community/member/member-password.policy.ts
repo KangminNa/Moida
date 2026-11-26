@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { RuleViolation } from '../../platform';
 
 // 회원 비밀번호 규칙 (스토어 3-1). 관리자 비밀번호와 같이 길이로 본다: 10~200자, 숫자 · 특수문자 조합은 요구하지 않는다
-// (긴 문장형 비밀번호가 더 안전하다). 더해서 아이디 · 닉네임과 같은 값, 한 글자만 되풀이한 값,
+// (긴 문장형 비밀번호가 더 안전하다). 더해서 아이디(메일의 @ 앞) · 닉네임과 같은 값, 한 글자만 되풀이한 값,
 // 유출 목록 맨 위의 흔한 값은 받지 않는다 (찔러보기에 가장 먼저 쓰인다)
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳
 export class MemberPassword {
@@ -30,15 +30,15 @@ export class MemberPassword {
   ]);
 
   /** 규칙에 맞지 않으면 RuleViolation. 앞뒤 공백도 비밀번호의 일부다 (잘라 내지 않는다) */
-  static check(plain: string, loginId: string, nickname: string): void {
+  static check(plain: string, loginName: string, nickname: string): void {
     const length = [...plain].length;
     if (length < MemberPassword.MIN)
       throw new RuleViolation(`비밀번호는 ${MemberPassword.MIN}자 이상이어야 해요`);
     if (length > MemberPassword.MAX)
       throw new RuleViolation(`비밀번호는 ${MemberPassword.MAX}자 이하여야 해요`);
     const lower = plain.trim().toLowerCase();
-    if (lower === loginId || lower === nickname.trim().toLowerCase())
-      throw new RuleViolation('아이디 · 닉네임과 같은 비밀번호는 쓸 수 없어요');
+    if (lower === loginName || lower === nickname.trim().toLowerCase())
+      throw new RuleViolation('메일 · 아이디 · 닉네임과 같은 비밀번호는 쓸 수 없어요');
     if (new Set(lower).size === 1 || MemberPassword.COMMON.has(lower))
       throw new RuleViolation('너무 쉬운 비밀번호예요. 다른 비밀번호를 써 주세요');
   }

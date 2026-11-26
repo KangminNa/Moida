@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { Forbidden, RuleViolation, SecretBox } from '../../platform';
 import type { MemberRow } from '../community.tables';
-import { LoginId } from './login-id.policy';
 import { Member } from './member';
 import { MemberCsrf } from './member-csrf.policy';
 import { MemberPassword } from './member-password.policy';
 import { Nickname } from './nickname.policy';
 
-// 회원 규칙 (스토어 3-1, 아이디 · 비밀번호 가입): 아이디 · 비밀번호 · 닉네임, 가입 · 닉네임 바꾸기 간격 · 차단 · 비밀번호 바꾸기, 쓰기 확인 값.
+// 회원 규칙 (스토어 3-1, 메일 인증 가입 2026-11-26): 비밀번호 · 닉네임, 가입 · 닉네임 바꾸기 간격 · 차단 · 비밀번호 바꾸기, 쓰기 확인 값.
 
 const NOW = new Date('2026-11-19T00:00:00Z');
 const DAY = 86_400_000;
@@ -34,29 +33,10 @@ function row(more: Partial<MemberRow> = {}): MemberRow {
     terms_version: 1,
     privacy_version: 1,
     left_at: null,
+    email: null,
     ...more,
   };
 }
-
-describe('LoginId', () => {
-  test('앞뒤 공백을 빼고 소문자로 둔다', () => {
-    assert.equal(LoginId.clean('  Villager_01 '), 'villager_01');
-  });
-
-  test('영문 소문자로 시작하는 4~20자 (영문 · 숫자 · _)만, 운영자로 보이는 아이디는 받지 않는다', () => {
-    for (const bad of [
-      'abc',
-      'a'.repeat(21),
-      '1villager',
-      'vil-lager',
-      '마을사람',
-      'admin2',
-      'cairn_team',
-      'Support',
-    ])
-      assert.throws(() => LoginId.clean(bad), RuleViolation, bad);
-  });
-});
 
 describe('MemberPassword', () => {
   test('10~200자, 조합 규칙은 없다 (긴 문장도 된다)', () => {
@@ -107,17 +87,22 @@ describe('Nickname', () => {
 
 describe('Member', () => {
   test('가입: 만 14세 확인이 있어야 하고, 첫 로그인을 함께 연다', () => {
-    assert.throws(() => Member.join('a1', 'villager', HASH, '마을사람', false, NOW), /만 14세/);
-    const member = Member.join('a1', 'villager', HASH, '마을사람', true, NOW);
+    assert.throws(
+      () => Member.join('a1', 'v@example.com', HASH, '마을사람', false, NOW),
+      /만 14세/,
+    );
+    const member = Member.join('a1', 'v@example.com', HASH, '마을사람', true, NOW);
     assert.equal(typeof member.startedSession?.token, 'string');
     const view = member.view().toJSON() as Record<string, unknown>;
-    assert.equal(view.loginId, 'villager');
+    assert.equal(view.email, 'v@example.com');
+    assert.equal(view.loginId, null);
+    assert.equal(member.loginName, 'v');
     assert.equal('passwordHash' in view || JSON.stringify(view).includes('scrypt'), false);
     assert.equal(view.writableAt, new Date(NOW.getTime() + Member.JOIN_WAIT_MS).toISOString());
   });
 
   test('닉네임은 처음엔 바로, 그 뒤로는 7일에 한 번', () => {
-    const member = Member.join('a1', 'villager', HASH, '처음이름', true, NOW);
+    const member = Member.join('a1', 'v@example.com', HASH, '처음이름', true, NOW);
     member.rename('두번째', new Date(NOW.getTime() + DAY));
     assert.throws(() => member.rename('세번째', new Date(NOW.getTime() + 3 * DAY)), /7일에 한 번/);
     member.rename('세번째', new Date(NOW.getTime() + 9 * DAY));
@@ -129,6 +114,21 @@ describe('Member', () => {
     member.changePassword('scrypt$new', 'keep-hash', NOW);
     assert.equal(member.passwordHash, 'scrypt$new');
     assert.equal(member.sessionToKeep, 'keep-hash');
+  });
+
+  test('메일로 비밀번호를 다시 정하면 모든 로그인을 끝낸다', () => {
+    const member = Member.restore(row({ login_id: null, email: 'v@example.com' }));
+    member.setPasswordByMail('scrypt$new', NOW);
+    assert.equal(member.passwordHash, 'scrypt$new');
+    assert.equal(member.endsSessions, true);
+    assert.equal(member.sessionToKeep, null);
+  });
+
+  test('탈퇴하면 메일도 지운다', () => {
+    const member = Member.restore(row({ login_id: null, email: 'v@example.com' }));
+    member.leave(NOW);
+    assert.equal(member.loginName, 'left:m1');
+    assert.equal(member.view().toJSON().email, null);
   });
 
   test('차단 중이면 403 (날짜와 함께), 지나면 된다', () => {

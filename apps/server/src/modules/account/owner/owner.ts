@@ -176,13 +176,36 @@ export class Owner extends TableEntity<UserRow, UserNew> {
     return [...this.unlinked];
   }
 
-  /** 비밀번호를 바꾼다. keep 말고 다른 로그인은 모두 끝난다 (다른 곳에서 훔친 로그인이 있어도 끊기게) */
-  setPassword(hash: string, keep: WebSession | null, now: Date): void {
+  /**
+   * 비밀번호를 바꾼다. keep 말고 다른 로그인은 모두 끝난다 (다른 곳에서 훔친 로그인이 있어도 끊기게).
+   * via: 어디서 바꿨나 (보안 기록) — 콘솔(web) · 서버 명령줄(command) · 메일 인증코드(mail, 2026-11-26)
+   */
+  setPassword(
+    hash: string,
+    keep: WebSession | null,
+    now: Date,
+    via: 'web' | 'command' | 'mail' = keep ? 'web' : 'command',
+  ): void {
     this.put('password_hash', hash);
     this.put('password_changed_at', now);
     this.othersEnd = true;
     this.keptSession = keep?.id ?? null;
-    this.recordAccess('account.password.changed', { via: keep ? 'web' : 'command' });
+    this.recordAccess('account.password.changed', { via });
+  }
+
+  /**
+   * 로그인에 쓰는 이름을 메일로 바꾼다 (2026-11-26: 아이디로 만든 계정을 메일로 옮기기 · 다른 메일로).
+   * 그 메일로 받은 인증코드 · 지금 비밀번호는 Service가 확인한다. 로그인은 그대로 둔다
+   */
+  useEmail(email: string): void {
+    if (this.row.login === email) return;
+    this.put('login', email);
+    this.recordAccess('account.login.changed', {});
+  }
+
+  /** 로그인에 쓰는 이름이 메일인가 (메일로 비밀번호를 다시 정할 수 있는 계정) */
+  usesEmail(email: string): boolean {
+    return this.row.login === email;
   }
 
   /** 같은 비밀번호를 더 강하게 다시 저장한다. 로그인은 그대로 둔다 */

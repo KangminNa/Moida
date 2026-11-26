@@ -6,7 +6,7 @@ import { Database } from '../base/database';
 // 서버를 시작할 때 들어 있는 플러그인을 모두 읽고 검사한다. 틀리면 시작하지 않는다.
 
 /** 플러그인이 지원하는 Cairn 플러그인 API 버전 */
-const CAIRN_PLUGIN_API = '0.13';
+const CAIRN_PLUGIN_API = '0.14';
 
 /** 웹 화면 자리. 늘릴 때는 웹의 <Slot>과 문서를 함께 고친다 */
 const WEB_SLOTS: readonly string[] = ['post.after', 'task.office', 'store.after'];
@@ -19,6 +19,7 @@ const WEB_SLOTS: readonly string[] = ['post.after', 'task.office', 'store.after'
  *   archive:read  보관 형식 파일 읽기 (vault 비공개 내용 포함)
  *   archive:restore  보관 형식 파일을 빈 Cairn에 들여오기
  *   login:<이름>  로그인 방법 (예: login:github). 주인이 연결해 둔 계정으로만 로그인된다
+ *   mail          코어의 확인 메일(가입 · 비밀번호 다시 정하기의 인증코드)을 보내는 길 (provideMail, 0.14)
  * 기능 패키지 (2026-11-08): 코어를 고치지 않고 자기 표 · API · MCP 도구 · 콘솔 메뉴를 갖는다
  *   table         자기 스키마(목록 파일 schema)에 표를 만들고 쓴다. 다른 스키마에는 쓰지 않는다
  *   api           목록 파일 api의 경로를 연다 (/api/p/<이름>/…)
@@ -41,6 +42,7 @@ const USES = [
   /^archive:(?:read|restore)$/,
   /^login:[a-z][a-z0-9-]*$/,
   /^lookup:(?:app|app-id|app-url)$/,
+  /^mail$/,
 ];
 
 const SETTING_TYPES = ['text', 'secret', 'select', 'boolean'];

@@ -47,7 +47,7 @@ export function LoginForm({
           <MoidaMark size={56} gather />
           <h1>로그인</h1>
           <label className="field">
-            <span>아이디</span>
+            <span>메일</span>
             <input
               className="input"
               value={login}
@@ -83,9 +83,9 @@ export function LoginForm({
               {m.label}
             </a>
           ))}
-          <p className="label-mono">
-            비밀번호를 잊었다면 서버에서 <code>pnpm run owner reset-password</code>로 다시 정해요.
-          </p>
+          <a className="ghost wide" href={`/login/reset?return=${encodeURIComponent(returnTo)}`}>
+            비밀번호를 잊었어요
+          </a>
         </form>
       </main>
     </>

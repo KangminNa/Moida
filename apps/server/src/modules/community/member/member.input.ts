@@ -24,13 +24,26 @@ export class MemberPlace extends BaseRequest {
   }
 }
 
+/** 인증코드 받기 (가입 · 비밀번호 다시 정하기): { email }. 주소 모양은 Service가 EmailAddress로 본다 */
+export class CodeRequestInput extends BaseRequest {
+  private constructor(readonly email: string) {
+    super();
+  }
+
+  static from(raw: unknown): CodeRequestInput {
+    return BaseRequest.read(raw, (f) => new CodeRequestInput(f.text('email', 320)));
+  }
+}
+
 /**
- * 가입: { loginId, password, nickname, ageConfirmed, termsVersion, privacyVersion }. 비밀번호는 앞뒤 공백까지 그대로 받는다.
- * 아이디 · 비밀번호 · 닉네임 규칙과 만 14세 확인은 도메인(LoginId · MemberPassword · Member.join)이 본다
+ * 가입: { email, code, password, nickname, ageConfirmed, termsVersion, privacyVersion } (2026-11-26 메일 인증 가입).
+ * code는 그 메일로 받은 인증코드. 비밀번호는 앞뒤 공백까지 그대로 받는다.
+ * 코드 · 비밀번호 · 닉네임 규칙과 만 14세 확인은 도메인(VerifyCodes · MemberPassword · Member.join)이 본다
  */
 export class JoinInput extends BaseRequest {
   private constructor(
-    readonly loginId: string,
+    readonly email: string,
+    readonly code: string,
     readonly password: string,
     readonly nickname: string,
     readonly ageConfirmed: boolean,
@@ -46,13 +59,33 @@ export class JoinInput extends BaseRequest {
       raw,
       (f) =>
         new JoinInput(
-          f.text('loginId', 40),
+          f.text('email', 320),
+          f.text('code', 20),
           f.text('password', 400),
           f.text('nickname', 60),
           f.boolean('ageConfirmed'),
           f.integer('termsVersion', 1, 1_000_000),
           f.integer('privacyVersion', 1, 1_000_000),
         ),
+    );
+  }
+}
+
+/** 비밀번호 다시 정하기: { email, code, password }. code는 그 메일로 받은 인증코드 */
+export class ResetPasswordInput extends BaseRequest {
+  private constructor(
+    readonly email: string,
+    readonly code: string,
+    readonly password: string,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): ResetPasswordInput {
+    return BaseRequest.read(
+      raw,
+      (f) =>
+        new ResetPasswordInput(f.text('email', 320), f.text('code', 20), f.text('password', 400)),
     );
   }
 }
@@ -68,10 +101,13 @@ export class LeaveInput extends BaseRequest {
   }
 }
 
-/** 로그인: { loginId, password }. 아이디는 앞뒤 공백을 빼고 소문자로 찾는다 */
+/**
+ * 로그인: { login, password }. login은 메일, 메일 인증 가입 전에 만든 회원은 아이디.
+ * 앞뒤 공백을 빼고 소문자로 찾는다
+ */
 export class LoginInput extends BaseRequest {
   private constructor(
-    readonly loginId: string,
+    readonly login: string,
     readonly password: string,
   ) {
     super();
@@ -80,7 +116,7 @@ export class LoginInput extends BaseRequest {
   static from(raw: unknown): LoginInput {
     return BaseRequest.read(
       raw,
-      (f) => new LoginInput(f.text('loginId', 40).trim().toLowerCase(), f.text('password', 400)),
+      (f) => new LoginInput(f.text('login', 320).trim().toLowerCase(), f.text('password', 400)),
     );
   }
 }

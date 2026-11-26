@@ -14,6 +14,7 @@ import { MemberGuard } from './guard/member.guard';
 import { MemberController } from './member/member.api';
 import { MemberQuery } from './member/member.query';
 import { MemberService } from './member/member.service';
+import { MemberMailService } from './member/member-mail.service';
 import { ModerationController } from './moderation/moderation.api';
 import { ModerationQuery } from './moderation/moderation.query';
 import { ModerationService } from './moderation/moderation.service';
@@ -38,6 +39,7 @@ import { TopicService } from './topic/topic.service';
     { provide: PasswordHasher, useValue: new PasswordHasher() },
     MemberQuery,
     MemberService,
+    MemberMailService,
     MemberGuard,
     TopicQuery,
     TopicService,

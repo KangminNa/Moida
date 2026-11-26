@@ -12,8 +12,10 @@ export class PasswordPolicy {
         ? `${PasswordPolicy.MIN}자 이상이어야 해요`
         : plain.length > PasswordPolicy.MAX
           ? `${PasswordPolicy.MAX}자 이하여야 해요`
-          : plain.trim().toLowerCase() === login.toLowerCase()
-            ? '아이디와 같은 비밀번호는 쓸 수 없어요'
+          : [login.toLowerCase(), login.toLowerCase().split('@')[0]].includes(
+                plain.trim().toLowerCase(),
+              )
+            ? '메일 · 아이디와 같은 비밀번호는 쓸 수 없어요'
             : null;
     if (problem) throw new InvalidRequest(new Map([[field, problem]]));
   }

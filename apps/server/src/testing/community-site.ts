@@ -2,12 +2,31 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Database, OutboxWorker, ZipFile } from '../modules/platform';
 import { type ApiClient, type ApiResult, TestUser } from './api-client';
+import { TestMailbox } from './test-mailbox';
 
 // 커뮤니티 API 테스트 도구 (스토어 3-1): 공개된 커뮤니티 앱 하나와 그 도메인, 그 도메인으로 보내는 요청, 회원 만들기.
 // 가입 제한이 곳(IP)마다라 가입마다 X-Forwarded-For로 다른 곳을 싣는다 (테스트는 앞단 프록시로 믿는 127.0.0.1에서 온다).
 // 쓰기는 이 도메인의 화면에서 보낸 것처럼 Origin과 그 회원의 CSRF 값을 붙인다
 export class CommunitySite {
   private static places = 0;
+  /** 띄운 서버마다 메일함 하나 (인증코드를 받는다) */
+  private static readonly boxes = new WeakMap<ApiClient, TestMailbox>();
+  /** 가입 비밀번호 (회원 테스트가 로그인할 때 쓴다) */
+  static readonly PASSWORD = '오늘은 비가 와서 집에 있다';
+
+  /** 이 서버의 테스트 메일함 (처음 부르면 붙인다) */
+  static mailbox(api: ApiClient): TestMailbox {
+    const found = CommunitySite.boxes.get(api);
+    if (found) return found;
+    const box = TestMailbox.install(api);
+    CommunitySite.boxes.set(api, box);
+    return box;
+  }
+
+  /** 회원 테스트의 메일 주소 (이름 → 이름@example.com) */
+  static emailOf(name: string): string {
+    return `${name.toLowerCase()}@example.com`;
+  }
   /** 도메인을 연결하지 않은 앱에 버전만 올려 보는 도구 (deploy만 쓴다) */
   static readonly Probe = class extends CommunitySite {
     constructor(api: ApiClient, appId: string) {
@@ -175,28 +194,58 @@ export class CommunitySite {
   }
 
   /**
-   * 가입한 회원의 브라우저. ready면 가입 직후 대기(5분)가 지난 것처럼 가입한 때를 앞으로 당긴다
-   * (테스트에서 5분을 기다리지 않으려고 DB에 바로 쓴다)
+   * 가입한 회원의 브라우저 (메일 인증 가입: 코드 받기 → 테스트 메일함의 코드로 가입). 메일은 emailOf(name).
+   * ready면 가입 직후 대기(5분)가 지난 것처럼 가입한 때를 앞으로 당긴다 (테스트에서 5분을 기다리지 않으려고 DB에 바로 쓴다)
    */
-  async member(loginId: string, nickname: string, ready = true): Promise<TestUser> {
-    CommunitySite.places += 1;
-    const n = CommunitySite.places;
-    const res = await this.at('/api/community/join', {
-      method: 'POST',
-      body: {
-        loginId,
-        password: '오늘은 비가 와서 집에 있다',
-        nickname,
-        ageConfirmed: true,
-        ...CommunitySite.AGREED,
-      },
-      headers: { 'x-forwarded-for': `10.30.${Math.floor(n / 250)}.${(n % 250) + 1}` },
+  async member(name: string, nickname: string, ready = true): Promise<TestUser> {
+    const res = await CommunitySite.join(this.api, this.host, {
+      email: CommunitySite.emailOf(name),
+      nickname,
     });
     assert.equal(res.status, 201, res.text);
     if (ready)
       await this.api.service(Database).sql`
         UPDATE community.members SET joined_at = joined_at - interval '10 minutes'
-        WHERE app_id = ${this.appId} AND login_id = ${loginId}`;
+        WHERE app_id = ${this.appId} AND email = ${CommunitySite.emailOf(name)}`;
     return new TestUser(res.cookies());
+  }
+
+  /** 가입 시도 한 번: 그 메일로 코드를 받고(받지 못하면 code로 준 값) 가입한다. 곳(IP)은 매번 다르게 (가입 제한) */
+  static async join(
+    api: ApiClient,
+    host: string,
+    body: { email: string; code?: string; [key: string]: unknown },
+    ip = CommunitySite.nextPlace(),
+  ): Promise<ApiResult> {
+    const box = CommunitySite.mailbox(api);
+    const headers = { origin: `http://${host}`, 'x-forwarded-for': ip };
+    let code = body.code;
+    if (code === undefined) {
+      const sent = await api.viaHost('/api/community/join/code', host, {
+        method: 'POST',
+        body: { email: body.email },
+        headers,
+      });
+      assert.equal(sent.status, 204, sent.text);
+      code = box.codeFor(String(body.email).trim().toLowerCase());
+    }
+    return api.viaHost('/api/community/join', host, {
+      method: 'POST',
+      body: {
+        password: CommunitySite.PASSWORD,
+        ageConfirmed: true,
+        ...CommunitySite.AGREED,
+        ...body,
+        code,
+      },
+      headers,
+    });
+  }
+
+  /** 가입마다 다른 곳 (가입 · 코드 보내기 제한이 곳마다라서) */
+  static nextPlace(): string {
+    CommunitySite.places += 1;
+    const n = CommunitySite.places;
+    return `10.30.${Math.floor(n / 250)}.${(n % 250) + 1}`;
   }
 }

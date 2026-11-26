@@ -1,7 +1,7 @@
 # community 모듈
 
 ## 하는 일
-스토어 3단계 커뮤니티 ([docs/스토어.md](../../../../../docs/스토어.md) 11장, 인터페이스 11.5): 앱 도메인의 방문자가 아이디 · 비밀번호로 회원이 되어 글 · 댓글을 쓰고 신고한다.
+스토어 3단계 커뮤니티 ([docs/스토어.md](../../../../../docs/스토어.md) 11장, 인터페이스 11.5): 앱 도메인의 방문자가 메일 인증코드로 회원이 되어(2026-11-26, 그 전은 아이디 · 비밀번호) 글 · 댓글을 쓰고 신고한다.
 관리자 계정(account)과 표 · 쿠키 · 권한을 나눈다 (원칙 10: 회원은 관리자가 아니다). 3-1a: 회원 · 가입 · 로그인 · 세션. 3-1b: 글 · 글 버전 · 댓글 · 쓰기 규칙. 3-1c: 신고 · 임시 가림 · 관리자 결정 · 차단 · 비밀번호 초기화 · 알림.
 화면(3-2, 스토어 11.6)은 웹이 이 API로 그린다: 목록 · 글은 앱 코드의 템플릿에 웹이 `me` · `topics` · `topics/:id`를 앱 도메인으로 읽어 채우고, 가입 · 로그인 · 글쓰기 · 댓글 · 신고는 앱 도메인의 고정 화면 `/_/…`, 관리는 앱 관리의 커뮤니티 탭. 응답 모양은 웹이 view의 `toJSON` 반환 타입으로 쓴다 (`toJSON(): object`로 적지 않고 안쪽 view는 `.toJSON()`으로 펼친다)
 
@@ -14,9 +14,10 @@
   남은 데이터 (2026-11-23): `AppDataQuery.holdings`가 앱마다 회원 수 · 앱 데이터 줄 수를 세어 Lookups `app-holdings`로 준다 (관리자만, 없는 앱은 빠짐). blog가 앱을 지우기 전에 묻고, 있으면 지우지 않는다.
   일꾼의 넣기는 설정 바꾸기 제안 `app_data`(`AppDataService.SETTING` · `rehearseSetting` · `applySetting`, `community-settings.ts`가 등록, 승인 뒤 반영: 원칙 7). 넣기만 한다.
 - `member/`: 회원(`Member`, 앱마다 따로) · 회원 세션(`MemberSession`, `cairn_member` 쿠키).
-  규칙: 아이디 `LoginId`(영문 소문자로 시작하는 4~20자, 소문자로, 운영자로 보이는 아이디 막기, 바꾸지 않음) · 비밀번호 `MemberPassword`(10~200자, 아이디 · 닉네임과 같은 값 · 한 글자 되풀이 · 흔한 값 막기) · 닉네임 `Nickname`(2~20자 · 운영자로 보이는 이름 막기 · 겹침 열쇠, 7일에 한 번 바꿈) · 가입 대기 `Member.JOIN_WAIT_MS` · 차단(`blocked_until`, 무기한은 `Member.FOREVER`)이면 `assertActive`가 403.
-  `MemberService`: 가입(`join`, 회원 + 첫 세션을 한 저장에, 아이디 · 닉네임이 겹치면 DB가 막고 409) · 로그인(`login`) · 비밀번호 바꾸기(`changePassword`, 지금 비밀번호 확인, 다른 로그인 끝냄: `Member.changePassword` → `MemberRepository.saveParts`) · 닉네임 바꾸기 · 로그아웃 · 마지막 접근. 해킹 대비는 서비스 머리 주석의 목록 (실패 문구 하나 · 같은 시간 · 시도 제한 · 가입 제한 · 새 세션)
-  `api/community`(`MemberController`): `me` · `join` · `login` · `logout` · `PATCH me` · `PATCH me/password` · `me/leave`(3-4). 가입 · 로그인 화면은 웹의 고정 화면(3-2).
+  규칙: 메일 `EmailAddress`(platform, 소문자로, 앱 안에서 하나, 바꾸지 않음. 전에 아이디로 가입한 회원은 `login_id`가 있고 메일은 null) · 비밀번호 `MemberPassword`(10~200자, 아이디(메일의 @ 앞) · 닉네임과 같은 값 · 한 글자 되풀이 · 흔한 값 막기) · 닉네임 `Nickname`(2~20자 · 운영자로 보이는 이름 막기 · 겹침 열쇠, 7일에 한 번 바꿈) · 가입 대기 `Member.JOIN_WAIT_MS` · 차단(`blocked_until`, 무기한은 `Member.FOREVER`)이면 `assertActive`가 403.
+  `MemberMailService`(2026-11-26): 가입 코드(`sendJoinCode`, 가입한 메일이면 코드 대신 안내 메일) · 가입(`join`, 코드 확인 → 회원 + 첫 세션을 한 저장에, 메일 · 닉네임이 겹치면 DB가 막고 409) · 비밀번호 다시 정하기 코드(`sendResetCode`, 가입한 메일에만) · 새 비밀번호(`resetPassword`, 모든 로그인 끝냄). 코드는 서버 메모리(`VerifyCodes`), 메일은 platform `CodeMail`(메일 플러그인의 길, 없으면 502). 코드 요청의 답은 늘 204
+  `MemberService`: 로그인(`login`, 메일 + 비밀번호, 메일 모양이 아니면 옛 아이디로 찾는다) · 비밀번호 바꾸기(`changePassword`, 지금 비밀번호 확인, 다른 로그인 끝냄: `Member.changePassword` → `MemberRepository.saveParts`) · 닉네임 바꾸기 · 로그아웃 · 마지막 접근. 해킹 대비는 서비스 머리 주석의 목록 (실패 문구 하나 · 같은 시간 · 시도 제한 · 가입 제한 · 새 세션)
+  `api/community`(`MemberController`): `me` · `join/code` · `join` · `login` · `password/code` · `password/reset` · `logout` · `PATCH me` · `PATCH me/password` · `me/leave`(3-4). 가입 · 로그인 화면은 웹의 고정 화면(3-2).
   `me`의 `csrf`는 회원 쿠키가 있으면 로그인이 끝났어도 그 쿠키의 값이다: 쿠키를 실은 쓰기는 이 값이 있어야 해서(MemberGuard), 끝난 로그인의 쿠키가 남은 브라우저(비밀번호 초기화 · 30일)도 다시 로그인 · 가입한다
 - `topic/`: 글(`Topic` + 추가만 하는 버전 `topic_revisions`). 제목 · 본문이 바뀔 때마다 버전 하나, 쓴 회원의 지우기는 상태 `deleted`(내용 · 버전은 남는다, 원칙 2). 상태 `hidden`(가림: `hidden_by` reports · owner) · `removed`(관리자가 내림)는 `Moderation`의 규칙 (`Topic.decide` · `hideByReports`, 댓글도 같다). 쓰기 규칙은 `WriteLimits`(가입 대기는 `Member.assertCanWrite`, 시간 · 하루 한도, 링크 수, 같은 본문 24시간): 쓰기 트랜잭션에서 쓴 회원의 행을 먼저 잠그고 DB에서 센다.
   `api/community/topics`(`TopicController`): 목록(보이는 글, 최근부터 30개, `cursor`는 마지막 글 id) · 글 하나(보이는 댓글 200개까지 함께) · 쓰기 · 고치기 · 지우기. 읽기는 누구나(`TopicQuery`), 작성자는 닉네임만, 내 글 · 댓글이면 `version`
@@ -67,7 +68,7 @@ platform. 앱마다 남은 회원 · 앱 데이터는 Lookups `app-holdings`로 
 - 회원은 권한이 없다 (`MemberActor.can`은 늘 false, 공간 없음): 다른 모듈의 읽기에는 방문자와 같다. 관리 일은 `assertOwner` 그대로
 - 비밀번호는 해시(platform `PasswordHasher`)만 두고 어느 View · 로그에도 싣지 않는다. 해시를 만들고 확인하는 일은 느려서 트랜잭션 밖에서
 - 로그인 실패는 늘 같은 문구 · 같은 시간 (없는 아이디도 `verify`가 가짜 값으로 같은 일을 한다): 아이디가 있는지 알려 주지 않는다
-- 시도 제한(`AttemptLimiter`)은 앱 · 곳(IP, IPv6는 /64)마다 서버 메모리에서만 센다. IP · 이메일은 저장하지 않는다 (최소 수집). 앱 도메인 요청의 거절도 보안 기록(IP를 담는다)에 남기지 않는다 (3-4, platform `DomainErrorFilter`)
+- 시도 제한(`AttemptLimiter`)과 인증코드(`VerifyCodes`)는 앱 · 곳(IP, IPv6는 /64)마다 서버 메모리에서만 센다. IP는 저장하지 않는다. 메일은 회원 행에만 두고 탈퇴하면 지운다 (2026-11-26). 앱 도메인 요청의 거절도 보안 기록(IP를 담는다)에 남기지 않는다 (3-4, platform `DomainErrorFilter`)
 - 탈퇴한 회원의 지운 값(`left:<id>`)을 어느 화면에도 아이디로 보이지 않는다. 회원 쪽 데이터는 md 보관 형식에 넣지 않는다 (앱 내보내기 · DB 백업)
 - 다른 모듈과는 Lookups와 이벤트로만 (나중에 진입점만 다른 컨테이너로 뗄 수 있게, 스토어 11.2)
 - 앱 데이터의 SQL에는 `app_tables`에 있는 표 · 칸 이름만 쓴다 (요청의 글자를 이름으로 넣지 않는다, 값은 늘 매개변수로). 회원 쪽 쿼리는 꼭 `asMember` 안에서: 규칙을 코드의 조건으로 대신하지 않는다

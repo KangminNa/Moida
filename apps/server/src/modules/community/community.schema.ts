@@ -76,12 +76,13 @@ export const members = communitySchema.table('members', {
   renamed_at: timestamp('renamed_at', { withTimezone: true }),
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
   version: integer('version').notNull(),
-  login_id: text('login_id').notNull(),
+  login_id: text('login_id'),
   password_hash: text('password_hash').notNull(),
   password_changed_at: timestamp('password_changed_at', { withTimezone: true }).notNull(),
   terms_version: integer('terms_version'),
   privacy_version: integer('privacy_version'),
   left_at: timestamp('left_at', { withTimezone: true }),
+  email: text('email'),
 });
 
 /** community.reports */

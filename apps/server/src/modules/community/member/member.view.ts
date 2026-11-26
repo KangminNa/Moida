@@ -1,11 +1,11 @@
 import type { MemberRow } from '../community.tables';
 
-/** 회원 자신에게 보이는 자기 정보 (비밀번호 해시는 싣지 않는다). writableAt: 가입 대기가 끝나 글 · 댓글을 쓸 수 있는 때 */
+/** 회원 자신에게 보이는 자기 정보 (비밀번호 해시는 싣지 않는다). 메일로 가입했으면 loginId는 null, 아이디로 가입했으면 email은 null. writableAt: 가입 대기가 끝나 글 · 댓글을 쓸 수 있는 때 */
 export class MemberSelfView {
   constructor(
     private readonly r: Pick<
       MemberRow,
-      'id' | 'login_id' | 'nickname' | 'joined_at' | 'blocked_until' | 'version'
+      'id' | 'login_id' | 'email' | 'nickname' | 'joined_at' | 'blocked_until' | 'version'
     >,
     private readonly writableAt: Date,
   ) {}
@@ -15,6 +15,7 @@ export class MemberSelfView {
     return {
       id: r.id,
       loginId: r.login_id,
+      email: r.email,
       nickname: r.nickname,
       joinedAt: r.joined_at.toISOString(),
       writableAt: this.writableAt.toISOString(),

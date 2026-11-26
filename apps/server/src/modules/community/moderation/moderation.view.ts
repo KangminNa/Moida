@@ -5,8 +5,8 @@ import type { CommentRow, DecisionRow, MemberRow, ReportRow, TopicRow } from '..
 
 /** 쓴 회원 (관리자에게는 아이디까지) */
 /** 탈퇴한 회원은 아이디를 지워 'left:<id>'만 남는다 (Member.leave, 3-4): 관리 화면에는 아이디 없음(null)으로 */
-function loginOf(loginId: string): string | null {
-  return loginId.startsWith('left:') ? null : loginId;
+function loginOf(loginId: string | null): string | null {
+  return !loginId || loginId.startsWith('left:') ? null : loginId;
 }
 
 function author(id: string, nickname: string, loginId: string) {
@@ -36,13 +36,18 @@ export class MemberDecidedView {
 /** 비밀번호 초기화의 답: 임시 비밀번호는 이 응답에만 있다 (저장하지 않는다). 관리자가 회원에게 직접 전한다 */
 export class MemberResetView {
   constructor(
-    private readonly r: Pick<MemberRow, 'id' | 'login_id' | 'version'>,
+    private readonly r: Pick<MemberRow, 'id' | 'login_id' | 'email' | 'version'>,
     private readonly password: string,
   ) {}
 
   toJSON() {
     const r = this.r;
-    return { id: r.id, loginId: r.login_id, password: this.password, version: r.version };
+    return {
+      id: r.id,
+      loginId: r.login_id ?? r.email,
+      password: this.password,
+      version: r.version,
+    };
   }
 }
 

@@ -1,12 +1,13 @@
 # account 모듈
 
 ## 하는 일
-블로그 공간과 설정, 블로그 주인(아이디·비밀번호 로그인), 연결된 기기와 권한, 로그인 토큰.
+블로그 공간과 설정, 블로그 주인(메일 · 비밀번호 로그인, 2026-11-26 전에 만든 계정은 아이디), 연결된 기기와 권한, 로그인 토큰.
 요청이 들어오면 Guard가 토큰·쿠키를 확인해 Actor(`OwnerActor` · `DeviceActor` · `AgentActor` · `VisitorActor`)를 만든다.
 M1 A(설치·주인 로그인)와 B(기기 연결, MCP OAuth 2.1)까지 있다.
 
 - `space/`: 공간 (`Space`, 이름 · 소개 · 스토어 첫 화면의 한 줄 소개 `store.tagline` · 소개 글 `store.about` · 한눈에 `store.highlights`(한 줄에 하나 "제목: 설명") · 이름의 뜻 `store.naming`(2026-11-26, `Space.introduce`, `PUT api/space`의 tagline · about · highlights · naming: 보내지 않으면 그대로, 빈 글이면 지움)은 대화로도 바꾼다: `SpaceEdit` · `AccountSettings`, 2026-11-15 D. 사이트 주소 · 앱 연결 · 로고는 화면에서만), 설치 코드·통행증 규칙(`InstallPolicy`), `api/install`(코드 확인, 주인 계정 만들기)·`api/space`(+ `PUT api/space/hosted-apps`: ChatGPT·Claude 앱 연결 허용, 사이트 로고 `PUT api/space/logo` · `POST api/space/logo/delete` · 누구나 보는 `GET api/space/logo`)
 - `owner/`: 주인 (`Owner` + `WebSession` + `LoginLink`), 비밀번호 규칙(`PasswordPolicy`), `api/auth`(로그인·로그아웃·비밀번호 바꾸기, 화면에 보일 이름 `PUT api/auth/me/profile`)
+  메일 (2026-11-26, `OwnerMailService` · `OwnerMailController`): 설치는 메일 + 비밀번호(`users.login`에 메일). 비밀번호를 잊으면 `POST api/auth/password/code`(관리자 메일에만 코드, 답은 늘 204) → `POST api/auth/password/reset`(모든 로그인 끝남, `account.password.changed` via mail). 로그인 메일 바꾸기 `POST api/auth/email/code` → `PUT api/auth/email`(새 메일의 코드 + 지금 비밀번호, `Owner.useEmail`, `account.login.changed`): 아이디로 만든 계정을 메일로 옮기는 길. 코드는 서버 메모리(`VerifyCodes`), 메일은 platform `CodeMail`(메일 플러그인의 길, 없으면 502). 아이디 계정 · 메일 플러그인이 없을 때는 `pnpm run owner reset-password` 그대로
   보안 화면 (2026-11-15): `api/auth/sessions`(끝나지 않은 로그인 · 보안 설정 값, `OwnerQuery.sessions`), `POST api/auth/sessions/:id/end`(다른 곳의 로그인 하나, `Owner.endSessionById`: 지금 로그인은 422), `POST api/auth/sessions/end-others`(`Owner.endOtherSessions`). 로그인 · 로그아웃 · 끝내기 · 비밀번호는 `Owner`가 사건(`account.login.succeeded` · `account.session.ended` · `account.password.changed`)으로 남기고 `AccountSecurity`(`Outbox.listen`)가 같은 트랜잭션에서 platform의 보안 기록으로 옮긴다. 로그인 사건의 `newPlace`는 최근 90일 로그인한 곳(IPv4, IPv6는 /64)과 다른지다 (설치 때는 보지 않음). 틀린 · 막힌 로그인과 틀린 설치 코드 · 러너 연결은 엔티티의 사건이 없어 Service가 `SecurityLog`에 바로 남기고 오류에 `markRecorded()`. 틀린 아이디는 관리자의 것일 때만 적는다. 마지막 접근은 Guard가 알아본 로그인 · 기기마다 `OwnerService.seen` · `DeviceService.seen`(프로세스마다 5분에 한 번, version 안 올림, 실패해도 요청은 막지 않고 서버 로그)
   외부 로그인(`ExternalLoginQuery`·`ExternalLoginController`): 로그인 플러그인(`login:<이름>`)의 경로·확인값·쿠키, 계정 연결·끊기
 - `device/`: 기기(`Device` + `DeviceCredential`), OAuth 클라이언트(`OAuthClient`), 승인 코드(`AuthorizationCode`), 승인 요청 규칙(`AuthorizationPolicy`).
@@ -42,7 +43,7 @@ M1 A(설치·주인 로그인)와 B(기기 연결, MCP OAuth 2.1)까지 있다.
 ## 내보내는 이벤트 / 받는 이벤트
 칸의 원본은 `account.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.
 
-`account.owner.claimed`(주인이 정해짐), `account.device.connected`, `account.device.revoked`(`reason`: owner · token_reused), `account.login.succeeded`(`sessionId, method, newPlace, ip, userAgent`), `account.session.ended`(`how`: logout · ended · others), `account.password.changed`(`via`: web · command), `account.setting.changed { approvalId, outcome, error? }`(승인한 사이트 설정 바꾸기의 결과, 2026-11-15 D) / 없음 (승인한 설정 바꾸기는 task의 처리기가 platform `SettingKinds`로 넘긴다)
+`account.owner.claimed`(주인이 정해짐), `account.device.connected`, `account.device.revoked`(`reason`: owner · token_reused), `account.login.succeeded`(`sessionId, method, newPlace, ip, userAgent`), `account.session.ended`(`how`: logout · ended · others), `account.password.changed`(`via`: web · command · mail), `account.login.changed`(로그인 메일 바꿈), `account.setting.changed { approvalId, outcome, error? }`(승인한 사이트 설정 바꾸기의 결과, 2026-11-15 D) / 없음 (승인한 설정 바꾸기는 task의 처리기가 platform `SettingKinds`로 넘긴다)
 
 알리는 것 (`AccountNotices`, 7단계. platform `NoticeCatalog`에 등록): `account.device.connected` 새 기기 연결 (즉시, 기기마다 묶음 키). 보안 화면 (2026-11-15): `account.login.new_place` 새 곳에서 로그인 (즉시, 로그인 사건의 `newPlace`), `account.login.blocked` 로그인 막힘 (즉시, 관리자의 아이디로 막혔을 때 `OwnerService`가 `Notices.post`로, 같은 곳은 1분에 한 번)
 

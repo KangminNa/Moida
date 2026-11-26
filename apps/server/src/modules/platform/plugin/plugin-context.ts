@@ -6,6 +6,7 @@ import type { BaseAction } from '../base/base-action';
 import type { BaseHandler } from '../base/base-handler';
 import type { BaseJob } from '../base/base-job';
 import type { BaseLogin } from '../base/base-login';
+import type { BaseMailer } from '../base/base-mailer';
 import { Command, Operation, type Read } from '../base/operation';
 import type { PluginManifest } from './plugin-manifest';
 
@@ -81,6 +82,8 @@ export class PluginContext {
   readonly operations: PackageOperation[] = [];
   readonly reactions: EventReaction[] = [];
   readonly guards: DelegateGuard[] = [];
+  /** 코어의 확인 메일을 보내는 길 (provideMail) */
+  mailer: BaseMailer | null = null;
 
   constructor(
     private readonly manifest: PluginManifest,
@@ -140,6 +143,15 @@ export class PluginContext {
   addLogin(name: string, login: BaseLogin): void {
     this.require(`login:${name}`);
     this.logins.push(new LoginMethod(this.manifest.name, name, login));
+  }
+
+  /**
+   * 코어가 보내는 확인 메일(인증코드)의 길 (플러그인 API 0.14). 목록 파일의 uses에 mail이 있어야 한다.
+   * 여러 플러그인이 등록하면 먼저 켠 것만 쓴다
+   */
+  provideMail(mailer: BaseMailer): void {
+    this.require('mail');
+    this.mailer = mailer;
   }
 
   /**

@@ -38,6 +38,7 @@ import { PushGateway } from './notice/push.gateway';
 import { PushQuery } from './notice/push.query';
 import { PushService } from './notice/push.service';
 import events from './platform.events.json';
+import { CodeMail } from './plugin/code-mail';
 import { Leases } from './plugin/leases';
 import { PackageController } from './plugin/package.api';
 import { PackageService } from './plugin/package.service';
@@ -62,6 +63,7 @@ import { OutboxWorker } from './worker/outbox-worker';
 @Global()
 @Module({
   providers: [
+    CodeMail,
     PackageService,
     Leases,
     PluginChats,
@@ -134,6 +136,7 @@ import { OutboxWorker } from './worker/outbox-worker';
     SecretRotation,
     SensitivePolicy,
     PluginRegistry,
+    CodeMail,
     PluginService,
     PackageService,
     Leases,

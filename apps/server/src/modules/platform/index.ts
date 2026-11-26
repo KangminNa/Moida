@@ -24,6 +24,7 @@ export { BaseGateway } from './base/base-gateway';
 export { BaseHandler } from './base/base-handler';
 export { BaseJob, type OwnCall } from './base/base-job';
 export { BaseLogin, LoginIdentity } from './base/base-login';
+export { BaseMailer } from './base/base-mailer';
 export { BaseQuery } from './base/base-query';
 export { BaseRepository } from './base/base-repository';
 export { BaseRequest, type ColumnReaders, RequestFields, VersionInput } from './base/base-request';
@@ -31,6 +32,7 @@ export { BaseService, EntityService, type VersionTarget } from './base/base-serv
 export { BaseTool, type ToolAnswer } from './base/base-tool';
 export { Blob, BlobStore } from './base/blob-store';
 export { Database, type Row, type Sql } from './base/database';
+export { EmailAddress } from './base/email-address';
 export {
   Conflict,
   DomainError,
@@ -62,6 +64,7 @@ export { type How, type RowOf, Rule, type Where } from './base/table-query';
 export { type EntityStore, TableRepository } from './base/table-repository';
 export { type ToolTextBody, ToolTexts } from './base/tool-texts';
 export { ValueList } from './base/value-list';
+export { VerifyCodes } from './base/verify-codes';
 export { ZipFile } from './base/zip-file';
 export { ZipLimits, ZipReader } from './base/zip-reader';
 export { ActionChecks, type ActionTarget } from './directory/action-checks';
@@ -84,6 +87,7 @@ export { NoticeKind } from './notice/notice-kind';
 export { type NoticeNew, Notices } from './notice/notices';
 export { PlatformModule } from './platform.module';
 export { BasePlugin } from './plugin/base-plugin';
+export { CodeMail } from './plugin/code-mail';
 export { LeasedWork, Leases, RunRecordTarget } from './plugin/leases';
 export { PackageService } from './plugin/package.service';
 export { PackageTool } from './plugin/package.tool';
