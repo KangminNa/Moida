@@ -10,6 +10,7 @@ import { POST_STATUS_LABELS } from '../../_blog/labels';
 import type { Asset, PostStatus, SavedPost } from '../../_blog/types';
 import { type ApiReply, api, describe, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
+import { SaveButton } from '../../_ui/SaveButton';
 import { useToast } from '../../_ui/useToast';
 import { BigQuote } from './editor/big-quote';
 import { docToMarkdown, markdownToEditorHtml } from './editor/markdown-doc';
@@ -327,14 +328,13 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
           {post ? ` · ${POST_STATUS_LABELS[status]}` : ''}
         </span>
         <div className="editor-actions">
-          <button
-            type="button"
+          <SaveButton
+            busy={busy}
+            saved={action.done === 'save'}
+            disabled={trashed}
             className="ghost"
-            disabled={busy || trashed}
             onClick={() => void save()}
-          >
-            {busy ? '저장 중' : '저장'}
-          </button>
+          />
           <button
             type="button"
             className="cta small"

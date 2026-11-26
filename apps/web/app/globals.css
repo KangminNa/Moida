@@ -1852,6 +1852,42 @@ a.chip {
   border-radius: 8px;
   color: var(--faint);
   font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* 빈 화면 (2026-11-26 콘솔 인터랙션 4): 흩어진 점 다섯 개가 가운데로 모여 한 줄이 된다 (Moida = 모이다, 스토어의 GatherMark와 같은 뜻).
+   점 하나와 그림자 넷이라 화면 코드는 그대로 .rows-empty. 처음 그려질 때 한 번, 움직임 줄이기면 모인 모양만 */
+.rows-empty::before {
+  content: "";
+  display: block;
+  width: 5px;
+  height: 5px;
+  margin: 2px auto 12px;
+  border-radius: 50%;
+  background: var(--faint);
+  box-shadow:
+    -16px 0 var(--line),
+    -8px 0 var(--faint),
+    8px 0 var(--faint),
+    16px 0 var(--line);
+  animation: rows-empty-gather 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes rows-empty-gather {
+  from {
+    background: transparent;
+    box-shadow:
+      -44px -10px transparent,
+      -22px 12px transparent,
+      26px -12px transparent,
+      42px 8px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rows-empty::before {
+    animation: none;
+  }
 }
 
 /* 상태 알약: 칠한 면. on = 나에게 온 것(승인 · 질문)은 강조색 */
@@ -4091,6 +4127,32 @@ ul.picked > .chip {
   }
 
   .card-settled-line {
+    animation: none;
+  }
+}
+
+/* 저장 · 복사가 끝난 버튼 (2026-11-26 콘솔 인터랙션 3, _ui/SaveButton · CopyButton): 잠깐 체크와 한 줄, 체크가 튀어 나온다 */
+.action-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-done .menu-ico {
+  width: 1.1em;
+  height: 1.1em;
+  animation: action-done-pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes action-done-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-done .menu-ico {
     animation: none;
   }
 }

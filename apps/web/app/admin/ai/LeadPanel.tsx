@@ -47,6 +47,7 @@ export function LeadPanel() {
           lead={boss}
           agents={agents.data?.agents ?? []}
           busy={save.busy !== null}
+          saved={save.done !== null}
           problem={save.problem}
           onSubmit={submit}
         />

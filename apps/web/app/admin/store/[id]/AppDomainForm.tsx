@@ -2,6 +2,7 @@
 
 import { type FormEvent, useId, useState } from 'react';
 import type { AdminApp } from '../../../_blog/types';
+import { SaveButton } from '../../../_ui/SaveButton';
 
 /** 도메인 칸에 받는 글자 (서버는 253자 도메인만 받는다) */
 const DOMAIN_MAX = 253;
@@ -10,11 +11,14 @@ const DOMAIN_MAX = 253;
 export function AppDomainForm({
   app,
   busy,
+  saved,
   onSubmit,
   onEdit,
 }: {
   app: AdminApp;
   busy: boolean;
+  /** 방금 저장이 끝났는지 (버튼이 잠깐 체크) */
+  saved: boolean;
   /** 빈 글자면 빼기 */
   onSubmit: (domain: string) => void;
   onEdit: () => void;
@@ -43,9 +47,7 @@ export function AppDomainForm({
           setDomain(e.target.value);
         }}
       />
-      <button type="submit" className="cta" disabled={busy || domain.trim() === (app.domain ?? '')}>
-        {busy ? '저장 중' : '저장'}
-      </button>
+      <SaveButton busy={busy} saved={saved} disabled={domain.trim() === (app.domain ?? '')} />
     </form>
   );
 }

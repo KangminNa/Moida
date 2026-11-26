@@ -5,6 +5,7 @@ import { useSpace } from '../../_account/live';
 import type { SpaceInfo } from '../../_account/types';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
+import { CopyButton } from '../../_ui/CopyButton';
 
 // 기기 화면 맨 위의 "연결하는 법". 도구마다 길이 다르다.
 //   이 컴퓨터의 도구(Claude Code · Codex): cairn connect가 스킬·검토자를 넣고 MCP 등록·로그인까지 한다
@@ -55,11 +56,6 @@ export function ConnectGuide({
   const site = siteUrl ?? '<사이트 주소>';
   const mcp = `${site}/mcp`;
 
-  function copy(text: string) {
-    void navigator.clipboard.writeText(text);
-    onMessage('복사했어요');
-  }
-
   return (
     <div className="field">
       <span>AI 도구 연결하기</span>
@@ -80,7 +76,7 @@ export function ConnectGuide({
       <div className="howto" role="tabpanel">
         {tab === 'claude-code' && (
           <>
-            <CopyLine text={`pnpm cairn connect ${site}`} onCopy={copy} />
+            <CopyLine text={`pnpm cairn connect ${site}`} />
             <small>
               Moida 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 다른
               회사 모델로 교차 검토하려면 끝에 <code>--review-with codex</code>
@@ -100,7 +96,7 @@ export function ConnectGuide({
         )}
         {tab === 'codex' && (
           <>
-            <CopyLine text={`pnpm cairn connect ${site} --tool codex`} onCopy={copy} />
+            <CopyLine text={`pnpm cairn connect ${site} --tool codex`} />
             <small>
               Moida 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 교차
               검토는 끝에 <code>--review-with claude</code>
@@ -123,7 +119,6 @@ export function ConnectGuide({
             app={tab}
             siteUrl={siteUrl}
             mcp={mcp}
-            onCopy={copy}
             onMessage={onMessage}
             onSpaceChange={onSpaceChange}
           />
@@ -133,13 +128,11 @@ export function ConnectGuide({
   );
 }
 
-function CopyLine({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
+function CopyLine({ text }: { text: string }) {
   return (
     <div className="copy">
       <code>{text}</code>
-      <button type="button" className="ghost" onClick={() => onCopy(text)}>
-        복사
-      </button>
+      <CopyButton text={text} />
     </div>
   );
 }
@@ -157,14 +150,12 @@ function AppSteps({
   app,
   siteUrl,
   mcp,
-  onCopy,
   onMessage,
   onSpaceChange,
 }: {
   app: 'claude-app' | 'chatgpt';
   siteUrl: string | null;
   mcp: string;
-  onCopy: (text: string) => void;
   onMessage: (text: string) => void;
   onSpaceChange?: (space: SpaceInfo) => void;
 }) {
@@ -226,7 +217,7 @@ function AppSteps({
           {app === 'claude-app'
             ? 'Claude 설정 → 커넥터 → 커스텀 커넥터 추가, 주소:'
             : 'ChatGPT 설정 → 앱 → 고급 설정에서 개발자 모드 켜고 앱 만들기, MCP 서버 주소:'}
-          <CopyLine text={mcp} onCopy={onCopy} />
+          <CopyLine text={mcp} />
         </li>
         <li>{app === 'chatgpt' && '인증은 OAuth. '}연결을 누르면 이 블로그의 승인 화면이 열려요</li>
         <li>

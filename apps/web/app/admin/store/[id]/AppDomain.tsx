@@ -77,6 +77,7 @@ export function AppDomain({
         key={app.version}
         app={app}
         busy={save.busy !== null}
+        saved={save.done !== null}
         onSubmit={submit}
         onEdit={save.clear}
       />

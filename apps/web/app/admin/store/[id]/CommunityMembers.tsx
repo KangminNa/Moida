@@ -8,6 +8,7 @@ import { api } from '../../../_lib/client-api';
 import { ago } from '../../../_lib/time-ago';
 import { useAction } from '../../../_lib/use-action';
 import { useLiveValue } from '../../../_lib/use-live';
+import { CopyButton } from '../../../_ui/CopyButton';
 import { CommunityPager } from './CommunityPager';
 
 /** 차단 기간 (일, null은 기한 없음) */
@@ -80,13 +81,7 @@ export function CommunityMembers({ appId }: { appId: string }) {
             이 화면을 닫으면 다시 볼 수 없어요. 회원에게 직접 전하고 로그인한 뒤 바꾸게 해 주세요
           </small>
           <div className="row">
-            <button
-              type="button"
-              className="ghost small"
-              onClick={() => void navigator.clipboard?.writeText(reset.password)}
-            >
-              복사
-            </button>
+            <CopyButton text={reset.password} className="ghost small" />
             <button type="button" className="ghost small" onClick={() => setReset(null)}>
               닫기
             </button>

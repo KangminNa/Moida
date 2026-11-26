@@ -2,6 +2,7 @@
 
 import { type FormEvent, useId, useState } from 'react';
 import type { AdminApp } from '../../../_blog/types';
+import { SaveButton } from '../../../_ui/SaveButton';
 
 /** 칸의 길이 (서버 App의 값과 같다) */
 const NAME_MAX = 40;
@@ -25,12 +26,15 @@ export type AppSettingsBody = {
 export function AppSettingsForm({
   app,
   busy,
+  saved,
   problem,
   onSubmit,
   onEdit,
 }: {
   app: AdminApp;
   busy: boolean;
+  /** 방금 저장이 끝났는지 (버튼이 잠깐 체크) */
+  saved: boolean;
   problem: string | null;
   onSubmit: (body: AppSettingsBody) => void;
   onEdit: () => void;
@@ -124,9 +128,7 @@ export function AppSettingsForm({
       </div>
       {problem && <p className="error">{problem}</p>}
       <div className="row">
-        <button type="submit" className="cta" disabled={busy}>
-          {busy ? '저장 중' : '저장'}
-        </button>
+        <SaveButton busy={busy} saved={saved} />
       </div>
     </form>
   );
