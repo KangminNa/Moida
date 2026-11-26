@@ -74,6 +74,7 @@ export function AppSettings({
         key={app.version}
         app={app}
         busy={save.busy !== null}
+        saved={save.done !== null}
         problem={save.problem}
         onSubmit={submit}
         onEdit={save.clear}

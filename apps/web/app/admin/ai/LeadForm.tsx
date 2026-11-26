@@ -3,6 +3,7 @@
 import { type FormEvent, useId, useState } from 'react';
 import { useEngines } from '../../_task/live';
 import type { Agent } from '../../_task/types';
+import { SaveButton } from '../../_ui/SaveButton';
 import { LimitField } from '../agents/LimitField';
 import { ReviewerField } from '../agents/ReviewerField';
 import { type Runtime, RuntimeFields, runtimeFor } from '../agents/RuntimeFields';
@@ -35,6 +36,7 @@ export function LeadForm({
   lead,
   agents,
   busy,
+  saved,
   problem,
   onSubmit,
 }: {
@@ -42,6 +44,8 @@ export function LeadForm({
   /** 검토자로 고를 수 있는 에이전트 (목록의 에이전트, 대표는 없다) */
   agents: readonly Agent[];
   busy: boolean;
+  /** 방금 저장이 끝났는지 (버튼이 잠깐 체크) */
+  saved: boolean;
   problem: string | null;
   onSubmit: (body: LeadBody) => void;
 }) {
@@ -187,9 +191,7 @@ export function LeadForm({
       />
       {problem && <p className="error">{problem}</p>}
       <div className="row">
-        <button type="submit" className="cta small" disabled={busy}>
-          {busy ? '저장 중' : '저장'}
-        </button>
+        <SaveButton busy={busy} saved={saved} className="cta small" />
       </div>
     </form>
   );

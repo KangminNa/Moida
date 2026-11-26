@@ -6,6 +6,7 @@ import { useAction } from '../../../_lib/use-action';
 import { useLiveValue } from '../../../_lib/use-live';
 import { when } from '../../../_task/labels';
 import type { Output, OutputShare, OutputShareList } from '../../../_task/types';
+import { CopyButton } from '../../../_ui/CopyButton';
 import { NewTabLink } from '../../../_ui/NewTabLink';
 import { useNotify } from '../../../_ui/notify';
 
@@ -117,9 +118,7 @@ export function OutputSharePanel({
                 </small>
               </div>
               <div className="row">
-                <button type="button" className="ghost" onClick={() => copy(s)}>
-                  복사
-                </button>
+                <CopyButton text={() => `${location.origin}${s.path}`} />
                 <button type="button" className="ghost" disabled={busy} onClick={() => end(s)}>
                   끄기
                 </button>

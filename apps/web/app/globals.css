@@ -4095,6 +4095,32 @@ ul.picked > .chip {
   }
 }
 
+/* 저장 · 복사가 끝난 버튼 (2026-11-26 콘솔 인터랙션 3, _ui/SaveButton · CopyButton): 잠깐 체크와 한 줄, 체크가 튀어 나온다 */
+.action-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-done .menu-ico {
+  width: 1.1em;
+  height: 1.1em;
+  animation: action-done-pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes action-done-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-done .menu-ico {
+    animation: none;
+  }
+}
+
 .result-card {
   display: flex;
   flex-direction: column;
