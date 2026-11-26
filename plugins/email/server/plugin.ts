@@ -1,4 +1,5 @@
 import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-api';
+import { CodeMailer } from './code-mailer';
 import { DeliverJob } from './deliver.job';
 import { ClaimMail, ReportMail } from './delivery';
 import { NoticeMail } from './notice-mail';
@@ -12,6 +13,7 @@ import { TestAction } from './test.action';
 //   관리자 알림: 코어의 알림이 푸시로 보내기로 정한 것(platform.notice.sent)을 한 통씩
 //   앱 소식 구독: 방문자가 스토어 첫 화면(store.after)에서 신청 → 확인 메일 → 확인. 글이 공개되면 소식이 생기고
 //     관리자가 콘솔(운영 › 메일 구독)에서 보내기를 누르면 일꾼(deliver, 30초마다)이 하루 상한 안에서 보낸다
+//   확인 메일: 코어의 가입 · 비밀번호 다시 정하기 인증코드 (provideMail, 0.14)
 export default class EmailPlugin extends BasePlugin {
   static readonly DAILY_MAX = 300;
 
@@ -42,5 +44,7 @@ export default class EmailPlugin extends BasePlugin {
     cairn.addOperation(new ReportMail());
     cairn.every('30s', new DeliverJob(smtp, mail));
     cairn.addAction('test', new TestAction(smtp, mail));
+    // 코어의 확인 메일 (가입 · 비밀번호 다시 정하기의 인증코드): 보낼 수 있을 때만 길을 연다
+    if (smtp && mail) cairn.provideMail(new CodeMailer(smtp, mail.from, dailyMax));
   }
 }

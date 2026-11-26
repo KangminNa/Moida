@@ -244,7 +244,7 @@ describe('DB가 거른다 (행 수준 보안)', () => {
     const schema = `app_${site.appId.replaceAll('-', '')}`;
     const seen = await db.transaction(async (tx) => {
       const [me] = await tx<{ id: string }[]>`
-        SELECT id FROM community.members WHERE app_id = ${site.appId} AND login_id = 'ann_learner'`;
+        SELECT id FROM community.members WHERE app_id = ${site.appId} AND email = 'ann_learner@example.com'`;
       await tx`SELECT set_config('cairn.member', ${me?.id ?? ''}, true)`;
       await tx.unsafe('SET LOCAL ROLE cairn_app');
       const rows = await tx.unsafe(`SELECT score FROM "${schema}"."progress"`);
@@ -311,7 +311,10 @@ describe('버전이 바뀌면', () => {
       /INSERT INTO "scores" \("id", "owner", [^)]*\) VALUES \('[0-9a-f-]{36}', '[0-9a-f-]{36}', /,
     );
     const members = (JSON.parse(files.get('members.json') ?? '{}') as { members: Json[] }).members;
-    assert.deepEqual(members.map((m) => m.login_id).sort(), ['ann_learner', 'bob_learner']);
+    assert.deepEqual(members.map((m) => m.email).sort(), [
+      'ann_learner@example.com',
+      'bob_learner@example.com',
+    ]);
     assert.deepEqual(
       members.map((m) => [m.terms_version, m.privacy_version, m.left_at]),
       [

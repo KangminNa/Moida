@@ -6,6 +6,9 @@
     "account.device.revoked": {
       "fields": ["deviceId", "name", "reason"]
     },
+    "account.login.changed": {
+      "fields": ["userId"]
+    },
     "account.login.succeeded": {
       "fields": ["userId", "sessionId", "method", "ip", "userAgent", "newPlace"]
     },

@@ -67,8 +67,8 @@ export function MePanel({
     <div className="member-form">
       {notice && <p className="note">{notice}</p>}
       <dl className="member-facts">
-        <dt>아이디</dt>
-        <dd>{member.loginId}</dd>
+        <dt>{member.email ? '메일' : '아이디'}</dt>
+        <dd>{member.email ?? member.loginId}</dd>
         <dt>가입</dt>
         <dd>{formatDate(member.joinedAt)}</dd>
       </dl>

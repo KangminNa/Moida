@@ -17,6 +17,8 @@ import { ExternalLoginQuery } from './owner/external-login.query';
 import { LoginController } from './owner/login.api';
 import { OwnerQuery } from './owner/owner.query';
 import { OwnerService } from './owner/owner.service';
+import { OwnerMailController } from './owner/owner-mail.api';
+import { OwnerMailService } from './owner/owner-mail.service';
 import { PasswordPolicy } from './owner/password.policy';
 import { InstallController } from './space/install.api';
 import { InstallPolicy } from './space/install.policy';
@@ -58,6 +60,7 @@ import { SpaceService } from './space/space.service';
     OwnerQuery,
     ExternalLoginQuery,
     OwnerService,
+    OwnerMailService,
     DeviceQuery,
     DeviceService,
     { provide: APP_GUARD, useClass: ActorGuard },
@@ -66,6 +69,7 @@ import { SpaceService } from './space/space.service';
     InstallController,
     SpaceController,
     LoginController,
+    OwnerMailController,
     ExternalLoginController,
     OAuthController,
     DeviceController,

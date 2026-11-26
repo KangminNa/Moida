@@ -51,7 +51,7 @@ export class SpaceQuery extends BaseQuery {
     return space.settingView();
   }
 
-  /** 사이트 로고 (누구나). 없으면 404: 화면은 Cairn 표시를 그린다 */
+  /** 사이트 로고 (누구나). 없으면 404: 화면은 Moida 표식을 그린다 */
   async logo(_actor: Actor): Promise<LogoFile> {
     const row = await this.row(spaces, { slug: Space.SLUG }, { columns: ['logo_blob_hash'] });
     const hash = row?.logo_blob_hash ?? null;

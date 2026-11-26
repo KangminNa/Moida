@@ -14,6 +14,7 @@
 // 0.13 (2026-11-26): work.lookup(app · app-id · app-url, uses의 lookup:<종류>) — 공개 앱의 이름 · 주소로 id · 바깥 주소를 묻는다.
 //     반복 작업의 run(own) — 자기 동작(SYSTEM, api 없이도 등록)을 서버 자신으로 불러 바깥 호출 앞뒤를 짧은 트랜잭션으로 나눈다.
 //     웹 자리 store.after — 스토어 첫 화면 아래 (email의 앱 소식 구독)
+// 0.14 (2026-11-26): provideMail(BaseMailer, uses의 mail) — 코어의 확인 메일(가입 · 비밀번호 다시 정하기의 인증코드)을 보내는 길 (email)
 export {
   ActionResult,
   Actor,
@@ -25,6 +26,7 @@ export {
   BaseHandler,
   BaseJob,
   BaseLogin,
+  BaseMailer,
   BasePlugin,
   ChatSent,
   Command,

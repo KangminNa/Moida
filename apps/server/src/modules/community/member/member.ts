@@ -6,8 +6,9 @@ import { MemberSession } from './member-session';
 import { Nickname } from './nickname.policy';
 
 // 커뮤니티 회원 하나 (community.members, 스토어 3-1). 앱마다 따로다 (같은 사람도 앱이 다르면 다른 회원).
-// 아이디 · 비밀번호로 가입한다 (2026-11-19): 아이디는 바꾸지 않고, 비밀번호는 해시(platform PasswordHasher)만 갖는다.
-// 이메일 · IP는 갖지 않는다. 관리자가 아니다 (원칙 10): 요청자는 MemberActor이고 권한이 없다
+// 메일 인증코드로 가입하고 메일 + 비밀번호로 로그인한다 (2026-11-26, 전에는 아이디 · 비밀번호 2026-11-19).
+// 메일 · 아이디는 바꾸지 않고, 비밀번호는 해시(platform PasswordHasher)만 갖는다. 아이디로 가입한 회원은 아이디로 그대로 로그인한다.
+// IP는 갖지 않는다. 관리자가 아니다 (원칙 10): 요청자는 MemberActor이고 권한이 없다
 export class Member extends TableEntity<MemberRow, MemberNew> {
   /** 가입하고 이만큼 지나야 글 · 댓글을 쓴다 (스팸, 11.0) */
   static readonly JOIN_WAIT_MS = 5 * 60_000;
@@ -26,12 +27,13 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
   private issuedPassword: string | null = null;
 
   /**
-   * 가입: 만 14세 이상이라고 확인해야 한다 (개인정보, 11.0). 아이디 · 비밀번호 규칙은 Service가 해시를 만들기 전에
-   * LoginId · MemberPassword로 본다. 닉네임 규칙은 Nickname, 아이디 · 닉네임 겹침은 DB가 본다 (409). 첫 로그인을 함께 연다
+   * 가입: 만 14세 이상이라고 확인해야 한다 (개인정보, 11.0). 메일은 Service가 인증코드로 확인한 주소(EmailAddress.clean),
+   * 비밀번호 규칙은 Service가 해시를 만들기 전에 MemberPassword로 본다. 닉네임 규칙은 Nickname, 메일 · 닉네임 겹침은 DB가 본다 (409).
+   * 첫 로그인을 함께 연다
    */
   static join(
     appId: string,
-    loginId: string,
+    email: string,
     passwordHash: string,
     nickname: string,
     ageConfirmed: boolean,
@@ -43,7 +45,8 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
       {
         id: BaseEntity.newId(),
         app_id: appId,
-        login_id: loginId,
+        login_id: null,
+        email,
         password_hash: passwordHash,
         password_changed_at: now,
         nickname: clean,
@@ -74,7 +77,7 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
   }
 
   /**
-   * 탈퇴 (3-4, 원칙 2의 예외: 개인정보보호법). 아이디 · 비밀번호 해시 · 닉네임 · 차단 메모 · 마지막 접근을 지우고 모든 로그인을 끝낸다.
+   * 탈퇴 (3-4, 원칙 2의 예외: 개인정보보호법). 아이디 · 메일 · 비밀번호 해시 · 닉네임 · 차단 메모 · 마지막 접근을 지우고 모든 로그인을 끝낸다.
    * 줄은 남긴다: 글 · 댓글 · 신고 · 결정 기록이 회원 id를 가리킨다 (글은 "탈퇴한 회원"으로 보인다).
    * 아이디 'left:<id>' · 빈 해시 · 겹침 열쇠 'left:<id>'는 DB CHECK가 탈퇴한 줄에만 받는다. 이미 탈퇴했으면 409
    */
@@ -83,6 +86,7 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
     const gone = `left:${this.id}`;
     this.put('left_at', now);
     this.put('login_id', gone);
+    this.put('email', null);
     this.put('password_hash', '');
     this.put('nickname', Member.LEFT_NAME);
     this.put('nickname_key', gone);
@@ -98,9 +102,9 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
     return this.row.password_hash;
   }
 
-  /** 아이디 · 닉네임 (새 비밀번호가 이것과 같은지 MemberPassword가 본다) */
-  get loginId(): string {
-    return this.row.login_id;
+  /** 로그인에 쓰는 이름: 아이디, 메일로 가입했으면 메일의 @ 앞 (새 비밀번호가 이것과 같은지 MemberPassword가 본다) */
+  get loginName(): string {
+    return this.row.login_id ?? (this.row.email ?? '').split('@')[0] ?? '';
   }
 
   get nickname(): string {
@@ -152,6 +156,17 @@ export class Member extends TableEntity<MemberRow, MemberNew> {
     this.endingSessions = true;
     this.keptSession = null;
     this.issuedPassword = temporary;
+  }
+
+  /**
+   * 메일로 받은 인증코드로 비밀번호를 다시 정한다 (2026-11-26, 비밀번호를 잊었을 때). 코드 확인 · 새 비밀번호 규칙은 Service가 본다.
+   * 모든 로그인을 끝낸다 (비밀번호를 잊은 사이 남이 쓰던 로그인까지). 탈퇴한 회원은 Repository가 찾지 않는다
+   */
+  setPasswordByMail(passwordHash: string, now: Date): void {
+    this.put('password_hash', passwordHash);
+    this.put('password_changed_at', now);
+    this.endingSessions = true;
+    this.keptSession = null;
   }
 
   /** 이번 저장에서 로그인을 끝내는가 (Repository가 끝낸다) */

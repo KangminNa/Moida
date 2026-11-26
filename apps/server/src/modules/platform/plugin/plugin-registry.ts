@@ -2,6 +2,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ArchiveQuery } from '../archive/archive.query';
 import type { ArchiveRestoreService } from '../archive/archive-restore.service';
+import type { BaseMailer } from '../base/base-mailer';
 import type { Sql } from '../base/database';
 import type { DomainEvent } from '../base/event';
 import type { SecretBox } from '../base/secret-box';
@@ -31,6 +32,7 @@ export class PluginRegistry {
   private scheduled: readonly ScheduledJob[] = [];
   private pluginActions: readonly PluginAction[] = [];
   private loginMethods: readonly LoginMethod[] = [];
+  private mailSender: BaseMailer | null = null;
   private packageOperations: readonly PackageOperation[] = [];
   private states = new Map<string, PluginState>();
   private failures = new Map<string, string>();
@@ -81,6 +83,7 @@ export class PluginRegistry {
     const scheduled: ScheduledJob[] = [];
     const actions: PluginAction[] = [];
     const logins: LoginMethod[] = [];
+    let mailer: BaseMailer | null = null;
     const operations: PackageOperation[] = [];
     const failures = new Map<string, string>();
     for (const state of states) {
@@ -100,6 +103,7 @@ export class PluginRegistry {
         scheduled.push(...context.jobs);
         actions.push(...context.actions);
         operations.push(...context.operations);
+        mailer ??= context.mailer;
         for (const login of context.logins) {
           // 같은 이름의 로그인 방법은 먼저 켠 플러그인 것만 쓴다
           if (logins.some((l) => l.name === login.name))
@@ -120,6 +124,7 @@ export class PluginRegistry {
     this.scheduled = scheduled;
     this.pluginActions = actions;
     this.loginMethods = logins;
+    this.mailSender = mailer;
     this.packageOperations = operations;
     this.failures = failures;
   }
@@ -201,6 +206,11 @@ export class PluginRegistry {
   /** 동작 중인 로그인 방법들 (로그인 화면의 버튼) */
   logins(): readonly LoginMethod[] {
     return this.loginMethods;
+  }
+
+  /** 코어의 확인 메일을 보내는 길 (메일 플러그인이 켜져 있고 설정이 끝났을 때만) */
+  mailer(): BaseMailer | null {
+    return this.mailSender;
   }
 
   login(name: string): LoginMethod | null {

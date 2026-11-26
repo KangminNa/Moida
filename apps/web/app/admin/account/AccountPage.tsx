@@ -8,9 +8,10 @@ import { useAction } from '../../_lib/use-action';
 import { useNotify } from '../../_ui/notify';
 import { AccountForm } from './AccountForm';
 import { LinkedLogins } from './LinkedLogins';
+import { LoginEmail } from './LoginEmail';
 import { ProfileForm } from './ProfileForm';
 
-// 계정: 표시 이름, 비밀번호, 연결된 로그인. 이름을 저장하면 콘솔 틀(메뉴 아래 이름)도 서버에서 다시 그린다
+// 계정: 표시 이름, 로그인 메일, 비밀번호, 연결된 로그인. 이름을 저장하면 콘솔 틀(메뉴 아래 이름)도 서버에서 다시 그린다
 export function AccountPage({ owner: first, error }: { owner: Owner; error: string | null }) {
   const notify = useNotify();
   const router = useRouter();
@@ -44,6 +45,13 @@ export function AccountPage({ owner: first, error }: { owner: Owner; error: stri
         busy={save.busy !== null}
         problem={save.problem}
         onSubmit={rename}
+      />
+      <LoginEmail
+        owner={owner}
+        onChanged={(changed) => {
+          setOwner(changed);
+          router.refresh();
+        }}
       />
       <AccountForm onChanged={() => notify('비밀번호를 바꾸고 다른 기기의 로그인을 끝냈어요')} />
       <LinkedLogins onMessage={notify} />

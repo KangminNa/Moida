@@ -94,14 +94,15 @@ export interface MemberRow {
   renamed_at: Date | null;
   last_seen_at: Date | null;
   version: number;
-  login_id: string;
+  login_id: string | null;
   password_hash: string;
   password_changed_at: Date;
   terms_version: number | null;
   privacy_version: number | null;
   left_at: Date | null;
+  email: string | null;
 }
-export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at' | 'login_id' | 'password_hash' | 'password_changed_at'>;
+export type MemberNew = Partial<MemberRow> & Pick<MemberRow, 'id' | 'app_id' | 'nickname' | 'nickname_key' | 'age_confirmed_at' | 'password_hash' | 'password_changed_at'>;
 
 /** community.reports.reason (값 목록 CHECK) */
 export const REPORT_REASON = ['spam', 'abuse', 'illegal', 'privacy', 'other'] as const;

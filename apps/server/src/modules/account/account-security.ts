@@ -13,6 +13,7 @@ export class AccountSecurity implements OnModuleInit {
     'account.login.succeeded': () => 'login.succeeded',
     'account.session.ended': (d) => (d.how === 'logout' ? 'session.logout' : 'session.ended'),
     'account.password.changed': () => 'password.changed',
+    'account.login.changed': () => 'login.changed',
     'account.device.connected': () => 'device.connected',
     'account.device.revoked': (d) =>
       d.reason === 'token_reused' ? 'device.token_reused' : 'device.revoked',

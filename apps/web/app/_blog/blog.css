@@ -1259,6 +1259,17 @@
   border-top: 1px solid var(--line);
 }
 
+/* 메일 칸 옆의 "코드 받기" (2026-11-26 메일 인증) */
+.member-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.member-inline .input {
+  flex: 1;
+  min-width: 0;
+}
+
 .member-check {
   display: flex;
   align-items: center;

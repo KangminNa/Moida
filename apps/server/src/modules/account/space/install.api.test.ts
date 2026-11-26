@@ -39,7 +39,7 @@ describe('처음 설치', () => {
       scope: 'install',
     });
     const noPass = await api.request('POST', '/api/install/owner', TestUser.visitor, {
-      login: LOGIN,
+      email: LOGIN,
       password: PASSWORD,
     });
     assert.equal(noPass.status, 401);
@@ -56,11 +56,11 @@ describe('처음 설치', () => {
     assert.equal((await api.get('/api/install', browser)).json().step, 'owner');
   });
 
-  test('아이디 모양이 틀리거나 비밀번호가 짧거나 아이디와 같으면 400 (어느 칸인지)', async () => {
+  test('메일 모양이 틀리거나 비밀번호가 짧거나 메일(@ 앞)과 같으면 400 (어느 칸인지)', async () => {
     const cases: [object, string][] = [
-      [{ login: 'A b', password: PASSWORD }, 'login'],
-      [{ login: LOGIN, password: 'short' }, 'password'],
-      [{ login: 'owner-name', password: 'OWNER-NAME' }, 'password'],
+      [{ email: 'owner-name', password: PASSWORD }, 'email'],
+      [{ email: LOGIN, password: 'short' }, 'password'],
+      [{ email: 'owner-name@example.com', password: 'OWNER-NAME' }, 'password'],
     ];
     for (const [body, field] of cases) {
       const res = await api.request('POST', '/api/install/owner', browser, body);
@@ -71,7 +71,7 @@ describe('처음 설치', () => {
 
   test('주인 계정을 만들면 바로 로그인되고 설치가 끝난다. 비밀번호 원문은 어디에도 없다', async () => {
     const res = await api.request('POST', '/api/install/owner', browser, {
-      login: 'Owner',
+      email: ' Owner@Example.com ',
       password: PASSWORD,
     });
     assert.equal(res.status, 200);
@@ -80,14 +80,14 @@ describe('처음 설치', () => {
     assert.equal(cookies.cairn_install, '', '통행증은 다 썼으니 지운다');
     owner = new TestUser({ cairn_session: cookies.cairn_session ?? '' });
     assert.deepEqual((await api.get('/api/auth/me', owner)).json(), {
-      login: 'owner',
+      login: 'owner@example.com',
       displayName: null,
       name: 'owner',
       version: 1,
     });
     assert.deepEqual((await api.get('/api/install')).json(), { installed: true, step: 'done' });
     const [row] = await api.service(Database).sql`
-      SELECT password_hash FROM account.users WHERE login = 'owner'`;
+      SELECT password_hash FROM account.users WHERE login = 'owner@example.com'`;
     assert.match(String(row?.password_hash), /^scrypt\$/);
     assert.equal(String(row?.password_hash).includes(PASSWORD), false);
   });
@@ -100,7 +100,7 @@ describe('설치가 끝난 뒤', () => {
     });
     assert.equal(code.status, 409);
     const again = await api.request('POST', '/api/install/owner', browser, {
-      login: 'second',
+      email: 'second@example.com',
       password: 'another-password',
     });
     assert.equal(again.status, 409);
@@ -112,11 +112,11 @@ describe('설치가 끝난 뒤', () => {
     assert.equal(wrong.status, 401);
     assert.equal(nobody.status, 401);
     assert.deepEqual(wrong.json(), nobody.json());
-    assert.equal(wrong.json().message, '맞지 않는 아이디나 비밀번호예요');
+    assert.equal(wrong.json().message, '맞지 않는 메일이나 비밀번호예요');
   });
 
-  test('주인은 아이디·비밀번호로 로그인한다 (아이디는 대문자로 넣어도 된다)', async () => {
-    const res = await api.login('OWNER', PASSWORD);
+  test('관리자는 메일 · 비밀번호로 로그인한다 (대문자로 넣어도 된다)', async () => {
+    const res = await api.login('OWNER@Example.com', PASSWORD);
     assert.equal(res.status, 200);
     assert.ok(res.cookies().cairn_session);
   });
@@ -286,7 +286,7 @@ describe('표시 이름과 로고', () => {
     });
     assert.equal(named.status, 200, named.text);
     assert.deepEqual(named.json(), {
-      login: 'owner',
+      login: 'owner@example.com',
       displayName: '나 강민',
       name: '나 강민',
       version: me.version + 1,
@@ -308,7 +308,7 @@ describe('표시 이름과 로고', () => {
     assert.deepEqual(
       [cleared.json().displayName, cleared.json().name],
       [null, 'owner'],
-      '비우면 아이디',
+      '비우면 메일의 @ 앞',
     );
   });
 

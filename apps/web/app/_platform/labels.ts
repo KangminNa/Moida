@@ -10,6 +10,7 @@ export const SECURITY_KINDS: Readonly<Record<string, string>> = {
   'session.logout': '로그아웃',
   'session.ended': '로그인 끝내기',
   'password.changed': '비밀번호 바꿈',
+  'login.changed': '로그인 메일 바꿈',
   'install.failed': '설치 코드 틀림',
   'device.connected': '기기 연결',
   'device.revoked': '기기 연결 해제',

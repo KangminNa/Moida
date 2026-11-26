@@ -66,8 +66,9 @@ async function send<T>(path: string, init: RequestInit): Promise<ApiReply<T>> {
 
 /** 칸 이름 → 화면 이름 (오류가 어느 칸인지 알려줄 때) */
 const FIELD_LABELS: Record<string, string> = {
-  code: '설치 코드',
-  login: '아이디',
+  code: '코드',
+  email: '메일',
+  login: '메일',
   loginId: '아이디',
   nickname: '닉네임',
   body: '본문',

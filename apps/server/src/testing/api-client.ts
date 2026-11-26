@@ -65,7 +65,7 @@ export class ApiResult {
 //   await api.close();
 export class ApiClient {
   /** 테스트용 주인 계정 */
-  static readonly OWNER_LOGIN = 'owner';
+  static readonly OWNER_LOGIN = 'owner@example.com';
   static readonly OWNER_PASSWORD = 'test-password-123';
 
   /**
@@ -214,7 +214,7 @@ export class ApiClient {
     return new TestUser(verified.cookies());
   }
 
-  /** 아이디·비밀번호 로그인 (응답 그대로) */
+  /** 메일(전에 만든 계정은 아이디) · 비밀번호 로그인 (응답 그대로) */
   async login(login: string, password: string): Promise<ApiResult> {
     return this.request('POST', '/api/auth/login', TestUser.visitor, { login, password });
   }
@@ -225,7 +225,7 @@ export class ApiClient {
     const done = status.installed
       ? await this.login(ApiClient.OWNER_LOGIN, ApiClient.OWNER_PASSWORD)
       : await this.request('POST', '/api/install/owner', await this.beginInstall(), {
-          login: ApiClient.OWNER_LOGIN,
+          email: ApiClient.OWNER_LOGIN,
           password: ApiClient.OWNER_PASSWORD,
         });
     const session = done.cookies().cairn_session;

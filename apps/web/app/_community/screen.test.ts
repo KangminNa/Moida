@@ -9,6 +9,7 @@ const me = {
   member: {
     id: 'm1',
     loginId: 'reader',
+    email: null,
     nickname: '읽는사람',
     joinedAt: '2026-11-19T00:00:00.000Z',
     writableAt: '2026-11-19T00:05:00.000Z',

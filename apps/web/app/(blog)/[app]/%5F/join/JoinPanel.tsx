@@ -14,7 +14,8 @@ const MISMATCH: ApiReply<MemberSelf> = {
   error: { code: 'mismatch', message: '비밀번호 확인이 맞지 않아요' },
 };
 
-// 가입: 아이디 · 비밀번호 · 닉네임 · 만 14세 이상 확인 · 약관 동의 (규칙은 서버가 본다: 커뮤니티 CLAUDE.md의 회원 규칙).
+// 가입: 메일 인증코드 · 비밀번호 · 닉네임 · 만 14세 이상 확인 · 약관 동의 (규칙은 서버가 본다: 커뮤니티 CLAUDE.md의 회원 규칙).
+// 메일을 넣고 "코드 받기" → 메일로 온 6자리를 넣는다 (2026-11-26 메일 인증 가입). 가입한 메일이어도 답은 같다 (그 메일로 안내가 간다).
 // 약관(3-4)은 이 화면에서 펼쳐 읽고 동의한다 (다른 화면으로 가면 쓰던 칸이 사라진다). 읽은 버전을 함께 보내고,
 // 그사이 새 버전이 올라왔으면 서버가 409로 다시 읽게 한다. 약관이 아직 없으면 가입을 받지 않는다
 // community: 커뮤니티 앱인가 (글 · 댓글의 가입 직후 대기를 알린다. 그 밖의 앱에는 글 · 댓글이 없다)
@@ -31,14 +32,24 @@ export function JoinPanel({
   terms: Term | null;
   privacy: Term | null;
 }) {
-  const [loginId, setLoginId] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
   const [nickname, setNickname] = useState('');
   const [adult, setAdult] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const action = useAction();
+  const sending = useAction();
   const busy = action.busy !== null;
+
+  async function sendCode() {
+    const reply = await sending.run('code', () =>
+      memberApi<null>(csrf, 'POST', 'join/code', { email }),
+    );
+    if (reply?.ok) setSentTo(email.trim());
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -46,7 +57,8 @@ export function JoinPanel({
       password !== again
         ? Promise.resolve(MISMATCH)
         : memberApi<MemberSelf>(csrf, 'POST', 'join', {
-            loginId,
+            email,
+            code,
             password,
             nickname,
             ageConfirmed: adult,
@@ -61,17 +73,45 @@ export function JoinPanel({
   return (
     <form className="member-form" onSubmit={submit}>
       <label className="field">
-        <span>아이디</span>
+        <span>메일</span>
+        <span className="member-inline">
+          <input
+            className="input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+          />
+          <button
+            className="ghost"
+            type="button"
+            disabled={sending.busy !== null || !email}
+            onClick={sendCode}
+          >
+            {sentTo ? '다시 받기' : '코드 받기'}
+          </button>
+        </span>
+        <small>
+          {sentTo
+            ? `${sentTo}로 6자리 코드를 보냈어요 (10분). 없으면 스팸함을 봐 주세요`
+            : '로그인에 쓰는 메일이에요. 바꿀 수 없어요'}
+        </small>
+        {sending.problem && <small className="error">{sending.problem}</small>}
+      </label>
+      <label className="field">
+        <span>인증코드</span>
         <input
           className="input"
-          value={loginId}
-          onChange={(e) => setLoginId(e.target.value)}
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="6자리"
           required
         />
-        <small>영문 소문자로 시작하는 4~20자. 바꿀 수 없어요</small>
       </label>
       <label className="field">
         <span>비밀번호</span>
@@ -83,7 +123,7 @@ export function JoinPanel({
           autoComplete="new-password"
           required
         />
-        <small>10자 이상. 아이디 · 닉네임과 다르게</small>
+        <small>10자 이상. 메일 · 닉네임과 다르게</small>
       </label>
       <label className="field">
         <span>비밀번호 확인</span>
@@ -132,7 +172,9 @@ export function JoinPanel({
       <button
         className="cta"
         type="submit"
-        disabled={busy || !loginId || !password || !again || !nickname || !adult || !agreed}
+        disabled={
+          busy || code.length !== 6 || !password || !again || !nickname || !adult || !agreed
+        }
       >
         {busy ? '가입하는 중' : '가입'}
       </button>

@@ -843,17 +843,18 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
   white-space: nowrap;
 }
 
+/* Moida 표식이 모여들며 나타남 (_ui/MoidaMark의 gather): 점마다 바깥 방향 --dx · --dy에서 가운데로 */
 .mark .st {
   opacity: 0;
   transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: stack 0.5s var(--ease-out) forwards;
+  transform-origin: center;
+  animation: gather 0.55s var(--ease-out) forwards;
 }
 
-@keyframes stack {
+@keyframes gather {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.4);
   }
   to {
     opacity: 1;
@@ -1903,7 +1904,7 @@ a.chip {
   overflow-wrap: anywhere;
 }
 
-/* 사이트 로고: 콘솔 왼쪽 위 · 블로그 머리 (Cairn 표시와 같은 크기), 사이트 메뉴의 미리 보기 */
+/* 사이트 로고: 콘솔 왼쪽 위 · 블로그 머리 (Moida 표식과 같은 크기), 사이트 메뉴의 미리 보기 */
 .brand-logo {
   width: 22px;
   height: 22px;

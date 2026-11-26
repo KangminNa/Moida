@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="apps/web/app/cairn.svg" width="88" alt="Moida">
+<img src="docs/moida.svg" width="88" alt="Moida">
 
 # Moida
 

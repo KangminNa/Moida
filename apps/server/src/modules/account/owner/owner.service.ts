@@ -39,7 +39,7 @@ import { PasswordPolicy } from './password.policy';
 // 틀린 · 막힌 로그인은 저장할 엔티티가 없어 여기서 SecurityLog에 바로 남기고, 오류에 표시해 오류 필터가 다시 남기지 않게 한다.
 @Injectable()
 export class OwnerService extends BaseService {
-  private static readonly WRONG = '맞지 않는 아이디나 비밀번호예요';
+  private static readonly WRONG = '맞지 않는 메일이나 비밀번호예요';
   /** 틀린 로그인은 한 곳에서 · 한 아이디에 정한 수까지 (맞는 로그인은 세지 않음) */
   private readonly byPlace = new AttemptLimiter(
     WebSession.TRIES_PER_PLACE,
@@ -73,12 +73,12 @@ export class OwnerService extends BaseService {
     userAgent: string,
   ): Promise<WebSession> {
     const spaceId = this.install.assertCanClaim(await this.spaces.installStatus(actor, pass));
-    this.passwords.check(req.login, req.password);
+    this.passwords.check(req.email, req.password);
     const hash = await this.hasher.hash(req.password);
     return this.transaction(async (tx) => {
       const owners = new OwnerRepository(tx);
       const now = new Date();
-      const owner = Owner.create(spaceId, req.login, hash, now);
+      const owner = Owner.create(spaceId, req.email, hash, now);
       const session = owner.startSession(ip, userAgent, now, 'install');
       await owners.save(owner);
       return session;

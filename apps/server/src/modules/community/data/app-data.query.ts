@@ -140,7 +140,7 @@ export class AppDataQuery extends BaseQuery {
       zip.add('data.sql', `${data.join('\n')}\n`);
     });
     const members = await this.sql<Record<string, unknown>[]>`
-      SELECT id, login_id, nickname, password_hash, joined_at, blocked_until,
+      SELECT id, login_id, email, nickname, password_hash, joined_at, blocked_until,
              terms_version, privacy_version, left_at
       FROM community.members WHERE app_id = ${req.appId} ORDER BY id`;
     zip.add('members.json', JSON.stringify({ members }, null, 2));

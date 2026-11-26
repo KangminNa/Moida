@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 2 20 20" width="88" height="88">
+<style>circle{fill:#18181b}@media (prefers-color-scheme:dark){circle{fill:#f4f4f5}}</style>
+<circle cx="12" cy="4" r="1.9"/>
+<circle cx="18.93" cy="8" r="1.9"/>
+<circle cx="18.93" cy="16" r="1.9"/>
+<circle cx="12" cy="20" r="1.9"/>
+<circle cx="5.07" cy="16" r="1.9"/>
+<circle cx="5.07" cy="8" r="1.9"/>
+<circle cx="12" cy="12" r="3.4"/>
+</svg>

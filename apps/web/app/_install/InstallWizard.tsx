@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import type { Device, InstallStatus, Owner, SpaceInfo } from '../_account/types';
 import { api, describe } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
-import { CairnMark } from '../_ui/CairnMark';
+import { MoidaMark } from '../_ui/MoidaMark';
 import { useToast } from '../_ui/useToast';
 import { DevicesPanel } from '../admin/devices/DevicesPanel';
 import { PluginsPanel } from '../admin/plugins/PluginsPanel';
@@ -45,7 +45,7 @@ export function InstallWizard({
     <>
       <header className="top">
         <a className="brand" href="/" aria-label="홈">
-          <CairnMark />
+          <MoidaMark />
           Moida
         </a>
       </header>
@@ -143,7 +143,7 @@ function CodeStep({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={verify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <CairnMark size={64} stack />
+      <MoidaMark size={64} gather />
       <h1>내 서버에 Moida를 설치해요</h1>
       <p>
         서버를 가진 사람인지 확인할게요. 서버 로그에 나온 설치 코드를 넣어 주세요. 터미널에서{' '}
@@ -173,7 +173,7 @@ function CodeStep({ onDone }: { onDone: () => void }) {
 
 // 계정 만들기는 손으로 둔다: 401(설치 통행증이 끝남)에 이 화면만의 문구가 있어 useAction으로 쓸 수 없다
 function OwnerStep({ onDone }: { onDone: (login: string) => Promise<void> }) {
-  const [login, setLogin] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -184,9 +184,9 @@ function OwnerStep({ onDone }: { onDone: (login: string) => Promise<void> }) {
     if (password !== again) return setError('비밀번호를 똑같이 두 번 넣어 주세요');
     setBusy(true);
     setError(null);
-    const reply = await api('POST', '/api/install/owner', { login, password });
+    const reply = await api('POST', '/api/install/owner', { email, password });
     setBusy(false);
-    if (reply.ok) return void (await onDone(login.trim().toLowerCase()));
+    if (reply.ok) return void (await onDone(email.trim().toLowerCase()));
     setError(
       reply.status === 401
         ? '새로 고친 뒤 설치 코드를 다시 넣어 주세요 (10분 지남)'
@@ -199,19 +199,21 @@ function OwnerStep({ onDone }: { onDone: (login: string) => Promise<void> }) {
       <h1>관리자 계정을 만들어요</h1>
       <p>블로그를 관리할 계정이에요. 하나만 만들 수 있고, 만들면 바로 로그인돼요.</p>
       <label className="field">
-        <span>아이디</span>
+        <span>메일</span>
         <input
           className="input"
-          value={login}
-          onChange={(e) => setLogin(e.target.value)}
-          autoComplete="username"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           autoCapitalize="none"
           spellCheck={false}
-          pattern="[A-Za-z0-9_\-]{3,40}"
-          maxLength={40}
+          maxLength={254}
           required
         />
-        <small>영문 소문자·숫자·-·_로 3~40자</small>
+        <small>
+          로그인에 써요. 비밀번호를 잊으면 이 메일로 인증코드를 받아요 (메일 플러그인을 켠 뒤)
+        </small>
       </label>
       <label className="field">
         <span>비밀번호</span>
@@ -241,7 +243,7 @@ function OwnerStep({ onDone }: { onDone: (login: string) => Promise<void> }) {
       <button
         className="cta"
         type="submit"
-        disabled={busy || login.length < 3 || password.length < 10}
+        disabled={busy || !email.includes('@') || password.length < 10}
       >
         <span>{busy ? '만드는 중' : '관리자 계정 만들기'}</span>
         <span className="arr">→</span>
@@ -288,7 +290,7 @@ function DeviceStep({
 function NotOwner() {
   return (
     <>
-      <CairnMark size={64} stack />
+      <MoidaMark size={64} gather />
       <h1>이미 설치된 블로그예요</h1>
       <p>로그인하면 남은 설정(사이트 정보, 플러그인)을 이어서 할 수 있어요.</p>
       <a className="cta" href="/login?return=/install">

@@ -14,8 +14,8 @@ export class OwnerView {
       login: this.row.login,
       /** 정한 이름. 비어 있으면 null */
       displayName: this.row.display_name,
-      /** 화면에 보일 이름: 정한 이름, 없으면 아이디 */
-      name: this.row.display_name ?? this.row.login,
+      /** 화면에 보일 이름: 정한 이름, 없으면 아이디 (메일이면 @ 앞) */
+      name: this.row.display_name ?? this.row.login.split('@')[0] ?? this.row.login,
       version: this.row.version,
     };
   }

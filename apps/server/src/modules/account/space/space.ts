@@ -73,7 +73,7 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
     };
   }
 
-  /** 로고: platform.blobs에 저장한 그림의 해시. null이면 뺀다 (화면은 Cairn 표시로 돌아간다) */
+  /** 로고: platform.blobs에 저장한 그림의 해시. null이면 뺀다 (화면은 Moida 표식으로 돌아간다) */
   setLogo(blobHash: string | null): void {
     this.put('logo_blob_hash', blobHash);
   }

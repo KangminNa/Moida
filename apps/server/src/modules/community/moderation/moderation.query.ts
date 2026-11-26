@@ -59,7 +59,7 @@ export class ModerationQuery extends BaseQuery {
         Authored & { comments: number })[]
     >`
       SELECT t.id, t.member_id, t.title, left(t.body, 400) AS body, t.state, t.hidden_by, t.created_at,
-        t.version, m.nickname, m.login_id,
+        t.version, m.nickname, coalesce(m.login_id, m.email) AS login_id,
         (SELECT count(*) FROM community.reports r WHERE r.topic_id = t.id AND r.state = 'open') AS open_reports,
         (SELECT count(*) FROM community.comments c WHERE c.topic_id = t.id) AS comments
       FROM community.topics t JOIN community.members m ON m.id = t.member_id
@@ -90,7 +90,7 @@ export class ModerationQuery extends BaseQuery {
         Authored)[]
     >`
       SELECT t.id, t.member_id, t.title, t.body, t.state, t.hidden_by, t.revisions, t.created_at,
-        t.edited_at, t.decided_at, t.version, m.nickname, m.login_id,
+        t.edited_at, t.decided_at, t.version, m.nickname, coalesce(m.login_id, m.email) AS login_id,
         (SELECT count(*) FROM community.reports r WHERE r.topic_id = t.id AND r.state = 'open') AS open_reports
       FROM community.topics t JOIN community.members m ON m.id = t.member_id
       WHERE t.app_id = ${req.appId} AND t.id = ${req.id}`;
@@ -102,7 +102,7 @@ export class ModerationQuery extends BaseQuery {
       > &
         Authored)[]
     >`
-      SELECT c.id, c.member_id, c.body, c.state, c.hidden_by, c.created_at, c.version, m.nickname, m.login_id,
+      SELECT c.id, c.member_id, c.body, c.state, c.hidden_by, c.created_at, c.version, m.nickname, coalesce(m.login_id, m.email) AS login_id,
         (SELECT count(*) FROM community.reports r WHERE r.comment_id = c.id AND r.state = 'open') AS open_reports
       FROM community.comments c JOIN community.members m ON m.id = c.member_id
       WHERE c.topic_id = ${topic.id} ORDER BY c.id LIMIT ${ModerationQuery.COMMENTS}`;
@@ -137,7 +137,7 @@ export class ModerationQuery extends BaseQuery {
         left(coalesce(c.body, t.body), 400) AS excerpt,
         coalesce(c.state, t.state) AS target_state,
         coalesce(c.version, t.version) AS target_version,
-        au.id AS author_id, au.nickname AS author_nickname, au.login_id AS author_login_id
+        au.id AS author_id, au.nickname AS author_nickname, coalesce(au.login_id, au.email) AS author_login_id
       FROM community.reports r
       JOIN community.members rep ON rep.id = r.member_id
       LEFT JOIN community.topics t ON t.id = r.topic_id
@@ -165,7 +165,7 @@ export class ModerationQuery extends BaseQuery {
         | 'version'
       > & { topics: number; comments: number })[]
     >`
-      SELECT m.id, m.login_id, m.nickname, m.joined_at, m.last_seen_at, m.blocked_until,
+      SELECT m.id, coalesce(m.login_id, m.email) AS login_id, m.nickname, m.joined_at, m.last_seen_at, m.blocked_until,
         m.password_changed_at, m.version,
         (SELECT count(*) FROM community.topics t WHERE t.member_id = m.id) AS topics,
         (SELECT count(*) FROM community.comments c WHERE c.member_id = m.id) AS comments
