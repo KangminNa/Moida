@@ -181,6 +181,14 @@ describe('브라우저 푸시 (/api/push)', () => {
     assert.equal(pushed.length, 1, '두 번 돌아도 한 번');
     assert.equal(pushed[0]?.title, '새 기기를 연결했어요');
     assert.equal(pushed[0]?.link, '/admin/devices');
+    const sent = await db.sql<{ title: string; link: string }[]>`
+      SELECT payload->>'title' AS title, payload->>'link' AS link FROM platform.outbox
+      WHERE topic = 'platform.notice.sent' AND payload->>'tag' = ${String(pushed[0]?.tag)}`;
+    assert.deepEqual(
+      sent.map((r) => [r.title, r.link]),
+      [['새 기기를 연결했어요', '/admin/devices']],
+      '같은 알림을 플러그인(이메일)도 받게 한 번 남긴다',
+    );
     await job.run();
     assert.equal(to(b).length, 1, '다룬 알림은 다시 보내지 않는다');
 
@@ -217,8 +225,13 @@ describe('브라우저 푸시 (/api/push)', () => {
       }),
       201,
     );
+    const [sentBefore] = await db.sql`
+      SELECT count(*)::int AS n FROM platform.outbox WHERE topic = 'platform.notice.sent'`;
     await job.run();
     assert.equal(to(b).length, 0);
+    const [sentAfter] = await db.sql`
+      SELECT count(*)::int AS n FROM platform.outbox WHERE topic = 'platform.notice.sent'`;
+    assert.equal(sentAfter?.n, sentBefore?.n, '보내지 않은 알림은 플러그인에도 넘기지 않는다');
     const [left] = await db.sql`
       SELECT count(*)::int AS n FROM platform.notifications
       WHERE kind = 'account.device.connected' AND push_sent_at IS NULL`;

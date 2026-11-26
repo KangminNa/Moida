@@ -10,6 +10,7 @@
 //     결재를 기다리던 작업을 다시 대기열로 (browser-tabs의 누르기 계획: 계획을 승인하면 같은 일이 이어서 누른다)
 // 0.10 (2026-11-23): work.sendChat — uses의 chat을 허락받은 쓰기 동작이 관리자의 대화에 말을 넣는다 (ChatSent, messenger-telegram)
 // 0.11 (2026-11-25): work.place · AttemptLimiter · TooManyRequests — 방문자가 부르는 동작이 곳(IP)마다 횟수를 센다 (map의 찾기)
+// 0.12 (2026-11-26): platform.notice.sent 이벤트 — 푸시로 가는 알림(같은 때 · 같은 묶음)을 플러그인도 받는다 (email)
 export {
   ActionResult,
   Actor,
