@@ -173,11 +173,22 @@ export class ChatQuery extends BaseQuery {
         WHERE c.status = ANY(${open}::text[])
       )
       SELECT t.id, t.agent_id, t.title, t.status, t.wait_reason, t.wait_until, t.created_at, t.parent_id,
-        a.name AS agent,
-        (SELECT e.body FROM task.task_events e
-          WHERE e.task_id = t.id AND e.body <> '' ORDER BY e.id DESC LIMIT 1) AS last_event
+        a.name AS agent, last.body AS last_event,
+        CASE
+          WHEN t.status = ${Task.QUEUED} THEN 'lease'
+          WHEN t.status = ${Task.WAITING} AND t.wait_reason = 'approval' THEN 'approve'
+          WHEN t.status = ${Task.WAITING} THEN 'run'
+          WHEN EXISTS (SELECT 1 FROM task.outputs o WHERE o.run_id = run.id) THEN 'upload'
+          WHEN last.kind = 'result' THEN 'check'
+          WHEN last.at >= run.started_at THEN 'run'
+          ELSE 'prepare'
+        END AS stage
       FROM tree JOIN task.tasks t ON t.id = tree.id
       LEFT JOIN task.agents a ON a.id = t.agent_id
+      LEFT JOIN LATERAL (SELECT e.body, e.kind, e.at FROM task.task_events e
+        WHERE e.task_id = t.id AND e.body <> '' ORDER BY e.id DESC LIMIT 1) last ON true
+      LEFT JOIN LATERAL (SELECT r.id, r.started_at FROM task.task_runs r
+        WHERE r.task_id = t.id ORDER BY r.seq DESC LIMIT 1) run ON true
       ORDER BY t.created_at, t.id`;
   }
 

@@ -3734,6 +3734,129 @@ ul.picked > .chip {
   color: var(--faint);
 }
 
+/* 일꾼 진행 단계 (LaneStages, 2026-11-26): 아이콘 여섯을 선으로 잇고, 지난 단계는 채우고 지금 단계는 숨 쉬듯 */
+.lane-stages {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  margin: 8px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.lane-stages::before,
+.lane-stages::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: calc(100% / 12);
+  height: 2px;
+  border-radius: 1px;
+}
+
+.lane-stages::before {
+  right: calc(100% / 12);
+  background: var(--line);
+}
+
+.lane-stages::after {
+  width: calc((100% - 100% / 6) * var(--done, 0));
+  background: var(--accent);
+  transition: width 0.6s var(--ease-out);
+}
+
+.lane-stages li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--faint);
+}
+
+.lane-stage-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--raised);
+  transition:
+    background 0.3s,
+    color 0.3s,
+    box-shadow 0.3s;
+}
+
+.lane-stage-dot .menu-ico {
+  width: 12px;
+  height: 12px;
+}
+
+.lane-stage-name {
+  font-size: 0.6563rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lane-stages li.done {
+  color: var(--muted);
+}
+
+.lane-stages li.done .lane-stage-dot {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.lane-stages li.now {
+  color: var(--accent-ink);
+}
+
+.lane-stages li.now .lane-stage-dot {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: lane-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes lane-pulse {
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+.lane-event {
+  animation: lane-rise 0.4s var(--ease-out);
+}
+
+@keyframes lane-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lane-stages li.now .lane-stage-dot,
+  .lane-event {
+    animation: none;
+  }
+
+  .lane-stages::after,
+  .lane-stage-dot {
+    transition: none;
+  }
+}
+
 @media (max-width: 1180px) {
   .chat-team {
     display: none;
