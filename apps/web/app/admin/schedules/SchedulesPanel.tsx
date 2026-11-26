@@ -84,7 +84,7 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
       </header>
       <p className="note">
         계기에 맞춰 지시대로 작업 · 대화 회차 · 페이지 새 버전을 만들어요. 앞 일이 끝나지 않았거나
-        담당이 쉬면 그 차례는 건너뛰고, 하루 한도에 닿으면 그날은 더 만들지 않아요
+        담당이 쉬면 그 차례는 건너뛰어요. 하루 한도에 닿으면 그날은 더 만들지 않아요
       </p>
       {agentId && (
         <p className="note">

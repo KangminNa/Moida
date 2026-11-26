@@ -60,7 +60,7 @@ export function AppOverview({ app }: { app: AdminApp }) {
         label="이 앱에 맡기기"
         placeholder={`예: ${app.name}에 이번 주 글 하나 써 줘`}
         submit="맡기기"
-        hint="대표가 받아 일꾼에게 맡기고, 결과는 대화의 카드로"
+        hint="대표가 받아 일꾼에게 맡기고 결과는 대화의 카드로"
         busy={ask.busy !== null}
         problem={ask.problem}
         onSubmit={send}

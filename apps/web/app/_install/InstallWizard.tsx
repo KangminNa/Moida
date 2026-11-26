@@ -197,7 +197,7 @@ function OwnerStep({ onDone }: { onDone: (login: string) => Promise<void> }) {
   return (
     <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <h1>관리자 계정을 만들어요</h1>
-      <p>블로그를 관리할 계정이에요. 하나만 만들 수 있고, 만들면 바로 로그인돼요.</p>
+      <p>블로그를 관리할 계정이에요. 하나만 만들 수 있고 만들면 바로 로그인돼요.</p>
       <label className="field">
         <span>메일</span>
         <input

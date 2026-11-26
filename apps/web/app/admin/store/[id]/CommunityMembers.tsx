@@ -77,7 +77,7 @@ export function CommunityMembers({ appId }: { appId: string }) {
           <b>{reset.loginId}의 임시 비밀번호</b>
           <code className="community-secret">{reset.password}</code>
           <small>
-            이 화면을 닫으면 다시 볼 수 없어요. 회원에게 직접 전하고, 로그인한 뒤 바꾸게 해 주세요
+            이 화면을 닫으면 다시 볼 수 없어요. 회원에게 직접 전하고 로그인한 뒤 바꾸게 해 주세요
           </small>
           <div className="row">
             <button

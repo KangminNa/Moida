@@ -43,7 +43,7 @@ export function PagesPanel({ watch }: { watch: string | null }) {
         <h1>페이지</h1>
       </header>
       <p className="note">
-        물으면 AI가 찾아보고 웹 페이지로 답해요. 끝나면 바로 주소가 생기고, 공개로 바꾸기 전에는
+        물으면 AI가 찾아보고 웹 페이지로 답해요. 끝나면 바로 주소가 생기고 공개로 바꾸기 전에는
         로그인한 나만 봐요
       </p>
       <InstructionForm

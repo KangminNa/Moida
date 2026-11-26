@@ -56,7 +56,7 @@ export function ConsentCard({
               {consent.app && (
                 <p className="warn" role="alert">
                   {consent.app} 앱의 연결이에요. 방금 {consent.app}에서 직접 연결을 눌렀을 때만
-                  승인하고, 다른 사람이 보낸 링크라면 거절해요
+                  승인하고 다른 사람이 보낸 링크라면 거절해요
                 </p>
               )}
               <ul className="uses" aria-label="받는 권한">

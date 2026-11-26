@@ -4008,6 +4008,93 @@ ul.picked > .chip {
 
 /* 결과 카드 (2차 2단계): 항목마다 고르는 칸, 검토 의견, 승인 · 수정 요청 · 반려 */
 /* 결과 카드: 떠 있는 카드 (선 대신 그림자), 승인은 크게 */
+/* 정한 결과 카드 (CardSettled, 2026-11-26): 카드가 접히며 빠지고 정한 것 한 줄이 아래에서 올라온다 */
+.card-settled {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-leaving {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  animation: card-leave 0.5s var(--ease-out);
+}
+
+.card-leaving > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@keyframes card-leave {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.card-settled-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--raised);
+  color: var(--fg);
+  font-weight: 600;
+  animation: card-settled-rise 0.4s 0.3s var(--ease-out) both;
+}
+
+.card-settled-line.approve {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.card-settled-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.card-settled-line.approve .card-settled-mark {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.card-settled-mark .menu-ico {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes card-settled-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-leaving {
+    display: none;
+  }
+
+  .card-settled-line {
+    animation: none;
+  }
+}
+
 .result-card {
   display: flex;
   flex-direction: column;

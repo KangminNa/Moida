@@ -54,7 +54,7 @@ export default function TelegramPage({ call, notify }: Props) {
   return (
     <div className="stack">
       <p className="note">
-        텔레그램에서 봇에게 쓰면 대표에게 맡겨지고, 답이 텔레그램으로 와요. 승인은 콘솔에서 해요.
+        텔레그램에서 봇에게 쓰면 대표에게 맡겨지고 답이 텔레그램으로 와요. 승인은 콘솔에서 해요.
         비밀번호 같은 비밀은 보내지 마요 (대화에 남아요)
       </p>
       {!ready && (

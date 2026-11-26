@@ -59,7 +59,7 @@ export function GoalRunTarget({ approval }: { approval: Approval }) {
           {approval.action === GOAL_COMPLETE
             ? '승인하면 목표 실행을 완료로 닫아요.'
             : '승인하면 다음 회차로 가요 (한도에 닿았으면 한 회차 늘려요).'}{' '}
-          수정 요청은 메모를 다음 회차의 지시로 넘기고, 반려하면 멈춰요
+          수정 요청은 메모를 다음 회차의 지시로 넘겨요. 반려하면 멈춰요
         </p>
       )}
       <div>

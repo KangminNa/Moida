@@ -84,7 +84,7 @@ export function PlanTarget({ approval }: { approval: Approval }) {
     <section className="preview" aria-label="누르기 계획">
       <b>{approval.note ?? '누르기 계획'}</b>
       <p className="note">
-        승인하면 이 일이 이어서 돌고, 버튼마다 러너가 같은 사이트 안에서 다시 찾아 눌러요. 계획한
+        승인하면 이 일이 이어서 돌아요. 버튼마다 러너가 같은 사이트 안에서 다시 찾아 눌러요. 계획한
         횟수를 넘거나 다른 사이트의 버튼은 누르지 않아요. 누른 것은{' '}
         <Link href={BROWSER_PAGE}>브라우저</Link>의 클릭에 하나씩 남아요
       </p>

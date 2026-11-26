@@ -53,7 +53,7 @@ export function PageEditForm({
           rows={4}
           value={aim}
           maxLength={DIRECTION_MAX}
-          placeholder="예: 매주 월요일 숫자를 새로 채우고, 지난주와 달라진 점을 맨 위에"
+          placeholder="예: 매주 월요일 숫자를 새로 채우고 지난주와 달라진 점을 맨 위에"
           onChange={(e) => setAim(e.target.value)}
         />
         <small>새 버전을 만들 때 지시와 함께 읽음</small>

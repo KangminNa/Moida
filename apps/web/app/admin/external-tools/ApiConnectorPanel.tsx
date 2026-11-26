@@ -158,7 +158,7 @@ export function ApiConnectorPanel() {
                 {c.note && <small className="clamp">제안한 까닭: {c.note}</small>}
                 {c.status === 'proposed' && (
                   <small>
-                    승인을 기다려요: <Link href="/admin/approvals">승인</Link>에서 정하면 켜지고, 그
+                    승인을 기다려요: <Link href="/admin/approvals">승인</Link>에서 정하면 켜지고 그
                     뒤 키를 넣어요
                   </small>
                 )}

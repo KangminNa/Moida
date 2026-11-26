@@ -170,13 +170,12 @@ import { WebPageGateway } from './web/web-page.gateway';
     ChatInspectService,
     ChatInspectHandler,
     ChatCardHandler,
-    // 평가가 남는 팀 (2026-11-20): 끝난 검토 · 검수 작업 → 판정을 점수와 함께 쌓는다 (성적표 · 주간 팀 점검)
+    // 평가가 남는 팀 (2026-11-20): 끝난 검토 · 검수 작업 → 판정을 점수와 함께 쌓는다 (성적표)
     VerdictService,
     VerdictHandler,
     // 피드백에서 배우기 (2026-11-20): 관리자의 수정 요청 메모가 쌓이면 대표에게 배우기 일
     LessonQuery,
     LessonHandler,
-    // 주간 팀 점검 (2026-11-20): 7일마다 대표에게 성적표로 팀을 점검하는 일
     // 대화의 만들기 일이 낸 앱 코드의 확인 대기 버전 → 결과 카드의 공개 승인 (스토어 1-6b)
     AppCodeCardHandler,
     // 승인 뒤 이어서 (O-2): 대표가 continue로 올린 설정 바꾸기가 적용되어 끝난 회차 → 같은 대화의 다음 회차

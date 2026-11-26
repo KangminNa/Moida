@@ -8,6 +8,7 @@ import { useApps } from '../../_blog/live';
 import { api, uploadFile } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLive, useLiveValue } from '../../_lib/use-live';
+import { CardSettled, type Settled, settledOf } from '../../_task/CardSettled';
 import { ChatCardForm } from '../../_task/ChatCardForm';
 import { scheduleLabel, tokens } from '../../_task/labels';
 import { CHAT_DETAIL_TOPICS, CHAT_LOG_TOPICS, useLead } from '../../_task/live';
@@ -66,6 +67,8 @@ export function ChatThreadPanel({
   if (!requestId.current) requestId.current = crypto.randomUUID();
   /** 보낸 횟수: 보내면 폼을 새로 만들어 칸을 비운다 (소식이 와도 쓰던 글은 그대로) */
   const [sent, setSent] = useState(0);
+  /** 이 화면에서 정한 마지막 결과 카드 (다음 말을 보내면 지운다) */
+  const [settled, setSettled] = useState<Settled | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const d = detail.data;
 
@@ -104,6 +107,7 @@ export function ChatThreadPanel({
     if (!reply?.ok) return false;
     requestId.current = crypto.randomUUID();
     setSent((n) => n + 1);
+    setSettled(null);
     return true;
   }
   /** 판단 바꾸기 (L1): 덧붙인 말로 보내고, 회차가 일꾼을 기다리는 중이면 먼저 깨워 대표가 그 단계부터 다시 맡기게 한다 */
@@ -117,18 +121,21 @@ export function ChatThreadPanel({
     });
   }
 
-  const decide = (body: { decision: string; note?: string; picked?: string[] }) =>
-    d.card &&
-    deciding.run(
+  // 정한 카드는 접히며 빠지고 정한 것 한 줄이 남는다 (CardSettled, 2026-11-26)
+  async function decide(body: { decision: string; note?: string; picked?: string[] }) {
+    const card = d?.card;
+    if (!card) return;
+    const reply = await deciding.run(
       'decide',
-      () =>
-        api('POST', `/api/approvals/${d.card?.id}/decide`, { version: d.card?.version, ...body }),
+      () => api('POST', `/api/approvals/${card.id}/decide`, { version: card.version, ...body }),
       {
         done: body.decision === 'approve' ? '고른 것만 남겼어요' : '정했어요',
         reload: detail.reload,
         conflict: '그사이 카드에 항목이 더해졌어요. 다시 골라요',
       },
     );
+    if (reply?.ok) setSettled(settledOf(card, body));
+  }
 
   // 결과 카드가 기다리는 중이면 멈추기가 그 카드까지 취소한다: 고르기 전의 결과를 한 번에 잃지 않게 묻는다
   const stop = () =>
@@ -294,7 +301,7 @@ export function ChatThreadPanel({
             onAnswer={(message) => send({ message })}
           />
         )}
-        {d.card && (
+        {d.card ? (
           <ChatCardForm
             key={`${d.card.id}:${d.card.version}`}
             card={d.card}
@@ -302,6 +309,8 @@ export function ChatThreadPanel({
             problem={deciding.problem}
             onDecide={decide}
           />
+        ) : (
+          settled && <CardSettled key={settled.card.id} settled={settled} />
         )}
         <ChatForm
           key={sent}
