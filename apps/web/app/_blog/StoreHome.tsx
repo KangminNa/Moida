@@ -8,6 +8,7 @@ import { formatDate, postPath } from './format';
 import { GatherMark } from './GatherMark';
 import { APP_KIND_LABELS } from './labels';
 import { StoreIntro } from './StoreIntro';
+import { joinableApps, joinHref, StoreJoin } from './StoreJoin';
 import type { Site } from './site';
 import type { PublicApp } from './types';
 
@@ -18,7 +19,7 @@ type Post = Site['recent'][number];
 
 // 스토어 첫 화면 (2026-11-26): 회사 · 프로젝트의 첫 화면. 여러 사이트가 한곳에 모이는 모습을 보인다:
 //   머리(회사 이름 · 바로 가기 · 로그인) → 점이 모여 되는 큰 이름(GatherMark) · 이름의 뜻 · 한 줄 소개와 사이트 아이콘이 모인 독 → 소개(두 단) →
-//   운영하는 사이트 카드 → 새 소식(날짜 줄) → 이 사이트를 돌리는 Moida 소개(StoreIntro, 고정 글) → 플러그인 자리(store.after: 메일 구독 띠).
+//   운영하는 사이트 카드 → 가입할 앱 고르기(StoreJoin, 회원을 받는 앱이 둘 이상일 때) → 새 소식(날짜 줄) → 이 사이트를 돌리는 Moida 소개(StoreIntro, 고정 글) → 플러그인 자리(store.after: 메일 구독 띠).
 // 글은 모두 콘솔 › 설정 › 사이트에서 정한다 (이름 · 소개 · 한 줄 소개 · 소개 글 · 로고). 서버에서 그린다.
 // 사이트 링크는 서버가 준 url (확인한 도메인이면 그 도메인, 스토어 3-0)
 export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
@@ -27,6 +28,8 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
   for (const p of recent) if (p.app && !latest.has(p.app.slug)) latest.set(p.app.slug, p);
   const name = space.name || 'Moida';
   const highlights = glance(space.highlights);
+  const joinable = joinableApps(apps);
+  const join = joinHref(joinable);
   return (
     <div className="store">
       <header className="store-top">
@@ -43,6 +46,7 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
           {apps.length > 0 && <a href="#sites">사이트</a>}
           {recent.length > 0 && <a href="#news">소식</a>}
           <a href="#moida">Moida</a>
+          {join && <a href={join}>가입</a>}
           <a className="store-login" href={owner ? '/admin' : '/login'}>
             {owner ? '콘솔' : '로그인'}
           </a>
@@ -59,8 +63,13 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
           {space.tagline ? <h1>{space.tagline}</h1> : <h1 className="store-sr">{name}</h1>}
           {space.description && <p className="store-lead">{space.description}</p>}
           <div className="store-actions">
+            {join && (
+              <a className="store-button primary" href={join}>
+                가입하기
+              </a>
+            )}
             {apps.length > 0 && (
-              <a className="store-button primary" href="#sites">
+              <a className={join ? 'store-button' : 'store-button primary'} href="#sites">
                 사이트 둘러보기
               </a>
             )}
@@ -128,6 +137,7 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
             </ul>
           )}
         </section>
+        <StoreJoin apps={joinable} />
         {recent.length > 0 && <News posts={recent.slice(0, 6)} />}
         <StoreIntro />
         {apps.length > 0 && (
