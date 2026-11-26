@@ -413,6 +413,15 @@ describe('보안 머리글과 쓰기 요청 출처', () => {
     const same = { origin: 'https://blog.example.com', 'sec-fetch-site': 'same-origin' };
     assert.equal((await api.request('PUT', '/api/space', owner, stale, same)).status, 409);
     assert.equal((await api.request('PUT', '/api/space', owner, stale)).status, 409, 'Origin 없음');
+    // 사이트 주소와 다른 주소로 연 콘솔 (새 도메인으로 옮기는 중): 브라우저가 같은 출처라고 밝히면 통과 (2026-11-26)
+    const moved = { origin: new URL(api.baseUrl).origin, 'sec-fetch-site': 'same-origin' };
+    assert.equal((await api.request('PUT', '/api/space', owner, stale, moved)).status, 409);
+    const notSelf = { origin: 'https://other.example.com', 'sec-fetch-site': 'same-origin' };
+    assert.equal(
+      (await api.request('PUT', '/api/space', owner, stale, notSelf)).status,
+      403,
+      '이 요청이 온 주소가 아니면 same-origin이라도 막는다',
+    );
     const evil = { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' };
     assert.equal((await api.request('GET', '/api/space', owner, undefined, evil)).status, 200);
     // 쿠키가 없으면 방문자일 뿐이라 막을 것이 없다 (권한은 Service가 본다)

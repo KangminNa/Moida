@@ -76,6 +76,7 @@ export class ActorGuard implements CanActivate {
    * 다른 사이트가 주인의 로그인 쿠키로 몰래 보내는 쓰기 요청을 막는다.
    *   Sec-Fetch-Site가 cross-site면 막는다 (요즘 브라우저는 늘 붙인다).
    *   Origin이 있으면 사이트 주소(정하기 전이면 이 요청이 온 주소)와 같아야 한다.
+   *   다만 Sec-Fetch-Site가 same-origin이고 Origin이 이 요청이 온 주소면 통과한다 (새 주소로 옮기는 중인 콘솔).
    *   Origin이 없으면 브라우저가 보낸 요청이 아니다 (브라우저는 다른 출처로 쓰기를 보낼 때 늘 Origin을 붙인다).
    */
   private async assertSameSite(request: HttpRequest): Promise<void> {
@@ -83,7 +84,12 @@ export class ActorGuard implements CanActivate {
     const origin = request.headers.origin;
     if (fetchSite !== 'cross-site' && typeof origin !== 'string') return;
     const { siteUrl } = await this.spaces.info(new SystemActor());
-    const expected = siteUrl ? [new URL(siteUrl).origin] : ActorGuard.selfOrigins(request);
+    const self = ActorGuard.selfOrigins(request);
+    // 브라우저가 같은 출처라고 밝힌 요청(이 주소에서 연 화면이 이 주소로 보냄)은 사이트 주소와 달라도 된다 (2026-11-26):
+    // 사이트 주소를 새 도메인으로 옮길 때 새 주소에서 연 콘솔이 사이트 주소조차 바꾸지 못하던 막힘을 푼다.
+    // 다른 사이트는 same-origin을 만들 수 없고, 앱 화면은 격리(출처 없음)되거나 앱 도메인(위에서 방문자)이라 여기 오지 않는다
+    if (fetchSite === 'same-origin' && typeof origin === 'string' && self.includes(origin)) return;
+    const expected = siteUrl ? [new URL(siteUrl).origin] : self;
     if (fetchSite !== 'cross-site' && typeof origin === 'string' && expected.includes(origin))
       return;
     throw new Forbidden(

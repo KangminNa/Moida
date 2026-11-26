@@ -2882,6 +2882,43 @@ ul.picked > .chip {
   text-underline-offset: 3px;
 }
 
+/* 사이트 주소와 다른 주소로 연 콘솔 (2026-11-26): 지금 주소로 바꿀지 묻는 한 줄. 로그인 끝남 줄보다 위 */
+.toast.site-moved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.site-moved-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.site-moved-actions button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.site-moved-actions button.quiet {
+  background: transparent;
+  color: inherit;
+}
+
+.site-moved-problem {
+  flex-basis: 100%;
+  color: var(--danger);
+}
+
 /* 소스 링크 (AGPL-3.0: 서비스 이용자도 소스를 받을 수 있게) */
 .source {
   position: fixed;
