@@ -1,25 +1,49 @@
 import { Operation, Read, type RequestFields } from '../../../apps/server/src/plugin-api';
 import { BrowserScreenGateway, type ScreenAction } from './screen.gateway';
+import { ScreenCastGateway } from './screen-cast.gateway';
 import { ControlledView, ScreenView } from './views';
 
 // 콘솔에서 서버 브라우저를 보고 누르기 (2026-11-14). 영상(neko · UDP) 대신 화면 그림을 HTTPS로 받고, 클릭 · 입력을 보낸다.
 // 로그인된 브라우저를 움직이는 길이라 관리자만. 표를 쓰지 않으니 트랜잭션 없이 돈다 (Read): 바깥 호출을 트랜잭션 안에서 기다리지 않는다.
 
-/** GET /api/p/browser-tabs/screen?tab=: 탭 목록과 고른 탭의 화면 그림 (관리자) */
-export class ScreenRead extends Read<{ tab: string | null }> {
+/**
+ * GET /api/p/browser-tabs/screen?tab=&after=: 탭 목록과 고른 탭의 화면 그림 (관리자).
+ * after(받은 마지막 그림 번호)보다 새 그림이 오면 바로, 없으면 몇 초 기다렸다가 그림 없이(image null, 화면 그대로) 답한다 (2026-11-26).
+ * 콘솔은 답을 받자마자 다시 묻는다: 화면이 바뀌는 만큼 그림이 오고, 그대로면 몇 초에 한 번만 오간다
+ */
+export class ScreenRead extends Read<{ tab: string | null; after: number }> {
   readonly name = 'screen';
   readonly allow = Operation.OWNER;
 
-  constructor(private readonly screen: BrowserScreenGateway) {
+  constructor(
+    private readonly screen: BrowserScreenGateway,
+    private readonly cast: ScreenCastGateway,
+  ) {
     super();
   }
 
   input(raw: unknown) {
-    return this.fields(raw, (f) => ({ tab: f.optionalText('tab', 64) }));
+    return this.fields(raw, (f) => {
+      const tab = f.optionalText('tab', 64);
+      if (tab && !BrowserScreenGateway.TAB_ID.test(tab)) f.reject('tab', '맞지 않는 탭 id예요');
+      // 주소의 값이라 글자로 온다
+      const text = (raw as Record<string, unknown> | null)?.after;
+      const after = text === undefined || text === '' ? 0 : Number(text);
+      if (!Number.isSafeInteger(after) || after < 0) f.reject('after', '0 이상의 정수여야 해요');
+      return { tab, after: Number.isSafeInteger(after) && after > 0 ? after : 0 };
+    });
   }
 
-  async run(_work: unknown, _actor: unknown, input: { tab: string | null }): Promise<ScreenView> {
-    return new ScreenView(await this.screen.shot(input.tab));
+  async run(
+    _work: unknown,
+    _actor: unknown,
+    input: { tab: string | null; after: number },
+  ): Promise<ScreenView> {
+    const { tabs, tab } = await this.screen.pick(input.tab);
+    // 고른 탭이 바뀌었으면(닫힘 · 처음) 그 탭의 첫 그림부터
+    const after = tab === input.tab ? input.after : 0;
+    const frame = await this.cast.frame(tab, after, ScreenCastGateway.WAIT_MS);
+    return new ScreenView(tabs, tab, frame);
   }
 }
 
@@ -34,7 +58,7 @@ export class ScreenControl extends Read<ControlInput> {
   private static readonly TEXT_MAX = 2_000;
   private static readonly URL_MAX = 2_000;
 
-  constructor(private readonly screen: BrowserScreenGateway) {
+  constructor(private readonly cast: ScreenCastGateway) {
     super();
   }
 
@@ -47,7 +71,7 @@ export class ScreenControl extends Read<ControlInput> {
   }
 
   async run(_work: unknown, _actor: unknown, input: ControlInput): Promise<ControlledView> {
-    await this.screen.control(input.tab, input.action);
+    await this.cast.control(input.tab, input.action);
     return new ControlledView();
   }
 
