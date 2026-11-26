@@ -17,11 +17,19 @@ x-secret-keys: &secret-keys
   CAIRN_SECRET_KEY: ${CAIRN_SECRET_KEY:?.env에 CAIRN_SECRET_KEY를 넣어 주세요 (pnpm secret:new 또는 openssl rand -base64 32)}
   CAIRN_SECRET_KEY_OLD: ${CAIRN_SECRET_KEY_OLD:-}   # 서버 키를 바꾸는 동안에만 (순서는 .env.example)
 
+# 컨테이너 로그는 서비스마다 10MB × 3개까지만 둔다 (Docker 기본은 끝없이 쌓여 디스크를 채운다)
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   db:
     build: ./db
     image: cairn-db:${CAIRN_IMAGE_TAG:-dev}
     restart: unless-stopped
+    logging: *logging
     networks:
       default:
         aliases: [cairn-db]
@@ -66,6 +74,7 @@ services:
       target: server
     image: cairn-server:${CAIRN_IMAGE_TAG:-dev}
     restart: unless-stopped
+    logging: *logging
     networks:
       default:
         aliases: [cairn-server]
@@ -97,6 +106,7 @@ services:
     image: cairn-server:${CAIRN_IMAGE_TAG:-dev}   # 일꾼: 이벤트 넘기기와 플러그인 반복 작업. 하나만 띄운다. HTTP가 없어 상태 확인은 두지 않는다
     pull_policy: never
     restart: unless-stopped
+    logging: *logging
     command: ["node", "src/main.worker.js"]
     environment:
       <<: *secret-keys
@@ -117,6 +127,7 @@ services:
       target: web
     image: cairn-web:${CAIRN_IMAGE_TAG:-dev}
     restart: unless-stopped
+    logging: *logging
     networks:
       default:
         aliases: [cairn-web]
@@ -148,6 +159,7 @@ services:
         CAIRN_RUNNER_BUILD: ${CAIRN_RUNNER_BUILD:-unknown}   # 실행 기록에 남는 러너 빌드 (git rev-parse --short HEAD)
     image: cairn-runner:${CAIRN_IMAGE_TAG:-dev}
     restart: unless-stopped
+    logging: *logging
     init: true                # AI CLI가 남긴 손자 프로세스를 거둔다
     stop_grace_period: 40s    # 첫 신호는 기다리는 next_jobs(25초)가 끝나기를 기다렸다가 일을 돌려준다
     read_only: true

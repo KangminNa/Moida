@@ -89,6 +89,34 @@ describe('요청 로그', () => {
     );
   });
 
+  test('러너가 되풀이해 묻는 도구(next_jobs)는 성공하면 남기지 않고, 실패는 남긴다', async () => {
+    const runner = await api.connectDevice(owner, 'trace-runner');
+    const { devices } = (await api.get('/api/devices', owner)).json() as {
+      devices: { id: string; name: string; version: number }[];
+    };
+    const device = devices.find((d) => d.name === 'trace-runner');
+    const scoped = await api.request('PATCH', `/api/devices/${device?.id}`, owner, {
+      scopes: ['run'],
+      version: device?.version,
+    });
+    assert.equal(scoped.status, 200, scoped.text);
+    const asked = await api.mcp(runner, 'tools/call', {
+      name: 'next_jobs',
+      arguments: { wait_seconds: 0 },
+    });
+    assert.equal(asked.status, 200, asked.text);
+    assert.doesNotMatch(asked.text, /isError":true/);
+    const wrong = await api.mcp(runner, 'tools/call', {
+      name: 'next_jobs',
+      arguments: { wait_seconds: 9999 },
+    });
+    assert.match(
+      await lineOf(wrong.header('x-request-id')),
+      / POST \/mcp 200 \d+ms device next_jobs$/,
+    );
+    assert.ok(!lines.some((l) => l.line.startsWith(`${asked.header('x-request-id')} `)));
+  });
+
   test('건강 확인의 2xx는 남기지 않는다 (Docker가 몇 초마다 부른다)', async () => {
     const res = await api.get('/api/health');
     assert.equal(res.status, 200);

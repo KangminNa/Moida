@@ -15,6 +15,7 @@ export class NextJobsTool extends BaseTool {
   readonly name = 'next_jobs';
   readonly scope = Actor.RUN;
   readonly readOnly = false;
+  override readonly polled = true;
   readonly inputSchema = {
     properties: {
       wait_seconds: {

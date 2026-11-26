@@ -15,6 +15,8 @@ export type HttpRequest = {
   requestId?: string;
   /** 요청 로그에 덧붙일, 이 요청이 한 일 (MCP 도구 이름) */
   traced?: string;
+  /** 성공하면 요청 로그에 남기지 않는다 (러너가 되풀이해 묻는 MCP 도구의 성공, BaseTool.polled) */
+  quiet?: boolean;
   /** 앱 도메인으로 온 요청이면 그 도메인 (HostGate, 스토어 3-0). 관리자 쿠키 · 토큰은 보지 않는다 */
   appHost?: string;
   /** 그 도메인의 앱과 앱이 든 공간 (HostGate, 스토어 3-1: 커뮤니티가 어느 앱인지, 이벤트 · 알림이 어느 공간인지 안다) */

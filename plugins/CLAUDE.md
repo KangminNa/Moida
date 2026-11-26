@@ -60,6 +60,7 @@ pnpm plugin sync-github check                 관리 동작
 ```
 plugins/<이름>/
   cairn-plugin.json     "schema", "api", "tools", "menu" + uses: table · api · tool:<이름> · menu · task:request
+                        (러너가 몇 초마다 묻는 도구는 "polled": true: 성공한 부름은 서버 요청 로그에 남기지 않는다)
   migrations/           <시각>_<이름>.sql (dbmate). 자기 스키마만 만들고 바꾼다
   server/plugin.ts      register(cairn)에서 cairn.addOperation(new XxxRead())
   server/operations.ts  Read · Command (plugin-api)
