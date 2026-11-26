@@ -4,8 +4,8 @@ import { NotFound } from '../base/errors';
 
 /** 앱 도메인 목록 읽기 (blog가 등록): 모든 앱의 도메인(확인 전 것까지) → [그 앱의 id, 앱이 든 공간의 id] */
 type AppHostsRead = (actor: Actor) => Promise<ReadonlyMap<string, readonly [string, string]>>;
-/** 사이트 주소 읽기 (account가 등록): 관리자가 정한 기본 도메인의 주소. 정하기 전이면 null */
-type SiteRead = (actor: Actor) => Promise<string | null>;
+/** 사이트 읽기 (account가 등록): [관리자가 정한 기본 도메인의 주소, 기본 도메인의 공간 id]. 정하기 전이면 null */
+type SiteRead = (actor: Actor) => Promise<readonly [string | null, string | null]>;
 
 /** HostGate가 보는 요청 (Express의 요청) */
 type GateRequest = {
@@ -15,6 +15,7 @@ type GateRequest = {
   appHost?: string;
   appId?: string;
   appSpaceId?: string;
+  siteSpaceId?: string;
 };
 type GateResponse = { status(code: number): { json(body: object): void } };
 
@@ -23,6 +24,8 @@ class HostSnapshot {
   constructor(
     readonly siteOrigin: string | null,
     readonly siteHost: string | null,
+    /** 기본 도메인의 공간 (스토어 가입, 2026-11-26) */
+    readonly siteSpaceId: string | null,
     /** 앱 도메인 → [앱 id, 공간 id] */
     readonly apps: ReadonlyMap<string, readonly [string, string]>,
     readonly at: number,
@@ -35,6 +38,7 @@ class HostSnapshot {
 // - 등록한 경로만 지나고 나머지는 없는 주소와 같은 404 (콘솔 · 관리 API · MCP · OAuth는 기본 도메인에서만).
 //   열 경로는 모듈이 등록한다 (openPaths): 읽기(GET · HEAD)만이거나, 쓰기까지 (커뮤니티의 회원 API, 스토어 3-1)
 // - request.appHost · appId · appSpaceId에 그 도메인과 앱, 앱이 든 공간을 적는다 (커뮤니티의 이벤트 · 알림이 공간을 안다). ActorGuard는 관리자 쿠키 · 토큰을 보지 않는다 (회원은 커뮤니티가 따로 정한다)
+// - 기본 도메인으로 온 요청에는 request.siteSpaceId에 기본 도메인의 공간을 적는다 (스토어 가입이 어느 스토어인지, 2026-11-26)
 // 사이트 주소의 호스트는 앱 도메인으로 치지 않는다: 같은 값이 들어가도 콘솔이 막히지 않게 (blog도 그 값을 받지 않는다).
 // 둘 다 머리글을 하나 더 속여 보내면 더 막힐 뿐 더 열리지 않는다. 도메인 목록은 30초 동안 기억하고, 바뀌면 stale로 바로 다시 읽는다.
 @Injectable()
@@ -62,7 +66,7 @@ export class HostGate {
     (writes ? this.openWrites : this.openReads).push(...paths);
   }
 
-  /** account가 시작할 때 한 번: 사이트 주소 */
+  /** account가 시작할 때 한 번: 사이트 주소와 공간 */
   registerSite(read: SiteRead): void {
     if (this.site) throw new Error('사이트 주소는 한 번만 등록해요');
     this.site = read;
@@ -88,8 +92,11 @@ export class HostGate {
   /** HttpSetup이 본문 읽기 전에 건다 */
   middleware(): (req: GateRequest, res: GateResponse, next: (error?: unknown) => void) => void {
     return (req, res, next) => {
-      this.appOf(req.headers).then((found) => {
-        if (found === null) return next();
+      this.appOf(req.headers).then(async (found) => {
+        if (found === null) {
+          req.siteSpaceId = (await this.read()).siteSpaceId ?? undefined;
+          return next();
+        }
         [req.appHost, req.appId, req.appSpaceId] = found;
         if (this.isOpen(req.method, req.path)) return next();
         const missing = new NotFound('없는 주소예요');
@@ -141,14 +148,15 @@ export class HostGate {
   private async load(now: number, generation: number): Promise<HostSnapshot> {
     const actor = new SystemActor();
     try {
-      const [siteUrl, apps] = await Promise.all([
-        this.site ? this.site(actor) : null,
+      const [[siteUrl, siteSpaceId], apps] = await Promise.all([
+        this.site ? this.site(actor) : ([null, null] as const),
         this.appHosts ? this.appHosts(actor) : new Map<string, readonly [string, string]>(),
       ]);
       const site = siteUrl ? new URL(siteUrl) : null;
       const read = new HostSnapshot(
         site?.origin ?? null,
         site ? HostGate.normalize(site.host) : null,
+        siteSpaceId,
         apps,
         now,
       );

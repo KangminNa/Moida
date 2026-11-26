@@ -48,6 +48,7 @@ export class App extends TableEntity<AppRow, AppNew> {
     'files',
     'graph',
     'install',
+    'join',
     'login',
     'm',
     'mcp',

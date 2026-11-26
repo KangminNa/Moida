@@ -31,6 +31,8 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   // 스토어 3-4: 약관은 앱 도메인에서만 (회원 화면 /_/terms · /_/privacy), 관리는 관리자만
   'GET /api/community/terms/:kind': 404,
   'GET /api/community/terms/store/:kind': 404,
+  // 스토어에서 가입 (2026-11-26): 기본 도메인의 가입 화면이 읽는 공통 약관 (누구나, 모르는 종류는 400)
+  'GET /api/store/terms/:kind': 400,
   'GET /api/community/admin/terms': 403,
   'GET /api/community/admin/accounts': 403,
   'GET /api/community/admin/:appId/terms': 403,

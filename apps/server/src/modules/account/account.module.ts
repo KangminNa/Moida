@@ -90,6 +90,9 @@ export class AccountModule implements OnModuleInit {
       this.spaces.usedBlobs(actor, hashes),
     );
     // 기본 도메인 (스토어 3-0): 사이트 주소의 호스트는 앱 도메인으로 치지 않는다
-    this.gate.registerSite(async (actor) => (await this.spaces.info(actor)).siteUrl);
+    this.gate.registerSite(async (actor) => {
+      const space = await this.spaces.info(actor);
+      return [space.siteUrl, space.spaceId];
+    });
   }
 }

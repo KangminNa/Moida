@@ -995,10 +995,6 @@
 }
 
 /* 가입할 앱 고르기 (StoreJoin): 앱 아이콘 · 이름 · 화살표의 줄 */
-.store-join-note {
-  margin: -12px 0 16px;
-}
-
 .store-join {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -1548,6 +1544,12 @@
 .member-hint {
   font-size: 0.875rem;
   color: var(--muted);
+}
+
+/* 스토어 가입을 마친 줄 (2026-11-26, /join) */
+.member-done {
+  margin: 0;
+  font-weight: 600;
 }
 
 /* 회원 화면 아래의 약관 링크 (3-4) */

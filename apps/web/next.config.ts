@@ -60,6 +60,7 @@ const WEB_ROUTES = [
   'connect',
   'graph',
   'install',
+  'join',
   'login',
   'm',
   'mcp',
