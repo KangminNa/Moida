@@ -454,82 +454,273 @@
   background: var(--hover);
 }
 
-/* 스토어 첫 화면 (2026-11-26, StoreHome): 회사 · 프로젝트 소개 · 운영하는 사이트 · 새 소식 · 플러그인 자리(store.after) */
+/* 스토어 첫 화면 (2026-11-26, StoreHome): 회사 · 프로젝트의 첫 화면. 여러 사이트가 한곳에 "모이는" 모습:
+   머리 → 큰 제목과 사이트 아이콘 독 → 소개(두 단) → 사이트 카드 → 새 소식(날짜 줄) → 구독 띠(색을 뒤집은 면) */
 .store {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-  max-width: 880px;
-  padding-top: 20px;
+  --store-width: 1080px;
+  --store-gutter: 24px;
+  overflow-x: clip;
 }
 
-.store-hero {
+.store main {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 36px 0 12px;
+  gap: 96px;
+  padding-bottom: 64px;
 }
 
-.store-hero h1 {
-  max-width: 22ch;
-  margin: 0;
-  font-size: 2.4rem;
+/* 머리: 회사 이름 · 바로 가기 · 로그인 (내려도 위에 남는다) */
+.store-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: calc(var(--store-width) + var(--store-gutter) * 2);
+  margin: 0 auto;
+  padding: 14px var(--store-gutter);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(1.6) blur(14px);
+}
+
+.store-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  font-size: 1.15rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-  word-break: keep-all;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+
+.store-brand img {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.store-top nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.store-top nav a {
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.store-top nav a:hover {
+  background: var(--raised);
+  color: var(--fg);
+}
+
+.store-top nav .store-login {
+  margin-left: 4px;
+  background: var(--raised);
+  color: var(--fg);
+}
+
+/* 첫 자리: 은은한 빛 위의 큰 제목, 단추 둘, 사이트 아이콘이 모인 독 */
+.store-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 88px var(--store-gutter) 0;
+  text-align: center;
+}
+
+.store-hero::before {
+  position: absolute;
+  inset: -120px 0 auto;
+  z-index: -1;
+  height: 640px;
+  background:
+    radial-gradient(
+      42% 52% at 28% 30%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      38% 46% at 74% 22%,
+      color-mix(in srgb, var(--accent) 14%, transparent),
+      transparent 70%
+    );
+  filter: blur(8px);
+  content: "";
+  pointer-events: none;
 }
 
 .store-eyebrow {
   margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  box-shadow: var(--float-1);
   color: var(--accent-ink);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-.store-lead {
-  max-width: 56ch;
-  margin: 0;
+.store-eyebrow span {
   color: var(--muted);
-  font-size: 1.05rem;
-  line-height: 1.65;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.store-hero h1 {
+  max-width: 18ch;
+  margin: 0;
+  font-size: clamp(2.2rem, 5.2vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
   word-break: keep-all;
 }
 
-.store-hero .store-open.cta {
-  margin-top: 8px;
-  padding: 10px 20px;
-  background: var(--accent);
-  color: var(--on-accent);
+.store-lead {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.12rem;
+  line-height: 1.7;
+  word-break: keep-all;
 }
 
-.store-logo {
-  flex: none;
+.store-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.store-button {
+  padding: 13px 22px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--fg);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    transform 0.2s var(--ease-out),
+    background 0.2s var(--ease-out);
+}
+
+.store-button:hover {
+  background: var(--hover);
+  transform: translateY(-1px);
+}
+
+.store-button.primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.store-button.primary:hover {
+  background: var(--fg);
+  opacity: 0.88;
+}
+
+/* 독: 운영하는 사이트의 아이콘이 한 줄로 모인다 */
+.store-dock {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin: 36px 0 0;
+  padding: 18px 26px;
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  box-shadow: var(--float-2);
+  backdrop-filter: blur(12px);
+  list-style: none;
+}
+
+.store-dock a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.store-dock .app-icon.tile,
+.store-site .app-icon.tile {
   width: 64px;
   height: 64px;
   border-radius: 18px;
-  object-fit: cover;
-  box-shadow: var(--float-1);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  box-shadow: none;
+  transition: transform 0.25s var(--ease-out);
 }
 
-.store-section h2 {
-  margin: 0 0 12px;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+.store-dock a:hover .app-icon.tile {
+  transform: translateY(-6px) scale(1.06);
 }
 
-/* 소개 글 (관리자가 쓴 마크다운) */
+.store-dock .app-icon.tile .menu-ico,
+.store-site .app-icon.tile .menu-ico {
+  width: 28px;
+  height: 28px;
+}
+
+/* 아래 칸들의 공통 틀 */
+.store-band {
+  width: 100%;
+  max-width: calc(var(--store-width) + var(--store-gutter) * 2);
+  margin: 0 auto;
+  padding: 0 var(--store-gutter);
+  scroll-margin-top: 80px;
+}
+
+.store-band h2 {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.store-band-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.store-band-head span {
+  color: var(--faint);
+  font-weight: 600;
+}
+
+/* 소개: 왼쪽 제목, 오른쪽 글 */
 .store-about {
-  padding: 24px;
-  border-radius: var(--radius-sheet);
-  background: var(--subtle);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 32px;
 }
 
 .store-about-body {
   color: var(--fg);
-  line-height: 1.75;
+  font-size: 1.08rem;
+  line-height: 1.85;
   word-break: keep-all;
 }
 
@@ -543,8 +734,10 @@
 
 .store-about-body h2,
 .store-about-body h3 {
-  margin: 20px 0 8px;
-  font-size: 1.05rem;
+  margin: 28px 0 8px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .store-about-body ul,
@@ -552,11 +745,15 @@
   padding-left: 1.2em;
 }
 
-/* 운영하는 사이트: 카드 전체가 링크 */
+.store-about-body li + li {
+  margin-top: 4px;
+}
+
+/* 사이트 카드: 카드 전체가 링크, 올리면 살짝 뜬다 */
 .store-sites {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -565,60 +762,74 @@
 .store-site {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   height: 100%;
-  padding: 18px;
-  border-radius: var(--radius-card);
-  background: var(--bg);
-  box-shadow: var(--float-1);
+  padding: 26px;
+  border-radius: var(--radius-sheet);
+  background: var(--subtle);
   color: var(--fg);
   text-decoration: none;
-  transition: box-shadow 0.2s var(--ease-out);
+  transition:
+    transform 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out),
+    background 0.25s var(--ease-out);
 }
 
 .store-site:hover {
+  background: var(--bg);
   box-shadow: var(--float-2);
+  transform: translateY(-3px);
 }
 
 .store-site:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
-.store-site-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.store-site .app-icon.tile {
+  margin-bottom: 12px;
 }
 
-.store-site .app-icon.small {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+.store-site-kind {
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-.store-site-name {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.store-site-name strong {
-  font-size: 1.05rem;
+.store-site strong {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .store-site-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   margin-top: auto;
+  padding-top: 16px;
+}
+
+.store-arrow {
+  flex: none;
+  color: var(--faint);
+  font-size: 1.1rem;
+  transition:
+    transform 0.25s var(--ease-out),
+    color 0.25s var(--ease-out);
+}
+
+.store-site:hover .store-arrow {
+  color: var(--fg);
+  transform: translateX(4px);
 }
 
 .store-meta {
+  overflow: hidden;
   color: var(--faint);
   font-size: 0.82rem;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -627,101 +838,103 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.95rem;
+  line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-/* 앱 목록: 휴대폰 스토어의 한 줄 (아이콘 · 이름 · 종류 · 설명 · 열기) */
-.store-open {
-  flex: none;
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: var(--raised);
-  color: var(--accent-ink);
-  font-size: 0.88rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.store-open:hover {
-  background: var(--hover);
-}
-
-/* 새 소식: 최근 공개 글 카드 */
+/* 새 소식: 날짜 · 사이트 · 제목의 줄 */
 .store-news {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--line);
   list-style: none;
 }
 
-.store-news-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  height: 100%;
-  padding: 16px;
-  border-radius: var(--radius-card);
-  background: var(--subtle);
+.store-news li {
+  border-bottom: 1px solid var(--line);
+}
+
+.store-news a {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 24px;
+  padding: 22px 4px;
   color: var(--fg);
   text-decoration: none;
 }
 
-.store-news-card:hover {
-  background: var(--raised);
+.store-news a:hover strong {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.store-news time {
+  color: var(--faint);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.store-news-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .store-news-app {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
+  color: var(--accent-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
-.store-news-app .app-icon.small {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
+.store-news-text strong {
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
-.store-news-app .store-meta {
-  margin-left: auto;
-  font-weight: 400;
-}
-
-.store-news-card strong {
-  font-size: 1rem;
-  line-height: 1.4;
-}
-
-/* 플러그인 email의 구독 칸 · 메일 링크 카드 (store.after, plugins/email/web/Subscribe.tsx) */
-.store-subscribe form,
-.store-mail-link {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 플러그인 email의 구독 띠 · 메일 링크 카드 (store.after, plugins/email/web/Subscribe.tsx): 색을 뒤집은 면 */
+#subscribe {
+  scroll-margin-top: 80px;
 }
 
 .store-subscribe,
 .store-mail-link {
-  padding: 20px;
-  border-radius: var(--radius-card);
-  background: var(--subtle);
+  max-width: var(--store-width);
+  margin: 0 auto;
+  padding: 48px;
+  border-radius: 32px;
+  background: var(--fg);
+  color: var(--bg);
 }
 
-.store-mail-link h2,
+.store-mail-link {
+  margin-bottom: 24px;
+}
+
+.store-subscribe h2,
+.store-mail-link h2 {
+  margin: 0 0 8px;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.store-subscribe form,
+.store-mail-link {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .store-mail-link p {
   margin: 0;
 }
 
-.store-mail-link .store-open {
-  align-self: flex-start;
+.store-subscribe .store-desc,
+.store-mail-link .store-desc {
+  color: color-mix(in srgb, var(--bg) 72%, transparent);
 }
 
 .store-chips {
@@ -734,25 +947,25 @@
 }
 
 .store-chips legend {
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: 0.85rem;
+  margin-bottom: 10px;
+  color: color-mix(in srgb, var(--bg) 70%, transparent);
+  font-size: 0.88rem;
 }
 
 .store-chips label {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
+  padding: 8px 14px;
   border-radius: 999px;
-  background: var(--raised);
-  font-size: 0.9rem;
+  background: color-mix(in srgb, var(--bg) 12%, transparent);
+  font-size: 0.92rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .store-chips label.on {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  font-weight: 600;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 .store-chips input {
@@ -769,18 +982,23 @@
 .store-subscribe-row {
   display: flex;
   gap: 8px;
+  max-width: 560px;
 }
 
 .store-subscribe-row input {
   flex: 1;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 14px 18px;
   border: 0;
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--fg);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 12%, transparent);
+  color: var(--bg);
   font: inherit;
   font-size: 16px;
+}
+
+.store-subscribe-row input::placeholder {
+  color: color-mix(in srgb, var(--bg) 55%, transparent);
 }
 
 .store-subscribe-row input:focus-visible {
@@ -789,15 +1007,21 @@
 
 .store-subscribe .store-open.cta,
 .store-mail-link .store-open.cta {
+  flex: none;
+  align-self: flex-start;
+  padding: 14px 24px;
   border: 0;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--on-accent);
+  font: inherit;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .store-subscribe .store-open.cta:disabled,
 .store-mail-link .store-open.cta:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -805,9 +1029,10 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: var(--muted);
+  max-width: 640px;
+  color: color-mix(in srgb, var(--bg) 70%, transparent);
   font-size: 0.82rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .store-agree input {
@@ -820,13 +1045,53 @@
   font-size: 0.9rem;
 }
 
-@media (max-width: 560px) {
-  .store-hero h1 {
-    font-size: 1.8rem;
+@media (max-width: 720px) {
+  .store {
+    --store-gutter: 18px;
+  }
+
+  .store main {
+    gap: 72px;
+  }
+
+  .store-top nav a:not(.store-login) {
+    display: none;
+  }
+
+  .store-hero {
+    padding-top: 56px;
+  }
+
+  .store-dock {
+    gap: 14px;
+    padding: 14px 18px;
+  }
+
+  .store-dock .app-icon.tile {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
   }
 
   .store-about {
-    padding: 18px;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .store-news a {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .store-subscribe,
+  .store-mail-link {
+    margin: 0 var(--store-gutter);
+    padding: 28px 22px;
+    border-radius: 24px;
+  }
+
+  .store-subscribe-row {
+    flex-direction: column;
   }
 }
 

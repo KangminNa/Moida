@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { SiteFooter } from '../../_blog/SiteFooter';
-import { SiteHeader } from '../../_blog/SiteHeader';
 import { StoreHome } from '../../_blog/StoreHome';
 import { siteNow } from '../../_blog/site';
 
@@ -39,7 +38,6 @@ export default async function Store({ searchParams }: { searchParams: Promise<Se
   if (!site.space.installed) redirect('/install');
   return (
     <>
-      <SiteHeader site={site} brand={false} />
       <StoreHome
         site={site}
         mail={{ mail: word(search.mail, 20), token: word(search.token, 100) }}

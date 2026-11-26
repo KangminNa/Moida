@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { SiteFooter } from '../_blog/SiteFooter';
-import { SiteHeader } from '../_blog/SiteHeader';
 import { StoreHome } from '../_blog/StoreHome';
 import { siteNow } from '../_blog/site';
 
@@ -55,7 +54,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   if (only && site.apps.length === 1) redirect(only.url);
   return (
     <>
-      <SiteHeader site={site} brand={false} />
       <StoreHome site={site} mail={{ mail: null, token: null }} />
       <SiteFooter site={site} />
     </>
