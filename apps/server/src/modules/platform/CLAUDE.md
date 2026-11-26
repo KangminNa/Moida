@@ -66,7 +66,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 ## 내보내는 이벤트 / 받는 이벤트
 칸의 원본은 `platform.events.json` (모듈마다 같다: 아래 표 · 목록은 뜻을 적고, 칸은 그 파일이 정한다).
 
-`platform.setting.changed { approvalId, outcome, error? }` (승인한 알림 · 플러그인 설정 바꾸기의 결과, 2026-11-15 D. task의 `ApprovalResultHandler`가 결재를 끝낸다) / 없음. 대신 `Outbox.listen`으로 모든 이벤트를 쓰는 트랜잭션 안에서 보고, 모듈이 등록한 종류의 알림을 남긴다 (`NoticeCatalog.onEvents`)
+`platform.setting.changed { approvalId, outcome, error? }` (승인한 알림 · 플러그인 설정 바꾸기의 결과, 2026-11-15 D. task의 `ApprovalResultHandler`가 결재를 끝낸다), `platform.notice.sent { title, body, link, tag }` (`NoticePushService`가 푸시로 보내기로 정한 것마다 같은 트랜잭션에 남긴다. 브라우저 구독이 없어도. 플러그인 `email`이 받아 메일로, 2026-11-26) / 없음. 대신 `Outbox.listen`으로 모든 이벤트를 쓰는 트랜잭션 안에서 보고, 모듈이 등록한 종류의 알림을 남긴다 (`NoticeCatalog.onEvents`)
 
 ## 써도 되는 모듈
 없음. platform은 다른 모듈을 모른다.

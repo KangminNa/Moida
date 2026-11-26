@@ -3,6 +3,9 @@
     "platform.plugin.changed": {
       "fields": ["plugin"]
     },
+    "platform.notice.sent": {
+      "fields": ["title", "body", "link", "tag"]
+    },
     "platform.setting.changed": {
       "fields": ["approvalId", "outcome", "error?"]
     }

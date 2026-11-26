@@ -34,6 +34,7 @@ describe('GET /api/plugins', () => {
         'browser-tabs',
         'code-github',
         'comments-giscus',
+        'email',
         'login-github',
         'map',
         'messenger-telegram',
