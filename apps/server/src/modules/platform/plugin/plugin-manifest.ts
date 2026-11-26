@@ -58,6 +58,8 @@ export interface PackageToolSpec {
   readonly description: string;
   /** 입력 모양 (JSON Schema의 properties · required) */
   readonly input: Readonly<Record<string, unknown>>;
+  /** 러너가 몇 초마다 되풀이해 부르는 도구 (목록 파일의 "polled": true). 성공은 요청 로그에 남기지 않는다 */
+  readonly polled: boolean;
 }
 
 /** 기능 패키지의 콘솔 메뉴 (목록 파일 menu) */
@@ -291,6 +293,7 @@ export class PluginManifest {
         operation: String(spec?.operation),
         description: String(spec?.description ?? ''),
         input: (spec?.input ?? { properties: {} }) as Record<string, unknown>,
+        polled: spec?.polled === true,
       });
     }
     let menu: PackageMenu | null = null;

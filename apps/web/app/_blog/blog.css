@@ -992,6 +992,203 @@
   letter-spacing: -0.01em;
 }
 
+/* 이 사이트를 돌리는 Moida 소개 (StoreIntro, 2026-11-26): 옅은 면 하나에 흐름 · 비교 · 카드 · 설치 · 자주 묻는 것 */
+.store-moida {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  width: calc(100% - var(--store-gutter) * 2);
+  max-width: var(--store-width);
+  margin: 0 auto;
+  padding: 56px 48px;
+  border-radius: var(--radius-sheet);
+  background: var(--subtle);
+  scroll-margin-top: 80px;
+}
+
+.store-moida-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.store-moida-head h2 {
+  max-width: 22ch;
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  word-break: keep-all;
+}
+
+.store-moida-part {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.store-moida-part h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
+.store-flow,
+.store-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-cards.five {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.store-cards.three {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.store-flow > li,
+.store-cards li,
+.store-compare > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px;
+  border-radius: var(--radius-card);
+  background: var(--bg);
+  box-shadow: var(--float-1);
+}
+
+.store-flow strong,
+.store-cards strong,
+.store-compare b {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+
+.store-flow ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.store-cards .store-desc {
+  -webkit-line-clamp: 4;
+  word-break: keep-all;
+}
+
+.store-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.store-compare p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+  word-break: keep-all;
+}
+
+.store-compare > div.on {
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+
+.store-compare > div.on b {
+  color: var(--accent-ink);
+}
+
+.store-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 28px;
+}
+
+.store-run > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.store-needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-needs li {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.store-run pre {
+  margin: 0;
+  padding: 22px 24px;
+  overflow-x: auto;
+  border-radius: var(--radius-card);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  line-height: 1.9;
+  white-space: pre;
+}
+
+.store-run pre span span {
+  opacity: 0.55;
+}
+
+.store-faq {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.store-faq details {
+  padding: 18px 22px;
+  border-radius: var(--radius-card);
+  background: var(--bg);
+  box-shadow: var(--float-1);
+}
+
+.store-faq summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.store-faq p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+  word-break: keep-all;
+}
+
 /* 플러그인 email의 구독 띠 · 메일 링크 카드 (store.after, plugins/email/web/Subscribe.tsx): 색을 뒤집은 면 */
 #subscribe {
   scroll-margin-top: 80px;
@@ -1179,6 +1376,21 @@
   .store-news a {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .store-moida {
+    gap: 40px;
+    padding: 36px 20px;
+  }
+
+  .store-moida-head h2 {
+    font-size: 1.6rem;
+  }
+
+  .store-compare,
+  .store-run,
+  .store-faq {
+    grid-template-columns: 1fr;
   }
 
   .store-subscribe,

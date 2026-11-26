@@ -10,6 +10,7 @@ services:
       dockerfile: browser/Dockerfile   # neko 3.2.0 (amd64 · arm64)
     image: cairn-browser:${CAIRN_IMAGE_TAG:-dev}
     restart: unless-stopped
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
     shm_size: 1g
     mem_limit: 1g   # 넘치면 브라우저만 죽는다 (시험: 쉬면 약 250MB, 화면을 보면 약 290MB)
     networks: [browser]   # 서버와만 붙는 망. 웹 · DB · 일꾼은 이 망에 없어 조종 중계(9223)에 닿지 않는다

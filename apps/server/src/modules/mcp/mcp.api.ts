@@ -70,6 +70,7 @@ export class McpController {
     const traced = req as unknown as HttpRequest;
     await this.endpoint.handle(actor, siteUrl, req, res, req.body, {
       called: (what) => RequestTrace.note(traced, what),
+      quiet: () => RequestTrace.quiet(traced),
       failed: (error) => RequestTrace.fail(traced, error),
     });
   }

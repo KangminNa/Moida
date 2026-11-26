@@ -37,6 +37,11 @@ export abstract class BaseTool {
   readonly destructive: boolean = false;
   /** 같은 입력을 다시 보내도 결과가 같은가 (idempotentHint) */
   readonly idempotent: boolean = false;
+  /**
+   * 러너가 몇 초마다 되풀이해 부르는 도구인가 (일 · 로그인 카드 · 클릭 묻기, 2026-11-26).
+   * 성공한 부름은 요청 로그에 남기지 않는다: 아무 일이 없어도 로그가 몇 초마다 쌓이지 않게 (실패 · 거절은 남는다)
+   */
+  readonly polled: boolean = false;
 
   /** 이 요청자가 쓸 수 있는 도구인가. 권한은 actor.can으로만 묻는다 (Actor 종류를 보지 않는다) */
   allows(actor: Actor): boolean {

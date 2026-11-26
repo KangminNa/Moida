@@ -13,6 +13,7 @@ export class PackageTool extends BaseTool {
 
   readonly scope: string;
   readonly readOnly: boolean;
+  override readonly polled: boolean;
   readonly description: string;
   readonly inputSchema: Readonly<Record<string, unknown>>;
 
@@ -31,6 +32,7 @@ export class PackageTool extends BaseTool {
           ? PackageTool.NOBODY
           : allow;
     this.readOnly = !found.operation.writes;
+    this.polled = spec.polled;
     this.description = spec.description;
     this.inputSchema = spec.input;
   }

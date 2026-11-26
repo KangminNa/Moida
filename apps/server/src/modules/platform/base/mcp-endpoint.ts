@@ -7,9 +7,10 @@ import type { BaseTool } from './base-tool';
 import { Database } from './database';
 import { DomainError, Forbidden } from './errors';
 
-/** 입구가 요청 로그에 남길 것 (리팩토링 6단계): 부른 것(도구 이름 · tools/list), 알 수 없는 오류 */
+/** 입구가 요청 로그에 남길 것 (리팩토링 6단계): 부른 것(도구 이름 · tools/list), 알 수 없는 오류, 되풀이 묻기의 성공(남기지 않음) */
 export interface McpTrace {
   called(what: string): void;
+  quiet(): void;
   failed(error: unknown): void;
 }
 
@@ -78,6 +79,7 @@ export class McpEndpoint {
         if (!tool.allows(actor)) throw new Forbidden(tool.scope);
         const answer = await tool.handle(actor, request.params.arguments ?? {}, site);
         const result = answer.toJSON();
+        if (tool.polled) trace?.quiet();
         // 그림은 글 뒤에 image로 (structuredContent에는 싣지 않는다: 글 크기가 커지지 않게)
         const images = (answer.images?.() ?? []).map((i) => ({
           type: 'image' as const,
