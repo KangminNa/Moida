@@ -43,6 +43,7 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
       [SpaceView.HOSTED_APPS]: view.hostedApps || null,
       [SpaceView.TAGLINE]: view.tagline || null,
       [SpaceView.ABOUT]: view.about || null,
+      [SpaceView.HIGHLIGHTS]: view.highlights || null,
     };
   }
 
@@ -57,12 +58,15 @@ export class Space extends TableEntity<SpaceRow, SpaceNew> {
     this.settings = { ...this.settings, [SpaceView.DESCRIPTION]: description.trim(), ...site };
   }
 
-  /** 스토어 첫 화면의 한 줄 소개 · 소개 글 (2026-11-26). null이면 그대로 둔다, 빈 글이면 지운다 */
-  introduce(tagline: string | null, about: string | null): void {
+  /** 스토어 첫 화면의 한 줄 소개 · 소개 글 · 한눈에 (2026-11-26). null이면 그대로 둔다, 빈 글이면 지운다 */
+  introduce(tagline: string | null, about: string | null, highlights: string | null = null): void {
+    const set = (key: string, value: string | null) =>
+      value === null ? {} : { [key]: value.trim() };
     this.settings = {
       ...this.settings,
-      ...(tagline === null ? {} : { [SpaceView.TAGLINE]: tagline.trim() }),
-      ...(about === null ? {} : { [SpaceView.ABOUT]: about.trim() }),
+      ...set(SpaceView.TAGLINE, tagline),
+      ...set(SpaceView.ABOUT, about),
+      ...set(SpaceView.HIGHLIGHTS, highlights),
     };
   }
 

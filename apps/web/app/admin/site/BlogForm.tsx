@@ -31,6 +31,7 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
   const [description, setDescription] = useState(space.description);
   const [tagline, setTagline] = useState(space.tagline);
   const [about, setAbout] = useState(space.about);
+  const [highlights, setHighlights] = useState(space.highlights);
   const [siteUrl, setSiteUrl] = useState(space.siteUrl ?? '');
   const [version, setVersion] = useState(space.version);
 
@@ -49,6 +50,7 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
           description,
           tagline,
           about,
+          highlights,
           siteUrl,
           version,
         }),
@@ -92,6 +94,20 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
           placeholder="예: 우리가 만드는 사이트들을 한곳에서"
         />
         <small>스토어 첫 화면에 크게 보여요 (비워도 돼요)</small>
+      </label>
+      <label className="field">
+        <span>한눈에 (하는 일)</span>
+        <textarea
+          className="input"
+          rows={4}
+          value={highlights}
+          maxLength={1500}
+          onChange={(e) => setHighlights(e.target.value)}
+          placeholder={
+            '한 줄에 하나씩, "제목: 설명"\n오픈소스: 코드를 공개하고 누구나 내려받아 써요\n여러 사이트: 한 서버에서 블로그 · 매거진 · 앱을 함께 운영해요'
+          }
+        />
+        <small>스토어 첫 화면의 "한눈에" 카드가 돼요 (6줄까지, 비우면 숨겨요)</small>
       </label>
       <label className="field">
         <span>회사 · 프로젝트 소개</span>

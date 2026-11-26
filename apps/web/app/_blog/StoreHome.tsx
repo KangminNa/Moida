@@ -1,6 +1,8 @@
 import { renderMarkdown } from '../_lib/markdown';
 import { ago } from '../_lib/time-ago';
 import { Slot } from '../_plugins/Slot';
+import { NewTabLink } from '../_ui/NewTabLink';
+import { SOURCE_URL } from '../_ui/source';
 import { AppIcon } from './AppIcon';
 import { formatDate, postPath } from './format';
 import { APP_KIND_LABELS } from './labels';
@@ -22,6 +24,7 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
   const latest = new Map<string, Post>();
   for (const p of recent) if (p.app && !latest.has(p.app.slug)) latest.set(p.app.slug, p);
   const name = space.name || 'Cairn';
+  const highlights = glance(space.highlights);
   return (
     <div className="store">
       <header className="store-top">
@@ -33,6 +36,7 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
           {name}
         </a>
         <nav aria-label="바로 가기">
+          {space.highlights && <a href="#glance">한눈에</a>}
           {space.about && <a href="#about">소개</a>}
           {apps.length > 0 && <a href="#sites">사이트</a>}
           {recent.length > 0 && <a href="#news">소식</a>}
@@ -44,21 +48,24 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
       <main>
         <section className="store-hero">
           <p className="store-eyebrow">
+            <span className="store-oss">오픈소스 · AGPL-3.0</span>
             {name}
             {apps.length > 0 && <span> · 사이트 {apps.length}곳</span>}
           </p>
           <h1>{space.tagline || name}</h1>
           {space.description && <p className="store-lead">{space.description}</p>}
+          <div className="store-actions">
+            {apps.length > 0 && (
+              <a className="store-button primary" href="#sites">
+                사이트 둘러보기
+              </a>
+            )}
+            <NewTabLink className="store-button" href={SOURCE_URL}>
+              GitHub에서 소스 보기
+            </NewTabLink>
+          </div>
           {apps.length > 0 && (
             <>
-              <div className="store-actions">
-                <a className="store-button primary" href="#sites">
-                  사이트 둘러보기
-                </a>
-                <a className="store-button" href="#subscribe">
-                  새 글 받아보기
-                </a>
-              </div>
               <ul className="store-dock" aria-label="운영하는 사이트">
                 {apps.map((a) => (
                   <li key={a.slug}>
@@ -72,6 +79,22 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
             </>
           )}
         </section>
+        {highlights.length > 0 && (
+          <section className="store-band" id="glance" aria-labelledby="store-glance">
+            <div className="store-band-head">
+              <h2 id="store-glance">한눈에</h2>
+            </div>
+            <ol className="store-glance">
+              {highlights.map((h) => (
+                <li key={h.no}>
+                  <span className="store-glance-no">{h.no}</span>
+                  <strong>{h.title}</strong>
+                  {h.text && <span className="store-desc">{h.text}</span>}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
         {space.about && (
           <section className="store-band store-about" id="about" aria-labelledby="store-about">
             <h2 id="store-about">
@@ -117,6 +140,23 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
       </main>
     </div>
   );
+}
+
+/** "한눈에" 칸: 한 줄에 하나 ("제목: 설명" 또는 "제목 - 설명", 설명은 없어도 된다). 6줄까지 */
+function glance(raw: string): { no: string; title: string; text: string }[] {
+  return raw
+    .split('\n')
+    .map((line) => line.replace(/^[-*\d.\s]+/, '').trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((line, i) => {
+      const [title = '', ...rest] = line.split(/:\s|\s-\s/);
+      return {
+        no: String(i + 1).padStart(2, '0'),
+        title: title.trim(),
+        text: rest.join(' ').trim(),
+      };
+    });
 }
 
 /** 이름 뒤의 "은/는": 한글 끝 글자에 받침이 있으면 은, 그 밖(영문 이름 포함)은 는 */

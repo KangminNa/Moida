@@ -156,6 +156,7 @@ describe('블로그 정보', () => {
       description: '작업 기록',
       tagline: '',
       about: '',
+      highlights: '',
       siteUrl: 'https://blog.example.com',
       installed: true,
       version: version + 1,
@@ -202,6 +203,11 @@ describe('블로그 정보', () => {
       (await put({ description: '작업 기록' })).about,
       '## 하는 일\n- 블로그',
       '보내지 않으면 그대로',
+    );
+    const lines = await put({ highlights: '오픈소스: 누구나 받아 쓴다\n여러 사이트: 한 서버에서' });
+    assert.equal(
+      (lines as { highlights?: string }).highlights,
+      '오픈소스: 누구나 받아 쓴다\n여러 사이트: 한 서버에서',
     );
     assert.equal((await put({ tagline: '', about: '' })).tagline, '', '빈 글이면 지운다');
     const { version } = (await api.get('/api/space')).json() as { version: number };

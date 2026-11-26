@@ -85,6 +85,7 @@ export class RenameSpaceInput extends BaseRequest {
     /** 스토어 첫 화면의 한 줄 소개 · 소개 글 (2026-11-26). 보내지 않으면 null: 그대로 둔다 */
     readonly tagline: string | null = null,
     readonly about: string | null = null,
+    readonly highlights: string | null = null,
   ) {
     super();
   }
@@ -101,6 +102,7 @@ export class RenameSpaceInput extends BaseRequest {
           f.version(),
           given('tagline') ? (f.optionalText('tagline', 120) ?? '') : null,
           given('about') ? (f.optionalText('about', 3000) ?? '') : null,
+          given('highlights') ? (f.optionalText('highlights', 1500) ?? '') : null,
         ),
     );
   }
