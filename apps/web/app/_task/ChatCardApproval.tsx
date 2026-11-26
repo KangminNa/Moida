@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { api } from '../_lib/client-api';
 import { useAction } from '../_lib/use-action';
 import { useLiveValue } from '../_lib/use-live';
+import { CardSettled, type Settled, settledOf } from './CardSettled';
 import { ChatCardForm } from './ChatCardForm';
 import { CHAT_DETAIL_TOPICS } from './live';
 import type { Approval, ChatDetail } from './types';
@@ -19,6 +21,8 @@ export function ChatCardApproval({ approval }: { approval: Approval }) {
     CHAT_DETAIL_TOPICS,
   );
   const deciding = useAction();
+  /** 여기서 정한 카드 (정하면 대화의 카드가 사라져 접히며 빠지는 모양과 한 줄을 남긴다) */
+  const [settled, setSettled] = useState<Settled | null>(null);
   const card = detail.data?.card ?? null;
   const toChat = <Link href={`/admin/chats/${chatId}`}>대화 열기</Link>;
 
@@ -28,11 +32,19 @@ export function ChatCardApproval({ approval }: { approval: Approval }) {
     ) : (
       <p className="label-mono">결과 카드 불러오는 중…</p>
     );
+  if (settled && (card === null || card.id !== approval.id))
+    return (
+      <>
+        <CardSettled settled={settled} />
+        <p className="note">{toChat}</p>
+      </>
+    );
   if (card === null || card.id !== approval.id)
     return <p className="note">대화의 결과 카드 · {toChat}</p>;
 
-  const decide = (body: { decision: string; note?: string; picked?: string[] }) =>
-    deciding.run(
+  async function decide(body: { decision: string; note?: string; picked?: string[] }) {
+    if (!card) return;
+    const reply = await deciding.run(
       'decide',
       () => api('POST', `/api/approvals/${card.id}/decide`, { version: card.version, ...body }),
       {
@@ -41,6 +53,8 @@ export function ChatCardApproval({ approval }: { approval: Approval }) {
         conflict: '그사이 카드에 항목이 더해졌어요. 다시 골라요',
       },
     );
+    if (reply?.ok) setSettled(settledOf(card, body));
+  }
 
   return (
     <>
