@@ -47,7 +47,13 @@ export type ChatBoardRow = ChatRow & { partner: string | null; state: string; ac
 /** 이 대화에서 시작해 아직 끝나지 않은 작업 하나 (팀이 동시에 일하는 칸, 2026-11-15) */
 export type ChatTeamRow = Pick<TaskRow, 'id' | 'agent_id' | 'title' | 'status' | 'parent_id'> &
   Pick<ChatTurnTaskRow, 'wait_reason' | 'wait_until' | 'created_at' | 'last_event'> &
-  Pick<ChatUpdateLine, 'agent'>;
+  Pick<ChatUpdateLine, 'agent'> & {
+    /**
+     * 지금 단계 (2026-11-26 일꾼 진행 단계): lease 빌리기를 기다림 · prepare 빌려 준비 중(이번 실행의 기록 없음) · run 실행(기록이 쌓임,
+     * 하위 작업 · 대표의 답을 기다리는 것 포함) · check AI가 결과를 냄(러너가 검사) · upload 이번 실행의 결과물을 올림 · approve 승인을 기다림
+     */
+    stage: 'lease' | 'prepare' | 'run' | 'check' | 'upload' | 'approve';
+  };
 
 /** 참조의 칸 (payload.refs · chats.pending_refs). 서버가 적은 값이지만 내보낼 칸은 여기서 고른다 */
 function refsOf(raw: unknown) {
@@ -336,13 +342,11 @@ export class ChatDetailView {
     return {
       chat: new ChatView(this.chat).toJSON(),
       /** 맡은 에이전트 (맡기 전이면 null) */
-      partner: p
-        ? {
-            name: p.name,
-            paused: p.status === 'paused',
-            deleted: p.deleted_at !== null,
-          }
-        : null,
+      partner: p && {
+        name: p.name,
+        paused: p.status === 'paused',
+        deleted: p.deleted_at !== null,
+      },
       turns: this.turns.map((t) => t.toJSON()),
       /** routing · asking · working · waiting_approval · done · failed, 지금 도는 작업 수 */
       state: this.board?.state ?? 'done',
@@ -393,6 +397,7 @@ export class ChatDetailView {
         parentId: t.parent_id,
         createdAt: t.created_at.toISOString(),
         lastEvent: t.last_event,
+        stage: t.stage,
       })),
     };
   }

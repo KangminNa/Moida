@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Database, OutboxWorker, ZipFile } from '../modules/platform';
 import { type ApiClient, type ApiResult, TestUser } from './api-client';
 import { TestMailbox } from './test-mailbox';
@@ -9,6 +9,11 @@ import { TestMailbox } from './test-mailbox';
 // 쓰기는 이 도메인의 화면에서 보낸 것처럼 Origin과 그 회원의 CSRF 값을 붙인다
 export class CommunitySite {
   private static places = 0;
+  /**
+   * 테스트 프로세스마다 다른 값 (2026-11-26): 계정은 공간(스토어)마다 하나라, 같은 테스트 DB를 쓰는 다른 파일이 같은 이름을 써도
+   * 메일 · 아이디가 겹치지 않게 메일의 도메인과 아이디 앞에 붙인다 (영문 소문자로 시작: 아이디 규칙)
+   */
+  private static readonly RUN = `r${randomBytes(3).toString('hex')}`;
   /** 띄운 서버마다 메일함 하나 (인증코드를 받는다) */
   private static readonly boxes = new WeakMap<ApiClient, TestMailbox>();
   /** 가입 비밀번호 (회원 테스트가 로그인할 때 쓴다) */
@@ -23,9 +28,9 @@ export class CommunitySite {
     return box;
   }
 
-  /** 회원 테스트의 메일 주소 (이름 → 이름@example.com) */
+  /** 회원 테스트의 메일 주소 (이름 → 이름@<프로세스 값>.example.com) */
   static emailOf(name: string): string {
-    return `${name.toLowerCase()}@example.com`;
+    return `${name.toLowerCase()}@${CommunitySite.RUN}.example.com`;
   }
   /** 도메인을 연결하지 않은 앱에 버전만 올려 보는 도구 (deploy만 쓴다) */
   static readonly Probe = class extends CommunitySite {
@@ -250,10 +255,10 @@ export class CommunitySite {
     return user;
   }
 
-  /** 테스트 메일의 아이디 (메일의 @ 앞을 아이디 규칙에 맞게: 영문 소문자로 시작하는 4~20자) */
+  /** 테스트 메일의 아이디 (프로세스 값 + 메일의 @ 앞을 아이디 규칙에 맞게: 영문 소문자로 시작하는 4~20자) */
   static loginIdOf(email: string): string {
     const local = (email.split('@')[0] ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    return `u${local}`.padEnd(4, '_').slice(0, 20);
+    return `${CommunitySite.RUN}${local}`.padEnd(4, '_').slice(0, 20);
   }
 
   /** 가입 시도 한 번: 그 메일로 코드를 받고(받지 못하면 code로 준 값) 가입한다. 곳(IP)은 매번 다르게 (가입 제한) */

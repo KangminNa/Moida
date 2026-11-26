@@ -768,13 +768,26 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
     // 대화 상세(관리자)의 "팀이 동시에 일하는 중" 칸 (2026-11-15 B): 이 대화의 일과 그 아래 작업, 상태와 도는 작업 수
     const busy = await detail(chatId);
     assert.deepEqual([busy.state, busy.active], ['working', 2]);
+    // 지금 단계 (2026-11-26): 일꾼을 기다리는 대표는 실행, 빌렸지만 기록이 없는 일꾼은 준비 → 기록이 쌓이면 실행 → 결과를 내면 검사
     assert.deepEqual(
-      (busy.team as Json[]).map((t) => [t.title, t.status]),
+      (busy.team as Json[]).map((t) => [t.title, t.status, t.stage]),
       [
-        ['대화 · 대회 요강 정리해 줘', 'waiting'],
-        ['요강 읽기', 'running'],
+        ['대화 · 대회 요강 정리해 줘', 'waiting', 'run'],
+        ['요강 읽기', 'running', 'prepare'],
       ],
     );
+    const stageOf = async () =>
+      ((await detail(chatId)).team as Json[]).find((t) => t.title === '요강 읽기')?.stage;
+    await tool(runner, 'report_progress', {
+      task_id: sub.task.id,
+      events: [{ kind: 'read', body: '요강 읽는 중', tokens: 10 }],
+    });
+    assert.equal(await stageOf(), 'run');
+    await tool(runner, 'report_progress', {
+      task_id: sub.task.id,
+      events: [{ kind: 'result', body: '평가 기준 3가지', tokens: 10 }],
+    });
+    assert.equal(await stageOf(), 'check');
     await tool(runner, 'submit_result', {
       task_id: sub.task.id,
       request_id: randomUUID(),

@@ -249,7 +249,7 @@ describe('메일 인증 가입', () => {
 describe('로그인', () => {
   test('메일 + 비밀번호: 맞으면 새 세션, 틀린 비밀번호와 없는 메일은 같은 문구', async () => {
     await member('login_ok', '로그인됨');
-    const res = await login('LOGIN_OK@example.com', PASSWORD);
+    const res = await login(CommunitySite.emailOf('login_ok').toUpperCase(), PASSWORD);
     const self = ok(res);
     assert.equal(self.email, CommunitySite.emailOf('login_ok'));
     assert.equal(self.loginId, CommunitySite.loginIdOf(CommunitySite.emailOf('login_ok')));

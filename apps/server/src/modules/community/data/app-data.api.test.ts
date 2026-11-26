@@ -245,7 +245,7 @@ describe('DB가 거른다 (행 수준 보안)', () => {
     const seen = await db.transaction(async (tx) => {
       const [me] = await tx<{ id: string }[]>`
         SELECT m.id FROM community.members m JOIN community.accounts a ON a.id = m.account_id
-        WHERE m.app_id = ${site.appId} AND a.email = 'ann_learner@example.com'`;
+        WHERE m.app_id = ${site.appId} AND a.email = ${CommunitySite.emailOf('ann_learner')}`;
       await tx`SELECT set_config('cairn.member', ${me?.id ?? ''}, true)`;
       await tx.unsafe('SET LOCAL ROLE cairn_app');
       const rows = await tx.unsafe(`SELECT score FROM "${schema}"."progress"`);
@@ -313,8 +313,8 @@ describe('버전이 바뀌면', () => {
     );
     const members = (JSON.parse(files.get('members.json') ?? '{}') as { members: Json[] }).members;
     assert.deepEqual(members.map((m) => m.email).sort(), [
-      'ann_learner@example.com',
-      'bob_learner@example.com',
+      CommunitySite.emailOf('ann_learner'),
+      CommunitySite.emailOf('bob_learner'),
     ]);
     assert.deepEqual(
       members.map((m) => [m.terms_version, m.privacy_version, m.left_at]),
