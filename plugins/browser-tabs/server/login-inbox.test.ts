@@ -38,10 +38,43 @@ describe('값을 두는 곳 (LoginInbox)', () => {
     assert.deepEqual(inbox.take('sp', 'runner', t0), {
       siteId: 'site',
       values: { id: 'me', password: 'pw' },
+      request: { kind: 'values' },
     });
     assert.equal(inbox.take('sp', 'runner', t0), null, '한 번만');
     assert.equal(inbox.attempt('sp', 'site', t0)?.status, 'filling');
     assert.doesNotMatch(JSON.stringify(inbox.attempt('sp', 'site', t0)), /pw/);
+  });
+
+  test('간편 로그인 (2026-11-26): 열림은 단추를 누른 것에만, 그 회사의 칸은 누른 회사의 것만 남긴다', () => {
+    const inbox = new LoginInbox();
+    const kakao = {
+      provider: 'kakao',
+      page_url: 'https://accounts.kakao.com/login',
+      fields: [
+        { kind: 'id' as const, role: 'textbox', name: '계정' },
+        { kind: 'password' as const, role: 'textbox', name: '비밀번호' },
+      ],
+      submit: { role: 'button', name: '로그인' },
+    };
+    const opened = { outcome: 'opened' as const, reason: null, afterUrl: null, image: null };
+    // 값을 넣은 일에 opened는 남기지 못한다
+    inbox.send('sp', 'site', 'runner', { id: 'me', password: 'pw' }, t0);
+    inbox.take('sp', 'runner', t0);
+    assert.equal(inbox.save('sp', 'site', 'runner', opened, t0), false);
+    // 간편 로그인: 다른 회사의 칸은 버리고, 누른 회사의 칸만 카드에 남는다
+    inbox.send('sp', 'site', 'runner', {}, t0, { kind: 'social', provider: 'kakao' });
+    assert.deepEqual(inbox.take('sp', 'runner', t0)?.request, {
+      kind: 'social',
+      provider: 'kakao',
+    });
+    const naver = { ...kakao, provider: 'naver' };
+    assert.equal(inbox.save('sp', 'site', 'runner', { ...opened, providerForm: naver }, t0), true);
+    assert.equal(inbox.providerForm('sp', 'site', t0), null, '누르지 않은 회사의 칸');
+    inbox.send('sp', 'site', 'runner', {}, t0, { kind: 'social', provider: 'kakao' });
+    inbox.take('sp', 'runner', t0);
+    assert.equal(inbox.save('sp', 'site', 'runner', { ...opened, providerForm: kakao }, t0), true);
+    assert.deepEqual(inbox.providerForm('sp', 'site', t0), kakao);
+    assert.equal(inbox.providerForm('sp', 'site', t0 + LoginInbox.KEEP_MS + 1), null, '10분 뒤');
   });
 
   test('결과는 꺼낸 러너만 남긴다', () => {
