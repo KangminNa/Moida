@@ -956,6 +956,92 @@ describe('로그인 카드 (2026-11-19)', () => {
     assert.equal(Number(found?.n), 0);
   });
 
+  test('간편 로그인 (2026-11-26): 단추 누르기 → 그 회사 화면의 칸 → 넣기. 회사의 화면은 고정 목록의 https 주소만', async () => {
+    const site = await newSite();
+    const { taskId } = await siteJob(site);
+    const kakao = { provider: 'kakao', role: 'button', name: '카카오 로그인' };
+    const noticed = await tool(runner, 'browser_login_needed', {
+      task_id: taskId,
+      page_url: 'https://login.blog.example/signin',
+      form: { social: [kakao] },
+    });
+    assert.equal(noticed.body.login_card, true, JSON.stringify(noticed.body));
+    const shown = await card(site.id);
+    assert.deepEqual([shown.fields, shown.social], [[], [{ provider: 'kakao' }]]);
+    const post = (body: object) =>
+      api.request('POST', `${BASE}/sites/${site.id}/login`, owner, body);
+    assert.equal((await post({ social: 'naver' })).status, 422, '사이트에 없는 회사');
+    assert.equal((await post({ values: { id: 'me', password: 'x' } })).status, 422, '칸이 없다');
+    assert.equal(
+      (await post({ step: 'provider', values: { id: 'me', password: 'x' } })).status,
+      422,
+      '열린 회사 화면이 없다',
+    );
+
+    ok(await post({ social: 'kakao' }));
+    const press = (await tool(runner, 'browser_login_next')).body.login as Json;
+    assert.deepEqual(
+      [press.kind, press.page_url, press.social, press.fields],
+      ['social', 'https://login.blog.example/signin', kakao, undefined],
+    );
+    const providerForm = {
+      provider: 'kakao',
+      page_url: 'https://accounts.kakao.com/login?continue=x',
+      fields: [
+        { kind: 'id', role: 'textbox', name: '계정' },
+        { kind: 'password', role: 'textbox', name: '비밀번호' },
+      ],
+      submit: { role: 'button', name: '로그인' },
+    };
+    const phishing = await tool(runner, 'browser_login_save', {
+      site_id: site.id,
+      outcome: 'opened',
+      provider_form: { ...providerForm, page_url: 'https://accounts.kakao.com.evil.example/' },
+    });
+    assert.equal(phishing.ok, false, '고정 목록의 호스트가 아니면 받지 않는다');
+    const opened = await tool(runner, 'browser_login_save', {
+      site_id: site.id,
+      outcome: 'opened',
+      after_url: providerForm.page_url,
+      image: JPEG,
+      provider_form: providerForm,
+    });
+    assert.equal(opened.ok, true, JSON.stringify(opened.body));
+    const attempt = (await card(site.id)).attempt as Json;
+    assert.deepEqual(
+      [attempt.status, attempt.provider],
+      [
+        'opened',
+        {
+          provider: 'kakao',
+          origin: 'https://accounts.kakao.com',
+          fields: [{ kind: 'id' }, { kind: 'password' }],
+        },
+      ],
+    );
+
+    ok(await post({ step: 'provider', values: { id: 'me@kakao', password: PASSWORD } }));
+    const fill = (await tool(runner, 'browser_login_next')).body.login as Json;
+    assert.deepEqual(
+      [fill.kind, fill.page_url, (fill.fields as Json[]).map((f) => [f.kind, f.name, f.value])],
+      [
+        'provider',
+        providerForm.page_url,
+        [
+          ['id', '계정', 'me@kakao'],
+          ['password', '비밀번호', PASSWORD],
+        ],
+      ],
+    );
+    const submitted = await tool(runner, 'browser_login_save', {
+      site_id: site.id,
+      outcome: 'submitted',
+    });
+    assert.equal(submitted.ok, true, JSON.stringify(submitted.body));
+    assert.equal(((await card(site.id)).attempt as Json).status, 'submitted');
+    assert.doesNotMatch(JSON.stringify(await card(site.id)), new RegExp(PASSWORD));
+  });
+
   test('믿지 않는 출처면 칸이 뜨지 않는다: 다른 도메인 · 저절로 만든 사이트. 관리자의 지시에 그 도메인이 있거나 "로그인했어요" 뒤에는 뜬다', async () => {
     const site = await newSite();
     const { taskId } = await siteJob(site);

@@ -7,6 +7,7 @@ import { BrowserPages, type BrowserTab } from './browser-page';
 import { BrowserStop } from './browser-stop';
 import { LoginForm, LoginFormProblemOnPage } from './login-form';
 import { LoginFormProblem, LoginFormRef } from './login-form-ref';
+import { ProviderLogin } from './provider-login';
 import { TestChromium } from './testing/test-chromium';
 
 // 로그인 카드 (2026-11-19): AI가 알려 준 로그인 칸의 모양(믿지 않는 입력)과, 관리자가 넣은 값을 AI 없이 그 칸에 넣고 누르기.
@@ -43,6 +44,30 @@ describe('로그인 칸의 모양 (browser-stop.json의 form)', () => {
       assert.throws(() => LoginFormRef.parse(form), LoginFormProblem, JSON.stringify(form));
   });
 
+  test('간편 로그인 (2026-11-26): 회사마다 하나, 칸 없이 간편 로그인만도, 둘 다 없으면 버린다', () => {
+    const social = [{ provider: 'kakao', role: 'button', name: '카카오 로그인' }];
+    assert.deepEqual(LoginFormRef.parse({ social })?.toJSON(), { fields: [], social });
+    assert.deepEqual(LoginFormRef.parse({ ...FORM, social })?.toJSON(), { ...FORM, social });
+    for (const form of [
+      {},
+      { social: [{ provider: 'facebook', role: 'button', name: 'f' }] },
+      { social: [social[0], social[0]] },
+      { fields: FORM.fields },
+    ])
+      assert.throws(() => LoginFormRef.parse(form), LoginFormProblem, JSON.stringify(form));
+  });
+
+  test('간편 로그인 회사의 화면은 고정 목록의 https 호스트만', () => {
+    assert.equal(LoginFormRef.providerHost('kakao', 'https://accounts.kakao.com/login'), true);
+    assert.equal(LoginFormRef.providerHost('naver', 'https://nid.naver.com/nidlogin.login'), true);
+    assert.equal(LoginFormRef.providerHost('kakao', 'https://nid.naver.com/'), false);
+    assert.equal(LoginFormRef.providerHost('kakao', 'http://accounts.kakao.com/'), false);
+    assert.equal(
+      LoginFormRef.providerHost('kakao', 'https://accounts.kakao.com.evil.example/'),
+      false,
+    );
+  });
+
   test('넣어도 되는 출처: https와 이 컴퓨터의 http만', () => {
     assert.equal(LoginForm.safeOrigin('https://nid.example.com/login'), true);
     assert.equal(LoginForm.safeOrigin('http://127.0.0.1:3000/login'), true);
@@ -73,6 +98,20 @@ describe('로그인 칸에 넣고 누르기 (실제 Chromium)', { skip: TestChro
     site = createServer((req, res) => {
       const html = (body: string) =>
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(body);
+      if (req.method === 'GET' && req.url === '/social')
+        return html(
+          `<title>간편 로그인</title><button onclick="location.href='/provider'">카카오 로그인</button>`,
+        );
+      if (req.method === 'GET' && req.url === '/provider')
+        return html(`<title>카카오계정</title><form action="/provider-session" method="post">
+  <label>계정 <input name="email" type="email"></label>
+  <label>비밀번호 <input name="password" type="password"></label>
+  <button type="button">QR코드 로그인</button>
+  <button>로그인</button></form>`);
+      if (req.method === 'GET' && req.url === '/signup')
+        return html(`<form><label>아이디 <input name="id"></label>
+  <label>비밀번호 <input type="password" name="a"></label><label>비밀번호 확인 <input type="password" name="b"></label>
+  <button>가입</button></form>`);
       if (req.method !== 'POST') return html(PAGE);
       let body = '';
       req.on('data', (c) => {
@@ -131,6 +170,50 @@ describe('로그인 칸에 넣고 누르기 (실제 Chromium)', { skip: TestChro
       });
     }
     assert.equal(posts.length, before);
+  });
+
+  test('간편 로그인: 있는 단추만 남기고, 누르면 그 단추가 가리키는 화면으로 간다 (AI 없음)', async () => {
+    const tab = await pages.open(`${url}/social`, signal());
+    await pause(800);
+    const form = LoginFormRef.parse({
+      social: [
+        { provider: 'kakao', role: 'button', name: '카카오 로그인' },
+        { provider: 'naver', role: 'button', name: '네이버 로그인' },
+      ],
+    }) as LoginFormRef;
+    const checked = await LoginForm.check(tab, form, signal());
+    assert.deepEqual(
+      checked.social.map((s) => s.provider),
+      ['kakao'],
+      '화면에 없는 네이버 단추는 뺀다',
+    );
+    const after = await LoginForm.press(tab, url, checked.social[0] as never, signal());
+    assert.equal(after, `${url}/provider`);
+  });
+
+  test('간편 로그인 회사의 화면: 아이디 · 비밀번호 칸과 로그인 단추를 AI 없이 찾고, 찾은 칸으로 넣는다', async () => {
+    const tab = await pages.open(`${url}/provider`, signal());
+    await pause(800);
+    const found = await ProviderLogin.read(tab, signal());
+    assert.ok(found, '칸을 찾는다');
+    assert.deepEqual(
+      found.fields.map((f) => f.kind),
+      ['id', 'password'],
+    );
+    assert.equal(found.submit?.name, '로그인');
+    await LoginForm.check(tab, found, signal());
+    const values = new Map([
+      ['id', 'kakao@example.com'],
+      ['password', 'pw-1'],
+    ]);
+    await LoginForm.submit(tab, url, found, values, signal());
+    assert.equal(posts.at(-1), 'email=kakao%40example.com&password=pw-1');
+    // 고정 목록의 호스트가 아니면 카드에 띄우지 않는다
+    assert.equal(await ProviderLogin.form(tab, 'kakao', signal()), null);
+    // 비밀번호 칸이 둘이면(가입 화면 같은 것) 찾지 않는다
+    const signup = await pages.open(`${url}/signup`, signal());
+    await pause(800);
+    assert.equal(await ProviderLogin.read(signup, signal()), null);
   });
 
   test('탭의 출처가 로그인 화면의 출처가 아니면 넣지 않는다', async () => {

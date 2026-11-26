@@ -8,23 +8,56 @@ export const LOGIN_KINDS = ['id', 'password', 'code'] as const;
 export type LoginKind = (typeof LOGIN_KINDS)[number];
 export type LoginValues = Partial<Record<LoginKind, string>>;
 
-/** 사이트에 적는 로그인 칸 (sites.login_form). 값은 없다 */
+/**
+ * 간편 로그인 회사와 그 회사의 로그인 화면 호스트 (2026-11-26, 고정 목록). 러너의 LoginFormRef.PROVIDERS와 같다.
+ * 간편 로그인 단추를 누른 뒤 러너가 이 호스트의 화면에서 찾은 칸만 카드에 띄운다 (AI가 정하지 않는다)
+ */
+export const LOGIN_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
+  kakao: ['accounts.kakao.com', 'kauth.kakao.com'],
+  naver: ['nid.naver.com'],
+  google: ['accounts.google.com'],
+  apple: ['appleid.apple.com'],
+};
+
+type Target = { role: string; name: string };
+
+/** 사이트에 적는 로그인 칸 (sites.login_form). 값은 없다. 칸이 없으면(간편 로그인만) submit도 null */
 export type LoginForm = {
   page_url: string;
   runner_id: string;
   fields: { kind: LoginKind; role: string; name: string }[];
-  submit: { role: string; name: string };
+  submit: Target | null;
+  /** 간편 로그인 단추 (2026-11-26) */
+  social?: ({ provider: string } & Target)[];
 };
 
-/** sent(넣음, 러너를 기다림) → filling(러너가 꺼내 넣는 중) → submitted(로그인 단추를 누름) | failed. 꺼내 가지 않으면 expired */
-export type LoginStatus = 'sent' | 'filling' | 'submitted' | 'failed' | 'expired';
+/** 간편 로그인 단추를 누른 뒤 러너가 그 회사의 화면에서 찾은 칸 (메모리에만, 10분). 아이디 · 비밀번호만 */
+export type ProviderForm = {
+  provider: string;
+  page_url: string;
+  fields: { kind: 'id' | 'password'; role: string; name: string }[];
+  submit: Target;
+};
 
-/** 카드가 읽는 진행 상태 (값은 없다) */
+/** 관리자가 카드에서 한 것: 사이트 칸에 넣기 · 간편 로그인 단추 누르기 · 그 회사의 화면 칸에 넣기 */
+export type LoginRequest =
+  | { kind: 'values' }
+  | { kind: 'social'; provider: string }
+  | { kind: 'provider'; form: ProviderForm };
+
+/**
+ * sent(넣음, 러너를 기다림) → filling(러너가 꺼내 하는 중) → submitted(로그인 단추를 누름) | opened(간편 로그인 단추를 눌러
+ * 그 회사의 화면이 열림, 2026-11-26) | failed. 꺼내 가지 않으면 expired
+ */
+export type LoginStatus = 'sent' | 'filling' | 'submitted' | 'opened' | 'failed' | 'expired';
+
+/** 카드가 읽는 진행 상태 (값은 없다). opened면 그 회사의 화면에서 찾은 칸(providerForm, 없으면 화면 · 휴대폰에서 마친다) */
 export type LoginAttempt = {
   status: LoginStatus;
   reason: string | null;
   afterUrl: string | null;
   image: string | null;
+  providerForm: ProviderForm | null;
   at: Date;
 };
 
@@ -32,6 +65,7 @@ type Entry = LoginAttempt & {
   spaceId: string;
   siteId: string;
   runnerId: string;
+  request: LoginRequest;
   values: LoginValues | null;
   /** 값을 버리는 때 (sent) · 상태를 버리는 때 (그 밖) */
   until: number;
@@ -44,20 +78,35 @@ export class LoginInbox {
   private static readonly FILLING_MS = 2 * 60_000;
   private readonly entries = new Map<string, Entry>();
 
-  /** 관리자가 넣은 값. 같은 사이트의 앞 값은 버린다 */
-  send(spaceId: string, siteId: string, runnerId: string, values: LoginValues, now = Date.now()) {
+  /** 관리자가 넣은 값 · 누를 간편 로그인. 같은 사이트의 앞 것은 버린다 */
+  send(
+    spaceId: string,
+    siteId: string,
+    runnerId: string,
+    values: LoginValues,
+    now = Date.now(),
+    request: LoginRequest = { kind: 'values' },
+  ) {
     this.entries.set(LoginInbox.key(spaceId, siteId), {
       spaceId,
       siteId,
       runnerId,
+      request,
       values: { ...values },
       status: 'sent',
       reason: null,
       afterUrl: null,
       image: null,
+      providerForm: null,
       at: new Date(now),
       until: now + LoginInbox.KEEP_MS,
     });
+  }
+
+  /** 그 사이트에서 지금 열려 있는 간편 로그인 회사의 칸 (opened 뒤, 10분). 없으면 null */
+  providerForm(spaceId: string, siteId: string, now = Date.now()): ProviderForm | null {
+    const attempt = this.attempt(spaceId, siteId, now);
+    return attempt?.status === 'opened' ? attempt.providerForm : null;
   }
 
   /** 이 러너가 넣을 값 하나를 꺼낸다 (꺼내면 메모리에서 지운다). 없으면 null */
@@ -65,7 +114,7 @@ export class LoginInbox {
     spaceId: string,
     runnerId: string,
     now = Date.now(),
-  ): { siteId: string; values: LoginValues } | null {
+  ): { siteId: string; values: LoginValues; request: LoginRequest } | null {
     this.sweep(now);
     for (const entry of this.entries.values()) {
       if (entry.spaceId !== spaceId || entry.runnerId !== runnerId || entry.status !== 'sent')
@@ -77,7 +126,7 @@ export class LoginInbox {
         at: new Date(now),
         until: now + LoginInbox.FILLING_MS,
       });
-      return { siteId: entry.siteId, values };
+      return { siteId: entry.siteId, values, request: entry.request };
     }
     return null;
   }
@@ -85,7 +134,7 @@ export class LoginInbox {
   /** 꺼내 간 값을 쓰지 못하고 돌려준다 (사이트의 칸이 지워졌을 때) */
   drop(spaceId: string, siteId: string, reason: string, now = Date.now()): void {
     const entry = this.entries.get(LoginInbox.key(spaceId, siteId));
-    if (entry) LoginInbox.end(entry, 'failed', reason, null, null, now);
+    if (entry) LoginInbox.end(entry, 'failed', reason, null, null, now, null);
   }
 
   /** 러너가 남긴 결과. 꺼내 간 그 러너만. 남겼으면 true */
@@ -94,16 +143,23 @@ export class LoginInbox {
     siteId: string,
     runnerId: string,
     result: {
-      outcome: 'submitted' | 'failed';
+      outcome: 'submitted' | 'opened' | 'failed';
       reason: string | null;
       afterUrl: string | null;
       image: string | null;
+      providerForm?: ProviderForm | null;
     },
     now = Date.now(),
   ): boolean {
     const entry = this.entries.get(LoginInbox.key(spaceId, siteId));
     if (!entry || entry.runnerId !== runnerId || entry.status !== 'filling') return false;
-    LoginInbox.end(entry, result.outcome, result.reason, result.afterUrl, result.image, now);
+    // 열림은 간편 로그인 단추를 누른 것에만, 그 회사의 칸은 누른 회사의 것만
+    if ((result.outcome === 'opened') !== (entry.request.kind === 'social')) return false;
+    const provider = entry.request.kind === 'social' ? entry.request.provider : null;
+    const form =
+      result.providerForm && result.providerForm.provider === provider ? result.providerForm : null;
+    const { outcome, reason, afterUrl, image } = result;
+    LoginInbox.end(entry, outcome, reason, afterUrl, image, now, form);
     return true;
   }
 
@@ -112,8 +168,8 @@ export class LoginInbox {
     this.sweep(now);
     const entry = this.entries.get(LoginInbox.key(spaceId, siteId));
     if (!entry) return null;
-    const { status, reason, afterUrl, image, at } = entry;
-    return { status, reason, afterUrl, image, at };
+    const { status, reason, afterUrl, image, providerForm, at } = entry;
+    return { status, reason, afterUrl, image, providerForm, at };
   }
 
   /** 값을 버릴 때가 지난 것: 꺼내 가지 않은 값은 expired, 꺼내 간 뒤 결과가 없으면 failed, 끝난 상태는 지운다 */
@@ -121,9 +177,25 @@ export class LoginInbox {
     for (const [key, entry] of this.entries) {
       if (entry.until > now) continue;
       if (entry.status === 'sent')
-        LoginInbox.end(entry, 'expired', '10분 안에 러너가 가져가지 않았어요', null, null, now);
+        LoginInbox.end(
+          entry,
+          'expired',
+          '10분 안에 러너가 가져가지 않았어요',
+          null,
+          null,
+          now,
+          null,
+        );
       else if (entry.status === 'filling')
-        LoginInbox.end(entry, 'failed', '러너가 로그인 결과를 남기지 않았어요', null, null, now);
+        LoginInbox.end(
+          entry,
+          'failed',
+          '러너가 로그인 결과를 남기지 않았어요',
+          null,
+          null,
+          now,
+          null,
+        );
       else this.entries.delete(key);
     }
   }
@@ -135,6 +207,7 @@ export class LoginInbox {
     afterUrl: string | null,
     image: string | null,
     now: number,
+    providerForm: ProviderForm | null,
   ): void {
     Object.assign(entry, {
       values: null,
@@ -142,6 +215,7 @@ export class LoginInbox {
       reason,
       afterUrl,
       image,
+      providerForm,
       at: new Date(now),
       until: now + LoginInbox.KEEP_MS,
     });

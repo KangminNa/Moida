@@ -1,4 +1,4 @@
-import type { LoginAttempt, LoginForm, LoginValues } from './login-inbox';
+import type { LoginAttempt, LoginForm, LoginRequest, LoginValues } from './login-inbox';
 import type { SiteRow } from './tables';
 
 // 로그인 카드의 모양 (콘솔은 camelCase, MCP는 snake_case). 값(아이디 · 비밀번호 · 인증번호)은
@@ -11,6 +11,14 @@ function attemptOf(a: LoginAttempt | null) {
         reason: a.reason,
         afterUrl: a.afterUrl,
         image: a.image,
+        /** 간편 로그인 회사의 화면에서 찾은 칸 (종류만). 있으면 카드가 그 칸을 띄운다 */
+        provider: a.providerForm
+          ? {
+              provider: a.providerForm.provider,
+              origin: new URL(a.providerForm.page_url).origin,
+              fields: a.providerForm.fields.map((f) => ({ kind: f.kind })),
+            }
+          : null,
         at: a.at.toISOString(),
       }
     : null;
@@ -32,6 +40,8 @@ export class LoginCardView {
       /** 값이 갈 곳 (로그인 화면의 출처) */
       origin: form && URL.canParse(form.page_url) ? new URL(form.page_url).origin : null,
       fields: form ? form.fields.map((f) => ({ kind: f.kind })) : null,
+      /** 간편 로그인 단추 (2026-11-26): 회사만 */
+      social: form ? (form.social ?? []).map((s) => ({ provider: s.provider })) : [],
       trusted: this.site.trusted_at !== null,
       attempt: attemptOf(this.attempt),
     };
@@ -63,27 +73,38 @@ export class NextLoginView {
       site: Readonly<SiteRow>;
       form: LoginForm;
       values: LoginValues;
+      request: LoginRequest;
     } | null,
   ) {}
 
   toJSON() {
     const n = this.next;
+    if (!n) return { login: null };
+    const base = {
+      kind: n.request.kind,
+      site_id: n.site.id,
+      site_name: n.site.name,
+      origins: n.site.origins,
+    };
+    if (n.request.kind === 'social') {
+      const provider = n.request.provider;
+      const button = (n.form.social ?? []).find((s) => s.provider === provider);
+      return { login: { ...base, page_url: n.form.page_url, social: button ?? null } };
+    }
+    // 간편 로그인 회사의 화면이면 그 화면의 주소 · 칸, 아니면 사이트의 로그인 칸
+    const form = n.request.kind === 'provider' ? n.request.form : n.form;
     return {
-      login: n
-        ? {
-            site_id: n.site.id,
-            site_name: n.site.name,
-            page_url: n.form.page_url,
-            origins: n.site.origins,
-            fields: n.form.fields.map((f) => ({
-              kind: f.kind,
-              role: f.role,
-              name: f.name,
-              value: n.values[f.kind] ?? '',
-            })),
-            submit: n.form.submit,
-          }
-        : null,
+      login: {
+        ...base,
+        page_url: form.page_url,
+        fields: form.fields.map((f) => ({
+          kind: f.kind,
+          role: f.role,
+          name: f.name,
+          value: n.values[f.kind] ?? '',
+        })),
+        submit: form.submit,
+      },
     };
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "browser-tabs",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "cairn": ">=0.9",
   "description": "서버 브라우저로 하는 일: 주소를 탭으로 읽고, 등록한 사이트(로그인된 프로필)나 둘러보기(새 빈 창)에서 AI 에이전트가 일하고, 마지막 버튼은 결재 뒤 러너가 같은 버튼인지 확인하고 누른다. 콘솔에서 화면을 보고 누르고 사이트 세션을 지운다. 되풀이하는 일은 사이트 도구(Playwright 코드)로 굳혀 에이전트가 AI 없이 부른다 (쓰기 도구는 검토자 짝 · 부를 때마다 결재)",
   "settings": {
@@ -220,11 +220,11 @@
           },
           "form": {
             "type": "object",
-            "description": "로그인 칸 (2026-11-19 로그인 카드). 값은 싣지 않는다",
+            "description": "로그인 칸 (2026-11-19 로그인 카드)과 간편 로그인 단추 (2026-11-26). 값은 싣지 않는다. 칸이나 간편 로그인 가운데 하나는 있어야 하고, 칸이 있으면 submit도",
             "properties": {
               "fields": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 0,
                 "maxItems": 3,
                 "items": {
                   "type": "object",
@@ -258,9 +258,32 @@
                   }
                 },
                 "required": ["role", "name"]
+              },
+              "social": {
+                "type": "array",
+                "maxItems": 4,
+                "description": "간편 로그인 단추 (회사마다 하나). 누르면 그 회사의 로그인 화면이 열린다",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "enum": ["kakao", "naver", "google", "apple"]
+                    },
+                    "role": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": ["provider", "role", "name"]
+                }
               }
             },
-            "required": ["fields", "submit"]
+            "required": []
           }
         },
         "required": ["task_id", "page_url"]
@@ -268,14 +291,14 @@
     },
     "browser_login_next": {
       "operation": "nextLogin",
-      "description": "관리자가 로그인 카드의 칸에 넣은 값 하나를 가져온다 (그 로그인 화면을 연 러너만, AI 없이). 가져가면 서버 메모리에서 지운다. 없으면 login: null. 받은 값은 그 사이트의 칸에만 넣고 어디에도 남기지 않는다.",
+      "description": "관리자가 로그인 카드에서 한 것 하나를 가져온다 (그 로그인 화면을 연 러너만, AI 없이). kind: values(사이트의 칸에 넣고 로그인 단추) · social(간편 로그인 단추 누르기, social에 단추) · provider(간편 로그인 회사의 화면 칸에 넣고 누르기, page_url은 그 회사의 로그인 화면). 가져가면 서버 메모리에서 지운다. 없으면 login: null. 받은 값은 그 화면의 칸에만 넣고 어디에도 남기지 않는다.",
       "input": {
         "properties": {}
       }
     },
     "browser_login_save": {
       "operation": "saveLogin",
-      "description": "가져간 로그인의 결과를 남긴다: submitted(칸에 넣고 로그인 단추를 눌렀다, 그 뒤 화면) 또는 failed(넣지 못했다, 까닭). 카드가 보고 같은 작업을 잇는다. 화면은 서버 메모리에만 10분.",
+      "description": "가져간 로그인의 결과를 남긴다: submitted(칸에 넣고 로그인 단추를 눌렀다, 그 뒤 화면) · opened(간편 로그인 단추를 눌러 그 회사의 화면이 열렸다, 그 화면과 찾은 칸 provider_form) · failed(하지 못했다, 까닭). 카드가 보고 이어서 한다. 화면 · 칸은 서버 메모리에만 10분.",
       "input": {
         "properties": {
           "site_id": {
@@ -285,7 +308,7 @@
           },
           "outcome": {
             "type": "string",
-            "enum": ["submitted", "failed"]
+            "enum": ["submitted", "opened", "failed"]
           },
           "reason": {
             "type": "string",
@@ -301,6 +324,58 @@
             "type": "string",
             "maxLength": 409604,
             "description": "누른 뒤 화면 (JPEG · PNG, base64, 300KB까지)"
+          },
+          "provider_form": {
+            "type": "object",
+            "description": "opened일 때 그 회사의 로그인 화면(고정 목록의 https 호스트)에서 AI 없이 찾은 아이디 · 비밀번호 칸과 로그인 단추 (값 없음)",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": ["kakao", "naver", "google", "apple"]
+              },
+              "page_url": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "fields": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["id", "password"]
+                    },
+                    "role": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": ["kind", "role", "name"]
+                }
+              },
+              "submit": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": ["role", "name"]
+              }
+            },
+            "required": ["provider", "page_url", "fields", "submit"]
           }
         },
         "required": ["site_id", "outcome"]

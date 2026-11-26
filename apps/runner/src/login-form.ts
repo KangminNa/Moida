@@ -1,7 +1,7 @@
 import { pause } from './backoff';
 import type { BrowserTab } from './browser-page';
 import { DevToolsSession } from './browser-tabs';
-import type { LoginFormRef } from './login-form-ref';
+import { LoginFormRef, type SocialLoginRef } from './login-form-ref';
 
 /** 칸이나 로그인 단추를 찾지 못하거나 쓸 수 없는 상태 (페이지의 문제). 까닭은 카드에 그대로 보인다 (값은 없다) */
 export class LoginFormProblemOnPage extends Error {}
@@ -48,12 +48,56 @@ export class LoginForm {
   /** 주소가 그대로여도(한 화면 로그인) 그려지기를 기다리는 시간 */
   private static readonly SETTLE_MS = 2_000;
 
-  /** 탭에서 칸 · 단추를 다시 찾아 쓸 수 있는지 본다. 쓸 수 없으면 LoginFormProblemOnPage */
-  static async check(tab: BrowserTab, form: LoginFormRef, signal: AbortSignal): Promise<void> {
+  /**
+   * 탭에서 칸 · 단추를 다시 찾아 쓸 수 있는지 본다. 칸이나 로그인 단추를 쓸 수 없으면 LoginFormProblemOnPage.
+   * 간편 로그인 단추는 누를 수 있는 것만 남긴다 (하나도 없고 칸도 없으면 LoginFormProblemOnPage). 확인한 모양을 돌려준다
+   */
+  static async check(
+    tab: BrowserTab,
+    form: LoginFormRef,
+    signal: AbortSignal,
+  ): Promise<LoginFormRef> {
     const s = await DevToolsSession.open(tab.socket, signal);
     try {
       for (const field of form.fields) await LoginForm.field(s, field.kind, field.role, field.name);
-      await LoginForm.button(s, form.submit.role, form.submit.name);
+      if (form.submit) await LoginForm.button(s, form.submit.role, form.submit.name);
+      const social: SocialLoginRef[] = [];
+      for (const button of form.social) {
+        const pressable = await LoginForm.button(s, button.role, button.name).then(
+          () => true,
+          (error: unknown) => {
+            if (error instanceof LoginFormProblemOnPage) return false;
+            throw error;
+          },
+        );
+        if (pressable) social.push(button);
+      }
+      if (form.fields.length === 0 && social.length === 0)
+        throw new LoginFormProblemOnPage('간편 로그인 단추를 찾지 못했어요');
+      return new LoginFormRef(form.fields, form.submit, social);
+    } finally {
+      s.close();
+    }
+  }
+
+  /**
+   * 간편 로그인 단추를 실제 마우스 이벤트로 누르고 주소가 바뀌거나 그려질 때까지 기다린다 (2026-11-26, AI 없음).
+   * 탭의 출처가 origin이 아니면 누르지 않는다. 누른 뒤의 주소를 돌려준다 (새 창으로 열리면 그대로일 수 있다)
+   */
+  static async press(
+    tab: BrowserTab,
+    origin: string,
+    button: SocialLoginRef,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const s = await DevToolsSession.open(tab.socket, signal);
+    try {
+      await s.send('Page.bringToFront');
+      const before = await LoginForm.location(s);
+      if (!URL.canParse(before) || new URL(before).origin !== origin)
+        throw new LoginFormProblemOnPage('로그인 화면이 아닌 곳이라 누르지 않았어요');
+      await LoginForm.click(s, await LoginForm.button(s, button.role, button.name));
+      return await LoginForm.settle(s, before, signal);
     } finally {
       s.close();
     }
@@ -90,15 +134,20 @@ export class LoginForm {
         if ((got.result as { value?: unknown } | undefined)?.value !== value.length)
           throw new LoginFormProblemOnPage(`칸에 값이 다 들어가지 않았어요 (${field.kind})`);
       }
-      const at = await LoginForm.button(s, form.submit.role, form.submit.name);
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...at });
-      const press = { ...at, button: 'left', clickCount: 1 };
-      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...press });
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...press });
+      if (!form.submit) throw new LoginFormProblemOnPage('로그인 단추가 없어요');
+      await LoginForm.click(s, await LoginForm.button(s, form.submit.role, form.submit.name));
       return await LoginForm.settle(s, before, signal);
     } finally {
       s.close();
     }
+  }
+
+  /** 그 자리를 실제 마우스 이벤트로 한 번 누른다 */
+  private static async click(s: DevToolsSession, at: { x: number; y: number }): Promise<void> {
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...at });
+    const press = { ...at, button: 'left', clickCount: 1 };
+    await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...press });
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...press });
   }
 
   /** 넣어도 되는 출처인가: https, 또는 이 컴퓨터(테스트 · 직접 띄운 사이트)의 http */
