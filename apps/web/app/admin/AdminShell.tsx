@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
+import type { SpaceInfo } from '../_account/types';
 import type { PackageEntry } from '../_plugins/package-types';
 import { useActivePackages } from '../_plugins/packages';
 import { countOf, usePendingApprovals } from '../_task/live';
@@ -16,6 +17,7 @@ import { NEW_CHAT, placeOf, SIDE_COOKIE } from './menu';
 import { SectionTabs } from './SectionTabs';
 import { ConsoleFoot, SettingsNav } from './SettingsNav';
 import { SignedOutBar } from './SignedOutBar';
+import { SiteAddressBar } from './SiteAddressBar';
 
 /** 폰 화면 (globals.css의 좁은 화면과 같은 폭): 옆 칸이 접히는 대신 서랍으로 열린다 */
 const PHONE = '(max-width: 760px)';
@@ -28,6 +30,7 @@ export function AdminShell({
   ownerName,
   siteName,
   logoUrl,
+  space,
   activePlugins,
   sideClosed,
   children,
@@ -37,6 +40,8 @@ export function AdminShell({
   siteName: string;
   /** 사이트 로고. 없으면 Cairn 표시 */
   logoUrl: string | null;
+  /** 사이트 정보 (설정 › 사이트). 사이트 주소와 다른 주소로 열었으면 바꿀지 묻는다 */
+  space: SpaceInfo | null;
   /** 서버에서 읽은 켜진 플러그인 이름. 메뉴를 처음부터 그 모양으로 그린다 */
   activePlugins: readonly string[];
   /** 옆 칸을 접어 두었는가 (쿠키, 서버에서 읽어 처음부터 그 모양으로) */
@@ -166,6 +171,7 @@ export function AdminShell({
         </div>
       )}
       <SignedOutBar />
+      <SiteAddressBar space={space} />
     </NotifyContext.Provider>
   );
 }

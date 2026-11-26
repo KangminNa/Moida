@@ -28,6 +28,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       ownerName={owner.name}
       siteName={space?.name ?? ''}
       logoUrl={space?.logoUrl ?? null}
+      space={space}
       activePlugins={plugins?.plugins.filter((p) => p.active).map((p) => p.name) ?? []}
       sideClosed={sideClosed}
     >
