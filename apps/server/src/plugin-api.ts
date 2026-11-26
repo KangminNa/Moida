@@ -11,6 +11,9 @@
 // 0.10 (2026-11-23): work.sendChat — uses의 chat을 허락받은 쓰기 동작이 관리자의 대화에 말을 넣는다 (ChatSent, messenger-telegram)
 // 0.11 (2026-11-25): work.place · AttemptLimiter · TooManyRequests — 방문자가 부르는 동작이 곳(IP)마다 횟수를 센다 (map의 찾기)
 // 0.12 (2026-11-26): platform.notice.sent 이벤트 — 푸시로 가는 알림(같은 때 · 같은 묶음)을 플러그인도 받는다 (email)
+// 0.13 (2026-11-26): work.lookup(app · app-id · app-url, uses의 lookup:<종류>) — 공개 앱의 이름 · 주소로 id · 바깥 주소를 묻는다.
+//     반복 작업의 run(own) — 자기 동작(SYSTEM, api 없이도 등록)을 서버 자신으로 불러 바깥 호출 앞뒤를 짧은 트랜잭션으로 나눈다.
+//     웹 자리 store.after — 스토어 첫 화면 아래 (email의 앱 소식 구독)
 export {
   ActionResult,
   Actor,
@@ -35,6 +38,7 @@ export {
   LoginIdentity,
   NotFound,
   Operation,
+  type OwnCall,
   OwnerActor,
   type PluginContext,
   Read,

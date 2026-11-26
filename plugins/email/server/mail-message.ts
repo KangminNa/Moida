@@ -19,9 +19,14 @@ export class MailMessage {
     readonly to: string,
     readonly subject: string,
     readonly text: string,
+    /** 더할 머리글 (해지 링크 List-Unsubscribe 같은 것). 이름은 글자 · 하이픈, 값은 한 줄 */
+    readonly headers: readonly (readonly [string, string])[] = [],
   ) {
     MailMessage.assertAddress(from);
     MailMessage.assertAddress(to);
+    for (const [name, value] of headers)
+      if (!/^[A-Za-z][A-Za-z-]{0,60}$/.test(name) || /[\r\n]/.test(value) || value.length > 500)
+        throw new RuleViolation(`머리글 모양이 아니에요: ${name.slice(0, 40)}`);
   }
 
   static isAddress(value: string): boolean {
@@ -45,6 +50,7 @@ export class MailMessage {
       'Content-Type: text/plain; charset=UTF-8',
       'Content-Transfer-Encoding: base64',
       'Auto-Submitted: auto-generated',
+      ...this.headers.map(([name, value]) => `${name}: ${value}`),
       '',
       ...(body.match(new RegExp(`.{1,${MailMessage.LINE}}`, 'g')) ?? []),
     ];

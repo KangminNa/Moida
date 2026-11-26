@@ -53,7 +53,7 @@ export class AppCodeCheck {
   // biome-ignore format: 줄마다 데이터의 한 덩어리
   static readonly NAMES: readonly string[] = [
     'cairn', 'screen', 'isHome', 'isPost', 'isMenu', 'isIssue', 'title', 'base', 'files',
-    'site', 'home', 'loginUrl', 'graphUrl', 'name',
+    'site', 'home', 'store', 'loginUrl', 'graphUrl', 'name',
     'app', 'description', 'kind', 'url', 'iconUrl', 'rssUrl',
     'apps', 'others', 'current', 'menus', 'active',
     'menu', 'isPosts', 'isIssues', 'isPages', 'isPage', 'isView', 'view',

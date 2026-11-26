@@ -454,90 +454,396 @@
   background: var(--hover);
 }
 
-.launcher {
+/* 스토어 첫 화면 (2026-11-26, StoreHome): 앱 스토어처럼 소개 · 추천 앱 · 앱 목록 · 새 소식 · 플러그인 자리(store.after) */
+.store {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 40px;
-  padding-top: 32px;
+  gap: 28px;
+  max-width: 880px;
+  padding-top: 20px;
 }
 
-.launcher-head {
+.store-hero {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  text-align: center;
+  gap: 16px;
 }
 
-.launcher-head h1 {
+.store-hero h1 {
   margin: 0;
-  font-size: 1.8rem;
+  font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
 
-.launcher-head p {
-  margin: 0;
+.store-hero p {
+  margin: 4px 0 0;
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
-.launcher-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+.store-logo {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
   object-fit: cover;
+  box-shadow: var(--float-1);
 }
 
-.launcher nav {
-  width: 100%;
+.store-logo-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--raised);
+  color: var(--fg);
 }
 
-.app-grid {
+.store-count {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.store-section h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* 추천 앱 한 장: 칠한 면의 큰 카드 */
+.store-feature {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
-  gap: 28px 12px;
-  justify-items: center;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 12px 16px;
+  padding: 22px;
+  border-radius: var(--radius-sheet);
+  background: linear-gradient(135deg, var(--accent-soft), var(--raised));
+  color: var(--fg);
+  text-decoration: none;
+  transition: box-shadow 0.2s var(--ease-out);
+}
+
+.store-feature:hover {
+  box-shadow: var(--float-2);
+}
+
+.store-feature-label {
+  grid-column: 1 / -1;
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.store-feature-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.store-feature-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.store-feature-text strong {
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+}
+
+.store-feature .store-open {
+  align-self: center;
+}
+
+.store-meta {
+  color: var(--faint);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* 앱 목록: 휴대폰 스토어의 한 줄 (아이콘 · 이름 · 종류 · 설명 · 열기) */
+.store-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 4px 24px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.app-tile {
+.store-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 116px;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.store-row-main {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
   color: var(--fg);
-  text-align: center;
   text-decoration: none;
 }
 
-.app-tile .app-icon {
-  margin-bottom: 8px;
+.store-row .app-icon.small {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
 }
 
-.app-tile:hover .app-icon {
-  box-shadow: var(--float-2);
+.store-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.app-tile:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-  border-radius: 20px;
+.store-row-text strong {
+  font-size: 1rem;
 }
 
-.app-tile-name {
-  font-size: 0.95rem;
+.store-open {
+  flex: none;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--accent-ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.store-open:hover {
+  background: var(--hover);
+}
+
+.store-feature .store-open.cta {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* 새 소식: 최근 공개 글 카드 */
+.store-news {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-news-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--subtle);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.store-news-card:hover {
+  background: var(--raised);
+}
+
+.store-news-app {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.85rem;
   font-weight: 600;
 }
 
-.app-tile-kind {
+.store-news-app .app-icon.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+
+.store-news-app .store-meta {
+  margin-left: auto;
+  font-weight: 400;
+}
+
+.store-news-card strong {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* 플러그인 email의 구독 칸 · 메일 링크 카드 (store.after, plugins/email/web/Subscribe.tsx) */
+.store-subscribe form,
+.store-mail-link {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.store-subscribe,
+.store-mail-link {
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: var(--subtle);
+}
+
+.store-mail-link h2,
+.store-mail-link p {
+  margin: 0;
+}
+
+.store-mail-link .store-open {
+  align-self: flex-start;
+}
+
+.store-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.store-chips legend {
+  margin-bottom: 8px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
+}
+
+.store-chips label {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--raised);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.store-chips label.on {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.store-chips input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.store-chips label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.store-subscribe-row {
+  display: flex;
+  gap: 8px;
+}
+
+.store-subscribe-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+}
+
+.store-subscribe-row input:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.store-subscribe .store-open.cta,
+.store-mail-link .store-open.cta {
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.store-subscribe .store-open.cta:disabled,
+.store-mail-link .store-open.cta:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.store-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.store-agree input {
+  margin-top: 3px;
+}
+
+.store-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 560px) {
+  .store-hero {
+    align-items: flex-start;
+  }
+
+  .store-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+  }
+
+  .store-feature {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .store-feature .store-open {
+    justify-self: start;
+  }
+
+  .store-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .blog-foot {
@@ -560,16 +866,8 @@
   color: var(--fg);
 }
 
-/* 폰: 한 줄에 셋 */
+/* 폰: 추천 앱의 아이콘을 조금 작게 */
 @media (max-width: 420px) {
-  .app-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .app-tile {
-    width: 100%;
-  }
-
   .app-icon.tile {
     width: 72px;
     height: 72px;

@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { Actor } from '../base/actor';
+import { type Actor, VisitorActor } from '../base/actor';
 import { BaseService } from '../base/base-service';
 import type { ToolAnswer } from '../base/base-tool';
 import { Database } from '../base/database';
 import { NotFound } from '../base/errors';
 import { Work } from '../base/operation';
 import { Outbox } from '../base/outbox';
+import { Lookups } from '../directory/lookups';
 import { Leases } from './leases';
 import { PluginChats } from './plugin-chats';
 import type { PackageOperation } from './plugin-context';
@@ -16,11 +17,14 @@ import { PluginRegistry } from './plugin-registry';
 // 동작 중인 패키지(켜졌고 허락한 확장 지점 안)의 동작만 찾는다. 꺼지면 경로 · 도구가 바로 없는 것과 같다.
 @Injectable()
 export class PackageService extends BaseService {
+  /** 기능 패키지가 물을 수 있는 코어의 읽기 (플러그인 API 0.13). 방문자에게 보이는 것만 돌려주는 종류만 둔다 */
+  static readonly LOOKUPS: readonly string[] = ['app', 'app-id', 'app-url'];
   constructor(
     db: Database,
     private readonly registry: PluginRegistry,
     private readonly leases: Leases,
     private readonly chats: PluginChats,
+    private readonly lookups: Lookups,
   ) {
     super(db);
   }
@@ -51,9 +55,15 @@ export class PackageService extends BaseService {
     const input = operation.input(raw);
     const emits = (name: string) => manifest.emits(name);
     const leased = (id: string) => this.leases.of(actor, id);
+    // 코어의 읽기 (0.13): 허락받은 종류만, 방문자의 눈으로 (공개된 것만)
+    const lookup = (kind: string, ids: readonly string[]) => {
+      if (!PackageService.LOOKUPS.includes(kind) || !manifest.allows(`lookup:${kind}`))
+        throw new Error(`허락받지 않은 코어의 읽기예요: ${kind} (uses에 lookup:${kind})`);
+      return this.lookups.visible(kind, new VisitorActor(), ids);
+    };
     if (!operation.writes)
       return operation.run(
-        new Work(this.db.sql, manifest.schema, emits, leased, null, place),
+        new Work(this.db.sql, manifest.schema, emits, leased, null, place, lookup),
         actor,
         input,
       );
@@ -63,7 +73,7 @@ export class PackageService extends BaseService {
         ? (spaceId: string, chatId: string | null, requestId: string, text: string) =>
             this.chats.send(tx, spaceId, chatId, requestId, text)
         : null;
-      const work = new Work(tx, manifest.schema, emits, leased, chat, place);
+      const work = new Work(tx, manifest.schema, emits, leased, chat, place, lookup);
       const answer = await operation.run(work, actor, input);
       await new Outbox(tx).publish(work.events);
       return answer;

@@ -161,6 +161,7 @@ describe('앱 도메인의 주소 (스토어 3-0)', () => {
     assert.equal(data.more?.url, '/?cursor=next');
     assert.deepEqual(data.site, {
       home: `${site}/`,
+      store: `${site}/store`,
       loginUrl: `${site}/login`,
       graphUrl: `${site}/graph`,
     });

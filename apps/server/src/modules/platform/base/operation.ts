@@ -64,6 +64,9 @@ export abstract class Command<I = unknown> extends Operation<I> {
   readonly writes = true;
 }
 
+/** 코어의 읽기 (플러그인 API 0.13): 종류 · ids → 방문자가 볼 수 있는 것의 id → 제목. 허락받지 않은 종류는 오류 */
+type LookupPort = (kind: string, ids: readonly string[]) => Promise<ReadonlyMap<string, string>>;
+
 /** 대화 입구: 부르는 쪽의 연결(트랜잭션)에 묶인 PluginChats.send */
 type ChatPort = (
   spaceId: string,
@@ -98,8 +101,20 @@ export class Work extends TableWriter {
      * 방문자가 부르는 동작이 곳마다 횟수를 셀 때 쓴다. MCP · 이벤트로 돈 일은 null
      */
     readonly place: string | null = null,
+    /** 코어의 읽기 (플러그인 API 0.13, uses의 lookup:<종류>) */
+    private readonly lookups: LookupPort = () =>
+      Promise.reject(new Error('코어의 읽기를 쓰려면 목록 파일의 uses에 lookup:<종류>를 적어요')),
   ) {
     super();
+  }
+
+  /**
+   * 코어가 가진 것의 이름 (플러그인 API 0.13, uses의 lookup:<종류>): ids 가운데 방문자가 볼 수 있는 것의 id → 제목.
+   * 지금 종류: app(공개 앱 id → 이름) · app-id(공개 앱의 주소 slug → id, 방문자 화면은 id를 모른다)
+   * · app-url(공개 앱 id → 바깥 주소: 확인한 도메인이면 https://<도메인>/, 아니면 /<주소>)
+   */
+  lookup(kind: string, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    return this.lookups(kind, ids);
   }
 
   /**

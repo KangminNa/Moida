@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { AppGrid } from '../_blog/AppGrid';
 import { SiteFooter } from '../_blog/SiteFooter';
 import { SiteHeader } from '../_blog/SiteHeader';
+import { StoreHome } from '../_blog/StoreHome';
 import { siteNow } from '../_blog/site';
 
 // 첫 화면 (스토어 1-4, 시안 6 · 7 · 8번): 관리자가 공개 앱 하나로 고정했으면 그 앱으로(스토어 2단계, 설정 › 사이트 "첫 화면"),
-// 아니면 자동: 공개 앱이 0개면 사이트 이름 · 소개 · "공개한 앱 없음", 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다),
-// 2개 이상이면 앱 아이콘 목록. 관리자가 열어도 방문자가 보는 그대로다.
+// 아니면 자동: 공개 앱이 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다), 0개 · 2개 이상이면 스토어 첫 화면
+// (2026-11-26, _blog/StoreHome). 스토어 첫 화면은 고정 · 앱 하나와 상관없이 /store에서도 열린다. 관리자가 열어도 방문자가 보는 그대로다.
 export const dynamic = 'force-dynamic';
 
 /** 예전 관리 시트 주소 (?sheet=이름). 이미 저장된 링크가 있어서 콘솔 주소로 넘긴다 */
@@ -53,25 +53,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   if (pinned) redirect(pinned.url);
   const [only] = site.apps;
   if (only && site.apps.length === 1) redirect(only.url);
-  const { space } = site;
   return (
     <>
       <SiteHeader site={site} brand={false} />
-      <main className="blog-main launcher">
-        <div className="launcher-head">
-          {space.logoUrl && (
-            // biome-ignore lint/performance/noImgElement: 작은 로고 하나라 Next의 이미지 최적화를 거치지 않는다
-            <img className="launcher-logo" src={space.logoUrl} alt="" />
-          )}
-          <h1>{space.name || 'Cairn'}</h1>
-          {space.description && <p>{space.description}</p>}
-        </div>
-        {site.apps.length === 0 ? (
-          <p className="blog-empty">공개한 앱 없음</p>
-        ) : (
-          <AppGrid apps={site.apps} />
-        )}
-      </main>
+      <StoreHome site={site} mail={{ mail: null, token: null }} />
       <SiteFooter site={site} />
     </>
   );

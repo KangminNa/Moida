@@ -15,6 +15,8 @@ export interface Site {
   apps: readonly PublicApp[];
   /** 공개 앱의 공개 글이 있는가 (없으면 그래프 링크를 숨긴다) */
   posts: boolean;
+  /** 공개 앱의 최근 공개 글 (스토어 첫 화면의 새 소식 · 앱마다 마지막 글, 2026-11-26) */
+  recent: PostList['posts'];
   /** 공개 페이지가 있는가 (/pages 목록) */
   pages: boolean;
 }
@@ -34,6 +36,7 @@ export const siteNow = cache(async (): Promise<Site | null> => {
     owner: owner !== null,
     apps: apps.apps,
     posts: (posts?.posts.length ?? 0) > 0,
+    recent: posts?.posts ?? [],
     pages: (pages?.pages.length ?? 0) > 0,
   };
 });

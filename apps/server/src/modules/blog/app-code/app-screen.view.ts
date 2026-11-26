@@ -131,6 +131,8 @@ export class AppScreenDataView {
       files: `${this.base}/files`,
       site: {
         home: `${this.origin()}/`,
+        /** 스토어 첫 화면 (2026-11-26): 첫 화면이 앱 하나로 고정돼도 늘 앱 목록. "모든 앱" 링크가 쓴다 */
+        store: `${this.origin()}/store`,
         loginUrl: `${this.origin()}/login`,
         graphUrl: this.graph ? `${this.origin()}/graph` : null,
       },

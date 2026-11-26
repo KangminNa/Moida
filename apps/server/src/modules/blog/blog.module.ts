@@ -167,6 +167,8 @@ export class BlogModule implements OnModuleInit {
     );
     // 앱 이름 (스토어 2단계): task가 대화의 앱을 확인한다 (관리자는 공간의 앱, 그 밖은 공개 앱)
     this.lookups.provide('app', (a, ids) => this.apps.names(a, ids));
+    this.lookups.provide('app-url', (a, ids) => this.apps.urls(a, ids));
+    this.lookups.provide('app-id', (a, slugs) => this.apps.idsBySlug(a, slugs));
     // 커뮤니티 앱 (스토어 3-1): community가 공개된 커뮤니티 앱인지 묻는다 (관리자는 공간의 커뮤니티 앱)
     this.lookups.provide('community-app', (a, ids) => this.apps.names(a, ids, App.COMMUNITY));
     // 회원을 받는 앱 (스토어 12.3): 커뮤니티 앱과 선언서에 members를 적은 앱. community의 회원 API가 묻는다
