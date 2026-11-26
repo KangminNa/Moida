@@ -4,6 +4,8 @@ import { AccountAdminController, AccountController } from './account/account.api
 import { AccountQuery } from './account/account.query';
 import { AccountService } from './account/account.service';
 import { AccountMailService } from './account/account-mail.service';
+import { StoreJoinController } from './account/store-join.api';
+import { StoreJoinService } from './account/store-join.service';
 import { CommentController } from './comment/comment.api';
 import { CommentService } from './comment/comment.service';
 import events from './community.events.json';
@@ -48,6 +50,7 @@ import { TopicService } from './topic/topic.service';
     MemberService,
     AccountService,
     AccountMailService,
+    StoreJoinService,
     AccountQuery,
     MemberGuard,
     TopicQuery,
@@ -81,6 +84,7 @@ import { TopicService } from './topic/topic.service';
     TermsController,
     StoreTermsAdminController,
     AccountAdminController,
+    StoreJoinController,
     TermsAdminController,
   ],
   exports: [CommunityTools],

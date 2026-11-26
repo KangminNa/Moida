@@ -69,6 +69,11 @@ export class SpaceView {
     return textOf(this.row, SpaceView.NAMING);
   }
 
+  /** 공간 id (공개 정보에 싣지 않는다: 기본 도메인의 스토어 가입이 어느 공간인지 HostGate가 쓴다) */
+  get spaceId(): string | null {
+    return this.row?.id ?? null;
+  }
+
   get siteUrl(): string | null {
     return this.text(SpaceView.SITE_URL);
   }

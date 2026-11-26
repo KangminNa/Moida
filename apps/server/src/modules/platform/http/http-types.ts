@@ -22,6 +22,8 @@ export type HttpRequest = {
   /** 그 도메인의 앱과 앱이 든 공간 (HostGate, 스토어 3-1: 커뮤니티가 어느 앱인지, 이벤트 · 알림이 어느 공간인지 안다) */
   appId?: string;
   appSpaceId?: string;
+  /** 기본 도메인으로 온 요청이면 그 공간 (HostGate, 2026-11-26: 스토어 가입이 어느 스토어인지) */
+  siteSpaceId?: string;
 };
 
 /** 본문을 흘려 읽는 요청 (JSON으로 읽지 않은 본문: 결과물 올리기). 받는 쪽이 크기를 세며 읽는다 */

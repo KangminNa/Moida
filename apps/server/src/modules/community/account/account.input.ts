@@ -1,4 +1,4 @@
-import { BaseRequest } from '../../platform';
+import { BaseRequest, type HttpRequest, NotFound } from '../../platform';
 import { Agreement } from '../member/member.input';
 
 /** 인증코드 받기 (가입 · 비밀번호 다시 정하기 · 메일 등록): { email }. 주소 모양은 Service가 EmailAddress로 본다 */
@@ -40,6 +40,57 @@ export class JoinInput extends BaseRequest {
           f.text('loginId', 40),
           f.text('password', 400),
           f.text('nickname', 60),
+          f.boolean('ageConfirmed'),
+          Agreement.of(f),
+        ),
+    );
+  }
+}
+
+/**
+ * 스토어에서 가입 (2026-11-26, 사용자 "스토어 가입을 넣고 회원가입 페이지 따로"): 기본 도메인으로 온 요청의 공간과 곳.
+ * 앱 도메인이면 없는 주소와 같은 404 (앱 도메인에서는 그 앱의 /_/join). 공간은 HostGate가 적는다
+ */
+export class StorePlace extends BaseRequest {
+  private constructor(
+    readonly spaceId: string,
+    /** 요청한 곳 (시도 제한의 열쇠, 서버 메모리에서만 쓰고 저장하지 않는다) */
+    readonly ip: string,
+  ) {
+    super();
+  }
+
+  static from(req: HttpRequest): StorePlace {
+    if (req.appHost || !req.siteSpaceId) throw new NotFound('없는 주소예요');
+    return new StorePlace(req.siteSpaceId, req.ip ?? '');
+  }
+}
+
+/**
+ * 스토어 가입: { email, code, loginId, password, ageConfirmed, termsVersion, privacyVersion }. 계정만 만들고 로그인하지 않는다:
+ * 기본 도메인은 콘솔과 같은 출처라 회원 쿠키를 두지 않는다. 앱에는 그 앱 도메인에서 로그인한 뒤 닉네임을 정해 참여한다
+ */
+export class StoreJoinInput extends BaseRequest {
+  private constructor(
+    readonly email: string,
+    readonly code: string,
+    readonly loginId: string,
+    readonly password: string,
+    readonly ageConfirmed: boolean,
+    readonly agreement: Agreement,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): StoreJoinInput {
+    return BaseRequest.read(
+      raw,
+      (f) =>
+        new StoreJoinInput(
+          f.text('email', 320),
+          f.text('code', 20),
+          f.text('loginId', 40),
+          f.text('password', 400),
           f.boolean('ageConfirmed'),
           Agreement.of(f),
         ),

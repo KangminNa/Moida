@@ -31,8 +31,25 @@ export class Account extends TableEntity<AccountRow, AccountNew> {
     ageConfirmed: boolean,
     now: Date,
   ): Account {
+    const account = Account.create(spaceId, email, loginId, passwordHash, ageConfirmed, now);
+    account.startSession(appId, now);
+    return account;
+  }
+
+  /**
+   * 로그인 없이 계정만 (스토어에서 가입, 2026-11-26): 기본 도메인은 콘솔과 같은 출처라 회원 로그인을 열지 않는다.
+   * 앱에는 그 앱 도메인에서 로그인해 참여한다
+   */
+  static create(
+    spaceId: string,
+    email: string,
+    loginId: string,
+    passwordHash: string,
+    ageConfirmed: boolean,
+    now: Date,
+  ): Account {
     if (!ageConfirmed) throw new RuleViolation('만 14세 이상만 가입할 수 있어요');
-    const account = new Account(
+    return new Account(
       {
         id: BaseEntity.newId(),
         space_id: spaceId,
@@ -45,8 +62,6 @@ export class Account extends TableEntity<AccountRow, AccountNew> {
       },
       true,
     );
-    account.startSession(appId, now);
-    return account;
   }
 
   static restore(row: AccountRow): Account {

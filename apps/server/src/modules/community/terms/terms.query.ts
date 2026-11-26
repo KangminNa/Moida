@@ -8,6 +8,7 @@ import {
   SettingActor,
   type SettingChangeInput,
 } from '../../platform';
+import type { StorePlace } from '../account/account.input';
 import { terms } from '../community.schema';
 import { TERM_KIND, type TermKind, type TermRow } from '../community.tables';
 import type { MemberPlace } from '../member/member.input';
@@ -42,6 +43,13 @@ export class TermsQuery extends BaseQuery {
     await this.lookups.assertVisible('member-app', actor, [place.appId], '없는 주소예요');
     const owner = store ? { spaceId: place.spaceId } : { appId: place.appId };
     const row = await this.latestRow(owner, kind);
+    if (!row) throw new NotFound('아직 공개된 약관이 없어요');
+    return new TermView(row);
+  }
+
+  /** 스토어 가입 화면(기본 도메인)의 공통 약관 (2026-11-26). 없으면 404 */
+  async storePublished(_actor: Actor, place: StorePlace, kind: TermKind): Promise<TermView> {
+    const row = await this.latestRow({ spaceId: place.spaceId }, kind);
     if (!row) throw new NotFound('아직 공개된 약관이 없어요');
     return new TermView(row);
   }

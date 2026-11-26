@@ -41,7 +41,7 @@
     "community": {
       "dependsOn": ["platform"],
       "schemas": ["community"],
-      "registries": { "provides": ["settings"] },
+      "registries": { "provides": ["settings"], "asks": ["site"] },
       "lookups": { "provides": ["app-holdings"], "asks": ["app", "community-app", "member-app"] }
     },
     "mcp": {
