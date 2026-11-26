@@ -122,7 +122,25 @@ export class PluginManifest {
     /** MCP 도구 이름 → 도구 */
     readonly tools: ReadonlyMap<string, PackageToolSpec> = new Map(),
     readonly menu: PackageMenu | null = null,
+    /** 쉬운 말 안내 (2026-11-26, 목록 파일의 guide.does): 이 플러그인이 하는 일, 한 줄에 하나 */
+    readonly guideDoes: readonly string[] = [],
+    /** 쉬운 말 안내 (guide.setup): 설정 순서, 한 줄에 한 단계 */
+    readonly guideSetup: readonly string[] = [],
   ) {}
+
+  /** guide의 목록 하나: 글자만, 한 줄 300자 · 12줄까지 (넘으면 목록 파일 문제) */
+  private static lines(raw: unknown, name: string, problems: string[]): string[] {
+    if (raw === undefined) return [];
+    if (
+      !Array.isArray(raw) ||
+      raw.length > 12 ||
+      raw.some((l) => typeof l !== 'string' || l.length > 300)
+    ) {
+      problems.push(`guide.${name}은 300자 이하 글 12줄까지의 목록이어야 해요`);
+      return [];
+    }
+    return raw as string[];
+  }
 
   /** 확장 지점을 켜는 사람이 읽을 말로 (설치 마법사·관리 화면·명령줄이 함께 씀) */
   static describeUse(use: string): string {
@@ -290,6 +308,10 @@ export class PluginManifest {
       };
     }
 
+    const guide = (raw.guide ?? {}) as Record<string, unknown>;
+    const guideDoes = PluginManifest.lines(guide.does, 'does', problems);
+    const guideSetup = PluginManifest.lines(guide.setup, 'setup', problems);
+
     if (problems.length > 0) {
       throw new Error(`플러그인 ${name || dir} 목록 파일 문제:\n- ${problems.join('\n- ')}`);
     }
@@ -306,6 +328,8 @@ export class PluginManifest {
       api,
       tools,
       menu,
+      guideDoes,
+      guideSetup,
     );
   }
 

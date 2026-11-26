@@ -20,6 +20,7 @@ plugins/<이름>/
 - `settings`: 설정 항목. `label`, `type`(`text`·`secret`·`select`·`boolean`), `required`, `help`, `default`, `options`(select), `public`.
   설치 마법사·관리 화면의 칸이 이것으로 만들어진다. 값은 DB(`platform.plugin_settings`)에 저장되고, `secret`은 서버 키로 암호화된다.
   `public: true`인 값만 웹으로 내려간다 (비밀값은 공개할 수 없다)
+- `guide`: 쉬운 말 안내 (2026-11-26). `does`(하는 일) · `setup`(설정 순서), 한 줄 300자 · 12줄까지. 콘솔의 플러그인 카드에 보이고, 켜면 허락하는 기술 목록(`uses`)은 "자세히"로 접힌다. 새 플러그인은 꼭 적는다
 - `web`: 화면 자리 → 파일. 지금 자리는 `post.after`(글 아래), `task.office`(콘솔의 오피스), `store.after`(스토어 화면 아래: 공개 앱의 주소 · 이름, 메일 링크의 `mail` · `token`)
 - `server`, `uses`: 서버 코드와 쓰는 확장 지점 (`event:<무늬>`, `job:<이름>`, `action:<이름>`, `archive:read`, `archive:restore`, `login:<이름>`, `delegate:<대상 종류>`). 객체설계 12장
 

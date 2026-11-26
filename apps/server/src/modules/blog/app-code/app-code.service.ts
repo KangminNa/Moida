@@ -24,6 +24,7 @@ import type {
   AppCodeBuiltInput,
   DeployedCodeInput,
   ShowCodeInput,
+  StarterCodeInput,
   UploadCodeInput,
 } from './app-code.input';
 import { AppCodeQuery } from './app-code.query';
@@ -169,14 +170,25 @@ export class AppCodeService extends EntityService<AppCode> {
     return Buffer.concat(chunks);
   }
 
-  /** 종류의 시작 코드를 새 버전으로 (처음으로 되돌리기, 기록은 남는다). 관리자만 */
-  async starter(actor: Actor, req: VersionInput): Promise<AppCode> {
+  /**
+   * 종류의 시작 코드를 새 버전으로 (처음으로 되돌리기, 기록은 남는다). template이면 그 이름의 시작 화면으로
+   * (2026-11-26, 페이지 앱의 intro: Moida 소개 페이지). 관리자만
+   */
+  async starter(actor: Actor, req: StarterCodeInput): Promise<AppCode> {
     actor.assertOwner();
     const app = await this.code.appOf(actor, actor.requireSpace(), req.id);
     if (app === null) throw new NotFound('앱을 찾을 수 없어요');
-    const starter = await this.code.filesOf(actor, app, 0);
+    const starter = req.template
+      ? this.code.templateOf(actor, app, req.template)
+      : await this.code.filesOf(actor, app, 0);
     const bundle = await this.bundleOf(starter.files, starter);
-    return this.add(actor, req, bundle, 'starter', '시작 코드');
+    return this.add(
+      actor,
+      req,
+      bundle,
+      'starter',
+      req.template ? `시작 화면 ${req.template}` : '시작 코드',
+    );
   }
 
   /**

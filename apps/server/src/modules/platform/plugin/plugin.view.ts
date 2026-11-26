@@ -77,11 +77,14 @@ export class PluginView {
     private readonly missing: readonly string[],
     private readonly settings: readonly PluginSettingView[],
     private readonly actions: readonly PluginActionView[],
+    /** 쉬운 말 안내: 하는 일 · 설정 순서 (목록 파일의 guide, 없으면 빈 목록) */
+    private readonly guide: { readonly does: readonly string[]; readonly setup: readonly string[] },
   ) {}
 
   toJSON() {
     return {
       ...this.summary.toJSON(),
+      guide: { does: [...this.guide.does], setup: [...this.guide.setup] },
       enabled: this.enabled,
       active: this.active,
       problem: this.problem,

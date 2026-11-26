@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moida</title>
+<style>
+/* 레이아웃: 1080px 한 단. 글은 섹션마다 제목 한 줄 + 한 줄, 설명은 그림과 누르기로.
+   점이 모이는 이름 → 흐름 그림 → 맡겨 보기 → 러너 구조(흐름 · 보안 보기) → 보안 카드(뒤집기) → 설치(타자) → 사이트 · 상태 · 질문 · 구독.
+   색은 Moida 콘솔의 테마 B: 중립 회색 + 남색 강조 하나 */
+:root {
+  --bg: #ffffff;
+  --subtle: #f6f6f8;
+  --line: #e4e4e7;
+  --fg: #18181b;
+  --muted: #4b4b52;
+  --faint: #6e6e76;
+  --accent: #4f5bd5;
+  --accent-ink: #3a45b8;
+  --accent-soft: #eef0fc;
+  --on-accent: #ffffff;
+  --inv-bg: #18181b;
+  --inv-fg: #f4f4f5;
+  --inv-muted: #a1a1aa;
+  --inv-subtle: #232328;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --ui: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --width: 1080px;
+  --radius: 24px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131316; --subtle: #1c1c21; --line: #2a2a2f; --fg: #f4f4f5; --muted: #b4b4bb; --faint: #8e8e96;
+    --accent: #6670e8; --accent-ink: #a9b0f6; --accent-soft: rgba(102, 112, 232, 0.18);
+    --inv-bg: #f4f4f5; --inv-fg: #18181b; --inv-muted: #52525b; --inv-subtle: #e4e4e7;
+    --shadow: 0 0 0 1px #2a2a2f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131316; --subtle: #1c1c21; --line: #2a2a2f; --fg: #f4f4f5; --muted: #b4b4bb; --faint: #8e8e96;
+  --accent: #6670e8; --accent-ink: #a9b0f6; --accent-soft: rgba(102, 112, 232, 0.18);
+  --inv-bg: #f4f4f5; --inv-fg: #18181b; --inv-muted: #52525b; --inv-subtle: #e4e4e7;
+  --shadow: 0 0 0 1px #2a2a2f; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body { background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 16px; line-height: 1.6; overflow-x: clip; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+svg text { font-family: var(--ui); }
+
+.wrap { width: 100%; max-width: calc(var(--width) + 48px); margin-inline: auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+
+/* 머리 */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; }
+.brand { font-size: 1.2rem; font-weight: 900; letter-spacing: 0.16em; text-decoration: none; }
+.top nav { display: flex; align-items: center; gap: 2px; }
+.top nav a { padding: 8px 12px; border-radius: 999px; color: var(--muted); font-size: 0.9rem; font-weight: 500; text-decoration: none; }
+.top nav a:hover { background: var(--subtle); color: var(--fg); }
+.top nav .gh { margin-left: 6px; background: var(--subtle); color: var(--fg); font-weight: 700; }
+@media (max-width: 760px) { .top nav a:not(.gh) { display: none; } }
+
+/* 첫 화면 */
+.hero { position: relative; padding-block: 48px 8px; text-align: center; }
+.hero::before { content: ""; position: absolute; inset: -80px 0 auto; z-index: -1; height: 560px; pointer-events: none;
+  background: radial-gradient(40% 50% at 26% 34%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), radial-gradient(36% 44% at 76% 24%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%); }
+.hero-grid { display: grid; gap: 40px; align-items: center; }
+.hero-main { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
+@media (min-width: 980px) { .hero-grid { grid-template-columns: minmax(0, 1fr) 340px; } .hero-grid.solo { grid-template-columns: minmax(0, 1fr); } }
+
+/* 우리 앱: 폰 첫 화면처럼 아이콘이 모인 판 */
+.launcher { position: relative; width: 100%; max-width: 420px; margin: 0 auto; padding: 22px 20px 18px; border-radius: 34px; background: var(--bg); box-shadow: var(--shadow); text-align: left; }
+.launcher::before { content: ""; position: absolute; top: 9px; left: 50%; width: 56px; height: 5px; margin-left: -28px; border-radius: 3px; background: var(--line); }
+.l-head { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 4px 16px; }
+.l-head b { font-size: 1.05rem; font-weight: 900; }
+.l-head a { color: var(--accent-ink); font-size: 0.85rem; font-weight: 700; text-decoration: none; }
+.l-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 10px; margin: 0; padding: 0; list-style: none; }
+.l-grid a { display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; }
+.l-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 19px; font-size: 1.45rem; font-weight: 900; overflow: hidden; transition: transform 0.2s; }
+.l-icon img { width: 100%; height: 100%; object-fit: cover; }
+.l-icon.t0 { background: var(--accent-soft); color: var(--accent-ink); }
+.l-icon.t1 { background: var(--fg); color: var(--bg); }
+.l-icon.t2 { background: var(--subtle); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.l-grid a:hover .l-icon { transform: translateY(-4px) scale(1.04); }
+.l-name { max-width: 100%; overflow: hidden; color: var(--fg); font-size: 0.8rem; font-weight: 700; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.l-foot { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--faint); font-size: 0.8rem; }
+.l-foot i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.8s ease-in-out infinite; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.chip { padding: 5px 12px; border-radius: 999px; background: var(--subtle); color: var(--muted); font-size: 0.8rem; font-weight: 700; }
+.chip.dark { background: var(--fg); color: var(--bg); }
+.mark { position: relative; display: grid; place-items: center; width: 100%; height: clamp(130px, 17vw, 210px); cursor: pointer; touch-action: pan-y; user-select: none; -webkit-tap-highlight-color: transparent; }
+.mark canvas { position: absolute; inset: -56px 0; width: 100%; height: calc(100% + 112px); pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent), linear-gradient(to right, transparent, #000 6%, #000 94%, transparent); mask-composite: intersect; }
+.mark-text { font-size: clamp(3.4rem, 13vw, 9.5rem); font-weight: 900; letter-spacing: 0.02em; line-height: 1; transition: color 0.3s; }
+.mark.ready .mark-text { color: transparent; }
+.hint { color: var(--faint); font-size: 0.78rem; }
+.naming { color: var(--muted); font-size: 1rem; word-break: keep-all; }
+.naming b { color: var(--fg); }
+.hero h1 { max-width: 18ch; margin-top: 6px; font-size: clamp(1.9rem, 4.4vw, 3.1rem); font-weight: 900; letter-spacing: -0.04em; line-height: 1.2; word-break: keep-all; }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border: 0; border-radius: 999px; background: var(--subtle); color: var(--fg); font-size: 0.95rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn:hover { filter: brightness(0.97); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+/* 공용 */
+.band { padding-block: 96px 0; }
+.head { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 28px; text-align: center; }
+.head h2 { font-size: clamp(1.6rem, 3.4vw, 2.3rem); font-weight: 900; letter-spacing: -0.035em; word-break: keep-all; }
+.head p { color: var(--muted); word-break: keep-all; }
+.kicker { color: var(--accent-ink); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; }
+.stage { padding: 18px; border-radius: var(--radius); background: var(--subtle); overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; }
+.cap { min-height: 1.7em; margin-top: 14px; color: var(--muted); font-size: 0.95rem; text-align: center; word-break: keep-all; transition: opacity 0.2s; }
+.cap b { color: var(--fg); }
+
+/* 흐름 그림 */
+#flow-svg { min-width: 620px; }
+.f-pill rect { fill: var(--bg); stroke: var(--line); }
+.f-pill text { fill: var(--fg); font-size: 15px; font-weight: 700; }
+.f-pill { cursor: pointer; }
+.f-pill.on rect { stroke: var(--accent); stroke-width: 2; }
+.f-path { fill: none; stroke: var(--line); stroke-width: 2; transition: stroke 0.2s; }
+.f-path.out { stroke: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.f-path.on { stroke: var(--accent); stroke-width: 3; }
+.f-dot { fill: var(--faint); }
+.f-dot.out { fill: var(--accent); }
+.f-hub { fill: var(--fg); }
+.f-hub-t { fill: var(--bg); font-size: 28px; font-weight: 900; letter-spacing: 0.14em; }
+.f-hub-s { fill: color-mix(in srgb, var(--bg) 65%, var(--fg)); font-size: 13px; }
+.f-worker { fill: var(--accent); }
+.f-gate { fill: var(--accent); }
+.f-gate-i { fill: none; stroke: var(--on-accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.f-label { fill: var(--faint); font-size: 12px; font-weight: 700; }
+
+/* 맡겨 보기 */
+.demo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.panel { display: flex; flex-direction: column; min-width: 0; min-height: 420px; border-radius: var(--radius); background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+.panel-head b { font-weight: 900; }
+.panel-head span { color: var(--faint); }
+.c-body { display: flex; flex: 1; flex-direction: column; gap: 10px; padding: 18px; }
+.c-empty { margin: auto; color: var(--faint); font-size: 0.9rem; text-align: center; }
+.bubble { align-self: flex-end; max-width: 85%; padding: 10px 14px; border-radius: 18px 18px 4px 18px; background: var(--accent); color: var(--on-accent); font-size: 0.92rem; animation: rise 0.3s ease-out; }
+.work { display: grid; gap: 8px; padding: 14px; border-radius: 16px; background: var(--subtle); font-size: 0.82rem; color: var(--muted); animation: rise 0.3s ease-out; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; width: 0; height: 100%; border-radius: 3px; background: var(--accent); animation: fill 1.8s ease-in-out forwards; }
+.bar.late i { animation-delay: 0.4s; }
+.result { display: grid; gap: 10px; padding: 16px; border-radius: 16px; background: var(--subtle); animation: rise 0.3s ease-out; transition: transform 0.5s, opacity 0.5s; }
+.result b { font-size: 0.95rem; }
+.result ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.88rem; }
+.result .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.result .btn { padding: 9px 16px; font-size: 0.85rem; background: var(--bg); }
+.result .btn.primary { background: var(--accent); }
+.result.sent { transform: translateX(24px); opacity: 0.4; }
+.lock { display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 0.78rem; }
+.lock svg { width: 14px; height: 14px; }
+.note-line { align-self: center; padding: 6px 12px; border-radius: 999px; background: var(--subtle); color: var(--muted); font-size: 0.82rem; animation: rise 0.3s ease-out; }
+.c-input { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--line); }
+.prompt { padding: 9px 14px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 0.86rem; font-weight: 700; cursor: pointer; }
+.prompt:disabled { opacity: 0.4; cursor: default; }
+.s-body { padding: 22px; }
+.s-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.s-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 900; }
+.s-title b { font-size: 1.1rem; font-weight: 900; }
+.posts { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.posts li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: var(--subtle); }
+.posts .thumb { height: 42px; border-radius: 10px; background: linear-gradient(135deg, var(--line), var(--subtle)); }
+.posts b { display: block; font-size: 0.92rem; }
+.posts small { color: var(--faint); font-size: 0.75rem; }
+.posts li.new { animation: land 0.9s ease-out; box-shadow: inset 0 0 0 2px var(--accent); }
+.posts li.new .thumb { background: linear-gradient(135deg, var(--accent), var(--accent-soft)); }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fill { to { width: 100%; } }
+@keyframes land { from { opacity: 0; transform: translateX(-30px) scale(0.96); } }
+@media (max-width: 760px) { .demo { grid-template-columns: minmax(0, 1fr); } .panel { min-height: 0; } .c-body { min-height: 300px; } }
+
+/* 러너 구조 */
+.toggle { display: inline-flex; gap: 4px; margin: 0 auto 16px; padding: 4px; border-radius: 999px; background: var(--subtle); }
+.toggle button { padding: 8px 18px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.center { display: flex; justify-content: center; }
+#dg { min-width: 760px; }
+.dg-group { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 6 6; }
+.dg-label { fill: var(--faint); font-size: 12px; font-weight: 700; }
+.dg-node, .f-pill { cursor: pointer; outline: none; }
+.dg-node .box { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; transition: stroke 0.2s; }
+.dg-node.dashed .box { stroke-dasharray: 5 5; }
+.dg-node.core .box { fill: var(--fg); stroke: var(--fg); }
+.dg-node.on .box { stroke: var(--accent); stroke-width: 2.5; }
+.dg-t { fill: var(--fg); font-size: 16px; font-weight: 900; }
+.dg-s { fill: var(--faint); font-size: 12.5px; }
+.core .dg-t { fill: var(--bg); }
+.core .dg-s { fill: color-mix(in srgb, var(--bg) 65%, var(--fg)); }
+.dg-row { fill: color-mix(in srgb, var(--bg) 12%, var(--fg)); }
+.dg-line { fill: none; stroke: var(--faint); stroke-width: 1.6; }
+.dg-line.a { stroke: var(--accent); stroke-width: 2; }
+.dg-head { fill: var(--faint); }
+.dg-head-a { fill: var(--accent); }
+.dg-k { fill: var(--faint); font-size: 11px; font-weight: 700; }
+.dg-dot { fill: var(--accent); }
+.badge { opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.badge rect { fill: var(--accent); }
+.badge text { fill: var(--on-accent); font-size: 12px; font-weight: 700; }
+#dg.sec .badge { opacity: 1; }
+#dg.sec .dg-dot { opacity: 0.25; }
+.life { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 28px 0 0; padding: 0; list-style: none; }
+.life button { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; padding: 14px 6px; border: 0; border-radius: 18px; background: var(--subtle); color: var(--muted); font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: background 0.25s, color 0.25s, transform 0.25s; }
+.life svg { width: 26px; height: 26px; }
+.life button.on { background: var(--fg); color: var(--bg); transform: translateY(-3px); }
+@media (max-width: 640px) { .life { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* 보안 카드: 누르면 뒤집혀 한 줄 */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.tile { position: relative; height: 150px; padding: 0; border: 0; background: none; cursor: pointer; perspective: 800px; }
+.tile .in { position: absolute; inset: 0; transition: transform 0.5s; transform-style: preserve-3d; }
+.tile.flip .in { transform: rotateY(180deg); }
+.tile .face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; border-radius: 20px; background: var(--subtle); backface-visibility: hidden; -webkit-backface-visibility: hidden; text-align: center; }
+.tile .face svg { width: 30px; height: 30px; color: var(--accent); }
+.tile .face b { font-size: 0.98rem; font-weight: 900; word-break: keep-all; }
+.tile .back { background: var(--fg); color: var(--bg); transform: rotateY(180deg); font-size: 0.86rem; line-height: 1.5; word-break: keep-all; }
+.more { display: flex; justify-content: center; margin-top: 16px; }
+.more button { padding: 9px 16px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 0.86rem; font-weight: 700; cursor: pointer; }
+
+/* 설치: 반전 띠 + 타자 */
+.inverse { margin-top: 96px; padding-block: 80px; background: var(--inv-bg); color: var(--inv-fg); }
+.inverse .head p { color: var(--inv-muted); }
+.inverse .kicker { color: var(--inv-muted); }
+.terminal { max-width: 720px; margin: 0 auto; border-radius: 20px; background: var(--inv-subtle); overflow: hidden; }
+.t-head { display: flex; align-items: center; gap: 6px; padding: 12px 16px; }
+.t-head i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, var(--inv-muted) 50%, transparent); }
+.t-head button { margin-left: auto; padding: 6px 12px; border: 0; border-radius: 999px; background: var(--inv-bg); color: var(--inv-fg); font-size: 0.72rem; cursor: pointer; }
+.terminal pre { min-height: 150px; margin: 0; padding: 4px 20px 22px; overflow-x: auto; font-family: var(--mono); font-size: 0.9rem; line-height: 2; }
+.terminal .p { color: var(--inv-muted); }
+.caret { display: inline-block; width: 8px; height: 1.1em; vertical-align: -0.2em; background: var(--inv-fg); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.facts span { padding: 8px 14px; border-radius: 999px; background: var(--inv-subtle); color: var(--inv-fg); font-size: 0.86rem; font-weight: 700; }
+
+/* 사이트 · 상태 · 질문 */
+.track { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 760px; margin: 0 auto; padding: 0; list-style: none; text-align: center; }
+.track::before { content: ""; position: absolute; left: 16.6%; right: 16.6%; top: 15px; height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--fg) 50%, var(--line) 50%); }
+.track li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 0.92rem; font-weight: 700; }
+.track li small { color: var(--faint); font-weight: 500; }
+.track .dot { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--line); color: var(--bg); font-size: 0.85rem; }
+.track .done .dot { background: var(--fg); }
+.track .now .dot { background: var(--accent); box-shadow: 0 0 0 6px var(--accent-soft); animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 12px transparent; } }
+.faq { display: grid; gap: 8px; max-width: 760px; margin: 0 auto; }
+.faq details { padding: 16px 20px; border-radius: 16px; background: var(--subtle); }
+.faq summary { cursor: pointer; font-weight: 700; list-style: none; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; float: right; color: var(--faint); font-weight: 400; }
+.faq details[open] summary::after { content: "−"; }
+.faq p { margin-top: 8px; color: var(--muted); font-size: 0.94rem; word-break: keep-all; }
+
+/* 구독 */
+.subscribe { margin-top: 96px; padding: 36px; border-radius: 32px; background: var(--inv-bg); color: var(--inv-fg); }
+.subscribe h2 { font-size: clamp(1.4rem, 3vw, 1.8rem); font-weight: 900; letter-spacing: -0.03em; }
+.subscribe form { display: grid; gap: 14px; margin-top: 18px; }
+.picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.picks label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: var(--inv-subtle); font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+.picks input { accent-color: var(--accent); }
+.row-in { display: flex; flex-wrap: wrap; gap: 10px; }
+.row-in input[type="email"] { flex: 1 1 240px; min-width: 0; padding: 14px 18px; border: 0; border-radius: 999px; background: var(--inv-subtle); color: var(--inv-fg); font: inherit; font-size: 16px; }
+.agree { display: flex; gap: 8px; color: var(--inv-muted); font-size: 0.82rem; word-break: keep-all; }
+.sub-line { margin: 8px 0 18px; color: var(--inv-muted); }
+.foot { padding-block: 56px 40px; color: var(--faint); font-size: 0.85rem; }
+.foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.foot nav { display: flex; flex-wrap: wrap; gap: 16px; }
+.foot strong { color: var(--fg); letter-spacing: 0.16em; font-weight: 900; }
+@media (max-width: 760px) { .subscribe { padding: 26px 20px; } }
+
+
+/* 에이전트 하나: 흔한 방식 ↔ Moida */
+.row-center { display: flex; justify-content: center; }
+.one-svg { display: block; width: 100%; max-width: 1000px; height: auto; margin-inline: auto; }
+.o-node rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; transition: stroke 0.2s, fill 0.2s; }
+.o-node text { fill: var(--fg); font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.o-node small, .o-node .sub { fill: var(--faint); font-size: 12px; font-weight: 500; }
+.o-node { cursor: pointer; }
+.o-node:hover rect, .o-node.on rect { stroke: var(--accent); stroke-width: 2.5; }
+.o-node.me rect { fill: var(--fg); stroke: var(--fg); }
+.o-node.me text { fill: var(--bg); }
+.o-node.lead rect { fill: var(--accent); stroke: var(--accent); }
+.o-node.lead text { fill: var(--on-accent); }
+.o-node.mess rect { stroke-dasharray: 5 4; }
+.o-line { fill: none; stroke: var(--line); stroke-width: 2; }
+.o-line.a { stroke: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.o-line.tangle { stroke: color-mix(in srgb, var(--fg) 22%, transparent); stroke-width: 1.5; }
+.o-dot { fill: var(--accent); }
+.o-dot.mess { fill: var(--faint); }
+.o-note { fill: var(--faint); font-size: 13px; font-weight: 700; text-anchor: middle; }
+.o-fade { animation: rise 0.35s ease-out; }
+
+/* 나에게 맞추기: 엔진은 바꿔 끼우고 다섯 가지는 남는다 */
+.fit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.engine { display: grid; grid-template-columns: auto 220px auto minmax(0, 1fr); align-items: center; gap: 20px; padding: 20px 24px; border-radius: var(--radius); background: var(--inv-bg); color: var(--inv-fg); }
+.engine small { color: var(--inv-muted); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.08em; }
+.engine .slot { display: grid; place-items: center; height: 84px; border-radius: 18px; background: var(--inv-subtle); overflow: hidden; }
+.engine .slot b { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; animation: rise 0.35s ease-out; }
+.engine .slot span { display: block; color: var(--inv-muted); font-size: 0.8rem; text-align: center; }
+.engine button { padding: 10px 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 700; cursor: pointer; }
+.engine p { color: var(--inv-muted); font-size: 0.86rem; word-break: keep-all; }
+.keeps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1000px) { .keeps { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }
+.keeps .tile { height: 140px; }
+.keeps .tile.pulse .face:not(.back) { box-shadow: inset 0 0 0 2px var(--accent); }
+@media (max-width: 760px) { .engine { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
+
+/* 배포 · 관리: 어디서 하든 같은 버전 기록 */
+.ship { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.ship .panel { min-height: 330px; }
+.ship-in { display: flex; flex-direction: column; gap: 12px; padding: 18px; }
+.term { margin: 0; padding: 16px; border-radius: 14px; background: var(--inv-bg); color: var(--inv-fg); font: 0.82rem/1.7 var(--mono); white-space: pre-wrap; word-break: break-all; }
+.term i { color: var(--inv-muted); font-style: normal; }
+.mock { display: grid; gap: 8px; }
+.mock div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--subtle); font-size: 0.86rem; }
+.mock button { padding: 6px 12px; border: 0; border-radius: 999px; background: var(--fg); color: var(--bg); font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.mock button.primary { background: var(--accent); color: var(--on-accent); }
+.reply { align-self: flex-start; max-width: 90%; padding: 10px 14px; border-radius: 18px 18px 18px 4px; background: var(--subtle); font-size: 0.9rem; animation: rise 0.3s ease-out; }
+.ship .go { align-self: flex-start; padding: 9px 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 700; cursor: pointer; }
+.vers { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 18px; list-style: none; }
+.vers li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--subtle); font-size: 0.86rem; animation: rise 0.35s ease-out; }
+.vers li b { min-width: 34px; font-family: var(--mono); }
+.vers li span { flex: 1; color: var(--muted); }
+.vers li em { padding: 3px 10px; border-radius: 999px; background: var(--line); color: var(--muted); font-size: 0.74rem; font-style: normal; font-weight: 700; }
+.vers li.live em { background: var(--accent); color: var(--on-accent); }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 18px 18px; }
+.facts span { padding: 5px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 0.8rem; font-weight: 700; }
+@media (max-width: 760px) { .ship { grid-template-columns: minmax(0, 1fr); } .ship .panel { min-height: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top">MOIDA</a>
+    <nav aria-label="바로 가기">
+      <a href="#apps">앱</a>
+      <a href="#flow">흐름</a>
+      <a href="#one">에이전트</a>
+      <a href="#try">맡겨 보기</a>
+      <a href="#ship">배포</a>
+      <a href="#runner">러너</a>
+      <a href="#security">보안</a>
+      <a href="#run">설치</a>
+      <a class="gh" href="https://github.com/KangminNa/blog" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-main">
+      <div class="chips"><span class="chip dark">오픈소스 · AGPL-3.0</span><span class="chip">내 서버에서 운영</span></div>
+      <div class="mark" id="mark"><span class="mark-text">MOIDA</span><canvas id="mark-canvas"></canvas></div>
+      <p class="hint" id="hint" aria-hidden="true">글자를 눌러 보세요</p>
+      <p class="naming"><b>Moida</b>로 운영해요. Moida = '모이다', 흩어진 것이 한곳에 모여요.</p>
+      <h1>흩어진 AI 작업을 모아, 사이트로 운영하는 오픈소스</h1>
+      <div class="actions"><a class="btn primary" href="#try">맡겨 보기</a><a class="btn" href="#run">직접 설치하기</a></div>
+      </div>
+      <aside class="launcher" id="apps" aria-labelledby="apps-title">
+        <div class="l-head"><b id="apps-title">우리 앱</b><a href="/store" id="apps-all">모두 보기</a></div>
+        <ul class="l-grid" id="apps-list"></ul>
+        <p class="l-foot"><i></i>모두 이 서버 하나에서 돌아요</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 흐름: 들어오는 것 → MOIDA → 승인 → 나가는 것 -->
+  <section class="band" id="flow" aria-labelledby="flow-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">흐름</span><h2 id="flow-title">모으고, 맡기고, 내보내요</h2></div>
+      <div class="stage">
+        <svg id="flow-svg" viewBox="0 0 1000 330" role="img" aria-labelledby="flow-desc">
+          <desc id="flow-desc">왼쪽의 Claude Code · Codex · 웹 AI 대화 · 읽던 페이지가 가운데 MOIDA로 모이고, 승인을 거쳐 오른쪽의 블로그 · 매거진 · 커뮤니티 · 메일 구독으로 나가요.</desc>
+          <text class="f-label" x="115" y="22" text-anchor="middle">모으기</text>
+          <text class="f-label" x="500" y="22" text-anchor="middle">맡기기</text>
+          <text class="f-label" x="885" y="22" text-anchor="middle">내보내기</text>
+          <path id="in0" class="f-path" d="M210 62 C300 62 300 160 390 160"/>
+          <path id="in1" class="f-path" d="M210 132 C300 132 300 168 390 168"/>
+          <path id="in2" class="f-path" d="M210 202 C300 202 300 176 390 176"/>
+          <path id="in3" class="f-path" d="M210 272 C300 272 300 184 390 184"/>
+          <path id="mid" class="f-path out" d="M610 172 H640"/>
+          <path id="out0" class="f-path out" d="M680 172 C735 172 735 62 790 62"/>
+          <path id="out1" class="f-path out" d="M680 172 C735 172 735 132 790 132"/>
+          <path id="out2" class="f-path out" d="M680 172 C735 172 735 202 790 202"/>
+          <path id="out3" class="f-path out" d="M680 172 C735 172 735 272 790 272"/>
+          <g id="flow-dots"></g>
+          <g class="f-pill" data-k="in0" tabindex="0"><rect x="20" y="40" width="190" height="44" rx="22"/><text x="115" y="67" text-anchor="middle">Claude Code</text></g>
+          <g class="f-pill" data-k="in1" tabindex="0"><rect x="20" y="110" width="190" height="44" rx="22"/><text x="115" y="137" text-anchor="middle">Codex</text></g>
+          <g class="f-pill" data-k="in2" tabindex="0"><rect x="20" y="180" width="190" height="44" rx="22"/><text x="115" y="207" text-anchor="middle">웹 AI 대화</text></g>
+          <g class="f-pill" data-k="in3" tabindex="0"><rect x="20" y="250" width="190" height="44" rx="22"/><text x="115" y="277" text-anchor="middle">읽던 페이지</text></g>
+          <rect class="f-hub" x="390" y="92" width="220" height="160" rx="26"/>
+          <text class="f-hub-t" x="500" y="160" text-anchor="middle">MOIDA</text>
+          <text class="f-hub-s" x="500" y="186" text-anchor="middle">기록 · 일꾼 · 사이트</text>
+          <circle class="f-worker" cx="478" cy="218" r="5"><animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite"/></circle>
+          <circle class="f-worker" cx="500" cy="218" r="5"><animate attributeName="opacity" values="1;0.3;1" dur="1.4s" begin="0.25s" repeatCount="indefinite"/></circle>
+          <circle class="f-worker" cx="522" cy="218" r="5"><animate attributeName="opacity" values="1;0.3;1" dur="1.4s" begin="0.5s" repeatCount="indefinite"/></circle>
+          <g class="f-pill" data-k="gate" tabindex="0"><circle class="f-gate" cx="660" cy="172" r="22"/><path class="f-gate-i" d="M650 172l7 7 13-14"/></g>
+          <text class="f-label" x="660" y="216" text-anchor="middle">승인</text>
+          <g class="f-pill" data-k="out0" tabindex="0"><rect x="790" y="40" width="190" height="44" rx="22"/><text x="885" y="67" text-anchor="middle">블로그</text></g>
+          <g class="f-pill" data-k="out1" tabindex="0"><rect x="790" y="110" width="190" height="44" rx="22"/><text x="885" y="137" text-anchor="middle">매거진</text></g>
+          <g class="f-pill" data-k="out2" tabindex="0"><rect x="790" y="180" width="190" height="44" rx="22"/><text x="885" y="207" text-anchor="middle">커뮤니티</text></g>
+          <g class="f-pill" data-k="out3" tabindex="0"><rect x="790" y="250" width="190" height="44" rx="22"/><text x="885" y="277" text-anchor="middle">메일 구독</text></g>
+        </svg>
+      </div>
+      <p class="cap" id="flow-cap" aria-live="polite">항목에 마우스를 올려 보세요</p>
+    </div>
+  </section>
+
+  <!-- 에이전트 하나: 흔한 방식 ↔ Moida -->
+  <section class="band" id="one" aria-labelledby="one-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">에이전트 하나</span><h2 id="one-title">에이전트는 많아도, 대화 상대는 하나</h2><p>버튼을 바꾸고 상자를 눌러 보세요</p></div>
+      <div class="row-center"><div class="toggle" role="group" aria-label="보기">
+        <button type="button" id="one-mess" aria-pressed="true">흔한 방식</button>
+        <button type="button" id="one-moida" aria-pressed="false">Moida</button>
+      </div></div>
+      <svg class="one-svg" id="one-svg" viewBox="0 0 1000 380" role="img" aria-labelledby="one-desc">
+        <desc id="one-desc">흔한 방식은 내가 여러 AI 창을 오가며 기억 · 규칙 · 결과를 따로 챙겨요. Moida는 대표 하나와만 이야기하고, 대표가 같은 일꾼들에게 나눠 맡긴 결과를 카드 하나로 받아 승인해요.</desc>
+        <g id="one-lines"></g><g id="one-dots"></g><g id="one-nodes"></g>
+      </svg>
+      <p class="cap" id="one-cap" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- 나에게 맞추기: 엔진은 바꿔 끼우고 다섯 가지는 남는다 -->
+  <section class="band" id="fit" aria-labelledby="fit-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">나에게 맞추기</span><h2 id="fit-title">모델은 바꿔 끼우고, 나에게 맞춘 것은 남아요</h2><p>엔진을 바꾸고 카드를 눌러 보세요</p></div>
+      <div class="fit">
+        <div class="engine">
+          <small>엔진</small>
+          <div class="slot" id="engine-slot" aria-live="polite"><div><b>Claude Code</b><span>공식 CLI · 내 구독</span></div></div>
+          <button type="button" id="engine-swap">다른 엔진으로</button>
+          <p>유능한 모델은 계속 나와요. 엔진은 러너에서 바꿔 끼우고, 아래 다섯 가지는 내 서버의 Moida에 남아요.</p>
+        </div>
+        <div class="keeps" id="keeps">
+          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3"/></svg><b>기억</b></span><span class="face back">흩어진 AI 대화 · 결정 · 위키가 모여 일마다 함께 가요</span></span></button>
+          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6"/></svg><b>내 규칙</b></span><span class="face back">스킬 · 지시문을 버전으로 쌓고, 버전마다 성적을 봐요</span></span></button>
+          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>검증</b></span><span class="face back">완료 조건을 먼저 정하고, 다른 일꾼이 점수 4점 넘어야 통과</span></span></button>
+          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h16"/><path d="M7 18V9M12 18V5M17 18v-6"/></svg><b>한도</b></span><span class="face back">모델 상한 · 하루 한도 · 대화마다 토큰을 내가 정하고 봐요</span></span></button>
+          <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg><b>배움</b></span><span class="face back">내 피드백을 모아 대표가 배우고, 매주 팀을 점검해 제안해요</span></span></button>
+        </div>
+      </div>
+      <p class="cap" id="fit-cap" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- 맡겨 보기: 누르면 일꾼이 쓰고, 승인해야 사이트에 올라가요 -->
+  <section class="band" id="try" aria-labelledby="try-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">맡겨 보기</span><h2 id="try-title">말하면 쓰고, 승인하면 올라가요</h2></div>
+      <div class="demo">
+        <div class="panel" aria-label="콘솔 대화">
+          <div class="panel-head"><b>대화</b><span>콘솔</span></div>
+          <div class="c-body" id="c-body" aria-live="polite"><p class="c-empty">아래에서 하나 골라 보세요</p></div>
+          <div class="c-input" id="c-input">
+            <button class="prompt" type="button" data-p="travel">교토 여행 글 두 편 써 줘</button>
+            <button class="prompt" type="button" data-p="weekly">이번 주 소식 정리해 줘</button>
+          </div>
+        </div>
+        <div class="panel" aria-label="사이트 미리 보기">
+          <div class="panel-head"><b id="site-url">travel.moida.example</b><span>사이트</span></div>
+          <div class="s-body">
+            <div class="s-title"><span class="s-icon" id="site-icon">여</span><b id="site-name">여행 노트</b></div>
+            <ul class="posts" id="posts"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 배포 · 관리: 대화 · CLI · 콘솔, 같은 버전 기록 -->
+  <section class="band" id="ship" aria-labelledby="ship-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">배포 · 관리</span><h2 id="ship-title">대화로도, CLI로도, 콘솔로도 같은 앱</h2><p>하나 골라 실행해 보세요</p></div>
+      <div class="row-center"><div class="toggle" role="group" aria-label="배포하는 곳">
+        <button type="button" data-ship="chat" aria-pressed="true">대화</button>
+        <button type="button" data-ship="cli" aria-pressed="false">CLI</button>
+        <button type="button" data-ship="console" aria-pressed="false">콘솔</button>
+      </div></div>
+      <div class="ship">
+        <div class="panel"><div class="panel-head"><b id="ship-where">대화</b><span>여기서</span></div><div class="ship-in" id="ship-in"></div></div>
+        <div class="panel"><div class="panel-head"><b>travel.moida.example</b><span>버전 기록</span></div>
+          <ol class="vers" id="vers"></ol>
+          <div class="facts"><span>도메인 연결 확인</span><span>회원 128</span><span>앱 데이터 3표</span><span>약관 v2</span></div>
+        </div>
+      </div>
+      <p class="cap" id="ship-cap" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- 러너 구조: 노드를 누르면 한 줄, 보안 보기를 누르면 자물쇠 -->
+  <section class="band" id="runner" aria-labelledby="runner-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">러너 구조</span><h2 id="runner-title">AI는 러너에서, 서버는 규칙만</h2></div>
+      <div class="center"><div class="toggle" role="group" aria-label="보기">
+        <button type="button" id="mode-flow" aria-pressed="true">흐름 보기</button>
+        <button type="button" id="mode-sec" aria-pressed="false">보안 보기</button>
+      </div></div>
+      <div class="stage">
+        <svg id="dg" viewBox="0 0 1000 580" role="img" aria-labelledby="dg-desc">
+          <desc id="dg-desc">내 서버 안에 Moida 서버 · 서버 러너 · 서버 브라우저 · 코드 러너 칸 · 나가는 프록시가 있어요. 러너는 모두 MCP로 서버에 먼저 붙고, 코드 러너 칸은 프록시를 거쳐 허용한 바깥 호스트에만 닿아요.</desc>
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="dg-head" d="M0 0 10 5 0 10z"/></marker>
+            <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="dg-head-a" d="M0 0 10 5 0 10z"/></marker>
+          </defs>
+          <rect class="dg-group" x="300" y="24" width="680" height="436" rx="22"/>
+          <text class="dg-label" x="322" y="50">내 서버</text>
+
+          <path id="r-https" class="dg-line" d="M262 114 H318" marker-end="url(#ah)"/>
+          <path id="r-mine" class="dg-line a" d="M262 275 H318" marker-end="url(#ah-a)"/>
+          <path id="r-srv" class="dg-line a" d="M658 121 H622" marker-end="url(#ah-a)"/>
+          <path id="r-code" class="dg-line a" d="M470 328 V304" marker-end="url(#ah-a)"/>
+          <path class="dg-line" d="M810 178 V198" marker-start="url(#ah)" marker-end="url(#ah)"/>
+          <path id="r-tun" class="dg-line" d="M622 385 H658" marker-end="url(#ah)"/>
+          <path id="r-out" class="dg-line" d="M810 442 V488" marker-end="url(#ah)"/>
+          <text class="dg-k" x="290" y="106" text-anchor="middle">https</text>
+          <text class="dg-k" x="290" y="267" text-anchor="middle">MCP</text>
+          <text class="dg-k" x="640" y="113" text-anchor="middle">MCP</text>
+          <text class="dg-k" x="480" y="320">MCP</text>
+          <text class="dg-k" x="822" y="192">CDP</text>
+          <g id="dg-dots"></g>
+
+          <g class="dg-node core" data-k="core" tabindex="0">
+            <rect class="box" x="320" y="66" width="300" height="236" rx="16"/>
+            <text class="dg-t" x="340" y="98">Moida 서버</text>
+            <text class="dg-s" x="340" y="120">AI 없음</text>
+            <rect class="dg-row" x="340" y="136" width="260" height="32" rx="9"/><text class="dg-s" x="354" y="157">MCP · 대기열 · 승인</text>
+            <rect class="dg-row" x="340" y="176" width="260" height="32" rx="9"/><text class="dg-s" x="354" y="197">이벤트 · 스케줄</text>
+            <rect class="dg-row" x="340" y="216" width="260" height="32" rx="9"/><text class="dg-s" x="354" y="237">콘솔 · 사이트</text>
+            <rect class="dg-row" x="340" y="256" width="260" height="32" rx="9"/><text class="dg-s" x="354" y="277">Postgres (원본)</text>
+          </g>
+          <g class="dg-node" data-k="srvrun" tabindex="0"><rect class="box" x="660" y="66" width="300" height="110" rx="16"/><text class="dg-t" x="680" y="100">서버 러너</text><text class="dg-s" x="680" y="124">Claude Code · Codex</text><text class="dg-s" x="680" y="144">동시 1~8</text></g>
+          <g class="dg-node" data-k="browser" tabindex="0"><rect class="box" x="660" y="200" width="300" height="102" rx="16"/><text class="dg-t" x="680" y="234">서버 브라우저</text><text class="dg-s" x="680" y="258">로그인 유지 Chrome</text></g>
+          <g class="dg-node" data-k="code" tabindex="0"><rect class="box" x="320" y="330" width="300" height="110" rx="16"/><text class="dg-t" x="340" y="364">코드 러너 칸</text><text class="dg-s" x="340" y="388">샌드박스 · 칸마다 일 하나</text></g>
+          <g class="dg-node" data-k="proxy" tabindex="0"><rect class="box" x="660" y="330" width="300" height="110" rx="16"/><text class="dg-t" x="680" y="364">나가는 프록시</text><text class="dg-s" x="680" y="388">허용 목록만</text></g>
+          <g class="dg-node" data-k="admin" tabindex="0"><rect class="box" x="20" y="66" width="240" height="96" rx="16"/><text class="dg-t" x="40" y="100">관리자</text><text class="dg-s" x="40" y="124">콘솔 · 승인</text></g>
+          <g class="dg-node" data-k="mine" tabindex="0"><rect class="box" x="20" y="200" width="240" height="150" rx="16"/><text class="dg-t" x="40" y="234">내 컴퓨터</text><text class="dg-s" x="40" y="258">내 컴퓨터 러너</text><text class="dg-s" x="40" y="278">세션 저장</text></g>
+          <g class="dg-node dashed" data-k="out" tabindex="0"><rect class="box" x="660" y="490" width="300" height="66" rx="16"/><text class="dg-t" x="680" y="529">허용한 바깥</text></g>
+
+          <g class="badge"><rect x="470" y="52" width="140" height="26" rx="13"/><text x="540" y="70" text-anchor="middle">승인 · 행 수준 보안</text></g>
+          <g class="badge"><rect x="790" y="52" width="160" height="26" rx="13"/><text x="870" y="70" text-anchor="middle">그 일의 도구만</text></g>
+          <g class="badge"><rect x="796" y="264" width="150" height="26" rx="13"/><text x="871" y="282" text-anchor="middle">비밀번호는 사람이</text></g>
+          <g class="badge"><rect x="466" y="402" width="140" height="26" rx="13"/><text x="536" y="420" text-anchor="middle">Docker 소켓 없음</text></g>
+          <g class="badge"><rect x="810" y="316" width="140" height="26" rx="13"/><text x="880" y="334" text-anchor="middle">allow.txt만</text></g>
+          <g class="badge"><rect x="110" y="52" width="140" height="26" rx="13"/><text x="180" y="70" text-anchor="middle">시도 제한 · Secure</text></g>
+          <g class="badge"><rect x="100" y="186" width="150" height="26" rx="13"/><text x="175" y="204" text-anchor="middle">들어오는 포트 없음</text></g>
+        </svg>
+      </div>
+      <p class="cap" id="dg-cap" aria-live="polite">상자를 눌러 보세요</p>
+      <ol class="life" id="life" aria-label="일 하나가 지나는 길">
+        <li><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>빌리기</button></li>
+        <li><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10H3z"/></svg>준비</button></li>
+        <li><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l6 6-6 6M12 18h8"/></svg>실행</button></li>
+        <li><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>검사</button></li>
+        <li><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>올리기</button></li>
+        <li><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>승인</button></li>
+      </ol>
+      <p class="cap" id="life-cap" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- 보안: 누르면 뒤집혀 한 줄 -->
+  <section class="band" id="security" aria-labelledby="security-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">보안</span><h2 id="security-title">AI에게 맡겨도 안전하게</h2><p>카드를 눌러 보세요</p></div>
+      <div class="tiles">
+        <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg><b>비밀번호는 해시로</b></span><span class="face back">되돌릴 수 없는 scrypt 해시만 저장해요</span></span></button>
+        <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><b>키는 암호화</b></span><span class="face back">API 키 · 토큰은 AES-256-GCM으로 잠가요</span></span></button>
+        <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><b>공개는 승인 뒤</b></span><span class="face back">공개 · 전송 · 삭제는 관리자가 눌러야 실행돼요</span></span></button>
+        <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg><b>AI는 칸 안에서</b></span><span class="face back">샌드박스 칸에서 돌고, 허용 목록으로만 나가요</span></span></button>
+        <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><rect x="7" y="12" width="10" height="4" rx="1" stroke-dasharray="2 2"/></svg><b>앱은 격리</b></span><span class="face back">앱 스크립트는 콘솔에 닿지 못하고, 데이터는 앱마다 나눠요</span></span></button>
+        <button class="tile" type="button"><span class="in"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg><b>탈퇴하면 바로 지움</b></span><span class="face back">회원 정보 · 구독 주소는 떠나면 바로 지워요</span></span></button>
+      </div>
+      <div class="more"><button type="button" id="see-sec">구조도에서 보기</button></div>
+    </div>
+  </section>
+
+  <!-- 설치 -->
+  <section class="inverse" id="run" aria-labelledby="run-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">직접 운영</span><h2 id="run-title">명령 세 줄이면 내 서버에</h2></div>
+      <div class="terminal">
+        <div class="t-head"><i></i><i></i><i></i><button type="button" id="copy">복사</button></div>
+        <pre id="cmd" aria-label="설치 명령"></pre>
+      </div>
+      <div class="facts"><span>리눅스 서버 · RAM 2GB</span><span>도메인 하나</span><span>내 AI 구독 연결</span><span>AGPL-3.0</span></div>
+    </div>
+  </section>
+
+
+  <section class="band" id="status" aria-labelledby="status-title">
+    <div class="wrap">
+      <div class="head"><span class="kicker">지금</span><h2 id="status-title">어디까지 왔나</h2></div>
+      <ol class="track">
+        <li class="done"><span class="dot" aria-hidden="true">✓</span>기능 완성<small>기록 · 일꾼 · 스토어</small></li>
+        <li class="now"><span class="dot" aria-hidden="true"></span>보안 검토 중<small>실제 서버 테스트</small></li>
+        <li><span class="dot" aria-hidden="true"></span>정식 배포<small>기여 받기</small></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band" id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <div class="head"><h2 id="faq-title">자주 묻는 것</h2></div>
+      <div class="faq">
+        <details><summary>AI 비용은?</summary><p>서버는 AI를 부르지 않아요. 쓰던 Claude Code · Codex 구독을 연결해요.</p></details>
+        <details><summary>AI가 마음대로 올리진 않나요?</summary><p>바깥으로 나가는 일은 승인 뒤에만 돼요. 검수 자동 승인은 따로 켜야 하고 기본은 꺼져 있어요.</p></details>
+        <details><summary>데이터는 어디에?</summary><p>내 서버의 Postgres에만 있어요. 백업 zip으로 언제든 옮겨요.</p></details>
+        <details><summary>지금 써도 되나요?</summary><p>정식 배포 전이에요. 보안 검토를 마치면 내놓아요.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="subscribe" aria-labelledby="sub-title">
+      <h2 id="sub-title">새 글을 메일로 받기</h2>
+      <p class="sub-line">고른 사이트에 새 글이 올라오면 메일로 알려 드려요</p><a class="btn primary" id="sub-link" href="#">사이트 고르고 구독하기</a>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span><strong>MOIDA</strong> · © 2026 · AGPL-3.0</span>
+    <nav aria-label="아래 링크"><a href="#apps">앱</a><a href="https://github.com/KangminNa/blog" target="_blank" rel="noopener noreferrer">소스</a><a href="#runner">러너</a><a href="#security">보안</a><span>Moida로 만듦</span></nav>
+  </div>
+</footer>
+
+<script>
+const page = (() => { try { return JSON.parse(document.getElementById('cairn-data').textContent); } catch { return {}; } })();
+const SITE_NAME = (page.site && page.site.name) || 'MOIDA';
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const wait = (ms) => new Promise((r) => setTimeout(r, still ? 0 : ms));
+const NS = 'http://www.w3.org/2000/svg';
+
+// 1. 점이 모여 되는 이름 (Moida 웹의 gather-scene.ts와 같은 계산: 3D 점 → 원근 → Canvas 2D)
+(() => {
+  const box = $('mark'), canvas = $('mark-canvas'), ctx = canvas.getContext('2d'), text = SITE_NAME;
+  const FOCAL = 720, SPRING = 0.045, DAMP = 0.86, REPEL = 80, PUSH = 2.6, TAU = Math.PI * 2;
+  let W = 0, H = 0, dpr = 1, dot = 1, n = 0, rotX = 0, rotY = 0, pointer = null, started = 0, burstAt = -1e9, raf = 0, seen = true, frames = 0;
+  let x, y, z, vx, vy, vz, tx, ty, tz, delay, acc, sx, sy;
+  const colors = { fg: '#18181b', accent: '#4f5bd5' };
+  const readColors = () => { const s = getComputedStyle(document.documentElement); colors.fg = s.getPropertyValue('--fg').trim() || colors.fg; colors.accent = s.getPropertyValue('--accent').trim() || colors.accent; };
+  function sample() {
+    const w = Math.round(W), h = Math.round(H), off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const c = off.getContext('2d', { willReadFrequently: true });
+    const font = (s) => `900 ${s}px "Pretendard Variable", system-ui, sans-serif`;
+    let size = h * 0.5; c.font = font(size);
+    const m = c.measureText(text).width; if (m > w * 0.9) size *= (w * 0.9) / m;
+    c.font = font(size); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2);
+    const data = c.getImageData(0, 0, w, h).data, limit = w < 600 ? 1300 : 2600;
+    for (let gap = 2; ; gap++) {
+      const pts = [];
+      for (let py = 0; py < h; py += gap) for (let px = 0; px < w; px += gap) if (data[(py * w + px) * 4 + 3] > 140) pts.push([px - w / 2, py - h / 2]);
+      if (pts.length <= limit || gap >= 12) return { pts, gap };
+    }
+  }
+  function place(pts, scatter) {
+    const old = { n, x, y, z }; n = pts.length;
+    [x, y, z, vx, vy, vz, tx, ty, tz, delay, sx, sy] = Array.from({ length: 12 }, () => new Float32Array(n));
+    acc = new Uint8Array(n);
+    const reach = Math.max(W, H) * 0.7;
+    for (let i = 0; i < n; i++) {
+      const [px, py] = pts[i];
+      tx[i] = px; ty[i] = py; tz[i] = (Math.random() - 0.5) * 10; acc[i] = Math.random() < 0.12 ? 1 : 0;
+      delay[i] = ((px + W / 2) / W) * 700 + Math.random() * 500;
+      if (old.n && i < old.n) { x[i] = old.x[i]; y[i] = old.y[i]; z[i] = old.z[i]; }
+      else if (scatter) { const r = reach * (0.55 + Math.random() * 0.6), th = Math.random() * TAU, ph = Math.acos(2 * Math.random() - 1); x[i] = r * Math.sin(ph) * Math.cos(th); y[i] = r * Math.sin(ph) * Math.sin(th) * 0.55; z[i] = r * Math.cos(ph); }
+      else { x[i] = px; y[i] = py; z[i] = tz[i]; }
+    }
+  }
+  function resize(first) {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h || (!first && w === W && h === H)) return;
+    W = w; H = h; dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const { pts, gap } = sample(); dot = Math.max(0.9, gap * 0.38); place(pts, first && !still); draw();
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    const cy = Math.cos(rotY), syn = Math.sin(rotY), cx = Math.cos(rotX), sxn = Math.sin(rotX);
+    for (const tone of [0, 1]) {
+      ctx.fillStyle = tone ? colors.accent : colors.fg;
+      for (let i = 0; i < n; i++) {
+        const x1 = x[i] * cy + z[i] * syn, z1 = -x[i] * syn + z[i] * cy, y1 = y[i] * cx - z1 * sxn, z2 = y[i] * sxn + z1 * cx;
+        const d = FOCAL / (FOCAL + z2), px = W / 2 + x1 * d, py = H / 2 + y1 * d;
+        sx[i] = px; sy[i] = py;
+        if (acc[i] !== tone || d <= 0) continue;
+        ctx.globalAlpha = Math.min(1, Math.max(0.15, d * d * 0.9)); ctx.beginPath(); ctx.arc(px, py, dot * Math.min(d, 2), 0, TAU); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function step(now) {
+    const p = pointer;
+    rotY += ((p ? (p.x / W - 0.5) * 0.7 : Math.sin(now * 0.00035) * 0.18) - rotY) * 0.05;
+    rotX += ((p ? -(p.y / H - 0.5) * 0.5 : Math.sin(now * 0.00027) * 0.08) - rotX) * 0.05;
+    const t = now - started, loose = now - burstAt < 320;
+    for (let i = 0; i < n; i++) {
+      const k = loose ? 0.004 : t > delay[i] ? SPRING : 0.002, wave = Math.sin(now * 0.0015 + tx[i] * 0.011 + ty[i] * 0.006) * 7;
+      let ax = (vx[i] + (tx[i] - x[i]) * k) * DAMP, ay = (vy[i] + (ty[i] - y[i]) * k) * DAMP, az = (vz[i] + (tz[i] + wave - z[i]) * k) * DAMP;
+      if (p) { const dx = sx[i] - p.x, dy = sy[i] - p.y, d2 = dx * dx + dy * dy; if (d2 < REPEL * REPEL) { const d = Math.sqrt(d2) || 1, f = (1 - d / REPEL) * PUSH; ax += (dx / d) * f; ay += (dy / d) * f; az -= f * 2.5; } }
+      vx[i] = ax; vy[i] = ay; vz[i] = az; x[i] += ax; y[i] += ay; z[i] += az;
+    }
+  }
+  function tick(now) { raf = 0; if (!seen || document.hidden) return; if (++frames % 60 === 0) readColors(); step(now); draw(); raf = requestAnimationFrame(tick); }
+  const schedule = () => { if (!raf && seen && !document.hidden && !still) raf = requestAnimationFrame(tick); };
+  const at = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  function burst(p) {
+    burstAt = performance.now();
+    for (let i = 0; i < n; i++) { const dx = sx[i] - p.x, dy = sy[i] - p.y, d = Math.hypot(dx, dy) || 1, push = 16 * (1 - Math.min(d, 420) / 420) + 3 + Math.random() * 4; vx[i] += (dx / d) * push + (Math.random() - 0.5) * 6; vy[i] += (dy / d) * push + (Math.random() - 0.5) * 6; vz[i] += (Math.random() - 0.5) * 40; }
+    $('hint').style.visibility = 'hidden'; schedule();
+  }
+  (async () => {
+    try { await document.fonts.load('900 64px "Pretendard Variable"', text); } catch {}
+    readColors(); resize(true); if (!n) return;
+    box.classList.add('ready');
+    new MutationObserver(() => { readColors(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); draw(); });
+    new ResizeObserver(() => resize(false)).observe(canvas);
+    if (still) { $('hint').hidden = true; return; }
+    box.addEventListener('pointermove', (e) => { pointer = at(e); });
+    box.addEventListener('pointerleave', () => { pointer = null; });
+    box.addEventListener('pointerdown', (e) => burst(at(e)));
+    document.addEventListener('visibilitychange', schedule);
+    new IntersectionObserver(([e]) => { seen = e.isIntersecting; schedule(); }).observe(canvas);
+    started = performance.now(); schedule();
+  })();
+})();
+
+// 길을 따라 움직이는 점 (SVG animateMotion). 움직임 줄이기면 만들지 않는다
+function travel(layer, pathId, cls, dur, begin) {
+  if (still) return;
+  const c = document.createElementNS(NS, 'circle');
+  c.setAttribute('r', '5'); c.setAttribute('class', cls);
+  const m = document.createElementNS(NS, 'animateMotion');
+  m.setAttribute('dur', `${dur}s`); m.setAttribute('begin', `${begin}s`); m.setAttribute('repeatCount', 'indefinite');
+  const mp = document.createElementNS(NS, 'mpath'); mp.setAttribute('href', `#${pathId}`);
+  m.appendChild(mp); c.appendChild(m); layer.appendChild(c);
+}
+
+// 2. 흐름 그림
+(() => {
+  const layer = $('flow-dots');
+  ['in0', 'in1', 'in2', 'in3'].forEach((id, i) => { travel(layer, id, 'f-dot', 2.4, i * 0.6); travel(layer, id, 'f-dot', 2.4, i * 0.6 + 1.2); });
+  ['out0', 'out1', 'out2', 'out3'].forEach((id, i) => travel(layer, id, 'f-dot out', 2, 0.9 + i * 0.5));
+  const say = {
+    in0: '<b>Claude Code</b> 세션이 끝나면 노트와 원문이 와요',
+    in1: '<b>Codex</b> 세션도 "저장해" 한마디로',
+    in2: '<b>웹 AI 대화</b>는 브라우저 확장으로 모아요',
+    in3: '<b>읽던 페이지</b>도 보관함에',
+    gate: '<b>승인</b>한 것만 바깥으로 나가요',
+    out0: '<b>블로그</b>에 공개돼요',
+    out1: '<b>매거진</b>은 호로 묶어 펴내요',
+    out2: '<b>커뮤니티</b>는 회원이 글을 써요',
+    out3: '<b>메일 구독</b>자에게 새 글 소식',
+  };
+  const cap = $('flow-cap');
+  document.querySelectorAll('#flow-svg .f-pill').forEach((g) => {
+    const k = g.dataset.k;
+    const on = () => {
+      document.querySelectorAll('#flow-svg .on').forEach((e) => e.classList.remove('on'));
+      g.classList.add('on');
+      if (k === 'gate') { $('mid').classList.add('on'); ['out0', 'out1', 'out2', 'out3'].forEach((p) => $(p).classList.add('on')); }
+      else $(k).classList.add('on');
+      cap.innerHTML = say[k];
+    };
+    g.addEventListener('mouseenter', on); g.addEventListener('focus', on); g.addEventListener('click', on);
+  });
+})();
+
+// 3. 맡겨 보기
+(() => {
+  const body = $('c-body'), posts = $('posts'), chips = [...document.querySelectorAll('.prompt')];
+  const sites = {
+    travel: { url: 'travel.moida.example', icon: '여', name: '여행 노트', old: [['오사카 첫날', '3일 전'], ['비 오는 날의 나라', '1주 전']], fresh: ['교토 골목 산책', '니시키 시장에서 먹은 것'] },
+    weekly: { url: 'blog.moida.example', icon: '블', name: '만들며 배운 것', old: [['메일 구독 붙이기', '2일 전'], ['러너 구조 정리', '5일 전']], fresh: ['이번 주 Moida 소식'] },
+  };
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+  const post = (title, when, fresh) => { const li = el('li', fresh ? 'new' : ''); li.append(el('span', 'thumb')); const d = el('div'); d.append(el('b', '', title), el('small', '', when)); li.append(d); return li; };
+  function show(k) {
+    const s = sites[k];
+    $('site-url').textContent = s.url; $('site-icon').textContent = s.icon; $('site-name').textContent = s.name;
+    posts.replaceChildren(...s.old.map(([t, w]) => post(t, w, false)));
+  }
+  const lock = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  async function run(k, label) {
+    const s = sites[k]; show(k);
+    chips.forEach((c) => { c.disabled = true; });
+    body.replaceChildren(el('p', 'bubble', label));
+    await wait(500);
+    const work = el('div', 'work', `<span>일꾼 ${s.fresh.length}명이 쓰는 중</span>`);
+    s.fresh.forEach((_, i) => { const b = el('div', `bar${i ? ' late' : ''}`); b.append(el('i')); work.append(b); });
+    body.append(work);
+    await wait(2400);
+    work.querySelector('span').textContent = '다 썼어요';
+    const card = el('div', 'result', `<b>${s.name} · 초안 ${s.fresh.length}편</b><ul>${s.fresh.map((t) => `<li>${t}</li>`).join('')}</ul>`);
+    const row = el('div', 'row'), ok = el('button', 'btn primary', '승인하고 공개'), no = el('button', 'btn', '버리기');
+    ok.type = 'button'; no.type = 'button'; row.append(ok, no);
+    card.append(row, el('p', 'lock', `${lock}누르기 전엔 아무것도 공개되지 않아요`));
+    body.append(card); ok.focus({ preventScroll: true });
+    const done = async (approved) => {
+      ok.disabled = true; no.disabled = true;
+      if (approved) {
+        card.classList.add('sent');
+        await wait(350);
+        s.fresh.slice().reverse().forEach((t) => posts.prepend(post(t, '방금', true)));
+        body.append(el('p', 'note-line', '공개했어요'));
+      } else body.append(el('p', 'note-line', '아무것도 공개되지 않았어요'));
+      chips.forEach((c) => { c.disabled = false; });
+    };
+    ok.addEventListener('click', () => done(true)); no.addEventListener('click', () => done(false));
+  }
+  chips.forEach((c) => c.addEventListener('click', () => run(c.dataset.p, c.textContent)));
+  show('travel');
+})();
+
+// 4. 러너 구조
+(() => {
+  const svg = $('dg'), cap = $('dg-cap'), layer = $('dg-dots');
+  [['r-mine', 0], ['r-srv', 0.5], ['r-code', 1], ['r-mine', 1.1], ['r-srv', 1.6]].forEach(([id, b]) => travel(layer, id, 'dg-dot', 1.6, b));
+  const flow = {
+    core: '<b>Moida 서버</b> 규칙과 기록만. AI를 부르지 않아요',
+    srvrun: '<b>서버 러너</b> 일을 빌려 Claude Code · Codex로 처리해요',
+    browser: '<b>서버 브라우저</b> 사람이 화면을 보고 승인해요',
+    code: '<b>코드 러너 칸</b> 코드 · 문서 · 영상을 샌드박스에서',
+    proxy: '<b>나가는 프록시</b> 허용 목록으로만 나가요',
+    admin: '<b>관리자</b> 콘솔에서 맡기고 승인해요',
+    mine: '<b>내 컴퓨터</b> 내 폴더가 필요한 일 · 세션 저장',
+    out: '<b>허용한 바깥</b> GitHub 같은 정해진 곳만',
+  };
+  const sec = {
+    core: '<b>승인 게이트</b> 공개 · 전송 · 삭제는 관리자만. 앱 데이터는 행 수준 보안',
+    srvrun: '<b>작업 토큰</b> 그 일에 필요한 도구만 써요',
+    browser: '<b>비밀번호</b> 사람이 직접 넣고, 메모리에 10분만',
+    code: '<b>샌드박스</b> Docker 소켓 없음, 일마다 비워요',
+    proxy: '<b>허용 목록</b> allow.txt의 호스트로만 터널',
+    admin: '<b>로그인</b> 시도 제한 · Secure 쿠키 · 보안 기록',
+    mine: '<b>나가는 요청만</b> 러너에 들어오는 포트가 없어요',
+    out: '<b>그 밖은 막혀요</b> 목록에 없는 곳엔 닿지 못해요',
+  };
+  let mode = 'flow';
+  const nodes = [...svg.querySelectorAll('.dg-node')];
+  const pick = (g) => { nodes.forEach((n) => n.classList.toggle('on', n === g)); cap.innerHTML = (mode === 'sec' ? sec : flow)[g.dataset.k]; };
+  nodes.forEach((g) => { g.addEventListener('click', () => pick(g)); g.addEventListener('focus', () => pick(g)); g.addEventListener('mouseenter', () => pick(g)); });
+  const setMode = (m) => {
+    mode = m; svg.classList.toggle('sec', m === 'sec');
+    $('mode-flow').setAttribute('aria-pressed', String(m === 'flow')); $('mode-sec').setAttribute('aria-pressed', String(m === 'sec'));
+    const on = nodes.find((n) => n.classList.contains('on'));
+    cap.innerHTML = on ? (m === 'sec' ? sec : flow)[on.dataset.k] : m === 'sec' ? '파란 표시가 막는 자리예요. 상자를 눌러 보세요' : '상자를 눌러 보세요';
+  };
+  $('mode-flow').addEventListener('click', () => setMode('flow'));
+  $('mode-sec').addEventListener('click', () => setMode('sec'));
+  $('see-sec').addEventListener('click', () => { setMode('sec'); $('runner').scrollIntoView({ behavior: still ? 'auto' : 'smooth' }); });
+
+  // 일 하나가 지나는 길: 저절로 넘어가고, 누르면 멈춰서 그 단계
+  const steps = [
+    '서버에서 할 수 있는 일만 <b>빌려요</b>',
+    '작업 폴더 · 지시문 · 재료를 <b>준비</b>해요',
+    '공식 CLI를 <b>실행</b>해요. 도구는 그 일의 것만',
+    '<b>검사</b>에 떨어지면 AI가 한 번 더 고쳐요',
+    '결과물을 <b>올리고</b> 기록의 비밀은 가려요',
+    '결과 카드를 올리고 <b>승인</b>을 기다려요',
+  ];
+  const btns = [...document.querySelectorAll('#life button')], lifeCap = $('life-cap');
+  let at = 0, timer = 0;
+  const show = (i) => { at = i; btns.forEach((b, j) => b.classList.toggle('on', j === i)); lifeCap.innerHTML = steps[i]; };
+  btns.forEach((b, i) => b.addEventListener('click', () => { clearInterval(timer); show(i); }));
+  show(0);
+  if (!still) timer = setInterval(() => show((at + 1) % steps.length), 1900);
+})();
+
+// 5. 보안 카드 뒤집기
+document.querySelectorAll('.tile').forEach((t) => t.addEventListener('click', () => t.classList.toggle('flip')));
+
+// 6. 설치 명령 타자
+(() => {
+  const lines = ['git clone https://github.com/KangminNa/blog.git moida && cd moida', 'docker compose up -d --build', 'pnpm moida connect https://내도메인'];
+  const pre = $('cmd');
+  let typed = false;
+  const render = (done, partial) => {
+    pre.innerHTML = '';
+    done.forEach((l) => { const s = document.createElement('span'); s.innerHTML = `<span class="p">$ </span>`; s.append(l, '\n'); pre.append(s); });
+    if (partial !== null) { const s = document.createElement('span'); s.innerHTML = `<span class="p">$ </span>`; s.append(partial); const c = document.createElement('span'); c.className = 'caret'; s.append(c); pre.append(s); }
+  };
+  async function type() {
+    if (typed) return; typed = true;
+    if (still) { render(lines, null); return; }
+    const done = [];
+    for (const line of lines) {
+      for (let i = 1; i <= line.length; i++) { render(done, line.slice(0, i)); await wait(28); }
+      done.push(line); await wait(380);
+    }
+    render(done, '');
+  }
+  render([], '');
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) type(); }, { threshold: 0.4 }).observe(pre);
+  $('copy').addEventListener('click', async (e) => {
+    try { await navigator.clipboard.writeText(lines.join('\n')); e.target.textContent = '복사했어요'; }
+    catch { render(lines, null); const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); e.target.textContent = '선택했어요'; }
+    setTimeout(() => { e.target.textContent = '복사'; }, 1800);
+  });
+})();
+
+
+// 8. 에이전트 하나: 흔한 방식 ↔ Moida
+(() => {
+  const lines = $('one-lines'), dots = $('one-dots'), nodes = $('one-nodes'), cap = $('one-cap');
+  const MESS = {
+    nodes: [
+      { x: 110, y: 190, w: 120, m: [200, 300, 100], t: '나', c: 'me', say: '<b>내가 오가요</b>: 창마다 처음부터 설명하고, 결과는 내가 모아 붙여요' },
+      { x: 420, y: 60, w: 170, m: [110, 70, 170], t: '채팅 AI', s: '기억 따로', c: 'mess', say: '<b>채팅 AI</b>: 지난 대화를 모르고, 내 규칙도 몰라요' },
+      { x: 640, y: 110, w: 170, m: [295, 150, 170], t: '코딩 에이전트', s: '규칙 따로', c: 'mess', say: '<b>코딩 에이전트</b>: 저장소 안에서만 알고, 블로그 · 앱은 몰라요' },
+      { x: 450, y: 200, w: 170, m: [105, 450, 170], t: '브라우저 봇', s: '권한 따로', c: 'mess', say: '<b>브라우저 봇</b>: 로그인 · 비밀번호를 어디까지 맡길지 매번 고민해요' },
+      { x: 820, y: 210, w: 170, m: [295, 520, 160], t: '자동화 툴', s: '결과 따로', c: 'mess', say: '<b>자동화 툴</b>: 돌았는지 · 실패했는지 따로 찾아봐야 해요' },
+      { x: 600, y: 320, w: 170, m: [130, 590, 170], t: '플러그인 봇', s: '비용 따로', c: 'mess', say: '<b>플러그인 봇</b>: 어디서 얼마나 썼는지 합쳐 볼 곳이 없어요' },
+    ],
+    links: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 4], [2, 5], [3, 1]],
+    note: '창 다섯 개 · 기억 다섯 곳 · 승인은 내 머릿속',
+    first: '<b>흔한 방식</b>: 에이전트마다 기억 · 규칙 · 권한 · 결과가 따로라, 사람이 사이를 오가요',
+  };
+  const MOIDA = {
+    nodes: [
+      { x: 90, y: 190, w: 110, m: [200, 40, 110], t: '나', c: 'me', say: '<b>나</b>: 대화 한 곳에서 목적만 말하고, 결과 카드를 승인해요' },
+      { x: 300, y: 190, w: 150, m: [200, 140, 170], t: '대표', s: '내 기억 · 규칙', c: 'lead', say: '<b>대표</b>: 내 기억과 규칙을 들고, 일을 나누고, 받을 결과를 정해요' },
+      { x: 560, y: 70, w: 160, m: [105, 260, 175], t: '일꾼', s: 'Claude · 글', c: '', say: '<b>일꾼</b>: 모두 같은 일꾼이에요. 일마다 상한 안에서 모델을 골라요' },
+      { x: 560, y: 150, w: 160, m: [295, 260, 175], t: '일꾼', s: 'Codex · 코드', c: '', say: '<b>일꾼</b>: 코드는 샌드박스 칸에서, 허용한 곳으로만 나가요' },
+      { x: 560, y: 230, w: 160, m: [105, 345, 175], t: '일꾼', s: '브라우저', c: '', say: '<b>일꾼</b>: 서버 브라우저로 보고, 누르기 전에 확인을 받아요' },
+      { x: 560, y: 310, w: 160, m: [295, 345, 175], t: '검토 일꾼', s: '4점 기준', c: '', say: '<b>검토 일꾼</b>: 다른 일꾼이 완료 조건마다 점수를 매겨요' },
+      { x: 840, y: 190, w: 170, m: [200, 480, 190], t: '결과 카드', s: '승인 하나', c: 'lead', say: '<b>결과 카드</b>: 공개 · 전송 · 삭제는 내가 승인해야 실행돼요' },
+    ],
+    links: [[0, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 6], [3, 6], [4, 6], [5, 6]],
+    note: '창 하나 · 기억 한 곳 · 승인 한 번',
+    first: '<b>Moida</b>: 대표 하나와만 이야기하고, 일꾼들은 뒤에서 나눠 일한 뒤 카드 하나로 돌아와요',
+  };
+  const btnMess = $('one-mess'), btnMoida = $('one-moida');
+  let timer;
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.appendChild(e);
+    return e;
+  }
+  // 좁은 화면(폰)은 세로로 그린다: 노드마다 m: [x, y, 너비]
+  const narrowQuery = matchMedia('(max-width: 640px)');
+  let current = { plan: null, moida: false };
+  function draw(plan, moida) {
+    current = { plan, moida };
+    const narrow = narrowQuery.matches;
+    $('one-svg').setAttribute('viewBox', narrow ? '0 0 400 640' : '0 0 1000 380');
+    lines.innerHTML = ''; dots.innerHTML = ''; nodes.innerHTML = '';
+    const at = (n) => (narrow ? { x: n.m[0], y: n.m[1], w: n.m[2] } : { x: n.x, y: n.y, w: n.w });
+    plan.links.forEach(([a, b], i) => {
+      const p = at(plan.nodes[a]), q = at(plan.nodes[b]);
+      let d;
+      if (!moida) d = `M${p.x} ${p.y} Q${(p.x + q.x) / 2 + (i % 2 ? 80 : -80)} ${(p.y + q.y) / 2 + (i % 3 ? -70 : 70)} ${q.x} ${q.y}`;
+      else if (narrow) d = `M${p.x} ${p.y + 28} C${p.x} ${(p.y + q.y) / 2} ${q.x} ${(p.y + q.y) / 2} ${q.x} ${q.y - 28}`;
+      else {
+        const x1 = p.x + p.w / 2, x2 = q.x - q.w / 2;
+        d = `M${x1} ${p.y} C${(x1 + x2) / 2} ${p.y} ${(x1 + x2) / 2} ${q.y} ${x2} ${q.y}`;
+      }
+      el('path', { id: `one-l${i}`, d, class: moida ? 'o-line a' : 'o-line tangle' }, lines);
+      // 시작을 앞으로 당겨(음수) 처음부터 길 위에 있게 한다 (기다리는 동안 0,0에 보이지 않게)
+      travel(dots, `one-l${i}`, moida ? 'o-dot' : 'o-dot mess', moida ? 2.4 : 1.4 + (i % 3) * 0.7, moida ? -i * 0.25 : -i * 0.4);
+    });
+    plan.nodes.forEach((raw) => {
+      const n = { ...raw, ...at(raw) };
+      const g = el('g', { class: `o-node o-fade ${n.c}`, tabindex: '0', role: 'button', 'aria-label': `${n.t} ${n.s ?? ''}` }, nodes);
+      el('rect', { x: n.x - n.w / 2, y: n.y - 28, width: n.w, height: 56, rx: 16 }, g);
+      const t = el('text', { x: n.x, y: n.s ? n.y - 8 : n.y }, g); t.textContent = n.t;
+      if (n.s) { const s2 = el('text', { x: n.x, y: n.y + 12, class: 'sub' }, g); s2.textContent = n.s; }
+      const pick = () => { nodes.querySelectorAll('.o-node').forEach((x) => x.classList.remove('on')); g.classList.add('on'); cap.innerHTML = n.say; };
+      g.addEventListener('click', pick); g.addEventListener('mouseenter', pick);
+      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    });
+    const note = el('text', narrow ? { x: 200, y: 632, class: 'o-note' } : { x: 500, y: 372, class: 'o-note' }, nodes);
+    note.textContent = plan.note;
+    cap.innerHTML = plan.first;
+  }
+  function show(moida) {
+    btnMess.setAttribute('aria-pressed', String(!moida));
+    btnMoida.setAttribute('aria-pressed', String(moida));
+    draw(moida ? MOIDA : MESS, moida);
+  }
+  btnMess.addEventListener('click', () => { clearTimeout(timer); show(false); });
+  btnMoida.addEventListener('click', () => { clearTimeout(timer); show(true); });
+  narrowQuery.addEventListener('change', () => current.plan && draw(current.plan, current.moida));
+  show(false);
+  // 처음 보이면 잠시 뒤 Moida 쪽으로 넘어간다 (누르면 멈춘다)
+  if (!still) new IntersectionObserver((es, ob) => {
+    if (es.some((e) => e.isIntersecting)) { ob.disconnect(); timer = setTimeout(() => show(true), 3200); }
+  }, { threshold: 0.5 }).observe($('one-svg'));
+})();
+
+// 9. 나에게 맞추기: 엔진을 바꿔도 다섯 카드는 그대로
+(() => {
+  const engines = [['Claude Code', '공식 CLI · 내 구독'], ['Codex', '공식 CLI · 내 구독'], ['API 키', '남에게 여는 쓰임은 키로']];
+  let at = 0;
+  const slot = $('engine-slot'), cap = $('fit-cap'), tiles = [...document.querySelectorAll('#keeps .tile')];
+  cap.innerHTML = '<b>문제는 모델이 아니라 맞추기</b>: 얼마나 나에게 맞게 쥐고 다루느냐예요';
+  $('engine-swap').addEventListener('click', async () => {
+    at = (at + 1) % engines.length;
+    const [name, sub] = engines[at];
+    slot.innerHTML = `<div><b>${name}</b><span>${sub}</span></div>`;
+    cap.innerHTML = `엔진이 <b>${name}</b>(으)로 바뀌어도 기억 · 규칙 · 검증 · 한도 · 배움은 그대로예요`;
+    for (const t of tiles) { t.classList.add('pulse'); await wait(120); }
+    await wait(700);
+    tiles.forEach((t) => t.classList.remove('pulse'));
+  });
+})();
+
+// 10. 배포 · 관리: 어디서 하든 같은 버전 기록
+(() => {
+  const inBox = $('ship-in'), where = $('ship-where'), vers = $('vers'), cap = $('ship-cap');
+  const btns = [...document.querySelectorAll('[data-ship]')];
+  let next = 3;
+  const list = [
+    { v: 1, what: '처음 만든 앱', state: 'old' },
+    { v: 2, what: '지도 페이지 더함', state: 'live' },
+  ];
+  const render = () => {
+    vers.innerHTML = '';
+    for (const r of [...list].reverse()) {
+      const li = document.createElement('li');
+      if (r.state === 'live') li.className = 'live';
+      const label = { live: '공개', wait: '공개 대기', old: '지난 버전' }[r.state];
+      li.innerHTML = `<b>v${r.v}</b><span>${r.what}</span><em>${label}</em>`;
+      vers.appendChild(li);
+    }
+  };
+  // live면 바로 공개 (대화의 "배포해줘" · 콘솔의 공개), 아니면 공개 대기 (CLI로 올린 버전은 콘솔에서 공개)
+  const ship = (what, how, live = true) => {
+    if (live) list.forEach((r) => { if (r.state !== 'wait') r.state = 'old'; });
+    list.push({ v: next++, what, state: live ? 'live' : 'wait' });
+    render();
+    cap.innerHTML = `<b>${how}</b>: 새 버전이 쌓이고, 지난 버전은 지우지 않아 언제든 되돌려요`;
+  };
+  const VIEWS = {
+    chat: {
+      name: '대화',
+      draw: () => {
+        inBox.innerHTML = '<div class="bubble">여행 앱 표지 사진 바꿔서 배포해줘</div>';
+        const go = document.createElement('button'); go.className = 'go'; go.type = 'button'; go.textContent = '보내기';
+        go.addEventListener('click', async () => {
+          go.remove();
+          const r = document.createElement('div'); r.className = 'reply'; r.textContent = '일꾼이 고치는 중…'; inBox.appendChild(r);
+          await wait(900);
+          r.textContent = '"배포해줘"를 그대로 인용해 공개했어요. 지난 버전은 남겨 뒀어요.';
+          ship('표지 사진 바꿈', '대화로 배포');
+        });
+        inBox.appendChild(go);
+      },
+      first: '관리자가 대화에 직접 "배포해줘"라고 하면 그 말이 승인이에요',
+    },
+    cli: {
+      name: 'CLI',
+      draw: () => {
+        inBox.innerHTML = '<pre class="term"><i>$</i> pnpm cairn app deploy https://travel.moida.example ./dist</pre>';
+        const go = document.createElement('button'); go.className = 'go'; go.type = 'button'; go.textContent = '실행';
+        go.addEventListener('click', async () => {
+          go.remove();
+          const t = inBox.querySelector('.term');
+          t.innerHTML += '\n<i>올리는 중 · 42개 파일 · 1.8MB</i>';
+          await wait(800);
+          t.innerHTML += `\n<i>v${next} 올림 · 공개는 콘솔에서</i>`;
+          ship('내 컴퓨터에서 빌드', 'CLI로 올림', false);
+        });
+        inBox.appendChild(go);
+      },
+      first: '내 컴퓨터에서 빌드한 폴더를 그대로 올려요. 처음 한 번은 브라우저로 기기를 승인해요',
+    },
+    console: {
+      name: '콘솔',
+      draw: () => {
+        inBox.innerHTML = '';
+        const mock = document.createElement('div'); mock.className = 'mock';
+        mock.innerHTML = '<div><span>새 버전 올리기 (zip)</span><button type="button" class="primary">올리고 공개</button></div><div><span>도메인 travel.moida.example</span><button type="button">연결 확인</button></div><div><span>회원 · 앱 데이터 · 약관</span><button type="button">관리</button></div>';
+        const [up, dom, mgr] = mock.querySelectorAll('button');
+        up.addEventListener('click', () => ship('콘솔에서 zip 올림', '콘솔로 배포'));
+        dom.addEventListener('click', () => { cap.innerHTML = '<b>도메인</b>: 연결을 확인한 내 도메인으로 앱이 열려요'; });
+        mgr.addEventListener('click', () => { cap.innerHTML = '<b>앱 관리</b>: 회원 · 앱 데이터 · 약관 · 신고를 앱마다 한 화면에서'; });
+        inBox.appendChild(mock);
+      },
+      first: '앱마다 버전 · 도메인 · 회원 · 데이터 · 약관을 한 화면에서 봐요',
+    },
+  };
+  const open = (key) => {
+    btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ship === key)));
+    where.textContent = VIEWS[key].name;
+    VIEWS[key].draw();
+    cap.innerHTML = VIEWS[key].first;
+  };
+  btns.forEach((b) => b.addEventListener('click', () => open(b.dataset.ship)));
+  render();
+  open('chat');
+})();
+
+// 우리 앱 (이 서버의 공개 앱, 이 소개 앱은 빼고) · 구독 링크 · 이름
+(() => {
+  const list = $('apps-list'), others = (page.apps || []).filter((a) => !a.current);
+  if (!others.length) { $('apps').hidden = true; document.querySelector('.hero-grid').classList.add('solo'); }
+  others.slice(0, 9).forEach((a, i) => {
+    const li = document.createElement('li'), link = document.createElement('a'), icon = document.createElement('span'), name = document.createElement('span');
+    link.href = a.url; icon.className = `l-icon t${i % 3}`; name.className = 'l-name'; name.textContent = a.name;
+    if (a.iconUrl) { const img = document.createElement('img'); img.src = a.iconUrl; img.alt = ''; icon.append(img); }
+    else icon.textContent = (a.name || '?').slice(0, 1);
+    link.append(icon, name); li.append(link); list.append(li);
+  });
+  const store = page.site && page.site.store;
+  if (store) { $('apps-all').href = store; $('sub-link').href = `${store}#subscribe`; }
+  else { $('apps-all').hidden = true; $('sub-link').closest('.wrap').hidden = true; }
+  document.querySelectorAll('.brand, .foot strong').forEach((e) => { e.textContent = SITE_NAME; });
+  document.querySelector('.mark-text').textContent = SITE_NAME;
+})();
+
+// 같은 화면 안의 이동 (<base>가 앱 폴더라 #주소가 다른 주소로 가지 않게)
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  const id = a.getAttribute('href').slice(1), to = id ? document.getElementById(id) : document.body;
+  if (!to) return;
+  e.preventDefault(); to.scrollIntoView({ behavior: still ? 'auto' : 'smooth' });
+});
+</script>
+
+</body>
+</html>

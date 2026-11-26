@@ -27,6 +27,7 @@ import {
   DeployedCodeInput,
   PreviewCodeInput,
   ShowCodeInput,
+  StarterCodeInput,
   UploadCodeInput,
 } from './app-code.input';
 import { AppCodeQuery } from './app-code.query';
@@ -130,7 +131,7 @@ export class AppCodeController {
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<AppCodeStateView> {
-    return (await this.service.starter(actor, VersionInput.from(id, body))).view();
+    return (await this.service.starter(actor, StarterCodeInput.from(id, body))).view();
   }
 
   /** 미리 보기 주소 (토큰 30분). 본문 { seq? }: 없으면 보이는 버전, 0은 시작 코드 */

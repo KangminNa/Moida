@@ -288,3 +288,24 @@ export class AppCodeBaseInput extends BaseRequest {
     return BaseRequest.read(raw, (f) => new AppCodeBaseInput(f.uuid('task_id')));
   }
 }
+
+/**
+ * 시작 코드로 (POST api/apps/:id/code/starter): { version, template? }. template이 없으면 앱 종류의 시작 코드,
+ * 있으면 이름 있는 시작 화면 (2026-11-26, 지금은 intro: Moida 소개 페이지, 페이지 앱만). 이름은 AppStarterGateway.TEMPLATES 안에서만
+ */
+export class StarterCodeInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly version: number,
+    readonly template: string | null,
+  ) {
+    super();
+  }
+
+  static from(id: string, raw: unknown): StarterCodeInput {
+    return BaseRequest.read(
+      { ...(raw as object), id },
+      (f) => new StarterCodeInput(f.uuid('id'), f.version(), f.optionalText('template', 40)),
+    );
+  }
+}

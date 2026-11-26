@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef } from 'react';
 import { useSpace } from '../../../_account/live';
+import { INTRO_SLUG, makeIntroApp } from '../../../_blog/intro-app';
 import { useApps, usePages } from '../../../_blog/live';
 import type { AdminApp } from '../../../_blog/types';
+import { newRequestId } from '../../../_community/request-id';
 import { api, uploadFile } from '../../../_lib/client-api';
 import { useAction } from '../../../_lib/use-action';
 import { CHAT_HREF, STORE_HREF } from '../../menu';
@@ -23,11 +25,13 @@ export function StorePanel({ make }: { make: string | null }) {
   const apps = useApps();
   const pages = usePages();
   const save = useAction();
+  const intro = useAction();
   const sheet = make !== null;
   /** 이 화면에서 시트를 열었는가 (닫을 때 뒤로 갈 수 있는지) */
   const opened = useRef(false);
   const space = useSpace();
   const list = apps.data?.apps ?? [];
+  const introApp = list.find((a) => a.slug === INTRO_SLUG) ?? null;
   /** 공개 주소 앞부분: 사이트 주소에서 https:// 와 끝 / 를 뺀 것 */
   const origin = (space.data?.siteUrl ?? '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
@@ -49,6 +53,15 @@ export function StorePanel({ make }: { make: string | null }) {
       );
     router.replace(`${STORE_HREF}/${app.id}`);
     return true;
+  }
+
+  /** 소개 페이지: 만들고 공개하고 첫 화면으로 고정한 뒤 앱 관리로 */
+  async function makeIntro() {
+    const reply = await intro.run('intro', () => makeIntroApp(newRequestId()), {
+      done: '소개 페이지를 첫 화면으로 열었어요',
+      reload: apps.reload,
+    });
+    if (reply?.ok) router.push(`${STORE_HREF}/${reply.data.id}`);
   }
 
   function open() {
@@ -97,6 +110,33 @@ export function StorePanel({ make }: { make: string | null }) {
           </Link>
         </section>
       )}
+      <section className="panel stack" aria-label="소개 페이지">
+        <b>소개 페이지</b>
+        {introApp ? (
+          <>
+            <p>이 사이트와 Moida를 소개하는 첫 화면이 있음 ({introApp.name})</p>
+            <Link className="ghost" href={`${STORE_HREF}/${introApp.id}`}>
+              관리
+            </Link>
+          </>
+        ) : (
+          <>
+            <p>
+              Moida 소개 화면을 한 번에 만들어 공개하고 첫 화면으로 고정. 사이트 이름 · 공개한 앱이
+              저절로 들어가고, 나중에 대화에서 고치거나 zip으로 바꿀 수 있음
+            </p>
+            {intro.problem && <p className="error">{intro.problem}</p>}
+            <button
+              type="button"
+              className="ghost"
+              disabled={intro.busy !== null || apps.data === undefined}
+              onClick={makeIntro}
+            >
+              {intro.busy ? '만드는 중' : '소개 페이지 만들기'}
+            </button>
+          </>
+        )}
+      </section>
       <section className="panel stack" aria-label="화면 맡기기">
         <b>화면 맡기기</b>
         <p>

@@ -1268,6 +1268,37 @@ textarea.input {
   content: "· ";
 }
 
+/* 플러그인 카드의 쉬운 말 안내 (2026-11-26): 하는 일 · 설정 순서. 켜면 허락하는 기술 목록은 접어 둔다 */
+.plugin-does {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plugin-setup {
+  margin: 0;
+  padding: 12px 14px 12px 30px;
+  border-radius: 6px;
+  background: var(--raised);
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uses-box summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.uses-box[open] summary {
+  margin-bottom: 8px;
+}
+
 .row {
   display: flex;
   flex-wrap: wrap;
