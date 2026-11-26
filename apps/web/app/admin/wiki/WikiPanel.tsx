@@ -127,7 +127,7 @@ export function WikiPanel({ openId, view }: { openId: string | null; view: strin
             </form>
             {list.error && <p className="error">{list.error}</p>}
             {list.data === null ? (
-              !list.error && <p className="label-mono">불러오는 중…</p>
+              !list.error && <p className="label-mono loading">불러오는 중…</p>
             ) : list.data.wikis.length === 0 ? (
               <p className="rows-empty">{query ? '찾은 위키 없음' : '위키 없음'}</p>
             ) : (
@@ -229,7 +229,7 @@ function WikiView({
     ) : wiki.error ? (
       <p className="error">{wiki.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
 
   async function trash(version: number) {
@@ -326,7 +326,7 @@ function ScoreList({ openId }: { openId: string | null }) {
     SCORE_TOPICS,
   );
   if (board.error) return <p className="error">{board.error}</p>;
-  if (board.data === null) return <p className="label-mono">불러오는 중…</p>;
+  if (board.data === null) return <p className="label-mono loading">불러오는 중…</p>;
   if (board.data.groups.length === 0) return <p className="rows-empty">위키 없음</p>;
   return (
     <>
@@ -438,7 +438,7 @@ function StaleList({ openId }: { openId: string | null }) {
     SCORE_TOPICS,
   );
   if (board.error) return <p className="error">{board.error}</p>;
-  if (board.data === null) return <p className="label-mono">불러오는 중…</p>;
+  if (board.data === null) return <p className="label-mono loading">불러오는 중…</p>;
   const stale = board.data.groups
     .flatMap((g) => g.wikis)
     .filter((w) => w.stale)
@@ -481,7 +481,7 @@ function TrashList() {
   }
 
   if (trash.error) return <p className="error">{trash.error}</p>;
-  if (trash.data === null) return <p className="label-mono">불러오는 중…</p>;
+  if (trash.data === null) return <p className="label-mono loading">불러오는 중…</p>;
   if (trash.data.wikis.length === 0) return <p className="rows-empty">휴지통 비어 있음</p>;
   return (
     <>

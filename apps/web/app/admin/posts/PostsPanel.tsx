@@ -87,7 +87,7 @@ export function PostsPanel({ onMessage }: { onMessage: (text: string) => void })
       </div>
       {problem && <p className="error">{problem}</p>}
       {list === null ? (
-        <p className="label-mono">불러오는 중…</p>
+        <p className="label-mono loading">불러오는 중…</p>
       ) : list.posts.length === 0 ? (
         <p className="label-mono">{tab === 'trash' ? '휴지통이 비었어요' : '글 없음'}</p>
       ) : (

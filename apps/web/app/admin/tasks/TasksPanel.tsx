@@ -108,7 +108,7 @@ function TaskBoard({ agents }: { agents: readonly Agent[] }) {
     return board.error ? (
       <p className="error">{board.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
   const pages = board.data;
 

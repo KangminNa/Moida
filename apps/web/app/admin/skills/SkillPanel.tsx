@@ -37,7 +37,7 @@ export function SkillPanel() {
       </p>
       {error && <p className="error">{error}</p>}
       {list === null
-        ? !error && <p className="label-mono">불러오는 중…</p>
+        ? !error && <p className="label-mono loading">불러오는 중…</p>
         : list.map((skill) => (
             <section key={skill.name} className="plugin" aria-label={skill.name}>
               <div className="plugin-head">

@@ -148,7 +148,7 @@ export function UsageBlock({ usage }: { usage: Usage | null }) {
         </Link>
       </header>
       {usage === null ? (
-        <p className="rows-empty">불러오는 중…</p>
+        <p className="label-mono loading">불러오는 중…</p>
       ) : rows.length === 0 ? (
         <p className="rows-empty">아직 없음. 대화에서 일을 맡기면 여기에 쌓여요</p>
       ) : (

@@ -6,6 +6,7 @@ import { api } from '../_lib/client-api';
 import { useLiveValue } from '../_lib/use-live';
 import type { Notification, NotificationList } from '../_platform/types';
 import { Icon } from '../_ui/Icon';
+import { Tick } from '../_ui/Tick';
 
 /** 알림이 남거나 읽히면 오는 변경 신호 */
 const TOPICS = ['platform.notification'];
@@ -69,7 +70,7 @@ export function NotificationBell() {
         </span>
         {unread > 0 && (
           <span className="dock-count" aria-hidden="true">
-            {unread}
+            <Tick value={unread} />
           </span>
         )}
       </button>

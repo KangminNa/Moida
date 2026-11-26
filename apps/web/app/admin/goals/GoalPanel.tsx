@@ -87,7 +87,7 @@ export function GoalPanel() {
         />
       )}
       {list === undefined ? (
-        !goals.error && <p className="label-mono">불러오는 중…</p>
+        !goals.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         open === null && (
           <div className="panel">
@@ -213,7 +213,7 @@ function GoalTasks({ goalId }: { goalId: string }) {
     goalId,
   );
   if (tasks.error) return <p className="error">{tasks.error}</p>;
-  if (tasks.data === null) return <p className="label-mono">불러오는 중…</p>;
+  if (tasks.data === null) return <p className="label-mono loading">불러오는 중…</p>;
   if (tasks.data.tasks.length === 0)
     return <p className="note">이어진 작업 없음. 작업을 맡길 때 이 목표를 고르면 여기에 보여요</p>;
   return (

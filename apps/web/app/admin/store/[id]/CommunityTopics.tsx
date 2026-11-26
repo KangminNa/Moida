@@ -56,7 +56,7 @@ export function CommunityTopics({ appId }: { appId: string }) {
         <p className="error">{action.problem ?? topics.error}</p>
       )}
       {items === null ? (
-        !topics.error && <p className="label-mono">불러오는 중…</p>
+        !topics.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">글 없음</p>
       ) : (
@@ -112,7 +112,7 @@ function TopicDetail({
     return topic.error ? (
       <p className="error">{topic.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
   const reload = () => Promise.all([topic.reload(), onDecided()]);
   return (

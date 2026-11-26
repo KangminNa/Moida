@@ -165,7 +165,7 @@ export function OutputPanel({ taskId }: { taskId: string | null }) {
         tab !== 'trash' && <OutputSharePanel output={null} />
       )}
       {page === null ? (
-        !error && <p className="label-mono">불러오는 중…</p>
+        !error && <p className="label-mono loading">불러오는 중…</p>
       ) : page.outputs.length === 0 ? (
         <p className="rows-empty">{tab === 'trash' ? '휴지통이 비었어요' : '결과물 없음'}</p>
       ) : (

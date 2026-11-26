@@ -70,7 +70,7 @@ export function AccountList() {
         <p className="error">{action.problem ?? accounts.error}</p>
       )}
       {items === null ? (
-        !accounts.error && <p className="label-mono">불러오는 중…</p>
+        !accounts.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">회원 계정 없음</p>
       ) : (

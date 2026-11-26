@@ -52,7 +52,7 @@ export function AiPanel() {
       {tools.error && <p className="error">{tools.error}</p>}
       {tools.data
         ? tools.data.tools.map((tool) => <ToolCard key={tool.tool} tool={tool} reload={reload} />)
-        : !tools.error && <p className="label-mono">불러오는 중…</p>}
+        : !tools.error && <p className="label-mono loading">불러오는 중…</p>}
       <p className="note">
         로그인은 러너가 돌려요. 러너가 꺼져 있으면 시작되지 않아요 ·{' '}
         <Link href="/admin/runners">러너 메뉴</Link>

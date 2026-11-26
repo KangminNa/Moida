@@ -34,7 +34,7 @@ export function GoalRunPanel({ id }: { id: string }) {
         ) : run.error ? (
           <p className="error">{run.error}</p>
         ) : (
-          <p className="label-mono">불러오는 중…</p>
+          <p className="label-mono loading">불러오는 중…</p>
         )}
       </>
     );

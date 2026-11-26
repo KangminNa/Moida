@@ -72,7 +72,7 @@ export function AppPanel({ id, tab: asked }: { id: string; tab: AppTab }) {
         없는 앱 · <Link href={STORE_HREF}>내 앱</Link>
       </p>
     ) : (
-      !problem && <p className="label-mono">불러오는 중…</p>
+      !problem && <p className="label-mono loading">불러오는 중…</p>
     );
 
   const tabs = tabsOf(app);

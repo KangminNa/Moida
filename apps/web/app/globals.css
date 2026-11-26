@@ -787,6 +787,74 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
   font-variant-numeric: tabular-nums;
 }
 
+/* 불러오는 틀 (2026-11-26 콘솔 인터랙션 5): "불러오는 중…" 줄 자리에 길이가 다른 회색 막대 셋이 천천히 숨 쉰다.
+   글자는 투명하게 남아 화면 읽기 프로그램에는 그대로 읽힌다. 빨리 끝나면 깜빡이지 않게 0.15초 뒤에 나타난다 */
+.loading {
+  position: relative;
+  height: 56px;
+  margin: 4px 0;
+  overflow: hidden;
+  color: transparent;
+  user-select: none;
+}
+
+.loading::before,
+.loading::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--line);
+  animation:
+    loading-in 0.2s 0.15s backwards,
+    loading-breathe 1.4s 0.35s ease-in-out infinite;
+}
+
+.loading::before {
+  top: 0;
+  width: 100%;
+  box-shadow: 0 22px 0 var(--line);
+}
+
+.loading::after {
+  top: 44px;
+  width: 56%;
+}
+
+@keyframes loading-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes loading-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* 숫자가 바뀌면 새 값이 아래에서 올라온다 (_ui/Tick) */
+.tick {
+  display: inline-block;
+  animation: tick-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes tick-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading::before,
+  .loading::after,
+  .tick {
+    animation: none;
+  }
+}
+
 /* 설치·로그인처럼 메뉴가 없는 화면의 머리 */
 .top {
   position: fixed;

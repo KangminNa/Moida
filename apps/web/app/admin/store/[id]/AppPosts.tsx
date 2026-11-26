@@ -37,7 +37,7 @@ export function AppPosts({ app }: { app: AdminApp }) {
       </div>
       {posts.error && <p className="error">{posts.error}</p>}
       {list === null ? (
-        !posts.error && <p className="label-mono">불러오는 중…</p>
+        !posts.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">이 앱의 글 없음 · 보관함 › 글에서 앱으로 옮길 수 있음</p>
       ) : (

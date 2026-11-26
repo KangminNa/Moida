@@ -58,7 +58,7 @@ export function SecurityEventsPanel() {
       </div>
       {list.error && <p className="error">{list.error}</p>}
       {!page ? (
-        !list.error && <p className="label-mono">불러오는 중…</p>
+        !list.error && <p className="label-mono loading">불러오는 중…</p>
       ) : page.events.length === 0 ? (
         <p className="rows-empty">기록 없음</p>
       ) : (

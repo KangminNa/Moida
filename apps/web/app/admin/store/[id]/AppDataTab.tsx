@@ -54,7 +54,7 @@ export function AppDataTab({ app }: { app: AdminApp }) {
         </a>
       </div>
       {list === null ? (
-        !tables.error && <p className="label-mono">불러오는 중…</p>
+        !tables.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">표 없음 · 앱 코드의 cairn.json에 tables를 선언하면 생겨요</p>
       ) : (
@@ -138,7 +138,7 @@ function AppDataRows({
       <b>{table.name}</b>
       {rows.error && <p className="error">{rows.error}</p>}
       {items === null ? (
-        !rows.error && <p className="label-mono">불러오는 중…</p>
+        !rows.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">줄 없음</p>
       ) : (

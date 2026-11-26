@@ -48,7 +48,7 @@ export function AppsPanel() {
       </p>
       {apps.error && <p className="error">{apps.error}</p>}
       {list === null ? (
-        !apps.error && <p className="label-mono">불러오는 중…</p>
+        !apps.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">앱 없음</p>
       ) : (

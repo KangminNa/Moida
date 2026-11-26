@@ -42,7 +42,7 @@ export function PageDetailPanel({ id }: { id: string }) {
     return problem ? (
       <p className="error">{problem}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
 
   const path = pagePath(p.name);

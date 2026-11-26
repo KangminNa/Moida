@@ -101,7 +101,7 @@ export function SecurityPanel() {
           )}
         </div>
         {!list ? (
-          !sessions.error && <p className="label-mono">불러오는 중…</p>
+          !sessions.error && <p className="label-mono loading">불러오는 중…</p>
         ) : (
           <ul className="list">
             {list.sessions.map((s) => (

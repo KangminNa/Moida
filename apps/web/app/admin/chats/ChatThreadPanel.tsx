@@ -13,6 +13,7 @@ import { ChatCardForm } from '../../_task/ChatCardForm';
 import { scheduleLabel, tokens } from '../../_task/labels';
 import { CHAT_DETAIL_TOPICS, CHAT_LOG_TOPICS, useLead } from '../../_task/live';
 import type { Chat, ChatDetail, ChatNews, OutputSaved } from '../../_task/types';
+import { Tick } from '../../_ui/Tick';
 import { STORE_HREF } from '../menu';
 import { ChatBriefForm } from './ChatBriefForm';
 import { changeMessage, type Decision } from './ChatDecisions';
@@ -84,7 +85,7 @@ export function ChatThreadPanel({
     ) : detail.error ? (
       <p className="error">{detail.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
 
   // 상대가 없으면(O-2 전에 맡기 전이던 대화) 보내는 말에 대표가 맡는다
@@ -224,7 +225,7 @@ export function ChatThreadPanel({
               className="chat-tokens"
               title="이 대화의 일이 쓴 토큰 (설정 › AI 한도와 같은 수)"
             >
-              토큰 {tokens(d.usage.tokens)}
+              토큰 <Tick value={tokens(d.usage.tokens)} />
             </small>
           )}
           {d.chat.deviceId && <span className="pill">기기에서</span>}

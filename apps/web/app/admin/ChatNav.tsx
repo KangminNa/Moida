@@ -27,7 +27,7 @@ export function ChatNav({ pathname }: { pathname: string | null }) {
     <nav className="chat-nav" aria-label="대화">
       {list.error && <p className="error">{list.error}</p>}
       {chats === null ? (
-        !list.error && <p className="label-mono">불러오는 중…</p>
+        !list.error && <p className="label-mono loading">불러오는 중…</p>
       ) : chats.length === 0 ? (
         <p className="note">아직 대화 없음</p>
       ) : (

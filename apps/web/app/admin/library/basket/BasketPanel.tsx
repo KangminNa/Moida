@@ -196,7 +196,7 @@ export function BasketPanel() {
       )}
 
       {items === null ? (
-        !error && <p className="label-mono">불러오는 중…</p>
+        !error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="label-mono">스크랩 없음</p>
       ) : (

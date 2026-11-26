@@ -125,7 +125,7 @@ export function AppPreviewPanel({ id, seq }: { id: string; seq: number | null })
           sandbox={FRAME_SANDBOX}
         />
       ) : (
-        !problem && <p className="label-mono">불러오는 중…</p>
+        !problem && <p className="label-mono loading">불러오는 중…</p>
       )}
     </>
   );

@@ -91,7 +91,7 @@ export function TaskList({ filter, agents }: { filter: string; agents: readonly 
         </div>
       )}
       {list.data === null ? (
-        !list.error && <p className="label-mono">불러오는 중…</p>
+        !list.error && <p className="label-mono loading">불러오는 중…</p>
       ) : tasks.length === 0 ? (
         <p className="rows-empty">
           {trash ? '휴지통이 비었어요' : `${TASK_STATUS[filter]} 작업 없음`}

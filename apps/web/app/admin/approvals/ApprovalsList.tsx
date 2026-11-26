@@ -121,7 +121,7 @@ function TaskApprovals({ filter, children }: { filter: string; children: ReactNo
       <div className={id ? 'split picked' : 'split'}>
         <div className="split-list">
           {list.data === null ? (
-            !list.error && <p className="label-mono">불러오는 중…</p>
+            !list.error && <p className="label-mono loading">불러오는 중…</p>
           ) : empty ? (
             <p className="rows-empty">
               {filter === ALL ? '승인 없음' : `${APPROVAL_STATUS[filter]} 승인 없음`}

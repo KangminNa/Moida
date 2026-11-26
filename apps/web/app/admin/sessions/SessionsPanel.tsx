@@ -103,7 +103,7 @@ export function SessionsPanel({ initialId }: { initialId: string | null }) {
       )}
       {list.error && <p className="error">{list.error}</p>}
       {sessions === null ? (
-        <p className="label-mono">불러오는 중…</p>
+        <p className="label-mono loading">불러오는 중…</p>
       ) : sessions.length === 0 ? (
         <div className="result">
           <b>저장한 세션 없음</b>

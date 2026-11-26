@@ -105,7 +105,7 @@ export function MenuIssuesPanel({ appId, menuId }: { appId: string; menuId: stri
         onEdit={add.clear}
       />
       {list === null ? (
-        !problem && <p className="label-mono">불러오는 중…</p>
+        !problem && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">호 없음</p>
       ) : (

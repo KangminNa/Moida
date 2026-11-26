@@ -37,7 +37,7 @@ export function DeletedAgents({
         <p className="error">{deleted.error ?? action.problem}</p>
       )}
       {list === undefined ? (
-        !deleted.error && <p className="label-mono">불러오는 중…</p>
+        !deleted.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="note">휴지통 비어 있음</p>
       ) : (

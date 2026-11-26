@@ -39,7 +39,7 @@ export function NoticesPanel() {
       <PushBox />
       {problem && <p className="error">{problem}</p>}
       {settings.data === null ? (
-        !problem && <p className="label-mono">불러오는 중…</p>
+        !problem && <p className="label-mono loading">불러오는 중…</p>
       ) : (
         <NoticeForm
           key={settings.data.version}

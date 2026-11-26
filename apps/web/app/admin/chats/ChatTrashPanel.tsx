@@ -30,7 +30,7 @@ export function ChatTrashPanel() {
   }
 
   if (trash.error) return <p className="error">{trash.error}</p>;
-  if (trash.data === null) return <p className="label-mono">불러오는 중…</p>;
+  if (trash.data === null) return <p className="label-mono loading">불러오는 중…</p>;
   if (trash.data.chats.length === 0) return <p className="rows-empty">휴지통 비어 있음</p>;
   return (
     <>
