@@ -132,7 +132,7 @@ export function DevicesPanel({
         </div>
       )}
       {devices === null ? (
-        <p className="label-mono">불러오는 중…</p>
+        <p className="label-mono loading">불러오는 중…</p>
       ) : live.length === 0 ? (
         <p className="label-mono">연결한 기기 없음</p>
       ) : (

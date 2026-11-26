@@ -80,7 +80,7 @@ export function AppMenus({ app }: { app: AdminApp }) {
       {problem && <p className="error">{problem}</p>}
       {open === NEW && form(null)}
       {list === null ? (
-        !problem && <p className="label-mono">불러오는 중…</p>
+        !problem && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">메뉴 없음</p>
       ) : (

@@ -97,7 +97,7 @@ export function RunnerPanel() {
         </p>
       )}
       {rows === null ? (
-        !error && <p className="label-mono">불러오는 중…</p>
+        !error && <p className="label-mono loading">불러오는 중…</p>
       ) : rows.length === 0 ? (
         <div className="panel">
           <b>러너 없음</b>

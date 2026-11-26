@@ -18,7 +18,7 @@ export function PageChangesPanel({ id, seq }: { id: string; seq: number }) {
     return read.error ? (
       <p className="error">{read.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
   if (!c.data) return <small>data.json 없음</small>;
   if (c.changes.length === 0) return <small>버전 {c.base}와 같은 데이터</small>;

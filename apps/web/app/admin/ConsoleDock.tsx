@@ -1,5 +1,6 @@
 import { Icon } from '../_ui/Icon';
 import { MoidaMark } from '../_ui/MoidaMark';
+import { Tick } from '../_ui/Tick';
 import { APPROVALS_HREF, CHAT_HREF, DOCK, SETTINGS_SECTION } from './menu';
 import { NotificationBell } from './NotificationBell';
 
@@ -44,7 +45,7 @@ export function ConsoleDock({
           {s.href === APPROVALS_HREF && pendingCount && (
             <span className="dock-count">
               <span className="sr">대기 </span>
-              {pendingCount}
+              <Tick value={pendingCount} />
               <span className="sr">건</span>
             </span>
           )}

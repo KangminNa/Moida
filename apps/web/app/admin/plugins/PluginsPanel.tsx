@@ -13,7 +13,7 @@ export function PluginsPanel({ onMessage }: { onMessage: (text: string) => void 
   const plugins = read.data?.plugins ?? null;
 
   if (read.error) return <p className="error">{read.error}</p>;
-  if (!plugins) return <p className="label-mono">불러오는 중…</p>;
+  if (!plugins) return <p className="label-mono loading">불러오는 중…</p>;
   if (plugins.length === 0) return <p className="label-mono">설치된 플러그인 없음</p>;
   return (
     <div>

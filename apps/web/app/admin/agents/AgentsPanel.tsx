@@ -148,7 +148,7 @@ export function AgentsPanel({ adding }: { adding: boolean }) {
         />
       )}
       {list === undefined ? (
-        !agents.error && <p className="label-mono">불러오는 중…</p>
+        !agents.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         open !== NEW && (
           <>

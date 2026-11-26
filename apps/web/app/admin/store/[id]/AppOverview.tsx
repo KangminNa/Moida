@@ -75,7 +75,7 @@ export function AppOverview({ app }: { app: AdminApp }) {
         <b>이 앱의 대화</b>
         {chats.error && <p className="error">{chats.error}</p>}
         {talks === null ? (
-          !chats.error && <p className="label-mono">불러오는 중…</p>
+          !chats.error && <p className="label-mono loading">불러오는 중…</p>
         ) : talks.length === 0 ? (
           <p className="rows-empty">아직 대화 없음 · 위에서 맡기기</p>
         ) : (
@@ -121,7 +121,7 @@ export function AppOverview({ app }: { app: AdminApp }) {
           </div>
           {posts.error && <p className="error">{posts.error}</p>}
           {recent === null ? (
-            !posts.error && <p className="label-mono">불러오는 중…</p>
+            !posts.error && <p className="label-mono loading">불러오는 중…</p>
           ) : recent.length === 0 ? (
             <p className="rows-empty">이 앱의 글 없음</p>
           ) : (

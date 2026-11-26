@@ -163,7 +163,7 @@ export function SessionPanel({
           )}
         </>
       ) : (
-        !error && <p className="label-mono">불러오는 중…</p>
+        !error && <p className="label-mono loading">불러오는 중…</p>
       )}
     </div>
   );

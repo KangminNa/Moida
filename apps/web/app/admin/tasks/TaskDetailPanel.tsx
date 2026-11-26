@@ -72,7 +72,7 @@ export function TaskDetailPanel({ id }: { id: string }) {
         ) : task.error ? (
           <p className="error">{task.error}</p>
         ) : (
-          <p className="label-mono">불러오는 중…</p>
+          <p className="label-mono loading">불러오는 중…</p>
         )}
       </>
     );

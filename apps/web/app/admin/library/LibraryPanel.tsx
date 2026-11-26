@@ -229,7 +229,7 @@ export function LibraryPanel() {
         </div>
       )}
       {items === null ? (
-        !list.error && <p className="label-mono">불러오는 중…</p>
+        !list.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <div className="result">
           <b>보관한 것 없음</b>

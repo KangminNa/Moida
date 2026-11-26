@@ -49,7 +49,7 @@ export function ToolTextPanel() {
       />
       {tools.error && <p className="error">{tools.error}</p>}
       {shown === null
-        ? !tools.error && <p className="label-mono">불러오는 중…</p>
+        ? !tools.error && <p className="label-mono loading">불러오는 중…</p>
         : shown.map((tool) => (
             <section key={tool.name} className="plugin" aria-label={tool.name}>
               <div className="plugin-head">

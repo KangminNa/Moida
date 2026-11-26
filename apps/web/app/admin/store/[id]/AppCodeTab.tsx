@@ -38,7 +38,7 @@ export function AppCodeTab({ app }: { app: AdminApp }) {
     return problem ? (
       <p className="error">{problem}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
 
   const show = (shown: AppCode, seq: number) =>

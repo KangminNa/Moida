@@ -55,7 +55,7 @@ export function CommunityReports({ appId }: { appId: string }) {
         <p className="error">{action.problem ?? reports.error}</p>
       )}
       {items === null ? (
-        !reports.error && <p className="label-mono">불러오는 중…</p>
+        !reports.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">{state === 'open' ? '열린 신고 없음' : '신고 없음'}</p>
       ) : (

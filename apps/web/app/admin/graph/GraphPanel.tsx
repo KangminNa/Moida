@@ -12,7 +12,7 @@ export function GraphPanel() {
         {graph.error ? (
           <p className="error">{graph.error}</p>
         ) : (
-          <p className="label-mono">불러오는 중…</p>
+          <p className="label-mono loading">불러오는 중…</p>
         )}
       </section>
     );

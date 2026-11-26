@@ -128,7 +128,7 @@ export function ApiConnectorPanel() {
         <p className="error">{action.problem ?? connectors.error}</p>
       )}
       {list === null ? (
-        !connectors.error && <p className="label-mono">불러오는 중…</p>
+        !connectors.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">
           API 커넥터 없음. 대화에서 "○○ 붙여줘"라고 하면 일꾼이 찾아 제안해요
@@ -247,7 +247,7 @@ function RecentCalls({ connector }: { connector: ApiConnector }) {
   );
   if (calls.error) return <p className="error">{calls.error}</p>;
   const list = calls.data?.calls ?? null;
-  if (list === null) return <p className="label-mono">불러오는 중…</p>;
+  if (list === null) return <p className="label-mono loading">불러오는 중…</p>;
   if (list.length === 0) return <p className="rows-empty">부른 적 없음</p>;
   return (
     <ul className="list" aria-label={`${connector.title} 최근 부르기`}>

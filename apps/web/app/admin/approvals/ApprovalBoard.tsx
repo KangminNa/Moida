@@ -91,7 +91,7 @@ export function ApprovalBoard() {
     return list.error ? (
       <p className="error">{list.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
   const pending = list.data.approvals;
   if (pending.length === 0) return <p className="rows-empty">승인할 것 없음</p>;

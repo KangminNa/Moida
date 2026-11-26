@@ -64,7 +64,7 @@ export function ApprovalDetail({ id }: { id: string }) {
     ) : approval.error ? (
       <p className="error">{approval.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
 
   return (

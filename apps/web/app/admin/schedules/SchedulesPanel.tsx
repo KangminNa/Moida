@@ -107,7 +107,7 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
         />
       )}
       {list === null ? (
-        !problem && <p className="label-mono">불러오는 중…</p>
+        !problem && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">스케줄 없음</p>
       ) : (

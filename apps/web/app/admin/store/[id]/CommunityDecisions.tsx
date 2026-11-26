@@ -26,7 +26,7 @@ export function CommunityDecisions({ appId }: { appId: string }) {
     <section className="stack" aria-label="결정 기록">
       {decisions.error && <p className="error">{decisions.error}</p>}
       {items === null ? (
-        !decisions.error && <p className="label-mono">불러오는 중…</p>
+        !decisions.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">기록 없음</p>
       ) : (

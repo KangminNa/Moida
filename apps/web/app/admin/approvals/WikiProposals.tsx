@@ -41,7 +41,7 @@ export function WikiProposals() {
     return waiting.error ? (
       <p className="error">{waiting.error}</p>
     ) : (
-      <p className="label-mono">불러오는 중…</p>
+      <p className="label-mono loading">불러오는 중…</p>
     );
   if (waiting.data.changes.length === 0)
     return <p className="rows-empty">기다리는 위키 제안 없음</p>;

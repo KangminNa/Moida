@@ -92,7 +92,7 @@ export function CommunityMembers({ appId }: { appId: string }) {
         <p className="error">{action.problem ?? members.error}</p>
       )}
       {items === null ? (
-        !members.error && <p className="label-mono">불러오는 중…</p>
+        !members.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">회원 없음</p>
       ) : (

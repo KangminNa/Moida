@@ -73,7 +73,7 @@ export function GoalRunsPanel() {
         />
       )}
       {list === undefined ? (
-        !runs.error && <p className="label-mono">불러오는 중…</p>
+        !runs.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="note">
           맡긴 목표 실행 없음. 맡은 에이전트가 회차마다 보고해요. 정한 때와 끝에는 승인이 와요

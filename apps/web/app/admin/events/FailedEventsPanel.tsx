@@ -51,7 +51,7 @@ export function FailedEventsPanel() {
       {list.error && <p className="error">{list.error}</p>}
       {action.problem && <p className="error">{action.problem}</p>}
       {!items ? (
-        !list.error && <p className="label-mono">불러오는 중…</p>
+        !list.error && <p className="label-mono loading">불러오는 중…</p>
       ) : items.length === 0 ? (
         <p className="rows-empty">멈춘 일 없음</p>
       ) : (
