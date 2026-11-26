@@ -8,6 +8,7 @@ import {
   Database,
   Leases,
   NotFound,
+  RuleViolation,
   SecretBox,
   ZipFile,
 } from '../../platform';
@@ -184,6 +185,15 @@ export class AppCodeQuery extends BaseQuery {
   /** 배포 표를 연다 (PUT …/code/versions). 없거나 · 틀리거나 · 끝났으면 403 */
   async deployOf(_actor: Actor, token: string | null, now: Date): Promise<DeployTicket> {
     return DeployTicket.open(this.box, token, now);
+  }
+
+  /**
+   * 이름 있는 시작 화면 한 벌 (StarterCodeInput.template). 페이지 앱에만, 없는 이름이면 422
+   */
+  templateOf(_actor: Actor, app: Readonly<AppRow>, name: string): AppCodeFiles {
+    const files = app.kind === 'page' ? this.starters.template(name) : null;
+    if (!files) throw new RuleViolation('이 앱에 쓸 수 없는 시작 화면이에요');
+    return AppCodeFiles.starter(files);
   }
 
   /**

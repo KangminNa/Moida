@@ -91,6 +91,13 @@ function PluginRow({
             {plugin.version} · {status}
           </span>
           <p>{plugin.description}</p>
+          {plugin.guide.does.length > 0 && (
+            <ul className="plugin-does" aria-label="하는 일">
+              {plugin.guide.does.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
         </div>
         <button
           type="button"
@@ -103,11 +110,15 @@ function PluginRow({
         />
       </div>
       {plugin.useLabels.length > 0 && (!plugin.enabled || plugin.needsGrant.length > 0) && (
-        <ul className="uses" aria-label="켜면 허락하는 것">
-          {plugin.useLabels.map((label) => (
-            <li key={label}>{label}</li>
-          ))}
-        </ul>
+        // 켜는 순간 허락하는 것 (기술적인 목록이라 접어 두고, 켜기 전 · 다시 허락할 때만 보인다)
+        <details className="uses-box">
+          <summary>켜면 허락하는 것 {plugin.useLabels.length}가지 (자세히)</summary>
+          <ul className="uses" aria-label="켜면 허락하는 것">
+            {plugin.useLabels.map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
+        </details>
       )}
       {plugin.enabled && plugin.problem && (
         <p className="error">동작하지 못해요: {plugin.problem}</p>
@@ -117,6 +128,13 @@ function PluginRow({
         <button type="button" className="ghost" onClick={fold} aria-expanded={open}>
           설정 {open ? '접기' : '열기'}
         </button>
+      )}
+      {open && plugin.guide.setup.length > 0 && (
+        <ol className="plugin-setup" aria-label="설정 순서">
+          {plugin.guide.setup.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ol>
       )}
       {open && (
         <SettingsForm

@@ -15,7 +15,13 @@ export class AppStarterGateway extends BaseGateway {
   private static readonly ALONE: readonly AppKind[] = ['page'];
   /** 폴더 없는 파일 이름만 (PageFiles와 같은 규칙) */
   private static readonly NAME = /^[^/\\.][^/\\]{0,119}$/;
+  /**
+   * 이름 있는 시작 화면 (2026-11-26): 종류의 시작 코드 대신 고를 수 있는 완성된 화면. 페이지 앱(정적)에만 둔다.
+   *   intro: Moida 소개 페이지 (사이트 이름 · 이 서버의 공개 앱을 cairn-data에서 읽는다). 설치하면 첫 화면으로 만든다
+   */
+  static readonly TEMPLATES: readonly string[] = ['intro'];
   private readonly cache = new Map<AppKind, ReadonlyMap<string, Buffer>>();
+  private readonly templates = new Map<string, ReadonlyMap<string, Buffer>>();
 
   constructor(private readonly dir: string) {
     super();
@@ -33,6 +39,16 @@ export class AppStarterGateway extends BaseGateway {
     const merged = new Map([...base, ...this.read(kind)]);
     const files = new Map([...merged].sort(([a], [b]) => a.localeCompare(b)));
     this.cache.set(kind, files);
+    return files;
+  }
+
+  /** 이름 있는 시작 화면의 파일 (이름 순). TEMPLATES에 없는 이름이면 null */
+  template(name: string): ReadonlyMap<string, Buffer> | null {
+    if (!AppStarterGateway.TEMPLATES.includes(name)) return null;
+    const cached = this.templates.get(name);
+    if (cached) return cached;
+    const files = new Map([...this.read(name)].sort(([a], [b]) => a.localeCompare(b)));
+    this.templates.set(name, files);
     return files;
   }
 

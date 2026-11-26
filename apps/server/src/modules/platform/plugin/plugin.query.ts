@@ -126,6 +126,7 @@ export class PluginQuery extends BaseQuery {
         .actions()
         .filter((a) => a.plugin === m.name)
         .map((a) => new PluginActionView(a.name, a.action.label)),
+      { does: m.guideDoes, setup: m.guideSetup },
     );
   }
 }

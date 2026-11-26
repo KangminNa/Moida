@@ -556,6 +556,30 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
     assert.ok((detail.files as Json[]).some((f) => f.name === 'issue.html'));
   });
 
+  test('시작 화면 intro (소개 페이지): 페이지 앱에만, 새 버전 하나로 (이름 없는 · 다른 종류는 422)', async () => {
+    const page = await newApp(`code-intro-${mark}`, 'page');
+    const made = ok(
+      await api.request('POST', `/api/apps/${page.id}/code/starter`, owner, {
+        version: (await appOf(page.id)).version,
+        template: 'intro',
+      }),
+    );
+    assert.deepEqual([made.current, made.latest], [1, 1]);
+    const names = ((await code(page)).files as Json[]).map((f) => f.name).sort();
+    assert.deepEqual(names, ['cairn.json', 'icon.svg', 'index.html']);
+    const wrong = await api.request('POST', `/api/apps/${page.id}/code/starter`, owner, {
+      version: (await appOf(page.id)).version,
+      template: 'nope',
+    });
+    assert.equal(wrong.status, 422, wrong.text);
+    const blog = await newApp(`code-intro-b-${mark}`);
+    const notPage = await api.request('POST', `/api/apps/${blog.id}/code/starter`, owner, {
+      version: (await appOf(blog.id)).version,
+      template: 'intro',
+    });
+    assert.equal(notPage.status, 422, notPage.text);
+  });
+
   test('묶음 규칙: zip 아님 415, 폴더 · index.html 없음 · 틀린 바깥 주소 422. 폴더 하나로 감싼 zip은 벗긴다', async () => {
     const app = await newApp(`code-h-${mark}`);
     assert.equal((await upload(app, Buffer.from('nope'), owner)).status, 415);
