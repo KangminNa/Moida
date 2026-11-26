@@ -1,18 +1,18 @@
 ---
 name: cairn-recall
-description: Cairn에 쌓인 wiki와 세션에서 찾아 출처와 함께 답한다. 사용자가 "전에 어떻게 했지", "cairn에서 찾아", "기록 찾아 줘", "지난번에 뭐라고 했지"라고 하거나 /cairn-recall을 부를 때 쓴다. 읽기만 한다.
+description: Moida에 쌓인 wiki와 세션에서 찾아 출처와 함께 답한다. 사용자가 "전에 어떻게 했지", "cairn에서 찾아", "기록 찾아 줘", "지난번에 뭐라고 했지"라고 하거나 /cairn-recall을 부를 때 쓴다. 읽기만 한다.
 ---
 
 # cairn-recall
 
-사용자의 Cairn에 쌓인 wiki와 세션 노트에서 찾아 답한다. **읽기만 한다.** 저장, 수정, 정리를 하지 않는다.
+사용자의 Moida에 쌓인 wiki와 세션 노트에서 찾아 답한다. **읽기만 한다.** 저장, 수정, 정리를 하지 않는다.
 
 사용자가 `/cairn-recall` 뒤에 적은 말을 질문으로 삼는다: $ARGUMENTS
 
 ## 순서
 
 1. **연결 확인.** cairn MCP 서버의 `search_wikis`와 `search_sessions`가 보이지 않으면 멈추고 알린다:
-   "Cairn에 연결되지 않았어요. 터미널에서 `cairn connect <블로그 주소>`로 연결하거나, AI 도구의 MCP·커넥터 설정에서 cairn에 로그인해 주세요."
+   "Moida에 연결되지 않았어요. 터미널에서 `cairn connect <블로그 주소>`로 연결하거나, AI 도구의 MCP·커넥터 설정에서 cairn에 로그인해 주세요."
 2. **wiki 먼저 찾기.** `search_wikis { query }`. wiki는 세션을 모아 정리한 문서라 먼저 본다. 고른 것은 `get_wiki { wiki_id }`로 읽는다.
 3. **세션으로 확인하기.** `search_sessions { query }`와 `get_session { session_id }`로 원본을 찾는다. wiki에 없거나 언제 어떻게 했는지가 중요할 때 꼭 읽는다.
 4. **이웃 보기.** 답이 조각나 있으면 `neighbors { node_id }`로 이어진 세션과 wiki를 따라간다.

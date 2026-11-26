@@ -11,7 +11,7 @@ export function SiteHeader({ site, brand }: { site: Site; brand: boolean }) {
             // biome-ignore lint/performance/noImgElement: 작은 로고 하나라 Next의 이미지 최적화를 거치지 않는다
             <img className="brand-logo" src={space.logoUrl} alt="" />
           )}
-          {space.name || 'Cairn'}
+          {space.name || 'Moida'}
         </a>
       ) : (
         <span />

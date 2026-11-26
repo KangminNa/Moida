@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await siteNow();
-  return { title: `페이지 · ${site?.space.name || 'Cairn'}` };
+  return { title: `페이지 · ${site?.space.name || 'Moida'}` };
 }
 
 export default async function PublicPages() {

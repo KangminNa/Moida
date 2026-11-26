@@ -1,7 +1,7 @@
 import { GoalPanel } from './GoalPanel';
 import { GoalRunsPanel } from './GoalRunsPanel';
 
-export const metadata = { title: '목표 · Cairn', robots: { index: false } };
+export const metadata = { title: '목표 · Moida', robots: { index: false } };
 
 // 목표 메뉴. 페이지는 틀만 두고, 읽기·쓰기는 클라이언트 패널이 서버 API로 한다.
 // 위는 목표 나무, 아래는 목표를 이룰 때까지 맡긴 실행 (목표 실행)

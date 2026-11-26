@@ -29,8 +29,8 @@ export async function GET(
   const origin = (space.siteUrl ?? new URL(request.url).origin).replace(/\/+$/, '');
   const page = `${appBase(holder, origin)}/m/${encodeURIComponent(menu.slug)}`;
   return rssResponse({
-    title: `${menu.name} · ${space.name || 'Cairn'}`,
-    description: space.description || space.name || 'Cairn',
+    title: `${menu.name} · ${space.name || 'Moida'}`,
+    description: space.description || space.name || 'Moida',
     page,
     self: `${page}/rss.xml`,
     posts: list.posts,

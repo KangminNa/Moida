@@ -97,7 +97,7 @@ export class ExploreProxy {
     if (url === null || address === null) {
       res
         .writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
-        .end('Cairn 둘러보기: 막힌 주소예요');
+        .end('Moida 둘러보기: 막힌 주소예요');
       return;
     }
     const headers = { ...req.headers };

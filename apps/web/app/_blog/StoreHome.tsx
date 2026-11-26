@@ -24,7 +24,7 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
   const { space, apps, recent, owner } = site;
   const latest = new Map<string, Post>();
   for (const p of recent) if (p.app && !latest.has(p.app.slug)) latest.set(p.app.slug, p);
-  const name = space.name || 'Cairn';
+  const name = space.name || 'Moida';
   const highlights = glance(space.highlights);
   return (
     <div className="store">

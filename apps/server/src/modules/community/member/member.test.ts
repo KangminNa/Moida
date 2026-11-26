@@ -98,6 +98,7 @@ describe('Nickname', () => {
       '운영자김',
       'admin1',
       'Cairn팀',
+      'Moida팀',
     ])
       assert.throws(() => Nickname.clean(bad), RuleViolation, bad);
     assert.equal(Nickname.clean('badminton'), 'badminton');

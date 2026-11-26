@@ -2,7 +2,7 @@
   "name": "sync-github",
   "version": "0.2.0",
   "cairn": ">=0.1",
-  "description": "Cairn의 내용을 GitHub 저장소에 보관 형식(md·yml·사진)으로 내보내 이력과 백업을 남기고, 빈 Cairn에 저장소에서 복원한다. vault는 저장소가 private일 때만 보낸다",
+  "description": "Moida의 내용을 GitHub 저장소에 보관 형식(md·yml·사진)으로 내보내 이력과 백업을 남기고, 빈 Moida에 저장소에서 복원한다. vault는 저장소가 private일 때만 보낸다",
   "server": "server/plugin.ts",
   "uses": [
     "archive:read",

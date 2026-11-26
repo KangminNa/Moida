@@ -103,7 +103,7 @@ describe('sync-github', () => {
     fake.isPrivate = true;
   });
 
-  test('빈 Cairn은 백업이 있는 저장소를 지우지 않는다', async () => {
+  test('빈 Moida는 백업이 있는 저장소를 지우지 않는다', async () => {
     const guarded = new FakeGithub();
     const url = await guarded.start();
     const gh = new GithubGateway('me/backup', 't0ken', url);
@@ -115,17 +115,17 @@ describe('sync-github', () => {
     archive = [cairnJson, ArchiveFile.text('vault/categories.yml', '[]\n')];
     const refused = await sync.syncOnce();
     assert.equal(refused.ok, false);
-    assert.match(refused.message, /비어 있는 Cairn이라 동기화를 멈췄어요/);
+    assert.match(refused.message, /비어 있는 Moida라 동기화를 멈췄어요/);
     assert.ok(refused.details.some((d) => d.includes('restore-preview')));
     assert.deepEqual(guarded.filesAt('main'), backup);
-    await assert.rejects(sync.run(), /비어 있는 Cairn/);
+    await assert.rejects(sync.run(), /비어 있는 Moida/);
 
     const onlyNew = await new SyncJob(gh, 'other', async () => archive, []).syncOnce();
     assert.equal(onlyNew.ok, false, '새 브랜치도 기본 브랜치의 백업을 보고 멈춘다');
     await guarded.stop();
   });
 
-  test('처음 쓰는 저장소와 내용 없는 저장소는 빈 Cairn도 맞춘다', async () => {
+  test('처음 쓰는 저장소와 내용 없는 저장소는 빈 Moida도 맞춘다', async () => {
     const empty = new FakeGithub();
     const url = await empty.start();
     const gh = new GithubGateway('me/new', 't0ken', url);
@@ -138,7 +138,7 @@ describe('sync-github', () => {
     await empty.stop();
   });
 
-  test('내용이 있으면 공개 저장소로 보낼 것이 없어도 빈 Cairn으로 보지 않는다', async () => {
+  test('내용이 있으면 공개 저장소로 보낼 것이 없어도 빈 Moida로 보지 않는다', async () => {
     const open = new FakeGithub();
     open.isPrivate = false;
     const url = await open.start();

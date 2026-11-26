@@ -21,7 +21,7 @@ export type OAuthServer = {
 // 주소는 https만, 계정 · 조각(#)을 넣은 주소는 받지 않는다. 내부망인지는 부를 때 OAuthGateway가 이름을 풀어 본다.
 // biome-ignore lint/complexity/noStaticOnlyClass: 상태 없는 판단 한 곳. OAuth 로그인 Service가 쓴다
 export class OAuthMetadata {
-  static readonly CLIENT_NAME = 'Cairn';
+  static readonly CLIENT_NAME = 'Moida';
   private static readonly URL_MAX = 2000;
   private static readonly SCOPE_MAX = 1000;
   private static readonly CLIENT_ID = /^[\x21-\x7e]{1,500}$/;

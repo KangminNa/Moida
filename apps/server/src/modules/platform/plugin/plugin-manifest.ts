@@ -125,7 +125,7 @@ export class PluginManifest {
   /** 확장 지점을 켜는 사람이 읽을 말로 (설치 마법사·관리 화면·명령줄이 함께 씀) */
   static describeUse(use: string): string {
     const [kind, arg] = [use.slice(0, use.indexOf(':')), use.slice(use.indexOf(':') + 1)];
-    if (use === 'archive:restore') return '보관 파일을 빈 Cairn에 들여와요';
+    if (use === 'archive:restore') return '보관 파일을 빈 Moida에 들여와요';
     if (kind === 'archive') return '블로그와 vault의 모든 내용(비공개 포함)을 읽어요';
     if (kind === 'event') return `"${arg}" 이벤트가 생기면 받아요`;
     if (kind === 'job') return `일꾼이 정해진 간격마다 "${arg}" 작업을 돌려요`;

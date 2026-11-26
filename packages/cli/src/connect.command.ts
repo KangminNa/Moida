@@ -28,7 +28,7 @@ export class ConnectCommand {
     const site = CairnSite.parse(input);
     const at = await site.address();
     if (at.site !== site.origin) t.say(`사이트 주소 기준으로 연결해요: ${at.site}`);
-    t.done(`Cairn 블로그 · ${at.mcp}`);
+    t.done(`Moida 블로그 · ${at.mcp}`);
 
     const version = await this.tool.version();
     if (!version)

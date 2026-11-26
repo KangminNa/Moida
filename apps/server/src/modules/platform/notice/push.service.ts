@@ -50,7 +50,7 @@ export class PushService extends BaseService {
     const now = new Date();
     const status = await this.gateway.send(
       target,
-      new PushMessage('Cairn 알림 시험', '이 브라우저로 알림이 와요', '/admin/notices', 'test'),
+      new PushMessage('Moida 알림 시험', '이 브라우저로 알림이 와요', '/admin/notices', 'test'),
       now,
     );
     await this.transaction((tx) =>

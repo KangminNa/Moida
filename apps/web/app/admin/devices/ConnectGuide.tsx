@@ -82,7 +82,7 @@ export function ConnectGuide({
           <>
             <CopyLine text={`pnpm cairn connect ${site}`} onCopy={copy} />
             <small>
-              Cairn 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 다른
+              Moida 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 다른
               회사 모델로 교차 검토하려면 끝에 <code>--review-with codex</code>
             </small>
             <Manual>
@@ -102,7 +102,7 @@ export function ConnectGuide({
           <>
             <CopyLine text={`pnpm cairn connect ${site} --tool codex`} onCopy={copy} />
             <small>
-              Cairn 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 교차
+              Moida 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 교차
               검토는 끝에 <code>--review-with claude</code>
             </small>
             <Manual>

@@ -1,6 +1,6 @@
 import { BasketPanel } from './BasketPanel';
 
-export const metadata = { title: '스크랩 · Cairn', robots: { index: false } };
+export const metadata = { title: '스크랩 · Moida', robots: { index: false } };
 
 export default function BasketPage() {
   return (

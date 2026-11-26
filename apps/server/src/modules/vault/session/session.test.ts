@@ -87,9 +87,9 @@ describe('SensitivePolicy', () => {
     });
   });
 
-  test('Cairn의 작업 토큰도 지운다', () => {
+  test('Moida의 작업 토큰도 지운다', () => {
     const clean = scrub(note(`작업 토큰 cairn_${'run'}_${'a'.repeat(40)}-${'b'.repeat(40)} 사용`));
-    assert.equal(clean.section('did'), '작업 토큰 [지움: Cairn 토큰] 사용');
+    assert.equal(clean.section('did'), '작업 토큰 [지움: Moida 토큰] 사용');
   });
 
   test('password=값은 값만 지우고, 코드 속 타입·환경 변수 이름은 그대로 둔다', () => {

@@ -23,7 +23,7 @@ type Search = { sheet?: string; session?: string; error?: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await siteNow();
-  return { title: site?.space.name || 'Cairn', description: site?.space.description };
+  return { title: site?.space.name || 'Moida', description: site?.space.description };
 }
 
 function oldSheetPath({ sheet, session, error }: Search): string | null {

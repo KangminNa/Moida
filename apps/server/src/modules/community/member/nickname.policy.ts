@@ -19,6 +19,7 @@ export class Nickname {
   private static readonly RESERVED_PREFIXES: readonly string[] = [
     'admin',
     'cairn',
+    'moida',
     'moderator',
     'official',
     'operator',

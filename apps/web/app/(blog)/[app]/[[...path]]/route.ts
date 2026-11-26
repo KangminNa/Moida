@@ -167,7 +167,7 @@ async function screen(
   const space = await serverGet<SpaceInfo>('/api/space', true);
   let html: string;
   try {
-    html = renderAppScreen(shown, template, space?.name || 'Cairn', ticket, extra);
+    html = renderAppScreen(shown, template, space?.name || 'Moida', ticket, extra);
   } catch (error) {
     // 템플릿 문법 오류: 미리 보기에서만 까닭을 보인다 (공개 버전은 미리 본 뒤에 공개한다)
     return brokenAnswer(ticket && error instanceof Error ? error.message : null);
@@ -214,7 +214,7 @@ async function staticScreen(
   if (text === null || shown.data === null)
     return (await file(request, app, name, ticket)) ?? missingAnswer();
   const space = await serverGet<SpaceInfo>('/api/space', true);
-  const html = renderStaticScreen(text, name, shown.data, space?.name || 'Cairn', ticket);
+  const html = renderStaticScreen(text, name, shown.data, space?.name || 'Moida', ticket);
   const site = await siteOf(request, app, host, space);
   const headers = appHeaders(
     site.origin,

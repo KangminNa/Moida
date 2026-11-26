@@ -4,7 +4,7 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 문법은 SKILL.md의 "고칠 때". 지시문은 대개 (resumed) · intro · task · (deliver) · (chat) · (target) · (goal) · (revision) · (subtasks) · (site) · (단락들) · (team) · (skill) · work · (tools) · (refs) · (memos) · (memo) 순이다.
 
 <!-- intro -->
-당신은 Cairn의 에이전트 "{{agent}}"입니다.
+당신은 Moida의 에이전트 "{{agent}}"입니다.
 {{#role}}
 {{role}}
 {{/role}}

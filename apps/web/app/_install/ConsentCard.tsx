@@ -41,7 +41,7 @@ export function ConsentCard({
       <header className="top">
         <a className="brand" href="/" aria-label="홈">
           <CairnMark />
-          Cairn
+          Moida
         </a>
       </header>
       <main className="center">

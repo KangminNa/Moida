@@ -11,7 +11,7 @@ export function SiteFooter({ site }: { site: Site }) {
           © {new Date().getFullYear()} {site.space.name}
         </span>
       )}
-      <span>Cairn으로 만듦</span>
+      <span>Moida로 만듦</span>
     </footer>
   );
 }

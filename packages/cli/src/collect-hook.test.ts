@@ -235,7 +235,7 @@ describe('세션 → 글 (사람의 말 · AI의 말 · 도구 이름만)', () =
     assert.ok(statSync(join(cairn(), 'collect.json')).mtimeMs > 0);
   });
 
-  test('비밀값은 이 컴퓨터에서 지운다 (본문 · 제목, Cairn 러너 토큰 cairn_run_ 포함)', async () => {
+  test('비밀값은 이 컴퓨터에서 지운다 (본문 · 제목, Moida 러너 토큰 cairn_run_ 포함)', async () => {
     const run = `cairn_run_${'r'.repeat(32)}`;
     const github = `ghp_${'g'.repeat(36)}`;
     short(SESSION, `배포해 줘 ${run}\n토큰 ${github} password=hunter2abc1`, `${run} 확인했어요`);
@@ -243,10 +243,10 @@ describe('세션 → 글 (사람의 말 · AI의 말 · 도구 이름만)', () =
     const args = blog.saves[0]?.args ?? {};
     const text = String(args.text);
     for (const secret of [run, github, 'hunter2abc1']) assert.equal(text.includes(secret), false);
-    assert.equal(text.split('[지움: Cairn 토큰]').length - 1, 2);
+    assert.equal(text.split('[지움: Moida 토큰]').length - 1, 2);
     assert.ok(text.includes('[지움: GitHub 토큰]'));
     assert.ok(text.includes('password=[지움: 비밀번호·키 값]'));
-    assert.equal(args.title, '배포해 줘 [지움: Cairn 토큰]');
+    assert.equal(args.title, '배포해 줘 [지움: Moida 토큰]');
   });
 
   test('1,000,000자를 넘으면 앞과 뒤를 남기고 가운데를 줄인다', async () => {

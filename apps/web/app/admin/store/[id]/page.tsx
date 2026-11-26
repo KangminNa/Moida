@@ -1,6 +1,6 @@
 import { AppPanel, type AppTab } from './AppPanel';
 
-export const metadata = { title: '앱 관리 · Cairn', robots: { index: false } };
+export const metadata = { title: '앱 관리 · Moida', robots: { index: false } };
 
 const TABS: readonly AppTab[] = [
   'overview',

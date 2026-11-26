@@ -229,7 +229,7 @@ export class AppManifest {
     for (const [column, type] of listed) {
       if (!AppManifest.NAME.test(column) || AppManifest.BUILT_IN.includes(column))
         throw new RuleViolation(
-          `쓸 수 없는 칸 이름이에요: ${name}.${column} (${AppManifest.BUILT_IN.join(' · ')}는 Cairn이 붙여요)`,
+          `쓸 수 없는 칸 이름이에요: ${name}.${column} (${AppManifest.BUILT_IN.join(' · ')}는 Moida가 붙여요)`,
         );
       if (typeof type !== 'string' || !AppManifest.TYPES.includes(type))
         throw new RuleViolation(

@@ -159,7 +159,7 @@ describe('블로그 주소', () => {
     assert.throws(() => CairnSite.parse('http://'), /주소 모양이 아니에요/);
   });
 
-  test('MCP 주소는 블로그가 알려 준 사이트 주소 기준. Cairn이 아니거나 사이트 주소 전이면 그 이유', async () => {
+  test('MCP 주소는 블로그가 알려 준 사이트 주소 기준. Moida가 아니거나 사이트 주소 전이면 그 이유', async () => {
     const at = await CairnSite.parse(origin).address();
     assert.deepEqual(
       [at.site, at.mcp],
@@ -168,7 +168,7 @@ describe('블로그 주소', () => {
     resource = null;
     await assert.rejects(CairnSite.parse(origin).address(), /사이트 주소부터 정해 주세요/);
     resource = { resource: 'https://other.example/api', resource_name: 'Other' };
-    await assert.rejects(CairnSite.parse(origin).address(), /Cairn 블로그가 아니에요/);
+    await assert.rejects(CairnSite.parse(origin).address(), /Moida 블로그가 아니에요/);
     await assert.rejects(CairnSite.parse('http://127.0.0.1:9').address(), /블로그에 닿지 않아요/);
   });
 });

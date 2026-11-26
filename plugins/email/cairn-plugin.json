@@ -39,7 +39,7 @@
       "help": "알림을 받을 관리자의 메일 주소. 비우면 보내는 계정으로 보내요"
     },
     "siteUrl": {
-      "label": "이 Cairn의 바깥 주소",
+      "label": "이 Moida의 바깥 주소",
       "type": "text",
       "required": true,
       "help": "메일 안 콘솔 링크의 앞부분 (예: https://blog.example.com)"

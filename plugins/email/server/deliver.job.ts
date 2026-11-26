@@ -56,7 +56,7 @@ export class DeliverJob extends BaseJob {
     try {
       await (this.smtp as SmtpGateway).send(
         message,
-        item.kind === 'post' ? (item.apps[0] ?? 'Cairn') : 'Cairn',
+        item.kind === 'post' ? (item.apps[0] ?? 'Moida') : 'Moida',
         new Date(),
       );
       return null;
