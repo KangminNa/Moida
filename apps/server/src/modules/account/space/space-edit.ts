@@ -14,7 +14,7 @@ export class SpaceEdit {
     setting: 'site',
     list: 'site',
     ops: ['edit'],
-    fields: ['name', 'description', 'tagline', 'about', 'highlights'],
+    fields: ['name', 'description', 'tagline', 'about', 'highlights', 'naming'],
     target: 'one',
     versioned: true,
     grants: [],
@@ -36,6 +36,7 @@ export class SpaceEdit {
       tagline = now.tagline,
       about = now.about,
       highlights = now.highlights,
+      naming = now.naming,
     } = change.body;
     const req = RenameSpaceInput.from({
       name,
@@ -43,11 +44,12 @@ export class SpaceEdit {
       tagline,
       about,
       highlights,
+      naming,
       version: change.version,
     });
     space.edit(req.changes);
     space.describe(req.description, null);
-    space.introduce(req.tagline, req.about, req.highlights);
+    space.introduce(req);
     return space;
   }
 }

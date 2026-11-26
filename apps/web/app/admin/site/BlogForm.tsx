@@ -32,6 +32,7 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
   const [tagline, setTagline] = useState(space.tagline);
   const [about, setAbout] = useState(space.about);
   const [highlights, setHighlights] = useState(space.highlights);
+  const [naming, setNaming] = useState(space.naming);
   const [siteUrl, setSiteUrl] = useState(space.siteUrl ?? '');
   const [version, setVersion] = useState(space.version);
 
@@ -51,6 +52,7 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
           tagline,
           about,
           highlights,
+          naming,
           siteUrl,
           version,
         }),
@@ -94,6 +96,21 @@ function SpaceForm({ space, submitLabel, onSaved }: Props) {
           placeholder="예: 우리가 만드는 사이트들을 한곳에서"
         />
         <small>스토어 첫 화면에 크게 보여요 (비워도 돼요)</small>
+      </label>
+      <label className="field">
+        <span>이름의 뜻</span>
+        <textarea
+          className="input"
+          rows={2}
+          value={naming}
+          maxLength={300}
+          onChange={(e) => setNaming(e.target.value)}
+          placeholder="예: '모이다'에서 왔어요. 흩어진 기록과 사람이 한곳에 모인다는 뜻이에요"
+        />
+        <small>
+          회사 · 팀 이름을 왜 그렇게 지었는지. 스토어 첫 화면의 큰 이름 아래에 보여요 (비우면
+          숨겨요)
+        </small>
       </label>
       <label className="field">
         <span>한눈에 (하는 일)</span>

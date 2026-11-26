@@ -490,9 +490,9 @@
   align-items: center;
   gap: 10px;
   color: var(--fg);
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
   text-decoration: none;
 }
 
@@ -588,10 +588,60 @@
   font-weight: 700;
 }
 
+/* 점이 모여 되는 큰 이름 (GatherMark · gather-scene.ts). 스크립트 전에는 같은 자리에 글자 그대로 */
+.store-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: clamp(120px, 16vw, 200px);
+  margin: 0;
+  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 흩어질 때 칸 끝에서 잘리지 않게 위아래로 넓히고 가장자리를 흐리게 */
+.store-mark canvas {
+  position: absolute;
+  inset: -56px 0;
+  width: 100%;
+  height: calc(100% + 112px);
+  pointer-events: none;
+  mask-image:
+    linear-gradient(to bottom, transparent, var(--fg) 18%, var(--fg) 82%, transparent),
+    linear-gradient(to right, transparent, var(--fg) 6%, var(--fg) 94%, transparent);
+  mask-composite: intersect;
+}
+
+.store-mark-text {
+  color: var(--fg);
+  font-size: clamp(3.6rem, 14vw, 11rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transition: color 0.3s;
+}
+
+.store-mark[data-ready] .store-mark-text {
+  color: transparent;
+}
+
+/* 이름의 뜻: 큰 이름 바로 아래 한두 줄 */
+.store-naming {
+  max-width: 44ch;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+
 .store-hero h1 {
   max-width: 18ch;
   margin: 0;
-  font-size: clamp(2.2rem, 5.2vw, 4rem);
+  font-size: clamp(1.9rem, 4.4vw, 3.3rem);
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 1.1;
@@ -1341,4 +1391,14 @@
   margin-bottom: 6px;
   font-size: 0.875rem;
   color: var(--muted);
+}
+
+/* 화면에는 숨기고 읽기 프로그램에만 (한 줄 소개가 없을 때의 제목) */
+.store-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

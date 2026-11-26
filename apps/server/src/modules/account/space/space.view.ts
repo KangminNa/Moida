@@ -25,6 +25,7 @@ export class SpaceSettingView {
       tagline: textOf(this.row, SpaceView.TAGLINE),
       about: textOf(this.row, SpaceView.ABOUT),
       highlights: textOf(this.row, SpaceView.HIGHLIGHTS),
+      naming: textOf(this.row, SpaceView.NAMING),
     };
   }
 }
@@ -40,6 +41,7 @@ export class SpaceView {
   static readonly ABOUT = 'store.about';
   /** 스토어 첫 화면의 "한눈에": 하는 일을 한 줄에 하나씩 ("제목: 설명", 2026-11-26) */
   static readonly HIGHLIGHTS = 'store.highlights';
+  static readonly NAMING = 'store.naming';
 
   constructor(
     private readonly row: Readonly<LoadedSpace> | null,
@@ -61,6 +63,10 @@ export class SpaceView {
 
   get highlights(): string {
     return textOf(this.row, SpaceView.HIGHLIGHTS);
+  }
+
+  get naming(): string {
+    return textOf(this.row, SpaceView.NAMING);
   }
 
   get siteUrl(): string | null {
@@ -89,6 +95,7 @@ export class SpaceView {
       tagline: this.tagline,
       about: this.about,
       highlights: this.highlights,
+      naming: this.naming,
       siteUrl: this.siteUrl,
       installed: this.installed,
       version: this.row?.version ?? 0,

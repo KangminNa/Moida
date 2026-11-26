@@ -5,6 +5,7 @@ import { NewTabLink } from '../_ui/NewTabLink';
 import { SOURCE_URL } from '../_ui/source';
 import { AppIcon } from './AppIcon';
 import { formatDate, postPath } from './format';
+import { GatherMark } from './GatherMark';
 import { APP_KIND_LABELS } from './labels';
 import type { Site } from './site';
 import type { PublicApp } from './types';
@@ -15,7 +16,7 @@ export type StoreMail = { mail: string | null; token: string | null };
 type Post = Site['recent'][number];
 
 // 스토어 첫 화면 (2026-11-26): 회사 · 프로젝트의 첫 화면. 여러 사이트가 한곳에 모이는 모습을 보인다:
-//   머리(회사 이름 · 바로 가기 · 로그인) → 큰 제목(한 줄 소개)과 사이트 아이콘이 모인 독 → 소개(두 단) →
+//   머리(회사 이름 · 바로 가기 · 로그인) → 점이 모여 되는 큰 이름(GatherMark) · 이름의 뜻 · 한 줄 소개와 사이트 아이콘이 모인 독 → 소개(두 단) →
 //   운영하는 사이트 카드 → 새 소식(날짜 줄) → 플러그인 자리(store.after: 메일 구독 띠).
 // 글은 모두 콘솔 › 설정 › 사이트에서 정한다 (이름 · 소개 · 한 줄 소개 · 소개 글 · 로고). 서버에서 그린다.
 // 사이트 링크는 서버가 준 url (확인한 도메인이면 그 도메인, 스토어 3-0)
@@ -49,10 +50,11 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
         <section className="store-hero">
           <p className="store-eyebrow">
             <span className="store-oss">오픈소스 · AGPL-3.0</span>
-            {name}
-            {apps.length > 0 && <span> · 사이트 {apps.length}곳</span>}
+            {apps.length > 0 ? `사이트 ${apps.length}곳 운영 중` : '준비 중'}
           </p>
-          <h1>{space.tagline || name}</h1>
+          <GatherMark name={name} />
+          {space.naming && <p className="store-naming">{space.naming}</p>}
+          {space.tagline ? <h1>{space.tagline}</h1> : <h1 className="store-sr">{name}</h1>}
           {space.description && <p className="store-lead">{space.description}</p>}
           <div className="store-actions">
             {apps.length > 0 && (

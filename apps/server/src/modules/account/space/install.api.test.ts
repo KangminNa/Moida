@@ -157,6 +157,7 @@ describe('블로그 정보', () => {
       tagline: '',
       about: '',
       highlights: '',
+      naming: '',
       siteUrl: 'https://blog.example.com',
       installed: true,
       version: version + 1,
@@ -209,6 +210,8 @@ describe('블로그 정보', () => {
       (lines as { highlights?: string }).highlights,
       '오픈소스: 누구나 받아 쓴다\n여러 사이트: 한 서버에서',
     );
+    const named = await put({ naming: '모이다에서 왔다' });
+    assert.equal((named as { naming?: string }).naming, '모이다에서 왔다');
     assert.equal((await put({ tagline: '', about: '' })).tagline, '', '빈 글이면 지운다');
     const { version } = (await api.get('/api/space')).json() as { version: number };
     const long = await api.request('PUT', '/api/space', owner, {

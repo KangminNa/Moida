@@ -86,6 +86,8 @@ export class RenameSpaceInput extends BaseRequest {
     readonly tagline: string | null = null,
     readonly about: string | null = null,
     readonly highlights: string | null = null,
+    /** 이름의 뜻: 회사 · 팀 이름을 왜 그렇게 지었는지 짧게 */
+    readonly naming: string | null = null,
   ) {
     super();
   }
@@ -103,6 +105,7 @@ export class RenameSpaceInput extends BaseRequest {
           given('tagline') ? (f.optionalText('tagline', 120) ?? '') : null,
           given('about') ? (f.optionalText('about', 3000) ?? '') : null,
           given('highlights') ? (f.optionalText('highlights', 1500) ?? '') : null,
+          given('naming') ? (f.optionalText('naming', 300) ?? '') : null,
         ),
     );
   }
