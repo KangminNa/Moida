@@ -1,14 +1,19 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { AppsHome } from '../../_blog/AppsHome';
+import { appsOrigin, isAppsHost } from '../../_blog/apps-domain';
+import { hostOf } from '../../_blog/request-host';
 import { SiteFooter } from '../../_blog/SiteFooter';
 import { StoreHome } from '../../_blog/StoreHome';
 import { siteNow } from '../../_blog/site';
 
 // 스토어 첫 화면 (2026-11-26): 첫 화면(/)이 앱 하나로 고정됐거나 공개 앱이 하나뿐이어도 여기서는 늘 앱 목록이 보인다.
+// 공통 앱 도메인(CAIRN_APPS_URL)의 / 는 proxy가 여기로 넘긴다: 그 도메인에서는 C안 첫 화면(AppsHome, 소개 · 앱 목록)을 그린다 (2026-11-27).
 // 메일 링크(플러그인 email의 구독 확인 · 해지)가 ?mail=…&token=…으로 여기에 온다: 값은 store.after 자리에 넘기기만 한다
 export const dynamic = 'force-dynamic';
 
-type Search = { mail?: string; token?: string };
+type Search = { mail?: string; token?: string; view?: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await siteNow();
@@ -36,6 +41,18 @@ export default async function Store({ searchParams }: { searchParams: Promise<Se
       </main>
     );
   if (!site.space.installed) redirect('/install');
+  const shared = appsOrigin();
+  if (shared !== null && isAppsHost(hostOf(await headers())) && !search.mail)
+    return (
+      <>
+        <AppsHome
+          site={site}
+          appsOrigin={shared}
+          view={search.view === 'apps' ? 'apps' : 'intro'}
+        />
+        <SiteFooter site={site} />
+      </>
+    );
   return (
     <>
       <StoreHome

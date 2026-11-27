@@ -36,6 +36,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
   return (
     <MemberFrame place={place} title="신고">
       <ReportPanel
+        base={place.base}
         csrf={place.csrf}
         topicId={topic.id}
         commentId={comment?.id ?? null}

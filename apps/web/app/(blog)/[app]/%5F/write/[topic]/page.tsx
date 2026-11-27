@@ -27,7 +27,12 @@ export default async function EditTopicPage({ params }: Props) {
   if (!topic.mine) notFound();
   return (
     <MemberFrame place={place} title="글 고치기">
-      <WritePanel csrf={place.csrf} topic={topic} notice={writeNotice(member, false)} />
+      <WritePanel
+        base={place.base}
+        csrf={place.csrf}
+        topic={topic}
+        notice={writeNotice(member, false)}
+      />
     </MemberFrame>
   );
 }

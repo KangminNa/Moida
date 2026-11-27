@@ -10,10 +10,13 @@ import { useAction } from '../../../../../_lib/use-action';
 
 // 댓글 달기와 이 글에 단 내 댓글 지우기. 댓글은 고치지 않는다 (1차). 지우면 서버에서 다시 그려 목록을 맞춘다
 export function CommentPanel({
+  base,
   csrf,
   topic,
   notice,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 '', 공통 앱 도메인 /<앱>) */
+  base: string;
   csrf: string | null;
   topic: TopicDetail;
   notice: string | null;
@@ -30,7 +33,7 @@ export function CommentPanel({
     const reply = await write.run('write', () =>
       memberApi(csrf, 'POST', `topics/${topic.id}/comments`, { requestId, body }),
     );
-    if (reply?.ok) window.location.replace(`/t/${topic.id}`);
+    if (reply?.ok) window.location.replace(`${base}/t/${topic.id}`);
   }
 
   async function erase(id: string, version: number | undefined) {
@@ -43,7 +46,7 @@ export function CommentPanel({
   return (
     <div className="member-form">
       <p className="member-hint">
-        <a href={`/t/${topic.id}`}>← {topic.title}</a>
+        <a href={`${base}/t/${topic.id}`}>← {topic.title}</a>
       </p>
       <form className="member-form" onSubmit={submit}>
         {notice && <p className="note">{notice}</p>}

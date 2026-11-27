@@ -16,11 +16,11 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ResetPage({ params, searchParams }: Props) {
   const place = await memberPlace((await params).app);
-  const back = memberReturn((await searchParams).return);
+  const back = memberReturn((await searchParams).return, place.base);
   if (place.member) redirect(back);
   return (
     <MemberFrame place={place} title="비밀번호 다시 정하기">
-      <ResetPanel csrf={place.csrf} returnTo={back} />
+      <ResetPanel base={place.base} csrf={place.csrf} returnTo={back} />
     </MemberFrame>
   );
 }

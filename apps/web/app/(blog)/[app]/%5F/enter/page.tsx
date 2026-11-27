@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { MemberFrame } from '../../../../_community/MemberFrame';
-import { memberPlace, memberTitle, termsOf } from '../../../../_community/member-page';
+import { memberPlace, memberTitle, termsOf, toScreen } from '../../../../_community/member-page';
 import { memberReturn } from '../../../../_community/return-path';
 import { EnterPanel } from './EnterPanel';
 
@@ -17,12 +17,13 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function EnterPage({ params, searchParams }: Props) {
   const place = await memberPlace((await params).app);
-  const back = memberReturn((await searchParams).return);
+  const back = memberReturn((await searchParams).return, place.base);
   if (place.member) redirect(back);
-  if (!place.account) redirect(`/_/login?return=${encodeURIComponent(back)}`);
+  if (!place.account) toScreen(place, 'login', back);
   return (
     <MemberFrame place={place} title={`${place.app.name} 참여`}>
       <EnterPanel
+        base={place.base}
         csrf={place.csrf}
         returnTo={back}
         account={place.account}

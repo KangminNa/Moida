@@ -21,7 +21,15 @@ const LEAVES = {
 // 나가기 (스토어 3-4, 스토어 계정 2026-11-26): 지금 비밀번호를 넣고 한 번 더 묻는다. 되돌릴 수 없다.
 // 이 앱에서 나가기: 이 앱의 닉네임만 지우고 글 · 댓글은 "탈퇴한 회원"으로 남는다 (계정 · 로그인 · 다른 앱은 그대로).
 // 계정 탈퇴: 모든 앱에서 나가고 메일 · 아이디 · 비밀번호 정보를 바로 지우며 모든 로그인이 끝난다
-export function LeavePanel({ csrf, community }: { csrf: string | null; community: boolean }) {
+export function LeavePanel({
+  base,
+  csrf,
+  community,
+}: {
+  base: string;
+  csrf: string | null;
+  community: boolean;
+}) {
   const [password, setPassword] = useState('');
   const leave = useAction();
 
@@ -31,7 +39,7 @@ export function LeavePanel({ csrf, community }: { csrf: string | null; community
       memberApi(csrf, 'POST', LEAVES[kind].path, { password }),
     );
     // 바꿔치기: 뒤로 가기로 내 정보에 돌아가지 않게 (웹 UX U1)
-    if (reply?.ok) window.location.replace('/');
+    if (reply?.ok) window.location.replace(`${base}/`);
   }
 
   return (

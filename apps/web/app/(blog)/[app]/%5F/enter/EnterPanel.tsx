@@ -9,11 +9,14 @@ import { useAction } from '../../../../_lib/use-action';
 // 앱 참여: 로그인한 계정으로 이 앱의 닉네임을 정한다. 약관은 이 앱이 공개한 것과 (공통 약관에 아직 동의하지 않은 옛 계정이면) 공통 약관.
 // 동의할 약관이 없으면 동의 칸이 없다. 다른 계정으로 바꾸려면 로그아웃
 export function EnterPanel({
+  base,
   csrf,
   returnTo,
   account,
   terms,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 '', 공통 앱 도메인 /<앱>) */
+  base: string;
   csrf: string | null;
   returnTo: string;
   account: AccountSelf;
@@ -41,7 +44,8 @@ export function EnterPanel({
 
   async function logout() {
     const reply = await out.run('logout', () => memberApi(csrf, 'POST', 'logout'));
-    if (reply?.ok) window.location.replace(`/_/login?return=${encodeURIComponent(returnTo)}`);
+    if (reply?.ok)
+      window.location.replace(`${base}/_/login?return=${encodeURIComponent(returnTo)}`);
   }
 
   return (

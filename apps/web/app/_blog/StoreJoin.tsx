@@ -5,9 +5,16 @@ import type { PublicApp } from './types';
 // /join으로 간다. 계정은 이 사이트(스토어)에 하나라 어느 앱에서나 같은 계정으로 로그인한다. 로그인(회원 쿠키)은 연결을 확인한
 // 앱 도메인에서만 열려(콘솔과 같은 출처에 회원 쿠키를 두지 않는다, 스토어 11장) 가입 뒤에는 앱을 골라 그 앱에서 로그인한다.
 
-/** 가입 뒤 로그인할 수 있는 앱: 회원을 받고 자기 도메인으로 열리는 앱 */
-export function joinableApps(apps: readonly PublicApp[]): PublicApp[] {
-  return apps.filter((a) => a.members && /^https?:\/\//.test(a.url));
+/**
+ * 가입 뒤 로그인할 수 있는 앱: 회원을 받고 자기 도메인이나 공통 앱 도메인으로 열리는 앱. 주소는 바깥 주소(https://…)로 바꿔 준다:
+ * 공통 앱 도메인(appsOrigin, 웹 서버에서 apps-domain.ts가 읽는다)이 있으면 /<앱>을 그 도메인 아래로, 없으면 자기 도메인 앱만
+ */
+export function joinableApps(apps: readonly PublicApp[], appsOrigin: string | null): PublicApp[] {
+  return apps.flatMap((a) => {
+    if (!a.members) return [];
+    if (/^https?:\/\//.test(a.url)) return [a];
+    return appsOrigin ? [{ ...a, url: `${appsOrigin}${a.url}` }] : [];
+  });
 }
 
 /** 가입하기 버튼이 갈 곳: 로그인할 앱이 있으면 스토어의 가입 화면, 없으면 없음 (가입해도 쓸 곳이 없다) */
@@ -15,9 +22,9 @@ export function joinHref(apps: readonly PublicApp[]): string | null {
   return apps.length > 0 ? '/join' : null;
 }
 
-/** 그 앱의 로그인 화면 주소 */
+/** 그 앱의 로그인 화면 주소: 앱 주소 아래의 /_/login (자기 도메인은 https://<도메인>/_/login, 공통 앱 도메인은 …/<앱>/_/login) */
 export function appLoginUrl(app: PublicApp): string {
-  return new URL('/_/login', app.url).toString();
+  return `${app.url.replace(/\/+$/, '')}/_/login`;
 }
 
 /** 가입한 계정으로 로그인할 앱 목록 (가입 화면의 끝 · 가입 뒤) */

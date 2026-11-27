@@ -7,7 +7,10 @@ import type { MemberMe, TopicDetail, TopicList } from './types';
 // 쓰기(가입 · 로그인 · 글 · 댓글 · 신고)는 템플릿이 아니라 Cairn이 그리는 고정 화면(/_/…)이 한다: 격리된 앱 화면에는 쿠키가 없다
 
 /** 고정 화면의 주소 앞부분 (앱 도메인의 뿌리 아래) */
-const FIXED = '/_';
+/** 고정 화면의 앞부분: 앱 안 주소의 '/_' (앱 도메인은 '/_', 공통 앱 도메인은 '/<앱>/_', 2026-11-27) */
+function fixedOf(place: CommunityPlace): string {
+  return `${place.base.replace(/\/$/, '')}/_`;
+}
 
 /** 지금 화면의 자리. open: 앱 도메인으로 연 화면이라 회원 기능이 열린다 (미리 보기 · 기본 도메인은 읽기만). here: 로그인 뒤 돌아올 곳 */
 export type CommunityPlace = { base: string; open: boolean; here: string };
@@ -31,10 +34,10 @@ export function communityOf(place: CommunityPlace, me: MemberMe | null) {
   return {
     open: true,
     member: me?.member ? { nickname: me.member.nickname } : null,
-    joinUrl: `${FIXED}/join`,
-    loginUrl: `${FIXED}/login?return=${encodeURIComponent(place.here)}`,
-    meUrl: `${FIXED}/me`,
-    writeUrl: `${FIXED}/write`,
+    joinUrl: `${fixedOf(place)}/join`,
+    loginUrl: `${fixedOf(place)}/login?return=${encodeURIComponent(place.here)}`,
+    meUrl: `${fixedOf(place)}/me`,
+    writeUrl: `${fixedOf(place)}/write`,
   };
 }
 
@@ -63,7 +66,8 @@ export function topicOf(topic: TopicDetail, place: CommunityPlace) {
     date: c.createdAt,
     author: c.author,
     mine: c.mine,
-    reportUrl: open && !c.mine ? `${FIXED}/report?comment=${c.id}&topic=${topic.id}` : null,
+    reportUrl:
+      open && !c.mine ? `${fixedOf(place)}/report?comment=${c.id}&topic=${topic.id}` : null,
   }));
   return {
     title: topic.title,
@@ -73,9 +77,9 @@ export function topicOf(topic: TopicDetail, place: CommunityPlace) {
     edited: topic.editedAt !== null,
     author: topic.author,
     mine: topic.mine,
-    editUrl: open && topic.mine ? `${FIXED}/write/${topic.id}` : null,
-    commentUrl: open ? `${FIXED}/comment/${topic.id}` : null,
-    reportUrl: open && !topic.mine ? `${FIXED}/report?topic=${topic.id}` : null,
+    editUrl: open && topic.mine ? `${fixedOf(place)}/write/${topic.id}` : null,
+    commentUrl: open ? `${fixedOf(place)}/comment/${topic.id}` : null,
+    reportUrl: open && !topic.mine ? `${fixedOf(place)}/report?topic=${topic.id}` : null,
     comments,
   };
 }

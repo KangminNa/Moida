@@ -29,7 +29,7 @@ export class MemberGuard implements CanActivate {
     const token = Cookies.read(request, AccountSession.COOKIE);
     if (!MemberGuard.READS.has(request.method.toUpperCase())) this.assertSameSite(request, token);
     if (!token) return true;
-    const member = await this.query.actorFor(token, request.appId);
+    const member = await this.query.actorFor(token, request.appId, request.appsDomain === true);
     if (!member) return true;
     request.actor = member;
     await this.accounts.seen(token, new Date());

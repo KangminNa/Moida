@@ -96,6 +96,8 @@ import { TopicService } from './topic/topic.service';
 export class CommunityModule implements OnModuleInit {
   /** 앱 도메인에서 여는 경로: /api/community 아래, 관리자 경로(admin/)만 빼고 쓰기까지 */
   static readonly MEMBER_PATHS = /^\/api\/community\/(?!admin(?:\/|$))/;
+  /** 스토어 가입 · 공통 약관: 공통 앱 도메인에서도 연다 (2026-11-27, 앱마다의 도메인에서는 StorePlace가 404) */
+  static readonly STORE_PATHS = /^\/api\/store\//;
 
   constructor(
     private readonly gate: HostGate,
@@ -111,7 +113,7 @@ export class CommunityModule implements OnModuleInit {
 
   onModuleInit(): void {
     EventCatalog.define('community', events);
-    this.gate.openPaths([CommunityModule.MEMBER_PATHS], true);
+    this.gate.openPaths([CommunityModule.MEMBER_PATHS, CommunityModule.STORE_PATHS], true);
     // 신고가 쌓이면 임시로 가린다 (3-1c)
     this.workers.on(ReportAddedHandler.TOPIC, this.reported);
     // 앱의 보이는 버전이 바뀌면 그 버전이 선언한 표에 맞춘다 (앱 데이터, 스토어 12.4)

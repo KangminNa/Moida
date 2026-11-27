@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 import { devOrigins } from './app/_lib/dev-origins';
-import { APP_SCREEN_ROOTS, SCREEN_HEADERS } from './app/_lib/screen-headers';
+import { APP_SCREEN_ROOTS, SCREEN_HEADERS, WEB_ROUTES } from './app/_lib/screen-headers';
 
 // 외부 주소는 하나: /api · /mcp · /oauth · /.well-known · /pages 는 서버로, 나머지는 웹.
 // 운영에서는 리버스 프록시가 나누고, 웹 하나만 열어 둔 개발 환경에서는 여기서 서버로 넘긴다.
@@ -51,23 +51,6 @@ const REPORT_HEADERS = [
 const SHARE_OWN_HEADERS = new Set(['Content-Security-Policy', 'Referrer-Policy']);
 const shareHeaders = securityHeaders.filter((h) => !SHARE_OWN_HEADERS.has(h.key));
 
-// 웹이 그리는 화면의 최상위 경로 (서버로 넘기는 경로 포함). 화면 머리글은 이 경로와 첫 화면(/)에만 붙인다.
-// 그 밖의 /<이름>/…은 앱 화면(스토어 1-6)이라 route handler가 앱마다 격리 머리글을 붙인다: 화면의 frame-ancestors 'none' ·
-// X-Frame-Options가 함께 붙으면 콘솔의 미리 보기가 막히고 CSP 둘이 겹친다. 구조 검사가 app/ 폴더 · App.RESERVED와 맞춰 본다
-const WEB_ROUTES = [
-  'admin',
-  'api',
-  'connect',
-  'graph',
-  'install',
-  'join',
-  'login',
-  'm',
-  'mcp',
-  'oauth',
-  'posts',
-  'store',
-];
 // 콘솔(/admin)만 다른 창과의 연결을 끊는다 (Cross-Origin-Opener-Policy, 웹 보안 S2): AI가 만든 페이지 · 앱 화면은 링크를
 // 격리 밖의 새 창으로 열 수 있어(allow-popups-to-escape-sandbox), 연 쪽이 그 창(콘솔)을 가짜 화면으로 바꿔치기할 수 있다.
 // /connect · /login에는 넣지 않는다: Claude · ChatGPT 앱 연결이 이 화면을 팝업으로 열고 돌아오는 흐름이 끊긴다

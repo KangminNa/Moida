@@ -24,15 +24,17 @@ export class MemberQuery extends BaseQuery {
 
   /**
    * 회원 쿠키의 요청자 (MemberGuard가 부른다): 그 앱 도메인에 열린 끝나지 않은 세션의 계정 (탈퇴 · 정지가 아닌),
-   * 그 계정이 이 앱에 참여했으면 그 회원까지. 아니면 null
+   * 그 계정이 이 앱에 참여했으면 그 회원까지. 아니면 null.
+   * shared: 공통 앱 도메인으로 온 요청 (2026-11-27). 그 도메인의 앱들은 회원 쿠키 하나를 함께 쓰므로 어느 앱에서 연 세션이든
+   * 이 앱의 로그인으로 친다 (로그인 한 번으로 모든 앱). 쿠키는 그 도메인에만 실려 다른 도메인 앱의 세션이 섞이지 않는다
    */
-  async actorFor(token: string, appId: string): Promise<MemberActor | null> {
+  async actorFor(token: string, appId: string, shared = false): Promise<MemberActor | null> {
     const [row] = await this.sql<{ account_id: string; member_id: string | null }[]>`
       SELECT a.id AS account_id, m.id AS member_id FROM community.account_sessions s
       JOIN community.accounts a ON a.id = s.account_id
-      LEFT JOIN community.members m ON m.account_id = a.id AND m.app_id = s.app_id
+      LEFT JOIN community.members m ON m.account_id = a.id AND m.app_id = ${appId}
       WHERE s.token_hash = ${AccountSession.hash(token)} AND s.ended_at IS NULL
-        AND s.expires_at > now() AND s.app_id = ${appId} AND a.left_at IS NULL
+        AND s.expires_at > now() AND (s.app_id = ${appId} OR ${shared}) AND a.left_at IS NULL
         AND (a.suspended_until IS NULL OR a.suspended_until <= now())`;
     return row ? new MemberActor(appId, row.member_id, row.account_id) : null;
   }

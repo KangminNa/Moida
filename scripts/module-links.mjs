@@ -28,6 +28,8 @@ const REGISTRIES = {
     registerSite: ['provides', 'site'],
     siteHost: ['asks', 'site'],
     siteOrigin: ['asks', 'site'],
+    appsHost: null,
+    appsOrigin: null,
     stale: null,
     openPaths: null,
   },

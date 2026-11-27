@@ -21,11 +21,14 @@ const MISMATCH: ApiReply<MemberMe> = {
 // 그사이 새 버전이 올라왔으면 서버가 409로 다시 읽게 한다. 공통 약관이 아직 없으면 가입을 받지 않는다
 // community: 커뮤니티 앱인가 (글 · 댓글의 가입 직후 대기를 알린다. 그 밖의 앱에는 글 · 댓글이 없다)
 export function JoinPanel({
+  base,
   csrf,
   returnTo,
   community,
   terms,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 '', 공통 앱 도메인 /<앱>) */
+  base: string;
   csrf: string | null;
   returnTo: string;
   community: boolean;
@@ -203,7 +206,7 @@ export function JoinPanel({
       </button>
       <p className="member-hint">
         이 사이트의 다른 앱에서 가입했으면 같은 계정으로{' '}
-        <a href={`/_/login?return=${encodeURIComponent(returnTo)}`}>로그인</a>.
+        <a href={`${base}/_/login?return=${encodeURIComponent(returnTo)}`}>로그인</a>.
         {community && ' 가입하고 5분 뒤부터 글 · 댓글을 쓸 수 있어요.'}
       </p>
     </form>

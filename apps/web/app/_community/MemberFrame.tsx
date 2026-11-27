@@ -28,16 +28,16 @@ export function MemberFrame({
   title: string;
   children: ReactNode;
 }) {
-  const { app, account, member } = place;
+  const { app, account, member, base } = place;
   const style = themeStyle(app.theme);
-  const logo = app.theme?.logo ? `/files/${encodeURIComponent(app.theme.logo)}` : null;
+  const logo = app.theme?.logo ? `${base}/files/${encodeURIComponent(app.theme.logo)}` : null;
   return (
     <div
       className="member-theme"
       style={style ? { ...style, background: 'var(--bg)', color: 'var(--fg)' } : undefined}
     >
       <header className="blog-top">
-        <a className="blog-brand" href="/">
+        <a className="blog-brand" href={`${base}/`}>
           {logo ? (
             // biome-ignore lint/performance/noImgElement: 앱 코드의 파일이라 Next 이미지 최적화를 거치지 않는다
             <img className="member-logo" src={logo} alt="" width={24} height={24} />
@@ -46,13 +46,13 @@ export function MemberFrame({
         </a>
         <nav aria-label="회원">
           {member ? (
-            <a href="/_/me">{member.nickname}</a>
+            <a href={`${base}/_/me`}>{member.nickname}</a>
           ) : account ? (
-            <a href="/_/enter">참여</a>
+            <a href={`${base}/_/enter`}>참여</a>
           ) : (
             <>
-              <a href="/_/login">로그인</a>
-              <a href="/_/join">가입</a>
+              <a href={`${base}/_/login`}>로그인</a>
+              <a href={`${base}/_/join`}>가입</a>
             </>
           )}
         </nav>
@@ -63,8 +63,8 @@ export function MemberFrame({
           {children}
         </section>
         <nav className="member-legal" aria-label="약관">
-          <a href="/_/terms">이용약관</a>
-          <a href="/_/privacy">개인정보처리방침</a>
+          <a href={`${base}/_/terms`}>이용약관</a>
+          <a href={`${base}/_/privacy`}>개인정보처리방침</a>
         </nav>
       </main>
     </div>

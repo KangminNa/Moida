@@ -37,6 +37,17 @@
   --radius-dock: 24px;
   --radius-sheet: 26px;
   --edge: 16px;
+  /* 공통 앱 도메인 첫 화면 (C안, _blog/apps-field.css): 밝기 설정과 상관없이 소개는 어둡게, 앱 목록은 밝게 */
+  --field-night: #1f1e22;
+  --field-day: #e7e6eb;
+  --field-paper: #efeee9;
+  --field-ink: #151518;
+  --field-tile: #18181b;
+  --field-tile-hover: #222226;
+  --field-dim: #a3a2a8;
+  --field-dim-day: #56555c;
+  --field-seg: #605f66;
+  --field-desc: #b9b8bd;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { MemberFrame } from '../../../../_community/MemberFrame';
-import { memberPlace, memberTitle, termsOf } from '../../../../_community/member-page';
+import { memberPlace, memberTitle, termsOf, toScreen } from '../../../../_community/member-page';
 import { memberReturn } from '../../../../_community/return-path';
 import { JoinPanel } from './JoinPanel';
 
@@ -16,13 +16,14 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function JoinPage({ params, searchParams }: Props) {
   const place = await memberPlace((await params).app);
-  const back = memberReturn((await searchParams).return);
+  const back = memberReturn((await searchParams).return, place.base);
   if (place.member) redirect(back);
-  if (place.account) redirect(`/_/enter?return=${encodeURIComponent(back)}`);
+  if (place.account) toScreen(place, 'enter', back);
   const terms = await termsOf(place);
   return (
     <MemberFrame place={place} title="가입">
       <JoinPanel
+        base={place.base}
         csrf={place.csrf}
         returnTo={back}
         community={place.app.kind === 'community'}

@@ -29,6 +29,7 @@ export default async function MePage({ params }: Props) {
     <MemberFrame place={place} title="내 정보">
       <MePanel
         key={`me:${member.version}`}
+        base={place.base}
         csrf={place.csrf}
         account={account}
         member={member}
@@ -36,7 +37,7 @@ export default async function MePage({ params }: Props) {
       />
       <AccountFill key={`fill:${account.version}`} csrf={place.csrf} account={account} />
       <NewsMail key={`news:${account.version}`} csrf={place.csrf} account={account} />
-      <LeavePanel csrf={place.csrf} community={place.app.kind === 'community'} />
+      <LeavePanel base={place.base} csrf={place.csrf} community={place.app.kind === 'community'} />
     </MemberFrame>
   );
 }

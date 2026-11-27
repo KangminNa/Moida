@@ -18,11 +18,14 @@ const MISMATCH: ApiReply<null> = {
 // 계정 비밀번호 바꾸기(모든 앱의 다른 로그인은 끝난다), 로그아웃.
 // 동작마다 오류를 제자리에 보이게 useAction을 따로 둔다 (web 규칙)
 export function MePanel({
+  base,
   csrf,
   account,
   member,
   notice,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 '', 공통 앱 도메인 /<앱>) */
+  base: string;
   csrf: string | null;
   account: AccountSelf;
   member: MemberSelf;
@@ -63,7 +66,7 @@ export function MePanel({
 
   async function logout() {
     const reply = await out.run('logout', () => memberApi(csrf, 'POST', 'logout'));
-    if (reply?.ok) window.location.replace('/');
+    if (reply?.ok) window.location.replace(`${base}/`);
   }
 
   return (
