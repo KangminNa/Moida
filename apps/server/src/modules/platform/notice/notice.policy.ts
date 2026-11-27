@@ -27,11 +27,13 @@ export class PushMessage {
   }
 }
 
-/** 이번 차례에 할 일: 보낼 푸시와 다룬 알림(보냈거나 보내지 않기로 한 것) */
+/** 이번 차례에 할 일: 보낼 푸시와 다룬 알림(보냈거나 보내지 않기로 한 것), 메일로도 보낼 것 */
 export class PushPlan {
   constructor(
     readonly messages: readonly PushMessage[],
     readonly handled: readonly string[],
+    /** 메일로도 보낼 것 (2026-11-27): 이번에 푸시로 보내는 알림 가운데 종류의 메일이 켜진 것만, 같은 묶음 규칙으로 */
+    readonly mails: readonly PushMessage[] = [],
   ) {}
 
   get empty(): boolean {
@@ -45,6 +47,7 @@ export class PushPlan {
 //   조용한 시간에는 아무것도 보내지 않고 미룬다. 끝나면 다음 차례에 보낸다
 //   즉시: 바로. 세 개가 넘게 쌓였으면(조용한 시간 뒤) 하나로 묶는다
 //   묶음: 가장 오래된 것 뒤로 묶음 시각(매시 정각 · 하루 한 번)이 지났으면 하나로 묶어서
+//   메일: 보내는 것 가운데 종류의 메일이 켜진 것만 같은 규칙으로 (메일만 따로 보내는 때는 없다)
 export class NoticePolicy {
   private static readonly MINUTE_MS = 60_000;
   private static readonly DAY_MS = 24 * 60 * 60_000;
@@ -72,23 +75,37 @@ export class NoticePolicy {
       else immediate.push(notice);
     }
     if (this.quiet(settings, now)) return new PushPlan([], handled);
-    const messages: PushMessage[] = [];
-    if (immediate.length > NoticePolicy.SINGLE_MAX) messages.push(NoticePolicy.bundle(immediate));
-    else messages.push(...immediate.map((n) => NoticePolicy.single(n)));
-    handled.push(...immediate.map((n) => n.id));
     const oldest = digest.reduce<Date | null>(
       (min, n) => (min === null || n.created_at < min ? n.created_at : min),
       null,
     );
-    if (oldest !== null && this.lastDigestSlot(settings, now) > oldest) {
+    const due = oldest !== null && this.lastDigestSlot(settings, now) > oldest;
+    const mailed = (n: PendingNotice) =>
+      settings.mailOf(byKind.get(n.kind) ?? new NoticeKind(n.kind, n.kind, n.severity));
+    handled.push(...immediate.map((n) => n.id));
+    if (due) handled.push(...digest.map((n) => n.id));
+    return new PushPlan(
+      NoticePolicy.messagesOf(immediate, due ? digest : []),
+      handled,
+      NoticePolicy.messagesOf(immediate.filter(mailed), due ? digest.filter(mailed) : []),
+    );
+  }
+
+  /** 즉시 알림(셋이 넘으면 하나로) + 때가 된 묶음 알림(둘 이상이면 하나로) */
+  private static messagesOf(
+    immediate: readonly PendingNotice[],
+    digest: readonly PendingNotice[],
+  ): PushMessage[] {
+    const messages: PushMessage[] = [];
+    if (immediate.length > NoticePolicy.SINGLE_MAX) messages.push(NoticePolicy.bundle(immediate));
+    else messages.push(...immediate.map((n) => NoticePolicy.single(n)));
+    if (digest.length > 0)
       messages.push(
         digest.length === 1
           ? NoticePolicy.single(digest[0] as PendingNotice)
           : NoticePolicy.bundle(digest),
       );
-      handled.push(...digest.map((n) => n.id));
-    }
-    return new PushPlan(messages, handled);
+    return messages;
   }
 
   /** 지금이 조용한 시간인가 (시간대 기준, 자정을 넘는 범위도) */

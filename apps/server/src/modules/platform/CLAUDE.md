@@ -15,7 +15,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - 알림(notifications, `notice/`): 무엇을 알리는지 모른다 (종류 · 이름 · 등급 · 제목 · 본문 · 주소는 알리는 쪽). 모듈은 `onModuleInit`에서 `NoticeCatalog.define(new NoticeKind(…).from(이벤트들, 만들기).settledOn(이벤트들, 묶음 키))`로 등록하고,
   `Outbox.listen`이 이벤트를 쓰는 같은 트랜잭션에서 `NoticeCatalog.onEvents` → `Notices.post`(경로가 off면 안 남김, 같은 `group_key`의 안 읽은 알림은 바꾸고 `push_sent_at`을 비움) · `Notices.settle`(끝난 일의 알림 읽음).
   이벤트 없이 남기는 알림도 종류는 등록한다 (설정 화면에 보이게). 읽기 `api/notifications`(최근 30개 · 안 읽은 수), 읽음 `api/notifications/read`. 주인만
-- 알림 설정(notice_settings, `NoticeSettings`): 공간마다 한 줄, 없으면 기본값. 묶음 간격 · 조용한 시간 · 시간대 · 종류별 경로(push · center · off). `api/notice-settings`(주인만, 종류 목록은 `NoticeCatalog`에서)
+- 알림 설정(notice_settings, `NoticeSettings`): 공간마다 한 줄, 없으면 기본값. 묶음 간격 · 조용한 시간 · 시간대 · 종류별 경로(push · center · off) · 종류별 메일(`mail` on · off, 없으면 `NoticeKind.defaultMail`: `noMailByDefault()`로 등록한 종류(대화의 답)는 끔, 2026-11-27). `api/notice-settings`(주인만, 종류 목록은 `NoticeCatalog`에서)
 - 멈춘 이벤트(outbox의 `failed_at`, `failed-event/`, 리팩토링 R1): 일꾼이 8번 실패한 이벤트를 멈출 때 같은 트랜잭션에서 알림 `platform.event.failed`(즉시, 묶음 키 `event-failed` 하나: `FailedEvent.notice`)를 남긴다. 읽기 `api/events/failed`(`FailedEventQuery`, 최근에 멈춘 50개), 다시 시도 `api/events/:id/retry`(`FailedEventService`: `FailedEvent.retry`가 멈춘 것만 시도 0 · `failed_at` NULL · 지금으로 돌리고, 같은 트랜잭션에서 일꾼을 깨우고(`Outbox.poke`), 공간에 멈춘 것이 더 없으면 알림을 읽음으로). 관리자는 자기 공간, 명령줄(`pnpm run events`, `SystemActor`)은 모두. 실패를 저절로 작업 실패로 바꾸지 않는다: 다시 시도해서 성공하면 어긋난다. 받는 쪽은 두 번 불려도 결과가 같아야 한다는 규칙이 있어 처음처럼 다시 넘긴다
 - 보안 기록(security_events, `security/`, 2026-11-15): 무엇의 사건인지 모른다 (종류 · 내용은 기록하는 모듈이). `SecurityLog`는 `Notices`처럼 부르는 쪽의 연결을 받아 한 줄을 남기고, 1분 안의 같은 공간 · 종류 · 곳 · 내용이면 `count` · `last_at`만 올린다 (새 줄이면 true: 알림을 한 번만 보내게). 거부된 접근은 `DomainErrorFilter`가 `/api` · `/mcp` · `/oauth`의 401 · 403 · 429에서 `SecurityLogService.record`로 남긴다 (기다리지 않고, 실패는 서버 로그. 401은 토큰 · 쿠키를 내민 요청만, 모듈이 사건으로 남긴 오류는 `DomainError.recorded`로 건너뜀). 읽기 `api/security/events`(주인만, `SecurityEventQuery`, 공간을 모르는 사건도 함께), 90일 지난 줄은 `SecurityLogPurgeJob`(하루)이 지운다. 비밀번호 · 토큰 · 쿠키 값은 어디에도 넣지 않는다
 - 브라우저 푸시(push_subscriptions, `PushSubscription`): 구독은 알려진 푸시 서비스의 https 주소만 (`CAIRN_PUSH_EXTRA_ORIGINS`는 시험 · 직접 운영하는 서비스). `api/push`(키 · 구독 · 끄기 · 보내 보기, 주인만).
@@ -66,7 +66,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 ## 내보내는 이벤트 / 받는 이벤트
 칸의 원본은 `platform.events.json` (모듈마다 같다: 아래 표 · 목록은 뜻을 적고, 칸은 그 파일이 정한다).
 
-`platform.setting.changed { approvalId, outcome, error? }` (승인한 알림 · 플러그인 설정 바꾸기의 결과, 2026-11-15 D. task의 `ApprovalResultHandler`가 결재를 끝낸다), `platform.notice.sent { title, body, link, tag }` (`NoticePushService`가 푸시로 보내기로 정한 것마다 같은 트랜잭션에 남긴다. 브라우저 구독이 없어도. 플러그인 `email`이 받아 메일로, 2026-11-26) / 없음. 대신 `Outbox.listen`으로 모든 이벤트를 쓰는 트랜잭션 안에서 보고, 모듈이 등록한 종류의 알림을 남긴다 (`NoticeCatalog.onEvents`)
+`platform.setting.changed { approvalId, outcome, error? }` (승인한 알림 · 플러그인 설정 바꾸기의 결과, 2026-11-15 D. task의 `ApprovalResultHandler`가 결재를 끝낸다), `platform.notice.sent { title, body, link, tag }` (`NoticePushService`가 푸시로 보내기로 정한 것 가운데 종류의 메일이 켜진 것(`PushPlan.mails`)마다 같은 트랜잭션에 남긴다. 브라우저 구독이 없어도. 플러그인 `email`이 받아 메일로, 2026-11-26) / 없음. 대신 `Outbox.listen`으로 모든 이벤트를 쓰는 트랜잭션 안에서 보고, 모듈이 등록한 종류의 알림을 남긴다 (`NoticeCatalog.onEvents`)
 
 ## 써도 되는 모듈
 없음. platform은 다른 모듈을 모른다.

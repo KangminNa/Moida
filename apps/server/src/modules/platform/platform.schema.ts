@@ -38,6 +38,7 @@ export const noticeSettings = platformSchema.table('notice_settings', {
   routes: jsonb('routes').notNull(),
   version: integer('version').notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  mail: jsonb('mail').notNull(),
 });
 
 /** platform.notifications */

@@ -118,6 +118,7 @@
 `onModuleInit`에서 platform의 `NoticeCatalog`에 등록한다. 알림 글과 주소는 여기서 정하고, 어디로 · 언제 보낼지는 platform이 정한다.
 - `task.approval.requested` 결재 요청 (즉시): 결재가 올라오면. 결재가 끝나면(승인 · 거절 · 고쳐 달라 · 취소) 그 알림은 읽음 (`approval:<결재>`). 대화의 결재(`chatId`)는 알리지 않고 결과 카드가 생길 때 한 번 ("결과를 골라 주세요", 대화로 가는 주소)
 - `task.task.failed` 작업 실패 (즉시): `task.task.changed`의 `failed`에서. 본문은 이벤트의 `error`
+- `task.chat.answered` 대화의 답 (즉시): 회차의 답. 메일은 기본 끔(`noMailByDefault`, 2026-11-27): 관리자가 알림 설정에서 켜거나, 자동화는 레시피의 "메일로 받기"로
 - `task.schedule.stopped` 자동화 멈춤 (즉시): 레시피의 일이 3번 잇달아 실패해 끈 때 `ScheduleService.checkHealth`가 같은 트랜잭션에서 `Notices.post`로
 - `task.schedule.skipped` 스케줄 한도 (기록만): 이벤트 없이 `ScheduleService`가 같은 트랜잭션에서 `Notices.post`로 (스케줄마다 한 줄)
 

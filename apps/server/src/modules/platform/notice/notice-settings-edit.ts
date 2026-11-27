@@ -11,16 +11,16 @@ import { NoticeSettingsRepository } from './notice-settings.repository';
  * 저장은 부르는 쪽이 정한다
  */
 export class NoticeSettingsEdit {
-  /** 대화로 바꾸는 알림 설정 (get_settings notices · propose_setting notice). 경로는 종류마다 한 줄로 펼친다 */
+  /** 대화로 바꾸는 알림 설정 (get_settings notices · propose_setting notice). 경로 · 메일은 종류마다 한 줄로 펼친다 */
   static readonly SETTING: SettingShape = {
     setting: 'notice',
     list: 'notices',
     ops: ['edit'],
-    fields: ['digest', 'digest_time', 'quiet_start', 'quiet_end', 'time_zone', 'routes'],
+    fields: ['digest', 'digest_time', 'quiet_start', 'quiet_end', 'time_zone', 'routes', 'mail'],
     target: 'one',
     versioned: true,
     grants: [],
-    maps: ['routes'],
+    maps: ['routes', 'mail'],
   };
 
   constructor(

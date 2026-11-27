@@ -12,6 +12,7 @@ const KINDS = [
   new NoticeKind('approval', '결재 요청', NoticeKind.IMMEDIATE),
   new NoticeKind('session', '세션 들어옴', NoticeKind.DIGEST),
   new NoticeKind('skip', '스케줄 한도', NoticeKind.LOG),
+  new NoticeKind('answer', '대화의 답', NoticeKind.IMMEDIATE).noMailByDefault(),
 ];
 const at = (iso: string) => new Date(iso);
 let seq = 0;
@@ -63,6 +64,43 @@ describe('NoticePolicy', () => {
     assert.deepEqual([...plan.handled].sort(), [a.id, s.id].sort());
     const center = policy.decide([a], settings({ routes: { approval: 'center' } }), KINDS, now);
     assert.deepEqual([center.messages.length, center.handled], [0, [a.id]]);
+  });
+
+  test('메일은 푸시로 보내는 것 가운데 종류의 메일이 켜진 것만 (대화의 답은 기본 끔)', () => {
+    const now = at('2026-11-11T03:10:00Z');
+    const a = notice('approval', 'immediate', '2026-11-11T03:09:00Z', '승인을 기다려요');
+    const b = notice('answer', 'immediate', '2026-11-11T03:09:00Z', '답이 왔어요');
+    const plan = policy.decide([a, b], settings(), KINDS, now);
+    assert.deepEqual(
+      plan.messages.map((m) => m.title),
+      ['승인을 기다려요', '답이 왔어요'],
+    );
+    assert.deepEqual(
+      plan.mails.map((m) => m.title),
+      ['승인을 기다려요'],
+    );
+    const flipped = policy.decide(
+      [a, b],
+      settings({ mail: { approval: 'off', answer: 'on' } }),
+      KINDS,
+      now,
+    );
+    assert.deepEqual(
+      flipped.mails.map((m) => m.title),
+      ['답이 왔어요'],
+    );
+    const center = policy.decide(
+      [b],
+      settings({ routes: { answer: 'center' }, mail: { answer: 'on' } }),
+      KINDS,
+      now,
+    );
+    assert.deepEqual(
+      [center.messages.length, center.mails.length],
+      [0, 0],
+      '푸시가 아니면 메일도 없다',
+    );
+    assert.throws(() => settings({ mail: { approval: 'yes' } }), /on · off/);
   });
 
   test('하루 지난 알림은 보내지 않는다. 즉시가 셋을 넘으면 하나로 묶는다', () => {
