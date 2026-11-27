@@ -116,6 +116,8 @@ export class DelegationPolicy {
         ...(order.deliver ? { deliver: order.deliver } : {}),
         // 이 일의 방법 (C4): 러너가 도구를 고른다 (web이면 커넥터를 붙이지 않는다)
         ...(order.route ? { route: order.route } : {}),
+        // 검증받기 (L2): 끝나면 SubtaskService가 검증 일을 연다 (SubtaskVerify)
+        ...(order.verify ? { verify: true } : {}),
         // 앱 코드를 고치는 make 일 (스토어 1-6b): 어느 앱인지만 물려준다. make 일이 아니면 MakeOrder가 막는다
         ...(order.appId ? { appCode: { appId: order.appId } } : {}),
         // 고른 모델 · 낮춘 모델: JobView가 팀원의 설정 대신 보내고, 이 일이 다시 맡기면 그 상한이 된다
