@@ -4,7 +4,7 @@
     "kakao": {
       "label": "카카오맵",
       "keySetting": "kakaoJsKey",
-      "script": "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey={key}",
+      "script": "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&libraries=clusterer&appkey={key}",
       "sdkHosts": ["dapi.kakao.com", "t1.daumcdn.net"],
       "hosts": ["dapi.kakao.com", "t1.daumcdn.net"],
       "search": {

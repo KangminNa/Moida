@@ -5,8 +5,8 @@ import {
   Read,
   type Work,
 } from '../../../apps/server/src/plugin-api';
-import type { MapLookup } from './map-lookup';
-import { AddressView, PlaceListView } from './views';
+import { MapLookup } from './map-lookup';
+import { AddressView, MapUsageView, PlaceListView } from './views';
 
 // 앱 코드의 cairn.map.search · geocode · reverse가 부르는 찾기 (docs/지도.md MP-2). 누구나 부른다 (공개 앱의 방문자):
 // 서버 키는 서버에만 있고, 곳마다 분당 상한 · 하루 상한 · 10분 기억은 MapLookup이 맡는다.
@@ -130,5 +130,27 @@ export class ReverseGeocode extends Read<{ lat: number; lng: number }> {
     const key = `reverse:${lat.toFixed(5)},${lng.toFixed(5)}`;
     const address = await this.lookup.answer(work.place, key, (g) => g.reverse(lat, lng));
     return new AddressView(address, this.provider, this.attribution);
+  }
+}
+
+/** GET /api/p/map/usage: 찾기 사용량 (관리자, 콘솔 › 지도) */
+export class MapUsage extends Read<Record<string, never>> {
+  readonly name = 'usage';
+  readonly allow = Operation.OWNER;
+
+  constructor(
+    private readonly provider: string,
+    private readonly ready: boolean,
+    private readonly limit: number,
+  ) {
+    super();
+  }
+
+  input(): Record<string, never> {
+    return {};
+  }
+
+  async run(_work: Work, _actor: Actor): Promise<MapUsageView> {
+    return new MapUsageView(this.provider, this.ready, MapLookup.spentToday(), this.limit);
   }
 }

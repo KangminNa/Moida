@@ -1,6 +1,6 @@
 {
   "name": "map",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "cairn": ">=0.11",
   "description": "지도 API를 등록한다. 앱 코드는 cairn.map.create(자리, { places })로 지도를 그리고 cairn.map.search · geocode · reverse로 장소 · 주소를 찾는다. 어느 회사 지도인지는 여기서 정한다 (회사마다 키 이름 · 주소는 providers.json). 브라우저용 키는 공개 값, 찾기용 서버 키는 암호화해 서버에만 둔다. 카카오 · 네이버 · 구글 지도는 앱의 도메인으로 연 화면에서만 돌고, 격리된 화면(미리 보기 · 기본 도메인 · 페이지)은 키가 필요 없는 OpenStreetMap으로 그린다",
   "guide": {
@@ -81,7 +81,14 @@
   "api": {
     "GET /search": "search",
     "GET /geocode": "geocode",
-    "GET /reverse": "reverse"
+    "GET /reverse": "reverse",
+    "GET /usage": "usage"
   },
-  "uses": ["api"]
+  "menu": {
+    "group": "운영",
+    "name": "지도",
+    "icon": "compass",
+    "page": "web/MapPage.tsx"
+  },
+  "uses": ["api", "menu"]
 }

@@ -37,3 +37,17 @@ export class AddressView {
     return { address: this.address, provider: this.provider, attribution: this.attribution };
   }
 }
+
+/** 찾기 사용량 (콘솔 › 지도, MP-3): 회사 · 켜졌는지 · 오늘(UTC) 부른 수 · 하루 상한 */
+export class MapUsageView {
+  constructor(
+    private readonly provider: string,
+    private readonly ready: boolean,
+    private readonly today: number,
+    private readonly limit: number,
+  ) {}
+
+  toJSON() {
+    return { provider: this.provider, ready: this.ready, today: this.today, limit: this.limit };
+  }
+}

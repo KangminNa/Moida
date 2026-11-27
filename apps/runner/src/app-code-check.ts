@@ -2,6 +2,7 @@ import type { AppCodeBase } from './app-code-base';
 import { AppManifestCheck } from './app-manifest-check';
 import { DesignCheck } from './design-check';
 import { DesignDocCheck } from './design-doc-check';
+import { MapCreditCheck } from './map-credit-check';
 import { StageCheck } from './stage-check';
 
 /** 검사할 파일 하나: 앞 코드의 것이거나 AI가 낸 것. text는 읽은 글(템플릿 · cairn.json)만, 못 읽었으면 null */
@@ -86,6 +87,9 @@ export class AppCodeCheck {
     // 디자인 문서 (references/design-research.md): 화면을 냈으면 묶음에 design.md가 있어야 한다
     const doc = DesignDocCheck.check(made, [...all.values()]);
     if (doc) checks.push(doc);
+    // 지도 출처 표시 (docs/지도.md MP-3): 낸 CSS가 지도 위의 출처 · 로고를 숨기면
+    const credit = MapCreditCheck.check(made);
+    if (credit) checks.push(credit);
     // 정적 앱의 HTML은 템플릿이 아니다: 문법 · 데이터 이름을 보지 않는다
     const templates = fixed ? [] : made.filter((f) => AppCodeCheck.isTemplate(f.name));
     if (templates.length === 0) return checks;

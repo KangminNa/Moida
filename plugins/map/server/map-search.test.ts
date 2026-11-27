@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, test } from 'node:test';
 import { MapLookup } from './map-lookup';
 import { type MapSearchBases, MapSearchGateway } from './map-search.gateway';
-import { SearchPlaces } from './operations';
+import { MapUsage, SearchPlaces } from './operations';
 
 // 지도 찾기 (docs/지도.md MP-2): 회사 응답을 테스트용 웹 서버(127.0.0.1)로 흉내 내고, 서버 키가 머리글 · 주소로만 가는지,
 // 회사마다 다른 응답이 같은 모양이 되는지, 곳마다 · 하루 상한과 10분 기억을 본다
@@ -189,6 +189,20 @@ describe('MapLookup', () => {
       /너무 많이/,
     );
     assert.equal(await lookup.answer('198.51.100.10', 'same', async () => 'x', now), 'x');
+  });
+});
+
+describe('MapUsage', () => {
+  test('관리자만, 회사 · 켜짐 · 오늘 부른 수 · 하루 상한', async () => {
+    const usage = new MapUsage('kakao', true, 50000);
+    assert.equal(usage.allow, 'owner');
+    const view = await usage.run(undefined as never, undefined as never);
+    assert.deepEqual(view.toJSON(), {
+      provider: 'kakao',
+      ready: true,
+      today: MapLookup.spentToday(),
+      limit: 50000,
+    });
   });
 });
 

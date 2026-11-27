@@ -53,4 +53,17 @@ describe('지도 찾기 (/api/p/map)', () => {
     const google = await api.get('/api/p/map/search?q=%EB%B9%B5');
     assert.equal(google.status, 404, '구글 찾기는 구글 지도와 함께만');
   });
+
+  test('사용량은 관리자만: 방문자 403, 관리자는 회사 · 켜짐 · 오늘 · 한도', async () => {
+    assert.equal((await settings({ searchProvider: 'kakao', dailyLimit: '200' })).status, 200);
+    const visitor = await api.get('/api/p/map/usage');
+    assert.equal(visitor.status === 401 || visitor.status === 403, true, visitor.text);
+    const usage = await api.request('GET', '/api/p/map/usage', owner);
+    assert.equal(usage.status, 200, usage.text);
+    const body = usage.json() as Json;
+    assert.equal(body.provider, 'kakao');
+    assert.equal(body.ready, true);
+    assert.equal(body.limit, 200);
+    assert.equal(typeof body.today, 'number');
+  });
 });

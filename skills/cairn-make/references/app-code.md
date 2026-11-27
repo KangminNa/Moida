@@ -172,7 +172,9 @@
 </script>
 ```
 
-- `cairn.map.create(자리, { places, zoom?, onSelect? })` → `{ provider, map, sdk, select(i) }`. 자리에는 높이를 준다. 좌표가 있는 장소만 핀이 되고, 핀을 누르면 이름이 뜨고 `onSelect(i, place)`가 불린다. 목록에서 `select(i)`로 그 핀을 연다.
+- `cairn.map.create(자리, { places, zoom?, cluster?, onSelect? })` → `{ provider, map, sdk, select(i) }`. 자리에는 높이를 준다. 좌표가 있는 장소만 핀이 되고, 핀을 누르면 이름이 뜨고 `onSelect(i, place)`가 불린다. 목록에서 `select(i)`로 그 핀을 연다.
+- 장소가 수십 곳 넘게 몰리면 `cluster: true`로 가까운 핀을 숫자 하나로 묶는다 (OpenStreetMap · 카카오 · 구글. 네이버는 묶지 않고 그대로 그린다). 묶기 라이브러리를 받지 못해도 핀은 그린다.
+- 지도 위의 출처 · 로고(`.leaflet-control-attribution`, 회사 로고)는 지도 회사 약관상 숨기지 않는다: `display:none` · `visibility:hidden` · `opacity:0`으로 가리면 러너 검사가 거절한다.
 - 카카오 · 네이버 · 구글 지도는 그 앱의 도메인으로 연 화면에서만 돈다 (회사 콘솔에 그 도메인을 등록한 키). 미리 보기 · 기본 도메인처럼 격리된 화면에서는 같은 코드가 OpenStreetMap으로 그린다. 고른 회사의 지도를 받지 못해도 OpenStreetMap으로 그리고, 그것도 못 받으면 Error를 던진다: 목록이 남게 한다.
 - 좌표를 모르면 지어내지 않고 주소를 넘긴다: `places: [{ address: '서울 중구 세종대로 110', name: '서울시청' }]`. 서버가 지도 플러그인의 서버 키로 좌표를 찾아 핀을 찍는다 (찾기를 켜지 않았거나 못 찾은 주소는 빠지고, 목록은 남긴다).
 - 검색 상자 · "내 주변"은 `cairn.map.search(q, { near?: { lat, lng }, size? })` → `{ places: [{ name, address, lat, lng, id }], provider, attribution }`, 주소 → 좌표는 `cairn.map.geocode(address)`, 좌표 → 주소는 `cairn.map.reverse(lat, lng)`. 결과 옆에 `attribution`(찾은 회사)을 작게 적는다. 찾기를 켜지 않았으면 Error(`status` 404)라 검색 상자를 숨긴다. 방문자 한 곳에서 분당 30번까지라 글자마다 부르지 않고 입력을 마치면(엔터 · 0.4초 멈춤) 부른다.
