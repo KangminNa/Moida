@@ -4,6 +4,7 @@ import { Slot } from '../_plugins/Slot';
 import { NewTabLink } from '../_ui/NewTabLink';
 import { SOURCE_URL } from '../_ui/source';
 import { AppIcon } from './AppIcon';
+import { appsOrigin } from './apps-domain';
 import { formatDate, postPath } from './format';
 import { GatherMark } from './GatherMark';
 import { APP_KIND_LABELS } from './labels';
@@ -28,7 +29,7 @@ export function StoreHome({ site, mail }: { site: Site; mail: StoreMail }) {
   for (const p of recent) if (p.app && !latest.has(p.app.slug)) latest.set(p.app.slug, p);
   const name = space.name || 'Moida';
   const highlights = glance(space.highlights);
-  const joinable = joinableApps(apps);
+  const joinable = joinableApps(apps, appsOrigin());
   const join = joinHref(joinable);
   return (
     <div className="store">

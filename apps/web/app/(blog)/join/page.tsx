@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { appsOrigin } from '../../_blog/apps-domain';
 import { SiteFooter } from '../../_blog/SiteFooter';
 import { joinableApps } from '../../_blog/StoreJoin';
 import { siteNow } from '../../_blog/site';
@@ -30,7 +31,7 @@ export default async function StoreJoinPage() {
     serverGet<Term>('/api/store/terms/terms', true),
     serverGet<Term>('/api/store/terms/privacy', true),
   ]);
-  const apps = joinableApps(site.apps);
+  const apps = joinableApps(site.apps, appsOrigin());
   return (
     <>
       <header className="blog-top">
