@@ -9,6 +9,8 @@
 //   6. 스킬에 비밀값 모양(sk-ant- · ghp_ · AKIA)과 개인 절대 경로(/home/<이름> · /Users/)가 없다
 //   7. 러너 스킬과 지시문 틀에 옛 말(팀원 · 팀장)이 없다 (2026-11-21 팀 없음 결정. 일꾼 · 대표로 쓴다)
 //   8. AGENTS.md의 명령 표에 적은 `pnpm <스크립트>`가 package.json에 있다
+//   9. 러너 스킬과 지시문 틀은 콘솔에서 고칠 수 있는 크기다: 파일 하나 96KB · 합쳐 128KB (서버 SkillFiles와 같은 값, 2026-11-27:
+//      저장소 판이 한도를 넘으면 콘솔에서 새 버전을 쌓지 못한다)
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +26,8 @@ const OLD_WORDS = ['팀원', '팀장'];
 const SECRET = [/sk-ant-[A-Za-z0-9_-]{8}/, /ghp_[A-Za-z0-9]{20}/, /AKIA[0-9A-Z]{16}/];
 const PERSONAL_PATH = [/\/home\/(?!user\b)[a-z][\w-]*\//, /\/Users\/[\w-]+\//];
 const PNPM_BUILTINS = new Set(['run', 'install', 'exec', 'dlx', 'add', 'i', 'test']);
+const SKILL_FILE_MAX = 96 * 1024;
+const SKILL_TOTAL_MAX = 128 * 1024;
 
 function files(dir, pick) {
   if (!existsSync(dir)) return [];
@@ -93,6 +97,19 @@ for (const name of readdirSync(skillsDir).filter((n) =>
     if (SECRET.some((re) => re.test(body))) problems.push(`${rel(path)}: 비밀값 모양이 있어요`);
     if (PERSONAL_PATH.some((re) => re.test(body)))
       problems.push(`${rel(path)}: 개인 절대 경로가 있어요`);
+  }
+  if (head['cairn-where'] === 'runner' || TEMPLATE_SKILLS.has(name)) {
+    const sizes = files(dir, () => true).map((p) => [p, statSync(p).size]);
+    for (const [path, size] of sizes)
+      if (size > SKILL_FILE_MAX)
+        problems.push(
+          `${rel(path)}: 콘솔에서 고칠 수 있는 ${SKILL_FILE_MAX / 1024}KB를 넘어요 (${size}바이트)`,
+        );
+    const total = sizes.reduce((sum, [, size]) => sum + size, 0);
+    if (total > SKILL_TOTAL_MAX)
+      problems.push(
+        `skills/${name}: 파일을 합쳐 ${SKILL_TOTAL_MAX / 1024}KB를 넘어요 (${total}바이트)`,
+      );
   }
   if (head['cairn-where'] === 'runner' || TEMPLATE_SKILLS.has(name))
     for (const word of OLD_WORDS)
