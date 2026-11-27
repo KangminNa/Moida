@@ -63,3 +63,15 @@ export interface SubscriberRow {
   account_id: string | null;
 }
 export type SubscriberNew = Partial<SubscriberRow> & Pick<SubscriberRow, 'id' | 'address' | 'status' | 'token'>;
+
+/** email.usage.kind (값 목록 CHECK) */
+export const USAGE_KIND = ['code', 'notice', 'answer', 'test', 'confirm', 'post', 'news'] as const;
+export type UsageKind = (typeof USAGE_KIND)[number];
+/** email.usage */
+export interface UsageRow {
+  day: string;
+  kind: UsageKind;
+  sent: number;
+  blocked: number;
+}
+export type UsageNew = Partial<UsageRow> & Pick<UsageRow, 'day' | 'kind'>;

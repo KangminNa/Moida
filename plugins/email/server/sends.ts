@@ -9,8 +9,9 @@ import {
 } from '../../../apps/server/src/plugin-api';
 import { sends, subscribers } from './schema';
 import { unsubscribed } from './subscriptions';
-import type { SendRow } from './tables';
-import { DoneView, OverviewView, SendView, SubscriberView } from './views';
+import type { SendRow, UsageKind } from './tables';
+import { MailLimits } from './usage';
+import { DoneView, OverviewView, SendView, SubscriberView, UsageView } from './views';
 
 // 새 글 소식 (2026-11-26): 앱의 글이 공개되면 소식(ready)이 생기고, 관리자가 콘솔(운영 › 메일 구독)에서
 // 보내기를 눌러야 받는 사람마다 한 줄씩 대기열에 올라 일꾼이 보낸다 (원칙 7: 바깥 전송은 사람이 정한다).
@@ -83,7 +84,7 @@ export class Overview extends Read<Record<string, never>> {
   constructor(
     private readonly ready: boolean,
     private readonly open: boolean,
-    private readonly dailyMax: number,
+    private readonly limits: MailLimits,
   ) {
     super();
   }
@@ -109,16 +110,42 @@ export class Overview extends Read<Record<string, never>> {
         limit: Overview.PEOPLE,
       },
     );
-    const [today] = await work.sql<{ n: number }[]>`
-      SELECT (SELECT count(*) FROM email.deliveries WHERE sent_at >= date_trunc('day', now()))::int
-           + (SELECT count(*) FROM email.subscribers WHERE confirm_sent_at >= date_trunc('day', now()))::int AS n`;
     return new OverviewView(
       this.ready,
       this.open,
-      today?.n ?? 0,
-      this.dailyMax,
+      await this.usage(work),
       recent.map((r) => new SendView(r, r.waiting)),
       people.map((p) => new SubscriberView(p)),
+    );
+  }
+
+  /** 오늘(종류마다) · 이번 달 사용량과 기다리는 소식 메일 수 */
+  private async usage(work: Work): Promise<UsageView> {
+    const rows = await work.sql<
+      { kind: UsageKind; today: boolean; sent: number; blocked: number }[]
+    >`
+      SELECT kind, day = (now() AT TIME ZONE 'UTC')::date AS today, sent, blocked FROM email.usage
+      WHERE day >= date_trunc('month', now() AT TIME ZONE 'UTC')::date`;
+    const today = new Map<UsageKind, { sent: number; blocked: number }>();
+    let month = 0;
+    let monthBlocked = 0;
+    for (const r of rows) {
+      month += r.sent;
+      monthBlocked += r.blocked;
+      if (r.today) today.set(r.kind, { sent: r.sent, blocked: r.blocked });
+    }
+    const [queued] = await work.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM email.deliveries d JOIN email.sends s ON s.id = d.send_id
+      WHERE d.status = 'queued' AND s.status = 'sending'`;
+    const l = this.limits;
+    return new UsageView(
+      today,
+      month,
+      monthBlocked,
+      l.dailyMax,
+      l.monthlyMax,
+      MailLimits.BULK_SHARE,
+      queued?.n ?? 0,
     );
   }
 }

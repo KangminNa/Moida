@@ -225,3 +225,42 @@ describe('앱 소식 구독 (email)', () => {
     assert.deepEqual(ok(await visitor(`unsubscribe/${token}`)).apps, []);
   });
 });
+
+describe('메일 사용량 · 한도 (email, 2026-11-27)', () => {
+  const BASE = '/api/p/email';
+  const settings = (extra: Record<string, string>) =>
+    api.request('PUT', '/api/plugins/email/settings', owner, {
+      values: {
+        host: '127.0.0.1',
+        port: String(port),
+        user: USER,
+        password: PASSWORD,
+        siteUrl: 'https://cairn.example',
+        subscriptions: 'true',
+        ...extra,
+      },
+    });
+
+  test('보낸 메일을 종류마다 센다: 콘솔의 메일 화면이 오늘 · 이번 달 · 상한을 보인다', async () => {
+    const usage = ok(await api.get(`${BASE}/overview`, owner)).usage as Json;
+    const kinds = new Map((usage.kinds as Json[]).map((k) => [k.kind, k.sent]));
+    assert.ok((kinds.get('confirm') ?? 0) >= 1, '구독 확인 메일');
+    assert.ok((kinds.get('post') ?? 0) >= 1, '글 소식');
+    assert.ok((kinds.get('test') ?? 0) >= 1, '테스트 메일');
+    assert.equal(usage.dailyMax, 300);
+    assert.equal(usage.monthlyMax, 0);
+    assert.ok(usage.month >= usage.today);
+  });
+
+  test('하루 상한에 닿으면 보내지 않고 막힌 수로 센다', async () => {
+    const before = ok(await api.get(`${BASE}/overview`, owner)).usage as Json;
+    ok(await settings({ dailyMax: String(before.today) }));
+    const answer = ok(await action());
+    assert.equal(answer.ok, false);
+    assert.match(answer.message, /한도/);
+    const after = ok(await api.get(`${BASE}/overview`, owner)).usage as Json;
+    assert.equal(after.today, before.today, '막힌 메일은 보낸 수에 들지 않는다');
+    assert.equal(after.todayBlocked, before.todayBlocked + 1);
+    ok(await settings({}));
+  });
+});

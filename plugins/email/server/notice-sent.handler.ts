@@ -1,6 +1,7 @@
 import { BaseHandler, type DomainEvent } from '../../../apps/server/src/plugin-api';
 import { NoticeMail } from './notice-mail';
 import type { SmtpGateway } from './smtp.gateway';
+import type { MailGate } from './usage';
 
 // platform.notice.sent를 받아 관리자에게 메일 한 통 (일꾼, 트랜잭션 밖). 푸시와 같은 때 · 같은 묶음이다:
 // 조용한 시간 · 묶음 시각 · 종류마다의 경로(push만)는 코어의 알림 설정이 정한다.
@@ -11,6 +12,7 @@ export class NoticeSentHandler extends BaseHandler {
   constructor(
     private readonly smtp: SmtpGateway | null,
     private readonly mail: NoticeMail | null,
+    private readonly gate: MailGate,
   ) {
     super();
   }
@@ -24,6 +26,8 @@ export class NoticeSentHandler extends BaseHandler {
       typeof body === 'string' ? body : '',
       typeof link === 'string' ? link : '',
     );
+    // 메일 한도에 닿았으면 보내지 않고 막힌 수로만 센다 (다시 시도하지 않는다: 콘솔 알림 · 대화에는 그대로 있다)
+    if (!(await this.gate.take('notice'))) return;
     await this.smtp.send(message, NoticeMail.NAME, new Date());
   }
 }
