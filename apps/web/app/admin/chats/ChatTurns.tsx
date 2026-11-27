@@ -3,13 +3,12 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { ApprovalDetail } from '../../_task/ApprovalDetail';
-import { DELIVER_LABELS, NEWS_KINDS, OUTPUT_KINDS, tokens, when } from '../../_task/labels';
+import { DELIVER_LABELS, NEWS_KINDS, tokens, when } from '../../_task/labels';
 import { MarkdownText } from '../../_task/MarkdownText';
-import { OutputOpen } from '../../_task/parts';
 import type { ChatNews, ChatTurn, ChatTurnUsage } from '../../_task/types';
 import { ChatDecisions, type Decision, decisionOf } from './ChatDecisions';
+import { ChatOutputs } from './ChatOutputs';
 import { RefChips } from './ChatRefs';
-import { ChatReportLinks } from './ChatReportLinks';
 import { LinkCards } from './LinkCards';
 
 /** 일하는 중인 회차의 상태 */
@@ -142,28 +141,18 @@ export function ChatTurns({
                   PROCESS.includes(n.kind) && !(n.kind === 'decision' && decisionOf(n.decision)),
               )}
               usage={usage.find((u) => u.turn === t.turn) ?? null}
+              chatId={chatId}
             />
             <div className="bubble theirs" aria-live={t.finishedAt ? undefined : 'polite'}>
               <span className="bubble-meta">
                 {partner ?? '에이전트'}
                 {t.finishedAt ? ` · ${when(t.finishedAt)}` : ''}
-                {t.reply && <ChatReportLinks chatId={chatId} turn={t.turn} />}
               </span>
               <Status turn={t} news={within} />
               <Reply turn={t} fold={(want !== null && want !== 'answer') || t.outputs.length > 0} />
-              {t.outputs.length > 0 && (
-                <ul className="list" aria-label="결과물">
-                  {t.outputs.map((o) => (
-                    <li key={o.id} className="list-cell output-row">
-                      <div className="output-main">
-                        <b>{o.name}</b>
-                        <small>{OUTPUT_KINDS[o.kind] ?? o.kind}</small>
-                      </div>
-                      <OutputOpen id={o.id} name={o.name} />
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ChatOutputs outputs={t.outputs} />
+              {/* 링크 미리보기는 그림 · 파일 아래에 (답의 글 → 결과물 → 참고한 곳) */}
+              {t.status === 'done' && t.reply?.trim() && <LinkCards text={t.reply} />}
               {(t.status === 'queued' || t.status === 'running') && (
                 <div className="row">
                   <button
@@ -258,10 +247,12 @@ function Process({
   turn: t,
   items,
   usage,
+  chatId,
 }: {
   turn: ChatTurn;
   items: readonly ChatNews[];
   usage: ChatTurnUsage | null;
+  chatId: string;
 }) {
   const open = OPEN.includes(t.status);
   if (!open && items.length === 0 && usage === null) return null;
@@ -289,9 +280,16 @@ function Process({
           </li>
         ))}
       </ol>
-      <Link className="note" href={`/admin/tasks/${t.taskId}`}>
-        작업 보기
-      </Link>
+      <p className="note">
+        <Link href={`/admin/tasks/${t.taskId}`}>작업 보기</Link>
+        {/* 회차 하나를 HTML 파일로 (2026-11-23). 대화 안에서 보이게 바꾼 뒤(2026-11-27) 내려받기만 과정에 남긴다 */}
+        {t.reply && (
+          <>
+            {' · '}
+            <a href={`/admin/chats/${chatId}/report/file?turn=${t.turn}`}>HTML 파일로 내려받기</a>
+          </>
+        )}
+      </p>
     </details>
   );
 }
@@ -305,14 +303,7 @@ function fixLine(message: string): string {
 function Reply({ turn: t, fold }: { turn: ChatTurn; fold: boolean }) {
   if (t.status === 'done')
     // 승인한 일을 서버가 실행해 끝난 회차에는 글 답이 없다
-    return t.reply?.trim() ? (
-      <>
-        <Answer text={t.reply} fold={fold} />
-        <LinkCards text={t.reply} />
-      </>
-    ) : (
-      <p className="note">완료</p>
-    );
+    return t.reply?.trim() ? <Answer text={t.reply} fold={fold} /> : <p className="note">완료</p>;
   if (t.status === 'failed') return <p className="error">{t.error ?? '실패'}</p>;
   if (t.status === 'cancelled') return <p className="note">멈춤</p>;
   const doing =
