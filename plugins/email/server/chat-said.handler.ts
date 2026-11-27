@@ -1,6 +1,7 @@
 import { BaseHandler, type DomainEvent } from '../../../apps/server/src/plugin-api';
 import { NoticeMail } from './notice-mail';
 import type { SmtpGateway } from './smtp.gateway';
+import type { MailGate } from './usage';
 
 // 자동화 결과를 메일로 (2026-11-27, 사용자 "대화에서 이메일로 보내달라는 스케줄은 설정 못하나?").
 // 코어가 "메일로 받기"를 켠 자동화 레시피의 회차에만 task.chat.said에 mail: true를 싣는다.
@@ -12,6 +13,7 @@ export class ChatSaidHandler extends BaseHandler {
   constructor(
     private readonly smtp: SmtpGateway | null,
     private readonly mail: NoticeMail | null,
+    private readonly gate: MailGate,
   ) {
     super();
   }
@@ -27,6 +29,8 @@ export class ChatSaidHandler extends BaseHandler {
       kind === 'failed',
       text,
     );
+    // 메일 한도에 닿았으면 보내지 않고 막힌 수로만 센다 (다시 시도하지 않는다: 콘솔 알림 · 대화에는 그대로 있다)
+    if (!(await this.gate.take('answer'))) return;
     await this.smtp.send(message, NoticeMail.NAME, new Date());
   }
 }

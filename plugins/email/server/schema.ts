@@ -3,9 +3,10 @@
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { TableColumns } from '../../../apps/server/src/plugin-api';
 
-const { integer, pgSchema, text, timestamp, uuid } = TableColumns;
-import type { DeliveryStatus, SendKind, SendStatus, SubscriberStatus } from './tables';
+const { customType, integer, pgSchema, text, timestamp, uuid } = TableColumns;
+import type { DeliveryStatus, SendKind, SendStatus, SubscriberStatus, UsageKind } from './tables';
 
+const dateColumn = customType<{ data: string }>({ dataType: () => 'date' });
 const emailSchema = pgSchema('email');
 
 /** email.deliveries */
@@ -53,4 +54,12 @@ export const subscribers = emailSchema.table('subscribers', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   space_id: uuid('space_id'),
   account_id: uuid('account_id'),
+});
+
+/** email.usage */
+export const usage = emailSchema.table('usage', {
+  day: dateColumn('day').notNull(),
+  kind: text('kind').$type<UsageKind>().notNull(),
+  sent: integer('sent').notNull(),
+  blocked: integer('blocked').notNull(),
 });

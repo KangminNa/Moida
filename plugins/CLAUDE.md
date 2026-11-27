@@ -1,7 +1,7 @@
 # 플러그인
 
 코어가 몰라도 되는 기능은 플러그인으로 만든다 (기획서 결정 기록 2026-10-10, 객체설계 12장).
-지금 있는 플러그인: `comments-giscus`(글 아래 giscus 댓글), `sync-github`(보관 형식을 GitHub에 동기화), `login-github`(GitHub 계정으로 로그인), `office`(콘솔의 픽셀 사무실), `browser-tabs`(서버 브라우저, 기능 패키지), `code-github`(코드 작업을 GitHub와 잇기, 기능 패키지), `map`(지도 API 등록 · 장소 · 주소 찾기: 앱 코드의 `cairn.map`이 쓴다, 회사 정보는 `providers.json`, 찾기는 서버 키로 `/api/p/map/…`, docs/지도.md), `messenger-telegram`(텔레그램 봇으로 대표와 대화, 기능 패키지, 대화 입구 `uses: chat`), `email`(콘솔의 알림과 "메일로 받기"를 켠 자동화의 결과를 관리자 메일로 · 방문자의 앱 소식 구독(스토어의 `store.after`, 두 번 확인, 관리자가 보내기) · 코어의 인증코드 메일(`uses: mail`, `provideMail`), SMTP 465, docs/이메일.md).
+지금 있는 플러그인: `comments-giscus`(글 아래 giscus 댓글), `sync-github`(보관 형식을 GitHub에 동기화), `login-github`(GitHub 계정으로 로그인), `office`(콘솔의 픽셀 사무실), `browser-tabs`(서버 브라우저, 기능 패키지), `code-github`(코드 작업을 GitHub와 잇기, 기능 패키지), `map`(지도 API 등록 · 장소 · 주소 찾기: 앱 코드의 `cairn.map`이 쓴다, 회사 정보는 `providers.json`, 찾기는 서버 키로 `/api/p/map/…`, docs/지도.md), `messenger-telegram`(텔레그램 봇으로 대표와 대화, 기능 패키지, 대화 입구 `uses: chat`), `email`(콘솔의 알림과 "메일로 받기"를 켠 자동화의 결과를 관리자 메일로 · 방문자의 앱 소식 구독(스토어의 `store.after`, 두 번 확인, 관리자가 보내기) · 코어의 인증코드 메일(`uses: mail`, `provideMail`) · 메일 사용량과 하루 · 한 달 상한(`email.usage`), SMTP 465, docs/이메일.md).
 
 ## 폴더 하나 = 플러그인 하나
 
@@ -76,7 +76,7 @@ plugins/<이름>/
 - 관리자의 대화에 말을 넣으려면 `uses`에 `chat`을 적고 쓰기 동작에서 `work.sendChat(공간, 대화 id 또는 null, requestId, 글)` (플러그인 API 0.10): 콘솔에서 보낸 말과 같다 (덧붙인 말 · 새 대화 · 같은 requestId는 한 번). 누가 보낸 말인지(관리자가 이어 둔 계정인지)는 패키지가 확인한다. 대화의 답은 `task.chat.said`(최종 답 · 덧붙인 말의 답 · 실패)로 받는다 (`messenger-telegram`)
 - 러너가 부르는 도구를 그 러너가 쥔 일에 묶으려면 `work.leased(id)` (플러그인 API 0.3): 코어가 임대를 확인하고 일의 id · 종류 · 입력(`LeasedWork`)을 준다. 0.4부터 일의 대상(`targetKind` · `targetId` · `targetVersion`), 0.5부터 지시(`instruction`), 0.7부터 관리자가 쓴 지시(`ownerText`: 위임된 일이면 맨 위 일의 제목과 지시, `read_url`의 기준과 같은 글)도 준다. 쥐고 있지 않으면 거절한다 (`code-github`의 `code_credential` · `code_pull_opened`, `browser-tabs`의 `browser_job` · `browser_click_hold` …)
 - 에이전트의 위임을 대상 종류로 먼저 보려면 `cairn.guardDelegate('<대상 종류>', new XxxGuard())` (플러그인 API 0.9, 읽기 동작 `Read`, 맡기는 에이전트의 자격): `RuleViolation`을 던지면 그 글로 위임이 거절된다 (`browser-tabs`의 `GuardSiteDelegation`: 켜진 사이트 도구가 있는 사이트의 browse는 도구를 써 본 뒤에만)
-- 반복 작업이 바깥에 보내고 결과를 적으려면 `run(own)`의 `own('동작', 입력)`으로 자기 동작(`Operation.SYSTEM`, `api`에 없어도 된다)을 부른다 (플러그인 API 0.13, `email`의 `deliver`: 잡기 → SMTP → 적기). 공개 앱의 이름 · 주소 → id · 바깥 주소는 `work.lookup('app' | 'app-id' | 'app-url', …)` (`uses`의 `lookup:<종류>`). 소식 메일에 동의한 계정의 메일은 `work.lookup('news-address', [계정 id])`: 서버 자신의 동작(이벤트 · 반복 작업)에서만 된다 (플러그인 API 0.15, `email`)
+- 반복 작업이 바깥에 보내고 결과를 적으려면 `run(own)`의 `own('동작', 입력)`으로 자기 동작(`Operation.SYSTEM`, `api`에 없어도 된다)을 부른다 (플러그인 API 0.13, `email`의 `deliver`: 잡기 → SMTP → 적기). 공개 앱의 이름 · 주소 → id · 바깥 주소는 `work.lookup('app' | 'app-id' | 'app-url', …)` (`uses`의 `lookup:<종류>`). 소식 메일에 동의한 계정의 메일은 `work.lookup('news-address', [계정 id])`: 서버 자신의 동작(이벤트 · 반복 작업)에서만 된다 (플러그인 API 0.15, `email`). 이벤트 처리기(`BaseHandler`) · 확인 메일(`BaseMailer`) · 관리 동작도 `register`에서 받은 `cairn.own()`으로 같은 길을 쓴다 (플러그인 API 0.16, `email`의 `MailGate`: 보내기 전에 사용량을 세고 한도를 본다)
 - 이벤트를 받아 표에 쓰거나 이벤트를 남기려면 `cairn.onEvent(무늬, new XxxCommand())`: `allow = Operation.SYSTEM`, 코어가 트랜잭션 하나에서 돌린다 (처리기 `BaseHandler`는 DB에 쓸 길이 없다)
 - 이벤트는 `plugin.<스키마>.<무엇>` 이름으로만 남긴다. 에이전트에게 일을 맡기려면 `uses`에 `task:request`를 적고 `task.task.requested`를 남긴다 (그 밖의 코어 이벤트는 `work.record`가 막는다)
 - 마이그레이션은 배포 때 코어와 함께 적용된다 (`docker compose`의 migrate가 `plugins/*/migrations`도 읽는다. 테스트 DB와 `pnpm db:rollback`도 같다). 마이그레이션 뒤 `pnpm db:rows`

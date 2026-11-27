@@ -4,7 +4,7 @@ import type { ArchiveRestoreService } from '../archive/archive-restore.service';
 import { SystemActor } from '../base/actor';
 import type { BaseAction } from '../base/base-action';
 import type { BaseHandler } from '../base/base-handler';
-import type { BaseJob } from '../base/base-job';
+import type { BaseJob, OwnCall } from '../base/base-job';
 import type { BaseLogin } from '../base/base-login';
 import type { BaseMailer } from '../base/base-mailer';
 import { Command, Operation, type Read } from '../base/operation';
@@ -90,6 +90,8 @@ export class PluginContext {
     private readonly values: ReadonlyMap<string, string>,
     private readonly archive: ArchiveQuery,
     private readonly restore: ArchiveRestoreService,
+    /** 자기 동작을 서버 자신으로 부르는 길 (own, 0.16). 레지스트리가 이 패키지 이름으로 묶어 넘긴다 */
+    private readonly ownCall: OwnCall,
   ) {}
 
   /** 자기 설정 값 전부 (비밀값은 풀어서, 비어 있으면 기본값). 다른 플러그인의 설정은 볼 수 없다 */
@@ -124,6 +126,15 @@ export class PluginContext {
     this.require(`delegate:${targetKind}`);
     if (guard.writes) throw new Error(`위임 지킴이는 읽기 동작(Read)이어야 해요: ${guard.name}`);
     this.guards.push(new DelegateGuard(targetKind, new PackageOperation(this.manifest, guard)));
+  }
+
+  /**
+   * 자기 동작(allow = Operation.SYSTEM)을 서버 자신으로 부르는 길 (플러그인 API 0.16, 2026-11-27 email의 사용량 세기).
+   * 반복 작업의 run(own)과 같다: 이벤트 처리기 · 확인 메일 · 관리자 동작이 바깥에 보내기 전에 자기 표에 적을 때.
+   * 쓰기 동작이면 트랜잭션 하나. 부르는 때는 등록이 끝난 뒤(처리기 · 메일이 돌 때)다
+   */
+  own(): OwnCall {
+    return this.ownCall;
   }
 
   /** every('30s' | '5m' | '1h', job) */

@@ -32,6 +32,7 @@ export class PackageService extends BaseService {
     private readonly lookups: Lookups,
   ) {
     super(db);
+    registry.useOwnRunner((found, input) => this.run(new SystemActor(), found, input));
   }
 
   /** REST: /api/p/<패키지>/<경로>. 경로의 :id 같은 값은 입력에 더한다 */

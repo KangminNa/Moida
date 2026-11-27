@@ -1,9 +1,11 @@
 import { type Actor, Command, Operation, type Work } from '../../../apps/server/src/plugin-api';
+import { lockUsage, type MailLimits, note, spent } from './usage';
 import { DoneView, MailBatchView, MailItemView } from './views';
 
 // 일꾼이 보낼 메일을 잡고(claimMail) 결과를 적는(reportMail) 자기 동작 (서버 자신, 반복 작업 deliver만 부른다, 플러그인 API 0.13).
 // 바깥 호출(SMTP)은 이 둘 사이, 트랜잭션 밖에서 한다. 잡을 때 먼저 적는다: 두 일꾼이 같은 메일을 잡지 않고, 많아야 한 번 간다.
-//   잡기: 7일 지난 미확인 신청 지우기 → 10분 넘게 잡혀 있던 것은 실패로 → 오늘 남은 수(하루 상한) 안에서 확인 메일 · 소식 메일
+//   잡기: 7일 지난 미확인 신청 지우기 → 10분 넘게 잡혀 있던 것은 실패로 → 남은 몫(MailLimits: 하루 · 한 달 상한의 80%) 안에서
+//   확인 메일 · 소식 메일. 잡은 수는 같은 트랜잭션에서 사용량(email.usage)에 센다. 몫이 없으면 대기열에 둔 채 다음 날을 기다린다
 //   적기: 받는 사람마다 sent · failed, 소식마다 수를 세고 남은 것이 없으면 done
 
 /** 소식마다 보낸 수 · 실패 수를 다시 세고, 대기열이 비었으면 끝낸다 */
@@ -27,7 +29,7 @@ export class ClaimMail extends Command<Record<string, never>> {
   readonly allow = Operation.SYSTEM;
   static readonly BATCH = 20;
 
-  constructor(private readonly dailyMax: number) {
+  constructor(private readonly limits: MailLimits) {
     super();
   }
 
@@ -42,12 +44,9 @@ export class ClaimMail extends Command<Record<string, never>> {
       UPDATE email.deliveries SET status = 'failed', error = '보냈는지 알 수 없어요 (시간 초과)'
       WHERE status = 'sending' AND claimed_at < now() - interval '10 minutes'`;
     await settle(work);
-    const [spent] = await work.sql<{ n: number }[]>`
-      SELECT (SELECT count(*) FROM email.deliveries
-              WHERE status IN ('sending', 'sent') AND claimed_at >= date_trunc('day', now()))::int
-           + (SELECT count(*) FROM email.subscribers
-              WHERE confirm_sent_at >= date_trunc('day', now()))::int AS n`;
-    let room = Math.min(ClaimMail.BATCH, this.dailyMax - (spent?.n ?? 0));
+    await lockUsage(work);
+    const used = await spent(work);
+    let room = Math.min(ClaimMail.BATCH, this.limits.room('post', used.today, used.month));
     if (room <= 0) return new MailBatchView([]);
     const items: MailItemView[] = [];
     // 확인 메일: 한 번의 신청(token)에 한 통, 그 신청의 앱 이름들을 함께
@@ -67,6 +66,7 @@ export class ClaimMail extends Command<Record<string, never>> {
     for (const [token, g] of byToken)
       items.push(new MailItemView('confirm', g.address, token, g.apps, null, null, '', ''));
     room -= byToken.size;
+    await note(work, 'confirm', byToken.size, 0);
     if (room <= 0) return new MailBatchView(items);
     const posts = await work.sql<
       {
@@ -115,6 +115,8 @@ export class ClaimMail extends Command<Record<string, never>> {
         ),
       );
     }
+    await note(work, 'post', items.filter((i) => i.kind === 'post').length, 0);
+    await note(work, 'news', items.filter((i) => i.kind === 'news').length, 0);
     await settle(work);
     return new MailBatchView(items);
   }

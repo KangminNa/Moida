@@ -1,4 +1,4 @@
-import type { SendRow, SubscriberRow } from './tables';
+import type { SendRow, SubscriberRow, UsageKind } from './tables';
 
 // 이 패키지가 내보내는 모양 (콘솔 · 방문자 모두 camelCase)
 
@@ -8,6 +8,44 @@ export class DoneView {
 
   toJSON() {
     return { done: this.done };
+  }
+}
+
+/** takeMail의 답: 이 한 통을 보내도 되는가 (서버 자신만 받는다) */
+export class TakeView {
+  constructor(private readonly ok: boolean) {}
+
+  toJSON() {
+    return { ok: this.ok };
+  }
+}
+
+/** 메일 사용량 (콘솔의 메일 화면, 2026-11-27): 오늘 · 이번 달(UTC), 종류마다 보낸 수 · 막힌 수, 상한 */
+export class UsageView {
+  constructor(
+    private readonly today: ReadonlyMap<UsageKind, { sent: number; blocked: number }>,
+    private readonly month: number,
+    private readonly monthBlocked: number,
+    private readonly dailyMax: number,
+    private readonly monthlyMax: number,
+    private readonly bulkShare: number,
+    /** 하루 상한 때문에 다음 날을 기다리는 소식 메일 수 */
+    private readonly waiting: number,
+  ) {}
+
+  toJSON() {
+    const kinds = [...this.today].map(([kind, n]) => ({ kind, sent: n.sent, blocked: n.blocked }));
+    return {
+      today: kinds.reduce((sum, k) => sum + k.sent, 0),
+      todayBlocked: kinds.reduce((sum, k) => sum + k.blocked, 0),
+      kinds,
+      month: this.month,
+      monthBlocked: this.monthBlocked,
+      dailyMax: this.dailyMax,
+      monthlyMax: this.monthlyMax,
+      bulkShare: this.bulkShare,
+      waiting: this.waiting,
+    };
   }
 }
 
@@ -81,8 +119,7 @@ export class OverviewView {
   constructor(
     private readonly ready: boolean,
     private readonly open: boolean,
-    private readonly today: number,
-    private readonly dailyMax: number,
+    private readonly usage: UsageView,
     private readonly sends: readonly SendView[],
     private readonly people: readonly SubscriberView[],
   ) {}
@@ -91,8 +128,7 @@ export class OverviewView {
     return {
       ready: this.ready,
       open: this.open,
-      today: this.today,
-      dailyMax: this.dailyMax,
+      usage: this.usage.toJSON(),
       sends: this.sends.map((s) => s.toJSON()),
       subscribers: this.people.map((s) => s.toJSON()),
     };

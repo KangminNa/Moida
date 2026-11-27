@@ -36,6 +36,8 @@ export class PluginRegistry {
   private packageOperations: readonly PackageOperation[] = [];
   private states = new Map<string, PluginState>();
   private failures = new Map<string, string>();
+  /** 자기 동작을 서버 자신으로 돌리는 길 (PackageService가 시작할 때 넘긴다, 플러그인 API 0.16) */
+  private ownRunner: ((found: PackageOperation, input: object) => Promise<unknown>) | null = null;
 
   private constructor(
     private readonly catalog: ReadonlyMap<string, PluginManifest>,
@@ -95,6 +97,7 @@ export class PluginRegistry {
           state.resolve(manifest, this.box),
           this.archive,
           this.restore,
+          (name, input) => this.runOwn(manifest.name, name, input),
         );
         PluginRegistry.instantiate(manifest).register(context);
         subscriptions.push(...context.subscriptions);
@@ -218,6 +221,19 @@ export class PluginRegistry {
   }
 
   /** 그 패키지의 동작 하나 (반복 작업이 자기 동작을 부를 때, 플러그인 API 0.13). 동작 중인 패키지만 */
+  /** PackageService가 자기 동작을 돌리는 길을 넘긴다 (레지스트리는 PackageService를 모른다: 서로 의존하지 않게) */
+  useOwnRunner(runner: (found: PackageOperation, input: object) => Promise<unknown>): void {
+    this.ownRunner = runner;
+  }
+
+  /** 플러그인의 own(): 그 패키지의 동작 하나를 서버 자신으로 (동작 중인 등록에서 찾는다) */
+  private runOwn(plugin: string, name: string, input: object): Promise<unknown> {
+    const found = this.ownOperation(plugin, name);
+    if (!found) return Promise.reject(new Error(`${plugin}에 없는 동작이에요: ${name}`));
+    if (!this.ownRunner) return Promise.reject(new Error('아직 동작을 돌릴 수 없어요'));
+    return this.ownRunner(found, input);
+  }
+
   ownOperation(plugin: string, name: string): PackageOperation | null {
     return (
       this.packageOperations.find((o) => o.manifest.name === plugin && o.operation.name === name) ??

@@ -8,6 +8,10 @@ import { MailMessage } from './mail-message';
 import { NoticeMail } from './notice-mail';
 import { NoticeSentHandler } from './notice-sent.handler';
 import { SmtpGateway } from './smtp.gateway';
+import { MailGate, MailLimits } from './usage';
+
+/** 한도 안: 늘 보내도 된다 (한도는 아래 사용량 테스트와 API 테스트가 본다) */
+const open = new MailGate(async () => ({ ok: true }));
 
 // 알림 메일 (2026-11-26): 메일 한 통의 모양 · SMTP 주고받기 · 알림 이벤트에서 메일로
 const USER = 'me@gmail.example';
@@ -160,9 +164,9 @@ describe('NoticeMail · NoticeSentHandler', () => {
         link: '/admin/tasks',
         tag: 'x',
       });
-    await new NoticeSentHandler(gateway(), mail).handle(event(NoticeSentHandler.TOPIC));
-    await new NoticeSentHandler(gateway(), mail).handle(event('platform.plugin.changed'));
-    await new NoticeSentHandler(null, null).handle(event(NoticeSentHandler.TOPIC));
+    await new NoticeSentHandler(gateway(), mail, open).handle(event(NoticeSentHandler.TOPIC));
+    await new NoticeSentHandler(gateway(), mail, open).handle(event('platform.plugin.changed'));
+    await new NoticeSentHandler(null, null, open).handle(event(NoticeSentHandler.TOPIC));
     assert.equal(smtp.mails.length, before + 1);
     assert.equal(decode(header(smtp.mails.at(-1)?.data ?? '', 'Subject')), '[Moida] 작업 실패');
   });
@@ -179,7 +183,7 @@ describe('NoticeMail · NoticeSentHandler', () => {
         text: '어제 소식 다섯 줄',
         ...data,
       });
-    const handler = new ChatSaidHandler(gateway(), mail);
+    const handler = new ChatSaidHandler(gateway(), mail, open);
     await handler.handle(said({ mail: true }));
     const sent = smtp.mails.at(-1)?.data ?? '';
     assert.equal(decode(header(sent, 'Subject')), '[Moida] 아침 요약');
@@ -193,7 +197,47 @@ describe('NoticeMail · NoticeSentHandler', () => {
     // 메일로 받지 않는 대화 · 덧붙인 말의 답 · 설정 없음은 보내지 않는다
     await handler.handle(said({}));
     await handler.handle(said({ mail: true, kind: 'reply' }));
-    await new ChatSaidHandler(null, null).handle(said({ mail: true }));
+    await new ChatSaidHandler(null, null, open).handle(said({ mail: true }));
     assert.equal(smtp.mails.length, before + 2);
+  });
+
+  test('메일 한도에 닿으면 알림 메일을 보내지 않는다 (2026-11-27)', async () => {
+    const before = smtp.mails.length;
+    const asked: unknown[] = [];
+    const shut = new MailGate(async (_op, input) => {
+      asked.push(input);
+      return { ok: false };
+    });
+    await new NoticeSentHandler(gateway(), mail, shut).handle(
+      new DomainEvent(NoticeSentHandler.TOPIC, 1, '00000000-0000-7000-8000-000000000003', {
+        title: '작업 실패',
+      }),
+    );
+    assert.equal(smtp.mails.length, before);
+    assert.deepEqual(asked, [{ kind: 'notice' }]);
+  });
+});
+
+describe('메일 사용량 한도 (MailLimits, 2026-11-27)', () => {
+  test('한 통씩 가는 메일은 하루 상한까지, 여러 명에게 가는 메일은 80%까지', () => {
+    const limits = new MailLimits(100, 0);
+    assert.equal(limits.room('code', 99, 99), 1);
+    assert.equal(limits.room('code', 100, 100), 0);
+    assert.equal(limits.room('post', 79, 79), 1);
+    assert.equal(limits.room('post', 80, 80), 0, '남은 20%는 인증코드 · 알림 몫');
+  });
+
+  test('한 달 상한이 있으면 둘 중 작은 쪽, 0이면 한 달 상한 없음', () => {
+    const limits = new MailLimits(100, 1000);
+    assert.equal(limits.room('code', 10, 995), 5);
+    assert.equal(limits.room('news', 10, 800), 0);
+    assert.equal(new MailLimits(100, 0).room('code', 10, 99999), 90);
+  });
+
+  test('설정 칸의 글: 비었거나 틀리면 기본값, 음수는 0', () => {
+    assert.equal(MailLimits.count(undefined, 300), 300);
+    assert.equal(MailLimits.count('abc', 300), 300);
+    assert.equal(MailLimits.count('500', 300), 500);
+    assert.equal(MailLimits.count('-3', 300), 0);
   });
 });
