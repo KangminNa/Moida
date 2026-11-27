@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type TestUser } from './api-client';
 
@@ -53,4 +54,76 @@ describe('지도 찾기 (/api/p/map)', () => {
     const google = await api.get('/api/p/map/search?q=%EB%B9%B5');
     assert.equal(google.status, 404, '구글 찾기는 구글 지도와 함께만');
   });
+
+  test('사용량은 관리자만: 방문자 403, 관리자는 회사 · 켜짐 · 오늘 · 한도', async () => {
+    assert.equal((await settings({ searchProvider: 'kakao', dailyLimit: '200' })).status, 200);
+    const visitor = await api.get('/api/p/map/usage');
+    assert.equal(visitor.status === 401 || visitor.status === 403, true, visitor.text);
+    const usage = await api.request('GET', '/api/p/map/usage', owner);
+    assert.equal(usage.status, 200, usage.text);
+    const body = usage.json() as Json;
+    assert.equal(body.provider, 'kakao');
+    assert.equal(body.ready, true);
+    assert.equal(body.limit, 200);
+    assert.equal(typeof body.today, 'number');
+  });
+
+  test('일꾼 도구 map_geocode: 일을 쥔 에이전트만 부르고, write 기기는 거절된다', async () => {
+    assert.equal((await settings({ searchProvider: 'none' })).status, 200);
+    const device = await api.writeDevice(owner, `지도 기기 ${randomUUID().slice(0, 6)}`);
+    const byDevice = await tool(device, 'map_geocode', { addresses: ['세종대로 110'] });
+    assert.equal(byDevice.ok, false, '기기는 바깥 회사로 주소를 보내지 못한다');
+
+    const token = await agentToken();
+    const off = await tool(token, 'map_geocode', { addresses: ['세종대로 110'] });
+    assert.equal(off.ok, false);
+    assert.match(JSON.stringify(off.body), /켜지 않았어요/, '찾기를 켜지 않았으면 거절');
+    const bad = await tool(token, 'map_geocode', { addresses: [] });
+    assert.equal(bad.ok, false);
+  });
 });
+
+async function tool(token: string, name: string, args: Json) {
+  const res = await api.mcp(token, 'tools/call', { name, arguments: args });
+  assert.equal(res.status, 200, res.text);
+  const result = (res.json() as { result: Json }).result as {
+    isError?: boolean;
+    content: { text: string }[];
+    structuredContent?: Json;
+  };
+  return result.isError
+    ? { ok: false, body: JSON.parse(result.content[0]?.text ?? '{}') as Json }
+    : { ok: true, body: (result.structuredContent ?? {}) as Json };
+}
+
+/** 대표에게 일을 하나 맡기고 러너가 빌려 그 일의 작업 토큰을 받는다 */
+async function agentToken(): Promise<string> {
+  const made = await api.request('POST', '/api/devices/runner', owner, {
+    requestId: randomUUID(),
+    name: `지도 러너 ${randomUUID().slice(0, 6)}`,
+  });
+  assert.equal(made.status, 201, made.text);
+  const runner = String((made.json() as Json).token);
+  const ai = await api.request('PUT', '/api/ai/claude/token', owner, {
+    token: `sk-ant-oat01-${randomUUID()}`,
+  });
+  assert.equal(ai.status, 200, ai.text);
+  let lead = (await api.get('/api/agents/lead', owner)).json() as { lead: Json | null };
+  if (!lead.lead) {
+    await api.request('POST', '/api/chats', owner, { requestId: randomUUID(), message: '시작' });
+    lead = (await api.get('/api/agents/lead', owner)).json() as { lead: Json | null };
+  }
+  const task = await api.request('POST', '/api/tasks', owner, {
+    requestId: randomUUID(),
+    agentId: lead.lead?.id,
+    instruction: '맛집 앱의 주소 확인',
+  });
+  assert.equal(task.status, 201, task.text);
+  const taskId = (task.json() as Json).id;
+  for (let round = 0; round < 20; round++) {
+    const next = await tool(runner, 'next_jobs', { wait_seconds: 0, limit: 10, tools: ['claude'] });
+    const job = (next.body.jobs as Json[]).find((j) => (j.task as Json).id === taskId);
+    if (job) return String(job.run_token);
+  }
+  throw new Error('빌린 일이 없다');
+}

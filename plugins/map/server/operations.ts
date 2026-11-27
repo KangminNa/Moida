@@ -1,12 +1,12 @@
 import {
-  type Actor,
+  Actor,
   InvalidRequest,
   Operation,
   Read,
   type Work,
 } from '../../../apps/server/src/plugin-api';
-import type { MapLookup } from './map-lookup';
-import { AddressView, PlaceListView } from './views';
+import { MapLookup } from './map-lookup';
+import { AddressView, GeocodeCheckView, MapUsageView, PlaceListView } from './views';
 
 // 앱 코드의 cairn.map.search · geocode · reverse가 부르는 찾기 (docs/지도.md MP-2). 누구나 부른다 (공개 앱의 방문자):
 // 서버 키는 서버에만 있고, 곳마다 분당 상한 · 하루 상한 · 10분 기억은 MapLookup이 맡는다.
@@ -130,5 +130,73 @@ export class ReverseGeocode extends Read<{ lat: number; lng: number }> {
     const key = `reverse:${lat.toFixed(5)},${lng.toFixed(5)}`;
     const address = await this.lookup.answer(work.place, key, (g) => g.reverse(lat, lng));
     return new AddressView(address, this.provider, this.attribution);
+  }
+}
+
+/** GET /api/p/map/usage: 찾기 사용량 (관리자, 콘솔 › 지도) */
+export class MapUsage extends Read<Record<string, never>> {
+  readonly name = 'usage';
+  readonly allow = Operation.OWNER;
+
+  constructor(
+    private readonly provider: string,
+    private readonly ready: boolean,
+    private readonly limit: number,
+  ) {
+    super();
+  }
+
+  input(): Record<string, never> {
+    return {};
+  }
+
+  async run(_work: Work, _actor: Actor): Promise<MapUsageView> {
+    return new MapUsageView(this.provider, this.ready, MapLookup.spentToday(), this.limit);
+  }
+}
+
+/**
+ * 일꾼 도구 map_geocode (MP-4): 앱을 만들 때 주소 목록이 지도에서 찾아지는지 미리 본다.
+ * 주소가 바깥 지도 회사로 나가므로 에이전트만 (Actor.AGENT_OUT). 같은 주소는 앱의 geocode와 같은 10분 기억 · 하루 상한을 쓴다
+ */
+export class GeocodeCheck extends Read<{ addresses: string[] }> {
+  readonly name = 'geocodeCheck';
+  readonly allow = Actor.AGENT_OUT;
+  /** 곳마다 분당 30번(MapLookup.PER_MINUTE) 안에서 한 번에 다 묻게 */
+  static readonly MAX = 20;
+
+  constructor(
+    private readonly lookup: MapLookup,
+    private readonly provider: string,
+    private readonly attribution: string,
+  ) {
+    super();
+  }
+
+  input(raw: unknown): { addresses: string[] } {
+    const list =
+      raw && typeof raw === 'object' ? (raw as Record<string, unknown>).addresses : undefined;
+    if (!Array.isArray(list) || list.length === 0 || list.length > GeocodeCheck.MAX)
+      throw invalid('addresses', `주소 1~${GeocodeCheck.MAX}개의 목록이어야 해요`);
+    const addresses = list.map((a) => (typeof a === 'string' ? a.trim() : ''));
+    if (addresses.some((a) => a === '' || a.length > 200))
+      throw invalid('addresses', '주소는 1~200자의 글이어야 해요');
+    return { addresses: [...new Set(addresses)] };
+  }
+
+  async run(
+    work: Work,
+    _actor: Actor,
+    { addresses }: { addresses: string[] },
+  ): Promise<GeocodeCheckView> {
+    const results = [];
+    for (const address of addresses) {
+      const found = await this.lookup.answer(work.place, `geocode:${address}`, (g) =>
+        g.geocode(address),
+      );
+      const ok = found && Number.isFinite(found.lat) && Number.isFinite(found.lng) ? found : null;
+      results.push({ address, found: ok });
+    }
+    return new GeocodeCheckView(results, this.provider, this.attribution);
   }
 }

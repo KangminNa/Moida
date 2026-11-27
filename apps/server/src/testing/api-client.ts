@@ -44,6 +44,11 @@ export class ApiResult {
   }
 
   /** 서버가 새로 준 쿠키 (지운 쿠키는 빈 문자열) */
+  /** Set-Cookie 줄 그대로 (Secure · Path 같은 속성을 볼 때) */
+  setCookies(): string[] {
+    return this.headers.getSetCookie();
+  }
+
   cookies(): Record<string, string> {
     const found: Record<string, string> = {};
     for (const line of this.headers.getSetCookie()) {

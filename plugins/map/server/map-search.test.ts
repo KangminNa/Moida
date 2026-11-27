@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, test } from 'node:test';
 import { MapLookup } from './map-lookup';
 import { type MapSearchBases, MapSearchGateway } from './map-search.gateway';
-import { SearchPlaces } from './operations';
+import { GeocodeCheck, MapUsage, SearchPlaces } from './operations';
 
 // 지도 찾기 (docs/지도.md MP-2): 회사 응답을 테스트용 웹 서버(127.0.0.1)로 흉내 내고, 서버 키가 머리글 · 주소로만 가는지,
 // 회사마다 다른 응답이 같은 모양이 되는지, 곳마다 · 하루 상한과 10분 기억을 본다
@@ -189,6 +189,52 @@ describe('MapLookup', () => {
       /너무 많이/,
     );
     assert.equal(await lookup.answer('198.51.100.10', 'same', async () => 'x', now), 'x');
+  });
+});
+
+describe('GeocodeCheck (일꾼 도구 map_geocode)', () => {
+  test('주소마다 found · 찾은 주소 · 좌표, 같은 주소는 한 번만, 확인용 안내', async () => {
+    const lookup = new MapLookup(new MapSearchGateway('kakao', KEYS, bases), 'kakao', 1_000_000);
+    const check = new GeocodeCheck(lookup, 'kakao', '카카오');
+    assert.equal(check.allow, 'agent_out', '주소가 바깥 회사로 나가니 에이전트만');
+    const input = check.input({ addresses: [' 세종대로 110 ', '세종대로 110'] });
+    assert.deepEqual(input, { addresses: ['세종대로 110'] });
+    const view = await check.run({ place: '192.0.2.40' } as never, undefined as never, input);
+    const json = view.toJSON();
+    assert.deepEqual(json.results, [
+      {
+        address: '세종대로 110',
+        found: true,
+        matched: '서울 중구 세종대로 110',
+        lat: 37.56,
+        lng: 126.97,
+      },
+    ]);
+    assert.equal(json.found, 1);
+    assert.match(json.note, /넣지 말고/);
+  });
+
+  test('주소는 1~20개, 빈 글 · 200자 넘는 글은 400', () => {
+    const check = new GeocodeCheck(new MapLookup(null, 'none', 0), 'none', '');
+    assert.throws(() => check.input({ addresses: [] }), /InvalidRequest|입력/);
+    assert.throws(() => check.input({ addresses: Array(21).fill('a') }));
+    assert.throws(() => check.input({ addresses: [' '] }));
+    assert.throws(() => check.input({ addresses: ['가'.repeat(201)] }));
+    assert.throws(() => check.input({}));
+  });
+});
+
+describe('MapUsage', () => {
+  test('관리자만, 회사 · 켜짐 · 오늘 부른 수 · 하루 상한', async () => {
+    const usage = new MapUsage('kakao', true, 50000);
+    assert.equal(usage.allow, 'owner');
+    const view = await usage.run(undefined as never, undefined as never);
+    assert.deepEqual(view.toJSON(), {
+      provider: 'kakao',
+      ready: true,
+      today: MapLookup.spentToday(),
+      limit: 50000,
+    });
   });
 });
 

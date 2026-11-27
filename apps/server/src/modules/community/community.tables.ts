@@ -11,9 +11,9 @@ export interface AccountSessionRow {
   last_seen_at: Date | null;
   ended_at: Date | null;
   account_id: string;
-  app_id: string;
+  app_id: string | null;
 }
-export type AccountSessionNew = Partial<AccountSessionRow> & Pick<AccountSessionRow, 'id' | 'token_hash' | 'expires_at' | 'account_id' | 'app_id'>;
+export type AccountSessionNew = Partial<AccountSessionRow> & Pick<AccountSessionRow, 'id' | 'token_hash' | 'expires_at' | 'account_id'>;
 
 /** community.accounts */
 export interface AccountRow {

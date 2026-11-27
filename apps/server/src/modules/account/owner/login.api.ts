@@ -68,7 +68,7 @@ export class LoginController {
       req.ip ?? '',
       String(req.headers['user-agent'] ?? ''),
     );
-    Cookies.clear(res, WebSession.COOKIE);
+    Cookies.clear(res, req, WebSession.COOKIE);
     return new LoggedOutView();
   }
 

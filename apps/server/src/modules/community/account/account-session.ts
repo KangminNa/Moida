@@ -22,7 +22,8 @@ export class AccountSession extends TableEntity<AccountSessionRow, AccountSessio
     super(row, token !== null);
   }
 
-  static start(accountId: string, appId: string, now: Date): AccountSession {
+  /** appId: 로그인한 앱. null이면 공통 앱 도메인에서 앱 없이 연 로그인 (2026-11-27, 그 도메인에서만 통한다) */
+  static start(accountId: string, appId: string | null, now: Date): AccountSession {
     const token = randomBytes(32).toString('base64url');
     return new AccountSession(
       {

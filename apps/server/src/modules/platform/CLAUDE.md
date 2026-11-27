@@ -77,7 +77,7 @@ DB 함수: `platform.uuid_v7()`, `platform.forbid_update_delete()` (모든 모�
 - 기반 클래스는 얇게: 모든 하위 클래스가 똑같이 하는 일만 넣는다
 - 기반 클래스의 동작을 바꾸면 `base/base.test.ts`에 테스트를 더한다
 - 같은 트랜잭션에 들어가야 하는 기능(outbox 등)은 호출한 쪽의 `Sql`(트랜잭션)을 받는 클래스로 만든다
-- 쿠키는 `Cookies`로만 쓴다: 늘 HttpOnly · SameSite=Lax, Secure는 요청이 https(앞단 프록시의 X-Forwarded-Proto, trust proxy)이거나 `CAIRN_WEB_URL`이 https면 (웹 보안 S2). 개발(http://localhost)에서는 붙이지 않는다
+- 쿠키는 `Cookies`로만 쓴다: 늘 HttpOnly · SameSite=Lax, Secure는 요청이 https(앞단 프록시의 X-Forwarded-Proto, trust proxy)이거나 `CAIRN_WEB_URL`이 https면 (웹 보안 S2). 개발(http://localhost)에서는 붙이지 않는다. 그때(https)는 이름도 `__Host-<이름>`이다 (3-5, 2026-11-27: 공통 앱 도메인 같은 하위 도메인이 Domain=<사이트>로 같은 이름을 심어 덮지 못하게). 읽기는 `__Host-` 이름을 먼저, https면 그것만. 모듈은 앞머리 없는 이름(`cairn_session` 등)만 안다
 - 복원은 모듈을 한 트랜잭션에 묶는 유일한 곳이다: 실패하면 Cairn이 비어 있는 채로 남아야 해서다. `ArchiveRestoreService`가 트랜잭션을 열고 모듈은 자기 스키마에만 쓴다. 이벤트는 남기지 않는다
 - 복원의 잠금은 두 가지다: 복원끼리와 `steadyRead`는 advisory 잠금, 빈 곳 확인은 모듈이 표를 잠근다 (`ArchivePart.existing`)
 - 푸시는 트랜잭션 밖에서 보낸다. 보내기 전에 다룬 것으로 적는다 (많아야 한 번: 두 번 울리는 것보다 빠지는 것이 낫고, 알림 센터에는 남는다)

@@ -7,6 +7,7 @@ import { AccountMailService } from './account/account-mail.service';
 import { NewsUnsubscribedHandler } from './account/news-unsubscribed.handler';
 import { StoreJoinController } from './account/store-join.api';
 import { StoreJoinService } from './account/store-join.service';
+import { StoreSessionController } from './account/store-session.api';
 import { CommentController } from './comment/comment.api';
 import { CommentService } from './comment/comment.service';
 import events from './community.events.json';
@@ -89,6 +90,7 @@ import { TopicService } from './topic/topic.service';
     StoreTermsAdminController,
     AccountAdminController,
     StoreJoinController,
+    StoreSessionController,
     TermsAdminController,
   ],
   exports: [CommunityTools],
