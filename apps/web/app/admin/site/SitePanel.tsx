@@ -5,6 +5,7 @@ import { type ChangeEvent, useState } from 'react';
 import type { SpaceInfo } from '../../_account/types';
 import { useApps } from '../../_blog/live';
 import { api, uploadFile } from '../../_lib/client-api';
+import { SHRINK, shrinkImage } from '../../_lib/image-shrink';
 import { useAction } from '../../_lib/use-action';
 import { MoidaMark } from '../../_ui/MoidaMark';
 import { useNotify } from '../../_ui/notify';
@@ -40,9 +41,10 @@ export function SitePanel({ space: first }: { space: SpaceInfo }) {
   }
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const picked = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
+    if (!picked) return;
+    const file = await shrinkImage(picked, SHRINK.icon);
     const reply = await logo.run(
       'upload',
       () =>

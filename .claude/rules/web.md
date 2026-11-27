@@ -60,6 +60,10 @@ paths:
 - 대화 목록의 대화를 끌어 대화 화면에 놓거나 줄 끝의 "옆에 열기"로 오른쪽에 그 대화를 연다 (`admin/chats/ChatPanes.tsx`). 옆 대화는 주소의 `?side=<id>`(`chat-panes.ts`)라 새로고침 · 뒤로 가기가 되고, 다른 대화로 옮겨도 옆 칸은 그대로다. 너비만 이 브라우저(localStorage)에 기억한다. 폰 폭에서는 나누지 않는다.
 - 칸마다 따로 내린다 (`.chat-pane`가 내리는 곳). 대화 화면 안의 것은 `.console-page`가 아니라 칸 안에 붙는다. 칸이 좁으면 일꾼 칸(`.chat-team`)을 숨긴다 (컨테이너 쿼리)
 
+## 사진 올리기 (2026-11-27)
+
+- 사진을 올리는 곳은 먼저 `shrinkImage(파일, SHRINK.photo | SHRINK.icon)`(`_lib/image-shrink.ts`)로 줄인다: 긴 변 2048px(로고 · 아이콘 512px) · WebP로 다시 그려 크기를 줄이고 위치(GPS) · 기기 정보(EXIF)를 뺀다. GIF · 사진이 아닌 파일 · 읽지 못하는 파일은 그대로. 크기 한도 검사는 줄인 뒤에 한다. 만들기 일의 재료(`_task/AskForm`)는 원본 그대로 올린다 (재료는 원본이 필요할 수 있다)
+
 ## 대화의 사진 (2026-11-19)
 
 - 사진은 따로 올리는 길이 없다: 파일 올리기(`POST /api/outputs/files`)로 결과물이 되고 참조(`image`)로 붙는다. 사진인지는 서버가 앞부분으로 알아본 형식(`chat-photos.ts`의 `PHOTO_TYPES`)으로 정한다.

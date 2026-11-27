@@ -7,6 +7,7 @@ import { useSpace } from '../../../_account/live';
 import { useApps, usePages } from '../../../_blog/live';
 import type { AdminApp } from '../../../_blog/types';
 import { api, uploadFile } from '../../../_lib/client-api';
+import { SHRINK, shrinkImage } from '../../../_lib/image-shrink';
 import { useAction } from '../../../_lib/use-action';
 import { CHAT_HREF, STORE_HREF } from '../../menu';
 import { type CreateAppBody, CreateAppForm } from './CreateAppForm';
@@ -38,15 +39,17 @@ export function StorePanel({ make }: { make: string | null }) {
     );
     if (!made?.ok) return false;
     const app = made.data;
-    if (icon)
+    if (icon) {
+      const small = await shrinkImage(icon, SHRINK.icon);
       await save.run('icon', () =>
         uploadFile<AdminApp>(
           `/api/apps/${app.id}/icon?version=${app.version}`,
-          icon,
-          icon.type,
+          small,
+          small.type,
           'PUT',
         ),
       );
+    }
     router.replace(`${STORE_HREF}/${app.id}`);
     return true;
   }

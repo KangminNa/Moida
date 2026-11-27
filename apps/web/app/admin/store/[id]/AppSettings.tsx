@@ -5,6 +5,7 @@ import type { ChangeEvent } from 'react';
 import { AppIcon } from '../../../_blog/AppIcon';
 import type { AdminApp } from '../../../_blog/types';
 import { api, uploadFile } from '../../../_lib/client-api';
+import { SHRINK, shrinkImage } from '../../../_lib/image-shrink';
 import { useAction } from '../../../_lib/use-action';
 import { STORE_HREF } from '../../menu';
 import { AppDomain } from './AppDomain';
@@ -37,9 +38,10 @@ export function AppSettings({
   }
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const picked = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
+    if (!picked) return;
+    const file = await shrinkImage(picked, SHRINK.icon);
     await icon.run(
       'upload',
       () => uploadFile(`/api/apps/${app.id}/icon?version=${app.version}`, file, file.type, 'PUT'),
