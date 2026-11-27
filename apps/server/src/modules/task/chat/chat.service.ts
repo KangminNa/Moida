@@ -28,6 +28,8 @@ import { ChatHistory } from './chat-history.policy';
 import { ChatProject } from './chat-project.policy';
 import { ChatResult } from './chat-result.policy';
 import { ChatTalk } from './chat-talk';
+import { ChatUpdateQuery } from './chat-update.query';
+import { AskedView } from './chat-update.view';
 
 // 대화 쓰기: 관리자(콘솔), 그리고 "에이전트에게 맡기기" 권한을 받은 기기(MCP ask_agent, 자기가 연 대화만). 대화와 회차 작업은 함께 바뀌어야 해서 같은 트랜잭션에서 쓴다 (목표 실행과 같은 이유).
 // 대화 줄을 잠그고 앞 회차를 읽어서, 동시에 두 메시지를 보내도 회차는 하나만 생긴다 (둘째는 그 회차에 덧붙인 말이 된다, 2차 1-1).
@@ -44,6 +46,7 @@ export class ChatService extends BaseService {
     private readonly library: LibraryQuery,
     private readonly lookups: Lookups,
     private readonly outputs: OutputQuery,
+    private readonly updates: ChatUpdateQuery,
   ) {
     super(db);
   }
@@ -96,6 +99,18 @@ export class ChatService extends BaseService {
    * chatId가 없으면 새 대화(목표 · 프로젝트와 함께), 있으면 그 기기가 연 대화에 이어 보낸다.
    * 같은 requestId는 한 번만. 기기의 메시지라고 남긴다 (read_url의 기준에 넣지 않게). 결재는 이 길로 하지 못한다
    */
+  /**
+   * MCP ask_agent: 보내고, wait_seconds를 주면 그 안에 온 이 대화의 답까지 함께 (2026-11-27). 기다림은 트랜잭션 밖이고,
+   * 커서는 보내기 전에 잡아 이번 메시지 뒤의 소식만 본다. 답이 늦으면 agent_updates로 이어 받는다
+   */
+  async askWaiting(actor: Actor, req: AskAgentInput): Promise<AskedView> {
+    const after = req.waitSeconds > 0 ? await this.updates.cursorNow(actor) : null;
+    const chat = await this.ask(actor, req);
+    const answer =
+      after === null ? null : await this.updates.answer(actor, chat.id, after, req.waitSeconds);
+    return new AskedView(chat.view(), answer);
+  }
+
   async ask(actor: Actor, req: AskAgentInput): Promise<Chat> {
     actor.assertCan(Actor.DELEGATE);
     if (actor.kind !== 'device' || !actor.id) throw new Forbidden(Actor.DELEGATE);

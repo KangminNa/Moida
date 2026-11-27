@@ -154,9 +154,13 @@ export class AskAgentInput extends BaseRequest {
     /** git 주소 그대로 (ChatProject가 맞춘다) */
     readonly project: string | null,
     readonly deliver: string | null,
+    /** 보낸 뒤 답을 기다릴 초 (0~25, 2026-11-27). 0이면 기다리지 않는다 */
+    readonly waitSeconds: number,
   ) {
     super();
   }
+
+  static readonly WAIT_MAX = 25;
 
   static from(raw: unknown): AskAgentInput {
     const body = (raw ?? {}) as Record<string, unknown>;
@@ -170,6 +174,7 @@ export class AskAgentInput extends BaseRequest {
           f.optionalText('goal', Chat.GOAL_MAX),
           f.optionalText('project', 400),
           f.optionalText('deliver', 20),
+          f.optionalInteger('wait_seconds', 0, AskAgentInput.WAIT_MAX) ?? 0,
         ),
     );
   }

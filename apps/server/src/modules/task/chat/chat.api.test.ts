@@ -731,6 +731,65 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
     assert.equal(next.body.turns, 2, '끝난 회차 뒤에는 다음 회차');
   });
 
+  test('wait_seconds: 보낸 뒤 그 안에 온 대표의 답을 answer로 함께 받는다. 답이 없으면 빈 소식과 커서', async () => {
+    await lead();
+    const mac = await device(`wait-${randomUUID().slice(0, 6)}`, ['delegate']);
+    const quiet = await call(mac, 'ask_agent', { request_id: randomUUID(), message: '조사해 줘' });
+    assert.equal(quiet.body.answer, null, '기다리지 않으면 answer는 null');
+    const chatId = quiet.body.id;
+    const tooLong = await call(mac, 'ask_agent', {
+      request_id: randomUUID(),
+      message: '더',
+      chat_id: chatId,
+      wait_seconds: 26,
+    });
+    assert.equal(tooLong.ok, false, '25초까지');
+
+    // 도는 회차에 덧붙이며 기다린다: 대표의 짧은 답이 오면 그 자리에서 돌아온다 (회차를 러너가 빌려 가 돌게 한다)
+    const turn = (await jobs()).find((j) => j.task.payload.chat?.chatId === chatId);
+    assert.ok(turn, '회차가 돈다');
+    const waiting = call(mac, 'ask_agent', {
+      request_id: randomUUID(),
+      message: '지금까지 찾은 것만 알려 줘',
+      chat_id: chatId,
+      wait_seconds: 20,
+    });
+    let reply: Json | undefined;
+    for (let i = 0; i < 50 && !reply; i++) {
+      reply = (await jobs()).find(
+        (j) => j.task.payload.chat?.reply && j.task.payload.chat.chatId === chatId,
+      ) as Json | undefined;
+      if (!reply) await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(reply, '대표가 답하는 작업이 생긴다');
+    await tool(runner, 'submit_result', {
+      task_id: reply.task.id,
+      request_id: randomUUID(),
+      status: 'done',
+      result: { text: '아직 두 곳을 봤어요' },
+    });
+    await drain();
+    const answered = await waiting;
+    assert.equal(answered.ok, true, JSON.stringify(answered.body));
+    const kinds = answered.body.answer.news.map((n: Json) => n.kind);
+    assert.deepEqual(kinds, ['appended', 'reply']);
+    assert.equal(answered.body.answer.news[1].text, '아직 두 곳을 봤어요');
+    const after = await call(mac, 'agent_updates', { after: answered.body.answer.cursor });
+    assert.deepEqual(after.body.news, [], '커서로 이어 받으면 같은 답이 다시 오지 않는다');
+
+    const empty = await call(mac, 'ask_agent', {
+      request_id: randomUUID(),
+      message: '한 줄 더',
+      chat_id: chatId,
+      wait_seconds: 1,
+    });
+    assert.deepEqual(
+      empty.body.answer.news.map((n: Json) => n.kind),
+      ['appended'],
+      '1초 안에 답이 없으면 덧붙인 말만 오고 커서로 agent_updates를 잇는다',
+    );
+  });
+
   test('대화의 일을 하는 에이전트는 post_update로 소식을 남긴다 (대화 밖의 일은 422). 팀원이 끝나면 소식, 회차는 다음 실행에 팀 소식을 받는다', async () => {
     const boss = await lead();
     const member = await agent('리서처');

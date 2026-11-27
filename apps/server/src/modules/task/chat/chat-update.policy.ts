@@ -45,6 +45,8 @@ export class ChatUpdates {
   static readonly QUESTION = 'question';
   /** 에이전트가 대화를 맡았다 (agent_id, 글은 고른 까닭이나 이름) */
   static readonly ROUTED = 'routed';
+  /** ask_agent가 기다리는 답 (덧붙인 말의 답 · 최종 답 · 실패 · 대표의 목표 확인 질문 ask_brief) */
+  static readonly ANSWERS: readonly ChatUpdateKind[] = ['reply', 'final', 'failed', 'question'];
   /** 에이전트가 post_update로 남기는 종류 (작업마다 POST_MAX개) */
   static readonly POSTED: readonly ChatUpdateKind[] = ['progress', 'decision', 'assumption'];
   static readonly POST_MAX = 20;
