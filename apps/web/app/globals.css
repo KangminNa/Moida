@@ -4782,3 +4782,81 @@ ul.picked > .chip {
   gap: 8px;
   align-self: flex-start;
 }
+
+/* 스케줄 캘린더 (2026-11-27): 한 달 칸, 날짜를 누르면 그날의 한 번 실행 등록 */
+.calendar {
+  display: grid;
+  gap: 8px;
+}
+.calendar-head {
+  align-items: center;
+  gap: 12px;
+}
+.calendar-grid {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+.calendar-grid th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.calendar-day {
+  vertical-align: top;
+  height: 88px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--raised);
+  overflow: hidden;
+}
+.calendar-day.other {
+  opacity: 0.5;
+}
+.calendar-day.today .calendar-date {
+  color: var(--accent);
+  font-weight: 700;
+}
+.calendar-date {
+  display: block;
+  font-size: 12px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: default;
+}
+button.calendar-date {
+  cursor: pointer;
+}
+button.calendar-date:hover {
+  color: var(--accent);
+}
+.calendar-line {
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+.calendar-line.planned {
+  color: var(--accent);
+}
+.calendar-line.failed {
+  color: var(--danger);
+}
+@media (max-width: 640px) {
+  .calendar-day {
+    height: 64px;
+  }
+  .calendar-line {
+    display: none;
+  }
+  .calendar-day:has(.calendar-line)::after {
+    content: "•";
+    color: var(--accent);
+  }
+}

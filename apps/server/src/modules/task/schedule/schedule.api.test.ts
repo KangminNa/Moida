@@ -311,6 +311,53 @@ describe('스케줄 (/api/schedules)', () => {
     assert.equal(removed.status, 204, removed.text);
   });
 
+  test('한 번 실행 · 캘린더 (2026-11-27): 날짜에 등록하면 그때 한 번 돌고 꺼진다. 캘린더에 돌 시각과 지난 실행이 보인다', async () => {
+    const runAt = new Date(Date.now() + 3 * 86_400_000);
+    const once = {
+      ...DAILY,
+      title: '보고서 마감',
+      mode: 'once',
+      atTime: undefined,
+      weekdays: undefined,
+    };
+    const made = ok(await create({ ...once, runAt: runAt.toISOString() }), 201);
+    assert.equal(made.mode, 'once');
+    assert.equal(made.runAt, runAt.toISOString());
+    assert.equal(made.nextRunAt, runAt.toISOString());
+    assert.equal((await create({ ...once })).status, 422, '날짜가 없으면');
+    const past = await create({ ...once, runAt: new Date(Date.now() - 60_000).toISOString() });
+    assert.equal(past.status, 422, past.text);
+    assert.match(past.text, /지난 시각/);
+
+    const from = new Date(Date.now() - 86_400_000).toISOString();
+    const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    const calendar = async () =>
+      ok(await api.get(`/api/schedules/calendar?from=${from}&to=${to}`, owner)) as {
+        planned: Json[];
+        runs: Json[];
+      };
+    const before = await calendar();
+    assert.ok(before.planned.some((p) => p.scheduleId === made.id && p.at === runAt.toISOString()));
+    assert.equal((await api.get(`/api/schedules/calendar?from=${from}&to=${to}`)).status, 403);
+    const tooLong = new Date(Date.now() + 90 * 86_400_000).toISOString();
+    assert.equal(
+      (await api.get(`/api/schedules/calendar?from=${from}&to=${tooLong}`, owner)).status,
+      400,
+    );
+
+    await makeDue(made);
+    await job.run();
+    const tasks = await tasksOf(made);
+    assert.equal(tasks.length, 1);
+    const [after] = (await list()).filter((s) => s.id === made.id);
+    assert.equal(after?.enabled, false, '한 번 돈 뒤 꺼진다');
+    assert.equal(after?.nextRunAt, null);
+    const done = await calendar();
+    assert.ok(!done.planned.some((p) => p.scheduleId === made.id));
+    const run = done.runs.find((r) => r.scheduleId === made.id);
+    assert.equal(run?.taskId, tasks[0]?.id);
+  });
+
   describe('자동화 레시피 (2차 5단계)', () => {
     /** 대화 레시피가 만든 회차 작업들 (회차를 보낸 요청이 schedule:<레시피>:) */
     const turnsOf = (schedule: Json) =>

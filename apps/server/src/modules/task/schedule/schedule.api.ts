@@ -1,10 +1,15 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { type Actor, CurrentActor, VersionInput } from '../../platform';
 import type { TaskView } from '../task/task.view';
-import { CreateScheduleInput, ListSchedulesInput, UpdateScheduleInput } from './schedule.input';
+import {
+  CreateScheduleInput,
+  ListSchedulesInput,
+  ScheduleCalendarInput,
+  UpdateScheduleInput,
+} from './schedule.input';
 import { ScheduleQuery } from './schedule.query';
 import { ScheduleService } from './schedule.service';
-import type { ScheduleListView, ScheduleView } from './schedule.view';
+import type { ScheduleCalendarView, ScheduleListView, ScheduleView } from './schedule.view';
 
 // 스케줄 (7단계, 콘솔 자동화 › 스케줄). 모두 주인만 (Service · Query 첫 줄에서 확인).
 // 고친 스케줄은 목록의 한 줄과 같은 모양이고, 화면은 그 version으로 다음 변경을 보낸다.
@@ -18,6 +23,12 @@ export class ScheduleController {
   @Get()
   list(@CurrentActor() actor: Actor, @Query() query: unknown): Promise<ScheduleListView> {
     return this.query.list(actor, ListSchedulesInput.from(query));
+  }
+
+  /** 캘린더 (2026-11-27): 기간 안에 돌 시각 · 짧은 주기 · 지난 실행 */
+  @Get('calendar')
+  calendar(@CurrentActor() actor: Actor, @Query() query: unknown): Promise<ScheduleCalendarView> {
+    return this.query.calendar(actor, ScheduleCalendarInput.from(query));
   }
 
   @Post()

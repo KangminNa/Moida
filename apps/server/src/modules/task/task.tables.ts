@@ -388,7 +388,7 @@ export interface RunnerRow {
 export type RunnerNew = Partial<RunnerRow> & Pick<RunnerRow, 'id' | 'space_id' | 'device_id'>;
 
 /** task.schedules.mode (값 목록 CHECK) */
-export const SCHEDULE_MODE = ['daily', 'hourly', 'minutely'] as const;
+export const SCHEDULE_MODE = ['daily', 'hourly', 'minutely', 'once'] as const;
 export type ScheduleMode = (typeof SCHEDULE_MODE)[number];
 /** task.schedules.destination (값 목록 CHECK) */
 export const SCHEDULE_DESTINATION = ['task', 'chat', 'page'] as const;
@@ -429,6 +429,7 @@ export interface ScheduleRow {
   chat_id: string | null;
   every_minutes: number | null;
   mail: boolean;
+  run_at: Date | null;
 }
 export type ScheduleNew = Partial<ScheduleRow> & Pick<ScheduleRow, 'id' | 'space_id' | 'title' | 'mode' | 'time_zone'>;
 

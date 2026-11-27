@@ -50,6 +50,7 @@ export class ScheduleSettingView {
       weekdays: r.weekdays,
       every_hours: r.every_hours,
       every_minutes: r.every_minutes,
+      run_at: r.run_at?.toISOString() ?? null,
       time_zone: r.time_zone,
       instruction: r.instruction,
       goal_id: r.goal_id,

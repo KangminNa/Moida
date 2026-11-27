@@ -106,6 +106,20 @@ export class SchedulePolicy {
     throw new RuleViolation('다음 시각을 찾지 못했어요');
   }
 
+  /**
+   * 캘린더 (2026-11-27): from 뒤 to 전까지의 시각들. next는 "after보다 뒤의 첫 시각"이고, max개까지만 (하루 한 번 주기를 펼친다)
+   */
+  static occurrences(next: (after: Date) => Date, from: Date, to: Date, max: number): Date[] {
+    const found: Date[] = [];
+    let at = new Date(from.getTime() - 1);
+    while (found.length < max) {
+      at = next(at);
+      if (at.getTime() >= to.getTime()) break;
+      found.push(at);
+    }
+    return found;
+  }
+
   /** 그 순간이 시간대에서 어느 날인가 ("2026-11-06"). 하루 한도를 세는 날 */
   static dayOf(at: Date, timeZone: string): string {
     const l = SchedulePolicy.local(at, timeZone);

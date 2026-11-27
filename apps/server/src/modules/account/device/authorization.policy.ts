@@ -1,5 +1,4 @@
 import type { SecretBox } from '../../platform';
-import { Device } from './device';
 import type { AuthorizeInput } from './device.input';
 import { ConsentInput } from './device.input';
 import { DeviceScopes } from './device-scope.policy';

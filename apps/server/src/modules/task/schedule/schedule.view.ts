@@ -1,4 +1,4 @@
-import type { ScheduleRow } from '../task.tables';
+import type { ScheduleRow, TaskRow } from '../task.tables';
 
 // 스케줄의 읽기 모양. 웹이 `import type`으로 가져온다 (객체설계 6장). 주인만 본다.
 
@@ -23,6 +23,7 @@ export class ScheduleView {
       everyHours: r.every_hours,
       /** N분마다의 간격 (2026-11-20). 다른 주기면 null */
       everyMinutes: r.every_minutes,
+      runAt: r.run_at?.toISOString() ?? null,
       timeZone: r.time_zone,
       instruction: r.instruction,
       goalId: r.goal_id,
@@ -56,5 +57,51 @@ export class ScheduleListView {
 
   toJSON() {
     return { schedules: this.rows.map((r) => new ScheduleView(r).toJSON()) };
+  }
+}
+
+/** 캘린더의 지난 실행 하나: 스케줄이 만든 작업 (대화로 보낸 것은 그 회차) */
+export type CalendarRunRow = Pick<TaskRow, 'title' | 'status' | 'created_at'> & {
+  task_id: string;
+  schedule_id: string;
+  chat_id: string | null;
+};
+
+/**
+ * 캘린더 (2026-11-27, GET api/schedules/calendar): 기간 안에 돌 시각(planned: 매일 · 한 번은 시각마다 펼친다),
+ * 펼치지 않는 짧은 주기(repeating: N시간 · N분마다), 지난 실행(runs: 만든 작업의 상태). 날짜로 묶는 것은 화면이 (보는 사람의 시간대)
+ */
+export class ScheduleCalendarView {
+  constructor(
+    private readonly planned: readonly { row: Readonly<ScheduleRow>; at: Date }[],
+    private readonly repeating: readonly Readonly<ScheduleRow>[],
+    private readonly runs: readonly CalendarRunRow[],
+  ) {}
+
+  toJSON() {
+    return {
+      planned: this.planned.map(({ row, at }) => ({
+        scheduleId: row.id,
+        title: row.title,
+        mode: row.mode,
+        destination: row.destination,
+        at: at.toISOString(),
+      })),
+      repeating: this.repeating.map((r) => ({
+        scheduleId: r.id,
+        title: r.title,
+        mode: r.mode,
+        everyHours: r.every_hours,
+        everyMinutes: r.every_minutes,
+      })),
+      runs: this.runs.map((r) => ({
+        taskId: r.task_id,
+        scheduleId: r.schedule_id,
+        title: r.title,
+        status: r.status,
+        chatId: r.chat_id,
+        at: r.created_at.toISOString(),
+      })),
+    };
   }
 }

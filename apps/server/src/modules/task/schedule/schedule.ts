@@ -19,7 +19,7 @@ import { ScheduleRecipe } from './schedule-recipe.policy';
 //   어디로: task(작업 하나) · chat(담당의 대화 회차 하나: 결과 카드 · 검사를 그대로) · page(페이지의 새 판, payload.page)
 //   계기: time(정한 시각) · manual(손으로만) · after(다른 레시피의 일이 끝나면, after_id)
 // 담당이 정해져 있고 지시가 비어 있으면 "정기 확인"(맡은 목표와 진행 중인 일을 확인)이 된다.
-// 주기는 매일(시각 + 요일) · N시간마다 · N분마다(2026-11-20). 켜져 있으면 늘 다음 시각(next_run_at)이 있다 (DB CHECK).
+// 주기는 매일(시각 + 요일) · N시간마다 · N분마다(2026-11-20) · 한 번(2026-11-27, 캘린더에서 날짜를 눌러 등록, 돈 뒤 꺼진다). 켜져 있으면 늘 다음 시각(next_run_at)이 있다 (DB CHECK).
 // 하루 한도(daily_max): 스케줄의 시간대 기준 하루에 저절로 만드는 작업 수. 구독 AI를 사람 없이 돌리는 양을 묶는다 (기획서 11장).
 // 관리자가 누른 "지금 한 번"은 세지 않는다 (2026-11-20: 사람이 보고 누른 것이라).
 // 설정은 configure로 한 번에 바꾸고, 때가 되면 fire가 이번 시각을 돌려주고 다음 시각으로 넘어간다.
@@ -30,6 +30,8 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   static readonly DAILY = 'daily';
   static readonly HOURLY = 'hourly';
   static readonly MINUTELY = 'minutely';
+  /** 한 번 실행 (2026-11-27, 캘린더): run_at에 한 번 돌고 저절로 꺼진다 */
+  static readonly ONCE = 'once';
   static readonly TITLE_MAX = 120;
   static readonly INSTRUCTION_MAX = 4000;
   /** 하루 한도의 끝 (5분마다 하루 내내면 288번) */
@@ -63,6 +65,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
         weekdays: Schedule.ALL_DAYS,
         every_hours: null,
         every_minutes: null,
+        run_at: null,
         time_zone: 'UTC',
         instruction: '',
         goal_id: null,
@@ -147,6 +150,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
       weekdays = [],
       every_hours: everyHours = null,
       every_minutes: everyMinutes = null,
+      run_at: runAt = null,
       time_zone: timeZone = '',
       instruction = '',
       goal_id: goalId = null,
@@ -189,6 +193,12 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     if (daily && (days.length === 0 || days.some((d) => !Schedule.ALL_DAYS.includes(d))))
       throw new RuleViolation('요일을 하나 이상 골라 주세요 (월 1 ~ 일 7)');
     SchedulePolicy.assertInterval(mode, everyHours, everyMinutes);
+    const once = mode === Schedule.ONCE;
+    if (once && runAt === null) throw new RuleViolation('한 번 실행이면 날짜와 시각이 있어야 해요');
+    if (once && recipe.trigger !== Schedule.TIME)
+      throw new RuleViolation('한 번 실행은 정한 시각에만 돌아요');
+    if (once && enabled && runAt !== null && runAt.getTime() <= now.getTime())
+      throw new RuleViolation('지난 시각이에요. 지금 뒤의 날짜 · 시각을 골라 주세요');
     if (!Number.isInteger(dailyMax) || dailyMax < 1 || dailyMax > Schedule.DAILY_MAX_LIMIT)
       throw new RuleViolation(`하루 한도는 1~${Schedule.DAILY_MAX_LIMIT}번이에요`);
     this.put('title', name);
@@ -198,6 +208,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('weekdays', daily ? days : Schedule.ALL_DAYS);
     this.put('every_hours', mode === Schedule.HOURLY ? everyHours : null);
     this.put('every_minutes', mode === Schedule.MINUTELY ? everyMinutes : null);
+    this.put('run_at', once ? runAt : null);
     this.put('time_zone', timeZone);
     this.put('instruction', instruction);
     this.put('goal_id', goalId);
@@ -230,7 +241,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     const slot = this.row.next_run_at;
     if (!this.dueAt(now) || slot === null) throw new RuleViolation('아직 돌 때가 아니에요');
     this.put('last_run_at', now);
-    this.put('next_run_at', this.after(now));
+    if (this.row.mode === Schedule.ONCE) {
+      // 한 번 실행은 돈 뒤 꺼진다: 다음 시각이 없다 (DB CHECK, 켜져 있으면 다음 시각이 있어야 한다)
+      this.put('enabled', false);
+      this.put('next_run_at', null);
+    } else this.put('next_run_at', this.after(now));
     return slot;
   }
 
@@ -346,6 +361,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
 
   private after(now: Date): Date {
     const r = this.row;
+    if (r.mode === Schedule.ONCE) {
+      if (r.run_at === null || r.run_at.getTime() <= now.getTime())
+        throw new RuleViolation('지난 시각이에요. 지금 뒤의 날짜 · 시각을 골라 주세요');
+      return r.run_at;
+    }
     if (r.mode === Schedule.MINUTELY)
       return SchedulePolicy.nextMinutely(
         r.every_minutes ?? SchedulePolicy.MINUTES_MIN,
