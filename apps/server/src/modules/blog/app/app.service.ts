@@ -26,6 +26,7 @@ import type {
   CheckDomainInput,
   CreateAppInput,
   HomeAppInput,
+  RemoveAppInput,
   UpdateAppInput,
   UploadIconInput,
 } from './app.input';
@@ -160,14 +161,19 @@ export class AppService extends EntityService<App> {
 
   /**
    * 지운다. 페이지 앱의 페이지는 앱 밖으로 풀고, 휴지통의 글은 앱에서 빼 휴지통에 그대로 둔다.
-   * 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다)
+   * 글 · 페이지 · 호가 남아 있으면 409 (먼저 옮기거나 지운다). 회원이 있으면 409.
+   * 앱 데이터의 줄이 남아 있으면 withData일 때만 지운다 (표는 community가 blog.app.changed deleted를 받아 치운다)
    */
-  async remove(actor: Actor, req: VersionInput): Promise<void> {
+  async remove(actor: Actor, req: RemoveAppInput): Promise<void> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
-    // 회원 · 앱 데이터가 남은 앱은 지우지 않는다 (2026-11-23, 커뮤니티 앱과 같다): 앱 id로만 이어진 데이터가 주인 없이 남는다.
-    // community에 묻는다 (트랜잭션 밖이라 묻고 지우는 사이에 가입한 회원은 막지 못한다)
-    const held = (await this.lookups.visible('app-holdings', actor, [req.id])).get(req.id);
+    // 회원이 남은 앱은 지우지 않는다 (2026-11-23, 커뮤니티 앱과 같다): 앱 id로만 이어진 회원이 주인 없이 남는다.
+    // 앱 데이터는 관리자가 내보내기를 받고 함께 지우기로 하면 지운다 (2026-11-27, 사용자 "삭제를 누르면 데이터도 내보내지고 삭제할 수 있도록").
+    // community에 묻는다 (트랜잭션 밖이라 묻고 지우는 사이에 가입한 회원 · 넣은 줄은 막지 못한다)
+    const members = (await this.lookups.visible('app-members', actor, [req.id])).get(req.id);
+    const rows = req.withData
+      ? undefined
+      : (await this.lookups.visible('app-rows', actor, [req.id])).get(req.id);
     await this.transaction(async (tx) => {
       const apps = this.store(tx);
       const app = await apps.lock(spaceId, req.id);
@@ -191,7 +197,10 @@ export class AppService extends EntityService<App> {
         );
       app.remove();
       // 커뮤니티 앱은 위의 remove가 먼저 막는다 (그쪽 문구가 맞다). 여기서 던지면 위의 옮기기도 모두 되돌아간다
-      if (held) throw new Conflict(`앱에 ${held}이 남아 있어 지우지 못해요. 비공개로 바꿔 주세요`);
+      if (members)
+        throw new Conflict(`앱에 ${members}이 남아 있어 지우지 못해요. 비공개로 바꿔 주세요`);
+      if (rows)
+        throw new Conflict(`앱에 ${rows}이 남아 있어요. 내보낸 뒤 데이터와 함께 삭제해 주세요`);
       await new MenuRepository(tx).removeAllIn(app.id);
       await apps.remove(app);
     });

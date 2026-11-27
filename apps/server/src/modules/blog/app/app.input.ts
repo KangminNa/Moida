@@ -121,6 +121,33 @@ export class UpdateAppInput extends BaseRequest {
   }
 }
 
+/**
+ * POST /api/apps/:id/delete { version, withData? }. withData: 남은 앱 데이터(선언한 표의 줄)도 함께 지운다 (2026-11-27,
+ * 화면은 내보내기 zip을 받은 뒤에만 보낸다). 없으면 false: 줄이 남은 앱은 409
+ */
+export class RemoveAppInput extends BaseRequest {
+  private constructor(
+    readonly id: string,
+    readonly version: number,
+    readonly withData: boolean,
+  ) {
+    super();
+  }
+
+  static from(id: string, raw: unknown): RemoveAppInput {
+    const body = { ...(raw as object), id } as Record<string, unknown>;
+    return BaseRequest.read(
+      body,
+      (f) =>
+        new RemoveAppInput(
+          f.uuid('id'),
+          f.version(),
+          body.withData === undefined ? false : f.boolean('withData'),
+        ),
+    );
+  }
+}
+
 /** POST /api/apps/:id/domain/check { version, token }: 관리자의 브라우저가 앱 도메인의 /.well-known/cairn-domain에서 읽은 값 */
 export class CheckDomainInput extends BaseRequest {
   private constructor(

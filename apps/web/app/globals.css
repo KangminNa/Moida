@@ -2621,6 +2621,51 @@ ul.picked > .chip {
 }
 
 /* 대화의 사진 (대화에 사진 넣기 ②-c): 입력 칸과 보낸 메시지의 미리보기. 누르면 새 탭에서 크게 */
+/* 대화의 그림 · 영상 결과물 (2026-11-27): 답 아래에 바로 크게. 하나면 칸 너비 가득, 여럿이면 두 줄 격자 */
+.chat-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-media.one {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 560px;
+}
+
+.chat-media > li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chat-media img,
+.chat-media video {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  border-radius: var(--radius);
+  background: var(--raised);
+  object-fit: contain;
+}
+
+.chat-media:not(.one) img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.chat-media-name {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .photo-thumbs {
   display: flex;
   flex-wrap: wrap;

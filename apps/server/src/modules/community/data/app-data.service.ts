@@ -13,6 +13,7 @@ import {
   SettingOutcome,
   type SettingShape,
   type Sql,
+  SystemActor,
 } from '../../platform';
 import type { MemberPlace } from '../member/member.input';
 import { MemberRepository } from '../member/member.repository';
@@ -75,6 +76,16 @@ export class AppDataService extends BaseService {
         table.close(req.seq, now);
         await tables.save(table);
       }
+    });
+  }
+
+  /** 지운 앱의 표 목록과 앱 스키마(줄까지)를 지운다 (AppRemovedHandler). 앱 줄이 이미 없어서 되살릴 길이 없다 */
+  async dropApp(actor: Actor, appId: string): Promise<void> {
+    if (!(actor instanceof SystemActor)) throw new Forbidden('system');
+    await this.transaction(async (tx) => {
+      const tables = new AppTableRepository(tx);
+      await tables.lockApp(appId);
+      await tables.dropApp(appId);
     });
   }
 

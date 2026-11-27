@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { AppIcon } from '../../../_blog/AppIcon';
 import type { AdminApp } from '../../../_blog/types';
-import { api, uploadFile } from '../../../_lib/client-api';
+import type { AppTableList } from '../../../_community/types';
+import { api, downloadFile, uploadFile } from '../../../_lib/client-api';
 import { SHRINK, shrinkImage } from '../../../_lib/image-shrink';
 import { useAction } from '../../../_lib/use-action';
 import { STORE_HREF } from '../../menu';
@@ -15,7 +16,7 @@ import { type AppSettingsBody, AppSettingsForm } from './AppSettingsForm';
 const ICON_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어요';
 
-// 앱 관리 › 설정 (스토어 1-5): 이름 · 주소 · 설명 · 순서 · 편집 방침, 도메인(스토어 3-0), 아이콘, 삭제(글 · 페이지 · 호가 없을 때만, 빈 메뉴는 함께).
+// 앱 관리 › 설정 (스토어 1-5): 이름 · 주소 · 설명 · 순서 · 편집 방침, 도메인(스토어 3-0), 아이콘, 삭제(글 · 페이지 · 호 · 회원이 없을 때만, 빈 메뉴와 내보낸 앱 데이터는 함께).
 // 아이콘 · 저장은 앱 version이 오르므로 저장 뒤 목록을 다시 읽고 폼을 새로 만든다 (key)
 export function AppSettings({
   app,
@@ -57,16 +58,35 @@ export function AppSettings({
     );
   }
 
+  // 앱 데이터가 남은 앱 (2026-11-27, 사용자 "삭제를 누르면 데이터도 내보내지고 삭제할 수 있도록"): 누르면 남은 줄 수를 읽어
+  // 무엇이 사라지는지 묻고, 내보내기 zip을 다 받은 뒤에만 데이터와 함께 지운다(withData). 회원이 있으면 서버가 409로 막는다
   async function drop() {
-    if (!window.confirm(`${app.name} 앱을 삭제할까요? 빈 메뉴도 함께 지워지고 되돌릴 수 없어요`))
-      return;
+    const tables = await api<AppTableList>('GET', `/api/community/admin/${app.id}/data`);
+    const rows = tables.ok ? tables.data.tables.reduce((sum, t) => sum + t.rows, 0) : 0;
+    const asked =
+      rows > 0
+        ? `${app.name} 앱을 삭제할까요? 앱 데이터 ${rows}줄을 내보내기 파일(zip)로 먼저 내려받은 뒤 함께 지워요. 빈 메뉴도 지워지고 되돌릴 수 없어요`
+        : `${app.name} 앱을 삭제할까요? 빈 메뉴도 함께 지워지고 되돌릴 수 없어요`;
+    if (!window.confirm(asked)) return;
     const reply = await remove.run(
       'delete',
-      () => api('POST', `/api/apps/${app.id}/delete`, { version: app.version }),
-      { done: `${app.name} 삭제` },
+      async () => {
+        if (rows > 0) {
+          const saved = await downloadFile(
+            `/api/community/admin/${app.id}/export`,
+            `${app.slug}-data.zip`,
+          );
+          if (!saved.ok) return saved;
+        }
+        return api('POST', `/api/apps/${app.id}/delete`, {
+          version: app.version,
+          withData: rows > 0,
+        });
+      },
+      { done: rows > 0 ? `${app.name} 삭제 · 데이터 내려받음` : `${app.name} 삭제` },
     );
     if (reply?.ok) router.push(STORE_HREF);
-    // 못 지운 까닭은 서버의 말 그대로 보인다 (남은 글 · 페이지 · 호의 수, 또는 그사이 바뀜). 그사이 바뀐 것이면 다시 누를 수 있게 새로 읽는다
+    // 못 지운 까닭은 서버의 말 그대로 보인다 (남은 글 · 페이지 · 호 · 회원의 수, 또는 그사이 바뀜). 그사이 바뀐 것이면 다시 누를 수 있게 새로 읽는다
     else if (reply?.status === 409) await onChanged();
   }
 
@@ -121,8 +141,9 @@ export function AppSettings({
           <div>
             <b>앱 삭제</b>
             <p>
-              글 · 페이지 · 호가 남아 있으면 삭제할 수 없음. 먼저 다른 앱으로 옮기기. 휴지통의 글은
-              앱에서 빠져 휴지통에 그대로 남음
+              글 · 페이지 · 호나 회원이 남아 있으면 삭제할 수 없음. 글은 먼저 다른 앱으로 옮기기.
+              휴지통의 글은 앱에서 빠져 휴지통에 그대로 남음. 앱 데이터는 내보내기 파일(zip)로
+              내려받은 뒤 함께 지워짐
             </p>
           </div>
         </div>

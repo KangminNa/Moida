@@ -54,17 +54,24 @@ export class AppDataQuery extends BaseQuery {
   }
 
   /**
-   * 앱마다 남아 있는 회원 · 앱 데이터 (2026-11-23 앱 지우기 막기, lookup `app-holdings`): 앱 id → "회원 N명 · 앱 데이터 M줄".
-   * 둘 다 없는 앱은 빠진다. 관리자만 (blog가 앱을 지우기 전에 묻는다). 줄 수는 표마다 ROWS_MAX를 넘으면 그 수에서 멈춘다
+   * 앱마다 남아 있는 회원 (lookup `app-members`, 2026-11-23 앱 지우기 막기): 앱 id → "회원 N명". 없는 앱은 빠진다.
+   * 관리자만 (blog가 앱을 지우기 전에 묻는다). 회원이 있으면 앱을 지우지 않는다 (탈퇴는 회원이 한다)
    */
-  async holdings(actor: Actor, appIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
-    actor.assertOwner();
-    const visible = await this.lookups.visible('app', actor, appIds);
-    const ids = appIds.filter((id) => visible.has(id));
+  async heldMembers(actor: Actor, appIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const ids = await this.ownedApps(actor, appIds);
     if (ids.length === 0) return new Map();
     const counted = await this.sql<{ app_id: string; n: string }[]>`
       SELECT app_id, count(*) AS n FROM community.members WHERE app_id = ANY(${ids}) GROUP BY app_id`;
-    const members = new Map(counted.map((r) => [r.app_id, Number(r.n)]));
+    return new Map(counted.map((r) => [r.app_id, `회원 ${Number(r.n)}명`]));
+  }
+
+  /**
+   * 앱마다 남아 있는 앱 데이터 (lookup `app-rows`): 앱 id → "앱 데이터 M줄". 줄이 없는 앱은 빠진다.
+   * 관리자만. 줄 수는 표마다 ROWS_MAX를 넘으면 그 수에서 멈춘다. blog는 "함께 지우기"(withData) 없이는 이 앱을 지우지 않는다 (2026-11-27)
+   */
+  async heldRows(actor: Actor, appIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const ids = await this.ownedApps(actor, appIds);
+    if (ids.length === 0) return new Map();
     return this.db.transaction(async (tx) => {
       const tables = new AppTableRepository(tx);
       const held = new Map<string, string>();
@@ -72,13 +79,16 @@ export class AppDataQuery extends BaseQuery {
         let rows = 0;
         for (const table of await tables.listOf(id))
           rows += (await tables.countRows(table, null))[0];
-        const people = members.get(id) ?? 0;
-        const parts = [people > 0 && `회원 ${people}명`, rows > 0 && `앱 데이터 ${rows}줄`];
-        const said = parts.filter((p): p is string => typeof p === 'string');
-        if (said.length > 0) held.set(id, said.join(' · '));
+        if (rows > 0) held.set(id, `앱 데이터 ${rows}줄`);
       }
       return held;
     });
+  }
+
+  private async ownedApps(actor: Actor, appIds: readonly string[]): Promise<string[]> {
+    actor.assertOwner();
+    const visible = await this.lookups.visible('app', actor, appIds);
+    return appIds.filter((id) => visible.has(id));
   }
 
   /** 관리자: 앱의 표 목록 (닫힌 것까지) */
