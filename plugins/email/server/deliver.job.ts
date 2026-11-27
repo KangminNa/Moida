@@ -3,7 +3,7 @@ import type { NoticeMail } from './notice-mail';
 import type { SmtpGateway } from './smtp.gateway';
 
 type Item = {
-  kind: 'confirm' | 'post';
+  kind: 'confirm' | 'post' | 'news';
   address: string;
   token: string;
   apps: string[];
@@ -11,6 +11,7 @@ type Item = {
   subscriberId: string | null;
   title: string;
   link: string;
+  body: string;
 };
 
 // 30초마다: 보낼 메일을 잡고(claimMail) → 한 통씩 SMTP로(트랜잭션 밖) → 결과를 적는다(reportMail).
@@ -34,7 +35,7 @@ export class DeliverJob extends BaseJob {
       const results = [];
       for (const item of items) {
         const error = await this.send(item);
-        if (item.kind === 'post' && item.sendId && item.subscriberId)
+        if (item.kind !== 'confirm' && item.sendId && item.subscriberId)
           results.push({
             sendId: item.sendId,
             subscriberId: item.subscriberId,
@@ -52,7 +53,9 @@ export class DeliverJob extends BaseJob {
     const message =
       item.kind === 'confirm'
         ? mail.confirm(item.address, item.token, item.apps)
-        : mail.post(item.address, item.token, item.apps[0] ?? '', item.title, item.link);
+        : item.kind === 'news'
+          ? mail.news(item.address, item.token, item.title, item.body)
+          : mail.post(item.address, item.token, item.apps[0] ?? '', item.title, item.link);
     try {
       await (this.smtp as SmtpGateway).send(
         message,

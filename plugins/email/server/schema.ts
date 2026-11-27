@@ -4,7 +4,7 @@
 import { TableColumns } from '../../../apps/server/src/plugin-api';
 
 const { integer, pgSchema, text, timestamp, uuid } = TableColumns;
-import type { DeliveryStatus, SendStatus, SubscriberStatus } from './tables';
+import type { DeliveryStatus, SendKind, SendStatus, SubscriberStatus } from './tables';
 
 const emailSchema = pgSchema('email');
 
@@ -22,11 +22,11 @@ export const deliveries = emailSchema.table('deliveries', {
 export const sends = emailSchema.table('sends', {
   id: uuid('id').notNull(),
   space_id: uuid('space_id').notNull(),
-  app_id: uuid('app_id').notNull(),
-  app_name: text('app_name').notNull(),
-  post_id: uuid('post_id').notNull(),
+  app_id: uuid('app_id'),
+  app_name: text('app_name'),
+  post_id: uuid('post_id'),
   title: text('title').notNull(),
-  link: text('link').notNull(),
+  link: text('link'),
   status: text('status').$type<SendStatus>().notNull(),
   total: integer('total').notNull(),
   sent: integer('sent').notNull(),
@@ -34,17 +34,23 @@ export const sends = emailSchema.table('sends', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
   started_at: timestamp('started_at', { withTimezone: true }),
   finished_at: timestamp('finished_at', { withTimezone: true }),
+  kind: text('kind').$type<SendKind>().notNull(),
+  body: text('body'),
+  request_id: text('request_id'),
+  approval_id: uuid('approval_id'),
 });
 
 /** email.subscribers */
 export const subscribers = emailSchema.table('subscribers', {
   id: uuid('id').notNull(),
-  app_id: uuid('app_id').notNull(),
-  app_name: text('app_name').notNull(),
+  app_id: uuid('app_id'),
+  app_name: text('app_name'),
   address: text('address').notNull(),
   status: text('status').$type<SubscriberStatus>().notNull(),
   token: text('token').notNull(),
   confirm_sent_at: timestamp('confirm_sent_at', { withTimezone: true }),
   confirmed_at: timestamp('confirmed_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  space_id: uuid('space_id'),
+  account_id: uuid('account_id'),
 });

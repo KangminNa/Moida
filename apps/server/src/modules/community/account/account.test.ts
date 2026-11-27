@@ -26,6 +26,7 @@ function row(more: Partial<AccountRow> = {}): AccountRow {
     joined_at: NOW,
     last_seen_at: null,
     left_at: null,
+    news_agreed_at: null,
     version: 1,
     ...more,
   };
@@ -114,5 +115,30 @@ describe('Account', () => {
     assert.equal(account.passwordHash, '');
     assert.equal(account.endsSessions, true);
     assert.throws(() => account.leave(NOW), /이미 탈퇴한/);
+  });
+});
+
+describe('소식 메일 수신 동의 (2026-11-27)', () => {
+  test('바뀔 때만 이벤트(메일 주소 없이), 탈퇴하면 동의를 지우고 알린다', () => {
+    const account = Account.restore(row());
+    account.setNews(true, NOW);
+    assert.equal(account.newsAgreed, true);
+    account.setNews(true, NOW);
+    const agreed = account.pullEvents();
+    assert.deepEqual(
+      agreed.map((e) => [e.name, e.data]),
+      [[Account.NEWS, { accountId: 'acc1', agreed: true }]],
+    );
+    account.leave(NOW);
+    assert.equal(account.newsAgreed, false);
+    assert.deepEqual(account.pullEvents()[0]?.data, { accountId: 'acc1', agreed: false });
+    assert.throws(() => account.setNews(true, NOW), /탈퇴한 계정/);
+  });
+
+  test('해지 링크로 이미 빠졌으면(notify false) 다시 알리지 않는다', () => {
+    const account = Account.restore(row({ news_agreed_at: NOW }));
+    account.setNews(false, NOW, false);
+    assert.equal(account.newsAgreed, false);
+    assert.equal(account.pullEvents().length, 0);
   });
 });

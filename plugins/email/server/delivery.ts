@@ -74,9 +74,11 @@ export class ClaimMail extends Command<Record<string, never>> {
         subscriber_id: string;
         address: string | null;
         token: string | null;
-        app_name: string;
+        app_name: string | null;
+        kind: 'post' | 'news';
         title: string;
-        link: string;
+        link: string | null;
+        body: string | null;
       }[]
     >`
       WITH pick AS (
@@ -89,7 +91,7 @@ export class ClaimMail extends Command<Record<string, never>> {
         UPDATE email.deliveries d SET status = 'sending', claimed_at = now()
         FROM pick WHERE d.send_id = pick.send_id AND d.subscriber_id = pick.subscriber_id
         RETURNING d.send_id, d.subscriber_id)
-      SELECT c.send_id, c.subscriber_id, p.address, p.token, s.app_name, s.title, s.link
+      SELECT c.send_id, c.subscriber_id, p.address, p.token, s.app_name, s.kind, s.title, s.link, s.body
       FROM claimed c JOIN email.sends s ON s.id = c.send_id
       LEFT JOIN email.subscribers p ON p.id = c.subscriber_id AND p.status = 'active'`;
     for (const p of posts) {
@@ -101,14 +103,15 @@ export class ClaimMail extends Command<Record<string, never>> {
       }
       items.push(
         new MailItemView(
-          'post',
+          p.kind,
           p.address,
           p.token,
-          [p.app_name],
+          p.app_name ? [p.app_name] : [],
           p.send_id,
           p.subscriber_id,
           p.title,
-          p.link,
+          p.link ?? '',
+          p.body ?? '',
         ),
       );
     }

@@ -116,6 +116,7 @@ export class StoreJoinService extends BaseService {
       new Date(),
     );
     account.agree(req.agreement.termsVersion ?? 0, req.agreement.privacyVersion ?? 0);
+    account.setNews(req.newsMail, new Date());
     this.joins.fail(at);
     await this.transaction((tx) => new AccountRepository(tx).save(account));
     this.codes.use(key);

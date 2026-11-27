@@ -6,7 +6,7 @@ import { Database } from '../base/database';
 // 서버를 시작할 때 들어 있는 플러그인을 모두 읽고 검사한다. 틀리면 시작하지 않는다.
 
 /** 플러그인이 지원하는 Cairn 플러그인 API 버전 */
-const CAIRN_PLUGIN_API = '0.14';
+const CAIRN_PLUGIN_API = '0.15';
 
 /** 웹 화면 자리. 늘릴 때는 웹의 <Slot>과 문서를 함께 고친다 */
 const WEB_SLOTS: readonly string[] = ['post.after', 'task.office', 'store.after'];
@@ -41,7 +41,7 @@ const USES = [
   /^action:[a-z][a-z0-9-]*$/,
   /^archive:(?:read|restore)$/,
   /^login:[a-z][a-z0-9-]*$/,
-  /^lookup:(?:app|app-id|app-url)$/,
+  /^lookup:(?:app|app-id|app-url|news-address)$/,
   /^mail$/,
 ];
 

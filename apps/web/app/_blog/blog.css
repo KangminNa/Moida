@@ -1699,3 +1699,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* 가입 화면의 선택 칸 아래 설명 (소식 메일 받기, 2026-11-27) */
+.member-check .member-hint {
+  display: block;
+  margin-top: 2px;
+}

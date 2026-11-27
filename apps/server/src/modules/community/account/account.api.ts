@@ -31,6 +31,7 @@ import {
   JoinInput,
   LoginIdInput,
   LoginInput,
+  NewsInput,
   PasswordInput,
   ResetPasswordInput,
   SuspendInput,
@@ -51,6 +52,7 @@ import { AccountSession } from './account-session';
 //   POST  api/community/logout             로그아웃 (이 앱 도메인의 로그인)
 //   PATCH api/community/me/password        비밀번호 바꾸기 { current, next } (다른 로그인은 모두 끝난다)
 //   PUT   api/community/account/login-id   아이디 정하기 { version, loginId } (아이디가 없는 옛 계정만)
+//   PUT   api/community/account/news       소식 메일 받기 { version, agreed } (2026-11-27)
 //   POST  api/community/account/email/code 메일 등록 인증코드 { email } (메일이 없는 옛 계정만, 답은 늘 204)
 //   PUT   api/community/account/email      메일 등록 { email, code }
 //   POST  api/community/account/leave      계정 탈퇴 { password }: 모든 앱에서 나가고 개인정보를 지우고 모든 로그인을 끝낸다
@@ -156,6 +158,16 @@ export class AccountController {
   ): Promise<AccountSelfView> {
     const place = MemberPlace.from(req);
     return (await this.accounts.setLoginId(actor, place, LoginIdInput.from(body))).view();
+  }
+
+  @Put('account/news')
+  async news(
+    @CurrentActor() actor: Actor,
+    @Body() body: unknown,
+    @Req() req: HttpRequest,
+  ): Promise<AccountSelfView> {
+    const place = MemberPlace.from(req);
+    return (await this.accounts.setNews(actor, place, NewsInput.from(body))).view();
   }
 
   @Post('account/email/code')

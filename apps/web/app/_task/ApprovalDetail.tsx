@@ -11,9 +11,11 @@ import {
   AskTarget,
   GoalRunTarget,
   LimitTarget,
+  NewsTarget,
   OtherTarget,
   PostTarget,
   PullTarget,
+  SEND_NEWS,
 } from './ApprovalTargets';
 import { ClickTarget, LoginDecide, LoginTarget, PlanTarget } from './BrowserApproval';
 import { ChatCardApproval } from './ChatCardApproval';
@@ -143,6 +145,8 @@ function Loaded({
         <PullTarget approval={a} />
       ) : a.action === START_CODE ? (
         <AskTarget approval={a} />
+      ) : a.action === SEND_NEWS ? (
+        <NewsTarget approval={a} />
       ) : a.action === PUBLISH_SITE && a.target.kind === 'browser_click_plan' ? (
         <PlanTarget approval={a} />
       ) : a.action === PUBLISH_SITE ? (

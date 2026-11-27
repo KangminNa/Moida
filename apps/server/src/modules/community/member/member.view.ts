@@ -28,7 +28,14 @@ export class AccountSelfView {
   constructor(
     private readonly r: Pick<
       AccountRow,
-      'id' | 'login_id' | 'email' | 'joined_at' | 'terms_version' | 'privacy_version' | 'version'
+      | 'id'
+      | 'login_id'
+      | 'email'
+      | 'joined_at'
+      | 'terms_version'
+      | 'privacy_version'
+      | 'news_agreed_at'
+      | 'version'
     >,
   ) {}
 
@@ -49,6 +56,8 @@ export class AccountSelfView {
       loginId: r.login_id,
       email: r.email,
       joinedAt: r.joined_at.toISOString(),
+      /** 소식 메일을 받기로 했는가 (2026-11-27, 내 정보에서 바꾼다) */
+      newsMail: r.news_agreed_at !== null,
       needs: this.needs,
       version: r.version,
     };

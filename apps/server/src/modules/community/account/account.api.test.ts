@@ -251,4 +251,29 @@ describe('옮겨 온 옛 계정', () => {
     assert.equal(twice.status, 409);
     await signIn(club, loginId);
   });
+
+  test('내 정보의 소식 메일 받기 (2026-11-27): 켜고 끄고, 본 version이 낡으면 409', async () => {
+    const browser = await town.member(`newsme${mark}`, '소식이');
+    const self = (await me(town, browser)).account as Json;
+    assert.equal(self.newsMail, false);
+    const on = ok(
+      await town.write(browser, 'PUT', '/api/community/account/news', {
+        version: self.version,
+        agreed: true,
+      }),
+    );
+    assert.equal(on.newsMail, true);
+    const stale = await town.write(browser, 'PUT', '/api/community/account/news', {
+      version: self.version,
+      agreed: false,
+    });
+    assert.equal(stale.status, 409);
+    const off = ok(
+      await town.write(browser, 'PUT', '/api/community/account/news', {
+        version: on.version,
+        agreed: false,
+      }),
+    );
+    assert.equal(off.newsMail, false);
+  });
 });

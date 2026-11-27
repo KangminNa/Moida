@@ -94,6 +94,29 @@ export class NoticeMail {
     );
   }
 
+  /**
+   * 가입자 소식 메일 (2026-11-27): 대표가 쓰고 관리자가 승인한 제목 · 본문. 광고성 정보의 표시(정보통신망법 제50조):
+   * 제목 앞 (광고), 보낸 곳, 수신 거부 링크(본문 · 원클릭 해지 머리글 RFC 8058)
+   */
+  news(address: string, token: string, subject: string, body: string): MailMessage {
+    return new MailMessage(
+      this.from,
+      address,
+      `(광고) ${subject}`,
+      [
+        body,
+        '',
+        '---',
+        `가입할 때 소식 메일 받기에 동의해서 보내는 메일이에요. 보낸 곳: ${this.site}`,
+        `수신 거부: ${this.site}/store?mail=unsubscribe&token=${token}`,
+      ].join('\n'),
+      [
+        ['List-Unsubscribe', `<${this.site}/api/p/email/unsubscribe/${token}>`],
+        ['List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'],
+      ],
+    );
+  }
+
   /** 설정을 마친 뒤 확인하는 메일 */
   test(): MailMessage {
     return new MailMessage(

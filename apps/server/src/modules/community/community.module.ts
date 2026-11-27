@@ -4,6 +4,7 @@ import { AccountAdminController, AccountController } from './account/account.api
 import { AccountQuery } from './account/account.query';
 import { AccountService } from './account/account.service';
 import { AccountMailService } from './account/account-mail.service';
+import { NewsUnsubscribedHandler } from './account/news-unsubscribed.handler';
 import { StoreJoinController } from './account/store-join.api';
 import { StoreJoinService } from './account/store-join.service';
 import { CommentController } from './comment/comment.api';
@@ -52,6 +53,7 @@ import { TopicService } from './topic/topic.service';
     AccountMailService,
     StoreJoinService,
     AccountQuery,
+    NewsUnsubscribedHandler,
     MemberGuard,
     TopicQuery,
     TopicService,
@@ -100,6 +102,8 @@ export class CommunityModule implements OnModuleInit {
     private readonly tables: AppTablesHandler,
     private readonly lookups: Lookups,
     private readonly data: AppDataQuery,
+    private readonly unsubscribed: NewsUnsubscribedHandler,
+    private readonly accountQuery: AccountQuery,
   ) {}
 
   onModuleInit(): void {
@@ -111,5 +115,8 @@ export class CommunityModule implements OnModuleInit {
     this.workers.on(AppTablesHandler.TOPIC, this.tables);
     // 남은 회원 · 앱 데이터 (2026-11-23): blog가 앱을 지우기 전에 묻는다. 있으면 지우지 않는다
     this.lookups.provide('app-holdings', (a, ids) => this.data.holdings(a, ids));
+    // 소식 메일 (2026-11-27): 동의한 계정의 주소는 메일 플러그인이 이벤트를 받을 때만 묻고, 해지 링크로 끊으면 동의를 지운다
+    this.lookups.provide('news-address', (a, ids) => this.accountQuery.newsAddresses(a, ids));
+    this.workers.on(NewsUnsubscribedHandler.TOPIC, this.unsubscribed);
   }
 }

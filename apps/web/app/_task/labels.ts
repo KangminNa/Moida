@@ -84,6 +84,7 @@ export const ACTION_LABELS: Record<string, string> = {
   [CALL_API]: 'API 부르기',
   [SETTING_CHANGE]: '설정 바꾸기',
   [START_CODE]: '코드 작업 열기',
+  'email.news.send': '가입자에게 소식 메일 보내기',
   [SHOW_APP_CODE]: '앱 코드 공개',
   [PUBLISH_APP]: '대화로 배포',
   [RAISE_LIMIT]: '한도 변경',

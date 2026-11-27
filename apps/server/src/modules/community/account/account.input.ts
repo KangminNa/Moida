@@ -1,5 +1,11 @@
-import { BaseRequest, type HttpRequest, NotFound } from '../../platform';
+import { BaseRequest, type HttpRequest, NotFound, type RequestFields } from '../../platform';
 import { Agreement } from '../member/member.input';
+
+/** 소식 메일 받기 칸 (선택): 없거나 null이면 받지 않음 */
+function newsOf(f: RequestFields, raw: unknown): boolean {
+  const value = (raw as { newsMail?: unknown } | null)?.newsMail;
+  return value === undefined || value === null ? false : f.boolean('newsMail');
+}
 
 /** 인증코드 받기 (가입 · 비밀번호 다시 정하기 · 메일 등록): { email }. 주소 모양은 Service가 EmailAddress로 본다 */
 export class CodeRequestInput extends BaseRequest {
@@ -26,6 +32,8 @@ export class JoinInput extends BaseRequest {
     readonly nickname: string,
     readonly ageConfirmed: boolean,
     readonly agreement: Agreement,
+    /** 소식 메일 받기 (선택, 2026-11-27). 보내지 않으면 받지 않음 */
+    readonly newsMail: boolean,
   ) {
     super();
   }
@@ -42,6 +50,7 @@ export class JoinInput extends BaseRequest {
           f.text('nickname', 60),
           f.boolean('ageConfirmed'),
           Agreement.of(f),
+          newsOf(f, raw),
         ),
     );
   }
@@ -78,6 +87,7 @@ export class StoreJoinInput extends BaseRequest {
     readonly password: string,
     readonly ageConfirmed: boolean,
     readonly agreement: Agreement,
+    readonly newsMail: boolean,
   ) {
     super();
   }
@@ -93,6 +103,7 @@ export class StoreJoinInput extends BaseRequest {
           f.text('password', 400),
           f.boolean('ageConfirmed'),
           Agreement.of(f),
+          newsOf(f, raw),
         ),
     );
   }
@@ -162,6 +173,20 @@ export class LoginIdInput extends BaseRequest {
 
   static from(raw: unknown): LoginIdInput {
     return BaseRequest.read(raw, (f) => new LoginIdInput(f.version(), f.text('loginId', 40)));
+  }
+}
+
+/** 소식 메일 받기 바꾸기 (내 정보, 2026-11-27): { version, agreed } */
+export class NewsInput extends BaseRequest {
+  private constructor(
+    readonly version: number,
+    readonly agreed: boolean,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): NewsInput {
+    return BaseRequest.read(raw, (f) => new NewsInput(f.version(), f.boolean('agreed')));
   }
 }
 

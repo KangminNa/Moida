@@ -15,7 +15,13 @@ import type { LeaveInput, MemberPlace } from '../member/member.input';
 import { MemberRepository } from '../member/member.repository';
 import { MemberPassword } from '../member/member-password.policy';
 import type { Account } from './account';
-import type { LoginIdInput, LoginInput, PasswordInput, SuspendInput } from './account.input';
+import type {
+  LoginIdInput,
+  LoginInput,
+  NewsInput,
+  PasswordInput,
+  SuspendInput,
+} from './account.input';
 import { AccountRepository } from './account.repository';
 import { AccountSession } from './account-session';
 import { LoginId } from './login-id.policy';
@@ -118,6 +124,34 @@ export class AccountService extends BaseService {
       account.setLoginId(loginId);
       await accounts.save(account);
       return account;
+    });
+  }
+
+  /** 소식 메일 받기 바꾸기 (내 정보, 2026-11-27): 바뀌면 메일 플러그인이 받는 사람 목록을 맞춘다 (community.account.news) */
+  async setNews(actor: Actor, place: MemberPlace, req: NewsInput): Promise<Account> {
+    const me = MemberActor.requireAccount(actor, place.appId);
+    return this.transaction(async (tx) => {
+      const accounts = new AccountRepository(tx);
+      const account = await accounts.lock(place.spaceId, me.accountId);
+      account.assertVersion(req.version);
+      account.setNews(req.agreed, new Date());
+      await accounts.save(account);
+      return account;
+    });
+  }
+
+  /**
+   * 메일의 해지 링크로 메일 플러그인의 목록에서 빠졌다 (plugin.email.unsubscribed, 일꾼): 동의를 지운다.
+   * 플러그인은 이미 지웠으니 이벤트를 다시 남기지 않는다. 없거나 탈퇴한 계정 · 이미 지운 동의는 그대로 (두 번 불려도 같다)
+   */
+  async newsUnsubscribed(actor: Actor, spaceId: string, accountId: string): Promise<void> {
+    actor.assertOwnerOrSystem();
+    await this.transaction(async (tx) => {
+      const accounts = new AccountRepository(tx);
+      const account = await accounts.findLive(spaceId, accountId);
+      if (!account?.newsAgreed) return;
+      account.setNews(false, new Date(), false);
+      await accounts.save(account);
     });
   }
 

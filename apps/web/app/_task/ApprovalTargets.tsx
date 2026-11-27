@@ -17,7 +17,7 @@ import {
 } from './labels';
 import { useGoalRun } from './live';
 import { Criteria, RoundReport } from './RoundReport';
-import type { Agent, Approval, CodeAsk, CodePull } from './types';
+import type { Agent, Approval, CodeAsk, CodePull, NewsMail } from './types';
 
 // 승인 화면의 "무엇을 승인하는지" 칸 가운데 글 · 한도가 아닌 것. 대상은 서버에서 읽는다 (에이전트의 메모가 아니라).
 
@@ -231,6 +231,37 @@ export function LimitTarget({ approval, agent }: { approval: Approval; agent: Ag
           에이전트가 재개돼요
         </p>
       )}
+    </section>
+  );
+}
+
+/** 가입자 소식 메일 보내기 (2026-11-27, email 패키지의 결재 동작) */
+export const SEND_NEWS = 'email.news.send';
+
+/** 가입자 소식 메일 (2026-11-27): 승인하면 소식 메일에 동의한 가입자 모두에게 이 메일이 나간다 */
+export function NewsTarget({ approval }: { approval: Approval }) {
+  const { id } = approval.target;
+  const { data: mail, error } = useLiveValue(
+    `news-mail:${id}`,
+    () => api<NewsMail>('GET', `/api/p/email/news/${id}`),
+    [],
+  );
+
+  if (error) return <p className="error">{error}</p>;
+  if (!mail) return <p className="label-mono loading">불러오는 중…</p>;
+  return (
+    <section className="preview" aria-label="소식 메일">
+      <b>(광고) {mail.subject}</b>
+      {mail.status !== 'draft' && (
+        <p className="warn">이미 보냈거나 취소한 메일이에요. 승인해도 다시 나가지 않아요</p>
+      )}
+      <dl className="kv">
+        <dt>받는 사람</dt>
+        <dd>소식 메일에 동의한 가입자 {mail.recipients}명</dd>
+        <dt>본문</dt>
+        <dd className="text">{mail.body}</dd>
+      </dl>
+      <small>끝에 수신 거부 링크가 붙어요</small>
     </section>
   );
 }

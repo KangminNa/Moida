@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, VisitorActor } from '../base/actor';
+import { type Actor, SystemActor, VisitorActor } from '../base/actor';
 import { BaseService } from '../base/base-service';
 import type { ToolAnswer } from '../base/base-tool';
 import { Database } from '../base/database';
@@ -18,7 +18,12 @@ import { PluginRegistry } from './plugin-registry';
 @Injectable()
 export class PackageService extends BaseService {
   /** 기능 패키지가 물을 수 있는 코어의 읽기 (플러그인 API 0.13). 방문자에게 보이는 것만 돌려주는 종류만 둔다 */
-  static readonly LOOKUPS: readonly string[] = ['app', 'app-id', 'app-url'];
+  static readonly LOOKUPS: readonly string[] = ['app', 'app-id', 'app-url', 'news-address'];
+  /**
+   * 서버 자신으로만 묻는 읽기 (0.15, 2026-11-27): 소식 메일을 받기로 한 계정의 메일. 이벤트 · 반복 작업(SYSTEM)에서만 되고,
+   * 관리자 · 에이전트 · 방문자의 동작에서는 막는다 (회원 메일이 화면 · 도구로 새지 않게)
+   */
+  static readonly SYSTEM_LOOKUPS: readonly string[] = ['news-address'];
   constructor(
     db: Database,
     private readonly registry: PluginRegistry,
@@ -59,7 +64,11 @@ export class PackageService extends BaseService {
     const lookup = (kind: string, ids: readonly string[]) => {
       if (!PackageService.LOOKUPS.includes(kind) || !manifest.allows(`lookup:${kind}`))
         throw new Error(`허락받지 않은 코어의 읽기예요: ${kind} (uses에 lookup:${kind})`);
-      return this.lookups.visible(kind, new VisitorActor(), ids);
+      if (!PackageService.SYSTEM_LOOKUPS.includes(kind))
+        return this.lookups.visible(kind, new VisitorActor(), ids);
+      if (!(actor instanceof SystemActor))
+        throw new Error(`서버 자신의 동작에서만 묻는 읽기예요: ${kind}`);
+      return this.lookups.visible(kind, actor, ids);
     };
     if (!operation.writes)
       return operation.run(

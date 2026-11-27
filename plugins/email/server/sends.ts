@@ -8,6 +8,7 @@ import {
   type Work,
 } from '../../../apps/server/src/plugin-api';
 import { sends, subscribers } from './schema';
+import { unsubscribed } from './subscriptions';
 import type { SendRow } from './tables';
 import { DoneView, OverviewView, SendView, SubscriberView } from './views';
 
@@ -95,7 +96,9 @@ export class Overview extends Read<Record<string, never>> {
     const space = actor.requireSpace();
     const recent = await work.sql<(SendRow & { waiting: number })[]>`
       SELECT s.*, (SELECT count(*)::int FROM email.subscribers p
-                   WHERE p.app_id = s.app_id AND p.status = 'active') AS waiting
+                   WHERE p.status = 'active' AND CASE WHEN s.kind = 'news'
+                     THEN p.space_id = s.space_id AND p.account_id IS NOT NULL
+                     ELSE p.app_id = s.app_id END) AS waiting
       FROM email.sends s WHERE s.space_id = ${space}
       ORDER BY s.created_at DESC LIMIT ${Overview.SENDS}`;
     const people = await work.rows(
@@ -136,9 +139,13 @@ export class RemoveSubscriber extends Command<IdInput> {
   }
 
   async run(work: Work, _actor: Actor, input: IdInput): Promise<DoneView> {
+    const found = await work.row(subscribers, { id: input.id });
+    if (!found) throw new NotFound('없는 구독자예요');
     await work.sql`DELETE FROM email.deliveries WHERE subscriber_id = ${input.id} AND status = 'queued'`;
-    const removed = await work.deleteRows(subscribers, { id: input.id });
-    if (removed === 0) throw new NotFound('없는 구독자예요');
+    await work.deleteRows(subscribers, { id: input.id });
+    // 가입자의 소식 메일이면 계정의 수신 동의도 지운다 (2026-11-27)
+    if (found.account_id && found.space_id)
+      work.record(unsubscribed(found.space_id, found.account_id));
     return new DoneView(true);
   }
 }
@@ -155,6 +162,8 @@ export class StartSend extends Command<IdInput> {
   async run(work: Work, actor: Actor, input: IdInput): Promise<DoneView> {
     const send = await work.row(sends, { id: input.id, space_id: actor.requireSpace() });
     if (!send) throw new NotFound('없는 소식이에요');
+    if (send.kind === 'news')
+      throw new Conflict('가입자 소식 메일은 대화의 결과 카드에서 승인하면 나가요');
     if (send.status !== 'ready') throw new Conflict('이미 보냈거나 취소한 소식이에요');
     const queued = await work.sql<{ n: number }[]>`
       WITH added AS (
@@ -190,7 +199,7 @@ export class CancelSend extends Command<IdInput> {
   async run(work: Work, actor: Actor, input: IdInput): Promise<DoneView> {
     const send = await work.row(sends, { id: input.id, space_id: actor.requireSpace() });
     if (!send) throw new NotFound('없는 소식이에요');
-    if (send.status !== 'ready' && send.status !== 'sending')
+    if (send.status !== 'ready' && send.status !== 'sending' && send.status !== 'draft')
       throw new Conflict('이미 끝난 소식이에요');
     await work.sql`DELETE FROM email.deliveries WHERE send_id = ${send.id} AND status = 'queued'`;
     await work.updateRows(sends, { status: 'cancelled', finished_at: new Date() }, { id: send.id });
