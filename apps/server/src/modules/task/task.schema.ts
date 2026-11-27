@@ -341,6 +341,7 @@ export const schedules = taskSchema.table('schedules', {
   chat_id: uuid('chat_id'),
   every_minutes: integer('every_minutes'),
   mail: boolean('mail').notNull(),
+  run_at: timestamp('run_at', { withTimezone: true }),
 });
 
 /** task.skill_revisions */

@@ -29,6 +29,8 @@ export type ScheduleBody = {
   weekdays?: readonly number[];
   everyHours?: number;
   everyMinutes?: number;
+  /** 한 번 실행의 시각 (ISO, 2026-11-27 캘린더) */
+  runAt?: string;
   timeZone: string;
   instruction: string;
   goalId: string | null;
@@ -55,6 +57,7 @@ export function ScheduleForm({
   schedules,
   agents,
   agentId: presetAgent,
+  period: presetPeriod,
   busy,
   problem,
   onSubmit,
@@ -68,6 +71,8 @@ export function ScheduleForm({
   agents: readonly Agent[];
   /** 새로 만들 때 미리 고를 담당 (에이전트 화면에서 왔을 때) */
   agentId: string | null;
+  /** 새로 만들 때 미리 정한 주기 (캘린더에서 날짜를 눌렀을 때: 그날의 한 번 실행) */
+  period?: Period | null;
   busy: boolean;
   problem: string | null;
   /** 저장. 됐으면 true (만들기의 requestId는 응답을 못 받아 다시 눌러도 같게 폼이 쥔다) */
@@ -81,7 +86,7 @@ export function ScheduleForm({
   const [title, setTitle] = useState(schedule?.title ?? '정기 확인');
   const [agentId, setAgentId] = useState(schedule?.agentId ?? presetAgent ?? '');
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
-  const [period, setPeriod] = useState<Period>(periodOf(schedule));
+  const [period, setPeriod] = useState<Period>(presetPeriod ?? periodOf(schedule));
   const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? browserZone());
   const [goalId, setGoalId] = useState(schedule?.goalId ?? '');
   const [recipe, setRecipe] = useState<Recipe>(recipeOf(schedule));

@@ -9,14 +9,21 @@ const EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12, 24];
 const EVERY_MINUTES = [5, 10, 15, 20, 30, 45, 90];
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 
-/** 주기 칸의 값: 매일(시각 · 요일) · N시간마다 · N분마다 */
+/** 주기 칸의 값: 매일(시각 · 요일) · N시간마다 · N분마다 · 한 번(이 브라우저 시각 "YYYY-MM-DDTHH:mm", 2026-11-27 캘린더) */
 export type Period = {
   mode: string;
   atTime: string;
   weekdays: readonly number[];
   everyHours: number;
   everyMinutes: number;
+  runAt: string;
 };
+
+/** 순간 → datetime-local 칸의 값 (이 브라우저 시간대) */
+export function localInput(at: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
 
 /** 스케줄에서 주기 칸의 처음 값 */
 export function periodOf(schedule: Schedule | null): Period {
@@ -26,11 +33,14 @@ export function periodOf(schedule: Schedule | null): Period {
     weekdays: schedule?.weekdays ?? DAYS,
     everyHours: schedule?.everyHours ?? 4,
     everyMinutes: schedule?.everyMinutes ?? 30,
+    runAt: schedule?.runAt ? localInput(new Date(schedule.runAt)) : '',
   };
 }
 
 /** 보낼 본문의 주기 칸: 매일이면 시각 · 요일, N시간 · N분마다면 간격만 */
 export function periodBody(period: Period) {
+  if (period.mode === 'once')
+    return { mode: period.mode, runAt: period.runAt ? new Date(period.runAt).toISOString() : '' };
   if (period.mode === 'minutely') return { mode: period.mode, everyMinutes: period.everyMinutes };
   return period.mode === 'daily'
     ? { mode: period.mode, atTime: period.atTime, weekdays: period.weekdays }
@@ -40,6 +50,7 @@ export function periodBody(period: Period) {
 /** 이 주기가 하루에 도는 횟수: 매일은 1, N시간마다는 시가 N으로 나누어떨어지는 정각, N분마다는 자정부터 N분 간격 */
 export function runsPerDay(period: Period): number {
   if (period.mode === 'minutely') return Math.ceil(1440 / period.everyMinutes);
+  if (period.mode === 'once') return 1;
   return period.mode === 'hourly' ? Math.ceil(24 / period.everyHours) : 1;
 }
 
@@ -75,8 +86,23 @@ export function PeriodFields({
           <option value="daily">매일 정한 시각</option>
           <option value="hourly">N시간마다</option>
           <option value="minutely">N분마다</option>
+          <option value="once">한 번 (날짜 · 시각)</option>
         </select>
       </div>
+      {value.mode === 'once' && (
+        <div className="field">
+          <label htmlFor={`${id}-run-at`}>날짜 · 시각</label>
+          <input
+            id={`${id}-run-at`}
+            className="input"
+            type="datetime-local"
+            value={value.runAt}
+            required
+            onChange={(e) => set({ runAt: e.target.value })}
+          />
+          <small>그때 한 번 돌고 저절로 꺼져요. 캘린더에서 날짜를 눌러도 정해요</small>
+        </div>
+      )}
       {value.mode === 'minutely' && (
         <div className="field">
           <label htmlFor={`${id}-minutes`}>간격</label>

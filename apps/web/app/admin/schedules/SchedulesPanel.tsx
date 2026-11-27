@@ -4,9 +4,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
-import { DESTINATION_LABELS, scheduleLabel, when } from '../../_task/labels';
+import { DESTINATION_LABELS, when } from '../../_task/labels';
 import { useAgents, useSchedules } from '../../_task/live';
+import { scheduleLabel } from '../../_task/schedule-label';
 import type { Schedule, Task } from '../../_task/types';
+import { CalendarPanel } from './CalendarPanel';
+import { localInput, type Period, periodOf } from './PeriodFields';
 import { type ScheduleBody, ScheduleForm } from './ScheduleForm';
 
 const NEW = 'new';
@@ -31,6 +34,10 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
   const action = useAction();
   const save = useAction();
   const [open, setOpen] = useState<string | null>(null);
+  /** 목록 · 캘린더 (2026-11-27) */
+  const [view, setView] = useState<'list' | 'calendar'>('list');
+  /** 캘린더에서 고른 날의 한 번 실행 (새 스케줄의 처음 주기) */
+  const [preset, setPreset] = useState<Period | null>(null);
   const list = schedules.data?.schedules ?? null;
   const problem = action.problem ?? schedules.error;
   const agentList = agents.data?.agents ?? [];
@@ -39,7 +46,16 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
 
   function close() {
     setOpen(null);
+    setPreset(null);
     save.clear();
+  }
+
+  /** 캘린더의 날짜: 그날 오전 9시(지났으면 지금부터 한 시간 뒤)의 한 번 실행으로 새 스케줄 */
+  function pick(day: Date) {
+    const nine = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9);
+    const at = nine.getTime() > Date.now() ? nine : new Date(Date.now() + 3_600_000);
+    setPreset({ ...periodOf(null), mode: 'once', runAt: localInput(at) });
+    setOpen(NEW);
   }
 
   // 저장은 패널이 돌린다 (폼은 칸만). 고치기는 본 version, 만들기는 폼이 쥔 requestId를 붙인다
@@ -93,8 +109,28 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
         </p>
       )}
       {problem && <p className="error">{problem}</p>}
+      <div className="chips">
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={view === 'list'}
+          onClick={() => setView('list')}
+        >
+          목록
+        </button>
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={view === 'calendar'}
+          onClick={() => setView('calendar')}
+        >
+          캘린더
+        </button>
+      </div>
       {open === NEW && (
         <ScheduleForm
+          key={preset?.runAt ?? NEW}
+          period={preset}
           schedule={null}
           schedules={list ?? []}
           agents={agentList}
@@ -106,7 +142,9 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
           onClose={close}
         />
       )}
-      {list === null ? (
+      {view === 'calendar' ? (
+        <CalendarPanel onPick={pick} />
+      ) : list === null ? (
         !problem && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
         <p className="rows-empty">스케줄 없음</p>

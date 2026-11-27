@@ -50,6 +50,7 @@ import type {
   RunnerView,
 } from '../../../server/src/modules/task/runner/runner.view';
 import type {
+  ScheduleCalendarView,
   ScheduleListView,
   ScheduleView,
 } from '../../../server/src/modules/task/schedule/schedule.view';
@@ -116,6 +117,8 @@ export type ApiCallLine = ReturnType<ApiCallLineView['toJSON']>;
 export type ExternalToolOAuthStart = ReturnType<OAuthStartView['toJSON']>;
 export type Schedule = ReturnType<ScheduleView['toJSON']>;
 export type ScheduleList = ReturnType<ScheduleListView['toJSON']>;
+/** 스케줄 캘린더 (2026-11-27): 돌 시각 · 짧은 주기 · 지난 실행 */
+export type ScheduleCalendar = ReturnType<ScheduleCalendarView['toJSON']>;
 export type Usage = ReturnType<UsageView['toJSON']>;
 export type UsageAgent = Usage['agents'][number];
 export type UsageWindow = Usage['plan'][number];

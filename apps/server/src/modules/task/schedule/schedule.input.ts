@@ -28,6 +28,8 @@ function settingsOf(
       SchedulePolicy.MINUTES_MIN,
       SchedulePolicy.MINUTES_MAX,
     ),
+    // 한 번 실행의 날짜 · 시각 (ISO, 2026-11-27 캘린더). 다른 주기면 쓰지 않는다
+    run_at: f.optionalDate('runAt'),
     time_zone: f.text('timeZone', 100),
     instruction: f.optionalText('instruction', Schedule.INSTRUCTION_MAX) ?? '',
     goal_id: body.goalId === undefined || body.goalId === null ? null : f.uuid('goalId'),
@@ -122,5 +124,32 @@ export class ListSchedulesInput extends BaseRequest {
           query.agentId === undefined || query.agentId === '' ? null : f.uuid('agentId'),
         ),
     );
+  }
+}
+
+/** GET /api/schedules/calendar?from=&to= (2026-11-27): ISO 시각 둘, 62일까지 (한 달 보기에 앞뒤 주를 더한 만큼) */
+export class ScheduleCalendarInput extends BaseRequest {
+  static readonly DAYS_MAX = 62;
+
+  private constructor(
+    readonly from: Date,
+    readonly to: Date,
+  ) {
+    super();
+  }
+
+  static from(raw: unknown): ScheduleCalendarInput {
+    return BaseRequest.read(raw ?? {}, (f) => {
+      const from = f.optionalDate('from');
+      const to = f.optionalDate('to');
+      if (from === null) f.reject('from', 'ISO 8601 날짜여야 해요');
+      if (to === null) f.reject('to', 'ISO 8601 날짜여야 해요');
+      const start = from ?? new Date(0);
+      const end = to ?? new Date(0);
+      const days = (end.getTime() - start.getTime()) / 86_400_000;
+      if (from && to && (days <= 0 || days > ScheduleCalendarInput.DAYS_MAX))
+        f.reject('to', `from 뒤 ${ScheduleCalendarInput.DAYS_MAX}일 안이어야 해요`);
+      return new ScheduleCalendarInput(start, end);
+    });
   }
 }

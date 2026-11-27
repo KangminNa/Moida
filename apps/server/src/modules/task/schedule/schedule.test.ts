@@ -176,6 +176,40 @@ describe('Schedule', () => {
     assert.equal(schedule.unsaved.every_hours, 6);
   });
 
+  test('한 번 실행 (2026-11-27 캘린더): 그 시각이 다음 시각이고, 돈 뒤 꺼진다. 지난 시각은 켤 수 없다', () => {
+    const runAt = at('2026-11-10T05:00:00Z');
+    const once = daily({ mode: 'once', at_minute: null, run_at: runAt });
+    assert.equal(once.unsaved.next_run_at?.toISOString(), runAt.toISOString());
+    assert.equal(once.unsaved.at_minute, null);
+    assert.equal(once.fire(at('2026-11-10T05:00:30Z')).toISOString(), runAt.toISOString());
+    assert.equal(once.unsaved.enabled, false);
+    assert.equal(once.unsaved.next_run_at, null);
+    assert.throws(
+      () => daily({ mode: 'once', at_minute: null, run_at: at('2026-11-01T00:00:00Z') }),
+      /지난 시각/,
+    );
+    assert.throws(() => daily({ mode: 'once', at_minute: null }), /날짜와 시각/);
+    // 꺼 두면 지난 시각이어도 저장된다 (돈 뒤 고칠 때)
+    daily({ mode: 'once', at_minute: null, run_at: at('2026-11-01T00:00:00Z'), enabled: false });
+  });
+
+  test('캘린더 펼치기: 기간 안의 시각만, max개까지', () => {
+    const next = (after: Date) => SchedulePolicy.nextDaily(9 * 60, ALL, SEOUL, after);
+    const days = SchedulePolicy.occurrences(
+      next,
+      at('2026-11-01T00:00:00Z'),
+      at('2026-11-08T00:00:00Z'),
+      100,
+    );
+    assert.equal(days.length, 7);
+    assert.equal(days[0]?.toISOString(), '2026-11-01T00:00:00.000Z');
+    assert.equal(
+      SchedulePolicy.occurrences(next, at('2026-11-01T00:00:00Z'), at('2026-12-01T00:00:00Z'), 3)
+        .length,
+      3,
+    );
+  });
+
   test('N분마다 (2026-11-20): 간격만 남기고 다음 시각은 자정부터 N분 간격', () => {
     const schedule = daily({
       mode: 'minutely',
