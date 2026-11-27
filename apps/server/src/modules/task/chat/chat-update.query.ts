@@ -59,6 +59,45 @@ export class ChatUpdateQuery extends BaseQuery {
     }
   }
 
+  /** 지금 가장 큰 소식 번호 (ask_agent가 보내기 전에 잡아 두는 커서) */
+  async cursorNow(actor: Actor): Promise<number> {
+    return this.lastNumber(actor.requireSpace());
+  }
+
+  /**
+   * ask_agent의 기다리기 (2026-11-27): 이 대화에 after 다음의 답(덧붙인 말의 답 · 최종 답 · 실패 · 질문)이 오거나 waitSeconds가 지날 때까지.
+   * 그동안 쌓인 이 대화의 소식을 모두 돌려준다. 보낸 기기만 부르므로(ChatService.askWaiting) 범위는 그 기기의 그 대화
+   */
+  async answer(
+    actor: Actor,
+    chatId: string,
+    after: number,
+    waitSeconds: number,
+  ): Promise<AgentUpdatesView> {
+    actor.assertCan(Actor.DELEGATE);
+    const spaceId = actor.requireSpace();
+    const scope = [spaceId, actor.id, chatId, null] as const;
+    const deadline = Date.now() + waitSeconds * 1000;
+    for (;;) {
+      const news = await this.news(...scope, after);
+      const left = deadline - Date.now();
+      if (
+        news.some((u) => ChatUpdates.ANSWERS.includes(u.kind)) ||
+        left <= 0 ||
+        this.changes.closed
+      )
+        return new AgentUpdatesView(
+          news,
+          Number(news.at(-1)?.n ?? after),
+          await this.board(...scope),
+        );
+      await this.changes.wait(
+        (signal) => signal.spaceId === spaceId && signal.topic === ChatUpdates.TOPIC,
+        Math.min(left, ChatUpdateQuery.RECHECK_MS),
+      );
+    }
+  }
+
   /**
    * next_jobs: 빌려 주는 일이 대화의 일이면 덧붙인 말(이 회차 작업에)과 팀 소식(이 일 아래 작업들이 남긴 중간 보고 · 정한 것 · 가정,
    * 최근 TEAM개). 둘 다 없으면 null. 러너가 빌리는 중이라 호출자는 run 권한이다

@@ -64,6 +64,21 @@ export class AgentUpdatesView {
   }
 }
 
+/**
+ * ask_agent의 답 (2026-11-27): 대화(콘솔과 같은 모양)에 answer를 더한다. wait_seconds를 주면 그 안에 온 이 대화의 소식 ·
+ * 커서 · 상태판(agent_updates와 같은 모양), 답이 오지 않았거나 기다리지 않았으면 null 또는 답 없는 소식만
+ */
+export class AskedView {
+  constructor(
+    private readonly chat: { toJSON(): object },
+    private readonly answer: AgentUpdatesView | null,
+  ) {}
+
+  toJSON() {
+    return { ...this.chat.toJSON(), answer: this.answer?.toJSON() ?? null };
+  }
+}
+
 /** post_update의 답 */
 export class PostedUpdateView {
   constructor(private readonly n: number) {}
