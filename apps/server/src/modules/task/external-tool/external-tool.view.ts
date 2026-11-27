@@ -104,3 +104,46 @@ export class OAuthStartView {
     return { url: this.url };
   }
 }
+
+/**
+ * get_settings { kind: connectors } (C4, 2026-11-27): 커넥터마다 켜짐 · 쓸 수 있는지 · 허락한 에이전트.
+ * 주소는 출처만 (경로 · 질의에 키가 들어 있을 수 있다), 토큰 · 머리글 값은 싣지 않는다
+ */
+export class ConnectorSettingView {
+  constructor(
+    private readonly row: Readonly<ExternalToolRow>,
+    private readonly agents: readonly string[],
+  ) {}
+
+  toJSON() {
+    const r = this.row;
+    let origin = '';
+    try {
+      origin = new URL(r.url).origin;
+    } catch {
+      origin = '';
+    }
+    return {
+      id: r.id,
+      version: r.version,
+      name: r.name,
+      title: r.title,
+      origin,
+      status: r.status,
+      enabled: r.status === 'active',
+      auth: r.auth,
+      tools_changed: r.catalog_changed_at !== null,
+      last_error: r.last_error ?? r.check_error,
+      agents: this.agents,
+    };
+  }
+}
+
+/** get_settings { kind: connectors }: 이름순 */
+export class ConnectorSettingsView {
+  constructor(private readonly items: readonly ConnectorSettingView[]) {}
+
+  toJSON() {
+    return { connectors: this.items.map((i) => i.toJSON()) };
+  }
+}

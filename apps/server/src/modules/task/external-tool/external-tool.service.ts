@@ -8,9 +8,14 @@ import {
   Idempotency,
   RuleViolation,
   SecretBox,
+  SettingActor,
+  type SettingChangeInput,
+  SettingOutcome,
   type Sql,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
+import { SettingChanges } from '../setting-change/setting-change.policy';
+import { ConnectorEdit } from './connector-edit';
 import { ExternalTool } from './external-tool';
 import type {
   CreateExternalToolInput,
@@ -73,6 +78,30 @@ export class ExternalToolService extends EntityService<ExternalTool> {
       tool.edit(req.changes, now);
       if (req.enabled !== null) tool.switchTo(req.enabled, now);
     });
+  }
+
+  /** 설정 바꾸기 제안의 미리 해 보기 (C4 커넥터 켜기 · 끄기): 같은 줄을 지나고 저장하지 않는다 */
+  async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingActor.spaceOf(actor);
+    await this.transaction(async (tx) => {
+      await new ConnectorEdit(tx, spaceId).apply(change, new Date());
+    });
+  }
+
+  /** 승인한 커넥터 설정 바꾸기: 결재마다 한 번 적용하고 결과(task.setting.changed)를 남긴다 */
+  async applySetting(actor: Actor, change: SettingChangeInput): Promise<void> {
+    const spaceId = SettingOutcome.spaceOf(actor, change.key);
+    await SettingOutcome.settle(
+      (work) => this.transaction(work),
+      SettingChanges.TOPIC,
+      spaceId,
+      change.key,
+      async (tx) => {
+        await new ExternalToolRepository(tx).save(
+          await new ConnectorEdit(tx, spaceId).apply(change, new Date()),
+        );
+      },
+    );
   }
 
   /** 토큰을 넣거나 바꾼다. 값은 여기서 잠그고 어디에도 다시 내보내지 않는다 */

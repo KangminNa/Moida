@@ -1,4 +1,4 @@
-import { BaseRequest, type RequestFields } from '../../platform';
+import { BaseRequest, InvalidRequest, type RequestFields } from '../../platform';
 import type { TaskNew } from '../task.tables';
 
 /** 대상의 판(target_version) 위쪽 끝 (Postgres integer) */
@@ -13,6 +13,8 @@ export class SubtaskOrder extends BaseRequest {
   private static readonly REF_SHAPE = 2_000;
   static readonly DELIVER_MAX = 300;
   static readonly AFTER_MAX = 4;
+  /** 이 일의 방법 (C4, 2026-11-27): mcp 공식 MCP만 · web 커넥터 없이. 러너가 payload.route로 도구를 고른다 */
+  static readonly ROUTES = ['mcp', 'web'] as const;
 
   private constructor(
     readonly requestId: string,
@@ -31,6 +33,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly model: string | null,
     /** 앞 단계 (D2, 2026-11-21): 같은 호출의 앞 하위 작업 request_id. 그것들이 끝나면 서버가 이 일을 시작한다 (SubtaskAfter) */
     readonly after: readonly string[],
+    /** 이 일의 방법 (ROUTES). 없으면 순서대로 (공식 MCP → 사이트 도구 → read_url → 브라우저) */
+    readonly route: string | null,
     /** 받은 모양 그대로 (after가 있으면 위 작업에 적어 두었다가 그대로 다시 읽는다, SubtaskOrder.saved) */
     readonly raw: Readonly<Record<string, unknown>>,
   ) {
@@ -62,7 +66,16 @@ export class SubtaskOrder extends BaseRequest {
       f.optionalText('app_id', 36) === null ? null : f.uuid('app_id'),
       f.optionalText('model', 20),
       f.optionalTextList('after', SubtaskOrder.AFTER_MAX, 200) ?? [],
+      SubtaskOrder.routeOf(f.optionalText('route', 10)),
       (raw ?? {}) as Record<string, unknown>,
     );
+  }
+
+  private static routeOf(route: string | null): string | null {
+    if (route !== null && !(SubtaskOrder.ROUTES as readonly string[]).includes(route))
+      throw new InvalidRequest(
+        new Map([['route', `${SubtaskOrder.ROUTES.join(' · ')} 중 하나예요`]]),
+      );
+    return route;
   }
 }
