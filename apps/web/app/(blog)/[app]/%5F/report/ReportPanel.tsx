@@ -9,12 +9,15 @@ type Reason = keyof typeof REPORT_REASON_LABELS;
 
 // 신고: 까닭 하나 + 메모(500자까지). 누가 신고했는지는 운영자에게만 보인다
 export function ReportPanel({
+  base,
   csrf,
   topicId,
   commentId,
   target,
   notice,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 '', 공통 앱 도메인 /<앱>) */
+  base: string;
   csrf: string | null;
   topicId: string;
   commentId: string | null;
@@ -25,7 +28,7 @@ export function ReportPanel({
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(false);
   const action = useAction();
-  const back = `/t/${topicId}`;
+  const back = `${base}/t/${topicId}`;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

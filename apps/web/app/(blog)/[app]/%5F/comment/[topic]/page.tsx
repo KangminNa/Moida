@@ -24,7 +24,12 @@ export default async function CommentPage({ params }: Props) {
   const topic = await shownTopic(place, id);
   return (
     <MemberFrame place={place} title="댓글">
-      <CommentPanel csrf={place.csrf} topic={topic} notice={writeNotice(member, true)} />
+      <CommentPanel
+        base={place.base}
+        csrf={place.csrf}
+        topic={topic}
+        notice={writeNotice(member, true)}
+      />
     </MemberFrame>
   );
 }

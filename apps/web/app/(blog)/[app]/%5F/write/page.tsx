@@ -21,7 +21,12 @@ export default async function WritePage({ params }: Props) {
   const member = signedIn(place, '/_/write');
   return (
     <MemberFrame place={place} title="글쓰기">
-      <WritePanel csrf={place.csrf} topic={null} notice={writeNotice(member, true)} />
+      <WritePanel
+        base={place.base}
+        csrf={place.csrf}
+        topic={null}
+        notice={writeNotice(member, true)}
+      />
     </MemberFrame>
   );
 }

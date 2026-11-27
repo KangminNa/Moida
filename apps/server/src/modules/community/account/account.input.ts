@@ -70,7 +70,8 @@ export class StorePlace extends BaseRequest {
   }
 
   static from(req: HttpRequest): StorePlace {
-    if (req.appHost || !req.siteSpaceId) throw new NotFound('없는 주소예요');
+    // 공통 앱 도메인(2026-11-27)은 스토어의 앞문이라 가입을 받는다. 앱마다의 도메인은 그 앱의 /_/join
+    if ((req.appHost && !req.appsDomain) || !req.siteSpaceId) throw new NotFound('없는 주소예요');
     return new StorePlace(req.siteSpaceId, req.ip ?? '');
   }
 }

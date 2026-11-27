@@ -16,6 +16,27 @@ export const SCREEN_HEADERS: readonly { key: string; value: string }[] = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
 ];
 
+// 웹이 그리는 화면의 최상위 경로 (서버로 넘기는 경로 포함). 화면 머리글은 이 경로와 첫 화면(/)에만 붙인다.
+// 그 밖의 /<이름>/…은 앱 화면(스토어 1-6)이라 route handler가 앱마다 격리 머리글을 붙인다: 화면의 frame-ancestors 'none' ·
+// X-Frame-Options가 함께 붙으면 콘솔의 미리 보기가 막히고 CSP 둘이 겹친다. next.config · proxy.ts가 함께 쓴다. 구조 검사가 app/ 폴더 · App.RESERVED와 맞춰 본다
+export const WEB_ROUTES: readonly string[] = [
+  'admin',
+  'api',
+  'connect',
+  'graph',
+  'install',
+  'join',
+  'login',
+  'm',
+  'mcp',
+  'oauth',
+  'posts',
+  'store',
+];
+
+/** 서버가 격리 머리글을 붙여 내는 웹의 최상위 경로 (AI가 만든 페이지, 결과물 공유 링크) */
+export const SERVER_ISOLATED_ROUTES: readonly string[] = ['pages', 'share'];
+
 /**
  * 앱 도메인(스토어 3-0)에서는 앱 화면이 되는 웹의 경로: 첫 화면(/) · /posts/… · /m/….
  * next.config의 머리글은 들어온 경로로 붙고 앱 화면의 격리 머리글(sandbox CSP)을 덮어쓰므로,

@@ -1,4 +1,5 @@
-import { appOfHost, hostOfApp } from '../_blog/app-domains';
+import { hostOfApp } from '../_blog/app-domains';
+import { appHeaderOf, appsOrigin, opensApp } from '../_blog/apps-domain';
 import type { AppScreenData } from '../_blog/types';
 import { serverFetch } from '../_lib/server-api';
 import { type CommunityPlace, communityOf, topicOf, topicsOf } from './screen';
@@ -20,13 +21,18 @@ export async function communityScreen(
   parts: readonly string[],
   cursor: string | null,
 ): Promise<CommunityScreen> {
-  const own = (await appOfHost(requestHost)) === app;
-  const host = own ? requestHost : await hostOfApp(app);
+  const own = await opensApp(requestHost, app);
+  // 미리 보기(기본 도메인)는 그 앱의 도메인, 없으면 공통 앱 도메인으로 읽는다 (2026-11-27)
+  const shared = appsOrigin();
+  const host = own
+    ? requestHost
+    : ((await hostOfApp(app)) ?? (shared ? new URL(shared).hostname : null));
+  const header = appHeaderOf(host, app);
   const place: CommunityPlace = { base: data.base, open: own, here: here(data.base, parts) };
   const read = <T>(path: string) =>
     host === null
       ? Promise.resolve(null)
-      : serverFetch<T>(`/api/community/${path}`, !own, host).then((r) =>
+      : serverFetch<T>(`/api/community/${path}`, !own, host, header).then((r) =>
           r.status === 200 ? r.data : null,
         );
   const me = own ? await read<MemberMe>('me') : null;

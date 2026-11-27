@@ -61,16 +61,19 @@ export class AppService extends EntityService<App> {
   async create(actor: Actor, req: CreateAppInput): Promise<App> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
-    return this.transaction(async (tx) => {
+    const app = await this.transaction(async (tx) => {
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, AppService.CREATE);
       const before = await once.previous();
       if (before) return this.store(tx).load(spaceId, String(before.id));
-      const edit = new AppEdit(tx, spaceId);
+      const edit = new AppEdit(tx, spaceId, this.gate.appsHost() !== null);
       const app = await edit.create(req, new Date());
       await edit.save();
       await once.remember({ id: app.id });
       return app;
     });
+    // 공통 앱 도메인은 앱 주소로 앱을 고른다 (2026-11-27): 새 앱 · 바뀐 주소를 바로 다시 읽게
+    this.gate.stale();
+    return app;
   }
 
   /** 본 version이 지금과 다르면 409. 공개 여부가 바뀌면 그래프 사본에 알린다 (App.edit). 다른 앱의 도메인이면 409 */
@@ -79,12 +82,12 @@ export class AppService extends EntityService<App> {
     const spaceId = actor.requireSpace();
     const siteHost = req.domain === undefined ? null : await this.gate.siteHost();
     const app = await this.transaction(async (tx) => {
-      const edit = new AppEdit(tx, spaceId);
+      const edit = new AppEdit(tx, spaceId, this.gate.appsHost() !== null);
       const app = await edit.update(req, new Date(), siteHost);
       await edit.save();
       return app;
     });
-    if (req.domain !== undefined) this.gate.stale();
+    if (req.domain !== undefined || req.changes.slug !== undefined) this.gate.stale();
     return app;
   }
 
@@ -106,7 +109,8 @@ export class AppService extends EntityService<App> {
     const opened = await this.transaction(async (tx) => {
       const apps = this.store(tx);
       const app = await apps.lockOrNull(spaceId, appId);
-      if (app === null || !app.publishAsked(new Date())) return false;
+      if (app === null || !app.publishAsked(new Date(), this.gate.appsHost() !== null))
+        return false;
       await apps.save(app);
       return true;
     });
@@ -118,7 +122,7 @@ export class AppService extends EntityService<App> {
   async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
     const spaceId = SettingActor.spaceOf(actor);
     await this.transaction(async (tx) => {
-      await new AppEdit(tx, spaceId).apply(change, new Date());
+      await new AppEdit(tx, spaceId, this.gate.appsHost() !== null).apply(change, new Date());
     });
   }
 
@@ -131,7 +135,7 @@ export class AppService extends EntityService<App> {
       spaceId,
       change.key,
       async (tx) => {
-        const edit = new AppEdit(tx, spaceId);
+        const edit = new AppEdit(tx, spaceId, this.gate.appsHost() !== null);
         await edit.apply(change, new Date());
         await edit.save();
       },

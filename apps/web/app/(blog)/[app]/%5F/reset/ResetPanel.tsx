@@ -6,7 +6,15 @@ import { useAction } from '../../../../_lib/use-action';
 
 // 비밀번호 다시 정하기: 가입한 메일로 인증코드를 받아 새 비밀번호를 정한다 (2026-11-26).
 // 가입하지 않은 메일이어도 답은 같다 (메일만 오지 않는다). 정하면 모든 기기에서 로그아웃되고 로그인 화면으로
-export function ResetPanel({ csrf, returnTo }: { csrf: string | null; returnTo: string }) {
+export function ResetPanel({
+  base,
+  csrf,
+  returnTo,
+}: {
+  base: string;
+  csrf: string | null;
+  returnTo: string;
+}) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +22,7 @@ export function ResetPanel({ csrf, returnTo }: { csrf: string | null; returnTo: 
   const sending = useAction();
   const action = useAction();
   const busy = action.busy !== null;
-  const login = `/_/login?return=${encodeURIComponent(returnTo)}`;
+  const login = `${base}/_/login?return=${encodeURIComponent(returnTo)}`;
 
   async function sendCode() {
     const reply = await sending.run('code', () =>

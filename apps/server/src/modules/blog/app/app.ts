@@ -195,7 +195,8 @@ export class App extends TableEntity<AppRow, AppNew> {
    * 관리자가 고친 칸을 적는다. 종류는 바꾸지 않는다. 공개 여부가 바뀌면 알리고,
    * 비공개가 되면 첫 화면 고정도 푼다 (방문자에게 없는 앱이 첫 화면일 수 없다, DB CHECK)
    */
-  edit(changes: Partial<Unchecked<AppRow>>, now: Date): void {
+  /** shared: 공통 앱 도메인이 있다 (2026-11-27: 커뮤니티의 가입 · 쓰기가 그 도메인에서도 되어 확인한 도메인 없이 공개해도 된다) */
+  edit(changes: Partial<Unchecked<AppRow>>, now: Date, shared = false): void {
     const before = this.row;
     this.accept(changes, App.RULES);
     if (this.row === before) return;
@@ -206,7 +207,8 @@ export class App extends TableEntity<AppRow, AppNew> {
       this.row.kind === App.COMMUNITY &&
       this.row.visibility === App.PUBLIC &&
       before.visibility !== App.PUBLIC &&
-      this.row.domain_checked_at === null
+      this.row.domain_checked_at === null &&
+      !shared
     )
       throw new RuleViolation('커뮤니티는 도메인 연결을 확인한 뒤에 공개할 수 있어요');
     this.put('updated_at', now);
@@ -214,9 +216,9 @@ export class App extends TableEntity<AppRow, AppNew> {
   }
 
   /** 대화에서 요청한 배포: 비공개면 공개로 (규칙은 관리자의 공개와 같다: 커뮤니티는 도메인 확인 뒤). 바꿨으면 true */
-  publishAsked(now: Date): boolean {
+  publishAsked(now: Date, shared = false): boolean {
     if (this.row.visibility === App.PUBLIC) return false;
-    this.edit({ visibility: App.PUBLIC }, now);
+    this.edit({ visibility: App.PUBLIC }, now, shared);
     return true;
   }
 

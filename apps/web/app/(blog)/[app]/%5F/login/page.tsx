@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { MemberFrame } from '../../../../_community/MemberFrame';
-import { memberPlace, memberTitle } from '../../../../_community/member-page';
+import { memberPlace, memberTitle, toScreen } from '../../../../_community/member-page';
 import { memberReturn } from '../../../../_community/return-path';
 import { LoginPanel } from './LoginPanel';
 
@@ -16,12 +16,12 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function LoginPage({ params, searchParams }: Props) {
   const place = await memberPlace((await params).app);
-  const back = memberReturn((await searchParams).return);
+  const back = memberReturn((await searchParams).return, place.base);
   if (place.member) redirect(back);
-  if (place.account) redirect(`/_/enter?return=${encodeURIComponent(back)}`);
+  if (place.account) toScreen(place, 'enter', back);
   return (
     <MemberFrame place={place} title="로그인">
-      <LoginPanel csrf={place.csrf} returnTo={back} />
+      <LoginPanel base={place.base} csrf={place.csrf} returnTo={back} />
     </MemberFrame>
   );
 }

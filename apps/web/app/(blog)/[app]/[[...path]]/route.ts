@@ -8,6 +8,7 @@ import {
   renderAppScreen,
   renderStaticScreen,
 } from '../../../_blog/app-screen';
+import { opensApp } from '../../../_blog/apps-domain';
 import { cairnAnswer } from '../../../_blog/cairn-client';
 import { withConsoleLink } from '../../../_blog/console-link';
 import { slugFrom } from '../../../_blog/format';
@@ -81,7 +82,7 @@ async function file(
   const res = await serverRaw(`/api/apps/site/${encodeURIComponent(app)}/files/${path}${query}`);
   if (!res) return unreachableAnswer();
   if (!res.ok) return null;
-  const own = ticket === null && (await appOfHost(hostOf(request.headers))) === app;
+  const own = ticket === null && (await opensApp(hostOf(request.headers), app));
   return passOn(
     res,
     own ? openFilePolicy(originOf(request.headers, request.nextUrl.protocol)) : null,
@@ -193,9 +194,11 @@ async function siteOf(
   host: string | null,
   space: SpaceInfo | null,
 ): Promise<{ origin: string; own: string }> {
-  if ((await appOfHost(host)) === app) {
+  if (await opensApp(host, app)) {
     const origin = originOf(request.headers, request.nextUrl.protocol);
-    return { origin, own: `${origin}/` };
+    // 공통 앱 도메인이면 앱은 그 도메인의 /<앱>/ 아래 (2026-11-27)
+    const shared = (await appOfHost(host)) !== app;
+    return { origin, own: shared ? `${origin}/${encodeURIComponent(app)}/` : `${origin}/` };
   }
   const origin = new URL(space?.siteUrl || request.nextUrl.origin).origin;
   return { origin, own: `${origin}/${encodeURIComponent(app)}/` };

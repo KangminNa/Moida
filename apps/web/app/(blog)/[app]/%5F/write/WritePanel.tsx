@@ -9,10 +9,13 @@ import { useAction } from '../../../../_lib/use-action';
 // 글 쓰기 · 고치기 · 지우기. 본문은 마크다운이고 화면에서 거른 HTML로 그린다 (바깥 링크는 nofollow ugc).
 // 만들기는 requestId를 함께 보내 응답을 못 받아 다시 눌러도 글이 하나만 생긴다. 고치기 · 지우기는 본 version을 보낸다
 export function WritePanel({
+  base,
   csrf,
   topic,
   notice,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 '', 공통 앱 도메인 /<앱>) */
+  base: string;
   csrf: string | null;
   topic: TopicDetail | null;
   notice: string | null;
@@ -39,7 +42,7 @@ export function WritePanel({
           : memberApi<TopicSaved>(csrf, 'POST', 'topics', { requestId, title, body }),
       { conflict },
     );
-    if (reply?.ok) window.location.replace(`/t/${reply.data.id}`);
+    if (reply?.ok) window.location.replace(`${base}/t/${reply.data.id}`);
   }
 
   async function erase() {
@@ -49,7 +52,7 @@ export function WritePanel({
       () => memberApi(csrf, 'DELETE', `topics/${topic.id}`, { version: topic.version }),
       { conflict },
     );
-    if (reply?.ok) window.location.replace('/');
+    if (reply?.ok) window.location.replace(`${base}/`);
   }
 
   return (
@@ -82,7 +85,7 @@ export function WritePanel({
         <button className="cta" type="submit" disabled={busy || !!notice || !title || !body}>
           {save.busy ? '올리는 중' : topic ? '고치기' : '올리기'}
         </button>
-        <a className="ghost" href={topic ? `/t/${topic.id}` : '/'}>
+        <a className="ghost" href={topic ? `${base}/t/${topic.id}` : `${base}/`}>
           취소
         </a>
         {topic && (

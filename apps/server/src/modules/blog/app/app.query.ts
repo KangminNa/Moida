@@ -128,7 +128,9 @@ export class AppQuery extends BaseQuery {
     return new Map(
       rows.map((r) => [
         r.id,
-        r.domain && r.domain_checked_at ? `https://${r.domain}/` : `/${r.slug}`,
+        r.domain && r.domain_checked_at
+          ? `https://${r.domain}/`
+          : `${this.gate.appsOrigin() ?? ''}/${r.slug}`,
       ]),
     );
   }
@@ -150,20 +152,29 @@ export class AppQuery extends BaseQuery {
   async publishProblem(actor: Actor, appId: string): Promise<string | null> {
     const app = await this.row(apps, { space_id: actor.requireSpace(), id: appId });
     if (!app) return '없는 앱이에요';
-    if (app.visibility !== App.PUBLIC && app.kind === App.COMMUNITY && !app.domain_checked_at)
+    const shared = this.gate.appsHost() !== null;
+    if (
+      app.visibility !== App.PUBLIC &&
+      app.kind === App.COMMUNITY &&
+      !app.domain_checked_at &&
+      !shared
+    )
       return '커뮤니티는 도메인 연결을 확인한 뒤에 공개할 수 있어요 (앱 관리 › 설정의 도메인)';
     return null;
   }
 
   /**
    * 회원을 받는 앱 (Lookups 'member-app', 스토어 12.3): 커뮤니티 앱이거나 보이는 코드의 선언서에 members가 참인 앱.
-   * 관리자는 공간의 그런 앱, 그 밖은 공개했고 도메인 연결을 확인한 앱만 (회원 가입 · 로그인은 앱 도메인에서만 된다)
+   * 관리자는 공간의 그런 앱, 그 밖은 공개했고 도메인 연결을 확인한 앱만 (회원 가입 · 로그인은 앱 도메인에서만 된다).
+   * 공통 앱 도메인이 있으면(2026-11-27) 모든 공개 앱이 그 도메인에서 회원을 받는다
    */
   async memberApps(actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
     const where =
       actor.kind === 'owner'
         ? this.sql`AND space_id = ${actor.requireSpace()}`
-        : this.sql`AND visibility = ${App.PUBLIC} AND domain_checked_at IS NOT NULL`;
+        : this.gate.appsHost() !== null
+          ? this.sql`AND visibility = ${App.PUBLIC}`
+          : this.sql`AND visibility = ${App.PUBLIC} AND domain_checked_at IS NOT NULL`;
     const rows = await this.sql<Pick<AppRow, 'id' | 'name'>[]>`
       SELECT id, name FROM blog.apps
       WHERE id = ANY(${ids as string[]}::uuid[]) ${where}
@@ -172,11 +183,20 @@ export class AppQuery extends BaseQuery {
   }
 
   /** 모든 앱의 도메인(확인 전 것까지) → [앱 id, 공간 id] (platform HostGate가 서버 자신으로 묻는다, 스토어 3-0) */
-  async hosts(actor: Actor): Promise<ReadonlyMap<string, readonly [string, string]>> {
+  async hosts(actor: Actor): Promise<{
+    domains: ReadonlyMap<string, readonly [string, string]>;
+    slugs: ReadonlyMap<string, readonly [string, string]>;
+  }> {
     actor.assertOwnerOrSystem();
-    const rows = await this.sql<{ domain: string; id: string; space_id: string }[]>`
-      SELECT domain, id, space_id FROM blog.apps WHERE domain IS NOT NULL`;
-    return new Map(rows.map((r) => [r.domain, [r.id, r.space_id] as const]));
+    const rows = await this.sql<
+      { domain: string | null; slug: string; id: string; space_id: string }[]
+    >`
+      SELECT domain, slug, id, space_id FROM blog.apps`;
+    const place = (r: (typeof rows)[number]) => [r.id, r.space_id] as const;
+    return {
+      domains: new Map(rows.flatMap((r) => (r.domain ? [[r.domain, place(r)] as const] : []))),
+      slugs: new Map(rows.map((r) => [r.slug, place(r)] as const)),
+    };
   }
 
   /**

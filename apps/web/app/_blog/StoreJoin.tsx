@@ -5,7 +5,7 @@ import type { PublicApp } from './types';
 // /join으로 간다. 계정은 이 사이트(스토어)에 하나라 어느 앱에서나 같은 계정으로 로그인한다. 로그인(회원 쿠키)은 연결을 확인한
 // 앱 도메인에서만 열려(콘솔과 같은 출처에 회원 쿠키를 두지 않는다, 스토어 11장) 가입 뒤에는 앱을 골라 그 앱에서 로그인한다.
 
-/** 가입 뒤 로그인할 수 있는 앱: 회원을 받고 자기 도메인으로 열리는 앱 */
+/** 가입 뒤 로그인할 수 있는 앱: 회원을 받고 자기 도메인이나 공통 앱 도메인으로 열리는 앱 (주소가 http(s)://로 시작) */
 export function joinableApps(apps: readonly PublicApp[]): PublicApp[] {
   return apps.filter((a) => a.members && /^https?:\/\//.test(a.url));
 }
@@ -15,9 +15,9 @@ export function joinHref(apps: readonly PublicApp[]): string | null {
   return apps.length > 0 ? '/join' : null;
 }
 
-/** 그 앱의 로그인 화면 주소 */
+/** 그 앱의 로그인 화면 주소: 앱 주소 아래의 /_/login (자기 도메인은 https://<도메인>/_/login, 공통 앱 도메인은 …/<앱>/_/login) */
 export function appLoginUrl(app: PublicApp): string {
-  return new URL('/_/login', app.url).toString();
+  return `${app.url.replace(/\/+$/, '')}/_/login`;
 }
 
 /** 가입한 계정으로 로그인할 앱 목록 (가입 화면의 끝 · 가입 뒤) */

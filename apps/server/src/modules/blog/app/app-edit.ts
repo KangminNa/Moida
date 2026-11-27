@@ -45,6 +45,8 @@ export class AppEdit {
   constructor(
     private readonly tx: Sql,
     private readonly spaceId: string,
+    /** 공통 앱 도메인이 있다 (App.edit의 shared) */
+    private readonly shared = false,
   ) {
     this.apps = new AppRepository(tx);
   }
@@ -72,7 +74,7 @@ export class AppEdit {
   async update(req: UpdateAppInput, now: Date, siteHost: string | null = null): Promise<App> {
     const app = await this.apps.lock(this.spaceId, req.id);
     app.assertVersion(req.version);
-    app.edit(req.changes, now);
+    app.edit(req.changes, now, this.shared);
     await this.assertFree(app.slug, app.id);
     if (req.domain !== undefined) {
       app.setDomain(req.domain, siteHost, now);

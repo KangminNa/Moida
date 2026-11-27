@@ -160,16 +160,16 @@ function checkReserved() {
 }
 
 /**
- * next.config의 WEB_ROUTES(화면 머리글을 붙이는 웹의 최상위 경로, 스토어 1-6)가 웹의 최상위 경로를 모두 담는가.
+ * screen-headers.ts의 WEB_ROUTES(화면 머리글을 붙이는 웹의 최상위 경로, 스토어 1-6)가 웹의 최상위 경로를 모두 담는가.
  * 빠지면 그 화면에 frame-ancestors 'none' · X-Frame-Options가 붙지 않는다 (앱 화면으로 여겨진다).
- * /pages · /share는 서버가 격리 머리글을 붙여 내는 경로라 next.config에 따로 적는다
+ * /pages · /share는 서버가 격리 머리글을 붙여 내는 경로라 SERVER_ISOLATED_ROUTES에 따로 적는다
  */
-/** 서버가 격리 머리글을 붙여 내는 웹의 최상위 경로 (AI가 만든 페이지, 결과물 공유 링크) */
-const SERVER_ISOLATED = new Set(['pages', 'share']);
-
 function checkWebRoutes() {
-  const file = join(root, 'apps/web/next.config.ts');
-  const block = /const WEB_ROUTES = \[([^\]]*)\]/.exec(readFileSync(file, 'utf8'))?.[1];
+  const file = join(root, 'apps/web/app/_lib/screen-headers.ts');
+  const text = readFileSync(file, 'utf8');
+  const block = /const WEB_ROUTES[^=]*=\s*\[([^\]]*)\]/.exec(text)?.[1];
+  const isolated = /const SERVER_ISOLATED_ROUTES[^=]*=\s*\[([^\]]*)\]/.exec(text)?.[1] ?? '';
+  const SERVER_ISOLATED = new Set([...isolated.matchAll(/'([^']+)'/g)].map((m) => m[1]));
   if (!block) {
     problems.push(`${at(file)} WEB_ROUTES를 찾지 못했어요`);
     return;

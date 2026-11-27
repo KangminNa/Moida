@@ -76,6 +76,8 @@ export class AppSiteQuery extends BaseQuery {
     }
     const { app, ticket } = found;
     const own = req.host !== null && req.host === app.domain;
+    // 공통 앱 도메인 (2026-11-27): 콘솔과 다른 출처라 격리를 풀고, 앱은 경로의 첫 칸(/<앱>)에 있다
+    const shared = req.host !== null && req.host === this.gate.appsHost();
     if (ticket === null && !own && req.host !== null && app.domain && app.domain_checked_at)
       return AppSiteQuery.toDomain(app.domain, req);
     const root = own ? '' : `/${app.slug}`;
@@ -88,9 +90,9 @@ export class AppSiteQuery extends BaseQuery {
     const site = own ? ((await this.gate.siteOrigin()) ?? '') : null;
     const code = await this.code.filesOf(actor, app, ticket?.seq ?? null);
     const manifest = await this.code.manifestOf(actor, code);
-    // 격리를 풀어도 되는 화면: 연결을 확인한 자기 도메인으로 연 공개 화면만 (미리 보기 · 기본 도메인은 격리, 스토어 12.2)
+    // 격리를 풀어도 되는 화면: 연결을 확인한 자기 도메인이나 공통 앱 도메인으로 연 공개 화면만 (미리 보기 · 기본 도메인은 격리, 스토어 12.2)
     const access = {
-      open: own && ticket === null && app.domain_checked_at !== null,
+      open: ticket === null && ((own && app.domain_checked_at !== null) || shared),
       permissions: manifest.permissions,
       // 관리자가 연 화면(쿠키가 실리는 기본 도메인 · 미리 보기)에는 콘솔로 돌아가는 길을 준다 (2026-11-25 사용자 요청)
       console:
