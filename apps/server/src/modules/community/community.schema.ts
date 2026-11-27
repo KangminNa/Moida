@@ -15,7 +15,7 @@ export const accountSessions = communitySchema.table('account_sessions', {
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
   ended_at: timestamp('ended_at', { withTimezone: true }),
   account_id: uuid('account_id').notNull(),
-  app_id: uuid('app_id').notNull(),
+  app_id: uuid('app_id'),
 });
 
 /** community.accounts */

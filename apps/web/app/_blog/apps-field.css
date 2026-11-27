@@ -73,7 +73,9 @@
   display: flex;
   gap: 2px;
 }
-.fd-account a {
+.fd-account a,
+.fd-account button,
+.fd-who {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -83,10 +85,23 @@
   font-size: 0.875rem;
   transition: background-color 0.2s;
 }
-.fd-account a:hover {
+.fd-account button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.fd-who {
+  color: var(--field-dim);
+}
+.fd-account a:hover,
+.fd-account button:hover {
   background: color-mix(in srgb, var(--field-paper) 10%, transparent);
 }
-.is-apps .fd-account a:hover {
+.is-apps .fd-account a:hover,
+.is-apps .fd-account button:hover {
   background: color-mix(in srgb, var(--field-ink) 7%, transparent);
 }
 .fd-mid {

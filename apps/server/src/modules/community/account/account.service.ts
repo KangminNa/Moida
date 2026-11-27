@@ -20,6 +20,7 @@ import type {
   LoginInput,
   NewsInput,
   PasswordInput,
+  SharedPlace,
   SuspendInput,
 } from './account.input';
 import { AccountRepository } from './account.repository';
@@ -65,16 +66,30 @@ export class AccountService extends BaseService {
   /** 로그인: 이 앱 도메인에 새 세션. 틀리면 401 (메일 · 아이디가 없어도 같은 문구 · 같은 시간), 많이 틀리면 429, 정지면 403 */
   async login(actor: Actor, place: MemberPlace, req: LoginInput): Promise<Account> {
     await this.assertApp(actor, place);
-    const who = `${place.spaceId}:${req.login}`;
-    const at = AccountService.placeOf(place);
+    return this.signIn(place.spaceId, place.ip, place.appId, req);
+  }
+
+  /** 앱 없는 로그인 (2026-11-27): 공통 앱 도메인에서 앱을 고르지 않고. 규칙은 앱의 로그인과 같다 (세션의 앱만 비어 있다) */
+  sharedLogin(_actor: Actor, place: SharedPlace, req: LoginInput): Promise<Account> {
+    return this.signIn(place.spaceId, place.ip, null, req);
+  }
+
+  private async signIn(
+    spaceId: string,
+    ip: string,
+    appId: string | null,
+    req: LoginInput,
+  ): Promise<Account> {
+    const who = `${spaceId}:${req.login}`;
+    const at = AccountService.placeOf(spaceId, ip);
     this.byPlace.check(at);
     this.byLogin.check(who);
     const email = EmailAddress.looksLike(req.login) ? EmailAddress.clean(req.login) : null;
     const found = await this.transaction(async (tx) => {
       const accounts = new AccountRepository(tx);
-      if (email) return accounts.findByEmail(place.spaceId, email);
+      if (email) return accounts.findByEmail(spaceId, email);
       if (EmailAddress.looksLike(req.login)) return null;
-      return accounts.findByLogin(place.spaceId, req.login);
+      return accounts.findByLogin(spaceId, req.login);
     });
     if (!(await this.hasher.verify(req.password, found?.passwordHash ?? null)) || !found) {
       this.byPlace.fail(at);
@@ -83,8 +98,8 @@ export class AccountService extends BaseService {
     }
     return this.transaction(async (tx) => {
       const accounts = new AccountRepository(tx);
-      const account = await accounts.lock(place.spaceId, found.id);
-      account.startSession(place.appId, new Date());
+      const account = await accounts.lock(spaceId, found.id);
+      account.startSession(appId, new Date());
       await accounts.save(account);
       return account;
     });
@@ -244,8 +259,8 @@ export class AccountService extends BaseService {
   }
 
   /** 시도를 세는 곳: 공간(스토어)마다 (계정이 모든 앱에 하나라서) */
-  private static placeOf(place: MemberPlace): string {
-    return `${place.spaceId}:${AttemptLimiter.place(place.ip)}`;
+  private static placeOf(spaceId: string, ip: string): string {
+    return `${spaceId}:${AttemptLimiter.place(ip)}`;
   }
 
   private assertApp(actor: Actor, place: MemberPlace): Promise<void> {

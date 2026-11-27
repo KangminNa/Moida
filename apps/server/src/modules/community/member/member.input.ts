@@ -18,9 +18,14 @@ export class MemberPlace extends BaseRequest {
 
   static from(req: HttpRequest): MemberPlace {
     if (!req.appId || !req.appSpaceId) throw new NotFound('없는 주소예요');
+    return new MemberPlace(req.appId, req.appSpaceId, MemberPlace.originOf(req), req.ip ?? '');
+  }
+
+  /** 요청이 온 출처 (쓰기의 Origin과 견준다): 앞단 프록시의 X-Forwarded-Host(첫 값)나 Host */
+  static originOf(req: HttpRequest): string {
     const raw = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '');
     const host = raw.split(',')[0]?.trim().toLowerCase() || (req.appHost ?? '');
-    return new MemberPlace(req.appId, req.appSpaceId, `${req.protocol}://${host}`, req.ip ?? '');
+    return `${req.protocol}://${host}`;
   }
 }
 

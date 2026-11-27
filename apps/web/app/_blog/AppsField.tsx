@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { api } from '../_lib/client-api';
 import './apps-field.css';
 import { AppsTiles, type FieldApp } from './AppsTiles';
 import { FieldParticles, type FieldShape } from './field-particles';
@@ -51,6 +52,7 @@ export function AppsField({
   apps,
   loginHref,
   joinHref,
+  signedIn,
   initialView,
 }: {
   name: string;
@@ -58,6 +60,8 @@ export function AppsField({
   apps: readonly FieldApp[];
   loginHref: string | null;
   joinHref: string | null;
+  /** 이 도메인에 로그인한 계정 (앱 없는 로그인 · 어느 앱에서 한 로그인이든): 보일 이름과 로그아웃의 쓰기 확인 값 */
+  signedIn: { name: string; csrf: string } | null;
   initialView: View;
 }) {
   const [view, setView] = useState<View>(initialView);
@@ -142,8 +146,27 @@ export function AppsField({
           {name}
         </a>
         <nav className="fd-account" aria-label="계정">
-          {loginHref && <a href={loginHref}>로그인</a>}
-          {joinHref && <a href={joinHref}>가입</a>}
+          {signedIn ? (
+            <>
+              <span className="fd-who">{signedIn.name}</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  const reply = await api('POST', '/api/store/logout', undefined, {
+                    'x-cairn-csrf': signedIn.csrf,
+                  });
+                  if (reply.ok) window.location.reload();
+                }}
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <>
+              {loginHref && <a href={loginHref}>로그인</a>}
+              {joinHref && <a href={joinHref}>가입</a>}
+            </>
+          )}
         </nav>
       </header>
 

@@ -159,7 +159,7 @@ export class Account extends TableEntity<AccountRow, AccountNew> {
   }
 
   /** 로그인 하나를 그 앱 도메인에 연다 (로그인할 때마다 새 토큰: 남이 미리 심은 세션을 이어 쓰지 못하게) */
-  startSession(appId: string, now: Date): AccountSession {
+  startSession(appId: string | null, now: Date): AccountSession {
     this.assertCanLogin(now);
     this.session = AccountSession.start(this.id, appId, now);
     return this.session;

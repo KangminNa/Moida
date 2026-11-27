@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type Actor, BaseQuery, Database, Lookups, MemberActor, SecretBox } from '../../platform';
+import type { SharedPlace } from '../account/account.input';
 import { AccountSession } from '../account/account-session';
 import { accounts, members } from '../community.schema';
 import { Member } from './member';
@@ -59,6 +60,27 @@ export class MemberQuery extends BaseQuery {
       ? new MemberSelfView(member, new Date(member.joined_at.getTime() + Member.JOIN_WAIT_MS))
       : null;
     return new MemberMeView(new AccountSelfView(account), self, csrf);
+  }
+
+  /**
+   * 앱 없이 이 브라우저가 누구인가 (2026-11-27, 공통 앱 도메인의 GET api/store/me): 로그인한 계정과 쓰기 확인 값. 회원(앱 참여)은 늘 null.
+   * 그 도메인의 쿠키는 모든 앱이 함께 써서 어느 앱에서 연 로그인이든, 앱 없이 연 로그인이든 받는다
+   */
+  async sharedMe(
+    _actor: Actor,
+    place: SharedPlace,
+    memberCookie: string | null,
+  ): Promise<MemberMeView> {
+    if (!memberCookie) return new MemberMeView(null, null, null);
+    const csrf = this.csrf.tokenOf(memberCookie);
+    const [row] = await this.sql<{ account_id: string }[]>`
+      SELECT a.id AS account_id FROM community.account_sessions s
+      JOIN community.accounts a ON a.id = s.account_id
+      WHERE s.token_hash = ${AccountSession.hash(memberCookie)} AND s.ended_at IS NULL
+        AND s.expires_at > now() AND a.space_id = ${place.spaceId} AND a.left_at IS NULL
+        AND (a.suspended_until IS NULL OR a.suspended_until <= now())`;
+    const account = row ? await this.row(accounts, { id: row.account_id }) : null;
+    return new MemberMeView(account ? new AccountSelfView(account) : null, null, csrf);
   }
 
   /** 쓰기 요청의 확인 값이 이 쿠키의 것과 맞는가 (MemberGuard) */

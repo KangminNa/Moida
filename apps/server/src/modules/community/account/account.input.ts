@@ -77,6 +77,25 @@ export class StorePlace extends BaseRequest {
 }
 
 /**
+ * 앱 없는 로그인의 곳 (2026-11-27, 공통 앱 도메인의 /_/login): 그 도메인에서만. 쿠키 하나를 그 도메인의 모든 앱이 함께 써서
+ * 앱을 고르지 않고 로그인한다. 기본 도메인(콘솔과 같은 출처)과 앱마다의 도메인에서는 없는 주소
+ */
+export class SharedPlace extends BaseRequest {
+  private constructor(
+    readonly spaceId: string,
+    /** 요청한 곳 (시도 제한의 열쇠, 서버 메모리에서만 쓰고 저장하지 않는다) */
+    readonly ip: string,
+  ) {
+    super();
+  }
+
+  static from(req: HttpRequest): SharedPlace {
+    if (!req.appsDomain || !req.siteSpaceId) throw new NotFound('없는 주소예요');
+    return new SharedPlace(req.siteSpaceId, req.ip ?? '');
+  }
+}
+
+/**
  * 스토어 가입: { email, code, loginId, password, ageConfirmed, termsVersion, privacyVersion }. 계정만 만들고 로그인하지 않는다:
  * 기본 도메인은 콘솔과 같은 출처라 회원 쿠키를 두지 않는다. 앱에는 그 앱 도메인에서 로그인한 뒤 닉네임을 정해 참여한다
  */

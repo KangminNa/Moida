@@ -25,10 +25,12 @@ export class MemberGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<HttpRequest>();
-    if (request.appId === undefined) return true;
+    // 공통 앱 도메인의 앱 없는 요청(api/store의 로그인 · 로그아웃 · me, 2026-11-27)도 쓰기는 같은 세 겹으로 본다.
+    // 요청자는 만들지 않는다 (앱이 없어 회원이 아니다): 그 API가 쿠키로 계정을 직접 읽는다
+    if (request.appId === undefined && request.appsDomain !== true) return true;
     const token = Cookies.read(request, AccountSession.COOKIE);
     if (!MemberGuard.READS.has(request.method.toUpperCase())) this.assertSameSite(request, token);
-    if (!token) return true;
+    if (!token || request.appId === undefined) return true;
     const member = await this.query.actorFor(token, request.appId, request.appsDomain === true);
     if (!member) return true;
     request.actor = member;
@@ -40,7 +42,7 @@ export class MemberGuard implements CanActivate {
     const origin = request.headers.origin;
     if (String(request.headers['sec-fetch-site'] ?? '') === 'cross-site')
       throw new Forbidden('origin', '이 커뮤니티에서 연 화면에서만 쓸 수 있어요');
-    if (typeof origin === 'string' && origin !== MemberPlace.from(request).origin)
+    if (typeof origin === 'string' && origin !== MemberPlace.originOf(request))
       throw new Forbidden('origin', '이 커뮤니티에서 연 화면에서만 쓸 수 있어요');
     if (cookie && !this.query.csrfMatches(cookie, request.headers[MemberCsrf.HEADER]))
       throw new Forbidden('csrf', '화면을 새로 고친 뒤 다시 해 주세요');
