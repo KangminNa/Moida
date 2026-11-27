@@ -390,7 +390,8 @@ describe('세션 읽기 도구 (search_sessions · get_session)', () => {
   describe('권한', () => {
     test('read_public이나 read_all 하나만 있어도 보이고, 둘 다 없으면 목록에 없고 불러도 forbidden', async () => {
       assert.deepEqual(await toolNames(publicReader), READ_TOOLS);
-      assert.deepEqual(await toolNames(allReader), READ_TOOLS);
+      // read_all은 결과물 읽기(task의 list_outputs · get_output, 2026-11-27)도 본다. read_public은 못 본다
+      assert.deepEqual(await toolNames(allReader), [...READ_TOOLS, 'list_outputs', 'get_output']);
       assert.deepEqual(await toolNames(uploadOnly), [
         'check_session',
         'save_session',
