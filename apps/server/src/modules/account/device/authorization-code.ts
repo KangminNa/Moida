@@ -30,6 +30,8 @@ export class AuthorizationCode extends BaseEntity {
     now: Date,
     /** 앱이 요청한 기기 모양 ([news] · [collect] · [extension]). 없으면 null: 기본 권한 */
     scopes: readonly string[] | null = null,
+    /** 승인 화면에서 고른 권한 묶음 (DeviceScopes.PRESETS). 앱이 기기 모양을 요청했으면 쓰지 않는다 */
+    preset: string | null = null,
   ): AuthorizationCode {
     const code = randomBytes(32).toString('base64url');
     return new AuthorizationCode(
@@ -38,7 +40,7 @@ export class AuthorizationCode extends BaseEntity {
         client_id: clientId,
         redirect_uri: redirectUri,
         code_challenge: codeChallenge,
-        device_draft: { spaceId, userId, name: deviceName, clientName, scopes },
+        device_draft: { spaceId, userId, name: deviceName, clientName, scopes, preset },
         expires_at: new Date(now.getTime() + AuthorizationCode.TTL_MS),
         used_at: null,
       },
@@ -86,6 +88,7 @@ export class AuthorizationCode extends BaseEntity {
       text('clientName'),
       now,
       Array.isArray(draft.scopes) ? draft.scopes.map(String) : null,
+      typeof draft.preset === 'string' ? draft.preset : null,
     );
   }
 }

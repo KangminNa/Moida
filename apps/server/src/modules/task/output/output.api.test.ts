@@ -425,3 +425,47 @@ describe('주인이 결과물을 본다', () => {
     assert.deepEqual(kept, [], '그림은 앞 시험에서 지웠다');
   });
 });
+
+describe('바깥 AI 도구가 결과물을 읽는다 (list_outputs · get_output, 2026-11-27)', () => {
+  let taskId: string;
+  let doc: Json;
+  let picture: Json;
+  let reader: string;
+  let plain: string;
+
+  before(async () => {
+    taskId = await leased();
+    doc = await upload(taskId, '보고서.md', Buffer.from('# 보고서\n결론은 이렇다'));
+    picture = await upload(taskId, '사진.png', png());
+    plain = await api.connectDevice(owner, 'outputs-plain');
+    reader = await api.connectDevice(owner, 'outputs-reader', undefined, 'work');
+  });
+
+  test('read_all이 없는 기기(기본 묶음)는 목록도 내용도 못 본다', async () => {
+    assert.equal((await mcp(plain, 'list_outputs', {})).ok, false);
+    assert.equal((await mcp(plain, 'get_output', { output_id: doc.id })).ok, false);
+  });
+
+  test('목록은 최근부터, 작업으로 거르고 콘솔 링크를 싣는다', async () => {
+    const { ok: listed, body } = await mcp(reader, 'list_outputs', { task_id: taskId });
+    assert.ok(listed, JSON.stringify(body));
+    const rows = body.outputs as Json[];
+    assert.deepEqual(
+      rows.map((r) => r.name),
+      ['사진.png', '보고서.md'],
+    );
+    assert.equal(rows[1]?.link, `/admin/library/outputs?task=${taskId}`);
+    assert.equal(body.next_cursor, null);
+  });
+
+  test('글자 파일은 내용까지, 그림은 내용 없이 까닭을. 없는 id는 오류', async () => {
+    const text = await mcp(reader, 'get_output', { output_id: doc.id });
+    assert.ok(text.ok, JSON.stringify(text.body));
+    assert.equal(text.body.text, '# 보고서\n결론은 이렇다');
+    assert.equal(text.body.truncated, false);
+    const image = await mcp(reader, 'get_output', { output_id: picture.id });
+    assert.equal(image.body.text, null);
+    assert.match(String(image.body.note), /콘솔에서/);
+    assert.equal((await mcp(reader, 'get_output', { output_id: randomUUID() })).ok, false);
+  });
+});

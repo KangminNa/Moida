@@ -71,6 +71,22 @@ export class ListOutputsInput extends BaseRequest {
       );
     });
   }
+
+  /** MCP list_outputs: { kind?, task_id?, cursor? }. 휴지통은 보지 않는다 */
+  static fromTool(raw: unknown): ListOutputsInput {
+    const input = (raw ?? {}) as Record<string, unknown>;
+    return BaseRequest.read(raw ?? {}, (f) => {
+      const kind = f.optionalText('kind', 20);
+      if (kind !== null && !ValueList.has(OUTPUT_KIND, kind))
+        f.reject('kind', `${OUTPUT_KIND.join(' · ')} 중 하나예요`);
+      return new ListOutputsInput(
+        kind,
+        input.task_id ? f.uuid('task_id') : null,
+        false,
+        input.cursor ? f.uuid('cursor') : null,
+      );
+    });
+  }
 }
 
 /**
@@ -124,5 +140,16 @@ export class UploadOutputInput extends BaseRequest {
       query,
       (f) => new UploadOutputInput(f.text('name', OutputPolicy.NAME_MAX)),
     );
+  }
+}
+
+/** get_output (MCP, 2026-11-27): { output_id } */
+export class OutputReadInput extends BaseRequest {
+  private constructor(readonly id: string) {
+    super();
+  }
+
+  static from(raw: unknown): OutputReadInput {
+    return BaseRequest.read(raw, (f) => new OutputReadInput(f.uuid('output_id')));
   }
 }

@@ -123,6 +123,11 @@ export class OutputPolicy {
     return ext === 'html' || ext === 'htm';
   }
 
+  /** 바깥 AI 도구가 get_output으로 내용까지 읽는 글자 형식인가 (2026-11-27). 그 밖은 링크로 */
+  static isText(mime: string): boolean {
+    return mime.startsWith('text/') || mime === 'application/json';
+  }
+
   /** 미리 보기(inline)를 열어도 되는 형식인가. 앞부분으로 알아본 그림 · PDF · 영상만 */
   static canInline(mime: string): boolean {
     return OutputPolicy.INLINE.has(mime);

@@ -268,7 +268,12 @@ export class ApiClient {
    * 스스로 등록 → 승인 요청 → 주인이 승인 화면에서 연결 → 코드를 토큰으로 (PKCE).
    * 사이트 주소(블로그 정보)가 정해져 있어야 한다.
    */
-  async connectDevice(owner: TestUser, name: string, scope?: string): Promise<string> {
+  async connectDevice(
+    owner: TestUser,
+    name: string,
+    scope?: string,
+    preset?: string,
+  ): Promise<string> {
     const redirect = 'http://localhost:33418/callback';
     const registered = await this.request('POST', '/oauth/register', TestUser.visitor, {
       client_name: 'Claude Code',
@@ -287,7 +292,11 @@ export class ApiClient {
     });
     const begin = await this.get(`/oauth/authorize?${query}`);
     const request = new URL(begin.location ?? 'http://x').searchParams.get('request') ?? '';
-    const approved = await this.request('POST', '/api/connect/approve', owner, { request, name });
+    const approved = await this.request('POST', '/api/connect/approve', owner, {
+      request,
+      name,
+      ...(preset ? { preset } : {}),
+    });
     if (approved.status !== 200) throw new Error(`기기 승인 실패: ${approved.text}`);
     const code = new URL(String(approved.json().redirect)).searchParams.get('code') ?? '';
     const token = await this.form('/oauth/token', {
