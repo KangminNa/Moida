@@ -132,7 +132,7 @@ export class AccountController {
   ): Promise<void> {
     MemberPlace.from(req);
     await this.accounts.logout(Cookies.read(req, AccountSession.COOKIE));
-    Cookies.clear(res, AccountSession.COOKIE);
+    Cookies.clear(res, req, AccountSession.COOKIE);
   }
 
   @Patch('me/password')
@@ -198,7 +198,7 @@ export class AccountController {
     @Res({ passthrough: true }) res: HttpResponse,
   ): Promise<void> {
     await this.accounts.leave(actor, MemberPlace.from(req), LeaveInput.from(body));
-    Cookies.clear(res, AccountSession.COOKIE);
+    Cookies.clear(res, req, AccountSession.COOKIE);
   }
 
   /** 가입 · 로그인한 브라우저에 새 회원 쿠키 (Domain 없이 이 앱 도메인에만) */

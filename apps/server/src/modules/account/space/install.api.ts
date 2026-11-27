@@ -65,7 +65,7 @@ export class InstallController {
       String(req.headers['user-agent'] ?? ''),
     );
     Cookies.set(res, req, WebSession.COOKIE, session.token ?? '', WebSession.COOKIE_SECONDS);
-    Cookies.clear(res, InstallPolicy.COOKIE);
+    Cookies.clear(res, req, InstallPolicy.COOKIE);
     return new LoggedInView();
   }
 }

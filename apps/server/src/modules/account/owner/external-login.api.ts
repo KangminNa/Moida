@@ -86,7 +86,7 @@ export class ExternalLoginController {
       Cookies.read(req, ExternalCallbackInput.COOKIE),
       this.box,
     );
-    Cookies.clear(res, ExternalCallbackInput.COOKIE);
+    Cookies.clear(res, req, ExternalCallbackInput.COOKIE);
     try {
       const session = await this.owners.finishExternal(
         actor,

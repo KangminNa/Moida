@@ -31,8 +31,8 @@ function shared(
   });
 }
 
-/** 도메인 없이 공개한, 회원을 받는 페이지 앱 하나 (앱의 약관도 공개) */
-async function sharedApp(slug: string): Promise<{ id: string; slug: string }> {
+/** 도메인 없이 공개한(open이 false면 비공개로 둔), 회원을 받는 페이지 앱 하나 (앱의 약관도 공개) */
+async function sharedApp(slug: string, open = true): Promise<{ id: string; slug: string }> {
   const made = await api.request('POST', '/api/apps', owner, {
     requestId: randomUUID(),
     kind: 'page',
@@ -49,6 +49,7 @@ async function sharedApp(slug: string): Promise<{ id: string; slug: string }> {
     });
     assert.equal(res.status, 201, res.text);
   }
+  if (!open) return { id, slug };
   const opened = await api.request('PATCH', `/api/apps/${id}`, owner, {
     version: app.version,
     visibility: 'public',
@@ -147,5 +148,41 @@ describe('공통 앱 도메인', () => {
       ).member?.nickname,
       '두번째앱',
     );
+  });
+
+  test('3-5: 비공개 앱의 주소를 머리글에 넣어도 회원 API · 앱 데이터는 없는 주소다', async () => {
+    const hidden = await sharedApp(`hidden-${mark}`, false);
+    for (const path of ['/api/community/me', '/api/community/terms/terms']) {
+      const res = await shared(path, hidden.slug);
+      assert.equal(res.status, 404, `${path} ${res.status} ${res.text}`);
+    }
+    const sent = await shared('/api/community/join/code', hidden.slug, {
+      method: 'POST',
+      body: { email: CommunitySite.emailOf(`hidden_${mark}`) },
+    });
+    assert.equal(sent.status, 404, sent.text);
+  });
+
+  test('3-5: 회원 쿠키는 관리 경로에서 통하지 않고, 공통 도메인에 관리자 쿠키를 실어도 회원 · 관리자가 아니다', async () => {
+    const [one] = apps as unknown as [{ slug: string; id: string }];
+    assert.equal((await shared('/api/apps', one.slug, { as: owner })).status, 404);
+    const me = (await shared('/api/community/me', one.slug, { as: owner })).json() as {
+      account: unknown;
+      member: unknown;
+    };
+    assert.equal(me.account, null);
+    assert.equal(me.member, null);
+  });
+
+  test('3-5: 공통 도메인의 쓰기도 다른 출처 · 다른 사이트에서 오면 403', async () => {
+    const [one] = apps as unknown as [{ slug: string }];
+    for (const origin of ['https://evil.example', `http://other.${APPS}`]) {
+      const res = await shared('/api/community/join/code', one.slug, {
+        method: 'POST',
+        body: { email: CommunitySite.emailOf(`csrf_${mark}`) },
+        headers: { origin },
+      });
+      assert.equal(res.status, 403, `${origin} ${res.status} ${res.text}`);
+    }
   });
 });
