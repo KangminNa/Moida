@@ -1163,7 +1163,11 @@ describe('위임', () => {
     assert.equal(job.rounds_left, 3);
 
     const subtasks = [
-      order('draft', writer, { kind: 'draft_post', deliver: '초안 한 편과 제목 후보 3개' }),
+      order('draft', writer, {
+        kind: 'draft_post',
+        deliver: '초안 한 편과 제목 후보 3개',
+        route: 'web',
+      }),
       order('tidy', tidier, { kind: 'tidy_session' }),
     ];
     const delegated = await tool(job.run_token, 'delegate_task', { subtasks });
@@ -1204,6 +1208,11 @@ describe('위임', () => {
       first.deliver,
       first.agent.name === '글쓰기 일꾼' ? '초안 한 편과 제목 후보 3개' : null,
       '받을 것은 정한 하위 작업에만 간다',
+    );
+    assert.equal(
+      (first.task.payload as Json).route ?? null,
+      first.agent.name === '글쓰기 일꾼' ? 'web' : null,
+      '방법(route)은 정한 하위 작업의 payload에만 (러너가 커넥터를 붙이지 않는다)',
     );
     const finish = (child: Awaited<ReturnType<typeof take>>) =>
       child.agent.name === '글쓰기 일꾼'
@@ -1305,6 +1314,14 @@ describe('위임', () => {
       subtasks: [order('v', writer, { deliver: '가'.repeat(301) })],
     });
     assert.equal(longShape.body.code, 'invalid_request', '받을 것은 300자까지');
+    const badRoute = await tool(job.run_token, 'delegate_task', {
+      subtasks: [order('r', writer, { route: 'browser' })],
+    });
+    assert.equal(
+      badRoute.body.code,
+      'invalid_request',
+      '방법은 mcp · web만 (브라우저는 kind browse)',
+    );
 
     const once = await tool(job.run_token, 'delegate_task', { subtasks: [order('z', writer)] });
     assert.equal(once.ok, true, JSON.stringify(once.body));

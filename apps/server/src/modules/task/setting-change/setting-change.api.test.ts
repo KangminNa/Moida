@@ -378,6 +378,68 @@ describe('설정 바꾸기: 목록과 목표 (D)', () => {
   });
 });
 
+describe('설정 바꾸기: 커넥터 켜기 · 끄기 (C4)', () => {
+  test('get_settings connectors는 토큰 · 경로 없이 출처만, 승인해야 꺼진다. 주소 · 토큰 칸은 받지 않는다', async () => {
+    const name = `note${randomUUID().slice(0, 6)}`;
+    ok(
+      await api.request('POST', '/api/external-tools', owner, {
+        requestId: randomUUID(),
+        name,
+        title: '노트',
+        url: 'https://mcp.example.com/v1/secret-path?key=abc',
+        header_name: 'Authorization',
+      }),
+      201,
+    );
+    const { token } = await partner();
+    const { connectors } = await call(token, 'get_settings', { kind: 'connectors' });
+    const mine = (connectors as Json[]).find((c) => c.name === name) as Json;
+    assert.deepEqual(
+      [mine.origin, mine.enabled, mine.title],
+      ['https://mcp.example.com', true, '노트'],
+    );
+    assert.equal(
+      JSON.stringify(mine).includes('secret-path'),
+      false,
+      '주소의 경로 · 질의는 싣지 않는다',
+    );
+
+    const url = await tool(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'connector',
+      op: 'edit',
+      target_id: mine.id,
+      version: mine.version,
+      fields: { url: 'https://evil.example.com' },
+      note: '주소 바꾸기',
+    });
+    assert.equal(url.ok, false, '주소는 화면에서만');
+
+    const off = await call(token, 'propose_setting', {
+      request_id: randomUUID(),
+      setting: 'connector',
+      op: 'edit',
+      target_id: mine.id,
+      version: mine.version,
+      fields: { enabled: false },
+      note: '이번 주는 쓰지 않아요',
+    });
+    assert.deepEqual(
+      (off.changes as Json[]).map((c) => [c.field, c.before, c.after]),
+      [['enabled', true, false]],
+    );
+    const before = (ok(await api.get('/api/external-tools', owner)).tools as Json[]).find(
+      (t) => t.name === name,
+    ) as Json;
+    assert.equal(before.status, 'active', '승인 전에는 그대로');
+    await decide(off.approval_id);
+    const after = (ok(await api.get('/api/external-tools', owner)).tools as Json[]).find(
+      (t) => t.name === name,
+    ) as Json;
+    assert.equal(after.status, 'off');
+  });
+});
+
 describe('설정 바꾸기: 다른 모듈의 설정 (D)', () => {
   const propose = (token: string, fields: Json) =>
     call(token, 'propose_setting', { request_id: randomUUID(), note: '바꿔요', ...fields });

@@ -1,11 +1,10 @@
 import type { BrowsePlan } from './browser-mcp';
 import { ChatTurn } from './chat-turn';
 import { CliRuntime } from './cli-runtime';
-import { JobAfter } from './job-after';
-import { JobLeadReplies } from './job-lead-replies';
 import { JobLineage } from './job-lineage';
-import { JobPlan } from './job-plan';
+import { type JobNote, JobNotes } from './job-notes';
 import { JobRefs, type RefPhotos } from './job-refs';
+import { JobRoute } from './job-route';
 import { JobTarget } from './job-target';
 import type { Json } from './json';
 import type { PromptPack } from './prompt-pack';
@@ -145,11 +144,8 @@ export class Job {
     readonly wake: string | null = null,
     /** 팀장이 맡긴 일인가 (payload.delegatedBy). 아래 팀이 없으면 일이 클 때 ask_help로 도움을 청한다 (2026-11-20) */
     readonly delegated = false,
-    /**
-     * 지시문에 더할 payload의 단락 (있는 것만, 이 순서로): set_plan으로 정한 계획(JobPlan, 2026-11-20) · 앞 단계의 결과
-     * (JobAfter, D2 순서가 있는 위임) · 대표의 답(JobLeadReplies, 2026-11-24 대표 ↔ 일꾼 대화)
-     */
-    readonly notes: readonly (JobPlan | JobAfter | JobLeadReplies)[] = [],
+    /** 지시문에 더할 payload의 단락 (JobNotes: 계획 · 앞 단계의 결과 · 대표의 답 · 이 일의 방법) */
+    readonly notes: readonly JobNote[] = [],
   ) {}
 
   static from(raw: Json): Job {
@@ -187,7 +183,7 @@ export class Job {
       ChatTurn.from(payload, raw.field('chat_updates') ? raw.child('chat_updates') : null),
       agent.flag('bound'),
       raw.field('prompt_package') ? SkillPackage.from(raw.child('prompt_package')) : null,
-      CliRuntime.from(agent, raw.list('tools')),
+      CliRuntime.from(agent, JobRoute.from(payload)?.skipsConnectors ? [] : raw.list('tools')),
       JobRefs.from(payload),
       JobLineage.from(raw.child('run')),
       raw.optionalText('deliver'),
@@ -195,9 +191,7 @@ export class Job {
       agent.flag('lead'),
       raw.optionalText('wake'),
       Boolean(payload.optionalText('delegatedBy')),
-      [JobPlan.from(payload), JobAfter.from(payload), JobLeadReplies.from(payload)].flatMap(
-        (p) => p ?? [],
-      ),
+      JobNotes.from(payload),
     );
   }
 

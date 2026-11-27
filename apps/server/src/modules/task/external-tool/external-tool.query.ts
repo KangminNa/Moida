@@ -1,11 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { Actor, BaseQuery, Database, SecretBox } from '../../platform';
+import {
+  Actor,
+  BaseQuery,
+  Database,
+  NotFound,
+  SecretBox,
+  SettingActor,
+  type SettingChangeInput,
+} from '../../platform';
 import type { Agent } from '../agent/agent';
 import type { JobToolView } from '../task/job.view';
 import { externalTools } from '../task.schema';
 import type { TaskRow } from '../task.tables';
 import { ExternalTool } from './external-tool';
-import { ExternalToolListView } from './external-tool.view';
+import {
+  ConnectorSettingsView,
+  ConnectorSettingView,
+  ExternalToolListView,
+} from './external-tool.view';
 
 // 외부 도구 읽기 (2차 7단계). 관리 화면의 목록과, 일을 빌려 줄 때 그 에이전트에게 붙일 도구.
 // 토큰을 푸는 곳은 forJob 하나뿐이다 (러너에게 가는 일에만 싣는다).
@@ -32,6 +44,38 @@ export class ExternalToolQuery extends BaseQuery {
         ExternalTool.restore(r).view(agents.filter((a) => a.external_tools.includes(r.name))),
       ),
     );
+  }
+
+  /** get_settings { kind: connectors } (C4): 대표 · 설정 제안 허락을 받은 에이전트가 읽는다 */
+  async settings(actor: Actor): Promise<ConnectorSettingsView> {
+    const spaceId = SettingActor.spaceOf(actor);
+    const rows = await this.rows(externalTools, { space_id: spaceId }, { order: ['name'] });
+    const agents = await this.grantedAgents(spaceId);
+    return new ConnectorSettingsView(
+      rows
+        .filter((r) => r.status !== 'proposed')
+        .map((r) => new ConnectorSettingView(r, agents(r.name))),
+    );
+  }
+
+  /** 제안의 지금 값 */
+  async settingNow(actor: Actor, change: SettingChangeInput): Promise<ConnectorSettingView> {
+    const spaceId = SettingActor.spaceOf(actor);
+    const row =
+      change.targetId === null
+        ? null
+        : await this.row(externalTools, { space_id: spaceId, id: change.targetId });
+    if (!row || row.status === 'proposed') throw new NotFound('커넥터를 찾을 수 없어요');
+    return new ConnectorSettingView(row, (await this.grantedAgents(spaceId))(row.name));
+  }
+
+  /** 커넥터 이름 → 허락한 에이전트 이름 (지우지 않은 것) */
+  private async grantedAgents(spaceId: string): Promise<(name: string) => string[]> {
+    const agents = await this.sql<{ name: string; external_tools: string[] }[]>`
+      SELECT name, external_tools FROM task.agents
+      WHERE space_id = ${spaceId} AND deleted_at IS NULL AND cardinality(external_tools) > 0
+      ORDER BY name`;
+    return (tool) => agents.filter((a) => a.external_tools.includes(tool)).map((a) => a.name);
   }
 
   /**
