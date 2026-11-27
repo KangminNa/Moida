@@ -31,6 +31,8 @@ export class ScheduleView {
       /** 레시피 (2차 5단계): 어디로(task · chat · page) · 받을 것 · 지킬 것 · 계기(time · manual · after)와 앞 레시피 */
       destination: r.destination,
       deliver: r.deliver,
+      /** 회차의 답 · 실패를 관리자 메일로도 보낸다 (2026-11-27, 대화로 보낼 때만, 메일 플러그인이 보낸다) */
+      mail: r.mail,
       rules: r.rules,
       trigger: r.trigger,
       afterId: r.after_id,

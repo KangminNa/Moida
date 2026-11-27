@@ -10,6 +10,7 @@ type TurnChat = {
   review?: unknown;
   deliver?: unknown;
   deliverNote?: unknown;
+  mail?: unknown;
 };
 
 // 회차의 받을 것 (O-3, docs/서브나.md 14장, 2026-11-18): 대표가 첫 실행에서 정하고(MCP set_deliver)
@@ -55,6 +56,16 @@ export class TurnDeliver {
     const given = note?.trim().slice(0, TurnDeliver.NOTE_MAX) || null;
     const text = given ?? TurnDeliver.noteOf(payload);
     return { ...payload, chat: { ...chat, deliver: value, deliverNote: text } };
+  }
+
+  /** 이 회차의 답 · 실패를 관리자 메일로도 보내는가 (payload.chat.mail, 메일로 받는 자동화 레시피의 회차, 2026-11-27) */
+  static mailOf(payload: unknown): boolean {
+    return ((payload ?? {}) as { chat?: TurnChat }).chat?.mail === true;
+  }
+
+  /** 서버가 다시 맡긴 회차(Chat.fix)가 앞 회차에서 물려받는 것: 받을 것과 메일로 받기 */
+  static carry(payload: unknown): { deliver: string | null; mail: boolean } {
+    return { deliver: TurnDeliver.of(payload), mail: TurnDeliver.mailOf(payload) };
   }
 
   /** 회차 작업의 payload에 적힌 받을 것. 없으면 null */

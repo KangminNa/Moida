@@ -144,6 +144,7 @@ export function SchedulesPanel({ agentId }: { agentId: string | null }) {
                     ) : (
                       (DESTINATION_LABELS[s.destination] ?? s.destination)
                     )}
+                    {s.mail ? ' · 메일로 받기' : ''}
                   </small>
                 </div>
                 <div className="row">

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { connect } from 'node:net';
 import { after, before, describe, test } from 'node:test';
 import { DomainEvent, RuleViolation } from '../../../apps/server/src/plugin-api';
+import { ChatSaidHandler } from './chat-said.handler';
 import { FakeSmtp } from './fake-smtp';
 import { MailMessage } from './mail-message';
 import { NoticeMail } from './notice-mail';
@@ -164,5 +165,35 @@ describe('NoticeMail · NoticeSentHandler', () => {
     await new NoticeSentHandler(null, null).handle(event(NoticeSentHandler.TOPIC));
     assert.equal(smtp.mails.length, before + 1);
     assert.equal(decode(header(smtp.mails.at(-1)?.data ?? '', 'Subject')), '[Moida] 작업 실패');
+  });
+
+  test('자동화 결과 (2026-11-27): 메일로 받는 회차의 답 · 실패만 한 통, 답은 늘 싣고 대화 · HTML 링크', async () => {
+    const before = smtp.mails.length;
+    const chatId = '00000000-0000-7000-8000-0000000000c1';
+    const said = (data: Record<string, unknown>) =>
+      new DomainEvent(ChatSaidHandler.TOPIC, 1, '00000000-0000-7000-8000-000000000002', {
+        chatId,
+        title: '아침 요약',
+        kind: 'final',
+        taskId: 't1',
+        text: '어제 소식 다섯 줄',
+        ...data,
+      });
+    const handler = new ChatSaidHandler(gateway(), mail);
+    await handler.handle(said({ mail: true }));
+    const sent = smtp.mails.at(-1)?.data ?? '';
+    assert.equal(decode(header(sent, 'Subject')), '[Moida] 아침 요약');
+    assert.match(body(sent), /어제 소식 다섯 줄/);
+    assert.match(body(sent), new RegExp(`https://cairn\\.example/admin/chats/${chatId}/report`));
+    await handler.handle(said({ mail: true, kind: 'failed', text: '시간 초과' }));
+    assert.equal(
+      decode(header(smtp.mails.at(-1)?.data ?? '', 'Subject')),
+      '[Moida] 못 했어요 · 아침 요약',
+    );
+    // 메일로 받지 않는 대화 · 덧붙인 말의 답 · 설정 없음은 보내지 않는다
+    await handler.handle(said({}));
+    await handler.handle(said({ mail: true, kind: 'reply' }));
+    await new ChatSaidHandler(null, null).handle(said({ mail: true }));
+    assert.equal(smtp.mails.length, before + 2);
   });
 });

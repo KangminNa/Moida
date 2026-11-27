@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   Actor,
+  CodeMail,
   Database,
   EntityService,
   Idempotency,
@@ -48,6 +49,7 @@ export class ScheduleService extends EntityService<Schedule> {
   constructor(
     db: Database,
     private readonly skills: SkillQuery,
+    private readonly mail: CodeMail,
   ) {
     super(db);
   }
@@ -65,7 +67,7 @@ export class ScheduleService extends EntityService<Schedule> {
       const once = new Idempotency(tx, actor.id ?? spaceId, req.requestId, ScheduleService.CREATE);
       const before = await once.previous();
       if (before) return schedules.load(spaceId, String(before.scheduleId));
-      const schedule = await new ScheduleEdit(tx, spaceId).open(req, now);
+      const schedule = await new ScheduleEdit(tx, spaceId, this.mail).open(req, now);
       await schedules.save(schedule);
       await once.remember({ scheduleId: schedule.id });
       return schedule;
@@ -76,7 +78,7 @@ export class ScheduleService extends EntityService<Schedule> {
     actor.assertOwner();
     const spaceId = actor.requireSpace();
     return this.transaction(async (tx) => {
-      const schedule = await new ScheduleEdit(tx, spaceId).update(req, new Date());
+      const schedule = await new ScheduleEdit(tx, spaceId, this.mail).update(req, new Date());
       await new ScheduleRepository(tx).save(schedule);
       return schedule;
     });
@@ -86,7 +88,7 @@ export class ScheduleService extends EntityService<Schedule> {
   async rehearseSetting(actor: Actor, change: SettingChangeInput): Promise<void> {
     const spaceId = SettingActor.spaceOf(actor);
     await this.transaction(async (tx) => {
-      await new ScheduleEdit(tx, spaceId).apply(change, new Date());
+      await new ScheduleEdit(tx, spaceId, this.mail).apply(change, new Date());
     });
   }
 
@@ -102,7 +104,7 @@ export class ScheduleService extends EntityService<Schedule> {
       spaceId,
       change.key,
       async (tx) => {
-        const schedule = await new ScheduleEdit(tx, spaceId).apply(change, new Date());
+        const schedule = await new ScheduleEdit(tx, spaceId, this.mail).apply(change, new Date());
         // 대화에서 올라온 결재로 만든 대화 레시피는 그 대화에 묶는다 (O-3, change.key는 결재 id)
         if (change.op === 'create')
           schedule.bindChat((await new ApprovalRepository(tx).load(spaceId, change.key)).chatId);
@@ -236,7 +238,7 @@ export class ScheduleService extends EntityService<Schedule> {
     if (chatId === null) {
       // 받을 것은 대화가 아니라 회차마다 싣는다 (O-4): 레시피의 받을 것이 바뀌어도 같은 대화에 이어 쌓인다
       const chat = Chat.open(spaceId, requestId, instruction, now);
-      const turn = chat.assign(lead, now, schedule.deliver);
+      const turn = chat.assign(lead, now, schedule.deliver, schedule.mail);
       await chats.save(chat);
       schedule.bindChat(chat.id);
       await new ScheduleRepository(tx).save(schedule);
@@ -248,6 +250,7 @@ export class ScheduleService extends EntityService<Schedule> {
     // 대화에 묶인 레시피(O-3)는 그 회차의 받을 것으로 레시피의 받을 것을 싣는다 (대표가 다른 값을 정하지 못한다)
     const turn = chat.send(lead, requestId, instruction, previous, now, {
       deliver: schedule.deliver,
+      mail: schedule.mail,
     });
     await chats.save(chat);
     return (await tasks.insertOnce(turn)) ? turn : null;

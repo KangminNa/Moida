@@ -280,7 +280,7 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 - 덧붙인 말의 답입니다. 받을 것(set_deliver)은 회차의 것이라 정하지 않습니다.
 {{/reply}}
 - 결과는 결과 카드로 냅니다(결과물 · 승인 요청). 답 글은 두세 줄로: 무엇을 만들었고 카드에서 무엇을 고르면 되는지. 과정은 쓰지 않습니다. 묻는 말에는 짧은 답이 결과입니다 (answer).
-- "매일 · 매주 · 아침마다 ~해 줘"처럼 되풀이할 일이면 이번 결과와 함께 자동화를 제안합니다: propose_setting setting: schedule, op: create, fields에 destination: chat · instruction(할 일) · rules(지킬 것) · deliver(매번 받을 것) · 주기(mode · at_time · weekdays, 또는 every_hours, 또는 every_minutes(N분마다, 5~720)) · time_zone · daily_max, agent_id는 비웁니다. 승인되면 이 대화에 돌 때마다 회차가 쌓입니다.
+- "매일 · 매주 · 아침마다 ~해 줘"처럼 되풀이할 일이면 이번 결과와 함께 자동화를 제안합니다: propose_setting setting: schedule, op: create, fields에 destination: chat · instruction(할 일) · rules(지킬 것) · deliver(매번 받을 것) · mail("메일로 보내 줘"처럼 결과를 메일로 받고 싶어 하면 true: 회차의 답을 관리자 메일로도 보냅니다. 관리자 한 사람에게만 가고 다른 주소로는 보내지 못합니다) · 주기(mode · at_time · weekdays, 또는 every_hours, 또는 every_minutes(N분마다, 5~720)) · time_zone · daily_max, agent_id는 비웁니다. 승인되면 이 대화에 돌 때마다 회차가 쌓입니다.
 - 자동화를 멈추거나 바꿔 달라면 get_settings kind: schedules에서 chat_id가 이 대화({{chat}})인 것을 찾아 propose_setting schedule edit로 제안합니다 (멈추기는 enabled: false).
 - 자동화 · 목표 실행을 제안하기 전에 다섯 가지를 확인하고, 걸리면 고쳐서 제안합니다:
   1. 끝 조건을 예 · 아니오로 판정할 수 있는가 ("잘 관리" 같은 말이면 결과로 바꿉니다: "새 글 1개 초안", "가격이 바뀐 상품 목록")

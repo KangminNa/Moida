@@ -35,6 +35,8 @@ function settingsOf(
     // 레시피 칸 (2차 5단계). 보내지 않으면 기본값 (어디로는 페이지가 있으면 page, 아니면 task)
     destination: f.optionalText('destination', 20) ?? undefined,
     deliver: f.optionalText('deliver', 20),
+    // 회차의 답을 관리자 메일로도 (2026-11-27). 보내지 않으면 끔
+    mail: body.mail === undefined || body.mail === null ? false : f.boolean('mail'),
     rules: f.optionalText('rules', Schedule.RULES_MAX) ?? '',
     trigger: f.optionalText('trigger', 20) ?? undefined,
     after_id: body.afterId === undefined || body.afterId === null ? null : f.uuid('afterId'),

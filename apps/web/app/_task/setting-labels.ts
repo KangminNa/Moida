@@ -48,6 +48,7 @@ export const SETTING_FIELDS: Readonly<Record<string, string>> = {
   page_id: '페이지',
   destination: '어디로',
   deliver: '받을 것',
+  mail: '메일로 받기',
   rules: '지킬 것',
   trigger: '계기',
   after_id: '앞 레시피',

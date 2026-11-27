@@ -35,6 +35,27 @@ export class NoticeMail {
     return new MailMessage(this.from, this.to, `[Moida] ${title}`, lines.join('\n'));
   }
 
+  /**
+   * 자동화 회차의 답 · 실패 (2026-11-27, 메일로 받기를 켠 레시피만). 답은 앞부분(코어가 자른 3500자)을 싣고
+   * 전체 · 결과물은 대화와 정리한 HTML 링크로. chatId는 UUID만 (아니면 콘솔 첫 화면)
+   */
+  answer(chatId: string, title: string, failed: boolean, text: string): MailMessage {
+    const name = title.trim() || '자동화';
+    const chat = /^[0-9a-f-]{36}$/i.test(chatId) ? `/admin/chats/${chatId}` : '/admin';
+    const lines = [
+      failed ? `못 했어요 · ${name}` : name,
+      '',
+      text,
+      '',
+      ...(failed ? [] : [`정리한 HTML: ${this.site}${chat}/report`]),
+      `대화: ${this.site}${chat}`,
+      '',
+      '이 메일은 자동화의 "메일로 받기"를 켜서 왔어요. 끄려면 콘솔 › 자동화에서 바꿔요.',
+    ];
+    const subject = failed ? `[Moida] 못 했어요 · ${name}` : `[Moida] ${name}`;
+    return new MailMessage(this.from, this.to, subject, lines.join('\n'));
+  }
+
   /** 구독 확인 메일 (두 번 확인): 스토어 화면의 확인 단추로 가는 링크. 신청하지 않았으면 무시하면 7일 뒤 지워진다 */
   confirm(address: string, token: string, apps: readonly string[]): MailMessage {
     const names = apps.join(', ');

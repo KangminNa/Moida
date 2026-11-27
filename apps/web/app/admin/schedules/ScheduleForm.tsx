@@ -36,6 +36,8 @@ export type ScheduleBody = {
   destination: string;
   pageId: string | null;
   deliver: string | null;
+  /** 회차의 답 · 실패를 관리자 메일로도 (2026-11-27) */
+  mail: boolean;
   rules: string;
   trigger: string;
   afterId: string | null;
@@ -112,6 +114,7 @@ export function ScheduleForm({
       destination: recipe.destination,
       pageId: recipe.pageId || null,
       deliver: recipe.deliver || null,
+      mail: recipe.destination === 'chat' && recipe.mail,
       rules: recipe.rules.trim(),
       trigger: recipe.trigger,
       afterId: recipe.afterId || null,

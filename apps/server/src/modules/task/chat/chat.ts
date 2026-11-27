@@ -27,6 +27,8 @@ type ChatTurnExtra = {
   /** 서버가 연 회차의 화면용 한 줄 (O-3) · 물려받은 받을 것 */
   note?: string;
   deliver?: string | null;
+  /** 이 회차의 답 · 실패를 관리자 메일로도 (2026-11-27, 메일로 받는 자동화 레시피의 회차와 그 뒤 서버가 다시 맡긴 회차) */
+  mail?: boolean;
   refs?: TaskRefs;
 };
 
@@ -172,6 +174,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
       fixBy,
       note,
       deliver,
+      mail = false,
       refs = TaskRefs.of(null),
     }: ChatTurnExtra = {},
   ): Task {
@@ -199,6 +202,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
             ...(fix ? { fix: true, ...(fixBy ? { fixBy } : {}) } : {}),
             ...(note ? { note } : {}),
             ...(deliver ? { deliver } : {}),
+            ...(mail ? { mail: true } : {}),
             ...(this.row.app_id ? { appId: this.row.app_id } : {}),
           },
           ...refs.payload,
@@ -235,8 +239,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     now: Date,
     { by, note }: { by?: string; note: string },
   ) {
-    const deliver = TurnDeliver.of(previous.at(-1)?.payload);
-    const extra = { fix: true, fixBy: by, note, deliver };
+    const extra = { fix: true, fixBy: by, note, ...TurnDeliver.carry(previous.at(-1)?.payload) };
     return this.send(agent, `fix:${this.row.turns + 1}`, message, previous, now, extra);
   }
 
@@ -279,11 +282,8 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     deviceId: string | null = null,
   ): Task | null {
     this.assertPartner(agent);
-    if (appended >= ChatUpdates.APPEND_MAX)
-      throw new RuleViolation(`덧붙인 말은 회차마다 ${ChatUpdates.APPEND_MAX}개까지예요`);
     const text = message.trim();
-    if (text.length > ChatUpdates.TEXT_MAX)
-      throw new RuleViolation(`덧붙인 말은 ${ChatUpdates.TEXT_MAX}자까지예요`);
+    ChatUpdates.assertAppend(appended, text);
     this.note(ChatUpdates.APPENDED, text, current.id, null, now);
     this.touch(now);
     if (current.status === Task.QUEUED) return null;
@@ -314,7 +314,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
    * 대표가 맡는다 (O-2): 맡기 전의 첫 메시지로 첫 회차를 연다. 새 대화는 열 때 바로,
    * O-2 전에 배정을 기다리던 대화는 다음 말에서 (그 말은 첫 회차에 덧붙인 말이 된다)
    */
-  assign(lead: Agent, now: Date, deliver: string | null = null): Task {
+  assign(lead: Agent, now: Date, deliver: string | null = null, mail = false): Task {
     const message = this.row.pending;
     if (this.row.agent_id !== null || message === null) throw new Conflict('이미 맡은 대화예요');
     const refs = this.pendingRefs;
@@ -325,6 +325,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
       deviceId: this.row.device_id,
       refs,
       deliver,
+      mail,
     });
   }
 
@@ -350,7 +351,7 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   settled({ kind, text, said }: SettledLine, taskId: string, agentId: string | null, now: Date) {
     this.note(kind, text, taskId, agentId, now);
     if (kind === ChatUpdates.FINAL) this.announce(Chat.ANSWERED, { text: text.slice(0, 300) });
-    if (said !== undefined) this.announce('task.chat.said', { kind, taskId, text: said });
+    if (said !== undefined) this.announce('task.chat.said', { kind, taskId, ...said });
   }
 
   /** 소식 한 줄을 남긴다 (끝난 작업 · post_update · 덧붙인 말). 저장할 때 함께 쌓인다 */

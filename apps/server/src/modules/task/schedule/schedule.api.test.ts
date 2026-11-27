@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
+import { TestMailbox } from '../../../testing/test-mailbox';
 import { Database, DomainEvent } from '../../platform';
 import { ScheduleJob } from './schedule.job';
 import { ScheduleFollowHandler } from './schedule-follow.handler';
@@ -405,6 +406,35 @@ describe('스케줄 (/api/schedules)', () => {
       assert.match(refused.text, /대표가 맡아요/);
       assert.equal((await chatTo(null, { instruction: '' })).status, 422, '지시가 있어야 한다');
       assert.equal((await create({ ...DAILY, instruction: '요약', deliver: 'html' })).status, 422);
+    });
+
+    test('메일로 받기 (2026-11-27): 대화로 보낼 때만, 메일을 보낼 수 있어야 켜고, 회차와 다시 맡긴 회차가 payload.chat.mail을 싣는다', async () => {
+      const recipe = {
+        ...DAILY,
+        title: '아침 요약 메일',
+        agentId: null,
+        destination: 'chat',
+        instruction: '어제 소식을 다섯 줄로 요약해 줘',
+        mail: true,
+      };
+      const notReady = await create(recipe);
+      assert.equal(notReady.status, 502, notReady.text);
+      assert.match(notReady.text, /메일 플러그인/);
+      TestMailbox.install(api);
+      const notChat = await create({ ...recipe, destination: 'task' });
+      assert.equal(notChat.status, 422, notChat.text);
+      assert.match(notChat.text, /대화로 보낼 때만/);
+      const schedule = ok(await create(recipe), 201);
+      assert.equal(schedule.mail, true);
+      assert.equal(ok(await create({ ...recipe, mail: undefined }), 201).mail, false, '기본은 끔');
+      await makeDue(schedule, 3);
+      await job.run();
+      const [first] = await turnsOf(schedule);
+      assert.ok(first, '첫 회차');
+      const [row] = await db.sql<{ mail: boolean | null }[]>`
+        SELECT (payload->'chat'->>'mail')::boolean AS mail FROM task.tasks WHERE id = ${first.id}`;
+      assert.equal(row?.mail, true, '회차가 메일로 받기를 싣는다');
+      await cancel(first.id);
     });
 
     test('손으로만 도는 레시피는 시각이 없고 "지금 실행"으로만 돈다', async () => {
