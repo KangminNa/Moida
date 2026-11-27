@@ -165,6 +165,12 @@ export class AppTableRepository extends TableRepository<AppTableRow, AppTable> {
     return done.count;
   }
 
+  /** 앱의 표를 모두 지운다: 앱 스키마(표 · 줄째)와 표 목록. 지운 앱에만 (AppDataService.dropApp) */
+  async dropApp(appId: string): Promise<void> {
+    await this.sql.unsafe(`DROP SCHEMA IF EXISTS "${AppTable.schemaOf(appId)}" CASCADE`);
+    await this.deleteRows(appTables, { app_id: appId });
+  }
+
   /** 내보내기 (스토어 12.5): 표의 줄을 INSERT 문으로 (값은 Postgres가 적는다). 붙인 칸까지 싣는다 */
   async dumpRows(table: AppTable): Promise<readonly string[]> {
     const names = table.columnNames.map((c) => `"${c}"`).join(', ');

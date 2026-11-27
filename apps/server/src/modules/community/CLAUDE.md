@@ -11,7 +11,7 @@
   맞추기: `blog.app_code.shown`(`AppTablesHandler`) → `AppDataService.apply`가 없는 스키마 · 표 · 칸을 더하고 정책(`cairn_read` · `cairn_insert` · `cairn_update` · `cairn_delete`)을 다시 건다 (`AppTableRepository.ensure`). 지우는 DDL은 없다: 선언에서 빠진 표는 닫기만 한다(`open = false`, 줄은 남는다).
   회원 쪽 `api/community/data/:table`(`AppDataController`, 앱 도메인 · `MemberGuard`): 읽기 · 넣기 · 고치기 · 지우기. 쿼리는 트랜잭션 안에서 `cairn.member`(회원 id) · 5초 제한 · `SET LOCAL ROLE cairn_app`을 정한 뒤 돈다(`AppTableRepository.asMember`): 규칙(`anyone` · `member` · `owner` · `admin`)은 DB의 행 수준 보안이 거른다. 이 뒤에는 community의 다른 표를 읽지 못하므로 회원 확인은 그 앞에서 한다.
   관리자 `api/community/admin/:appId/data`(표 목록 · 줄 읽기 · 넣기 · 지우기) · `…/export`(`tables.json` · `schema.sql` · `data.sql` · `members.json`의 zip). 역할을 바꾸지 않는다.
-  남은 데이터 (2026-11-23): `AppDataQuery.holdings`가 앱마다 회원 수 · 앱 데이터 줄 수를 세어 Lookups `app-holdings`로 준다 (관리자만, 없는 앱은 빠짐). blog가 앱을 지우기 전에 묻고, 있으면 지우지 않는다.
+  남은 데이터 (2026-11-23, 나눔 2026-11-27): `AppDataQuery.heldMembers` · `heldRows`가 앱마다 회원 수 · 앱 데이터 줄 수를 세어 Lookups `app-members` · `app-rows`로 준다 (관리자만, 없는 앱은 빠짐). blog가 앱을 지우기 전에 묻는다: 회원이 있으면 지우지 않고, 줄은 관리자가 내보낸 뒤 함께 지우기(`withData`)를 골랐을 때만 지운다. 지운 앱은 `AppRemovedHandler`(`blog.app.changed`의 deleted)가 `AppDataService.dropApp`으로 앱 스키마(`DROP SCHEMA … CASCADE`)와 `app_tables` 줄을 지운다 (서버 자신만, 두 번 받아도 같다). 앱이 살아 있는 동안에는 지우는 DDL이 여전히 없다.
   일꾼의 넣기는 설정 바꾸기 제안 `app_data`(`AppDataService.SETTING` · `rehearseSetting` · `applySetting`, `community-settings.ts`가 등록, 승인 뒤 반영: 원칙 7). 넣기만 한다.
 - `account/`: 스토어 계정 (2026-11-26). `Account`(공간에 하나: 메일 · 아이디 · 비밀번호 해시 · 공통 약관 동의 · 정지 · 탈퇴) · 로그인(`AccountSession`, `cairn_member` 쿠키, 계정과 그 앱 도메인을 가리켜 앱에 참여하기 전에도 열림).
   규칙: 메일 `EmailAddress`(platform, 소문자로, 공간에서 하나) · 아이디 `LoginId`(영문 소문자로 시작하는 4~20자, 운영자 · 서비스로 보이는 아이디 막기, 공간에서 하나) · 둘 다 바꾸지 않고 옮겨 온 옛 계정의 빈 칸만 한 번 채운다(`setLoginId` · `setEmail`) · 비밀번호 `MemberPassword`(아이디 · 메일의 @ 앞 · 닉네임과 같은 값 막기, `passwordNames`) · 정지(`suspended_until`, 무기한은 `Account.FOREVER`)면 로그인 403 · 세션이 요청자로 안 된다 · 탈퇴(`leave`)는 메일 · 아이디 · 해시 · 마지막 접근을 지우고 모든 로그인을 끝낸다.
@@ -64,10 +64,11 @@
 ## 받는 이벤트
 - `community.report.added`(자기 이벤트): 대상의 신고를 세어 임시로 가린다 (`ReportAddedHandler`). 두 번 받아도 한 번만 가린다
 - `plugin.email.unsubscribed`: 메일의 해지 링크로 끊은 계정의 수신 동의를 지운다 (`NewsUnsubscribedHandler`, 2026-11-27)
+- `blog.app.changed`: 지운 앱(`deleted: true`)의 표 · 앱 스키마를 지운다 (`AppRemovedHandler`, 2026-11-27). 다른 바뀜은 넘긴다
 - `blog.app_code.shown`: 보이는 버전이 선언한 표에 맞춘다 (`AppTablesHandler`). 두 번 받아도 같다 (맞춘 버전 `applied_seq`보다 옛 것은 넘긴다)
 
 ## 써도 되는 모듈
-platform. 앱마다 남은 회원 · 앱 데이터는 Lookups `app-holdings`로 준다 (blog의 앱 지우기). 소식 메일에 동의한 계정의 주소는 `news-address`로 준다 (서버 자신에게만, 메일 플러그인). blog의 앱은 platform `Lookups`로만 묻는다 (`modules.json`의 lookups.asks): `community-app`(공개된 커뮤니티 앱: 글 · 댓글 · 신고) · `member-app`(회원을 받는 공개 앱: 회원 API · 관리) · `app`(앱 데이터). 앱 도메인에서 여는 경로는 `HostGate.openPaths`로 등록한다 (`/api/community` 아래, `admin/`만 빼고 쓰기까지)
+platform. 앱마다 남은 회원 · 앱 데이터는 Lookups `app-members` · `app-rows`로 준다 (blog의 앱 지우기). 소식 메일에 동의한 계정의 주소는 `news-address`로 준다 (서버 자신에게만, 메일 플러그인). blog의 앱은 platform `Lookups`로만 묻는다 (`modules.json`의 lookups.asks): `community-app`(공개된 커뮤니티 앱: 글 · 댓글 · 신고) · `member-app`(회원을 받는 공개 앱: 회원 API · 관리) · `app`(앱 데이터). 앱 도메인에서 여는 경로는 `HostGate.openPaths`로 등록한다 (`/api/community` 아래, `admin/`만 빼고 쓰기까지)
 
 ## 지켜야 할 것
 - 회원 쿠키는 앱 도메인에서만 읽고, Domain 없이 그 도메인에만 둔다. 기본 도메인(콘솔과 같은 출처)에서는 회원 API가 없는 주소와 같다. 예외는 스토어 가입(`api/store/…`, 2026-11-26) 하나: 계정만 만들고 쿠키 · 로그인은 없다

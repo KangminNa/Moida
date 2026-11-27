@@ -25,6 +25,7 @@ import {
   CreateAppInput,
   DomainProofInput,
   HomeAppInput,
+  RemoveAppInput,
   UpdateAppInput,
   UploadIconInput,
 } from './app.input';
@@ -122,7 +123,7 @@ export class AppController {
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<void> {
-    await this.service.remove(actor, VersionInput.from(id, body));
+    await this.service.remove(actor, RemoveAppInput.from(id, body));
   }
 
   /** 아이콘 올리기. 본문은 그림 파일 그대로 (HttpSetup이 image/*를 받는다) */

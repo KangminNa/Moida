@@ -136,6 +136,8 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/security/events': 403,
   'GET /api/project-rules': 403,
   'GET /api/schedules': 403,
+  // 캘린더 (2026-11-27): 기간(from · to)이 없으면 입력 검사가 먼저 400. 기간이 있으면 관리자만 (schedule.api.test)
+  'GET /api/schedules/calendar': 400,
   'GET /api/sessions': 403,
   'GET /api/sessions/:id': 403,
   'GET /api/sessions/:id/revisions/:seq': 403,

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client';
 import { CommunitySite } from '../../../testing/community-site';
-import { Database, ZipReader } from '../../platform';
+import { Database, OutboxWorker, ZipReader } from '../../platform';
 
 // 앱 데이터 (앱 플랫폼, docs/스토어.md 12.4): 앱이 cairn.json에 선언한 표가 그 앱의 스키마에 생기고, 앱 도메인에서 읽고 쓴다.
 // 보는 사람별: 방문자 · 회원(쓴 회원 / 다른 회원) · 관리자. 규칙(anyone · member · owner · admin)은 DB의 행 수준 보안이 거른다
@@ -328,19 +328,48 @@ describe('버전이 바뀌면', () => {
   });
 });
 
-describe('앱 지우기 (2026-11-23)', () => {
-  test('회원 · 앱 데이터가 남은 앱은 지우지 못한다 (409, 무엇이 남았는지)', async () => {
-    const appOf = async () =>
-      ((ok(await api.get('/api/apps', owner)).apps as Json[]) ?? []).find(
-        (a) => a.id === site.appId,
-      );
-    const app = (await appOf()) as { version: number };
-    const res = await api.request('POST', `/api/apps/${site.appId}/delete`, owner, {
-      version: app.version,
+describe('앱 지우기 (2026-11-23, 함께 지우기 2026-11-27)', () => {
+  const appOf = async (id: string) =>
+    ((ok(await api.get('/api/apps', owner)).apps as Json[]) ?? []).find((a) => a.id === id) as
+      | { version: number }
+      | undefined;
+  const remove = async (id: string, body: Json = {}) =>
+    api.request('POST', `/api/apps/${id}/delete`, owner, {
+      version: (await appOf(id))?.version,
+      ...body,
     });
-    assert.equal(res.status, 409, res.text);
-    assert.match(res.text, /회원 2명 · 앱 데이터 \d+줄/);
-    assert.ok(await appOf(), '앱은 그대로');
+
+  test('회원이 남은 앱은 데이터와 함께 지우기로도 지우지 못한다 (409, 무엇이 남았는지)', async () => {
+    for (const body of [{}, { withData: true }]) {
+      const res = await remove(site.appId, body);
+      assert.equal(res.status, 409, res.text);
+      assert.match(res.text, /회원 2명이 남아 있어/);
+    }
+    assert.ok(await appOf(site.appId), '앱은 그대로');
+  });
+
+  test('앱 데이터만 남은 앱은 함께 지우기(withData)로만 지워지고, 그 앱의 표 · 스키마가 사라진다', async () => {
+    const plain = await CommunitySite.openPage(api, owner, `gone-${mark}`, {
+      tables: { notes: { columns: { text: 'text' }, read: 'admin', write: 'admin' } },
+    });
+    const path = `/api/community/admin/${plain.appId}/data/notes`;
+    ok(await api.request('POST', path, owner, { rows: [{ text: '하나' }, { text: '둘' }] }), 201);
+
+    const kept = await remove(plain.appId);
+    assert.equal(kept.status, 409, kept.text);
+    assert.match(kept.text, /앱 데이터 2줄이 남아 있어요\. 내보낸 뒤 데이터와 함께 삭제/);
+    assert.equal((await remove(plain.appId, { withData: 'yes' })).status, 400);
+
+    assert.equal((await remove(plain.appId, { withData: true })).status, 204);
+    assert.equal(await appOf(plain.appId), undefined);
+    const worker = api.service(OutboxWorker);
+    while ((await worker.tick()) > 0);
+    const schema = `app_${plain.appId.replaceAll('-', '')}`;
+    const [left] = await api.service(Database).sql<{ schema: string | null; tables: number }[]>`
+      SELECT to_regnamespace(${schema})::text AS schema,
+             (SELECT count(*)::int FROM community.app_tables WHERE app_id = ${plain.appId}) AS tables`;
+    assert.deepEqual(left, { schema: null, tables: 0 });
+    assert.equal(await api.unprocessed('blog.app.changed'), 0);
   });
 });
 
