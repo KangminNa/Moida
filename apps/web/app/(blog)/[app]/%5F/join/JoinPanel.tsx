@@ -171,7 +171,9 @@ export function JoinPanel({
       {terms.terms && terms.privacy ? (
         <TermsAgree terms={terms} store agreed={agreed} onChange={setAgreed} />
       ) : (
-        <p className="error">아직 약관이 공개되지 않아 가입할 수 없어요</p>
+        <p className="error">
+          아직 약관이 공개되지 않아 가입을 받지 않아요. 운영자가 약관을 공개하면 가입할 수 있어요
+        </p>
       )}
       <label className="member-check">
         <input type="checkbox" checked={news} onChange={(e) => setNews(e.target.checked)} />

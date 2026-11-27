@@ -1190,6 +1190,13 @@ textarea.input {
   font-size: 0.8125rem;
 }
 
+/* 내 앱의 "회원 가입을 받지 않는 중" (StoreTermsNotice): 글 + 단추 한 줄 */
+.store-terms-warn {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
 /* 카드형 묶음 (플러그인, 기기) */
 .plugin {
   padding: 14px;
