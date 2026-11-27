@@ -7,7 +7,8 @@ import { RuleViolation } from '../../platform';
 export class SkillFiles {
   static readonly ENTRY = 'SKILL.md';
   static readonly FILES_MAX = 10;
-  static readonly FILE_MAX = 64 * 1024;
+  /** 파일 하나 (2026-11-27 64KB → 96KB: 지시문 틀 prompts.md가 64KB를 넘었다. 합친 한도는 그대로) */
+  static readonly FILE_MAX = 96 * 1024;
   static readonly TOTAL_MAX = 128 * 1024;
   /** 러너가 깔 수 있는 경로 (스킬 폴더 밖이나 실행 파일은 없다) */
   private static readonly PATH = /^(SKILL\.md|references\/[a-z0-9][a-z0-9._-]{0,60}\.md)$/;
