@@ -25,6 +25,7 @@ export class NoticeKind {
   private build: ((event: DomainEvent) => NoticeBody | null) | null = null;
   private settleTopics: readonly string[] = [];
   private settle: ((event: DomainEvent) => string | null) | null = null;
+  private mails = true;
 
   constructor(
     /** 알림의 kind 칸 (예: task.approval.requested) */
@@ -49,6 +50,20 @@ export class NoticeKind {
     this.settleTopics = topics;
     this.settle = groupKey;
     return this;
+  }
+
+  /**
+   * 설정에 없을 때 메일로도 보내지 않는다 (2026-11-27). 자주 오는 알림(대화의 답)은 메일함을 채우므로 끈 채로 두고,
+   * 관리자가 알림 설정에서 켠다. 자동화의 답은 레시피의 "메일로 받기"로 따로 받는다
+   */
+  noMailByDefault(): this {
+    this.mails = false;
+    return this;
+  }
+
+  /** 설정에 없을 때 메일로도 보내는가 (경로가 push일 때만 뜻이 있다) */
+  get defaultMail(): boolean {
+    return this.mails;
   }
 
   /** 이 종류가 듣는 주제 (만들기 · 읽음): 서버가 뜰 때 이벤트 목록과 맞춰 본다 */

@@ -44,7 +44,13 @@ function ok(res: ApiResult, status = 200): Json {
 const settings = async () => ok(await api.get('/api/notice-settings', owner));
 const put = (body: Json, as = owner, headers: Record<string, string> = {}) =>
   api.request('PUT', '/api/notice-settings', as, body, headers);
-const BASE = { digest: 'hourly', digestTime: '09:00', timeZone: 'Asia/Seoul', routes: {} };
+const BASE = {
+  digest: 'hourly',
+  digestTime: '09:00',
+  timeZone: 'Asia/Seoul',
+  routes: {},
+  mail: {},
+};
 
 async function notices(kind: string): Promise<Notice[]> {
   const { notifications } = ok(await api.get('/api/notifications', owner)) as unknown as {
@@ -108,9 +114,14 @@ describe('알림 설정 (/api/notice-settings)', () => {
         quietStart: '23:00',
         quietEnd: '07:00',
         routes: { 'vault.session.saved': 'center' },
+        mail: { 'task.task.failed': 'off' },
         version: before.version,
       }),
     );
+    const mailOf = (kind: string) => (saved.kinds as Json[]).find((k) => k.kind === kind)?.mail;
+    assert.equal(mailOf('task.task.failed'), false, '끈 메일');
+    assert.equal(mailOf('task.chat.answered'), false, '대화의 답은 기본 끔');
+    assert.equal(mailOf('task.approval.requested'), true, '나머지는 기본 켬');
     assert.deepEqual(
       [saved.digest, saved.digestTime, saved.quietStart, saved.quietEnd],
       ['daily', '08:30', '23:00', '07:00'],
@@ -129,6 +140,10 @@ describe('알림 설정 (/api/notice-settings)', () => {
     );
     assert.equal(
       (await put({ ...BASE, routes: { 'task.task.failed': 'email' }, version: v })).status,
+      422,
+    );
+    assert.equal(
+      (await put({ ...BASE, mail: { 'task.task.failed': 'yes' }, version: v })).status,
       422,
     );
     ok(await put({ ...BASE, version: v }));

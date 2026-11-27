@@ -32,6 +32,8 @@ export type NoticeSettingsBody = {
   quietEnd: string | null;
   timeZone: string;
   routes: Record<string, string>;
+  /** 종류마다 메일로도 (on · off, 2026-11-27) */
+  mail: Record<string, string>;
 };
 
 // 알림 설정 폼: 칸의 상태와 보낼 본문만 가진다. 저장은 패널이 돌린다 (onSubmit).
@@ -57,6 +59,9 @@ export function NoticeForm({
   const [routes, setRoutes] = useState<Record<string, string>>(
     Object.fromEntries(settings.kinds.map((k) => [k.kind, k.route])),
   );
+  const [mail, setMail] = useState<Record<string, boolean>>(
+    Object.fromEntries(settings.kinds.map((k) => [k.kind, k.mail])),
+  );
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -68,6 +73,7 @@ export function NoticeForm({
       quietEnd: quiet ? quietEnd : null,
       timeZone: timeZone.trim(),
       routes,
+      mail: Object.fromEntries(Object.entries(mail).map(([k, on]) => [k, on ? 'on' : 'off'])),
     });
   }
 
@@ -136,6 +142,10 @@ export function NoticeForm({
         />
         <small>IANA 이름 (예: Asia/Seoul). 묶음 시각과 조용한 시간의 기준</small>
       </div>
+      <small>
+        메일: 메일 플러그인이 켜져 있으면 푸시로 보내는 알림을 메일로도. 대화의 답은 기본 끔
+        (자동화의 답은 레시피의 "메일로 받기")
+      </small>
       <ul className="list" aria-label="알림 종류">
         {settings.kinds.map((k: NoticeKindSetting) => (
           <li key={k.kind} className="list-cell schedule-row">
@@ -143,6 +153,15 @@ export function NoticeForm({
               <b>{k.label}</b>
               <small>{SEVERITY_LABELS[k.severity] ?? k.severity}</small>
             </div>
+            <label className="check" title="메일 플러그인이 켜져 있을 때, 푸시로 보내는 알림만">
+              <input
+                type="checkbox"
+                checked={mail[k.kind] ?? k.mail}
+                disabled={(routes[k.kind] ?? k.route) !== 'push'}
+                onChange={(e) => setMail({ ...mail, [k.kind]: e.target.checked })}
+              />
+              메일
+            </label>
             <select
               className="input"
               aria-label={`${k.label} 경로`}

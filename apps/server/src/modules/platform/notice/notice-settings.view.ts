@@ -11,6 +11,8 @@ export class NoticeSettingsView {
       label: string;
       severity: string;
       route: string;
+      /** 푸시로 보낼 때 메일로도 (2026-11-27) */
+      mail: boolean;
     }[],
   ) {}
 
@@ -34,7 +36,7 @@ export class NoticeSettingsView {
 
 /**
  * 대화로 바꾸는 알림 설정 (2026-11-15 D, get_settings notices). MCP라 snake_case, 칸 이름은 propose_setting의 fields와 같다.
- * routes는 종류마다 지금 가는 곳 (정하지 않았으면 등급의 기본), kinds는 바꿀 수 있는 종류와 이름
+ * routes는 종류마다 지금 가는 곳 (정하지 않았으면 등급의 기본), mail은 종류마다 메일로도 보내는지(on · off, 경로가 push일 때만), kinds는 바꿀 수 있는 종류와 이름
  */
 export class NoticeSettingView {
   constructor(
@@ -44,6 +46,8 @@ export class NoticeSettingView {
       label: string;
       severity: string;
       route: string;
+      /** 푸시로 보낼 때 메일로도 (2026-11-27) */
+      mail: boolean;
     }[],
   ) {}
 
@@ -61,6 +65,7 @@ export class NoticeSettingView {
       quiet_end: time(r.quiet_end),
       time_zone: r.time_zone,
       routes: Object.fromEntries(this.kinds.map((k) => [k.kind, k.route])),
+      mail: Object.fromEntries(this.kinds.map((k) => [k.kind, k.mail ? 'on' : 'off'])),
       kinds: this.kinds.map((k) => ({ kind: k.kind, label: k.label, severity: k.severity })),
     };
   }

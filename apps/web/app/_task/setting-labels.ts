@@ -82,6 +82,8 @@ const SETTING_VALUES: Readonly<Record<string, Readonly<Record<string, string>>>>
   'moderation.state': CONTENT_STATE_LABELS,
   'moderation.target': { topic: '글', comment: '댓글', member: '회원' },
   'moderation.blocked_until': { forever: '기한 없음' },
+  'notice.mail': { on: '켬', off: '끔' },
+  'notice.routes': { push: '푸시까지', center: '알림 센터만', off: '끄기' },
 };
 
 /**
@@ -97,8 +99,12 @@ export function settingField(field: string, label?: string): string {
 
 /** 바뀔 값 한 칸을 글로 (빈 값 · 목록 · 켜고 끔, 칸마다 따로 읽는 값). 긴 글은 앞부분만 */
 export function settingValue(value: unknown, field?: string, setting?: string | null): string {
+  // 목록형 칸의 줄("mail.<알림 종류>")은 칸 이름으로 값을 읽는다
+  const head = field?.split('.')[0];
   const own = field
-    ? (SETTING_VALUES[`${setting}.${field}`] ?? SETTING_VALUES[field])?.[String(value)]
+    ? (SETTING_VALUES[`${setting}.${field}`] ??
+        SETTING_VALUES[field] ??
+        SETTING_VALUES[`${setting}.${head}`])?.[String(value)]
     : undefined;
   if (own) return own;
   if (value === null || value === undefined || value === '') return '없음';

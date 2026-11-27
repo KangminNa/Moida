@@ -17,8 +17,8 @@ import { PushSubscription } from './push-subscription';
 //   트랜잭션 밖: 구독마다 보낸다 (먼저 적으므로 많아야 한 번 간다. 닿지 못한 푸시는 다시 보내지 않는다)
 //   짧은 트랜잭션: 구독마다 결과를 적는다 (사라진 구독 · 실패가 쌓인 구독은 지운다)
 // 구독이 없는 공간도 다룬 것으로 적는다: 나중에 구독해도 지난 알림이 한꺼번에 울리지 않게.
-// 보내기로 정한 것마다 platform.notice.sent도 같은 트랜잭션에 남긴다 (2026-11-26): 푸시와 같은 때 · 같은 묶음으로
-// 플러그인이 다른 길(이메일 플러그인 email)로도 보낸다. 브라우저 구독이 없어도 남긴다.
+// 보내기로 정한 것 가운데 종류의 메일이 켜진 것마다 platform.notice.sent도 같은 트랜잭션에 남긴다 (2026-11-26, 종류별 메일 2026-11-27):
+// 푸시와 같은 때 · 같은 묶음으로 플러그인이 다른 길(이메일 플러그인 email)로도 보낸다. 브라우저 구독이 없어도 남긴다.
 @Injectable()
 export class NoticePushService extends BaseService {
   /** 한 차례에 공간 하나에서 다루는 알림 수 */
@@ -57,7 +57,7 @@ export class NoticePushService extends BaseService {
       const decided = this.policy.decide(pending, settings, kinds, now);
       await store.markHandled(decided.handled, now);
       await new Outbox(tx).publish(
-        decided.messages.map(
+        decided.mails.map(
           (m) =>
             new DomainEvent(NoticePushService.SENT, 1, spaceId, {
               title: m.title,

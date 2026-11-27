@@ -29,6 +29,7 @@ export class SaveNoticeSettingsInput extends BaseRequest {
           quiet_end: minuteOf(f, 'quietEnd', body.quietEnd),
           time_zone: f.text('timeZone', 100),
           routes: Object.fromEntries(f.textMap('routes', 10)),
+          mail: Object.fromEntries(f.textMap('mail', 3)),
         }),
     );
   }
@@ -51,6 +52,7 @@ export class NoticeSettingChangeInput extends BaseRequest {
       if (has('quiet_end')) changes.quiet_end = minuteOf(f, 'quiet_end', body.quiet_end);
       if (has('time_zone')) changes.time_zone = f.text('time_zone', 100);
       if (has('routes')) changes.routes = Object.fromEntries(f.textMap('routes', 10));
+      if (has('mail')) changes.mail = Object.fromEntries(f.textMap('mail', 3));
       return new NoticeSettingChangeInput(changes);
     });
   }

@@ -38,6 +38,7 @@ export interface NoticeSettingRow {
   routes: unknown;
   version: number;
   updated_at: Date;
+  mail: unknown;
 }
 export type NoticeSettingNew = Partial<NoticeSettingRow> & Pick<NoticeSettingRow, 'space_id'>;
 

@@ -19,6 +19,7 @@ export interface LoadedNoticeSettings extends NoticeSettingRow {
 //   digest: 묶음 등급 알림을 보내는 간격 (hourly · daily, daily면 digest_minute에)
 //   quiet_start · quiet_end: 조용한 시간 (시간대 기준 하루 중 분). 그동안 푸시는 미뤘다가 끝날 때 모아 보낸다
 //   routes: 종류 → push · center · off. 등록한 종류(NoticeCatalog)만 적을 수 있다
+//   mail: 종류 → on · off (2026-11-27). 푸시로 보내는 알림을 메일로도 보낼지. 없으면 종류의 기본 (NoticeKind.defaultMail)
 export class NoticeSettings extends TableEntity<
   LoadedNoticeSettings,
   NoticeSettingNew & { id: string }
@@ -26,6 +27,8 @@ export class NoticeSettings extends TableEntity<
   static readonly HOURLY: NoticeSettingDigest = 'hourly';
   static readonly DAILY: NoticeSettingDigest = 'daily';
   private static readonly MINUTES_PER_DAY = 1440;
+  private static readonly ON = 'on';
+  private static readonly MAIL = ['on', 'off'];
 
   /** 아직 행이 없는 공간: 기본값, version 0. 처음 저장할 때 넣는다 */
   static absent(spaceId: string): NoticeSettings {
@@ -38,6 +41,7 @@ export class NoticeSettings extends TableEntity<
       quiet_end: null,
       time_zone: 'UTC',
       routes: {},
+      mail: {},
       version: 0,
       updated_at: new Date(0),
     });
@@ -60,6 +64,7 @@ export class NoticeSettings extends TableEntity<
       quiet_end: quietEnd = null,
       time_zone: timeZone = '',
       routes = {},
+      mail = {},
     } = settings;
     if (!ValueList.has(NOTICE_SETTING_DIGEST, digest))
       throw new RuleViolation(`묶음 간격은 ${NOTICE_SETTING_DIGEST.join(' · ')} 중 하나예요`);
@@ -76,12 +81,14 @@ export class NoticeSettings extends TableEntity<
       throw new RuleViolation('조용한 시간의 시작과 끝이 같아요');
     NoticeSettings.assertTimeZone(timeZone);
     const clean = NoticeSettings.routesOf(routes, known);
+    const mails = NoticeSettings.mailsOf(mail, known);
     this.put('digest', digest);
     this.put('digest_minute', digestMinute);
     this.put('quiet_start', quietStart);
     this.put('quiet_end', quietEnd);
     this.put('time_zone', timeZone);
     this.put('routes', clean);
+    this.put('mail', mails);
     this.put('updated_at', now);
   }
 
@@ -92,11 +99,12 @@ export class NoticeSettings extends TableEntity<
   adjust(changes: Partial<Unchecked<NoticeSettingRow>>, known: readonly string[], now: Date): void {
     const r = this.row;
     // 지금 없는 종류(지운 알림 · 끈 플러그인)의 경로는 버린다: 남기면 규칙(등록한 종류만)에 걸려 저장이 막힌다
-    const routes = Object.fromEntries(
-      Object.entries((r.routes ?? {}) as Record<string, unknown>).filter(([k]) =>
-        known.includes(k),
-      ),
-    );
+    const keep = (map: unknown) =>
+      Object.fromEntries(
+        Object.entries((map ?? {}) as Record<string, unknown>).filter(([k]) => known.includes(k)),
+      );
+    const routes = keep(r.routes);
+    const mail = keep(r.mail);
     this.configure(
       {
         digest: r.digest,
@@ -106,6 +114,7 @@ export class NoticeSettings extends TableEntity<
         time_zone: r.time_zone,
         ...changes,
         routes: { ...routes, ...((changes.routes ?? {}) as Record<string, unknown>) },
+        mail: { ...mail, ...((changes.mail ?? {}) as Record<string, unknown>) },
       },
       known,
       now,
@@ -141,6 +150,13 @@ export class NoticeSettings extends TableEntity<
     return routes[kind.kind] ?? kind.defaultRoute;
   }
 
+  /** 이 종류를 푸시로 보낼 때 메일로도 보내는가. 정하지 않았으면 종류의 기본 */
+  mailOf(kind: NoticeKind): boolean {
+    const mail = (this.row.mail ?? {}) as Record<string, string>;
+    const set = mail[kind.kind];
+    return set === undefined ? kind.defaultMail : set === NoticeSettings.ON;
+  }
+
   view(kinds: readonly NoticeKind[]): NoticeSettingsView {
     return new NoticeSettingsView(
       this.row,
@@ -149,6 +165,7 @@ export class NoticeSettings extends TableEntity<
         label: k.label,
         severity: k.severity,
         route: this.routeOf(k),
+        mail: this.mailOf(k),
       })),
     );
   }
@@ -162,6 +179,7 @@ export class NoticeSettings extends TableEntity<
         label: k.label,
         severity: k.severity,
         route: this.routeOf(k),
+        mail: this.mailOf(k),
       })),
     );
   }
@@ -188,6 +206,20 @@ export class NoticeSettings extends TableEntity<
       if (!NoticeKind.ROUTES.includes(route as NoticeRoute))
         throw new RuleViolation(`경로는 ${NoticeKind.ROUTES.join(' · ')} 중 하나예요`);
       clean[kind] = route as NoticeRoute;
+    }
+    return clean;
+  }
+
+  /** 등록한 종류만, 값은 on · off만 */
+  private static mailsOf(mail: unknown, known: readonly string[]): Record<string, string> {
+    if (typeof mail !== 'object' || mail === null || Array.isArray(mail))
+      throw new RuleViolation('메일은 종류 → on · off 모양이에요');
+    const clean: Record<string, string> = {};
+    for (const [kind, value] of Object.entries(mail)) {
+      if (!known.includes(kind)) throw new RuleViolation(`모르는 알림 종류예요: ${kind}`);
+      if (typeof value !== 'string' || !NoticeSettings.MAIL.includes(value))
+        throw new RuleViolation('메일은 on · off 중 하나예요');
+      clean[kind] = value;
     }
     return clean;
   }
