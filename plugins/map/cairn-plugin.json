@@ -84,11 +84,32 @@
     "GET /reverse": "reverse",
     "GET /usage": "usage"
   },
+  "tools": {
+    "map_geocode": {
+      "operation": "geocodeCheck",
+      "description": "앱을 만들 때 장소 주소들이 지도에서 찾아지는지 미리 본다 (지도 플러그인의 장소 · 주소 찾기, 관리자가 켠 회사). 주소마다 found · 찾은 주소(matched) · 좌표를 돌려준다. 확인용이다: 좌표를 앱 코드 · 앱 데이터에 넣지 않고 places에는 주소를 넘긴다 (회사 약관의 저장 기간). 못 찾은 주소는 고쳐서 다시 보거나 관리자에게 알린다. 찾기를 켜지 않았으면 거절된다(그때는 주소만 넘긴다). 하루 찾기 한도를 함께 쓰니 꼭 필요한 주소만 묻는다.",
+      "input": {
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "확인할 주소 (도로명 주소가 가장 잘 찾아진다). 한 번에 20개까지"
+          }
+        },
+        "required": ["addresses"]
+      }
+    }
+  },
   "menu": {
     "group": "운영",
     "name": "지도",
     "icon": "compass",
     "page": "web/MapPage.tsx"
   },
-  "uses": ["api", "menu"]
+  "uses": ["api", "tool:map_geocode", "menu"]
 }

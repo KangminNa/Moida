@@ -2,7 +2,7 @@ import { BasePlugin, type PluginContext } from '../../../apps/server/src/plugin-
 import MAPS from '../providers.json';
 import { MapLookup } from './map-lookup';
 import { MapSearchGateway } from './map-search.gateway';
-import { GeocodeAddress, MapUsage, ReverseGeocode, SearchPlaces } from './operations';
+import { GeocodeAddress, GeocodeCheck, MapUsage, ReverseGeocode, SearchPlaces } from './operations';
 
 // 지도 플러그인의 서버 (docs/지도.md MP-2): 장소 · 주소 찾기를 서버 키로 대신 부른다.
 // 그리기(브라우저용 키 · 스크립트 · 타일)는 웹(_blog/map-config.ts)이 공개 설정으로 하고, 서버 키는 여기서만 쓴다.
@@ -32,6 +32,7 @@ export default class MapPlugin extends BasePlugin {
     cairn.addOperation(new SearchPlaces(lookup, provider ?? 'none', attribution));
     cairn.addOperation(new GeocodeAddress(lookup, provider ?? 'none', attribution));
     cairn.addOperation(new ReverseGeocode(lookup, provider ?? 'none', attribution));
+    cairn.addOperation(new GeocodeCheck(lookup, provider ?? 'none', attribution));
     cairn.addOperation(new MapUsage(provider ?? 'none', ready, limit));
   }
 

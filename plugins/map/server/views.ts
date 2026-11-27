@@ -51,3 +51,28 @@ export class MapUsageView {
     return { provider: this.provider, ready: this.ready, today: this.today, limit: this.limit };
   }
 }
+
+/** 일꾼 도구 map_geocode의 답 (MCP는 snake_case): 주소마다 찾았는지 · 찾은 주소 · 좌표. 확인용이라 앱 코드에 좌표를 넣지 않는다 */
+export class GeocodeCheckView {
+  constructor(
+    private readonly results: readonly { address: string; found: MapPlace | null }[],
+    private readonly provider: string,
+    private readonly attribution: string,
+  ) {}
+
+  toJSON() {
+    return {
+      results: this.results.map(({ address, found }) => ({
+        address,
+        found: found !== null,
+        matched: found?.address ?? null,
+        lat: found?.lat ?? null,
+        lng: found?.lng ?? null,
+      })),
+      found: this.results.filter((r) => r.found !== null).length,
+      provider: this.provider,
+      attribution: this.attribution,
+      note: '확인용 결과예요. 좌표를 앱 코드 · 앱 데이터에 넣지 말고 places에 주소를 넘겨요 (지도 회사 약관의 저장 기간)',
+    };
+  }
+}
