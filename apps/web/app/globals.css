@@ -714,6 +714,19 @@ html:active-view-transition-type(flip-down)::view-transition-new(console-card) {
   margin-bottom: 6px;
 }
 
+/* 알림 칸 맨 위의 "브라우저 알림 받기" (BellPush): 칠한 면 한 줄 */
+.bell-push {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
 .bell-item {
   width: 100%;
   border: none;
@@ -1175,6 +1188,13 @@ textarea.input {
   background: var(--raised);
   color: var(--fg);
   font-size: 0.8125rem;
+}
+
+/* 내 앱의 "회원 가입을 받지 않는 중" (StoreTermsNotice): 글 + 단추 한 줄 */
+.store-terms-warn {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 /* 카드형 묶음 (플러그인, 기기) */

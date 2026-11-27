@@ -16,9 +16,22 @@ import { TaskQuery } from '../task/task.query';
 import { outputs } from '../task.schema';
 import type { OutputRow } from '../task.tables';
 import { DownloadTicket } from './download-ticket';
-import type { BeginDownloadInput, ListOutputsInput, OutputFileInput } from './output.input';
+import type {
+  BeginDownloadInput,
+  ListOutputsInput,
+  OutputFileInput,
+  OutputReadInput,
+} from './output.input';
 import { OutputPolicy } from './output.policy';
-import { DownloadTicketView, OutputPageView, OutputUsageView, OutputView } from './output.view';
+import {
+  DownloadTicketView,
+  OutputPageView,
+  OutputReadView,
+  OutputToolPageView,
+  OutputToolView,
+  OutputUsageView,
+  OutputView,
+} from './output.view';
 
 /**
  * 내려줄 결과물 파일 하나. 늘 내려받기(attachment)이고, 미리 보기(inline)는 열어도 되는 형식만이다.
@@ -72,6 +85,10 @@ export class OutputQuery extends BaseQuery {
   /** 보관함의 종류 (결과물) */
   static readonly LIBRARY_KIND = 'output';
   private static readonly PAGE = 50;
+  /** MCP list_outputs의 한 쪽 */
+  private static readonly TOOL_PAGE = 20;
+  /** get_output이 싣는 글자의 최대 (바이트). 넘으면 앞부분만 (truncated) */
+  static readonly TEXT_MAX = 200 * 1024;
 
   constructor(
     db: Database,
@@ -115,6 +132,71 @@ export class OutputQuery extends BaseQuery {
       next,
       await this.usage(spaceId),
     );
+  }
+
+  /**
+   * MCP list_outputs (바깥 AI 도구 · 일꾼, 권한 read_all, 2026-11-27): 휴지통 밖 결과물 최근부터.
+   * 결과물은 비공개 자료라 read_all이 있어야 한다. 내려받기 · 공유 · 지우기는 콘솔에서만
+   */
+  async recent(actor: Actor, req: ListOutputsInput): Promise<OutputToolPageView> {
+    actor.assertCan(Actor.READ_ALL);
+    const rows = await this.sql<(OutputRow & { task_title: string | null })[]>`
+      SELECT o.*, t.title AS task_title FROM task.outputs o
+      LEFT JOIN task.tasks t ON t.id = o.task_id
+      WHERE o.space_id = ${actor.requireSpace()} AND o.deleted_at IS NULL
+        ${req.kind === null ? this.sql`` : this.sql`AND o.kind = ${req.kind}`}
+        ${req.taskId === null ? this.sql`` : this.sql`AND o.task_id = ${req.taskId}`}
+        ${req.cursor === null ? this.sql`` : this.sql`AND o.id < ${req.cursor}`}
+      ORDER BY o.id DESC
+      LIMIT ${OutputQuery.TOOL_PAGE + 1}`;
+    const { items, next } = this.pageOf(rows, OutputQuery.TOOL_PAGE, (last) => last.id);
+    return new OutputToolPageView(
+      items.map((r) => new OutputToolView(r, r.task_title, OutputQuery.linkOf(r))),
+      next,
+    );
+  }
+
+  /** MCP get_output: 결과물 하나. 글자 형식이면 앞 TEXT_MAX 바이트까지 내용을 싣는다 */
+  async read(actor: Actor, req: OutputReadInput): Promise<OutputReadView> {
+    actor.assertCan(Actor.READ_ALL);
+    const [row] = await this.sql<(OutputRow & { task_title: string | null })[]>`
+      SELECT o.*, t.title AS task_title FROM task.outputs o
+      LEFT JOIN task.tasks t ON t.id = o.task_id
+      WHERE o.space_id = ${actor.requireSpace()} AND o.id = ${req.id} AND o.deleted_at IS NULL`;
+    if (!row) throw new NotFound('없거나 휴지통에 있는 결과물이에요');
+    const line = new OutputToolView(row, row.task_title, OutputQuery.linkOf(row));
+    if (!OutputPolicy.isText(row.mime))
+      return new OutputReadView(
+        line,
+        null,
+        false,
+        '글자 파일이 아니라 내용은 싣지 않아요. 콘솔에서 열어 주세요',
+      );
+    const head = await this.headOf(row.blob_hash);
+    return new OutputReadView(line, head, row.size_bytes > OutputQuery.TEXT_MAX, null);
+  }
+
+  /** 콘솔의 결과물 화면 (보관함 · 작업으로 거른 목록) */
+  private static linkOf(row: Pick<OutputRow, 'task_id'>): string {
+    return row.task_id ? `/admin/library/outputs?task=${row.task_id}` : '/admin/library/outputs';
+  }
+
+  /** 파일의 앞 TEXT_MAX 바이트를 UTF-8로. 잘린 끝의 반쪽 글자는 버린다 */
+  private async headOf(hash: string): Promise<string> {
+    const stream = await this.blobs.open(hash);
+    const chunks: Buffer[] = [];
+    let size = 0;
+    try {
+      for await (const chunk of stream) {
+        const part = Buffer.from(chunk as Uint8Array);
+        chunks.push(part.subarray(0, OutputQuery.TEXT_MAX - size));
+        size += Math.min(part.length, OutputQuery.TEXT_MAX - size);
+        if (size >= OutputQuery.TEXT_MAX) break;
+      }
+    } finally {
+      stream.destroy();
+    }
+    return new TextDecoder('utf-8').decode(Buffer.concat(chunks)).replace(/\uFFFD$/, '');
   }
 
   /**

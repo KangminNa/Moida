@@ -19,7 +19,12 @@ import {
 import { ProposeToolTool } from './external-tool/external-tool.tool';
 import { ReportRoundTool } from './goal-run/goal-run.tool';
 import { InboxTool } from './inbox/inbox.tool';
-import { BeginDownloadTool, BeginUploadTool } from './output/output.tool';
+import {
+  BeginDownloadTool,
+  BeginUploadTool,
+  GetOutputTool,
+  ListOutputsTool,
+} from './output/output.tool';
 import { GetSettingsTool, ProposeSettingTool } from './setting-change/setting-change.tool';
 import { AskHelpTool, DelegateTaskTool, SetPlanTool, WaitSubtasksTool } from './task/delegate.tool';
 import { AskLeadTool, ReplyWorkerTool } from './task/lead-talk.tool';
@@ -54,6 +59,8 @@ export class TaskTools {
     AiSigninTool,
     BeginUploadTool,
     BeginDownloadTool,
+    ListOutputsTool,
+    GetOutputTool,
     ReadUrlTool,
     ReportRoundTool,
     AskAgentTool,
@@ -93,6 +100,8 @@ export class TaskTools {
     aiSignin: AiSigninTool,
     beginUpload: BeginUploadTool,
     beginDownload: BeginDownloadTool,
+    listOutputs: ListOutputsTool,
+    getOutput: GetOutputTool,
     readUrl: ReadUrlTool,
     reportRound: ReportRoundTool,
     askAgent: AskAgentTool,
@@ -128,6 +137,8 @@ export class TaskTools {
       aiSignin,
       beginUpload,
       beginDownload,
+      listOutputs,
+      getOutput,
       readUrl,
       reportRound,
       askAgent,

@@ -73,6 +73,8 @@ export class ConsentView {
     readonly scopes: readonly string[],
     /** ChatGPT·Claude 앱의 연결이면 그 앱 이름 (승인 화면이 직접 시작한 연결인지 묻는다) */
     readonly app: string | null,
+    /** 관리자가 고를 권한 묶음 (이름 → 권한, 2026-11-27). 앱이 기기 모양을 요청했으면 null: scopes 그대로 */
+    readonly presets: Readonly<Record<string, readonly string[]>> | null = null,
   ) {}
 
   toJSON() {
@@ -82,6 +84,9 @@ export class ConsentView {
       name: this.name,
       scopes: [...this.scopes],
       app: this.app,
+      presets: this.presets
+        ? Object.entries(this.presets).map(([name, scopes]) => ({ name, scopes: [...scopes] }))
+        : null,
     };
   }
 }

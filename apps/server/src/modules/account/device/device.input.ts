@@ -2,6 +2,7 @@ import {
   BaseRequest,
   type ColumnReaders,
   InvalidRequest,
+  type RequestFields,
   type SecretBox,
   type Unchecked,
 } from '../../platform';
@@ -159,6 +160,8 @@ export class ConsentInput extends BaseRequest {
     readonly issuer: string,
     /** 앱이 요청한 기기 모양 (news · collect · extension). 없으면 null: 새 기기는 기본 권한 */
     readonly scopes: readonly string[] | null,
+    /** 승인 화면에서 고른 권한 묶음 (record · work · all, 2026-11-27). 보내지 않으면 null: 기본 권한 */
+    readonly preset: string | null = null,
   ) {
     super();
   }
@@ -180,7 +183,7 @@ export class ConsentInput extends BaseRequest {
     );
   }
 
-  /** raw: { request, name? } — request는 승인 화면 주소의 ?request= 값 */
+  /** raw: { request, name?, preset? } — request는 승인 화면 주소의 ?request= 값 */
   static from(raw: unknown, box: SecretBox): ConsentInput {
     return BaseRequest.read(raw, (f) => {
       const opened = box.unpack(ConsentInput.PURPOSE, f.text('request', 4000));
@@ -195,9 +198,18 @@ export class ConsentInput extends BaseRequest {
         f.optionalText('name', 60) ?? String(v.clientName ?? ''),
         String(v.issuer ?? ''),
         Array.isArray(v.scopes) ? v.scopes.map(String) : null,
+        presetOf(f),
       );
     });
   }
+}
+
+/** 고른 권한 묶음: DeviceScopes.PRESETS의 이름만 (입력은 모양만 본다: 이름 목록은 기기의 것) */
+function presetOf(f: RequestFields): string | null {
+  const preset = f.optionalText('preset', 20);
+  if (preset !== null && !['record', 'work', 'all'].includes(preset))
+    f.reject('preset', 'record · work · all 중 하나예요');
+  return preset;
 }
 
 /** 러너 추가: { requestId, name } */

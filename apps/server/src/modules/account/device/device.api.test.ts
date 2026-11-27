@@ -209,7 +209,8 @@ describe('승인 요청', () => {
 
   test('올바른 요청은 승인 화면으로. 승인 화면은 주인만 보고, 기본 권한은 올리기 + 공개 읽기', async () => {
     const clientId = await registerClient('Claude Code');
-    const res = await api.get(authorizePath(clientId, pkce().challenge));
+    const { verifier, challenge } = pkce();
+    const res = await api.get(authorizePath(clientId, challenge));
     const to = new URL(res.location ?? '');
     assert.equal(`${to.origin}${to.pathname}`, `${site}/connect`);
     const request = to.searchParams.get('request') ?? '';
@@ -221,7 +222,37 @@ describe('승인 요청', () => {
       name: 'Claude Code',
       scopes: ['upload', 'read_public'],
       app: null,
+      presets: [
+        { name: 'record', scopes: ['upload', 'read_public'] },
+        { name: 'work', scopes: ['upload', 'read_all', 'write', 'delegate', 'inbox'] },
+        { name: 'all', scopes: ['upload', 'read_all', 'tidy', 'write', 'delegate', 'inbox'] },
+      ],
     });
+    // 승인할 때 묶음을 고른다 (2026-11-27). 모르는 이름은 400, run은 어느 묶음에도 없다
+    const approve = (preset: string) =>
+      api.request('POST', '/api/connect/approve', owner, { request, name: 'preset-work', preset });
+    assert.equal((await approve('root')).status, 400);
+    const approved = await approve('work');
+    assert.equal(approved.status, 200, approved.text);
+    const token = await api.form('/oauth/token', {
+      grant_type: 'authorization_code',
+      code: new URL(String(approved.json().redirect)).searchParams.get('code') ?? '',
+      redirect_uri: REDIRECT,
+      client_id: clientId,
+      code_verifier: verifier,
+    });
+    assert.equal(token.status, 200, token.text);
+    const devices = (await api.get('/api/devices', owner)).json().devices as {
+      name: string;
+      scopes: string[];
+    }[];
+    assert.deepEqual(
+      devices
+        .find((d) => d.name === 'preset-work')
+        ?.scopes.slice()
+        .sort(),
+      ['delegate', 'inbox', 'read_all', 'upload', 'write'],
+    );
   });
 
   test('주인이 거절하면 access_denied를 붙여 돌려보낸다', async () => {
@@ -466,6 +497,7 @@ describe('소식 기기 (scope=news)', () => {
       name: 'macbook · 소식',
       scopes: ['news'],
       app: null,
+      presets: null,
     });
     const approved = await api.request('POST', '/api/connect/approve', owner, {
       request,

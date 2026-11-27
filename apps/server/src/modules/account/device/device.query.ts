@@ -14,6 +14,7 @@ import {
   OAuthAddressView,
   ProtectedResourceView,
 } from './device.view';
+import { DeviceScopes } from './device-scope.policy';
 import { OAuthClient } from './oauth-client';
 import { OAuthClientRepository } from './oauth-client.repository';
 
@@ -87,8 +88,9 @@ export class DeviceQuery extends BaseQuery {
       req.clientName,
       new URL(req.redirectUri).host,
       req.name,
-      Device.scopesFor(req.scopes),
+      DeviceScopes.of(req.scopes),
       OAuthClient.appOf(req.redirectUri),
+      DeviceScopes.profileOf(req.scopes) ? null : DeviceScopes.PRESETS,
     );
   }
 

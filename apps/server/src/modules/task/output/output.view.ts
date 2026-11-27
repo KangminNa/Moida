@@ -117,3 +117,56 @@ export class DownloadTicketView {
     };
   }
 }
+
+/**
+ * MCP list_outputs의 한 줄 (바깥 AI 도구 · 일꾼, 2026-11-27). 글자 파일은 get_output으로 내용까지 읽고,
+ * 그 밖의 파일은 관리자가 콘솔에서 받는다 (link: 콘솔의 결과물 화면)
+ */
+export class OutputToolView {
+  constructor(
+    private readonly row: Readonly<OutputRow>,
+    private readonly taskTitle: string | null,
+    private readonly link: string,
+  ) {}
+
+  toJSON() {
+    const r = this.row;
+    return {
+      output_id: r.id,
+      name: r.name,
+      kind: r.kind,
+      mime: r.mime,
+      size_bytes: r.size_bytes,
+      task_id: r.task_id,
+      task_title: this.taskTitle,
+      created_at: r.created_at.toISOString(),
+      link: this.link,
+    };
+  }
+}
+
+/** MCP list_outputs의 답 */
+export class OutputToolPageView {
+  constructor(
+    private readonly outputs: readonly OutputToolView[],
+    private readonly next: string | null,
+  ) {}
+
+  toJSON() {
+    return { outputs: this.outputs.map((o) => o.toJSON()), next_cursor: this.next };
+  }
+}
+
+/** MCP get_output의 답: 글자 파일이면 앞부분 내용(text), 아니면 null과 까닭 */
+export class OutputReadView {
+  constructor(
+    private readonly line: OutputToolView,
+    private readonly text: string | null,
+    private readonly truncated: boolean,
+    private readonly note: string | null,
+  ) {}
+
+  toJSON() {
+    return { ...this.line.toJSON(), text: this.text, truncated: this.truncated, note: this.note };
+  }
+}

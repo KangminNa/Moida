@@ -9,6 +9,7 @@ import type { AdminApp } from '../../_blog/types';
 import { useChats } from '../../_task/live';
 import { NewTabLink } from '../../_ui/NewTabLink';
 import { STORE_HREF } from '../menu';
+import { StoreTermsNotice } from './StoreTermsNotice';
 
 /** 카드의 한 줄 요약: 든 것의 수 */
 function summary(app: AdminApp): string {
@@ -46,6 +47,7 @@ export function AppsPanel() {
       <p className="note">
         대화에서 "요리 블로그 만들어 줘"처럼 맡겨도 돼요. 제안 카드를 승인하면 비공개로 만들어져요
       </p>
+      <StoreTermsNotice />
       {apps.error && <p className="error">{apps.error}</p>}
       {list === null ? (
         !apps.error && <p className="label-mono loading">불러오는 중…</p>
