@@ -3,6 +3,7 @@ import {
   type Actor,
   AttemptLimiter,
   Command,
+  DomainEvent,
   NotFound,
   Operation,
   RuleViolation,
@@ -95,6 +96,11 @@ function tokenOf(raw: unknown): TokenInput {
   return { token };
 }
 
+/** 가입자가 소식 메일을 끊었다 (코어 community가 받아 수신 동의를 지운다) */
+export function unsubscribed(spaceId: string, accountId: string): DomainEvent {
+  return new DomainEvent('plugin.email.unsubscribed', 1, spaceId, { accountId });
+}
+
 /** POST /api/p/email/confirm/:token: 확인 메일의 링크 (방문자). 그 신청의 앱들이 함께 active */
 export class Confirm extends Command<TokenInput> {
   readonly name = 'confirm';
@@ -112,7 +118,7 @@ export class Confirm extends Command<TokenInput> {
       { status: 'active', confirmed_at: new Date() },
       { token: input.token, status: 'pending' },
     );
-    return new SubscribedView(rows.map((r) => r.app_name));
+    return new SubscribedView(rows.map((r) => r.app_name ?? '소식 메일'));
   }
 }
 
@@ -127,9 +133,12 @@ export class Unsubscribe extends Command<TokenInput> {
 
   async run(work: Work, _actor: Actor, input: TokenInput): Promise<UnsubscribedView> {
     const rows = await work.rows(subscribers, { token: input.token });
-    for (const r of rows)
+    for (const r of rows) {
       await work.deleteRows(deliveries, { subscriber_id: r.id, status: 'queued' });
+      // 가입자의 소식 메일이면 코어가 계정의 수신 동의도 지운다 (내 정보와 어긋나지 않게, 2026-11-27)
+      if (r.account_id && r.space_id) work.record(unsubscribed(r.space_id, r.account_id));
+    }
     await work.deleteRows(subscribers, { token: input.token });
-    return new UnsubscribedView(rows.map((r) => r.app_name));
+    return new UnsubscribedView(rows.map((r) => r.app_name ?? '소식 메일'));
   }
 }

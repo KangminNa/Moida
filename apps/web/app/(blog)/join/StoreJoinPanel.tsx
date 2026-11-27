@@ -34,6 +34,8 @@ export function StoreJoinPanel({
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
   const [adult, setAdult] = useState(false);
+  /** 소식 메일 받기 (선택, 2026-11-27): 체크하지 않아도 가입한다 */
+  const [news, setNews] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [joined, setJoined] = useState<AccountSelf | null>(null);
   const action = useAction();
@@ -74,6 +76,7 @@ export function StoreJoinPanel({
             loginId,
             password,
             ageConfirmed: adult,
+            newsMail: news,
             ...agreedVersions(agree, true),
           }),
     );
@@ -170,6 +173,15 @@ export function StoreJoinPanel({
       ) : (
         <p className="error">아직 약관이 공개되지 않아 가입할 수 없어요</p>
       )}
+      <label className="member-check">
+        <input type="checkbox" checked={news} onChange={(e) => setNews(e.target.checked)} />
+        <span>
+          (선택) 소식 메일 받기
+          <small className="member-hint">
+            새 앱 · 소식 같은 광고성 메일이에요. 내 정보에서 언제든 끌 수 있어요
+          </small>
+        </span>
+      </label>
       {action.problem && <p className="error">{action.problem}</p>}
       <button
         className="cta"

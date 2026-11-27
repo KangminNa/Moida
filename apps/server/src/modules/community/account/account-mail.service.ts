@@ -132,6 +132,7 @@ export class AccountMailService extends BaseService {
       now,
     );
     account.agree(req.agreement.termsVersion ?? 0, req.agreement.privacyVersion ?? 0);
+    account.setNews(req.newsMail, now);
     const member = Member.enter(place.appId, account.id, req.nickname, now, now);
     member.agree(req.agreement.appTermsVersion, req.agreement.appPrivacyVersion);
     this.joins.fail(at);

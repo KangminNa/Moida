@@ -12,6 +12,9 @@
     "community.member.decided": {
       "fields": ["appId", "decisionId", "action", "memberId"]
     },
+    "community.account.news": {
+      "fields": ["accountId", "agreed"]
+    },
     "community.setting.changed": {
       "fields": ["approvalId", "outcome", "error?"]
     }

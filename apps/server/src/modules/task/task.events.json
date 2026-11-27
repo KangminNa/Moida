@@ -122,7 +122,7 @@
       "fields": ["chatId", "title", "text"]
     },
     "task.chat.said": {
-      "fields": ["chatId", "title", "kind", "taskId", "text"]
+      "fields": ["chatId", "title", "kind", "taskId", "text", "mail?"]
     },
     "task.goal_run.changed": {
       "fields": ["goalRunId", "goalId", "status", "round?"]

@@ -428,6 +428,7 @@ export interface ScheduleRow {
   after_id: string | null;
   chat_id: string | null;
   every_minutes: number | null;
+  mail: boolean;
 }
 export type ScheduleNew = Partial<ScheduleRow> & Pick<ScheduleRow, 'id' | 'space_id' | 'title' | 'mode' | 'time_zone'>;
 

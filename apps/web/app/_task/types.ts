@@ -3,8 +3,10 @@ import type {
   ShotImageView,
   ShotListView,
 } from '../../../../plugins/browser-tabs/server/click-views';
+import type { IntegrationListView } from '../../../../plugins/browser-tabs/server/integration-views';
 import type { LoginCardView } from '../../../../plugins/browser-tabs/server/login-views';
 import type { PullView, TaskAskView } from '../../../../plugins/code-github/server/views';
+import type { NewsDetailView } from '../../../../plugins/email/server/views';
 import type {
   AgentLeadView,
   AgentListView,
@@ -129,6 +131,11 @@ export type AiTest = ReturnType<AiTestView['toJSON']>;
 export type CodePull = ReturnType<PullView['toJSON']>;
 /** code-github 패키지의 코드 작업 요청 (승인 화면의 code.task.start 대상, 2026-11-15 C) */
 export type CodeAsk = ReturnType<TaskAskView['toJSON']>;
+/** email 패키지의 가입자 소식 메일 (승인 화면의 email.news.send 대상, 2026-11-27) */
+export type NewsMail = ReturnType<NewsDetailView['toJSON']>;
+/** browser-tabs 패키지의 사이트 도구 목록 (외부 도구 화면의 "만든 도구", 2026-11-27) */
+export type SiteToolList = ReturnType<IntegrationListView['toJSON']>;
+export type SiteTool = SiteToolList['integrations'][number];
 /** browser-tabs 패키지의 승인된 클릭 하나 (승인 화면이 그린다) */
 export type BrowserClick = ReturnType<ClickDetailView['toJSON']>;
 /** browser-tabs 패키지의 작업 화면 목록 · 하나 */

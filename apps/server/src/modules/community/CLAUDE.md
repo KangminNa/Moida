@@ -16,6 +16,7 @@
 - `account/`: 스토어 계정 (2026-11-26). `Account`(공간에 하나: 메일 · 아이디 · 비밀번호 해시 · 공통 약관 동의 · 정지 · 탈퇴) · 로그인(`AccountSession`, `cairn_member` 쿠키, 계정과 그 앱 도메인을 가리켜 앱에 참여하기 전에도 열림).
   규칙: 메일 `EmailAddress`(platform, 소문자로, 공간에서 하나) · 아이디 `LoginId`(영문 소문자로 시작하는 4~20자, 운영자 · 서비스로 보이는 아이디 막기, 공간에서 하나) · 둘 다 바꾸지 않고 옮겨 온 옛 계정의 빈 칸만 한 번 채운다(`setLoginId` · `setEmail`) · 비밀번호 `MemberPassword`(아이디 · 메일의 @ 앞 · 닉네임과 같은 값 막기, `passwordNames`) · 정지(`suspended_until`, 무기한은 `Account.FOREVER`)면 로그인 403 · 세션이 요청자로 안 된다 · 탈퇴(`leave`)는 메일 · 아이디 · 해시 · 마지막 접근을 지우고 모든 로그인을 끝낸다.
   `AccountMailService`: 가입 코드(`sendJoinCode`, 공통 약관이 공개 전이면 409, 가입한 메일이면 코드 대신 안내 메일) · 가입(`join`, 코드 확인 → 계정 + 이 앱 참여(`Member.enter`) + 첫 세션을 한 트랜잭션에, 약관은 `TermsConsent`) · 비밀번호 다시 정하기(`sendResetCode` · `resetPassword`, 모든 로그인 끝냄) · 옛 계정의 메일 등록(`sendEmailCode` · `setEmail`). 코드 열쇠 · 시도 제한은 공간마다. `AccountService`: 로그인(메일이나 아이디) · 비밀번호 바꾸기 · 아이디 정하기 · 계정 탈퇴(계정 → 모든 회원 잠그고 `Member.leave` · `Account.leave`) · 로그아웃 · 마지막 접근 · 관리자의 정지 · 풀기. `AccountQuery`: 관리 목록. `AccountRepository`: `load` · `lock`의 첫 값은 공간 id, 세션 넣기 · 끝내기, 마지막 접근은 계정과 그 앱의 회원에 함께.
+  소식 메일 수신 동의 (2026-11-27): 가입(`newsMail`, 선택) · 내 정보(`PUT account/news`)가 `Account.setNews`로 `news_agreed_at`을 적고 `community.account.news { accountId, agreed }`(메일 주소 없음)를 남긴다. 탈퇴도 동의를 지우고 알린다. 메일 플러그인이 받아 받는 사람 목록을 맞추고, 주소는 Lookups `news-address`(`AccountQuery.newsAddresses`, 서버 자신에게만, 동의한 탈퇴 전 계정)로 묻는다. 플러그인의 해지 링크로 끊으면 `plugin.email.unsubscribed { accountId }` → `NewsUnsubscribedHandler` → `AccountService.newsUnsubscribed`(이벤트 없이 동의만 지움)
   스토어에서 가입 (2026-11-26, `StoreJoinService` · `StoreJoinController`): 기본 도메인의 가입 화면(웹 `/join`)이 `api/store/join/code` · `api/store/join` · `GET api/store/terms/:kind`를 부른다. 계정만 만들고(`Account.create`, 앱 참여 · 세션 없음) 로그인하지 않는다: 기본 도메인에 회원 쿠키를 두지 않는 규칙 그대로. 공간은 HostGate가 기본 도메인 요청에 적는 `siteSpaceId`(`StorePlace`, 앱 도메인이면 404). 코드 · 약관 · 아이디 · 비밀번호 · 시도 제한 규칙은 앱의 가입과 같다
   `api/community`(`AccountController`): `join/code` · `join` · `login` · `password/code` · `password/reset` · `logout` · `PATCH me/password` · `PUT account/login-id` · `POST account/email/code` · `PUT account/email` · `POST account/leave`. 관리 `api/community/admin/accounts`(`AccountAdminController`: 목록 · 정지 · 풀기)
 - `member/`: 앱의 회원(`Member`) = 계정의 앱 참여(`account_id`, 앱마다 하나). 닉네임 `Nickname`(2~20자 · 운영자로 보이는 이름 막기 · 겹침 열쇠, 7일에 한 번) · 가입 대기 `Member.JOIN_WAIT_MS` · 앱마다의 차단(`blocked_until`)이면 `assertActive`가 403 · 앱 약관 동의 버전(앱이 공개했을 때만) · 나가기(`leave`: 연결 · 닉네임 · 차단 메모 · 마지막 접근을 지움, 줄은 남는다).
@@ -56,15 +57,17 @@
 | `community.content.hidden` | `appId, decisionId, reports, topicId, commentId`. 신고가 쌓여 시스템이 임시로 가림 (관리자 즉시 알림) |
 | `community.content.decided` | `appId, decisionId, action, topicId, commentId`. 관리자가 글 · 댓글을 정함 (가림 알림을 읽음으로) |
 | `community.member.decided` | `appId, decisionId, action, memberId`. 관리자가 회원을 차단 · 풀기 · 비밀번호 초기화 |
+| `community.account.news` | `accountId, agreed`. 계정의 소식 메일 수신 동의가 바뀜 (2026-11-27, 메일 플러그인이 받는다. 메일 주소는 싣지 않는다) |
 | `community.setting.changed` | 승인된 설정 제안(`app_data` · `moderation` · `terms`)을 반영함 (task가 결재 · 결과 카드에 잇는다) |
 | `task.task.requested` (task의 주제) | 신고 검토 일 요청 (`ReviewRequest`, 3-3) |
 
 ## 받는 이벤트
 - `community.report.added`(자기 이벤트): 대상의 신고를 세어 임시로 가린다 (`ReportAddedHandler`). 두 번 받아도 한 번만 가린다
+- `plugin.email.unsubscribed`: 메일의 해지 링크로 끊은 계정의 수신 동의를 지운다 (`NewsUnsubscribedHandler`, 2026-11-27)
 - `blog.app_code.shown`: 보이는 버전이 선언한 표에 맞춘다 (`AppTablesHandler`). 두 번 받아도 같다 (맞춘 버전 `applied_seq`보다 옛 것은 넘긴다)
 
 ## 써도 되는 모듈
-platform. 앱마다 남은 회원 · 앱 데이터는 Lookups `app-holdings`로 준다 (blog의 앱 지우기). blog의 앱은 platform `Lookups`로만 묻는다 (`modules.json`의 lookups.asks): `community-app`(공개된 커뮤니티 앱: 글 · 댓글 · 신고) · `member-app`(회원을 받는 공개 앱: 회원 API · 관리) · `app`(앱 데이터). 앱 도메인에서 여는 경로는 `HostGate.openPaths`로 등록한다 (`/api/community` 아래, `admin/`만 빼고 쓰기까지)
+platform. 앱마다 남은 회원 · 앱 데이터는 Lookups `app-holdings`로 준다 (blog의 앱 지우기). 소식 메일에 동의한 계정의 주소는 `news-address`로 준다 (서버 자신에게만, 메일 플러그인). blog의 앱은 platform `Lookups`로만 묻는다 (`modules.json`의 lookups.asks): `community-app`(공개된 커뮤니티 앱: 글 · 댓글 · 신고) · `member-app`(회원을 받는 공개 앱: 회원 API · 관리) · `app`(앱 데이터). 앱 도메인에서 여는 경로는 `HostGate.openPaths`로 등록한다 (`/api/community` 아래, `admin/`만 빼고 쓰기까지)
 
 ## 지켜야 할 것
 - 회원 쿠키는 앱 도메인에서만 읽고, Domain 없이 그 도메인에만 둔다. 기본 도메인(콘솔과 같은 출처)에서는 회원 API가 없는 주소와 같다. 예외는 스토어 가입(`api/store/…`, 2026-11-26) 하나: 계정만 만들고 쿠키 · 로그인은 없다

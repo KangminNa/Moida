@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type Actor, BaseQuery, Database } from '../../platform';
+import { type Actor, BaseQuery, Database, SystemActor } from '../../platform';
 import type { AccountRow } from '../community.tables';
 import { AdminPageView } from '../moderation/moderation.view';
 import type { AccountListInput } from './account.input';
@@ -41,5 +41,18 @@ export class AccountQuery extends BaseQuery {
       items.map((r) => new AccountAdminView(r)),
       next,
     );
+  }
+
+  /**
+   * 소식 메일 받는 사람의 주소 (Lookups news-address, 2026-11-27): ids(계정) 가운데 동의했고 탈퇴하지 않은 계정의 id → 메일.
+   * 서버 자신(메일 플러그인의 이벤트 처리)만 묻는다. 다른 요청자에게는 빈 답 (회원 메일을 드러내지 않는다)
+   */
+  async newsAddresses(actor: Actor, ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    if (!(actor instanceof SystemActor) || ids.length === 0) return new Map();
+    const rows = await this.sql<Pick<AccountRow, 'id' | 'email'>[]>`
+      SELECT id, email FROM community.accounts
+      WHERE id = ANY(${ids}::uuid[]) AND left_at IS NULL AND news_agreed_at IS NOT NULL
+        AND email IS NOT NULL`;
+    return new Map(rows.map((r) => [r.id, r.email ?? '']));
   }
 }

@@ -3,6 +3,7 @@ import { Task } from '../task/task';
 import type { ChatUpdateKind, ChatUpdateNew, TaskRow } from '../task.tables';
 import { ChatInspect } from './chat-inspect.policy';
 import { ChatReview } from './chat-review.policy';
+import { TurnDeliver } from './turn-deliver.policy';
 
 /** 끝난 작업과 그 작업이 속한 대화 (ChatRepository.placeOf가 위로 올라가 찾는다) */
 export type ChatPlaceRow = Pick<
@@ -20,7 +21,8 @@ export interface ChatSaid {
 export interface SettledLine {
   kind: ChatUpdateKind;
   text: string;
-  said?: string;
+  /** mail: 관리자 메일로도 (메일로 받는 자동화의 회차, 2026-11-27) */
+  said?: { text: string; mail: boolean };
 }
 
 // 대화의 소식 (task.chat_updates, 2차 1-1 · docs/API설계.md 4장 agent_updates). 무엇이 소식이 되는지 한 곳에서 정한다.
@@ -80,6 +82,14 @@ export class ChatUpdates {
       throw new RuleViolation(`소식은 작업마다 ${ChatUpdates.POST_MAX}개까지예요`);
   }
 
+  /** 덧붙인 말 하나를 더해도 되는가 (Chat.appendTo): 회차마다 APPEND_MAX개, TEXT_MAX자까지 */
+  static assertAppend(appended: number, text: string): void {
+    if (appended >= ChatUpdates.APPEND_MAX)
+      throw new RuleViolation(`덧붙인 말은 회차마다 ${ChatUpdates.APPEND_MAX}개까지예요`);
+    if (text.length > ChatUpdates.TEXT_MAX)
+      throw new RuleViolation(`덧붙인 말은 ${ChatUpdates.TEXT_MAX}자까지예요`);
+  }
+
   /** 소식의 글: 앞뒤 공백을 떼고 TEXT_MAX자로 자른다. 비었으면 RuleViolation */
   static text(raw: string): string {
     const body = raw.trim();
@@ -94,10 +104,12 @@ export class ChatUpdates {
     const error = typeof result.error === 'string' ? result.error : '';
     const root = place.id === place.root_id;
     const chat = (place.payload as { chat?: { reply?: unknown; review?: unknown } } | null)?.chat;
+    // 메일로 받는 자동화의 회차는 그 답 · 실패를 메일로도 (2026-11-27). 덧붙인 말의 답 · 검토는 아니다
+    const mail = root && TurnDeliver.mailOf(place.payload);
     if (place.status === Task.DONE) {
       if (!root) return { kind: 'member_done', text: `${place.title} — ${said || '-'}` };
       if (chat?.reply)
-        return { kind: ChatUpdates.REPLY, text: said || '-', said: ChatUpdates.said(said) };
+        return { kind: ChatUpdates.REPLY, text: said || '-', said: ChatUpdates.said(said, false) };
       // 검토의 답은 JSON 판정이라 소식에는 판정과 까닭 한 줄로 (검증 고리 V)
       if (chat?.review) {
         const line = ChatReview.line(ChatReview.parse(said));
@@ -110,19 +122,23 @@ export class ChatUpdates {
       return {
         kind: ChatUpdates.FINAL,
         text: `${ChatUpdates.cut(said || '-', 1700)}\n\n${path}`,
-        said: ChatUpdates.said(said),
+        said: ChatUpdates.said(said, mail),
       };
     }
     if (place.status === Task.FAILED) {
       if (!root) return { kind: 'member_failed', text: `${place.title} — ${error || '-'}` };
-      return { kind: 'failed', text: error || '-', said: ChatUpdates.said(error) };
+      return {
+        kind: 'failed',
+        text: error || '-',
+        said: ChatUpdates.said(error, mail),
+      };
     }
     return null;
   }
 
   /** task.chat.said의 글: 메신저 한 통(4096자)에 제목 · 링크와 함께 들어가게 앞 3500자 */
-  private static said(text: string): string {
-    return ChatUpdates.cut(text || '-', 3500);
+  private static said(text: string, mail: boolean): { text: string; mail: boolean } {
+    return { text: ChatUpdates.cut(text || '-', 3500), mail };
   }
 
   private static cut(text: string, max: number): string {

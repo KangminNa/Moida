@@ -31,6 +31,7 @@ export interface AccountRow {
   last_seen_at: Date | null;
   left_at: Date | null;
   version: number;
+  news_agreed_at: Date | null;
 }
 export type AccountNew = Partial<AccountRow> & Pick<AccountRow, 'id' | 'space_id' | 'password_hash' | 'password_changed_at' | 'age_confirmed_at'>;
 

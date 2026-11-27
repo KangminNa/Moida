@@ -48,6 +48,11 @@ export class AccountRepository extends TableRepository<AccountRow, Account> {
   }
 
   /** 아이디로 그 공간의 계정 (로그인). 탈퇴하면 아이디를 지워 찾히지 않는다 */
+  /** 탈퇴하지 않은 계정을 잠가 읽는다. 없으면 null (일꾼이 받은 이벤트의 계정) */
+  findLive(spaceId: string, id: string): Promise<Account | null> {
+    return this.findOne({ space_id: spaceId, id, left_at: null }, { lock: true });
+  }
+
   findByLogin(spaceId: string, loginId: string, lock = false): Promise<Account | null> {
     return this.findOne({ space_id: spaceId, login_id: loginId, left_at: null }, { lock });
   }

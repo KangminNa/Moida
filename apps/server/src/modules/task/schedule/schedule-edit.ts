@@ -1,5 +1,6 @@
 import {
   Actor,
+  type CodeMail,
   RuleViolation,
   type SettingChangeInput,
   type SettingShape,
@@ -39,6 +40,7 @@ export class ScheduleEdit {
       'page_id',
       'destination',
       'deliver',
+      'mail',
       'rules',
       'trigger',
       'after_id',
@@ -52,11 +54,14 @@ export class ScheduleEdit {
   constructor(
     private readonly tx: Sql,
     private readonly spaceId: string,
+    /** 메일로 받기를 켤 때 메일을 보낼 수 있는지 본다 (2026-11-27) */
+    private readonly mail: CodeMail,
   ) {}
 
   /** 새 스케줄 (아직 저장 전) */
   async open(req: CreateScheduleInput, now: Date): Promise<Schedule> {
     await this.assertRefs(req.settings);
+    if (req.settings.mail) this.mail.assertReady();
     return Schedule.open(this.spaceId, req.settings, now);
   }
 
@@ -64,6 +69,8 @@ export class ScheduleEdit {
     const schedule = await new ScheduleRepository(this.tx).lock(this.spaceId, req.id);
     schedule.assertVersion(req.version);
     await this.assertRefs(req.settings, schedule.id);
+    // 새로 켤 때만: 켜 둔 뒤 플러그인을 꺼도 다른 칸은 고칠 수 있게
+    if (req.settings.mail && !schedule.mail) this.mail.assertReady();
     schedule.configure(req.settings, now);
     return schedule;
   }

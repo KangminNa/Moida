@@ -34,10 +34,13 @@ export class TestMailbox extends BaseMailer {
     return this.sent.filter((m) => m.to === address);
   }
 
-  /** 그 주소로 온 마지막 메일의 인증코드 (6자리) */
+  /**
+   * 그 주소로 온 마지막 메일의 인증코드 (6자리). 본문의 "인증코드: 123456" 자리만 읽는다:
+   * 본문 앞의 앱 · 사이트 이름에 숫자가 여섯 자리 넘게 이어지면(data-5744378b) 그 숫자를 코드로 잘못 읽던 것 (2026-11-27)
+   */
   codeFor(address: string): string {
     const last = this.to(address).at(-1);
-    const code = last ? /(\d{6})/.exec(last.text)?.[1] : undefined;
+    const code = last ? /인증코드:\s*(\d{6})(?!\d)/.exec(last.text)?.[1] : undefined;
     assert.ok(code, `${address}로 온 인증코드가 없어요`);
     return code;
   }

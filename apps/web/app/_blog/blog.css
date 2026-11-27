@@ -1383,7 +1383,23 @@
 }
 
 .store-agree input {
-  margin-top: 3px;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+/* 구독 칸은 글자색 바탕(반전)이다: 어두운 테마에서 체크 칸 · 입력의 기본 모양이 어두운 채로 그려져
+   체크하지 않은 칸이 꽉 찬 검은 네모(체크한 것처럼)로 보이던 것 (2026-11-27). 칸 안은 밝은 테마로 그린다 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.store-subscribe, .store-mail-link) {
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="dark"] :is(.store-subscribe, .store-mail-link) {
+  color-scheme: light;
 }
 
 .store-error {
@@ -1682,4 +1698,10 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* 가입 화면의 선택 칸 아래 설명 (소식 메일 받기, 2026-11-27) */
+.member-check .member-hint {
+  display: block;
+  margin-top: 2px;
 }

@@ -11,6 +11,7 @@ const me = {
     loginId: 'reader',
     email: null,
     joinedAt: '2026-11-19T00:00:00.000Z',
+    newsMail: false,
     needs: ['email'],
     version: 1,
   },

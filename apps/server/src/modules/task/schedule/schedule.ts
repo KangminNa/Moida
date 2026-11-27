@@ -1,5 +1,4 @@
 import { BaseEntity, RuleViolation, TableEntity, type Unchecked, ValueList } from '../../platform';
-import { ChatResult } from '../chat/chat-result.policy';
 import type { Goal } from '../goal/goal';
 import { Task } from '../task/task';
 import {
@@ -13,6 +12,7 @@ import {
 } from '../task.tables';
 import { SchedulePolicy } from './schedule.policy';
 import { ScheduleView } from './schedule.view';
+import { ScheduleRecipe } from './schedule-recipe.policy';
 
 // 스케줄 하나 (task.schedules, 7단계). 정해진 시각에 지시대로 작업을 만든다. 하트비트를 넓힌 것이다.
 // 2차 5단계에서 자동화 레시피가 되었다 (새 표 없이): 언제(계기) · 누가(담당) · 무엇을(지시 · 지킬 것) · 받을 것 · 어디로.
@@ -44,7 +44,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
   static readonly TIME = 'time';
   static readonly MANUAL = 'manual';
   static readonly AFTER = 'after';
-  static readonly RULES_MAX = 2000;
+  static readonly RULES_MAX = ScheduleRecipe.RULES_MAX;
   /** 스케줄이 만든 작업의 request_id 앞부분 */
   static readonly REQUEST_PREFIX = 'schedule:';
   private static readonly MINUTES_PER_DAY = 1440;
@@ -69,6 +69,7 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
         page_id: null,
         destination: Schedule.TASK,
         deliver: null,
+        mail: false,
         rules: '',
         trigger: Schedule.TIME,
         after_id: null,
@@ -128,6 +129,11 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     return this.row.deliver;
   }
 
+  /** 회차의 답을 관리자 메일로도 받는가 (2026-11-27, 대화로 보낼 때만) */
+  get mail(): boolean {
+    return this.row.mail;
+  }
+
   /**
    * 설정을 한 번에 바꾼다. 매일이면 at_minute와 요일, N시간마다면 every_hours, N분마다면 every_minutes만 쓴다.
    * 켜면 지금 뒤의 첫 시각을 다음 시각으로 정하고, 끄면 지운다. 오늘 센 수(day_runs)는 그대로 둔다
@@ -147,22 +153,25 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
       page_id: pageId = null,
       destination = pageId === null ? Schedule.TASK : Schedule.PAGE,
       deliver = null,
+      mail = false,
       rules = '',
       trigger = Schedule.TIME,
       after_id: afterId = null,
       daily_max: dailyMax = 0,
       enabled = false,
     } = settings;
-    const recipe = this.recipeOf(
+    const recipe = ScheduleRecipe.check({
+      id: this.id,
       destination,
-      pageId,
-      agentId,
+      page_id: pageId,
+      agent_id: agentId,
       instruction,
       deliver,
+      mail,
       rules,
       trigger,
-      afterId,
-    );
+      after_id: afterId,
+    });
     const name = title.trim();
     if (name.length < 1 || name.length > Schedule.TITLE_MAX)
       throw new RuleViolation(`이름은 1~${Schedule.TITLE_MAX}자예요`);
@@ -198,49 +207,13 @@ export class Schedule extends TableEntity<ScheduleRow, ScheduleNew> {
     this.put('page_id', pageId);
     this.put('destination', recipe.destination);
     this.put('deliver', recipe.deliver);
+    this.put('mail', mail);
     this.put('rules', rules);
     this.put('trigger', recipe.trigger);
     this.put('after_id', afterId);
     this.put('daily_max', dailyMax);
     this.put('enabled', enabled);
     this.put('next_run_at', enabled && recipe.trigger === Schedule.TIME ? this.after(now) : null);
-  }
-
-  /**
-   * 레시피의 칸이 서로 맞는가: 어디로 ↔ 페이지 · 담당 · 지시, 받을 것은 대화에만, 계기 ↔ 앞 레시피.
-   * 맞으면 값 목록으로 좁힌 어디로 · 받을 것 · 계기를 돌려준다
-   */
-  private recipeOf(
-    destination: string,
-    pageId: string | null,
-    agentId: string | null,
-    instruction: string,
-    deliver: string | null,
-    rules: string,
-    trigger: string,
-    afterId: string | null,
-  ): Pick<ScheduleRow, 'destination' | 'deliver' | 'trigger'> {
-    if (!ValueList.has(SCHEDULE_DESTINATION, destination))
-      throw new RuleViolation(`어디로는 ${SCHEDULE_DESTINATION.join(' · ')} 중 하나예요`);
-    if ((destination === Schedule.PAGE) !== (pageId !== null))
-      throw new RuleViolation('페이지로 보내면 페이지를 골라요 (다른 곳이면 비워요)');
-    // 대화로 보내는 레시피는 대표가 맡는다 (O-2): 담당은 비운다
-    if (destination === Schedule.CHAT && agentId !== null)
-      throw new RuleViolation('대화로 보내는 스케줄은 대표가 맡아요 (담당을 비워요)');
-    if (destination === Schedule.CHAT && instruction.trim() === '')
-      throw new RuleViolation('대화로 보내면 지시가 있어야 해요');
-    if (deliver !== null && destination !== Schedule.CHAT)
-      throw new RuleViolation('받을 것은 대화로 보낼 때만 정해요');
-    const checked = ChatResult.deliverOf(deliver);
-    if (rules.length > Schedule.RULES_MAX)
-      throw new RuleViolation(`지킬 것은 ${Schedule.RULES_MAX}자까지예요`);
-    if (!ValueList.has(SCHEDULE_TRIGGER, trigger))
-      throw new RuleViolation(`계기는 ${SCHEDULE_TRIGGER.join(' · ')} 중 하나예요`);
-    if ((trigger === Schedule.AFTER) !== (afterId !== null))
-      throw new RuleViolation('다른 레시피 뒤에 돌리려면 그 레시피를 골라요');
-    if (afterId !== null && afterId === this.id)
-      throw new RuleViolation('자기 뒤에 돌 수는 없어요');
-    return { destination, deliver: checked, trigger };
   }
 
   /** 때가 되었는가 (켜져 있고 다음 시각이 지났다) */

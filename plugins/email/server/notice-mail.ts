@@ -35,6 +35,27 @@ export class NoticeMail {
     return new MailMessage(this.from, this.to, `[Moida] ${title}`, lines.join('\n'));
   }
 
+  /**
+   * 자동화 회차의 답 · 실패 (2026-11-27, 메일로 받기를 켠 레시피만). 답은 앞부분(코어가 자른 3500자)을 싣고
+   * 전체 · 결과물은 대화와 정리한 HTML 링크로. chatId는 UUID만 (아니면 콘솔 첫 화면)
+   */
+  answer(chatId: string, title: string, failed: boolean, text: string): MailMessage {
+    const name = title.trim() || '자동화';
+    const chat = /^[0-9a-f-]{36}$/i.test(chatId) ? `/admin/chats/${chatId}` : '/admin';
+    const lines = [
+      failed ? `못 했어요 · ${name}` : name,
+      '',
+      text,
+      '',
+      ...(failed ? [] : [`정리한 HTML: ${this.site}${chat}/report`]),
+      `대화: ${this.site}${chat}`,
+      '',
+      '이 메일은 자동화의 "메일로 받기"를 켜서 왔어요. 끄려면 콘솔 › 자동화에서 바꿔요.',
+    ];
+    const subject = failed ? `[Moida] 못 했어요 · ${name}` : `[Moida] ${name}`;
+    return new MailMessage(this.from, this.to, subject, lines.join('\n'));
+  }
+
   /** 구독 확인 메일 (두 번 확인): 스토어 화면의 확인 단추로 가는 링크. 신청하지 않았으면 무시하면 7일 뒤 지워진다 */
   confirm(address: string, token: string, apps: readonly string[]): MailMessage {
     const names = apps.join(', ');
@@ -65,6 +86,29 @@ export class NoticeMail {
         link,
         '',
         `그만 받으려면: ${this.site}/store?mail=unsubscribe&token=${token}`,
+      ].join('\n'),
+      [
+        ['List-Unsubscribe', `<${this.site}/api/p/email/unsubscribe/${token}>`],
+        ['List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'],
+      ],
+    );
+  }
+
+  /**
+   * 가입자 소식 메일 (2026-11-27): 대표가 쓰고 관리자가 승인한 제목 · 본문. 광고성 정보의 표시(정보통신망법 제50조):
+   * 제목 앞 (광고), 보낸 곳, 수신 거부 링크(본문 · 원클릭 해지 머리글 RFC 8058)
+   */
+  news(address: string, token: string, subject: string, body: string): MailMessage {
+    return new MailMessage(
+      this.from,
+      address,
+      `(광고) ${subject}`,
+      [
+        body,
+        '',
+        '---',
+        `가입할 때 소식 메일 받기에 동의해서 보내는 메일이에요. 보낸 곳: ${this.site}`,
+        `수신 거부: ${this.site}/store?mail=unsubscribe&token=${token}`,
       ].join('\n'),
       [
         ['List-Unsubscribe', `<${this.site}/api/p/email/unsubscribe/${token}>`],

@@ -34,6 +34,7 @@ export const accounts = communitySchema.table('accounts', {
   last_seen_at: timestamp('last_seen_at', { withTimezone: true }),
   left_at: timestamp('left_at', { withTimezone: true }),
   version: integer('version').notNull(),
+  news_agreed_at: timestamp('news_agreed_at', { withTimezone: true }),
 });
 
 /** community.app_tables */

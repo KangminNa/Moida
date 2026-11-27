@@ -1,4 +1,11 @@
-import { BaseEntity, Conflict, Forbidden, RuleViolation, TableEntity } from '../../platform';
+import {
+  BaseEntity,
+  Conflict,
+  DomainEvent,
+  Forbidden,
+  RuleViolation,
+  TableEntity,
+} from '../../platform';
 import type { AccountNew, AccountRow } from '../community.tables';
 import { AccountSelfView } from '../member/member.view';
 import { AccountSuspendedView } from './account.view';
@@ -11,6 +18,11 @@ import { AccountSession } from './account-session';
 export class Account extends TableEntity<AccountRow, AccountNew> {
   /** 무기한 정지의 끝 (DB의 infinity는 Date로 읽히지 않아 먼 날짜로 둔다) */
   static readonly FOREVER = new Date('9999-12-31T00:00:00Z');
+  /**
+   * 소식 메일 수신 동의가 바뀌었다 (2026-11-27): { accountId, agreed }. 메일 주소는 싣지 않는다 (outbox에 남지 않게).
+   * 메일 플러그인이 받아 받는 사람 목록을 맞추고, 주소는 Lookups news-address로 묻는다
+   */
+  static readonly NEWS = 'community.account.news';
 
   private session: AccountSession | null = null;
   /** 이번 저장에서 로그인을 끝낸다 (비밀번호 바꾸기 · 초기화 · 정지 · 탈퇴) */
@@ -103,6 +115,25 @@ export class Account extends TableEntity<AccountRow, AccountNew> {
     this.put('privacy_version', privacyVersion);
   }
 
+  /** 소식 메일을 받기로 했는가 (2026-11-27) */
+  get newsAgreed(): boolean {
+    return this.row.news_agreed_at !== null && this.row.news_agreed_at !== undefined;
+  }
+
+  /**
+   * 소식 메일 수신 동의 (가입 화면의 선택 칸 · 내 정보, 2026-11-27). 바뀔 때만 이벤트를 남긴다.
+   * notify: false면 남기지 않는다 (메일 플러그인의 해지 링크로 이미 목록에서 빠졌을 때)
+   */
+  setNews(agreed: boolean, now: Date, notify = true): void {
+    if (this.row.left_at) throw new Conflict('탈퇴한 계정이에요');
+    if (agreed === this.newsAgreed) return;
+    this.put('news_agreed_at', agreed ? now : null);
+    if (notify)
+      this.record(
+        new DomainEvent(Account.NEWS, 1, this.row.space_id, { accountId: this.id, agreed }),
+      );
+  }
+
   /** 아이디가 없는 계정(메일로 가입한 옛 회원)에 아이디를 정한다. 이미 있으면 409 (아이디는 바꾸지 않는다) */
   setLoginId(loginId: string): void {
     if (this.row.login_id) throw new Conflict('아이디는 이미 정했어요');
@@ -176,6 +207,7 @@ export class Account extends TableEntity<AccountRow, AccountNew> {
    */
   leave(now: Date): void {
     if (this.row.left_at) throw new Conflict('이미 탈퇴한 계정이에요');
+    this.setNews(false, now);
     this.put('left_at', now);
     this.put('login_id', null);
     this.put('email', null);

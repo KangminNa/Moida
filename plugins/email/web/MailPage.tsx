@@ -12,10 +12,12 @@ type Props = {
 };
 type Send = {
   id: string;
-  appName: string;
+  /** news: 가입자 소식 메일 (대화의 결과 카드에서 승인하면 나간다, 2026-11-27) */
+  kind: 'post' | 'news';
+  appName: string | null;
   title: string;
-  link: string;
-  status: 'ready' | 'sending' | 'done' | 'cancelled';
+  link: string | null;
+  status: 'draft' | 'ready' | 'sending' | 'done' | 'cancelled';
   total: number;
   sent: number;
   failed: number;
@@ -23,7 +25,9 @@ type Send = {
 };
 type Person = {
   id: string;
-  appName: string;
+  appName: string | null;
+  /** 가입 때 소식 메일을 받기로 한 계정 */
+  member: boolean;
   address: string;
   status: 'pending' | 'active';
   createdAt: string;
@@ -38,6 +42,7 @@ type Overview = {
 };
 
 const STATUS: Record<Send['status'], string> = {
+  draft: '승인 기다림',
   ready: '보내기 전',
   sending: '보내는 중',
   done: '보냄',
@@ -99,13 +104,15 @@ export default function MailPage({ call, notify }: Props) {
             {data.sends.map((s) => (
               <li key={s.id} className="panel">
                 <b>
-                  [{s.appName}] {s.title}
+                  [{s.kind === 'news' ? '가입자 소식' : s.appName}] {s.title}
                 </b>
                 <small className="note">
                   {STATUS[s.status]} · {day(s.createdAt)} ·{' '}
-                  {s.status === 'ready'
-                    ? `구독자 ${s.total}명에게 보낼 수 있어요`
-                    : `${s.sent}/${s.total}통 보냄`}
+                  {s.status === 'draft'
+                    ? `가입자 ${s.total}명 · 대화의 결과 카드에서 승인하면 나가요`
+                    : s.status === 'ready'
+                      ? `구독자 ${s.total}명에게 보낼 수 있어요`
+                      : `${s.sent}/${s.total}통 보냄`}
                   {s.failed > 0 ? ` · 실패 ${s.failed}` : ''}
                 </small>
                 {(s.status === 'ready' || s.status === 'sending') && (
@@ -159,8 +166,8 @@ export default function MailPage({ call, notify }: Props) {
               <li key={p.id} className="panel">
                 <b>{p.address}</b>
                 <small className="note">
-                  {p.appName} · {p.status === 'active' ? '구독 중' : '확인 메일 기다림'} ·{' '}
-                  {day(p.createdAt)}
+                  {p.member ? '가입자 · 소식 메일 동의' : p.appName} ·{' '}
+                  {p.status === 'active' ? '구독 중' : '확인 메일 기다림'} · {day(p.createdAt)}
                 </small>
                 <div>
                   <button

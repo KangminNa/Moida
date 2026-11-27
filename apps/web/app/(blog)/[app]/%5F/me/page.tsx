@@ -9,9 +9,10 @@ import {
 import { AccountFill } from './AccountFill';
 import { LeavePanel } from './LeavePanel';
 import { MePanel } from './MePanel';
+import { NewsMail } from './NewsMail';
 
 // 내 정보 (스토어 3-2, 앱 도메인의 /_/me): 계정 · 이 앱의 닉네임 · 비밀번호 바꾸기, 로그아웃, 가입 대기 · 차단 안내,
-// 옛 계정의 빈 아이디 · 메일 채우기, 이 앱에서 나가기 · 계정 탈퇴 (스토어 계정, 2026-11-26)
+// 옛 계정의 빈 아이디 · 메일 채우기, 소식 메일 받기(2026-11-27), 이 앱에서 나가기 · 계정 탈퇴 (스토어 계정, 2026-11-26)
 export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ app: string }> };
@@ -34,6 +35,7 @@ export default async function MePage({ params }: Props) {
         notice={writeNotice(member, true)}
       />
       <AccountFill key={`fill:${account.version}`} csrf={place.csrf} account={account} />
+      <NewsMail key={`news:${account.version}`} csrf={place.csrf} account={account} />
       <LeavePanel csrf={place.csrf} community={place.app.kind === 'community'} />
     </MemberFrame>
   );
