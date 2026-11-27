@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { type PushState, readPush, subscribePush } from '../../_lib/browser-push';
 import { api, describe } from '../../_lib/client-api';
 import type { PushKey, PushTest } from '../../_platform/types';
 import { useNotify } from '../../_ui/notify';
-
-/** 이 브라우저의 푸시 상태 */
-type PushState = 'loading' | 'unsupported' | 'denied' | 'off' | 'on' | 'stale';
 
 const STATE_LABELS: Record<PushState, string> = {
   loading: '확인 중…',
@@ -24,29 +22,7 @@ const STATE_HINTS: Partial<Record<PushState, string>> = {
   stale: '서버 키가 바뀌어 지난 구독으로는 받을 수 없어요',
 };
 
-/** base64url → 바이트 (pushManager.subscribe의 applicationServerKey) */
-function bytesOf(text: string): Uint8Array<ArrayBuffer> {
-  const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-}
-
-/** 구독이 지금 서버 키로 만든 것인가 */
-function sameKey(subscription: PushSubscription, key: string): boolean {
-  const used = subscription.options.applicationServerKey;
-  if (!used) return false;
-  const a = new Uint8Array(used);
-  const b = bytesOf(key);
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
-
-const supported = () =>
-  typeof window !== 'undefined' &&
-  'serviceWorker' in navigator &&
-  'PushManager' in window &&
-  'Notification' in window;
-
-// 이 브라우저에서 푸시 받기 (7단계). 서비스 워커(/sw.js)를 깔고, 서버의 공개 키로 구독해 서버에 맡긴다.
+// 이 브라우저에서 푸시 받기 (7단계). 구독 · 상태는 _lib/browser-push (독의 알림 칸과 함께 쓴다).
 // 서버 키를 바꾸면 공개 키가 달라져 구독이 끊긴다: 그때는 "다시 켜기".
 export function PushBox() {
   const notify = useNotify();
@@ -57,16 +33,12 @@ export function PushBox() {
   const [problem, setProblem] = useState<string | null>(null);
 
   const check = useCallback(async () => {
-    if (!supported()) return setState('unsupported');
-    if (Notification.permission === 'denied') return setState('denied');
     const reply = await api<PushKey>('GET', '/api/push/key');
     if (!reply.ok) return setProblem(describe(reply.error));
     setKey(reply.data.publicKey);
-    const registration = await navigator.serviceWorker.getRegistration('/');
-    const found = (await registration?.pushManager.getSubscription()) ?? null;
-    setSubscription(found);
-    if (!found) return setState('off');
-    setState(sameKey(found, reply.data.publicKey) ? 'on' : 'stale');
+    const found = await readPush(reply.data.publicKey);
+    setSubscription(found.subscription);
+    setState(found.state);
   }, []);
 
   useEffect(() => {
@@ -77,33 +49,11 @@ export function PushBox() {
     if (!key) return;
     setBusy(true);
     setProblem(null);
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return setState('denied');
-      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      await navigator.serviceWorker.ready;
-      // 서버 키가 바뀐 옛 구독은 브라우저와 서버 양쪽에서 지운다 (남겨 두면 실패를 다섯 번 쌓아야 지워진다)
-      const old = await registration.pushManager.getSubscription();
-      if (old) {
-        await old.unsubscribe();
-        await api('POST', '/api/push/subscriptions/delete', { endpoint: old.endpoint });
-      }
-      const made = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: bytesOf(key),
-      });
-      const reply = await api('POST', '/api/push/subscriptions', made.toJSON());
-      if (!reply.ok) {
-        await made.unsubscribe();
-        return setProblem(describe(reply.error));
-      }
-      notify('이 브라우저로 알림을 받아요');
-    } catch (error) {
-      setProblem(`알림을 켜지 못했어요: ${(error as Error).message}`);
-    } finally {
-      setBusy(false);
-      await check();
-    }
+    const reply = await subscribePush(key);
+    setBusy(false);
+    if (reply.ok) notify('이 브라우저로 알림을 받아요');
+    else setProblem(describe(reply.error));
+    await check();
   }
 
   async function turnOff() {

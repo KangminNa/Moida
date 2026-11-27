@@ -64,6 +64,10 @@ paths:
 
 - 사진을 올리는 곳은 먼저 `shrinkImage(파일, SHRINK.photo | SHRINK.icon)`(`_lib/image-shrink.ts`)로 줄인다: 긴 변 2048px(로고 · 아이콘 512px) · WebP로 다시 그려 크기를 줄이고 위치(GPS) · 기기 정보(EXIF)를 뺀다. GIF · 사진이 아닌 파일 · 읽지 못하는 파일은 그대로. 크기 한도 검사는 줄인 뒤에 한다. 만들기 일의 재료(`_task/AskForm`)는 원본 그대로 올린다 (재료는 원본이 필요할 수 있다)
 
+## 브라우저 알림 (2026-11-27)
+
+- 푸시 구독 · 상태는 `_lib/browser-push.ts` 한 곳 (설정 › 알림의 `PushBox`와 독 알림 칸의 `BellPush`가 함께 쓴다). 콘솔이 열려 있는 동안의 새 즉시 알림은 `NotificationBell`이 아래 한 줄(`useNotify`)로 알린다. 창을 닫았을 때는 서비스 워커(`/sw.js`)의 푸시가 맡는다
+
 ## 대화의 사진 (2026-11-19)
 
 - 사진은 따로 올리는 길이 없다: 파일 올리기(`POST /api/outputs/files`)로 결과물이 되고 참조(`image`)로 붙는다. 사진인지는 서버가 앞부분으로 알아본 형식(`chat-photos.ts`의 `PHOTO_TYPES`)으로 정한다.
