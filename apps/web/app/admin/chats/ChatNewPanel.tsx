@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useRef } from 'react';
 import { useMe } from '../../_account/live';
 import { api, uploadFile } from '../../_lib/client-api';
+import { SHRINK, shrinkImage } from '../../_lib/image-shrink';
 import { useAction } from '../../_lib/use-action';
 import type { Chat, OutputSaved } from '../../_task/types';
 import { ChatForm, type ChatMessageBody } from './ChatForm';
@@ -23,7 +24,9 @@ export function ChatNewPanel() {
   const name = me.data?.name;
 
   /** 파일을 올려 결과물로 만들고 참조로 넣는다 (올린 파일은 보관함의 결과물이 된다) */
-  async function upload(file: File): Promise<RefChoice | null> {
+  async function upload(picked: File): Promise<RefChoice | null> {
+    // 사진이면 줄여서 올린다 (긴 변 2048px · WebP, 위치 정보 빠짐). 사진이 아닌 파일은 그대로
+    const file = await shrinkImage(picked, SHRINK.photo);
     const reply = await uploading.run('upload', () =>
       uploadFile<OutputSaved>(
         `/api/outputs/files?name=${encodeURIComponent(file.name)}`,

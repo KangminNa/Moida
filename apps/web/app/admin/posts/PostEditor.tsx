@@ -6,9 +6,10 @@ import { Placeholder } from '@tiptap/extensions';
 import { type Editor, EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { POST_STATUS_LABELS } from '../../_blog/labels';
+import { POST_STATUS_CHOICES, POST_STATUS_DONE, POST_STATUS_LABELS } from '../../_blog/labels';
 import type { Asset, PostStatus, SavedPost } from '../../_blog/types';
 import { type ApiReply, api, describe, uploadFile } from '../../_lib/client-api';
+import { SHRINK, shrinkImage } from '../../_lib/image-shrink';
 import { useAction } from '../../_lib/use-action';
 import { SaveButton } from '../../_ui/SaveButton';
 import { useToast } from '../../_ui/useToast';
@@ -22,22 +23,9 @@ import { WikiPicker } from './WikiPicker';
 /** 서버의 이미지 본문 한도와 같다 (HttpSetup.IMAGE_LIMIT) */
 const PHOTO_MAX = 10 * 1024 * 1024;
 const PHOTO_TOO_BIG = '10MB 이하 사진만 올릴 수 있어요';
-const PHOTO_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 /** 서버의 Post.REFS_MAX와 같다 */
 const REFS_MAX = 20;
-
-const STATUSES: readonly [PostStatus, string][] = [
-  ['published', '목록에 표시'],
-  ['unlisted', '주소를 아는 사람만'],
-  ['draft', '나만'],
-];
-
-const STATUS_DONE: Record<PostStatus, string> = {
-  draft: '초안으로 돌렸어요',
-  published: '글을 공개했어요',
-  unlisted: '링크 공개로 바꿨어요',
-};
 
 const EXTENSIONS = [
   StarterKit.configure({
@@ -203,7 +191,7 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
       );
       if (!reply?.ok) return;
       setPost(reply.data);
-      showToast(STATUS_DONE[choice]);
+      showToast(POST_STATUS_DONE[choice]);
     }
     setPanel(false);
   }
@@ -232,7 +220,9 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
   }
 
   /** 사진은 글에 붙으므로 새 글이면 먼저 저장한다. 본문에는 커서 자리에 넣고, 저장은 평소처럼 */
-  async function addPhoto(file: File) {
+  async function addPhoto(picked: File) {
+    // 올리기 전에 줄인다 (긴 변 2048px · WebP, 위치 정보 빠짐): 큰 폰 사진도 한도 안으로
+    const file = await shrinkImage(picked, SHRINK.photo);
     if (file.size > PHOTO_MAX) return setError(PHOTO_TOO_BIG);
     const target = post ?? (await save());
     if (!target) return;
@@ -242,7 +232,7 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
     const reply = await uploadFile<Asset>(`/api/posts/${target.id}/assets`, file);
     setUploading(false);
     if (!reply.ok) return setError(reply.status === 413 ? PHOTO_TOO_BIG : describe(reply.error));
-    const alt = file.name.replace(/\.[^.]+$/, '');
+    const alt = picked.name.replace(/\.[^.]+$/, '');
     editor?.chain().focus().setImage({ src: reply.data.url, alt }).run();
     showToast('사진을 넣었어요');
   }
@@ -351,7 +341,7 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
         <section className="publish" aria-label="발행 설정">
           <fieldset className="publish-status">
             <legend>공개 범위</legend>
-            {STATUSES.map(([s, help]) => (
+            {POST_STATUS_CHOICES.map(([s, help]) => (
               <button
                 key={s}
                 type="button"
@@ -475,7 +465,7 @@ export function PostEditor({ initial, app }: { initial: LinkedPost | null; app: 
           ref={photoInput}
           type="file"
           className="sr"
-          accept={PHOTO_TYPES}
+          accept="image/png,image/jpeg,image/webp,image/gif"
           tabIndex={-1}
           aria-hidden="true"
           onChange={(e) => {

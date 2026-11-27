@@ -21,7 +21,7 @@
     "apps/server/src/modules/vault/change/change-op.ts": 797,
     "apps/web/app/_vault/GraphBoard.tsx": 342,
     "apps/web/app/_vault/graph-scene.ts": 701,
-    "apps/web/app/admin/posts/PostEditor.tsx": 498,
+    "apps/web/app/admin/posts/PostEditor.tsx": 489,
     "apps/web/app/admin/wiki/WikiPanel.tsx": 637,
     "plugins/code-github/server/operations.ts": 382,
     "plugins/office/web/pixel/engine/characters.ts": 303,
