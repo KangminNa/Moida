@@ -97,6 +97,9 @@ function SubscribeForm({ apps }: { apps: readonly App[] }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    // 버튼을 막아 두지 않고 무엇이 빠졌는지 말한다 (2026-11-27: 동의 칸을 못 보고 눌러도 반응이 없던 것)
+    if (picked.length === 0) return setAnswer({ ok: false, text: '받을 앱을 골라 주세요' });
+    if (!agree) return setAnswer({ ok: false, text: '아래 동의 칸에 체크해 주세요' });
     setBusy(true);
     const { ok, data } = await post('subscribe', { apps: picked, address, agree });
     setBusy(false);
@@ -137,16 +140,19 @@ function SubscribeForm({ apps }: { apps: readonly App[] }) {
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />
-          <button
-            type="submit"
-            className="store-open cta"
-            disabled={busy || picked.length === 0 || !agree}
-          >
+          <button type="submit" className="store-open cta" disabled={busy}>
             구독
           </button>
         </div>
         <label className="store-agree">
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={agree}
+            onChange={(e) => {
+              setAgree(e.target.checked);
+              setAnswer(null);
+            }}
+          />
           <span>
             메일 주소를 고른 앱의 새 글 소식을 보내는 데만 쓰는 것에 동의해요. 메일마다 해지 링크가
             있고, 해지하면 주소를 바로 지워요. 확인하지 않은 신청은 7일 뒤 지워져요
