@@ -48,6 +48,9 @@
   --field-dim-day: #56555c;
   --field-seg: #605f66;
   --field-desc: #b9b8bd;
+  /* 계정 화면 (C안 로그인 · 가입, _community/auth-field.css): 판 안의 칸을 누른 바탕 · 판의 그림자 */
+  --field-white: #ffffff;
+  --field-shadow: rgba(0, 0, 0, 0.45);
 }
 
 @media (prefers-color-scheme: dark) {

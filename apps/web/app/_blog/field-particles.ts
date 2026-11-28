@@ -1,8 +1,11 @@
 // 공통 앱 도메인 첫 화면(C안, 2026-11-27)의 점 그림. 점 수천 개가 모양(일 카드 · 이어진 컴퓨터 · 도는 고리 · 구)으로 모였다가
 // 앱 목록에서는 화면 가득 흩어진다. 마우스가 지나가면 밀려난다. 움직임을 줄이는 설정이면 돌지 않고 바로 자리를 잡는다.
-// React와 상관없는 그리기만 (AppsField가 만들고 모양을 바꾸고 멈춘다)
+// React와 상관없는 그리기만 (AppsField가 만들고 모양을 바꾸고 멈춘다).
+// 로그인 · 가입 화면(AuthField, 2026-11-28)은 'account' 모양을 왼쪽에 두고, 글자를 칠 때마다 점을 밖으로 한 번 민다(pulse)
 
-export type FieldShape = 'task' | 'nodes' | 'orbit' | 'sphere' | 'dust';
+import { accountMoves, placeAccount } from './field-account';
+
+export type FieldShape = 'task' | 'nodes' | 'orbit' | 'sphere' | 'dust' | 'account';
 
 type Dot = {
   x: number;
@@ -100,6 +103,8 @@ export class FieldParticles {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     shape: FieldShape,
+    /** 모양을 둘 쪽: 첫 화면은 오른쪽(글이 왼쪽), 로그인 · 가입은 왼쪽(판이 오른쪽) */
+    private readonly side: 'right' | 'left' = 'right',
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('캔버스를 열지 못했어요');
@@ -143,6 +148,17 @@ export class FieldParticles {
     });
   }
 
+  /** 점을 가운데에서 밖으로 한 번 민다 (s: 세기, 글자를 칠 때 0.35 · 탭을 바꿀 때 0.8). 움직임을 줄이는 설정이면 하지 않는다 */
+  pulse(s: number): void {
+    if (this.reduced) return;
+    for (const p of this.dots) {
+      const d = Math.hypot(p.x, p.y) || 1;
+      const f = (3 + p.r3 * 8) * s;
+      p.ox += (p.x / d) * f;
+      p.oy += (p.y / d) * f;
+    }
+  }
+
   /** 마우스 자리 (캔버스 기준). 밖으로 나가면 null */
   pointer(at: { x: number; y: number } | null): void {
     const r = this.canvas.getBoundingClientRect();
@@ -162,15 +178,21 @@ export class FieldParticles {
     c.width = Math.round(this.w * this.dpr);
     c.height = Math.round(this.h * this.dpr);
     const narrow = this.w < 720;
-    this.cx = narrow ? this.w * 0.5 : this.w * 0.68;
-    this.cy = narrow ? this.h * 0.36 : this.h * 0.4;
-    this.R = narrow ? Math.min(this.w * 0.34, this.h * 0.2) : Math.min(this.w * 0.2, this.h * 0.28);
+    // 모양의 가운데 · 크기 (화면 너비 · 높이의 비): [cx, cy, R을 정하는 너비 비, 높이 비]
+    const [fx, fy, rw, rh] = narrow
+      ? [0.5, 0.36, ...(this.side === 'left' ? [0.26, 0.13] : [0.34, 0.2])]
+      : this.side === 'left'
+        ? [0.3, 0.42, 0.16, 0.25]
+        : [0.68, 0.4, 0.2, 0.28];
+    [this.cx, this.cy] = [this.w * (fx ?? 0.5), this.h * (fy ?? 0.4)];
+    this.R = Math.min(this.w * (rw ?? 0.2), this.h * (rh ?? 0.28));
   }
 
   private place(p: Dot, i: number, shape: FieldShape): void {
     const t = this.t;
     if (shape === 'sphere') onSphere(p, i % 7 === 0 ? 0.4 + p.r3 * 0.5 : 0.985 + p.r3 * 0.03);
     else if (shape === 'orbit') this.orbit(p, i, t);
+    else if (shape === 'account') placeAccount(p, i, t);
     else if (shape === 'task') {
       if (i % 10 < 7) {
         const [hw, hh, cr] = [1.3, 0.82, 0.2];
@@ -232,7 +254,7 @@ export class FieldParticles {
     this.t += dt;
     const step = Math.min(2.5, dt * 60);
     const shape = this.shape;
-    const spin = shape === 'sphere' || shape === 'orbit';
+    const spin = shape === 'sphere' || shape === 'orbit' || shape === 'account';
     if (!this.reduced) {
       if (spin) this.rot += dt * 0.2;
       else {
@@ -244,9 +266,16 @@ export class FieldParticles {
     const apps = shape === 'dust';
     this.inked += ((apps ? 1 : 0) - this.inked) * Math.min(1, dt * 2.4);
     this.dim += ((apps ? 0.42 : 1) - this.dim) * Math.min(1, dt * 2.4);
-    if (shape === 'orbit' || shape === 'nodes')
+    if (shape === 'orbit' || shape === 'nodes' || shape === 'account')
       this.dots.forEach((p, i) => {
-        if (shape === 'orbit' ? i % 10 >= 3 : i % 25 >= 3 && i % 25 < 8) this.place(p, i, shape);
+        if (
+          shape === 'account'
+            ? accountMoves(i)
+            : shape === 'orbit'
+              ? i % 10 >= 3
+              : i % 25 >= 3 && i % 25 < 8
+        )
+          this.place(p, i, shape);
       });
     this.draw(step);
   }

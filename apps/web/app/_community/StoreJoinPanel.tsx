@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { StoreAppLogins } from '../../_blog/StoreJoin';
-import type { PublicApp } from '../../_blog/types';
-import { agreedVersions, TermsAgree } from '../../_community/TermsAgree';
-import type { AccountSelf, Term } from '../../_community/types';
-import { type ApiReply, api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
+import { StoreAppLogins } from '../_blog/StoreJoin';
+import type { PublicApp } from '../_blog/types';
+import { type ApiReply, api } from '../_lib/client-api';
+import { useAction } from '../_lib/use-action';
+import { agreedVersions, TermsAgree } from './TermsAgree';
+import type { AccountSelf, Term } from './types';
 
 /** 비밀번호 확인이 다를 때: 서버에 보내지 않는다 */
 const MISMATCH: ApiReply<AccountSelf> = {
@@ -17,15 +17,19 @@ const MISMATCH: ApiReply<AccountSelf> = {
 
 // 스토어 가입 칸 (2026-11-26): 앱의 가입(/_/join)과 같은 칸에서 닉네임만 뺐다 (닉네임은 앱마다, 앱에 처음 들어갈 때 정한다).
 // 메일 → "코드 받기" → 6자리 · 아이디 · 비밀번호 · 만 14세 확인 · 공통 약관 동의. 가입한 메일이어도 답은 같다 (그 메일로 안내가 간다).
-// 끝나면 로그인하지 않은 채 "로그인할 앱" 목록을 보인다: 회원 로그인은 앱 도메인에서만 열린다
+// 끝나면 로그인하지 않은 채 "로그인할 앱" 목록을 보인다: 회원 로그인은 앱 도메인에서만 열린다.
+// 공통 앱 도메인의 C안 화면(AuthTabs, 2026-11-28)은 onJoined로 받아 로그인 탭으로 넘긴다 (앱 목록은 보이지 않는다)
 export function StoreJoinPanel({
   apps,
   terms,
   privacy,
+  onJoined,
 }: {
   apps: readonly PublicApp[];
   terms: Term | null;
   privacy: Term | null;
+  /** 가입한 뒤 (공통 앱 도메인: 로그인 탭으로) */
+  onJoined?: (loginId: string) => void;
 }) {
   const [email, setEmail] = useState('');
   const [loginId, setLoginId] = useState('');
@@ -80,7 +84,9 @@ export function StoreJoinPanel({
             ...agreedVersions(agree, true),
           }),
     );
-    if (reply?.ok) setJoined(reply.data);
+    if (!reply?.ok) return;
+    if (onJoined) onJoined(reply.data.loginId ?? loginId);
+    else setJoined(reply.data);
   }
 
   return (
@@ -192,8 +198,12 @@ export function StoreJoinPanel({
       >
         {busy ? '가입하는 중' : '가입'}
       </button>
-      <p className="member-hint">이미 가입했으면 아래 앱에서 같은 계정으로 로그인해요</p>
-      <StoreAppLogins apps={apps} />
+      {!onJoined && (
+        <>
+          <p className="member-hint">이미 가입했으면 아래 앱에서 같은 계정으로 로그인해요</p>
+          <StoreAppLogins apps={apps} />
+        </>
+      )}
     </form>
   );
 }

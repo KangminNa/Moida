@@ -1,22 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import type { AccountSelf } from '../../_community/types';
-import { api } from '../../_lib/client-api';
-import { useAction } from '../../_lib/use-action';
+import { api } from '../_lib/client-api';
+import { useAction } from '../_lib/use-action';
+import type { AccountSelf } from './types';
 
 // 앱 없는 로그인 칸 (2026-11-27): 메일이나 아이디 + 비밀번호. 틀리면 서버가 늘 같은 문구로 답한다 (계정이 있는지 알려 주지 않는다).
-// 로그인하면 이 도메인의 모든 앱에서 로그인돼 있다. 앱의 닉네임은 그 앱에 처음 들어갈 때 정한다
+// 로그인하면 이 도메인의 모든 앱에서 로그인돼 있다. 앱의 닉네임은 그 앱에 처음 들어갈 때 정한다.
+// C안 화면(AuthTabs, 2026-11-28)에서는 가입이 옆 탭이라 아래 줄에 비밀번호 다시 정하기만 둔다
 export function SharedLoginPanel({
   csrf,
   returnTo,
   resetHref,
+  initialLogin = '',
+  notice = null,
 }: {
   csrf: string | null;
   returnTo: string;
-  resetHref: string | null;
+  resetHref: string;
+  /** 방금 가입한 아이디처럼 처음부터 채울 값 */
+  initialLogin?: string;
+  /** 칸 위의 안내 한 줄 (가입 뒤) */
+  notice?: string | null;
 }) {
-  const [login, setLogin] = useState('');
+  const [login, setLogin] = useState(initialLogin);
   const [password, setPassword] = useState('');
   const action = useAction();
   const busy = action.busy !== null;
@@ -36,6 +43,11 @@ export function SharedLoginPanel({
 
   return (
     <form className="member-form" onSubmit={submit}>
+      {notice && (
+        <p className="note" role="status">
+          {notice}
+        </p>
+      )}
       <label className="field">
         <span>메일 또는 아이디</span>
         <input
@@ -65,13 +77,7 @@ export function SharedLoginPanel({
         {busy ? '확인하는 중' : '로그인'}
       </button>
       <p className="member-hint">
-        처음이면 <a href="/join">가입</a>.
-        {resetHref && (
-          <>
-            {' '}
-            비밀번호를 잊었으면 <a href={resetHref}>메일로 다시 정하기</a>.
-          </>
-        )}
+        <a href={resetHref}>비밀번호 다시 정하기</a>
       </p>
     </form>
   );
