@@ -252,7 +252,7 @@ export interface SiteRow {
 export type SiteNew = Partial<SiteRow> & Pick<SiteRow, 'id' | 'space_id' | 'name' | 'start_url' | 'origins'>;
 
 /** browser_tabs.suggestions.status (값 목록 CHECK) */
-export const SUGGESTION_STATUS = ['open', 'dismissed', 'made'] as const;
+export const SUGGESTION_STATUS = ['open', 'dismissed', 'made', 'failed'] as const;
 export type SuggestionStatus = (typeof SUGGESTION_STATUS)[number];
 /** browser_tabs.suggestions */
 export interface SuggestionRow {
@@ -269,5 +269,7 @@ export interface SuggestionRow {
   updated_at: Date;
   version: number;
   note: string;
+  failed_at: Date | null;
+  fail_reason: string;
 }
 export type SuggestionNew = Partial<SuggestionRow> & Pick<SuggestionRow, 'id' | 'space_id' | 'site_id' | 'key' | 'count' | 'sample'>;

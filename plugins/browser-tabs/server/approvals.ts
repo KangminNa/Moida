@@ -141,7 +141,7 @@ export class ApprovalDecided extends Command<DecidedInput> {
   }
 }
 
-type SettledInput = { taskId: string; status: string; spaceId: string };
+type SettledInput = { taskId: string; status: string; spaceId: string; error: string | null };
 
 /** task.task.changed: 실패 · 취소로 끝난 작업의 열린 클릭(붙잡음 · 승인됨)을 닫는다. 끝난 작업의 누르기 계획도 닫는다 */
 export class TaskSettled extends Command<SettledInput> {
@@ -155,6 +155,7 @@ export class TaskSettled extends Command<SettledInput> {
       taskId: f.uuid('taskId'),
       status: f.text('status', 20),
       spaceId: f.uuid('spaceId'),
+      error: f.optionalText('error', 1000),
     }));
   }
 
@@ -163,7 +164,7 @@ export class TaskSettled extends Command<SettledInput> {
     await dropOldShots(work, input.spaceId);
     const planned = await settlePlans(work, input.taskId, true);
     if (!TaskSettled.ENDED.includes(input.status)) return new ConfirmedView(planned);
-    const built = await buildSettled(work, input.spaceId, input.taskId);
+    const built = await buildSettled(work, input.spaceId, input.taskId, input.error);
     const open = await work.rows(clicks, {
       space_id: input.spaceId,
       task_id: input.taskId,

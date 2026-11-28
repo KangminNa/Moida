@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { OutboxWorker } from '../modules/platform';
+import { Database, OutboxWorker } from '../modules/platform';
 import { ApiClient, TestUser } from './api-client';
 
 // 기능 패키지 browser-tabs의 사이트 도구 (2026-11-16 MCP 2단계, docs/MCP.md 6장).
@@ -432,6 +432,75 @@ describe('사이트 도구: 되풀이되는 일 (MCP 3단계)', () => {
     );
     await repeat('051910');
     assert.deepEqual(await mineOf(), []);
+  });
+
+  test('굳히기가 실패하면 "못 만듦: 까닭"으로 남고 30일 동안 다시 굳히지 않는다. 30일 뒤에는 같은 도구를 다시 굳힌다 (C4)', async () => {
+    const browseAgent = await newAgent('되풀이 담당 3');
+    const site = ok(
+      await api.request('POST', `${BASE}/sites`, owner, { ...SITE, name: '되풀이 3' }),
+    );
+    const repeat = async (code: string) => {
+      ok(
+        await api.request('POST', `${BASE}/sites/${site.id}/tasks`, owner, {
+          requestId: randomUUID(),
+          instruction: `${code} 오늘 거래량 알려줘`,
+          agentId: browseAgent,
+        }),
+      );
+      await drain();
+      const job = await leased('되풀이 3');
+      await tool(runner, 'browser_job', { task_id: (job.task as Json).id });
+    };
+    const mineOf = async () =>
+      (
+        ok(await api.get(`${BASE}/integrations`, owner)) as { integrations: Json[] }
+      ).integrations.filter((t) => t.siteId === site.id);
+    const suggestionOf = async () =>
+      (ok(await api.get(`${BASE}/suggestions`, owner)) as { suggestions: Json[] }).suggestions.find(
+        (s) => s.siteId === site.id,
+      );
+    for (const code of ['005930', '000660', '035720']) await repeat(code);
+    const [made] = await mineOf();
+    assert.equal(made?.status, 'building');
+
+    // 굳히기 작업이 실패로 끝난다: 도구는 꺼지고 제안은 못 만듦 (까닭은 작업의 실패 글)
+    await drain();
+    const build = await leased('도구 만들기: 되풀이 3');
+    await tool(runner, 'browser_job', { task_id: (build.task as Json).id });
+    const failed = await tool(runner, 'submit_result', {
+      task_id: (build.task as Json).id,
+      request_id: randomUUID(),
+      status: 'failed',
+      error: '로그인 화면만 보여요',
+    });
+    assert.equal(failed.ok, true, JSON.stringify(failed.body));
+    await drain();
+    const [off] = await mineOf();
+    assert.equal(off?.status, 'off');
+    const failedSuggestion = await suggestionOf();
+    assert.equal(failedSuggestion?.status, 'failed');
+    assert.equal(failedSuggestion?.failReason, '로그인 화면만 보여요');
+    const days = (Date.parse(String(failedSuggestion?.retryAt)) - Date.now()) / 86_400_000;
+    assert.ok(days > 29 && days <= 30, `30일 뒤 다시: ${days}`);
+
+    // 30일 안에 또 되풀이돼도 다시 굳히지 않는다 (그 일은 브라우저로)
+    await repeat('051910');
+    assert.deepEqual(
+      (await mineOf()).map((t) => t.status),
+      ['off'],
+    );
+
+    // 30일이 지나 다시 되풀이되면 꺼 둔 같은 도구를 다시 굳힌다 (새 도구를 늘리지 않는다)
+    await api.service(Database).sql`
+      UPDATE browser_tabs.suggestions SET failed_at = now() - interval '31 days'
+      WHERE site_id = ${String(site.id)}`;
+    await repeat('068270');
+    const again = await mineOf();
+    assert.deepEqual(
+      again.map((t) => [t.id, t.status]),
+      [[off?.id, 'building']],
+    );
+    assert.equal(await suggestionOf(), undefined, '다시 굳히기 시작했으면 제안은 닫힘');
   });
 });
 

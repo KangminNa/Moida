@@ -93,6 +93,10 @@ export type Suggestion = {
   sample: string;
   /** 승인한 누르기 계획에서 기록한 쓰기 API로 바로 낸 제안이면 그 까닭. 되풀이 제안은 빈 글 */
   note: string;
+  /** open · failed (못 만듦, C4): 굳히기가 실패해 까닭(failReason)을 남기고 retryAt까지 다시 굳히지 않는다 */
+  status: string;
+  failReason: string;
+  retryAt: string | null;
   version: number;
   lastSeenAt: string;
 };
