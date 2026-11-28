@@ -7,12 +7,16 @@ import { AgentUser } from './agent-user';
 import { ClaudeCli } from './claude-cli';
 import { Job } from './job';
 import { Json } from './json';
-import { MakeMaterials, MakeStage } from './make-stage';
+import { MakeMaterials } from './make-materials';
+import { MakeStage } from './make-stage';
 import type { MoidaServer } from './moida-server';
 import { PageBase } from './page-base';
 import { PromptPack } from './prompt-pack';
 import { Redactor, RunLog } from './redactor';
 import { RunnerConfig } from './runner-config';
+
+// 결과 화면 찍기는 result-shots.test에서 본다. 여기서는 꺼서 이 컴퓨터에 Chromium이 있어도 검사 목록이 같게 한다
+process.env.MOIDA_SHOT_CHROMIUM = 'off';
 
 // 만들기 작업의 재료 읽기 (서버가 걸렀어도 지시문 · 도구 입력에 쓰기 전에 다시 본다)와 일의 모양.
 
@@ -223,7 +227,7 @@ describe('만들기 작업의 검사 (검증 고리 V)', () => {
     try {
       assert.equal(await stage.prepare(new AbortController().signal, () => {}, redactor), null);
       await made(stage.workspaceRoom?.outputsDir ?? '');
-      return (await stage.check()).map((c) => ({
+      return (await stage.check(new AbortController().signal, () => {})).map((c) => ({
         name: c.name,
         ok: c.ok,
         how: c.how,

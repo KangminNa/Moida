@@ -76,6 +76,8 @@ class RunnerProcess {
           MOIDA_RUNNER_CLI: FAKE_CLI,
           MOIDA_RUNNER_CODEX_CLI: FAKE_CODEX,
           CLAUDE_CODE_OAUTH_TOKEN: OAUTH_TOKEN,
+          // 결과 화면 찍기는 result-shots.test가 본다. Chromium이 있는 컴퓨터에서도 만들기 일의 검사 목록이 같게 끈다
+          MOIDA_SHOT_CHROMIUM: 'off',
           ...env,
         } as NodeJS.ProcessEnv,
         stdio: ['ignore', 'pipe', 'pipe'],

@@ -6,6 +6,7 @@ import { AppManifestCheck } from './app-manifest-check';
 import { DesignCheck } from './design-check';
 import { DesignDocCheck } from './design-doc-check';
 import type { Job } from './job';
+import { MakeMaterials } from './make-materials';
 import {
   MaterialBroken,
   MaterialDownloader,
@@ -19,37 +20,14 @@ import type { PageBase } from './page-base';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
+import { ResultShots } from './result-shots';
 import { RunEnding } from './run-ending';
 import type { RunnerConfig } from './runner-config';
 import { SandboxRoom } from './sandbox-room';
 import type { SandboxStage } from './sandbox-stage';
+import { ShotBundle } from './shot-bundle';
 import { StageCheck } from './stage-check';
 import { ZipIndex } from './zip-index';
-
-/** 만들기 작업의 재료 id (payload.make). 서버가 이미 걸렀지만 지시문 · 도구 입력에 쓰기 전에 모양을 다시 본다 */
-export class MakeMaterials {
-  private static readonly UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-  private static readonly MAX = 10;
-
-  private constructor(
-    readonly outputs: readonly string[],
-    readonly wikis: readonly string[],
-  ) {}
-
-  static from(payload: unknown): MakeMaterials {
-    const make = (typeof payload === 'object' && payload !== null ? payload : {}) as {
-      outputs?: unknown;
-      wikis?: unknown;
-    };
-    return new MakeMaterials(MakeMaterials.ids(make.outputs), MakeMaterials.ids(make.wikis));
-  }
-
-  private static ids(raw: unknown): string[] {
-    if (!Array.isArray(raw)) return [];
-    const ids = raw.filter((v): v is string => typeof v === 'string' && MakeMaterials.UUID.test(v));
-    return [...new Set(ids)].slice(0, MakeMaterials.MAX);
-  }
-}
 
 // 만들기 작업의 앞뒤 (결과물 2차). 칸 안에서 AI가 셸로 PPT · 문서 · 영상을 만들어 outputs/에 두면 JobRun이 결과물로 올린다.
 //   앞: 자리 → 고칠 페이지의 지금 판(page_base, 글 파일을 inputs/page/에) · 고칠 앱의 지금 코드(app_code_base, inputs/app/에)
@@ -233,7 +211,7 @@ export class MakeStage implements SandboxStage {
    * 새 페이지를 만드는 일이면 문(index.html)도 (고치는 일은 바뀐 파일만 내도 된다: 서버의 PageOrder.refusal).
    * 앱 코드 일이면 받은 코드 위에 얹은 묶음 · 템플릿 (AppCodeCheck). 그 밖에는 목록만 읽고 파일은 열지 않는다
    */
-  async check(): Promise<StageCheck[]> {
+  async check(signal: AbortSignal, note: (event: RunEvent) => void): Promise<StageCheck[]> {
     if (this.room === null) return [];
     const dir = this.room.outputsDir;
     // 목록 · 크기는 agent 권한으로 읽는다 (칸의 러너는 agent의 700 폴더를 직접 읽지 못한다)
@@ -248,13 +226,20 @@ export class MakeStage implements SandboxStage {
     const checks = [
       StageCheck.seen('결과물 파일', made, made ? `${names.length}개` : '없음', none),
     ];
-    if (this.app !== null)
-      return [...checks, ...(await this.codeChecks(this.app.code, dir, files))];
-    if (!this.job.page || this.base !== null) return checks;
-    const entry = names.includes(MakeStage.ENTRY);
-    const why = `새 페이지는 ${dir}/${MakeStage.ENTRY}가 문이에요. 없으면 페이지가 되지 않아요`;
-    checks.push(StageCheck.seen(MakeStage.ENTRY, entry, entry ? '있음' : '없음', why));
-    return checks;
+    if (this.app !== null) checks.push(...(await this.codeChecks(this.app.code, dir, files)));
+    else if (this.job.page && this.base === null) {
+      const entry = names.includes(MakeStage.ENTRY);
+      const why = `새 페이지는 ${dir}/${MakeStage.ENTRY}가 문이에요. 없으면 페이지가 되지 않아요`;
+      checks.push(StageCheck.seen(MakeStage.ENTRY, entry, entry ? '있음' : '없음', why));
+    }
+    if (!made) return checks;
+    // 결과 화면 찍기 · 참고 화면과 비교 (2026-11-28): 앞 버전 위에 낸 파일을 얹은 묶음을 찍는다
+    const base = this.app ? { app: this.app.code } : this.base ? { page: this.base.page } : null;
+    const bundle = await ShotBundle.gather(this.agent, dir, files, base);
+    return [
+      ...checks,
+      ...(await new ResultShots(this.agent, this.room).checks(bundle, signal, note)),
+    ];
   }
 
   /**
