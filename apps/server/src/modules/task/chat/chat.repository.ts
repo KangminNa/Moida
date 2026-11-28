@@ -4,6 +4,7 @@ import { chats, chatUpdates } from '../task.schema';
 import type { ChatRow, TaskRow } from '../task.tables';
 import { Chat } from './chat';
 import { ChatHistory, type ChatTurnRow } from './chat-history.policy';
+import type { PlanChildRow } from './chat-plan.policy';
 import { ChatRequest } from './chat-request.policy';
 import type { ChatTurnStateRow } from './chat-result.policy';
 import { type ChatPlaceRow, ChatUpdates } from './chat-update.policy';
@@ -98,6 +99,33 @@ export class ChatRepository extends TableRepository<ChatRow, Chat> {
       JOIN task.tasks root ON root.id = top.id
       WHERE t.id = ${taskId} AND root.payload->'chat'->>'chatId' IS NOT NULL`;
     return row ?? null;
+  }
+
+  /**
+   * 계획 판단(D3, ChatPlan)에 쓸 것: 위 작업의 상태 · payload, 바로 아래 하위 작업과 받은 일꾼의 이름, 공간의 일꾼 이름
+   * (앞 단계를 기다리는 하위 작업의 일꾼), 이 작업이 앞서 남긴 계획 판단의 수(planned 중 가장 큰 것)
+   */
+  async planOf(spaceId: string, taskId: string) {
+    const [parent] = await this.sql<
+      Pick<TaskRow, 'status' | 'wait_reason' | 'payload' | 'agent_id'>[]
+    >`
+      SELECT status, wait_reason, payload, agent_id FROM task.tasks
+      WHERE space_id = ${spaceId} AND id = ${taskId}`;
+    const children = await this.sql<PlanChildRow[]>`
+      SELECT t.title, t.agent_id, a.name AS agent_name FROM task.tasks t
+      LEFT JOIN task.agents a ON a.id = t.agent_id
+      WHERE t.parent_id = ${taskId} ORDER BY t.created_at, t.id`;
+    const agents = await this.sql<{ id: string; name: string }[]>`
+      SELECT id, name FROM task.agents WHERE space_id = ${spaceId}`;
+    const [noted] = await this.sql<{ n: number }[]>`
+      SELECT coalesce(max((data->>'planned')::int), 0) AS n FROM task.chat_updates
+      WHERE task_id = ${taskId} AND kind = 'decision' AND data ? 'planned'`;
+    return {
+      parent: parent ?? null,
+      children,
+      names: new Map(agents.map((a) => [a.id, a.name])),
+      noted: noted?.n ?? 0,
+    };
   }
 
   /** 이 회차 작업의 바로 앞 회차의 payload (목표 확인 질문을 했는가, TurnBrief). 첫 회차 · 앞 회차가 없으면 null */

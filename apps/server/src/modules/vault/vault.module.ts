@@ -30,7 +30,10 @@ import {
   SearchSessionsTool,
 } from './session/session.tool';
 import { ReadTranscriptTool, SaveNoteTool, SaveTranscriptTool } from './session/transcript.tool';
+import { WorkSessionQuery } from './session/work-session.query';
+import { FlowSettledHandler } from './tidy/flow-settled.handler';
 import { TidyController } from './tidy/tidy.api';
+import { FlowEventInput } from './tidy/tidy.input';
 import { TidyQuery } from './tidy/tidy.query';
 import { TidyService } from './tidy/tidy.service';
 import { TidyDailyJob } from './tidy/tidy-daily.job';
@@ -58,6 +61,7 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
     VaultSettings,
     SessionService,
     SessionQuery,
+    WorkSessionQuery,
     SaveSessionTool,
     CheckSessionTool,
     SearchSessionsTool,
@@ -83,6 +87,7 @@ import { WikiStaleJob } from './wiki-score/wiki-stale.job';
     TidyQuery,
     TidyService,
     TidyRequestHandler,
+    FlowSettledHandler,
     TidyDailyJob,
     PostMarkService,
     PostMarkHandler,
@@ -111,6 +116,7 @@ export class VaultModule implements OnModuleInit {
   constructor(
     private readonly workers: CoreWorkers,
     private readonly tidy: TidyRequestHandler,
+    private readonly flowSettled: FlowSettledHandler,
     private readonly tidyDaily: TidyDailyJob,
     private readonly postMarks: PostMarkHandler,
     private readonly appMarks: AppMarkHandler,
@@ -127,6 +133,9 @@ export class VaultModule implements OnModuleInit {
   onModuleInit(): void {
     EventCatalog.define('vault', events);
     this.workers.on('vault.session.saved', this.tidy);
+    // 끝난 요청의 작업 세션을 wiki 정리에 (S2): 맨 위 작업이 끝나거나 결과 카드를 정했을 때
+    this.workers.on(FlowEventInput.TASK_CHANGED, this.flowSettled);
+    for (const topic of FlowEventInput.APPROVAL_TOPICS) this.workers.on(topic, this.flowSettled);
     // 모듈 사이 읽기 (리팩토링 R3b): blog가 글의 wiki · 스크랩의 세션을 vault를 가져오지 않고 확인한다
     this.lookups.provide('wiki', (a, ids) => this.postWikis.visible(a, ids));
     this.lookups.provide('session', (a, ids) => this.sessions.titles(a, ids));

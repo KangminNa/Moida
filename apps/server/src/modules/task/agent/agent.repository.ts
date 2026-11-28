@@ -208,4 +208,13 @@ export class AgentRepository extends TableRepository<AgentRow, Agent> {
         AND e.at >= date_trunc('month', ${now}::timestamptz)`;
     return row?.used ?? 0;
   }
+
+  /** 에이전트마다 지금 쥔 일(대기 · 실행)의 수 (D3, 담당을 비운 위임에서 덜 바쁜 일꾼을 고른다) */
+  async loads(spaceId: string): Promise<ReadonlyMap<string, number>> {
+    const rows = await this.sql<{ agent_id: string; n: number }[]>`
+      SELECT agent_id, count(*)::int AS n FROM task.tasks
+      WHERE space_id = ${spaceId} AND agent_id IS NOT NULL AND status IN ('queued', 'running')
+      GROUP BY agent_id`;
+    return new Map(rows.map((r) => [r.agent_id, r.n]));
+  }
 }

@@ -59,10 +59,10 @@ export class TidyQuery extends BaseQuery {
   async daily(actor: Actor, spaceId: string): Promise<readonly TidySessionRow[]> {
     actor.assertCan(Actor.TIDY);
     return this.sql<TidySessionRow[]>`
-      SELECT s.node_id, s.head_title, s.revision_count, s.version
+      SELECT s.node_id, s.head_title, ${this.ready()} AS revision_count, s.version
       FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
       WHERE s.space_id = ${spaceId} AND n.deleted_at IS NULL
-        AND s.tidy_requested_seq < s.revision_count AND s.tool <> ${Session.AGENT_TOOL}
+        AND s.tidy_requested_seq < ${this.ready()}
       ORDER BY s.node_id
       LIMIT ${TidyQuery.DAILY_BATCH}`;
   }
@@ -81,7 +81,7 @@ export class TidyQuery extends BaseQuery {
   async backlog(actor: Actor): Promise<readonly TidySessionRow[]> {
     actor.assertOwner();
     return this.sql<TidySessionRow[]>`
-      SELECT s.node_id, s.head_title, s.revision_count, s.version
+      SELECT s.node_id, s.head_title, ${this.ready()} AS revision_count, s.version
       FROM vault.sessions s JOIN vault.nodes n ON n.id = s.node_id
       WHERE ${this.waiting(actor)}
       ORDER BY s.node_id
@@ -99,11 +99,19 @@ export class TidyQuery extends BaseQuery {
   }
 
   /**
-   * 대표 wiki가 없고, 지금 판의 정리를 아직 요청하지 않은 세션. 요청한 뒤에 실패한 세션은 새 판이 쌓여야 돌아온다.
-   * 작업 세션(에이전트 실행의 기록)은 아직 정리하지 않는다: 끝난 요청만 정리하는 길은 S2 (기획서 결정 2026-11-17)
+   * 대표 wiki가 없고, 정리할 판의 정리를 아직 요청하지 않은 세션. 요청한 뒤에 실패한 세션은 새 판이 쌓여야 돌아온다.
    */
   private waiting(actor: Actor) {
     return this.sql`s.space_id = ${actor.spaceId} AND s.wiki_id IS NULL AND n.deleted_at IS NULL
-      AND s.tidy_requested_seq < s.revision_count AND s.tool <> ${Session.AGENT_TOOL}`;
+      AND s.tidy_requested_seq < ${this.ready()}`;
+  }
+
+  /**
+   * 정리할 판: 사람의 AI 도구 세션은 지금 판, 작업 세션(에이전트 실행의 기록)은 끝난 요청까지의 판(settled_seq, S2).
+   * 기획서 결정 2026-11-17: wiki 정리는 끝난 요청만, 취소 · 반려된 요청은 원문으로만. 일 요청의 requestId도 이 번호다
+   */
+  private ready() {
+    return this
+      .sql`(CASE WHEN s.tool = ${Session.AGENT_TOOL} THEN s.settled_seq ELSE s.revision_count END)`;
   }
 }

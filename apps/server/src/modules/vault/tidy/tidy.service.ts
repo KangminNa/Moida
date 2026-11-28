@@ -3,13 +3,14 @@ import {
   Actor,
   Database,
   EntityService,
+  Leases,
   SettingActor,
   type SettingChangeInput,
   SettingOutcome,
   type Sql,
 } from '../../platform';
 import { SessionRepository } from '../session/session.repository';
-import type { SaveTidySettingsInput, SessionSavedInput } from './tidy.input';
+import type { FlowEventInput, SaveTidySettingsInput, SessionSavedInput } from './tidy.input';
 import { TidyQuery } from './tidy.query';
 import { TidyBacklogView, type TidySettingsView } from './tidy.view';
 import { TidyEdit } from './tidy-edit';
@@ -24,6 +25,7 @@ export class TidyService extends EntityService<TidySettings> {
   constructor(
     db: Database,
     private readonly query: TidyQuery,
+    private readonly leases: Leases,
   ) {
     super(db);
   }
@@ -79,6 +81,29 @@ export class TidyService extends EntityService<TidySettings> {
       if (!found.autoTidy || found.daily) return;
       if (!(await new SessionRepository(tx).noteTidyRequested(session.node_id, req.seq))) return;
       found.sessionSaved(session, req.seq);
+      await settings.save(found);
+    });
+  }
+
+  /**
+   * 작업 세션의 요청이 끝났을지 모를 때 (S2, FlowSettledHandler): task에 묻고(트랜잭션 밖, platform Leases.settled)
+   * 끝났으면 그 세션의 지금 판까지를 정리할 판(settled_seq)으로 적고, 저장마다 정리하면 바로 요청한다 (하루 한 번이면 그 차례에).
+   * 버린 요청(취소 · 실패 · 결과 카드 반려)은 적지 않는다: 그 판은 다음에 끝나는 요청이 없으면 원문으로만 남는다.
+   * 잠그는 순서는 설정 → 세션
+   */
+  async flowEnded(actor: Actor, spaceId: string, req: FlowEventInput): Promise<void> {
+    actor.assertCan(Actor.TIDY);
+    if (req.id === null) return;
+    const settled = await this.leases.settled(actor, spaceId, req.id, req.card);
+    if (!settled?.done) return;
+    await this.transaction(async (tx) => {
+      const settings = new TidySettingsRepository(tx);
+      const found = await settings.lock(spaceId);
+      const sessions = new SessionRepository(tx);
+      const session = await sessions.settleFlow(spaceId, settled.flow);
+      if (!session || !found.autoTidy || found.daily) return;
+      if (!(await sessions.noteTidyRequested(session.node_id, session.revision_count))) return;
+      found.sessionSaved(session, session.revision_count);
       await settings.save(found);
     });
   }

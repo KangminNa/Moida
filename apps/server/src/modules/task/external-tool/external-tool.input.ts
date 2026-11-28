@@ -239,3 +239,17 @@ export class OAuthCallbackInput extends BaseRequest {
     return new OAuthCallbackInput(text('state', 200) ?? '', text('code', 4000), text('iss', 2000));
   }
 }
+
+/** POST /api/external-tools/presets/:key { requestId } (C2 추천 커넥터). 같은 requestId는 처음 만든 것 */
+export class AddPresetInput extends BaseRequest {
+  private constructor(
+    readonly key: string,
+    readonly requestId: string,
+  ) {
+    super();
+  }
+
+  static from(key: string, raw: unknown): AddPresetInput {
+    return BaseRequest.read(raw, (f) => new AddPresetInput(key.slice(0, 40), f.uuid('requestId')));
+  }
+}

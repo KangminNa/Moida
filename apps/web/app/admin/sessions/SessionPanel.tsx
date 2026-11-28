@@ -5,6 +5,7 @@ import { api } from '../../_lib/client-api';
 import { useAction } from '../../_lib/use-action';
 import { useLiveValue } from '../../_lib/use-live';
 import type { SessionDetail, SessionRevision, Transcript } from '../../_vault/types';
+import { WORK_TOOL, WorkSessionPanel } from './WorkSessionPanel';
 
 /** 세션이 저장되거나 노트 · 대표 위키가 정해지거나 휴지통을 오가면(변경 묶음) 다시 읽는다 */
 export const SESSION_TOPICS = ['vault.session.*', 'vault.change.*'];
@@ -90,8 +91,9 @@ export function SessionPanel({
             <p className="label-mono" style={{ margin: '4px 0 0' }}>
               {[
                 detail.project ?? '프로젝트 없음',
-                deviceName(detail.deviceId),
-                detail.tool,
+                ...(detail.tool === WORK_TOOL
+                  ? ['작업 세션']
+                  : [deviceName(detail.deviceId), detail.tool]),
                 detail.visibility === 'public' ? '공개' : '비공개',
               ].join(' · ')}
             </p>
@@ -102,6 +104,9 @@ export function SessionPanel({
             )}
           </div>
           {shown === null && <p className="note">노트 쓰는 중 · 서버 러너가 원문으로 써요</p>}
+          {detail.tool === WORK_TOOL && (
+            <WorkSessionPanel id={id} topics={SESSION_TOPICS} when={when} />
+          )}
           {detail.history.length > 0 && (
             <fieldset className="row" style={{ border: 0, margin: 0, padding: 0 }}>
               <legend className="sr">버전</legend>

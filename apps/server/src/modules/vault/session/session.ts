@@ -359,7 +359,7 @@ export class Session extends TrashTarget<LoadedSession, NewNode<SessionNew>> {
     this.put('head_text', revision.body_md);
     this.put('revision_count', revision.seq);
     this.put('last_revision_at', now);
-    // 작업 세션의 판은 알리지 않는다: 자동 정리 · 세션 알림은 사람의 AI 도구 세션만 (작업 세션 정리는 S2).
+    // 작업 세션의 판은 알리지 않는다: 자동 정리 · 세션 알림은 사람의 AI 도구 세션만 (작업 세션은 S2의 FlowSettledHandler가 끝난 요청만 정리한다).
     // 휴지통의 세션도 알리지 않는다: 지운 세션을 정리하거나 들어왔다고 알리지 않게
     if (this.row.tool !== Session.AGENT_TOOL && !this.gone)
       this.record(

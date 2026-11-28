@@ -1,4 +1,5 @@
 import { NodeRepository } from '../change/change-target.repository';
+import type { TidySessionRow } from '../tidy/tidy-settings';
 import { sessions } from '../vault.schema';
 import type { RunMemoRow } from '../vault.tables';
 import { type LoadedSession, Session } from './session';
@@ -90,6 +91,21 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
       UPDATE vault.sessions SET tidy_requested_seq = ${seq}
       WHERE node_id = ${id} AND tidy_requested_seq < ${seq}`;
     return update.count > 0;
+  }
+
+  /**
+   * 작업 세션의 요청이 끝났다 (S2): 지금 판까지를 정리할 판(settled_seq)으로 적는다. 정리 요청 번호처럼 version을 올리지 않는다.
+   * 세션이 없거나 · 노트 판이 없거나 · 이미 적었거나 · 휴지통이면 null
+   */
+  async settleFlow(spaceId: string, flow: string): Promise<TidySessionRow | null> {
+    const [row] = await this.sql<TidySessionRow[]>`
+      UPDATE vault.sessions s SET settled_seq = s.revision_count
+      FROM vault.nodes n
+      WHERE n.id = s.node_id AND n.deleted_at IS NULL AND s.space_id = ${spaceId}
+        AND s.tool = ${Session.AGENT_TOOL} AND s.source_session_id = ${flow}
+        AND s.settled_seq < s.revision_count
+      RETURNING s.node_id, s.head_title, s.revision_count, s.version`;
+    return row ?? null;
   }
 
   /** 새 판 · 원문 · 인수인계 메모 (모두 추가만) */

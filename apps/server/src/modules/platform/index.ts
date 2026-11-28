@@ -88,7 +88,12 @@ export { type NoticeNew, Notices } from './notice/notices';
 export { PlatformModule } from './platform.module';
 export { BasePlugin } from './plugin/base-plugin';
 export { CodeMail } from './plugin/code-mail';
-export { LeasedWork, Leases, RunRecordTarget } from './plugin/leases';
+export {
+  LeasedWork,
+  Leases,
+  RunRecordTarget,
+  SettledFlow,
+} from './plugin/leases';
 export { PackageService } from './plugin/package.service';
 export { PackageTool } from './plugin/package.tool';
 export { PluginService } from './plugin/plugin.service';

@@ -12,6 +12,7 @@ import type {
   ApiConnectorList,
   ApprovalPage,
   ChatList,
+  ConnectorPresetList,
   Engine,
   EngineList,
   ExternalToolList,
@@ -92,6 +93,15 @@ export function useExternalTools() {
   return useLiveValue(
     'external-tools',
     () => api<ExternalToolList>('GET', '/api/external-tools'),
+    EXTERNAL_TOOL_TOPICS,
+  );
+}
+
+/** 추천 커넥터 (C2): 이미 더한 것은 added. 커넥터가 바뀌면 다시 읽는다 */
+export function useConnectorPresets() {
+  return useLiveValue(
+    'connector-presets',
+    () => api<ConnectorPresetList>('GET', '/api/external-tools/presets'),
     EXTERNAL_TOOL_TOPICS,
   );
 }

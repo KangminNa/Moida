@@ -73,6 +73,35 @@ export class DelegationPolicy {
       );
   }
 
+  /**
+   * 담당을 비운 하위 작업에 일꾼을 고른다 (D3, 2026-11-28: 2026-11-17의 "역할로 맡기기"를 팀 없는 같은 일꾼에 맞춤).
+   * 대표가 맡길 수 있고(Agent.manages) 멈추지 않았으며 그 일의 권한을 가진 일꾼 가운데 지금 쥔 일(대기 · 실행, loads)이
+   * 가장 적은 쪽, 같으면 목록 순서. 한 번의 호출에서 먼저 맡긴 것도 센다. 고를 일꾼이 없으면 RuleViolation
+   */
+  static assign(
+    manager: Agent,
+    org: readonly Agent[],
+    loads: ReadonlyMap<string, number>,
+    orders: readonly SubtaskOrder[],
+  ): SubtaskOrder[] {
+    const load = new Map(loads);
+    const busy = (id: string) => load.get(id) ?? 0;
+    return orders.map((order) => {
+      const needs = TaskKinds.SCOPES[order.fields.kind ?? 'general'] ?? [];
+      const pick =
+        order.toAgentId ??
+        org
+          .filter((a) => manager.manages(a) && !a.paused)
+          .filter((a) => needs.every((scope) => a.scopes.includes(scope)))
+          .reduce<Agent | null>((best, a) => (best && busy(best.id) <= busy(a.id) ? best : a), null)
+          ?.id;
+      if (!pick)
+        throw new RuleViolation('맡을 수 있는 일꾼이 없어요 (일꾼 메뉴에서 일꾼을 더해요)');
+      load.set(pick, busy(pick) + 1);
+      return order.toAgentId === null ? order.assigned(pick) : order;
+    });
+  }
+
   /** 위임에 쓰는 하위 작업의 request_id. AI가 만든 값을 위 작업마다 따로 센다 */
   static requestIdOf(parentId: string, requestId: string): string {
     return `delegate:${parentId}:${requestId}`;

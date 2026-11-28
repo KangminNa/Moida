@@ -310,6 +310,10 @@ export class TaskModule implements OnModuleInit {
     // 기능 패키지의 도구(code-github의 code_credential 등)가 묻는 임대 확인
     this.leaseChecks.register((actor, id) => this.tasks.leasedWork(actor, id));
     this.leaseChecks.registerRecord((actor, id) => this.tasks.recordTarget(actor, id));
+    // S2: 작업 세션의 요청이 끝났는지 (vault가 끝난 요청만 wiki로 정리한다)
+    this.leaseChecks.registerSettled((actor, spaceId, id, card) =>
+      this.tasks.settledFlow(actor, spaceId, id, card),
+    );
     // 기능 패키지의 대화 입구 (플러그인 API 0.10, 텔레그램): 패키지의 트랜잭션에서 관리자의 대화에 말을 넣는다
     this.pluginChats.register((sql, spaceId, chatId, requestId, text) =>
       new ChatTalk(sql).fromPlugin(spaceId, chatId, requestId, text, new Date()),

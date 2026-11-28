@@ -73,7 +73,7 @@ export class DelegateTaskTool extends BaseTool {
             route: { type: 'string', enum: [...SubtaskOrder.ROUTES] },
             verify: { type: 'boolean' },
           },
-          required: ['request_id', 'to_agent_id', 'title', 'instruction'],
+          required: ['request_id', 'title', 'instruction'],
         },
       },
       wait_minutes: { type: 'integer', minimum: 1, maximum: SubtaskWait.MINUTES_MAX },

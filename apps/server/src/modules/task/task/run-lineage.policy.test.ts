@@ -132,4 +132,28 @@ describe('RunLineage', () => {
     for (const t of refused)
       assert.throws(() => RunLineage.assertRecordable(t, 'runner-1', NOW), RuleViolation);
   });
+
+  test('끝난 요청 (S2): 완료면 정리, 실패 · 취소면 원문으로만, 대화는 가라앉고 카드를 기다리지 않을 때만', () => {
+    const chat = { chat: { chatId: 'c1' } };
+    const cases: [Partial<TaskRow>, boolean, boolean, boolean | null][] = [
+      [{ status: 'done' }, true, false, true],
+      [{ status: 'failed' }, true, false, false],
+      [{ status: 'cancelled' }, true, false, false],
+      [{ status: 'running' }, true, false, null],
+      [{ status: 'done' }, false, false, null],
+      [{ status: 'done', parent_id: 'top' }, true, false, null],
+      [{ status: 'done', payload: chat }, true, true, null],
+      [{ status: 'done', payload: chat }, true, false, true],
+      [{ status: 'done' }, true, true, true],
+    ];
+    for (const [more, recorded, open, want] of cases)
+      assert.equal(RunLineage.settledOf(task(more), recorded, open), want, JSON.stringify(more));
+    assert.equal(RunLineage.flowOf(task({ payload: chat })), RunLineage.chatFlow('c1'));
+    assert.deepEqual(
+      ['approved', 'rejected', 'cancelled', 'revision_requested', 'pending'].map((s) =>
+        RunLineage.settledCard(s),
+      ),
+      [true, false, false, null, null],
+    );
+  });
 });
