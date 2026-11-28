@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { connect } from 'node:net';
+import { connect, createServer, type Server } from 'node:net';
 import { after, before, describe, test } from 'node:test';
 import { DomainEvent, RuleViolation } from '../../../apps/server/src/plugin-api';
 import { ChatSaidHandler } from './chat-said.handler';
@@ -135,6 +135,38 @@ describe('SmtpGateway', () => {
   test('받는 사람을 거절하면 메일 서버의 번호와 글로 실패한다', async () => {
     const blocked = new NoticeMail(USER, 'nobody@blocked.example', 'https://cairn.example', false);
     await assert.rejects(gateway().send(blocked.test(), 'Moida', new Date()), /550/);
+  });
+
+  test('메일 서버가 끊거나 답하지 않으면 어느 단계인지와 흔한 까닭을 알린다 (2026-11-28)', async () => {
+    // 인사 · EHLO까지 답하고 로그인(AUTH)에서 끊는 서버, 붙기만 하고 아무 말도 하지 않는 서버
+    const cut = createServer((s) => {
+      s.write('220 hi\r\n');
+      s.on('data', (d) => (String(d).startsWith('EHLO') ? s.write('250 ok\r\n') : s.destroy()));
+    });
+    const mute = createServer(() => undefined);
+    const listen = (server: Server) =>
+      new Promise<number>((done) =>
+        server.listen(0, '127.0.0.1', () => done((server.address() as { port: number }).port)),
+      );
+    const [cutPort, mutePort] = [await listen(cut), await listen(mute)];
+    class Quick extends SmtpGateway {
+      protected override readonly timeoutMs = 300;
+    }
+    const via = (port: number) =>
+      new Quick('127.0.0.1', port, USER, PASSWORD, () => plain('127.0.0.1', port));
+    try {
+      await assert.rejects(
+        via(cutPort).send(mail.test(), 'Moida', new Date()),
+        /로그인 단계에서 연결을 끊었어요.*앱 비밀번호/,
+      );
+      await assert.rejects(
+        via(mutePort).send(mail.test(), 'Moida', new Date()),
+        (e: Error) => /붙지 못했어요|0\.3초/.test(e.message) && !e.message.includes(PASSWORD),
+      );
+    } finally {
+      cut.close();
+      mute.close();
+    }
   });
 });
 

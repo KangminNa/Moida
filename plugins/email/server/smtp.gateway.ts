@@ -14,8 +14,13 @@ class SmtpReply {
   ) {}
 }
 
+/** 보내는 단계 (오류 글에 어느 단계에서 멈췄는지 적는다) */
+type SmtpStage = '연결' | '인사' | '로그인' | '보내기';
+
 /** 붙은 연결 하나: 명령을 보내고 답을 한 개씩 받는다 */
 class SmtpSession {
+  /** 지금 단계. 메일 서버가 끊거나 답하지 않으면 이 단계를 오류 글에 적는다 */
+  stage: SmtpStage = '연결';
   private buffer = '';
   private lines: string[] = [];
   private waiting: ((reply: SmtpReply | Error) => void) | null = null;
@@ -25,7 +30,7 @@ class SmtpSession {
     socket.setEncoding('utf8');
     socket.on('data', (chunk: string) => this.receive(chunk));
     socket.on('error', (error) => this.fail(error));
-    socket.on('close', () => this.fail(new Error('메일 서버가 연결을 끊었어요')));
+    socket.on('close', () => this.fail(new Error(SmtpGateway.closed(this.stage))));
   }
 
   /** 다음 답. want가 아니면 오류 (번호와 메일 서버의 글) */
@@ -44,7 +49,9 @@ class SmtpSession {
     return this.expect(want);
   }
 
-  close(): void {
+  /** 연결을 닫는다. why를 주면(시간 초과) 기다리던 쪽은 '서버가 끊었다'가 아니라 그 까닭을 받는다 */
+  close(why?: string): void {
+    if (why) this.fail(new Error(why));
     this.socket.destroy();
   }
 
@@ -92,7 +99,7 @@ class SmtpSession {
 // 비밀번호는 AUTH 한 줄에만 들어가고 오류 글에는 메일 서버의 번호와 글만 싣는다.
 export class SmtpGateway extends BaseGateway {
   protected readonly name = '메일 서버';
-  protected override readonly timeoutMs = 20_000;
+  protected override readonly timeoutMs: number = 20_000;
 
   constructor(
     private readonly host: string,
@@ -127,16 +134,43 @@ export class SmtpGateway extends BaseGateway {
     return new Error(`${code} ${text}`.trim());
   }
 
+  /**
+   * 메일 서버가 연결을 끊었을 때의 글: 단계마다 흔한 까닭을 함께 (2026-11-28, "메일 서버가 연결을 끊었어요"만으로는
+   * 포트가 틀렸는지 · 로그인이 막혔는지 알 수 없었다)
+   */
+  static closed(stage: SmtpStage): string {
+    const hint: Record<SmtpStage, string> = {
+      연결: 'TLS로 바로 붙는 포트(465)인지, 서버 주소가 맞는지 확인해요',
+      인사: '메일 서버가 이 서버의 연결을 받지 않았어요. 잠시 뒤 다시 해 봐요',
+      로그인:
+        '로그인 시도가 많아 잠시 막혔을 수 있어요. 앱 비밀번호를 확인하고 몇 분 뒤 다시 해 봐요',
+      보내기:
+        '보내는 계정(From)이 로그인한 계정과 같은지, 하루 보내기 한도를 넘지 않았는지 확인해요',
+    };
+    return `메일 서버가 ${stage} 단계에서 연결을 끊었어요. ${hint[stage]}`;
+  }
+
+  /** 시간 안에 답이 없을 때의 글: 대개 이 서버에서 메일 서버로 나가는 연결이 막힌 것이다 */
+  private silent(stage: SmtpStage): string {
+    const where = `${this.host}:${this.port}`;
+    return stage === '연결'
+      ? `${where}에 ${this.timeoutMs / 1000}초 안에 붙지 못했어요. 이 서버에서 ${where}로 나가는 연결이 막혔는지(방화벽 · 클라우드의 메일 포트 차단) 확인해요`
+      : `메일 서버가 ${stage} 단계에서 ${this.timeoutMs / 1000}초 동안 답하지 않았어요`;
+  }
+
   async send(message: MailMessage, name: string, now: Date): Promise<void> {
     await this.call(async (signal) => {
       const session = new SmtpSession(this.open(this.host, this.port));
-      const stop = () => session.close();
+      const stop = () => session.close(this.silent(session.stage));
       signal.addEventListener('abort', stop, { once: true });
       try {
         await session.expect(220);
+        session.stage = '인사';
         await session.command('EHLO cairn', 250);
+        session.stage = '로그인';
         const plain = Buffer.from(`\u0000${this.user}\u0000${this.password}`, 'utf8');
         await session.command(`AUTH PLAIN ${plain.toString('base64')}`, 235);
+        session.stage = '보내기';
         await session.command(`MAIL FROM:<${message.from}>`, 250);
         await session.command(`RCPT TO:<${message.to}>`, 250);
         await session.command('DATA', 354);
