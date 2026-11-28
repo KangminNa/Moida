@@ -20,7 +20,7 @@ import { AccountService } from './account.service';
 import { AccountMailService } from './account-mail.service';
 import { AccountSession } from './account-session';
 
-// 앱 없는 계정 일 (2026-11-28): 공통 앱 도메인(CAIRN_APPS_URL)의 /_/reset · /_/me 화면이 부른다. 그 도메인에서만 열린다
+// 앱 없는 계정 일 (2026-11-28): 공통 앱 도메인(MOIDA_APPS_URL)의 /_/reset · /_/me 화면이 부른다. 그 도메인에서만 열린다
 // (기본 도메인 · 앱마다의 도메인은 404, SharedPlace). 규칙은 앱의 같은 API(api/community/…)와 같고, 앱 이름 자리에 사이트가 온다.
 // 로그인이 필요한 것은 그 도메인의 앱 없는 요청자(MemberGuard의 MemberActor, appId null)로, 쓰기의 세 겹도 MemberGuard가 본다
 //   POST  api/store/password/code    비밀번호 다시 정하기 인증코드 { email } (답은 늘 204)

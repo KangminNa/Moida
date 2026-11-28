@@ -22,7 +22,7 @@ const gateway = (password = PASSWORD) =>
   new SmtpGateway('127.0.0.1', smtp.port, USER, password, () => plain('127.0.0.1', smtp.port));
 const settings = (values: Record<string, string>) => ({ get: (k: string) => values[k] });
 const mail = NoticeMail.of(
-  settings({ user: USER, to: 'admin@mail.example', siteUrl: 'https://cairn.example/' }),
+  settings({ user: USER, to: 'admin@mail.example', siteUrl: 'https://moida.example/' }),
 ) as NoticeMail;
 
 /** DATA 원문에서 머리글 하나 (접힌 줄은 이어 붙인다) */
@@ -107,10 +107,10 @@ describe('SmtpGateway', () => {
     assert.equal(sent.to, 'admin@mail.example');
     assert.equal(decode(header(sent.data, 'Subject')), '[Moida] 승인 요청: 글 공개');
     const text = body(sent.data);
-    assert.match(text, /https:\/\/cairn\.example\/admin\/approvals/);
+    assert.match(text, /https:\/\/moida\.example\/admin\/approvals/);
     assert.doesNotMatch(text, /비공개 내용/, '본문 싣기를 켜지 않으면 제목 · 링크만');
     assert.deepEqual(smtp.commands.slice(-6), [
-      'EHLO cairn',
+      'EHLO moida',
       'AUTH',
       `MAIL FROM:<${USER}>`,
       'RCPT TO:<admin@mail.example>',
@@ -133,7 +133,7 @@ describe('SmtpGateway', () => {
   });
 
   test('받는 사람을 거절하면 메일 서버의 번호와 글로 실패한다', async () => {
-    const blocked = new NoticeMail(USER, 'nobody@blocked.example', 'https://cairn.example', false);
+    const blocked = new NoticeMail(USER, 'nobody@blocked.example', 'https://moida.example', false);
     await assert.rejects(gateway().send(blocked.test(), 'Moida', new Date()), /550/);
   });
 
@@ -179,8 +179,8 @@ describe('NoticeMail · NoticeSentHandler', () => {
 
   test('링크는 이 Moida 안의 경로만, 본문은 켰을 때만', () => {
     const outside = body(mail.notice('제목', '', '//evil.example/x').render('Moida', new Date()));
-    assert.match(outside, /https:\/\/cairn\.example\/admin\r\n/);
-    const detailed = new NoticeMail(USER, USER, 'https://cairn.example', true);
+    assert.match(outside, /https:\/\/moida\.example\/admin\r\n/);
+    const detailed = new NoticeMail(USER, USER, 'https://moida.example', true);
     assert.match(
       body(detailed.notice('제목', '자세한 글', '/admin').render('Moida', new Date())),
       /자세한 글/,
@@ -220,7 +220,7 @@ describe('NoticeMail · NoticeSentHandler', () => {
     const sent = smtp.mails.at(-1)?.data ?? '';
     assert.equal(decode(header(sent, 'Subject')), '[Moida] 아침 요약');
     assert.match(body(sent), /어제 소식 다섯 줄/);
-    assert.match(body(sent), new RegExp(`https://cairn\\.example/admin/chats/${chatId}/report`));
+    assert.match(body(sent), new RegExp(`https://moida\\.example/admin/chats/${chatId}/report`));
     await handler.handle(said({ mail: true, kind: 'failed', text: '시간 초과' }));
     assert.equal(
       decode(header(smtp.mails.at(-1)?.data ?? '', 'Subject')),

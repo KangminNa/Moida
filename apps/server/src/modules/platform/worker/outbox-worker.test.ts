@@ -42,19 +42,19 @@ async function bootWith(root: string, granted: readonly string[]): Promise<Plugi
 const API = resolve(__dirname, '../../../plugin-api');
 const SPACE = '00000000-0000-7000-8000-00000000f00d';
 const emptyRegistry = () =>
-  PluginRegistry.boot(mkdtempSync(join(tmpdir(), 'cairn-core-')), db.sql, archive, box, restore);
+  PluginRegistry.boot(mkdtempSync(join(tmpdir(), 'moida-core-')), db.sql, archive, box, restore);
 
 /** 받은 이벤트를 전역 배열에 적고, ".failed" 이벤트는 실패하는 테스트 플러그인 */
 function makePlugin(uses: readonly string[]): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-worker-'));
+  const root = mkdtempSync(join(tmpdir(), 'moida-worker-'));
   const dir = join(root, 'probe');
   mkdirSync(join(dir, 'server'), { recursive: true });
   writeFileSync(
-    join(dir, 'cairn-plugin.json'),
+    join(dir, 'moida-plugin.json'),
     JSON.stringify({
       name: 'probe',
       version: '0.1.0',
-      cairn: '>=0.1',
+      moida: '>=0.1',
       server: 'server/plugin.ts',
       uses,
     }),
@@ -69,10 +69,10 @@ function makePlugin(uses: readonly string[]): string {
      class Tick extends BaseJob { readonly name = 'tick'; async run() { seen.push('job'); } }
      class Hello extends BaseAction { readonly label = '인사'; async run() { return ActionResult.done('안녕'); } }
      export default class ProbePlugin extends BasePlugin {
-       register(cairn: any) {
-         cairn.onEvent('vault.testprobe.*', new Probe());
-         cairn.every('10s', new Tick());
-         cairn.addAction('hello', new Hello());
+       register(moida: any) {
+         moida.onEvent('vault.testprobe.*', new Probe());
+         moida.every('10s', new Tick());
+         moida.addAction('hello', new Hello());
        }
      }`,
   );

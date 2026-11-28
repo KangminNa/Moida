@@ -5,7 +5,7 @@ import { ApiClient, ApiResult, TestUser } from '../../../testing/api-client';
 import { Database, HostGate } from '../../platform';
 
 // 앱마다 도메인 (스토어 3-0, docs/스토어.md 11장): 도메인 정하기(관리자) · 앱 도메인으로 온 요청(HostGate) ·
-// 연결 확인(/.well-known/cairn-domain → domain/check) · 도메인으로 여는 앱 목록 · 화면의 주소 기준과 보내기.
+// 연결 확인(/.well-known/moida-domain → domain/check) · 도메인으로 여는 앱 목록 · 화면의 주소 기준과 보내기.
 // 도메인은 모든 공간에서 하나이고 테스트 DB를 다른 테스트와 함께 쓰므로 도메인마다 이 실행의 표시를 붙인다.
 
 type Json = Record<string, unknown>;
@@ -49,7 +49,7 @@ const patch = (app: Json, body: Json, as = owner, headers: Record<string, string
 /** 도메인을 정하고, 그 도메인의 확인 값을 읽어 연결을 확인한 앱 */
 async function linked(app: Json, domain: string): Promise<Json> {
   const set = ok(await patch(app, { domain }));
-  const { token } = ok(await viaHost('/.well-known/cairn-domain', domain));
+  const { token } = ok(await viaHost('/.well-known/moida-domain', domain));
   return ok(
     await api.request('POST', `/api/apps/${app.id}/domain/check`, owner, {
       version: set.version,
@@ -116,7 +116,7 @@ describe('앱 도메인으로 온 요청 (HostGate)', () => {
     assert.equal(forwarded.status, 404);
     // 등록한 경로라도 GET · HEAD만
     assert.equal(
-      (await viaHost('/.well-known/cairn-domain', domain, { method: 'POST' })).status,
+      (await viaHost('/.well-known/moida-domain', domain, { method: 'POST' })).status,
       404,
     );
     // 모르는 호스트는 기본 도메인처럼 (개발 · 서버끼리의 이름)
@@ -138,24 +138,24 @@ describe('앱 도메인으로 온 요청 (HostGate)', () => {
     assert.equal(onDomain.status, 404, '앱 도메인에서는 방문자: 비공개 앱은 없다');
   });
 
-  test('/.well-known/cairn-domain: 앱 도메인에서만 값을 주고, 사이트 주소의 출처만 읽게 한다', async () => {
-    assert.equal((await api.get('/.well-known/cairn-domain')).status, 404, '기본 도메인');
-    const proof = await viaHost('/.well-known/cairn-domain', domain);
+  test('/.well-known/moida-domain: 앱 도메인에서만 값을 주고, 사이트 주소의 출처만 읽게 한다', async () => {
+    assert.equal((await api.get('/.well-known/moida-domain')).status, 404, '기본 도메인');
+    const proof = await viaHost('/.well-known/moida-domain', domain);
     assert.equal(proof.status, 200, proof.text);
     assert.match(String(proof.json().token), /^[\w-]{40,}$/);
     // 출처는 사이트에서 온 요청에만 알려 준다: GET 한 번으로 콘솔이 있는 사이트를 알아내지 못하게 (2026-11-25)
     assert.equal(proof.header('access-control-allow-origin'), null, 'Origin 없는 요청');
-    const other = await api.viaHost('/.well-known/cairn-domain', domain, {
+    const other = await api.viaHost('/.well-known/moida-domain', domain, {
       headers: { origin: 'https://attacker.example' },
     });
     assert.equal(other.header('access-control-allow-origin'), null, '다른 출처');
     const site = new URL(api.baseUrl).origin;
-    const fromSite = await api.viaHost('/.well-known/cairn-domain', domain, {
+    const fromSite = await api.viaHost('/.well-known/moida-domain', domain, {
       headers: { origin: site },
     });
     assert.equal(fromSite.header('access-control-allow-origin'), site, '사이트 화면이 읽을 때');
     assert.equal(fromSite.header('vary'), 'Origin');
-    const again = await viaHost('/.well-known/cairn-domain', domain, { forwarded: true });
+    const again = await viaHost('/.well-known/moida-domain', domain, { forwarded: true });
     assert.equal(again.json().token, proof.json().token, '같은 앱 · 도메인이면 같은 값');
   });
 });
@@ -174,10 +174,10 @@ describe('연결 확인 (POST /api/apps/:id/domain/check)', () => {
     // 다른 앱 도메인의 값은 이 앱 · 도메인의 값이 아니다
     const elsewhere = await newApp(`check2-${mark}`);
     ok(await patch(elsewhere, { domain: domainOf('check2') }));
-    const otherToken = ok(await viaHost('/.well-known/cairn-domain', domainOf('check2'))).token;
+    const otherToken = ok(await viaHost('/.well-known/moida-domain', domainOf('check2'))).token;
     assert.equal((await check(String(otherToken))).status, 422);
 
-    const { token } = ok(await viaHost('/.well-known/cairn-domain', domain));
+    const { token } = ok(await viaHost('/.well-known/moida-domain', domain));
     assert.equal((await check(String(token), TestUser.visitor)).status, 403);
     const done = ok(await check(String(token)));
     assert.ok(done.domainCheckedAt, '확인한 때');

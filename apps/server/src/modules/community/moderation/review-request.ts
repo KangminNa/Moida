@@ -5,7 +5,7 @@ import { DomainEvent } from '../../platform';
 // 대상 · 관리자가 마지막으로 정한 때마다 일은 하나다 (requestId): 신고가 더 와도 같은 검토가 보고,
 // 관리자가 정한 뒤 새로 온 신고는 새 검토가 된다. 담당은 비워 두어 대표가 아닌 일꾼 누구나 빌린다.
 // 지시는 대상의 id뿐이다: 일꾼은 community_case로 내용을 읽고(작업 토큰은 그 도구 · 제안만 쓴다, task-kinds.json의 tools)
-// 판단하는 법은 스킬 cairn-moderate에 있다. 회원이 쓴 글은 지시에 싣지 않는다 (숨은 지시가 지시문에 섞이지 않게)
+// 판단하는 법은 스킬 moida-moderate에 있다. 회원이 쓴 글은 지시에 싣지 않는다 (숨은 지시가 지시문에 섞이지 않게)
 export class ReviewRequest {
   static readonly REQUESTED = 'task.task.requested';
   static readonly KIND = 'community_review';

@@ -218,14 +218,14 @@ describe('작업 상태', () => {
   });
 
   test('kind로 스킬을 고른다', () => {
-    assert.equal(job(queued()).skill, 'cairn-write');
+    assert.equal(job(queued()).skill, 'moida-write');
     const unknown = Task.open('s', 'r', { kind: 'other', title: 't' }, NOW);
     assert.equal(job(unknown).skill, null);
   });
 });
 
 describe('작업 토큰', () => {
-  const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+  const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 
   test('에이전트의 권한만 담는다', () => {
     const actor = running().actorFor(agentOf(['write']));
@@ -241,19 +241,19 @@ describe('작업 토큰', () => {
 
   test('다른 서버 키나 고친 토큰은 풀리지 않는다', () => {
     const token = running().actorFor(agentOf([])).seal(box, 60);
-    const other = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+    const other = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
     assert.equal(AgentActor.open(other, token), null);
     assert.equal(AgentActor.open(box, `${token.slice(0, -2)}xx`), null);
   });
 
   test('다른 용도로 싼 값은 작업 토큰이 아니다', () => {
     const value = JSON.stringify({ agentId: AGENT, scopes: ['write'] });
-    const forged = `cairn_run_${box.pack('ai-signin-code', value, 60)}`;
+    const forged = `moida_run_${box.pack('ai-signin-code', value, 60)}`;
     assert.equal(AgentActor.open(box, forged), null);
   });
 
   test('서버 키가 없으면 풀지 않는다', () => {
-    assert.equal(AgentActor.open(SecretBox.fromEnv({}), 'cairn_run_abc'), null);
+    assert.equal(AgentActor.open(SecretBox.fromEnv({}), 'moida_run_abc'), null);
   });
 });
 
@@ -512,10 +512,10 @@ describe('만들기 작업 (결과물 2차)', () => {
   const make = (payload: unknown, kind = 'make') =>
     Task.open('space', randomUUID(), { agent_id: AGENT, kind, title: '발표 자료', payload }, NOW);
 
-  test('칸에서만 돌고 make 권한과 cairn-make 스킬', () => {
+  test('칸에서만 돌고 make 권한과 moida-make 스킬', () => {
     assert.ok(Task.SANDBOXED.includes(Task.MAKE));
     assert.deepEqual(Task.SCOPES.make, ['make']);
-    assert.equal(job(make({})).skill, 'cairn-make');
+    assert.equal(job(make({})).skill, 'moida-make');
     assert.ok(Task.DELEGABLE.includes(Task.MAKE), '팀장도 맡긴다 (재료 없이 지시만)');
   });
 
@@ -530,7 +530,7 @@ describe('만들기 작업 (결과물 2차)', () => {
   });
 
   test('작업 토큰에 재료 위키의 읽기 허락이 봉인된다 (다른 일에는 없다)', () => {
-    const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+    const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
     const task = make({ make: { outputs: [OUT], wikis: [WIKI] } });
     task.lease(RUNNER, AGENT, NOW);
     const opened = AgentActor.open(box, task.actorFor(agentOf(['make'])).seal(box, 60));

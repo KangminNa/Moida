@@ -31,7 +31,7 @@ export type LoginOutcome = {
 
 /**
  * 로그인의 러너 쪽 MCP 도구 (browser-tabs 0.7, 2026-11-19 로그인 카드): 로그인 필요 남기기(칸과 함께),
- * 카드에 넣은 값 꺼내기 · 결과 남기기. 모양의 원본은 plugins/browser-tabs/cairn-plugin.json의 tools다
+ * 카드에 넣은 값 꺼내기 · 결과 남기기. 모양의 원본은 plugins/browser-tabs/moida-plugin.json의 tools다
  */
 export class LoginCalls {
   constructor(private readonly mcp: McpClient) {}

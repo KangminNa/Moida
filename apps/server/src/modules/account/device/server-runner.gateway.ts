@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { BaseGateway } from '../../platform';
 import type { ServerRunnerPolicy } from './server-runner.policy';
 
-// 서버 러너와 코드 러너 칸의 연결 값을 각자만 보는 볼륨에 쓴다 (CAIRN_RUNNER_PAIRING_FILE · CAIRN_CODE_PAIRING_FILE).
+// 서버 러너와 코드 러너 칸의 연결 값을 각자만 보는 볼륨에 쓴다 (MOIDA_RUNNER_PAIRING_FILE · MOIDA_CODE_PAIRING_FILE).
 // 서버가 시작할 때 한 번 쓴다. 설정이 없으면(러너를 두지 않는 배포, 테스트) 그 파일은 쓰지 않는다.
 // 다른 파일로 먼저 쓰고 이름을 바꿔, 러너가 반쯤 쓴 값을 읽지 않게 한다.
 export class ServerRunnerGateway extends BaseGateway {

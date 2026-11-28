@@ -1,12 +1,12 @@
 import { writeFile } from 'node:fs/promises';
 import type { AgentUser } from './agent-user';
-import { CairnServer } from './cairn-server';
 import { CodeReport } from './code-report';
 import { CodeSpec, CodeSpecProblem } from './code-spec';
 import { GitRepo, PatchRejected, type Replayed, RepoRefused, RepoUnreachable } from './git-repo';
 import { GitHubPulls, PullRefused } from './github-pulls';
 import type { Job } from './job';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
+import { MoidaServer } from './moida-server';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
 import type { Redactor, RunLog } from './redactor';
@@ -20,7 +20,7 @@ import { StageCheck } from './stage-check';
 //   앞: 저장소 정보 → 자리 → 깨끗한 clone(러너) → 사본을 agent에게 → setup(agent)
 //   뒤: checks(agent, check. 떨어지면 JobRun이 같은 자리에서 AI에게 한 번 더 맡기고 다시 돌린다)
 //       → 바뀐 것을 patch로(agent) → agent 프로세스 모두 끄기 → 깨끗한 clone에 옮기기(러너)
-//       → 맡긴 경로 밖이면 실패 → 커밋 하나 → cairn/<작업>에 push(러너)
+//       → 맡긴 경로 밖이면 실패 → 커밋 하나 → moida/<작업>에 push(러너)
 // 4단계 (code-github가 맡긴 일, repo.id가 있음): 앞에서 code_credential로 토큰을 받고, 뒤에서 push → draft PR(러너가 GitHub에)
 // → code_pull_opened → 결과물 → 결재(code.pr.merge).
 // 5단계 ("고쳐 달라"로 다시 온 일): 늘 최신 기준 브랜치를 받아 앞 PR의 변경을 3-way로 다시 얹는다. 충돌은 표시로 남겨 AI가 풀고,
@@ -62,7 +62,7 @@ export class CodeStage implements SandboxStage {
     private readonly agent: AgentUser,
     private readonly log: RunLog,
     /** 기기 토큰으로 연 서버 (code_credential · code_pull_opened). 결재는 작업 토큰으로 따로 연다 */
-    private readonly server: CairnServer | null = null,
+    private readonly server: MoidaServer | null = null,
   ) {}
 
   /** PR을 열어 결재를 올릴 차례인가 (JobRun이 결과물을 올린 뒤 requestApproval을 부른다) */
@@ -251,7 +251,7 @@ export class CodeStage implements SandboxStage {
       return failed(`충돌 표시가 남아 올리지 않았어요: ${CodeReport.list(marked).join(', ')}`);
 
     const head = await repo.commit(
-      [`cairn: ${this.job.title}`.slice(0, 72), '', brief || '(요약 없음)'].join('\n'),
+      [`moida: ${this.job.title}`.slice(0, 72), '', brief || '(요약 없음)'].join('\n'),
       `${this.job.agentName || '에이전트'} (Moida)`,
     );
     const pushed = await this.push(repo, spec.branch, signal);
@@ -282,7 +282,7 @@ export class CodeStage implements SandboxStage {
     if (approval === null || signal.aborted) return null;
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
     if (!this.job.runToken) return failed('작업 토큰이 없어 결재를 올리지 못했어요');
-    const asAgent = new CairnServer(new McpClient(this.config.mcpUrl, this.job.runToken));
+    const asAgent = new MoidaServer(new McpClient(this.config.mcpUrl, this.job.runToken));
     try {
       await asAgent.requestApproval({
         requestId: `code-merge:${this.job.taskId}:${approval.version}`,
@@ -339,7 +339,7 @@ export class CodeStage implements SandboxStage {
       pull = await GitHubPulls.of(credential.apiUrl, credential.token, spec.repoUrl).ensure(
         spec.branch,
         spec.base,
-        `cairn: ${this.job.title}`.slice(0, 120),
+        `moida: ${this.job.title}`.slice(0, 120),
         `${report.text()}\n\n---\nMoida 작업 ${this.job.taskId}가 연 PR이에요. 머지는 Moida 결재 뒤에 해요.`,
         signal,
       );

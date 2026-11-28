@@ -32,7 +32,7 @@ export class PasswordHasher {
 
   /** 맞으면 true. stored가 없거나 모양이 틀려도 같은 일을 하고 false */
   async verify(plain: string, stored: string | null): Promise<boolean> {
-    PasswordHasher.dummy ??= this.hash('cairn-dummy-password');
+    PasswordHasher.dummy ??= this.hash('moida-dummy-password');
     const parts = (stored ?? (await PasswordHasher.dummy)).split('$');
     const [kind, logN, r, p, salt, key] = parts;
     if (kind !== 'scrypt' || !logN || !r || !p || !salt || !key) return false;

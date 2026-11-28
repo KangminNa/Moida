@@ -1,7 +1,7 @@
 import type { AppCodeEntry } from './app-code-check';
 import { StageCheck } from './stage-check';
 
-// 앱의 디자인 문서 검사 (2026-11-25, 스킬 cairn-make의 references/design-research.md).
+// 앱의 디자인 문서 검사 (2026-11-25, 스킬 moida-make의 references/design-research.md).
 // 앱 화면은 정해 둔 스타일에서 고르지 않고, 같은 분야의 화면을 찾아 보고 쓴 이 앱만의 디자인 문서(design.md)를 따른다.
 // 이번에 화면(HTML · CSS)을 낸 앱 코드 일이면, 묶음(앞 코드 + 낸 것)에 그 문서가 있고 정해진 제목과 실제로 연 참고 주소가 있는지 본다.
 // 떨어지면 AI에게 한 번 더 맡기고, 그래도 떨어지면 결과에 적기만 한다 (디자인 기준 검사와 같다: 일을 실패로 끝내지 않는다).

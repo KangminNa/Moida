@@ -36,28 +36,28 @@ function download(path: string, as?: TestUser): Promise<Response> {
 
 describe('앱에 올릴 스킬 묶음', () => {
   test('방문자는 받을 수 없다', async () => {
-    assert.equal((await download('/api/skills/cairn-save.zip')).status, 403);
+    assert.equal((await download('/api/skills/moida-save.zip')).status, 403);
   });
 
   test('주인은 SKILL.md와 references만 든 zip을 받는다 (스크립트·검토자 정의는 빠짐)', async () => {
-    const res = await download('/api/skills/cairn-save.zip', owner);
+    const res = await download('/api/skills/moida-save.zip', owner);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'application/zip');
-    assert.match(res.headers.get('content-disposition') ?? '', /filename="cairn-save\.zip"/);
+    assert.match(res.headers.get('content-disposition') ?? '', /filename="moida-save\.zip"/);
     const files = unzip(Buffer.from(await res.arrayBuffer()));
     const names = [...files.keys()];
-    assert.ok(names.includes('cairn-save/SKILL.md'));
-    assert.ok(names.includes('cairn-save/references/note-rules.md'));
+    assert.ok(names.includes('moida-save/SKILL.md'));
+    assert.ok(names.includes('moida-save/references/note-rules.md'));
     assert.ok(names.every((n) => !n.includes('/scripts/') && !n.includes('/agents/')));
-    const skill = files.get('cairn-save/SKILL.md') ?? '';
-    assert.match(skill, /^---\nname: cairn-save\n/);
+    const skill = files.get('moida-save/SKILL.md') ?? '';
+    assert.match(skill, /^---\nname: moida-save\n/);
     assert.ok(!skill.includes('{{SKILL_DIR}}'));
     assert.ok(!skill.includes('allowed-tools'));
   });
 
   test('없는 스킬이나 zip이 아닌 이름은 404', async () => {
     assert.equal((await download('/api/skills/nothing.zip', owner)).status, 404);
-    assert.equal((await download('/api/skills/cairn-save', owner)).status, 404);
+    assert.equal((await download('/api/skills/moida-save', owner)).status, 404);
     assert.equal((await download('/api/skills/..%2Fdb.zip', owner)).status, 404);
   });
 });

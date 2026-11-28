@@ -1,4 +1,4 @@
-// Claude Code 대화 원문(JSONL) → 사람이 읽는 글 (세션 저장, cairn-collect.mjs가 쓴다). Node 내장 모듈만 쓴다.
+// Claude Code 대화 원문(JSONL) → 사람이 읽는 글 (세션 저장, moida-collect.mjs가 쓴다). Node 내장 모듈만 쓴다.
 //
 // 한 줄에 JSON 하나: { type: 'user' | 'assistant' | …, message: { content: 글 | [블록…] }, timestamp, cwd, … }.
 // 남기는 것: 사람이 쓴 글, AI가 쓴 글, AI가 쓴 도구의 이름. 버리는 것: 도구의 입력 · 결과, 생각(thinking),

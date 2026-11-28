@@ -5,7 +5,7 @@ import type { AppKind } from '../blog.tables';
 
 // 앱 종류의 시작 코드 (스토어 1-6, docs/스토어.md 9장). 저장소 apps/server/starters/의 파일이고 서버 이미지에 함께 든다:
 // 프로세스가 도는 동안 바뀌지 않아 처음 한 번 읽어 둔다. base/ 위에 종류 폴더(blog · magazine · community)를 얹은 것이 한 벌이다.
-// 페이지 앱(스토어의 "화면만" 앱)은 블로그 틀 없이 자기 폴더만이다: 빈 정적 앱(cairn.json static)이고 화면 전체를 앱이 정한다
+// 페이지 앱(스토어의 "화면만" 앱)은 블로그 틀 없이 자기 폴더만이다: 빈 정적 앱(moida.json static)이고 화면 전체를 앱이 정한다
 // (페이지 앱 P1 2026-11-20, 정적 시작 코드 2026-11-25 A4).
 // 코드가 없는 앱은 이 한 벌로 보이고, 처음 고칠 때(AI 작업 · 시작 코드로) 그 앱의 버전 1로 복사된다.
 export class AppStarterGateway extends BaseGateway {
@@ -17,7 +17,7 @@ export class AppStarterGateway extends BaseGateway {
   private static readonly NAME = /^[^/\\.][^/\\]{0,119}$/;
   /**
    * 이름 있는 시작 화면 (2026-11-26): 종류의 시작 코드 대신 고를 수 있는 완성된 화면. 페이지 앱(정적)에만 둔다.
-   *   intro: Moida 소개 페이지 (사이트 이름 · 이 서버의 공개 앱을 cairn-data에서 읽는다). 설치하면 첫 화면으로 만든다
+   *   intro: Moida 소개 페이지 (사이트 이름 · 이 서버의 공개 앱을 moida-data에서 읽는다). 설치하면 첫 화면으로 만든다
    */
   static readonly TEMPLATES: readonly string[] = ['intro'];
   private readonly cache = new Map<AppKind, ReadonlyMap<string, Buffer>>();

@@ -2,8 +2,8 @@ import type { AskedApproval } from './browse-login';
 import { type BrowserPages, type BrowserTab, ButtonProblem, type HeldButton } from './browser-page';
 import type { BrowserStop } from './browser-stop';
 import { BrowserUnavailable, TabUnreadable } from './browser-tabs';
-import type { CairnServer } from './cairn-server';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 
 /** 붙잡은 결과: 올릴 결재와 실행 기록 한 줄, 또는 실패로 끝낼 까닭 */
 export type HoldOutcome = { approval: AskedApproval; line: string } | { error: string };
@@ -16,7 +16,7 @@ export class StopHold {
   static readonly PUBLISH_ACTION = 'browser.site.publish';
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly pages: BrowserPages,
     private readonly taskId: string,
   ) {}

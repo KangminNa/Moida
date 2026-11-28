@@ -150,8 +150,8 @@ describe('ZipReader', () => {
 
 describe('ArchiveFile.unzip', () => {
   test('보관 형식 파일이 된다', () => {
-    const [file] = ArchiveFile.unzip(zipOf({ 'cairn.json': '{}' }));
-    assert.equal(file?.path, 'cairn.json');
+    const [file] = ArchiveFile.unzip(zipOf({ 'moida.json': '{}' }));
+    assert.equal(file?.path, 'moida.json');
     assert.equal(file?.asText(), '{}');
   });
 

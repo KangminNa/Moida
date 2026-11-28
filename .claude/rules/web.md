@@ -76,16 +76,16 @@ paths:
 ## 앱 화면 (스토어 1-6)
 
 - 공개 앱의 화면(`/<앱>/…`)은 React 화면이 아니다. route handler 하나(`app/(blog)/[app]/[[...path]]/route.ts`)가 서버가 준 앱 코드의 템플릿(Mustache)에 데이터를 채워 격리 머리글(`sandbox`, `_blog/app-screen.ts`)과 함께 보낸다. 앱 화면의 모양은 앱 코드에서 고친다 (코드가 없는 앱의 시작 코드는 `apps/server/starters/`). 서버가 `page`를 주면(앱 코드를 공개하지 않은 페이지 앱의 공개 페이지가 화면, 스토어 9.11.4) 템플릿 없이 그 페이지의 파일(`/api/pages/site/<페이지>/<파일>`)을 서버의 머리글 그대로 흘려보내고, 첫 화면은 `/<앱>/index.html`로 넘긴다 (페이지 안의 상대 경로가 맞게).
-- 웹의 최상위 경로를 더하면 `_lib/screen-headers.ts`의 `WEB_ROUTES`에도 적는다 (화면 머리글이 붙는 목록, 구조 검사가 본다). 앱 주소에는 Cairn 화면 머리글을 붙이지 않는다.
+- 웹의 최상위 경로를 더하면 `_lib/screen-headers.ts`의 `WEB_ROUTES`에도 적는다 (화면 머리글이 붙는 목록, 구조 검사가 본다). 앱 주소에는 Moida 화면 머리글을 붙이지 않는다.
 - `mustache`는 `_blog/app-screen.ts`에서만 가져온다 (규칙 검사).
 - 관리자가 연 앱 화면(기본 도메인 · 미리 보기 새 탭)에는 서버가 준 `console`(콘솔의 앱 관리 주소)로 "콘솔로" 링크를 붙인다 (`_blog/console-link.ts`, 2026-11-25). 그 답은 `private, no-store`, 콘솔의 미리 보기 틀(`Sec-Fetch-Dest: iframe`) 안에서는 붙이지 않는다. 앱 도메인에는 콘솔 쿠키가 없어 보이지 않는다. 앱 도메인에서 콘솔로 보내는 길은 만들지 않는다 (GET 한 번으로 콘솔이 있는 사이트를 드러내지 않게, 2026-11-25). 콘솔은 사이트 주소의 `/admin`
 - 앱 도메인 (스토어 3-0): `proxy.ts`가 연결을 확인한 앱 도메인의 요청을 `/<앱>/…`로 넘긴다(`_blog/app-domains.ts`, 30초 기억). 앱 화면은 방문자가 연 호스트(`_blog/request-host.ts`)를 서버에 넘기고, 앱 링크는 서버가 준 `url`(확인한 도메인이면 그 도메인)로 건다. `next.config`의 머리글은 들어온 경로로 붙어 앱 화면의 격리 머리글을 덮으므로, 앱 도메인에서 앱 화면이 되는 경로(`/` · `/posts` · `/m`)의 화면 머리글은 `proxy.ts`가 기본 도메인에서만 붙인다 (`_lib/screen-headers.ts`). 웹에 그런 경로를 더하면 `APP_SCREEN_ROOTS`에도 적는다
-- 공통 앱 도메인 (2026-11-27, `CAIRN_APPS_URL`): 앱은 그 도메인의 `/<앱>/…`다. `proxy.ts`가 `_blog/apps-paths.ts`로 경로를 나눈다 (`/`는 첫 화면 `_blog/AppsHome`(소개 · 넘겨 보는 앱 카드), 콘솔 · 로그인은 기본 도메인으로, 기본 도메인의 `/` · 앱 주소는 그 도메인으로). 서버를 부를 때 앱은 `x-cairn-app` 머리글로 알린다 (`appHeaderOf`, 브라우저의 `memberApi` · `cairn.js`는 주소의 첫 칸으로). 고정 화면의 링크는 `MemberPlace.base`(자기 도메인 '', 공통 도메인 `/<앱>`)를 앞에 붙인다. 앱 없는 로그인은 `app/%5F/login`(`/_/login`, 공통 도메인이 아니면 404)
+- 공통 앱 도메인 (2026-11-27, `MOIDA_APPS_URL`): 앱은 그 도메인의 `/<앱>/…`다. `proxy.ts`가 `_blog/apps-paths.ts`로 경로를 나눈다 (`/`는 첫 화면 `_blog/AppsHome`(소개 · 넘겨 보는 앱 카드), 콘솔 · 로그인은 기본 도메인으로, 기본 도메인의 `/` · 앱 주소는 그 도메인으로). 서버를 부를 때 앱은 `x-moida-app` 머리글로 알린다 (`appHeaderOf`, 브라우저의 `memberApi` · `moida.js`는 주소의 첫 칸으로). 고정 화면의 링크는 `MemberPlace.base`(자기 도메인 '', 공통 도메인 `/<앱>`)를 앞에 붙인다. 앱 없는 로그인은 `app/%5F/login`(`/_/login`, 공통 도메인이 아니면 404)
 
 ## 커뮤니티 화면 (스토어 3-2)
 
 - 커뮤니티 앱의 목록 · 글은 앱 화면(템플릿) 그대로다. route handler가 `_community/app-screen.ts`로 회원 API(`me` · `topics` · `topics/:id`)를 앱 도메인(`serverFetch`의 `host`)으로 읽어 템플릿 데이터에 더한다(`renderAppScreen`의 `extra`). 앱 도메인으로 온 화면만 회원 쿠키를 넘기고 회원 링크를 연다. 템플릿에는 닉네임과 내 것인지(`mine`)만 싣는다.
-- 가입 · 로그인 · 내 정보 · 글쓰기 · 댓글 · 신고는 고정 화면 `app/(blog)/[app]/%5F/…`(주소 `/_/…`)다. `page.tsx`는 `memberPlace`로 시작한다 (그 앱의 도메인으로 온 요청 · 커뮤니티 앱이 아니면 404). 회원 쓰기는 `memberApi(csrf, …)`로 `X-Cairn-CSRF`를 싣고, 만들기의 `requestId`는 `newRequestId()`(http로 연 시험용 도메인에도 있게). 회원 화면에는 콘솔의 변경 신호(`/api/stream`)가 없어 `useLiveValue`를 쓰지 않는다: 바꾼 뒤에는 `router.refresh()`나 화면을 다시 연다.
+- 가입 · 로그인 · 내 정보 · 글쓰기 · 댓글 · 신고는 고정 화면 `app/(blog)/[app]/%5F/…`(주소 `/_/…`)다. `page.tsx`는 `memberPlace`로 시작한다 (그 앱의 도메인으로 온 요청 · 커뮤니티 앱이 아니면 404). 회원 쓰기는 `memberApi(csrf, …)`로 `X-Moida-CSRF`를 싣고, 만들기의 `requestId`는 `newRequestId()`(http로 연 시험용 도메인에도 있게). 회원 화면에는 콘솔의 변경 신호(`/api/stream`)가 없어 `useLiveValue`를 쓰지 않는다: 바꾼 뒤에는 `router.refresh()`나 화면을 다시 연다.
 - 앱 도메인의 `/_/…`에는 `proxy.ts`가 화면 머리글을 붙인다 (`isMemberScreen`). 회원 글 본문은 `renderMarkdown(body, { ugc: true })`(바깥 링크에 nofollow ugc).
 
 ## 서버와 함께 쓰는 것

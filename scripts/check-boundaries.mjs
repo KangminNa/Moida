@@ -35,7 +35,7 @@ const moduleNames = Object.keys(map.modules);
 const packageSchemas = new Map(
   existsSync(join(root, 'plugins'))
     ? readdirSync(join(root, 'plugins')).flatMap((name) => {
-        const file = join(root, 'plugins', name, 'cairn-plugin.json');
+        const file = join(root, 'plugins', name, 'moida-plugin.json');
         if (!existsSync(file)) return [];
         const schema = JSON.parse(readFileSync(file, 'utf8')).schema;
         return typeof schema === 'string' ? [[name, schema]] : [];
@@ -91,7 +91,7 @@ function checkEvents() {
   const pluginsDir = join(root, 'plugins');
   if (!existsSync(pluginsDir)) return;
   for (const name of readdirSync(pluginsDir)) {
-    const file = join(pluginsDir, name, 'cairn-plugin.json');
+    const file = join(pluginsDir, name, 'moida-plugin.json');
     if (!existsSync(file)) continue;
     for (const use of JSON.parse(readFileSync(file, 'utf8')).uses ?? []) {
       if (!use.startsWith('event:')) continue;
@@ -216,7 +216,17 @@ function checkDatabase() {
       AND nspname NOT IN (SELECT schema FROM m);`;
   const out = execFileSync(
     'docker',
-    ['compose', 'exec', '-T', 'db', 'psql', '-U', 'cairn', '-d', 'cairn', '-tA', '-c', sql],
+    [
+      'compose',
+      'exec',
+      '-T',
+      'db',
+      'sh',
+      '-c',
+      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tA -c "$1"',
+      'sh',
+      sql,
+    ],
     { cwd: root, encoding: 'utf8' },
   );
   for (const line of out.trim().split('\n').filter(Boolean)) {

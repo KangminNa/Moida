@@ -195,7 +195,7 @@ export class PluginContext {
     return () => this.restore.steadyRead(() => this.archive.files(new SystemActor()));
   }
 
-  /** 보관 파일을 빈 Cairn에 들여오는 창구. 부른 사람이 주인이어야 한다. 목록 파일에 archive:restore가 있어야 한다 */
+  /** 보관 파일을 빈 Moida에 들여오는 창구. 부른 사람이 주인이어야 한다. 목록 파일에 archive:restore가 있어야 한다 */
   archiveRestorer(): ArchiveRestoreService {
     this.require('archive:restore');
     return this.restore;

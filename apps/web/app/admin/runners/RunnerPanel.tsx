@@ -15,7 +15,7 @@ import type { Runner, RunnerList } from '../../_task/types';
 const SERVER_RUNNER = '서버 러너';
 /** 연결 상태는 시간이 지나며 바뀌는데 신호가 없다. 이 간격으로 다시 읽는다 */
 const REREAD_MS = 15_000;
-/** 동시에 하는 일의 상한 (서버 Runner.SLOTS_MAX · 러너 CAIRN_RUNNER_CONCURRENCY) */
+/** 동시에 하는 일의 상한 (서버 Runner.SLOTS_MAX · 러너 MOIDA_RUNNER_CONCURRENCY) */
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /** 러너 하나와 그 기기 (이름·종류는 기기 목록에 있다) */

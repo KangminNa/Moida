@@ -14,13 +14,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, test } from 'node:test';
-import { CairnHome } from './cairn-home';
-import { FakeCairn } from './testing/fake-cairn';
+import { MoidaHome } from './moida-home';
+import { FakeMoida } from './testing/fake-moida';
 
-// 세션 저장 스크립트 (packages/cli/hooks/cairn-collect.mjs). cairn connect처럼 ~/.cairn/bin에 넣고(비밀값 무늬 secrets.mjs 포함)
-// 가짜 블로그에 붙여 프로세스로 돌린다. HOME을 임시 폴더로 바꿔 ~/.cairn이 그 안에 생긴다. 세션의 폴더는 git 원격이 있는 임시 저장소.
+// 세션 저장 스크립트 (packages/cli/hooks/moida-collect.mjs). moida connect처럼 ~/.moida/bin에 넣고(비밀값 무늬 secrets.mjs 포함)
+// 가짜 블로그에 붙여 프로세스로 돌린다. HOME을 임시 폴더로 바꿔 ~/.moida이 그 안에 생긴다. 세션의 폴더는 git 원격이 있는 임시 저장소.
 
-const TOKEN = 'cairn_at_collecttest';
+const TOKEN = 'moida_at_collecttest';
 const SESSION = '0192f0aa-2222-7000-8000-000000000001';
 
 class Run {
@@ -32,20 +32,20 @@ class Run {
   ) {}
 }
 
-let blog: FakeCairn;
+let blog: FakeMoida;
 let home: string;
 let repo: string;
 
-const cairn = () => join(home, '.cairn');
-const outbox = () => join(cairn(), 'outbox');
+const moida = () => join(home, '.moida');
+const outbox = () => join(moida(), 'outbox');
 const outboxFiles = () => (existsSync(outbox()) ? readdirSync(outbox()) : []);
-const credentials = () => JSON.parse(readFileSync(join(cairn(), 'credentials.json'), 'utf8'));
+const credentials = () => JSON.parse(readFileSync(join(moida(), 'credentials.json'), 'utf8'));
 
 /** 스크립트를 부른다 (hook은 표준 입력에 Claude Code의 JSON) */
 function run(args: readonly string[], stdin = ''): Promise<Run> {
   const started = Date.now();
   return new Promise((done) => {
-    const child = spawn(process.execPath, [join(cairn(), 'bin', 'cairn-collect.mjs'), ...args], {
+    const child = spawn(process.execPath, [join(moida(), 'bin', 'moida-collect.mjs'), ...args], {
       env: { PATH: process.env.PATH, HOME: home },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -85,21 +85,21 @@ const short = (session: string, said: string, answer = '답했어요') =>
   ]);
 
 function writeCredentials(collect: Record<string, unknown> = {}): void {
-  mkdirSync(cairn(), { recursive: true });
+  mkdirSync(moida(), { recursive: true });
   const device = (name: string, token: string) => ({
     site: blog.origin,
     mcp: `${blog.origin}/mcp`,
     token_endpoint: `${blog.origin}/oauth/token`,
-    client_id: `cairn_${name}`,
+    client_id: `moida_${name}`,
     device: `mac · ${name}`,
     access_token: token,
-    refresh_token: `cairn_rt_${name}test`,
+    refresh_token: `moida_rt_${name}test`,
     expires_at: new Date(Date.now() + 3_600_000).toISOString(),
   });
   writeFileSync(
-    join(cairn(), 'credentials.json'),
+    join(moida(), 'credentials.json'),
     JSON.stringify({
-      news: device('news', 'cairn_at_newstest'),
+      news: device('news', 'moida_at_newstest'),
       collect: { ...device('collect', TOKEN), ...collect },
     }),
     { mode: 0o600 },
@@ -116,18 +116,18 @@ async function until(what: string, ready: () => boolean): Promise<void> {
 }
 
 before(async () => {
-  blog = new FakeCairn();
+  blog = new FakeMoida();
   await blog.start();
   blog.allow(TOKEN);
 });
 after(() => blog.close());
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), 'cairn-collect-hook-'));
+  home = mkdtempSync(join(tmpdir(), 'moida-collect-hook-'));
   repo = join(home, 'repo');
   mkdirSync(repo);
   execFileSync('git', ['init', '-q', repo]);
   execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'git@github.com:Owner/Repo.git']);
-  new CairnHome(cairn()).installScripts();
+  new MoidaHome(moida()).installScripts();
   blog.calls.length = 0;
   blog.refreshed.length = 0;
   blog.mcpStatus = 0;
@@ -232,11 +232,11 @@ describe('세션 → 글 (사람의 말 · AI의 말 · 도구 이름만)', () =
       ].join('\n\n'),
     });
     assert.equal(outboxFiles().length, 0, '올렸으면 outbox에 남지 않는다');
-    assert.ok(statSync(join(cairn(), 'collect.json')).mtimeMs > 0);
+    assert.ok(statSync(join(moida(), 'collect.json')).mtimeMs > 0);
   });
 
-  test('비밀값은 이 컴퓨터에서 지운다 (본문 · 제목, Moida 러너 토큰 cairn_run_ 포함)', async () => {
-    const run = `cairn_run_${'r'.repeat(32)}`;
+  test('비밀값은 이 컴퓨터에서 지운다 (본문 · 제목, Moida 러너 토큰 moida_run_ 포함)', async () => {
+    const run = `moida_run_${'r'.repeat(32)}`;
     const github = `ghp_${'g'.repeat(36)}`;
     short(SESSION, `배포해 줘 ${run}\n토큰 ${github} password=hunter2abc1`, `${run} 확인했어요`);
     await work();
@@ -261,15 +261,15 @@ describe('세션 → 글 (사람의 말 · AI의 말 · 도구 이름만)', () =
     assert.equal(String(blog.saves[0]?.args.title).length, 200, '제목은 200자까지');
   });
 
-  test('저장소의 .cairn.json이 "collect": false면 올리지 않는다 (하위 폴더에서 끝나도)', async () => {
-    writeFileSync(join(repo, '.cairn.json'), JSON.stringify({ collect: false }));
+  test('저장소의 .moida.json이 "collect": false면 올리지 않는다 (하위 폴더에서 끝나도)', async () => {
+    writeFileSync(join(repo, '.moida.json'), JSON.stringify({ collect: false }));
     mkdirSync(join(repo, 'sub'));
     short(SESSION, '이 저장소는 올리지 않아요');
     await work(SESSION, transcriptFile(SESSION), join(repo, 'sub'));
     assert.equal(blog.calls.length, 0);
     assert.equal(outboxFiles().length, 0);
 
-    writeFileSync(join(repo, '.cairn.json'), JSON.stringify({ collect: true }));
+    writeFileSync(join(repo, '.moida.json'), JSON.stringify({ collect: true }));
     await work();
     assert.equal(blog.saves.length, 1);
   });
@@ -306,8 +306,8 @@ describe('못 올린 세션 (outbox)', () => {
     const kept = readFileSync(file, 'utf8');
     assert.equal(JSON.parse(kept).title, '첫 세션');
     assert.equal(kept.includes(TOKEN), false);
-    assert.equal(kept.includes('cairn_rt_'), false);
-    assert.equal(existsSync(join(cairn(), 'collect.json')), false);
+    assert.equal(kept.includes('moida_rt_'), false);
+    assert.equal(existsSync(join(moida(), 'collect.json')), false);
     const firstId = blog.saves[0]?.args.request_id;
 
     blog.mcpStatus = 0;
@@ -321,7 +321,7 @@ describe('못 올린 세션 (outbox)', () => {
     );
     assert.equal(blog.saves[1]?.args.request_id, firstId, '다시 올려도 서버에 하나');
     assert.deepEqual(outboxFiles(), []);
-    const saved = JSON.parse(readFileSync(join(cairn(), 'collect.json'), 'utf8'));
+    const saved = JSON.parse(readFileSync(join(moida(), 'collect.json'), 'utf8'));
     assert.equal(saved.status, 'saved');
     assert.ok(Date.now() - Date.parse(saved.saved_at) < 60_000);
   });
@@ -360,7 +360,7 @@ describe('못 올린 세션 (outbox)', () => {
   });
 
   test('세션 저장 기기가 없거나 끊겼으면 outbox에 두고, 기기가 생기면 다음에 올린다', async () => {
-    rmSync(join(cairn(), 'credentials.json'));
+    rmSync(join(moida(), 'credentials.json'));
     short(SESSION, '기기 없이 끝난 세션');
     await work();
     writeCredentials({ dead: true });
@@ -382,27 +382,27 @@ describe('못 올린 세션 (outbox)', () => {
 describe('토큰 (기다릴 수 있는 일꾼은 직접 갱신한다)', () => {
   test('이미 끝난 토큰이면 갱신하고 같은 실행에서 올린다. 소식 기기의 열쇠는 그대로', async () => {
     writeCredentials({
-      access_token: 'cairn_at_expired',
+      access_token: 'moida_at_expired',
       expires_at: new Date(Date.now() - 1000).toISOString(),
     });
     const news = credentials().news;
     short(SESSION, '하루 만에 끝난 세션');
     await work();
-    assert.deepEqual(blog.refreshed, ['cairn_rt_collecttest']);
+    assert.deepEqual(blog.refreshed, ['moida_rt_collecttest']);
     const collect = credentials().collect;
-    assert.notEqual(collect.access_token, 'cairn_at_expired');
+    assert.notEqual(collect.access_token, 'moida_at_expired');
     assert.equal(blog.saves.length, 1);
     assert.equal(blog.saves[0]?.token, collect.access_token);
     assert.deepEqual(credentials().news, news);
-    assert.equal(statSync(join(cairn(), 'credentials.json')).mode & 0o777, 0o600);
-    assert.equal(existsSync(join(cairn(), 'credentials.lock')), false);
+    assert.equal(statSync(join(moida(), 'credentials.json')).mode & 0o777, 0o600);
+    assert.equal(existsSync(join(moida(), 'credentials.lock')), false);
   });
 
   test('서버가 토큰을 받지 않으면 갱신한 뒤 한 번 더 부른다', async () => {
-    writeCredentials({ access_token: 'cairn_at_revoked' });
+    writeCredentials({ access_token: 'moida_at_revoked' });
     short(SESSION, '토큰이 버려진 뒤');
     await work();
-    assert.deepEqual(blog.refreshed, ['cairn_rt_collecttest']);
+    assert.deepEqual(blog.refreshed, ['moida_rt_collecttest']);
     assert.deepEqual(
       blog.saves.map((c) => c.token),
       [credentials().collect.access_token],
@@ -426,7 +426,7 @@ describe('SessionEnd 훅', () => {
     assert.ok(hooked.ms < 1_500, `${hooked.ms}ms`);
     await until('일꾼이 올림', () => blog.saves.length === 1);
     assert.equal(blog.saves[0]?.args.title, '훅으로 올라갈 세션');
-    await until('일꾼이 끝남', () => existsSync(join(cairn(), 'collect.json')));
+    await until('일꾼이 끝남', () => existsSync(join(moida(), 'collect.json')));
   });
 
   test('입력이 깨졌거나 모자라면 아무것도 하지 않고 0으로 끝난다', async () => {

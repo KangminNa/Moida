@@ -59,7 +59,7 @@ describe('누가 쓸 수 있나', () => {
     assert.equal(asWriter.status, 403);
     const put = await api.request(
       'POST',
-      '/api/runner-skills/cairn-write/revisions',
+      '/api/runner-skills/moida-write/revisions',
       TestUser.visitor,
       { requestId: randomUUID(), files: {}, version: 0 },
       writer,
@@ -73,39 +73,39 @@ describe('콘솔 판', () => {
     const { skills } = ok(await api.get('/api/runner-skills', owner)) as { skills: Json[] };
     const names = skills.map((s) => s.name);
     for (const name of [
-      'cairn-write',
-      'cairn-tidy',
-      'cairn-browse',
-      'cairn-code',
-      'cairn-make',
-      'cairn-runner',
+      'moida-write',
+      'moida-tidy',
+      'moida-browse',
+      'moida-code',
+      'moida-make',
+      'moida-runner',
     ])
       assert.ok(names.includes(name), name);
-    assert.equal(names.includes('cairn-save'), false);
-    const write = skills.find((s) => s.name === 'cairn-write') as Json;
+    assert.equal(names.includes('moida-save'), false);
+    const write = skills.find((s) => s.name === 'moida-write') as Json;
     assert.equal(write.source, 'repo');
     assert.match(String(write.hash), /^[0-9a-f]{64}$/);
-    assert.equal((await api.get('/api/runner-skills/cairn-save', owner)).status, 404);
+    assert.equal((await api.get('/api/runner-skills/moida-save', owner)).status, 404);
   });
 
   test('판을 쌓으면 바로 그 판을 쓰고, 저장소 판이나 앞 판으로 되돌릴 수 있다', async () => {
-    const before = await detail('cairn-tidy');
+    const before = await detail('moida-tidy');
     assert.equal(before.source, 'repo');
     assert.equal(before.version, 0, '콘솔 판이 없으면 0');
     const repo = before.repo as Json;
 
-    const first = ok(await save('cairn-tidy', edited(repo, '첫 판'), 0), 201);
+    const first = ok(await save('moida-tidy', edited(repo, '첫 판'), 0), 201);
     assert.deepEqual(
       { source: first.source, revision: first.revision, revisions: first.revisions },
       { source: 'console', revision: 1, revisions: 1 },
     );
     const second = ok(
-      await save('cairn-tidy', edited(repo, '둘째 판'), Number(first.version)),
+      await save('moida-tidy', edited(repo, '둘째 판'), Number(first.version)),
       201,
     );
     assert.equal(second.revision, 2);
 
-    const now = await detail('cairn-tidy');
+    const now = await detail('moida-tidy');
     assert.equal(now.source, 'console');
     assert.match(String((now.files as Json)['SKILL.md']), /둘째 판/);
     assert.deepEqual(
@@ -115,60 +115,60 @@ describe('콘솔 판', () => {
     assert.equal(now.repoChanged, false);
 
     const back = ok(
-      await api.request('PUT', '/api/runner-skills/cairn-tidy/active', owner, {
+      await api.request('PUT', '/api/runner-skills/moida-tidy/active', owner, {
         revision: 1,
         version: second.version,
       }),
     );
     assert.equal(back.revision, 1);
     const toRepo = ok(
-      await api.request('PUT', '/api/runner-skills/cairn-tidy/active', owner, {
+      await api.request('PUT', '/api/runner-skills/moida-tidy/active', owner, {
         revision: null,
         version: back.version,
       }),
     );
     assert.equal(toRepo.source, 'repo');
-    assert.equal((await detail('cairn-tidy')).hash, repo.hash, '저장소 판으로 돌아왔다');
-    const one = ok(await api.get('/api/runner-skills/cairn-tidy/revisions/1', owner));
+    assert.equal((await detail('moida-tidy')).hash, repo.hash, '저장소 판으로 돌아왔다');
+    const one = ok(await api.get('/api/runner-skills/moida-tidy/revisions/1', owner));
     assert.match(String((one.files as Json)['SKILL.md']), /첫 판/, '앞 판은 그대로 남는다');
   });
 
   test('같은 requestId는 판 하나. 본 version이 다르면 409', async () => {
-    const start = await detail('cairn-browse');
+    const start = await detail('moida-browse');
     const repo = start.repo as Json;
     const requestId = randomUUID();
-    const once = ok(await save('cairn-browse', edited(repo, '한 번'), 0, { requestId }), 201);
-    const again = ok(await save('cairn-browse', edited(repo, '한 번'), 0, { requestId }), 201);
+    const once = ok(await save('moida-browse', edited(repo, '한 번'), 0, { requestId }), 201);
+    const again = ok(await save('moida-browse', edited(repo, '한 번'), 0, { requestId }), 201);
     assert.equal(again.revisions, once.revisions);
-    const stale = await save('cairn-browse', edited(repo, '옛 화면'), 0);
+    const stale = await save('moida-browse', edited(repo, '옛 화면'), 0);
     assert.equal(stale.status, 409, stale.text);
   });
 
   test('파일 규칙을 어기면 422, 모양이 틀리면 400, 없는 판 · 콘솔 판 없는 스킬의 되돌리기는 404', async () => {
-    const repo = (await detail('cairn-code')).repo as Json;
+    const repo = (await detail('moida-code')).repo as Json;
     const files = (repo as { files: Record<string, string> }).files;
     const skillMd = files['SKILL.md'] as string;
     for (const [label, bad] of [
-      ['다른 이름', { 'SKILL.md': skillMd.replace('name: cairn-code', 'name: cairn-write') }],
-      ['러너 표시를 지움', { 'SKILL.md': skillMd.replace('cairn-where: runner\n', '') }],
+      ['다른 이름', { 'SKILL.md': skillMd.replace('name: moida-code', 'name: moida-write') }],
+      ['러너 표시를 지움', { 'SKILL.md': skillMd.replace('moida-where: runner\n', '') }],
       ['스크립트', { 'SKILL.md': skillMd, 'scripts/run.sh': 'rm -rf /' }],
       ['폴더 밖', { 'SKILL.md': skillMd, '../x.md': 'x' }],
       ['앞부분 없음', { 'SKILL.md': '# 그냥 글' }],
     ] as const) {
-      const res = await save('cairn-code', bad, 0);
+      const res = await save('moida-code', bad, 0);
       assert.equal(res.status, 422, `${label}: ${res.text}`);
     }
-    assert.equal((await save('cairn-code', { 'SKILL.md': 1 } as Json, 0)).status, 400);
-    const missing = await api.request('PUT', '/api/runner-skills/cairn-code/active', owner, {
+    assert.equal((await save('moida-code', { 'SKILL.md': 1 } as Json, 0)).status, 400);
+    const missing = await api.request('PUT', '/api/runner-skills/moida-code/active', owner, {
       revision: null,
       version: 1,
     });
     assert.equal(missing.status, 404, '콘솔 판이 없는 스킬');
-    const noRevision = await api.request('PUT', '/api/runner-skills/cairn-code/active', owner, {
+    const noRevision = await api.request('PUT', '/api/runner-skills/moida-code/active', owner, {
       version: 1,
     });
     assert.equal(noRevision.status, 400, 'revision을 보내지 않으면 (저장소 판은 null로 보낸다)');
-    assert.equal((await api.get('/api/runner-skills/cairn-code/revisions/9', owner)).status, 404);
+    assert.equal((await api.get('/api/runner-skills/moida-code/revisions/9', owner)).status, 404);
   });
 
   test('쌓인 판은 DB도 고치거나 지우지 못한다', async () => {
@@ -242,20 +242,20 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
 
   test('next_jobs는 지금 쓰는 판(콘솔 판이 있으면 그것)을 파일까지 실어 보낸다', async () => {
     const repoJob = await lease();
-    assert.equal(repoJob.skill, 'cairn-write');
+    assert.equal(repoJob.skill, 'moida-write');
     const repoPackage = repoJob.skill_package as Json;
     assert.equal(repoPackage.source, 'repo');
     assert.equal(repoPackage.revision, null);
-    assert.match(String((repoPackage.files as Json)['SKILL.md']), /name: cairn-write/);
+    assert.match(String((repoPackage.files as Json)['SKILL.md']), /name: moida-write/);
 
-    const repo = (await detail('cairn-write')).repo as Json;
-    ok(await save('cairn-write', edited(repo, '콘솔에서 더한 규칙'), 0), 201);
+    const repo = (await detail('moida-write')).repo as Json;
+    ok(await save('moida-write', edited(repo, '콘솔에서 더한 규칙'), 0), 201);
     const consoleJob = await lease();
     const consolePackage = consoleJob.skill_package as Json;
     assert.equal(consolePackage.source, 'console');
     assert.equal(consolePackage.revision, 1);
     assert.match(String((consolePackage.files as Json)['SKILL.md']), /콘솔에서 더한 규칙/);
-    assert.equal(consolePackage.hash, (await detail('cairn-write')).hash);
+    assert.equal(consolePackage.hash, (await detail('moida-write')).hash);
   });
 
   test('빌릴 때마다 실행 기록: 에이전트 설정 판 · 스킬 판 · 러너 빌드 · CLI. 모델은 첫 보고가 한 번 채운다', async () => {
@@ -266,7 +266,7 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
     assert.equal(run.seq, 1);
     assert.equal(run.agentRevision, 1);
     assert.deepEqual(run.skill, {
-      name: 'cairn-write',
+      name: 'moida-write',
       source: 'console',
       revision: 1,
       hash: (job.skill_package as Json).hash,
@@ -285,17 +285,17 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
     await assert.rejects(db.sql`DELETE FROM task.task_runs WHERE task_id = ${String(taskId)}`);
   });
 
-  test('지시문 틀(cairn-runner)도 일마다 실려 가고 실행 기록에 남는다. 콘솔 판은 저장소 판과 틀 이름 · 자리가 맞아야 한다', async () => {
+  test('지시문 틀(moida-runner)도 일마다 실려 가고 실행 기록에 남는다. 콘솔 판은 저장소 판과 틀 이름 · 자리가 맞아야 한다', async () => {
     const repoJob = await lease();
     const repoPrompt = repoJob.prompt_package as Json;
-    assert.equal(repoPrompt.name, 'cairn-runner');
+    assert.equal(repoPrompt.name, 'moida-runner');
     assert.equal(repoPrompt.source, 'repo');
     const prompts = String((repoPrompt.files as Json)['references/prompts.md']);
     assert.match(prompts, /<!-- intro -->/);
     const [repoRun] = await runsOf((repoJob.task as Json).id);
     assert.deepEqual(repoRun?.prompt, { source: 'repo', revision: null, hash: repoPrompt.hash });
 
-    const files = ((await detail('cairn-runner')).repo as { files: Json }).files;
+    const files = ((await detail('moida-runner')).repo as { files: Json }).files;
     const withPrompts = (text: string): Json => ({ ...files, 'references/prompts.md': text });
     for (const [label, text, said] of [
       [
@@ -315,14 +315,14 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
       ],
       ['없는 틀', `${prompts}\n<!-- extra -->\n더`, /저장소 버전에 없는 틀이에요: extra/],
     ] as const) {
-      const res = await save('cairn-runner', withPrompts(text), 0);
+      const res = await save('moida-runner', withPrompts(text), 0);
       assert.equal(res.status, 422, `${label}: ${res.text}`);
       assert.match(res.text, said, label);
     }
 
     const saved = ok(
       await save(
-        'cairn-runner',
+        'moida-runner',
         withPrompts(prompts.replace('# 할 일: {{title}}', '# 맡은 일: {{title}}')),
         0,
       ),
@@ -343,7 +343,7 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
       hash: consolePrompt.hash,
     });
     ok(
-      await api.request('PUT', '/api/runner-skills/cairn-runner/active', owner, {
+      await api.request('PUT', '/api/runner-skills/moida-runner/active', owner, {
         revision: null,
         version: saved.version,
       }),
@@ -396,10 +396,10 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
     assert.equal((await api.get(`/api/agents/${agent.id}/revisions`)).status, 403, '방문자');
   });
   test('스킬 버전 성적표 (2026-11-24): 버전마다 끝냄 · 한 번에 통과 · 고쳐 달라 · 토큰을 세고, 끝난 일이 적으면 판단 보류', async () => {
-    const before = await detail('cairn-write');
+    const before = await detail('moida-write');
     const saved = ok(
       await save(
-        'cairn-write',
+        'moida-write',
         edited(before.repo as Json, `성적표 ${randomUUID()}`),
         Number(before.version),
       ),
@@ -428,7 +428,7 @@ describe('러너에게 실어 보내기 · 실행 기록', () => {
         (${space}, ${String(second)}, 'task.chat.result', 'chat_turn', ${randomUUID()}, 1,
         'revision_requested', now())`;
 
-    const after = await detail('cairn-write');
+    const after = await detail('moida-write');
     assert.deepEqual([after.scoreDays, after.scoreMinFinished], [30, 5]);
     const scores = after.scores as Json[];
     const mine = scores.find((s) => s.source === 'console' && s.revision === saved.revision);

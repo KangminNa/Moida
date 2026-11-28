@@ -125,7 +125,7 @@ export async function approvedPlan(work: Work, actor: Actor): Promise<ClickPlanR
   });
   if (!plan)
     throw new RuleViolation(
-      '승인된 누르기 계획이 없어요. 마지막 버튼 앞에서 browser-stop.json으로 멈춰요 (cairn-browse)',
+      '승인된 누르기 계획이 없어요. 마지막 버튼 앞에서 browser-stop.json으로 멈춰요 (moida-browse)',
     );
   return plan;
 }

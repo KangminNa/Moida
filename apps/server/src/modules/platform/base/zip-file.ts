@@ -23,7 +23,7 @@ export class ZipFile {
 
   private readonly entries: ZipEntry[] = [];
 
-  /** path는 묶음 안의 경로 (예: cairn-save/SKILL.md) */
+  /** path는 묶음 안의 경로 (예: moida-save/SKILL.md) */
   add(path: string, content: string | Buffer): this {
     const data = typeof content === 'string' ? Buffer.from(content, 'utf8') : content;
     this.entries.push(new ZipEntry(Buffer.from(path, 'utf8'), data));

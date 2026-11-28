@@ -163,12 +163,12 @@ describe('브라우저 작업의 설정 (러너)', () => {
     ]);
   });
 
-  test('Claude · Codex 설정: 브라우저 작업에만 playwright를 더한다 (작업 토큰은 cairn에만)', () => {
+  test('Claude · Codex 설정: 브라우저 작업에만 playwright를 더한다 (작업 토큰은 moida에만)', () => {
     const browser = BrowserMcp.for(siteJob(['https://blog.example']), 'http://127.0.0.1:9222');
     const plain = JSON.parse(ClaudeCli.mcpConfig('https://c.example/mcp', 'tok'));
-    assert.deepEqual(Object.keys(plain.mcpServers), ['cairn']);
+    assert.deepEqual(Object.keys(plain.mcpServers), ['moida']);
     const withBrowser = JSON.parse(ClaudeCli.mcpConfig('https://c.example/mcp', 'tok', browser));
-    assert.deepEqual(Object.keys(withBrowser.mcpServers), ['cairn', 'playwright']);
+    assert.deepEqual(Object.keys(withBrowser.mcpServers), ['moida', 'playwright']);
     assert.equal(withBrowser.mcpServers.playwright.type, 'stdio');
     assert.equal(JSON.stringify(withBrowser.mcpServers.playwright).includes('tok'), false);
 
@@ -196,7 +196,7 @@ describe('브라우저 작업의 설정 (러너)', () => {
       type: 'system',
       subtype: 'init',
       mcp_servers: [
-        { name: 'cairn', status: 'connected' },
+        { name: 'moida', status: 'connected' },
         { name: 'playwright', status: 'connected' },
       ],
     });
@@ -301,7 +301,7 @@ describe('브라우저 작업 (실제 Chromium + Playwright MCP)', { skip: TestC
   });
 
   beforeEach(() => {
-    work = mkdtempSync(join(tmpdir(), 'cairn-browse-'));
+    work = mkdtempSync(join(tmpdir(), 'moida-browse-'));
   });
 
   afterEach(() => {

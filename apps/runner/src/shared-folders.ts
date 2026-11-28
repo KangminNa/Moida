@@ -2,7 +2,7 @@ import { copyFile, lstat, mkdir, readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import type { PromptPack } from './prompt-pack';
 
-// 내 컴퓨터 러너가 AI에게 나눠 주는 폴더 (CAIRN_RUNNER_FOLDERS, 기획서 결정 2026-11-14).
+// 내 컴퓨터 러너가 AI에게 나눠 주는 폴더 (MOIDA_RUNNER_FOLDERS, 기획서 결정 2026-11-14).
 // 이 러너에 묶인 에이전트의 일에만 연다 (서버가 job.agent.bound로 알린다): 아무 에이전트나 내 파일을 보지 않게.
 // 원본을 AI에게 열지 않고 일마다 작업 자리(work/folders/<이름>)로 복사한다. 홈 막기(ClaudeCli.settings)는 그대로고,
 // AI가 고쳐도 원본에 닿지 않는다. 숨김 파일 · .git · node_modules · 링크는 빼고, 한도에 닿으면 거기까지만 복사한다.

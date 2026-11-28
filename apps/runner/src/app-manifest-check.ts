@@ -1,11 +1,11 @@
-// 앱의 선언서 cairn.json의 모양 검사 (스토어 9.2 · 9.13 · 12.1). 서버의 AppManifest와 같은 규칙이다:
+// 앱의 선언서 moida.json의 모양 검사 (스토어 9.2 · 9.13 · 12.1). 서버의 AppManifest와 같은 규칙이다:
 // 그리는 법(render) · 바깥 주소(hosts) · 회원(members) · 브라우저 권한(permissions) · 고정 화면의 테마(theme) · 표(tables).
 // 서버가 버전을 쌓을 때 다시 보지만, 러너가 먼저 보고 AI에게 한 번 더 맡긴다 (검증 고리 V).
 // 서버와 달리 앞 버전과 견주지 않는다 (칸의 타입 바꾸기는 서버가 거절하고 그 까닭이 알림으로 간다).
 // biome-ignore lint/complexity/noStaticOnlyClass: 규칙과 그 한도를 한 이름 아래에 둔다
 export class AppManifestCheck {
   /**
-   * 지도 회사의 스크립트 호스트: 지도는 cairn.map으로. plugins/map/providers.json의 sdkHosts와 같다
+   * 지도 회사의 스크립트 호스트: 지도는 moida.map으로. plugins/map/providers.json의 sdkHosts와 같다
    * (러너 이미지에는 plugins/가 없어 옮겨 적고, app-code-check.test.ts가 그 파일과 맞춰 본다)
    */
   private static readonly MAP_HOSTS: readonly string[] = [
@@ -16,7 +16,23 @@ export class AppManifestCheck {
     'maps.googleapis.com',
     'maps.gstatic.com',
   ];
-  static readonly FILE = 'cairn.json';
+  static readonly FILE = 'moida.json';
+  /** 옛 이름의 선언서 (2026-11-28 이름 cairn → moida 전에 만든 앱 코드). 새 이름이 없을 때만 (서버의 AppCodeBundle과 같다) */
+  static readonly LEGACY_FILE = 'cairn.json';
+
+  /** 선언서로 읽을 수 있는 이름인가 (새 이름 · 옛 이름) */
+  static isManifest(name: string): boolean {
+    return name === AppManifestCheck.FILE || name === AppManifestCheck.LEGACY_FILE;
+  }
+
+  /** 묶음에서 선언서로 읽을 파일: moida.json, 없으면 옛 cairn.json */
+  static pick<T extends { name: string }>(files: Iterable<T>): T | undefined {
+    const list = [...files];
+    return (
+      list.find((f) => f.name === AppManifestCheck.FILE) ??
+      list.find((f) => f.name === AppManifestCheck.LEGACY_FILE)
+    );
+  }
   static readonly STATIC = 'static';
   static readonly HOSTS_MAX = 10;
   static readonly TABLES_MAX = 20;
@@ -25,7 +41,7 @@ export class AppManifestCheck {
   static readonly TYPES: readonly string[] = ['text', 'int', 'number', 'bool', 'time', 'json'];
   static readonly READS: readonly string[] = ['anyone', 'member', 'owner', 'admin'];
   static readonly WRITES: readonly string[] = ['member', 'owner', 'admin'];
-  /** Cairn이 모든 표에 붙이는 칸 */
+  /** Moida이 모든 표에 붙이는 칸 */
   static readonly BUILT_IN: readonly string[] = ['id', 'owner', 'created_at', 'updated_at'];
   private static readonly BY_MEMBER: readonly string[] = ['member', 'owner'];
   private static readonly COMMUNITY = 'community';
@@ -35,7 +51,7 @@ export class AppManifestCheck {
   private static readonly HOST =
     /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
-  /** cairn.json이 정적 앱이라고 하는가 ("render": "static"). 읽을 수 없으면 템플릿 앱으로 본다 */
+  /** moida.json이 정적 앱이라고 하는가 ("render": "static"). 읽을 수 없으면 템플릿 앱으로 본다 */
   static isStatic(text: string | null): boolean {
     if (text === null) return false;
     try {
@@ -57,9 +73,10 @@ export class AppManifestCheck {
       return [`${file}이 JSON이 아니에요`];
     }
     if (!AppManifestCheck.isObject(parsed)) return [`${file}은 객체여야 해요`];
-    const { cairn, hosts = [], render = 'template', members, permissions = [] } = parsed;
+    const { hosts = [], render = 'template', members, permissions = [] } = parsed;
+    const moida = parsed.moida ?? parsed.cairn;
     const problems: string[] = [];
-    if (cairn !== undefined && cairn !== 1) problems.push('데이터 약속(cairn)은 1이에요');
+    if (moida !== undefined && moida !== 1) problems.push('데이터 약속(moida)은 1이에요');
     if (render !== 'template' && render !== AppManifestCheck.STATIC)
       problems.push('그리는 법(render)은 template · static 중 하나예요');
     if (!Array.isArray(hosts) || hosts.length > AppManifestCheck.HOSTS_MAX)
@@ -72,7 +89,7 @@ export class AppManifestCheck {
           );
         else if (AppManifestCheck.MAP_HOSTS.includes(host.toLowerCase()))
           problems.push(
-            `지도는 cairn.map으로 그려요 (키는 관리자가 지도 플러그인에 넣어요): 바깥 주소에 ${host}을 적지 않고, 지도 회사의 스크립트 · 키 · config.js를 넣지 않아요`,
+            `지도는 moida.map으로 그려요 (키는 관리자가 지도 플러그인에 넣어요): 바깥 주소에 ${host}을 적지 않고, 지도 회사의 스크립트 · 키 · config.js를 넣지 않아요`,
           );
     if (members !== undefined && typeof members !== 'boolean')
       problems.push('회원(members)은 true · false로 적어요');

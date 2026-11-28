@@ -24,7 +24,7 @@ function shared(
   return api.viaHost(path, APPS, {
     ...options,
     headers: {
-      ...(app ? { 'x-cairn-app': app } : {}),
+      ...(app ? { 'x-moida-app': app } : {}),
       ...(write ? { origin: `http://${APPS}`, 'x-forwarded-for': CommunitySite.nextPlace() } : {}),
       ...options.headers,
     },
@@ -32,7 +32,7 @@ function shared(
 }
 
 before(async () => {
-  process.env.CAIRN_APPS_URL = `http://${APPS}`;
+  process.env.MOIDA_APPS_URL = `http://${APPS}`;
   api = await ApiClient.start();
   owner = await api.signIn();
   CommunitySite.mailbox(api);
@@ -86,7 +86,7 @@ before(async () => {
   assert.equal(joined.status, 201, joined.text);
 });
 after(async () => {
-  delete process.env.CAIRN_APPS_URL;
+  delete process.env.MOIDA_APPS_URL;
   await api.close();
 });
 
@@ -139,7 +139,7 @@ describe('앱 없는 로그인', () => {
     const out = await shared('/api/store/logout', {
       method: 'POST',
       as: member,
-      headers: { 'x-cairn-csrf': csrf },
+      headers: { 'x-moida-csrf': csrf },
     });
     assert.equal(out.status, 204, out.text);
     assert.equal(

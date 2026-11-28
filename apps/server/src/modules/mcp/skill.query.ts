@@ -24,7 +24,7 @@ export class SkillPackageView {
 
 // ChatGPT·Claude 앱(웹·데스크톱 채팅)에 사용자가 직접 올릴 스킬 묶음. DB가 아니라 저장소의 skills/<이름>/에서 읽는다.
 // 앱에서는 이 컴퓨터의 스크립트를 쓸 수 없어서 scripts/와 agents/는 빼고, {{SKILL_DIR}}은 "이 스킬 폴더"로 바꾼다.
-// 이 컴퓨터에서 도는 도구(Claude Code·Codex)는 이것이 아니라 cairn connect가 함께 든 스킬을 넣는다.
+// 이 컴퓨터에서 도는 도구(Claude Code·Codex)는 이것이 아니라 moida connect가 함께 든 스킬을 넣는다.
 @Injectable()
 export class SkillQuery extends BaseQuery {
   private static readonly NAME = /^[a-z0-9-]{1,40}$/;

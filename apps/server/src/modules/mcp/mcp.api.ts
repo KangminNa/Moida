@@ -31,7 +31,7 @@ export class McpController {
     texts: ToolTextQuery,
   ) {
     this.endpoint = new McpEndpoint(
-      'cairn',
+      'moida',
       '0.1.0',
       () => toolbox.toolsNow(),
       McpToolbox.INSTRUCTIONS,

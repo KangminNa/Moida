@@ -113,7 +113,7 @@ async function newSession(wikiId: unknown): Promise<string> {
     request_id: randomUUID(),
     source_session_id: randomUUID(),
     tool: 'claude-code',
-    project: 'cairn',
+    project: 'moida',
     title: named('세션'),
     did: '한 일',
   });

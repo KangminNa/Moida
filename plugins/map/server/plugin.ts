@@ -8,8 +8,8 @@ import { GeocodeAddress, GeocodeCheck, MapUsage, ReverseGeocode, SearchPlaces } 
 // 그리기(브라우저용 키 · 스크립트 · 타일)는 웹(_blog/map-config.ts)이 공개 설정으로 하고, 서버 키는 여기서만 쓴다.
 // 구글 찾기는 구글 지도와 함께일 때만 (지오코딩 결과는 구글 지도에 보여야 한다, 구글 약관)
 export default class MapPlugin extends BasePlugin {
-  register(cairn: PluginContext): void {
-    const settings = cairn.settings();
+  register(moida: PluginContext): void {
+    const settings = moida.settings();
     const chosen = settings.get('searchProvider') ?? 'none';
     const provider =
       chosen === 'kakao' || chosen === 'naver' || chosen === 'google' ? chosen : null;
@@ -29,11 +29,11 @@ export default class MapPlugin extends BasePlugin {
     const limit = MapPlugin.limitOf(settings.get('dailyLimit'), spec?.dailyDefault ?? 0);
     const lookup = new MapLookup(gateway, provider ?? 'none', limit);
     const attribution = spec?.attribution ?? '';
-    cairn.addOperation(new SearchPlaces(lookup, provider ?? 'none', attribution));
-    cairn.addOperation(new GeocodeAddress(lookup, provider ?? 'none', attribution));
-    cairn.addOperation(new ReverseGeocode(lookup, provider ?? 'none', attribution));
-    cairn.addOperation(new GeocodeCheck(lookup, provider ?? 'none', attribution));
-    cairn.addOperation(new MapUsage(provider ?? 'none', ready, limit));
+    moida.addOperation(new SearchPlaces(lookup, provider ?? 'none', attribution));
+    moida.addOperation(new GeocodeAddress(lookup, provider ?? 'none', attribution));
+    moida.addOperation(new ReverseGeocode(lookup, provider ?? 'none', attribution));
+    moida.addOperation(new GeocodeCheck(lookup, provider ?? 'none', attribution));
+    moida.addOperation(new MapUsage(provider ?? 'none', ready, limit));
   }
 
   /** 하루 상한: 설정의 숫자, 비었거나 틀리면 회사의 기본 (providers.json의 dailyDefault) */

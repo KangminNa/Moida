@@ -19,7 +19,7 @@ let replies: [number, object][] = [];
 const seen: string[] = [];
 
 before(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'cairn-pairing-'));
+  dir = mkdtempSync(join(tmpdir(), 'moida-pairing-'));
   server = createServer((req, res) => {
     let body = '';
     req.on('data', (chunk) => {
@@ -53,10 +53,10 @@ describe('서버 러너 연결 (ServerPairing)', () => {
     seen.length = 0;
     replies = [
       [409, { code: 'conflict', message: '설치가 끝나면 서버 러너가 연결돼요' }],
-      [200, { id: 'd1', token: 'cairn_dt_new' }],
+      [200, { id: 'd1', token: 'moida_dt_new' }],
     ];
     const token = await pairing(file).token(new AbortController().signal);
-    assert.equal(token, 'cairn_dt_new');
+    assert.equal(token, 'moida_dt_new');
     assert.equal(seen.length, 2);
     assert.equal(seen[0], 'POST /api/devices/server-runner {"secret":"the-secret"}');
   });
@@ -66,12 +66,12 @@ describe('서버 러너 연결 (ServerPairing)', () => {
     seen.length = 0;
     replies = [
       [403, { code: 'forbidden', message: '서버 러너의 연결 값이 맞지 않아요' }],
-      [200, { id: 'd1', token: 'cairn_dt_after' }],
+      [200, { id: 'd1', token: 'moida_dt_after' }],
     ];
     setTimeout(() => writeFileSync(file, 'old'), 30);
     setTimeout(() => writeFileSync(file, 'new'), 60);
     const token = await pairing(file).token(new AbortController().signal);
-    assert.equal(token, 'cairn_dt_after');
+    assert.equal(token, 'moida_dt_after');
     assert.match(seen.at(-1) ?? '', /"secret":"(old|new)"/);
   });
 
@@ -79,9 +79,9 @@ describe('서버 러너 연결 (ServerPairing)', () => {
     const file = join(dir, 'code-pairing');
     writeFileSync(file, 'code-secret\n');
     seen.length = 0;
-    replies = [[200, { id: 'd2', token: 'cairn_dt_slot' }]];
+    replies = [[200, { id: 'd2', token: 'moida_dt_slot' }]];
     const token = await pairing(file, '3').token(new AbortController().signal);
-    assert.equal(token, 'cairn_dt_slot');
+    assert.equal(token, 'moida_dt_slot');
     assert.deepEqual(seen, ['POST /api/devices/code-runner {"secret":"code-secret","slot":"3"}']);
   });
 

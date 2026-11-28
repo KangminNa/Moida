@@ -269,7 +269,7 @@ a {
   color: var(--fg);
 }
 
-/* 글 본문 (Cairn이 md를 그린 HTML) */
+/* 글 본문 (Moida이 md를 그린 HTML) */
 .prose {
   font-size: 1.1rem;
   line-height: 1.85;

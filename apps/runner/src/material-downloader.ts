@@ -5,8 +5,8 @@ import { extname, join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { pause } from './backoff';
-import type { CairnServer } from './cairn-server';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 
 /** 받지 않고 넘어갈 파일: 그사이 휴지통에 갔거나 없어졌다, 한도보다 크다. 그 파일만 빼고 이어 간다 */
 export class MaterialGone extends Error {}
@@ -40,7 +40,7 @@ export class MaterialDownloader {
   private readonly taken = new Set<string>();
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly serverUrl: string,
     /** 받을 파일 하나의 한도. 표의 크기가 넘으면 받지 않는다 (MaterialGone) */
     private readonly maxBytes = Number.POSITIVE_INFINITY,

@@ -2,7 +2,7 @@
 // 주소에 두어 새로고침 · 뒤로 가기 · 북마크가 그대로 되고, 옆 칸의 너비만 이 브라우저에 기억한다.
 
 /** 대화 목록 줄을 끌 때 싣는 값의 종류 (다른 것을 끌어 오면 놓을 자리를 보이지 않는다) */
-export const CHAT_DRAG = 'application/x-cairn-chat';
+export const CHAT_DRAG = 'application/x-moida-chat';
 
 /** 옆 칸이 차지하는 몫: 처음 값과 끌어서 바꿀 수 있는 범위 */
 export const SIDE_RATIO = { initial: 0.5, min: 0.3, max: 0.7 } as const;

@@ -1,4 +1,4 @@
-// 러너의 자리 (CAIRN_RUNNER_CONCURRENCY): 동시에 도는 일을 세고, 자리가 빌 때까지 기다리게 한다.
+// 러너의 자리 (MOIDA_RUNNER_CONCURRENCY): 동시에 도는 일을 세고, 자리가 빌 때까지 기다리게 한다.
 // 일 하나는 다른 일과 상관없이 끝까지 간다 (JobRun · SigninRun이 각자 자리 · AI CLI · 보고를 가진다).
 // 사이트 일(대상이 있는 브라우저 작업)은 자리가 남아도 하나씩만 빌린다: 서버 브라우저의 로그인된 프로필 하나를 AI 둘이 함께 움직이면
 // 탭이 섞인다 (그 안에서도 BrowserSlot이 결재된 클릭과 차례를 나눈다). 둘러보기는 일마다 새 컨텍스트라 여럿이 함께 돈다.
@@ -24,7 +24,7 @@ export class JobPool {
     return true;
   }
 
-  /** 자리 수의 상한 (CAIRN_RUNNER_CONCURRENCY와 같다) */
+  /** 자리 수의 상한 (MOIDA_RUNNER_CONCURRENCY와 같다) */
   private static readonly SLOTS_MAX = 8;
 
   /** 지금 더 빌릴 수 있는 일의 수 */

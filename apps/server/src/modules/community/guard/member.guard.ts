@@ -11,7 +11,7 @@ import { MemberCsrf } from '../member/member-csrf.policy';
 // 앱 도메인에서는 관리자 쿠키를 보지 않는다 (ActorGuard). 그래서 회원은 관리 API에, 관리자 로그인은 회원 API에 닿지 않는다.
 // 쓰기(POST · PATCH · DELETE)는 세 겹으로 본다 (11.1 세션 탈취 · CSRF):
 //   다른 사이트에서 온 요청(Sec-Fetch-Site: cross-site)은 403, Origin이 있으면 이 앱 도메인의 출처여야 하고,
-//   회원 쿠키를 실었으면 X-Cairn-CSRF가 그 쿠키의 확인 값(MemberCsrf)이어야 한다 (쿠키가 없으면 훔칠 로그인이 없다).
+//   회원 쿠키를 실었으면 X-Moida-CSRF가 그 쿠키의 확인 값(MemberCsrf)이어야 한다 (쿠키가 없으면 훔칠 로그인이 없다).
 //   가입 · 로그인은 쿠키 없이 오므로 앞의 둘이 지킨다: 다른 사이트가 남의 브라우저를 자기 계정으로 로그인시키지 못하게.
 //   본문은 JSON만 읽는다 (HttpSetup): 다른 사이트의 폼은 JSON을 보내지 못하고, fetch는 CORS를 열지 않아 막힌다
 @Injectable()

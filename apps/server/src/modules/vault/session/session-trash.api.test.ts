@@ -26,7 +26,7 @@ async function save(source: string, did: string): Promise<string> {
       request_id: randomUUID(),
       source_session_id: source,
       tool: 'claude-code',
-      project: 'cairn',
+      project: 'moida',
       title: `휴지통 ${mark}`,
       did,
     },

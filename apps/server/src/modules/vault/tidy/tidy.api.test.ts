@@ -43,7 +43,7 @@ const save = async (source: string, did: string, title = '로그인 고치기'):
     request_id: randomUUID(),
     source_session_id: source,
     tool: 'claude-code',
-    project: 'cairn',
+    project: 'moida',
     title,
     did,
   });
@@ -421,7 +421,7 @@ describe('가짜 러너', () => {
     const [job] = await nextJobs();
     const task = job?.task as Json;
     const target = job?.target as Json;
-    assert.equal(job?.skill, 'cairn-tidy');
+    assert.equal(job?.skill, 'moida-tidy');
     assert.equal(target.kind, 'session');
     assert.equal(target.id, id);
     assert.equal((job?.agent as Json | undefined)?.id, agent.id);

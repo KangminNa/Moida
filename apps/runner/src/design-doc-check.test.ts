@@ -3,7 +3,7 @@ import { describe, test } from 'node:test';
 import { AppCodeEntry } from './app-code-check';
 import { DesignDocCheck } from './design-doc-check';
 
-// 디자인 문서 검사 (2026-11-25, 스킬 cairn-make의 references/design-research.md)
+// 디자인 문서 검사 (2026-11-25, 스킬 moida-make의 references/design-research.md)
 
 const DOC = [
   '# 디자인 문서: 동네 빵집',
@@ -23,7 +23,7 @@ const screen = [entry('index.html', '<main></main>')];
 
 describe('디자인 문서 검사', () => {
   test('화면을 내지 않은 일은 보지 않는다', () => {
-    assert.equal(DesignDocCheck.check([entry('cairn.json', '{}')], []), null);
+    assert.equal(DesignDocCheck.check([entry('moida.json', '{}')], []), null);
   });
 
   test('문서가 있고 제목 넷 · 참고 주소 둘이면 통과 (앞 버전의 문서도 된다)', () => {

@@ -5,7 +5,6 @@ import { BrowserMcp } from './browser-mcp';
 import { BrowserPages } from './browser-page';
 import { BrowserSlot } from './browser-slot';
 import { BrowserTabs } from './browser-tabs';
-import { CairnServer } from './cairn-server';
 import { ClickRunner } from './click-runner';
 import { CodeStage } from './code-stage';
 import { IntegrationExec } from './integration-exec';
@@ -16,6 +15,7 @@ import { CliUnavailable, JobRun } from './job-run';
 import { LoginRunner } from './login-runner';
 import { MakeStage } from './make-stage';
 import { AccessDenied, McpClient, ToolRefused } from './mcp-client';
+import { MoidaServer } from './moida-server';
 import { NoteStage } from './note-stage';
 import { RunResult } from './progress';
 import { Redactor, RunLog } from './redactor';
@@ -34,7 +34,7 @@ export class RunnerHalted extends Error {}
 export class TokenRejected extends RunnerHalted {}
 
 // 러너의 고리: 빈 자리만큼 일을 빌리고(next_jobs의 limit), 일마다 따로 끝까지 처리하고, 자리가 비면 다시 빌린다.
-// 동시에 하는 일의 수는 CAIRN_RUNNER_CONCURRENCY (서버 러너 기본 3, 내 컴퓨터 러너 1, 코드 러너 칸은 늘 1. JobPool).
+// 동시에 하는 일의 수는 MOIDA_RUNNER_CONCURRENCY (서버 러너 기본 3, 내 컴퓨터 러너 1, 코드 러너 칸은 늘 1. JobPool).
 // 서버에 닿지 못하면 간격을 늘려 다시 묻는다. 들어오는 포트 없이 나가는 요청만 쓴다 (객체설계 13장 임대 큐).
 // 이 러너가 할 수 있는 것(가진 AI CLI, 웹 로그인, 스스로 가진 로그인)을 next_jobs로 알리면 서버가 할 수 있는 일만 준다:
 // 로그인이 없는 도구의 일은 빌렸다 돌려주지 않고 대기열에 남는다. 웹 로그인은 토큰 없이 돈다 (SigninRun).
@@ -74,7 +74,7 @@ export class Runner {
   private readonly repoWait = new Backoff(Runner.REPO_WAIT_FIRST_MS, Runner.REPO_WAIT_MAX_MS);
   private readonly redactor: Redactor;
   private readonly log: RunLog;
-  private readonly server: CairnServer;
+  private readonly server: MoidaServer;
   private readonly logins: AiLogins;
   private readonly ability: RunnerAbility;
   /** 서버 브라우저의 로그인된 프로필을 쓰는 자리: 사이트 일과 결재된 클릭이 하나씩 (BrowseStage · ClickRunner) */
@@ -86,7 +86,7 @@ export class Runner {
     if (!token) throw new RunnerHalted('기기 토큰 없이 러너를 시작할 수 없어요');
     this.redactor = new Redactor([token, ...Object.values(config.ownLogins)]);
     this.log = new RunLog(this.redactor);
-    this.server = new CairnServer(new McpClient(config.mcpUrl, token));
+    this.server = new MoidaServer(new McpClient(config.mcpUrl, token));
     this.logins = new AiLogins(this.server, config.ownLogins);
     this.ability = RunnerAbility.detect(config);
     this.pages = config.browserUrl ? new BrowserPages(config.browserUrl) : null;

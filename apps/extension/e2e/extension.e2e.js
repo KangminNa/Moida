@@ -1,5 +1,5 @@
 // 확장을 실제 Chromium(창 없이)에 올려 처음부터 끝까지 본다.
-//   - 가짜 Cairn(127.0.0.1)과 가짜 chatgpt.com · claude.ai · 글 페이지(context.route)
+//   - 가짜 Moida(127.0.0.1)과 가짜 chatgpt.com · claude.ai · 글 페이지(context.route)
 //   - 연결은 승인 창을 띄울 수 없어 서비스 워커로 저장소에 열쇠를 넣는다 (연결 흐름은 단위 테스트가 본다)
 //   - 연결할 때 받는 사이트 권한과, 팝업을 누를 때 받는 activeTab 대신 시험용 manifest에 host_permissions를 더한다
 // Playwright(require('playwright'))와 그 Chromium이 없으면 건너뛴다.
@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { ACCESS_TOKEN, FakeCairn } from './fake-cairn.js';
+import { ACCESS_TOKEN, FakeMoida } from './fake-moida.js';
 import { ARTICLE, CHATGPT, CLAUDE, GEMINI } from './fake-pages.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,13 +46,13 @@ function extensionCopy(dir) {
 }
 
 describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromium 없음' }, () => {
-  const cairn = new FakeCairn();
-  const temp = mkdtempSync(join(tmpdir(), 'cairn-extension-'));
+  const moida = new FakeMoida();
+  const temp = mkdtempSync(join(tmpdir(), 'moida-extension-'));
   let context;
   let worker;
 
   before(async () => {
-    await cairn.start();
+    await moida.start();
     extensionCopy(join(temp, 'extension'));
     const extension = join(temp, 'extension');
     context = await playwright.chromium.launchPersistentContext(join(temp, 'profile'), {
@@ -86,13 +86,13 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
           },
           quietMs: 800,
         }),
-      { site: cairn.site, token: ACCESS_TOKEN },
+      { site: moida.site, token: ACCESS_TOKEN },
     );
   });
 
   after(async () => {
     await context?.close();
-    await cairn.stop();
+    await moida.stop();
     rmSync(temp, { recursive: true, force: true });
   });
 
@@ -100,7 +100,7 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     const page = await context.newPage();
     await page.goto('https://chatgpt.com/c/e2e-chatgpt-1');
     const chatgpt = () =>
-      cairn.argumentsOf('save_transcript').filter((a) => a.tool === 'chatgpt-web');
+      moida.argumentsOf('save_transcript').filter((a) => a.tool === 'chatgpt-web');
     const [args] = await until(() => chatgpt().length > 0 && chatgpt(), 'ChatGPT 대화');
     assert.equal(args.source_session_id, 'e2e-chatgpt-1');
     assert.equal(args.title, '피보나치 함수');
@@ -119,7 +119,7 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     const page = await context.newPage();
     await page.goto('https://claude.ai/chat/e2e-claude-1');
     const args = await until(
-      () => cairn.argumentsOf('save_transcript').find((a) => a.tool === 'claude-web'),
+      () => moida.argumentsOf('save_transcript').find((a) => a.tool === 'claude-web'),
       'Claude 대화',
     );
     assert.equal(args.source_session_id, 'e2e-claude-1');
@@ -135,7 +135,7 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     const page = await context.newPage();
     await page.goto('https://gemini.google.com/app/e2e-gemini-1');
     const args = await until(
-      () => cairn.argumentsOf('save_transcript').find((a) => a.tool === 'gemini-web'),
+      () => moida.argumentsOf('save_transcript').find((a) => a.tool === 'gemini-web'),
       'Gemini 대화',
     );
     assert.equal(args.source_session_id, 'e2e-gemini-1');
@@ -151,7 +151,7 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     const page = await context.newPage();
     await page.goto('https://chatgpt.com/');
     await new Promise((done) => setTimeout(done, 3000));
-    assert.equal(cairn.argumentsOf('save_transcript').length, 3);
+    assert.equal(moida.argumentsOf('save_transcript').length, 3);
     await page.close();
   });
 
@@ -177,7 +177,7 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     );
     const popup = await opened;
     await popup.waitForSelector('#connected:not([hidden])');
-    assert.equal(await popup.textContent('#state'), `연결: ${new URL(cairn.site).host}`);
+    assert.equal(await popup.textContent('#state'), `연결: ${new URL(moida.site).host}`);
     assert.equal(await popup.textContent('#result.error'), '연결하지 못했어요: 시험');
     const { connectProblem } = await worker.evaluate(() =>
       chrome.storage.local.get('connectProblem'),
@@ -190,7 +190,7 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
 
     await popup.click('#keep');
     await until(async () => (await popup.textContent('#result')) === '보관했어요', '보관');
-    const [kept] = cairn.argumentsOf('keep_page');
+    const [kept] = moida.argumentsOf('keep_page');
     assert.equal(kept.url, ARTICLE_URL);
     assert.equal(kept.title, '읽을 만한 글');
     assert.equal(kept.text, '이 문단을 골라 보관해요.');
@@ -198,8 +198,8 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     const chat = context.waitForEvent('page', (p) => p.url().includes('/admin/chats/'));
     await popup.fill('#words', '이 글을 세 줄로 요약해 줘');
     await popup.click('#ask button[type=submit]');
-    assert.equal((await chat).url(), `${cairn.site}/admin/chats/chat-1`);
-    const [asked] = cairn.argumentsOf('ask_agent');
+    assert.equal((await chat).url(), `${moida.site}/admin/chats/chat-1`);
+    const [asked] = moida.argumentsOf('ask_agent');
     assert.equal(
       asked.message,
       `이 글을 세 줄로 요약해 줘\n\n페이지: ${ARTICLE_URL}\n제목: 읽을 만한 글\n\n고른 부분:\n이 문단을 골라 보관해요.`,
@@ -216,13 +216,13 @@ describe('확장 (Chromium)', { skip: playwright ? false : 'Playwright · Chromi
     await gemini.goto('https://gemini.google.com/app/e2e-gemini-2');
     await new Promise((done) => setTimeout(done, 3000));
     assert.equal(
-      cairn.argumentsOf('save_transcript').some((a) => a.source_session_id === 'e2e-gemini-2'),
+      moida.argumentsOf('save_transcript').some((a) => a.source_session_id === 'e2e-gemini-2'),
       false,
       '끈 사이트의 대화는 올리지 않는다',
     );
     await gemini.close();
 
-    const admin = context.waitForEvent('page', (p) => p.url() === `${cairn.site}/admin`);
+    const admin = context.waitForEvent('page', (p) => p.url() === `${moida.site}/admin`);
     await popup.click('#console');
     await admin;
   });

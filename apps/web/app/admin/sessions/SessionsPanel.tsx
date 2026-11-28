@@ -109,7 +109,7 @@ export function SessionsPanel({ initialId }: { initialId: string | null }) {
         <div className="result">
           <b>저장한 세션 없음</b>
           <p className="label-mono" style={{ margin: '6px 0 0' }}>
-            cairn connect로 연결하면 Claude Code 세션이 끝날 때 저절로 올라와요
+            moida connect로 연결하면 Claude Code 세션이 끝날 때 저절로 올라와요
           </p>
         </div>
       ) : (

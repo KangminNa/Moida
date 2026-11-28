@@ -20,7 +20,7 @@ let fake: FakeGithub;
 let api: string;
 let archive: ArchiveFile[];
 
-const cairnJson = ArchiveFile.text('cairn.json', '{"format":1}\n');
+const moidaJson = ArchiveFile.text('moida.json', '{"format":1}\n');
 const session = ArchiveFile.text('vault/sessions/api/2026-10-10-oauth.md', '## 한 일\n토큰 갱신\n');
 const post = ArchiveFile.text('blog/posts/2026/mcp-login.md', '# MCP 로그인\n');
 const photo = ArchiveFile.bytes(
@@ -30,7 +30,7 @@ const photo = ArchiveFile.bytes(
 
 function job(branch = 'main'): SyncJob {
   return new SyncJob(
-    new GithubGateway('me/cairn-archive', 't0ken', api),
+    new GithubGateway('me/moida-archive', 't0ken', api),
     branch,
     async () => archive,
     [],
@@ -45,7 +45,7 @@ after(() => fake.stop());
 
 describe('sync-github', () => {
   test('빈 저장소에 처음 보내고, 바뀐 게 없으면 커밋하지 않는다', async () => {
-    archive = [cairnJson, session, post, photo];
+    archive = [moidaJson, session, post, photo];
     const first = await job().syncOnce();
     assert.equal(first.ok, true, first.message);
     assert.deepEqual([...fake.filesAt('main').keys()].sort(), archive.map((f) => f.path).sort());
@@ -57,7 +57,7 @@ describe('sync-github', () => {
 
   test('없어진 보관 파일은 지우고, README처럼 보관 형식 밖의 파일은 그대로 둔다', async () => {
     fake.seed('main', 'README.md', '내 보관소');
-    archive = [cairnJson, session, photo];
+    archive = [moidaJson, session, photo];
     const result = await job().syncOnce();
     assert.match(result.message, /0개 올림, 1개 지움/);
     const files = fake.filesAt('main');
@@ -66,8 +66,8 @@ describe('sync-github', () => {
   });
 
   test('받아 온 파일이 보낸 파일과 바이트까지 같다 (사진 포함)', async () => {
-    const gh = new GithubGateway('me/cairn-archive', 't0ken', api);
-    const files = [cairnJson, session, photo];
+    const gh = new GithubGateway('me/moida-archive', 't0ken', api);
+    const files = [moidaJson, session, photo];
     await gh.commit('bytes', await gh.snapshot('bytes'), files, '바이트 확인');
     const downloaded = await gh.download('bytes');
     const byPath = new Map(downloaded.map((f) => [f.path, f.body]));
@@ -81,12 +81,12 @@ describe('sync-github', () => {
     const url = await open.start();
     const draft = ArchiveFile.text('blog/posts/2026/draft.md', '임시 글\n').keptPrivate();
     const draftPhoto = ArchiveFile.bytes('assets/aa11.png', Buffer.from([1, 2, 3])).keptPrivate();
-    archive = [cairnJson, session, post, draft, photo, draftPhoto];
-    const gh = new GithubGateway('me/cairn-site', 't0ken', url);
+    archive = [moidaJson, session, post, draft, photo, draftPhoto];
+    const gh = new GithubGateway('me/moida-site', 't0ken', url);
     const result = await new SyncJob(gh, 'main', async () => archive, []).syncOnce();
     await open.stop();
     assert.equal(result.ok, true, result.message);
-    const sent = [cairnJson, post, photo].map((f) => f.path).sort();
+    const sent = [moidaJson, post, photo].map((f) => f.path).sort();
     assert.deepEqual([...open.filesAt('main').keys()].sort(), sent);
     assert.deepEqual(result.details, ['저장소가 공개라 비공개 파일 3개는 보내지 않았어요']);
   });
@@ -97,7 +97,7 @@ describe('sync-github', () => {
     assert.equal(blocked.ok, false);
     assert.match(blocked.message, /공개 저장소에 vault 파일이 있어요/);
 
-    archive = [cairnJson, session, post];
+    archive = [moidaJson, session, post];
     const fresh = await job('public-site').syncOnce();
     assert.equal(fresh.ok, false, '갈라 만든 브랜치에도 main의 vault가 따라오므로 막혀야 한다');
     fake.isPrivate = true;
@@ -108,11 +108,11 @@ describe('sync-github', () => {
     const url = await guarded.start();
     const gh = new GithubGateway('me/backup', 't0ken', url);
     const sync = new SyncJob(gh, 'main', async () => archive, []);
-    archive = [cairnJson, session, post, photo];
+    archive = [moidaJson, session, post, photo];
     await sync.syncOnce();
     const backup = guarded.filesAt('main');
 
-    archive = [cairnJson, ArchiveFile.text('vault/categories.yml', '[]\n')];
+    archive = [moidaJson, ArchiveFile.text('vault/categories.yml', '[]\n')];
     const refused = await sync.syncOnce();
     assert.equal(refused.ok, false);
     assert.match(refused.message, /비어 있는 Moida라 동기화를 멈췄어요/);
@@ -129,7 +129,7 @@ describe('sync-github', () => {
     const empty = new FakeGithub();
     const url = await empty.start();
     const gh = new GithubGateway('me/new', 't0ken', url);
-    archive = [cairnJson, ArchiveFile.text('vault/categories.yml', '[]\n')];
+    archive = [moidaJson, ArchiveFile.text('vault/categories.yml', '[]\n')];
     const sync = new SyncJob(gh, 'main', async () => archive, []);
     const first = await sync.syncOnce();
     assert.equal(first.ok, true, first.message);
@@ -143,9 +143,9 @@ describe('sync-github', () => {
     open.isPrivate = false;
     const url = await open.start();
     const gh = new GithubGateway('me/site', 't0ken', url);
-    archive = [cairnJson, post];
+    archive = [moidaJson, post];
     await new SyncJob(gh, 'main', async () => archive, []).syncOnce();
-    archive = [cairnJson, session];
+    archive = [moidaJson, session];
     const result = await new SyncJob(gh, 'main', async () => archive, []).syncOnce();
     assert.equal(result.ok, true, result.message);
     assert.equal(open.filesAt('main').has(post.path), false, '내린 글은 지운다');
@@ -154,7 +154,7 @@ describe('sync-github', () => {
 
   test('복원 동작은 주인만, 설정이 비어 있으면 받지 않는다', async () => {
     const restorer = {} as ArchiveRestoreService;
-    const gh = new GithubGateway('me/cairn-archive', 't0ken', api);
+    const gh = new GithubGateway('me/moida-archive', 't0ken', api);
     for (const action of [
       new RestorePreviewAction(gh, 'main', restorer, []),
       new RestoreAction(gh, 'main', restorer, []),
@@ -170,7 +170,7 @@ describe('sync-github', () => {
   });
 
   test('연결 확인은 주인만, 결과에 private 여부와 브랜치 상태가 나온다', async () => {
-    const check = new CheckAction(new GithubGateway('me/cairn-archive', 't0ken', api), 'main', []);
+    const check = new CheckAction(new GithubGateway('me/moida-archive', 't0ken', api), 'main', []);
     await assert.rejects(check.run(new VisitorActor()), /권한으로만 할 수 있어요/);
     const result = await check.run(new OwnerActor('s', 'u'));
     assert.equal(result.ok, true);

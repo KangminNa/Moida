@@ -9,7 +9,7 @@ import { OutputBatch } from './output-batch';
 
 // 결과물로 올릴 파일 모으기 (디스크만, 서버 없이).
 
-const root = mkdtempSync(join(tmpdir(), 'cairn-output-batch-'));
+const root = mkdtempSync(join(tmpdir(), 'moida-output-batch-'));
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 
 after(() => rmSync(root, { recursive: true, force: true }));

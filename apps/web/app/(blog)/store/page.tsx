@@ -6,7 +6,7 @@ import { SiteFooter } from '../../_blog/SiteFooter';
 import { siteNow } from '../../_blog/site';
 
 // 첫 화면 (소개 + 넘겨 보는 앱 카드, AppsHome): 첫 화면(/)이 앱 하나로 고정됐거나 공개 앱이 하나뿐이어도 여기서는 늘 앱이 보인다.
-// 공통 앱 도메인(CAIRN_APPS_URL)의 / 는 proxy가 여기로 넘긴다. 옛 스토어 첫 화면(StoreHome)은 지웠다 (2026-11-28).
+// 공통 앱 도메인(MOIDA_APPS_URL)의 / 는 proxy가 여기로 넘긴다. 옛 스토어 첫 화면(StoreHome)은 지웠다 (2026-11-28).
 // 메일 링크(플러그인 email의 구독 확인 · 해지)가 ?mail=…&token=…으로 여기에 온다: 값은 store.after 자리에 넘기기만 한다
 export const dynamic = 'force-dynamic';
 

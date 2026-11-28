@@ -1,16 +1,16 @@
 import { RuleViolation } from '../../platform';
 
-/** 그리는 법 (cairn.json의 render): 템플릿을 채우거나(기본), 파일 그대로(정적 앱, 스토어 9.13) */
+/** 그리는 법 (moida.json의 render): 템플릿을 채우거나(기본), 파일 그대로(정적 앱, 스토어 9.13) */
 export type AppCodeRender = 'template' | 'static';
 
-/** 선언한 표 하나 (cairn.json의 tables, 스토어 12.1): 칸 이름 → 타입, 읽기 · 쓰기 규칙 */
+/** 선언한 표 하나 (moida.json의 tables, 스토어 12.1): 칸 이름 → 타입, 읽기 · 쓰기 규칙 */
 export interface AppTableSpec {
   columns: Readonly<Record<string, string>>;
   read: string;
   write: string;
 }
 
-/** 고정 화면에 입히는 테마 (cairn.json의 theme): 색은 #rrggbb, 로고는 묶음의 파일 이름 */
+/** 고정 화면에 입히는 테마 (moida.json의 theme): 색은 #rrggbb, 로고는 묶음의 파일 이름 */
 export interface AppThemeSpec {
   accent: string | null;
   background: string | null;
@@ -18,13 +18,13 @@ export interface AppThemeSpec {
   logo: string | null;
 }
 
-// 앱의 선언서 cairn.json (스토어 9.2 · 9.13 · 12.1). 앱이 Cairn에게 바라는 것을 적는 한 장이다:
+// 앱의 선언서 moida.json (스토어 9.2 · 9.13 · 12.1). 앱이 Moida에게 바라는 것을 적는 한 장이다:
 // 그리는 법(render) · 바깥 주소(hosts) · 회원(members) · 브라우저 권한(permissions) · 고정 화면의 테마(theme) · 표(tables).
 // 앱 코드는 SQL · 서버 코드를 갖지 않는다: 표는 여기 적은 선언으로만 생기고 community가 맞춘다 (12.4).
 // 버전을 쌓을 때 모양을 검사하고, 보이는 버전의 것은 정리한 모양(toJSON)으로 blog.apps.code_manifest에 둔다.
 export class AppManifest {
-  static readonly FILE = 'cairn.json';
-  /** 데이터 약속의 버전 (cairn). 지금은 1뿐 */
+  static readonly FILE = 'moida.json';
+  /** 데이터 약속의 버전 (moida). 지금은 1뿐 */
   static readonly CONTRACT = 1;
   static readonly HOSTS_MAX = 10;
   static readonly TABLES_MAX = 20;
@@ -37,7 +37,7 @@ export class AppManifest {
   static readonly WRITES: readonly string[] = ['member', 'owner', 'admin'];
   /** 회원이 있어야 뜻이 있는 규칙 */
   private static readonly BY_MEMBER: readonly string[] = ['member', 'owner'];
-  /** Cairn이 모든 표에 붙이는 칸 (선언하지 않는다) */
+  /** Moida이 모든 표에 붙이는 칸 (선언하지 않는다) */
   static readonly BUILT_IN: readonly string[] = ['id', 'owner', 'created_at', 'updated_at'];
   /** 표 · 칸 이름: SQL의 이름이 된다. 영문 소문자로 시작하는 소문자 · 숫자 · _ 40자까지 */
   private static readonly NAME = /^[a-z][a-z0-9_]{0,39}$/;
@@ -46,7 +46,7 @@ export class AppManifest {
   /** 정확한 호스트 이름만: 소문자 글자 · 숫자 · 하이픈 마디 둘 이상, 와일드카드 · IP · 포트 없음 */
   private static readonly HOST =
     /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-  /** cairn.json이 없는 묶음: 템플릿 앱, 바깥 주소 · 회원 · 표 없음 */
+  /** moida.json이 없는 묶음: 템플릿 앱, 바깥 주소 · 회원 · 표 없음 */
   static readonly NONE = new AppManifest([], AppManifest.TEMPLATED, false, [], null, {});
 
   private constructor(
@@ -58,7 +58,7 @@ export class AppManifest {
     readonly tables: Readonly<Record<string, AppTableSpec>>,
   ) {}
 
-  /** cairn.json의 글에서. 모양이 틀리면 RuleViolation */
+  /** moida.json의 글에서. 모양이 틀리면 RuleViolation */
   static of(text: string): AppManifest {
     const file = AppManifest.FILE;
     let parsed: unknown;
@@ -75,8 +75,10 @@ export class AppManifest {
       throw new RuleViolation(
         `그리는 법(render)은 ${AppManifest.TEMPLATED} · ${AppManifest.STATIC} 중 하나예요`,
       );
-    if (raw.cairn !== undefined && raw.cairn !== AppManifest.CONTRACT)
-      throw new RuleViolation(`데이터 약속(cairn)은 ${AppManifest.CONTRACT}이에요`);
+    // 데이터 약속의 칸 이름은 moida (옛 선언서는 cairn, 2026-11-28 이름 바꾸기 전)
+    const contract = raw.moida ?? raw.cairn;
+    if (contract !== undefined && contract !== AppManifest.CONTRACT)
+      throw new RuleViolation(`데이터 약속(moida)은 ${AppManifest.CONTRACT}이에요`);
     if (raw.members !== undefined && typeof raw.members !== 'boolean')
       throw new RuleViolation('회원(members)은 true · false로 적어요');
     const members = raw.members === true;
@@ -143,7 +145,7 @@ export class AppManifest {
   }
 
   /**
-   * 지도 회사의 스크립트 호스트 (2026-11-25): 앱이 지도 SDK와 키를 직접 넣지 않고 cairn.map을 쓰게 바깥 주소에 받지 않는다.
+   * 지도 회사의 스크립트 호스트 (2026-11-25): 앱이 지도 SDK와 키를 직접 넣지 않고 moida.map을 쓰게 바깥 주소에 받지 않는다.
    * 키는 관리자가 지도 플러그인에 넣고, 웹이 화면마다 회사의 호스트를 연다. 목록은 plugins/map/providers.json의 sdkHosts와 같다
    * (서버는 src 밖을 가져오지 않아 옮겨 적고, app-manifest.test.ts가 그 파일과 맞춰 본다)
    */
@@ -167,7 +169,7 @@ export class AppManifest {
     const map = (hosts as string[]).find((h) => AppManifest.MAP_HOSTS.includes(h.toLowerCase()));
     if (map)
       throw new RuleViolation(
-        `지도는 cairn.map으로 그려요 (키는 지도 플러그인에): 바깥 주소에 ${map}을 적지 않아요`,
+        `지도는 moida.map으로 그려요 (키는 지도 플러그인에): 바깥 주소에 ${map}을 적지 않아요`,
       );
     return [...new Set(hosts as string[])];
   }

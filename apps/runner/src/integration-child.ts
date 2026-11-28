@@ -1,6 +1,6 @@
 /** 자식 프로세스의 표시: 결과 · 연 탭 (stdout의 다른 글과 섞이지 않게) */
-export const RESULT_MARK = '@@cairn-site-result@@';
-export const PAGE_MARK = '@@cairn-site-page@@';
+export const RESULT_MARK = '@@moida-site-result@@';
+export const PAGE_MARK = '@@moida-site-page@@';
 
 /**
  * 사이트 도구 코드를 돌리는 자식 프로세스의 코드 (CommonJS, -e로 넘긴다: 러너의 TS 등록 없이 돈다). 표준 입력으로 일을 받는다.
@@ -20,7 +20,7 @@ process.stdin.on('end', async () => {
   const job = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   const write = job.mode === 'write';
   const send = (m) => process.stdout.write('\\n${RESULT_MARK}' + JSON.stringify(m) + '\\n');
-  const DRY = { cairnDry: true };
+  const DRY = { moidaDry: true };
   let browser = null;
   let page = null;
   let called = false;
@@ -53,7 +53,7 @@ process.stdin.on('end', async () => {
       start_url: job.startUrl,
       loginNeeded: (why) => {
         const e = new Error(String(why || '로그인이 필요해요'));
-        e.cairnLogin = true;
+        e.moidaLogin = true;
         throw e;
       },
       api: async (path, options) => {
@@ -94,7 +94,7 @@ process.stdin.on('end', async () => {
     if (e === DRY || (job.dryRun && reached && !committed)) send({ ok: true, output: {}, dry: true });
     else {
       const message = String((e && e.message) || e).split('\\n')[0].slice(0, 500);
-      send({ ok: false, error: message, kind: e && e.cairnLogin ? 'login' : 'code', committed });
+      send({ ok: false, error: message, kind: e && e.moidaLogin ? 'login' : 'code', committed });
     }
   } finally {
     try { if (page) await page.close(); } catch {}

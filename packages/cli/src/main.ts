@@ -11,17 +11,17 @@ import { SkillPackage } from './skill';
 import { StatusCommand } from './status.command';
 import { CliError, Terminal } from './terminal';
 
-// 작업하는 컴퓨터의 AI 도구를 Cairn 블로그에 연결하는 명령. 저장소에서는 `pnpm cairn …`, npm 배포 뒤에는 npx로 부른다.
+// 작업하는 컴퓨터의 AI 도구를 Moida 블로그에 연결하는 명령. 저장소에서는 `pnpm moida …`, npm 배포 뒤에는 npx로 부른다.
 // ChatGPT·Claude 앱(웹·데스크톱 채팅)은 이 명령이 아니라 블로그 관리 화면의 기기 시트 안내를 따른다.
-const HELP = `cairn: 작업하는 컴퓨터의 AI 도구를 Moida 블로그에 연결한다
+const HELP = `moida: 작업하는 컴퓨터의 AI 도구를 Moida 블로그에 연결한다
 
-  cairn connect <블로그 주소> [--tool claude-code|codex] [--review-with claude|codex|gemini] [--yes]
+  moida connect <블로그 주소> [--tool claude-code|codex] [--review-with claude|codex|gemini] [--yes]
       스킬 · 검토자 넣기 + MCP 등록 + 로그인 + 연결 확인
       Claude Code는 팀 소식도: 소식 기기(소식 읽기만) + 말을 걸 때마다 소식을 덧붙이는 훅 + 상태 줄
       세션 자동 저장도: 세션 저장 기기(세션 올리기만) + 세션이 끝나면 블로그에 올리는 훅
       --review-with: 다른 회사 모델로 교차 검토할 때 쓸 명령줄
-  cairn status [--tool claude-code|codex]   넣은 스킬과 연결 상태, 소식 · 세션 저장 기기와 훅
-  cairn app deploy <앱 주소> <폴더> [--site <블로그 주소>] [--note <메모>]
+  moida status [--tool claude-code|codex]   넣은 스킬과 연결 상태, 소식 · 세션 저장 기기와 훅
+  moida app deploy <앱 주소> <폴더> [--site <블로그 주소>] [--note <메모>]
       빌드한 폴더(index.html이 든)를 앱 코드의 새 버전으로 올리기. 처음에는 --site와 브라우저 승인(배포 기기: 쓰기만)
       공개 앱의 새 버전은 콘솔에서 공개해야 보여요
 

@@ -53,7 +53,7 @@ export class PushGateway extends BaseGateway {
 
   /** VAPID의 연락처: 웹 주소가 https면 그 주소, 아니면 이름만 있는 mailto */
   private static subject(): string {
-    const web = process.env.CAIRN_WEB_URL ?? '';
-    return web.startsWith('https://') ? web : 'mailto:push@cairn.invalid';
+    const web = process.env.MOIDA_WEB_URL ?? '';
+    return web.startsWith('https://') ? web : 'mailto:push@moida.invalid';
   }
 }

@@ -2,7 +2,7 @@ import { ActionResult, type Actor, BaseAction } from '../../../apps/server/src/p
 import type { TelegramGateway } from './telegram.gateway';
 import { TelegramBot } from './telegram-bot';
 
-// 웹훅 연결: 텔레그램이 이 봇의 메시지를 이 Cairn의 바깥 주소로 보내게 한다 (설정을 바꾼 뒤 한 번 누른다).
+// 웹훅 연결: 텔레그램이 이 봇의 메시지를 이 Moida의 바깥 주소로 보내게 한다 (설정을 바꾼 뒤 한 번 누른다).
 // 주소의 열쇠는 봇 토큰에서 만든다: 토큰을 바꾸면 다시 누른다.
 export class ConnectAction extends BaseAction {
   readonly label = '웹훅 연결';

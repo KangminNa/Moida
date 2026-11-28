@@ -9,7 +9,7 @@ import { ApiClient, TestUser } from '../../../testing/api-client';
 
 type Json = Record<string, unknown>;
 /** WebPageGateway.TEST_LOOPBACK_ENV (모듈 안을 가져오지 않으려고 이름만) */
-const LOOPBACK = 'CAIRN_READ_URL_TEST_LOOPBACK';
+const LOOPBACK = 'MOIDA_READ_URL_TEST_LOOPBACK';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3, 4]);
 
 let api: ApiClient;

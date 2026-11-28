@@ -1,11 +1,11 @@
 import { Backoff, pause } from './backoff';
 import { type BrowserTabs, BrowserUnavailable, TabUnreadable } from './browser-tabs';
-import type { CairnServer } from './cairn-server';
 import { ExploreProxy } from './explore-proxy';
 import { AccessDenied, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import type { RunLog } from './redactor';
 
-// browser-tabs 패키지의 러너 쪽. 브라우저(CAIRN_BROWSER_URL)가 있는 러너만 돈다.
+// browser-tabs 패키지의 러너 쪽. 브라우저(MOIDA_BROWSER_URL)가 있는 러너만 돈다.
 // 읽어 달라는 주소를 받아(browser_tab_pending) 브라우저 탭으로 열어 읽고 남긴다(browser_tab_save).
 // 작업 대기열(next_jobs)과 따로 돈다: 탭 읽기는 AI를 부르지 않아 일과 한도를 나눠 쓰지 않는다.
 // 로그에는 요청 id와 주소의 호스트만 남긴다 (경로 · 내용은 남기지 않는다).
@@ -26,7 +26,7 @@ export class TabReader {
   private proxy: Promise<ExploreProxy> | null = null;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly browser: BrowserTabs,
     private readonly log: RunLog,
   ) {}

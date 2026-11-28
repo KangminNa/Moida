@@ -2,11 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Database } from '../base/database';
 
-// 플러그인 목록 파일(cairn-plugin.json). 플러그인이 무엇을 쓰는지 여기에 적힌 것만 허락된다.
+// 플러그인 목록 파일(moida-plugin.json). 플러그인이 무엇을 쓰는지 여기에 적힌 것만 허락된다.
 // 서버를 시작할 때 들어 있는 플러그인을 모두 읽고 검사한다. 틀리면 시작하지 않는다.
 
-/** 플러그인이 지원하는 Cairn 플러그인 API 버전 */
-const CAIRN_PLUGIN_API = '0.16';
+/** 플러그인이 지원하는 Moida 플러그인 API 버전 */
+const MOIDA_PLUGIN_API = '0.16';
 
 /** 웹 화면 자리. 늘릴 때는 웹의 <Slot>과 문서를 함께 고친다 */
 const WEB_SLOTS: readonly string[] = ['post.after', 'task.office', 'store.after'];
@@ -17,7 +17,7 @@ const WEB_SLOTS: readonly string[] = ['post.after', 'task.office', 'store.after'
  *   job:<이름>    일꾼이 간격마다 돌리는 일
  *   action:<이름> 주인이 누르는 동작
  *   archive:read  보관 형식 파일 읽기 (vault 비공개 내용 포함)
- *   archive:restore  보관 형식 파일을 빈 Cairn에 들여오기
+ *   archive:restore  보관 형식 파일을 빈 Moida에 들여오기
  *   login:<이름>  로그인 방법 (예: login:github). 주인이 연결해 둔 계정으로만 로그인된다
  *   mail          코어의 확인 메일(가입 · 비밀번호 다시 정하기의 인증코드)을 보내는 길 (provideMail, 0.14)
  * 기능 패키지 (2026-11-08): 코어를 고치지 않고 자기 표 · API · MCP 도구 · 콘솔 메뉴를 갖는다
@@ -52,7 +52,7 @@ const CORE_SCHEMAS = ['public', ...Database.MODULE_SCHEMAS];
 
 /** 기능 패키지의 MCP 도구 하나 (목록 파일 tools의 한 항목) */
 export interface PackageToolSpec {
-  /** 부를 동작 이름 (서버 파일이 cairn.addOperation으로 등록) */
+  /** 부를 동작 이름 (서버 파일이 moida.addOperation으로 등록) */
   readonly operation: string;
   /** AI가 언제 이 도구를 쓸지 판단할 설명 */
   readonly description: string;
@@ -185,10 +185,19 @@ export class PluginManifest {
     return [...this.uses].filter((u) => !granted.has(u));
   }
 
-  /** 플러그인 폴더에서 cairn-plugin.json을 읽고 검사한다. 문제가 있으면 모두 모아 한 번에 알린다 */
+  /** 플러그인 폴더의 목록 파일. moida-plugin.json, 없으면 옛 이름 cairn-plugin.json (2026-11-28 이름 cairn → moida 전의 플러그인). 둘 다 없으면 null */
+  static fileIn(dir: string): string | null {
+    for (const name of ['moida-plugin.json', 'cairn-plugin.json']) {
+      if (existsSync(join(dir, name))) return join(dir, name);
+    }
+    return null;
+  }
+
+  /** 플러그인 폴더에서 목록 파일(moida-plugin.json)을 읽고 검사한다. 문제가 있으면 모두 모아 한 번에 알린다 */
   static read(dir: string): PluginManifest {
-    const file = join(dir, 'cairn-plugin.json');
-    if (!existsSync(file)) throw new Error(`플러그인 목록 파일이 없어요: ${file}`);
+    const file = PluginManifest.fileIn(dir);
+    if (file === null)
+      throw new Error(`플러그인 목록 파일이 없어요: ${join(dir, 'moida-plugin.json')}`);
     let raw: Record<string, unknown>;
     try {
       raw = JSON.parse(readFileSync(file, 'utf8'));
@@ -197,16 +206,16 @@ export class PluginManifest {
     }
     const problems: string[] = [];
     const str = (k: string) => (typeof raw[k] === 'string' ? (raw[k] as string) : '');
+    // 지원 범위의 칸 이름도 옛 이름(cairn)을 받는다
+    const range = str('moida') || str('cairn');
 
     const name = str('name');
     if (!PluginManifest.NAME.test(name)) problems.push('name은 소문자·숫자·하이픈 2~40자여야 해요');
     if (!PluginManifest.VERSION.test(str('version'))) {
       problems.push('version은 1.2.3 형식이어야 해요');
     }
-    if (!PluginManifest.supports(str('cairn'))) {
-      problems.push(
-        `cairn 범위("${str('cairn')}")가 지금 플러그인 API ${CAIRN_PLUGIN_API}와 맞지 않아요`,
-      );
+    if (!PluginManifest.supports(range)) {
+      problems.push(`moida 범위("${range}")가 지금 플러그인 API ${MOIDA_PLUGIN_API}와 맞지 않아요`);
     }
 
     const settings: PluginSettingSpec[] = [];
@@ -340,7 +349,7 @@ export class PluginManifest {
   private static supports(range: string): boolean {
     const m = /^>=(\d+)\.(\d+)$/.exec(range);
     if (!m) return false;
-    const [major, minor] = CAIRN_PLUGIN_API.split('.').map(Number);
+    const [major, minor] = MOIDA_PLUGIN_API.split('.').map(Number);
     return Number(m[1]) === major && Number(m[2]) <= (minor ?? 0);
   }
 }

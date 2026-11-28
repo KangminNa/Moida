@@ -1,8 +1,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BrowserPages } from './browser-page';
-import type { CairnServer } from './cairn-server';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import { RunEvent } from './progress';
 
 /**
@@ -13,7 +13,7 @@ export class StepShots {
   private static readonly FILE = /\.(jpe?g|png)$/i;
 
   constructor(
-    private readonly server: Pick<CairnServer, 'saveShot'>,
+    private readonly server: Pick<MoidaServer, 'saveShot'>,
     private readonly taskId: string,
   ) {}
 

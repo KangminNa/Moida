@@ -21,7 +21,7 @@ export type LoadedOwner = UserRow & { space_id: string };
 
 /** 관리 화면 로그인 한 번 (web_sessions). 토큰 원문은 만든 순간에만 메모리에 있고, DB에는 해시만 둔다 */
 export class WebSession extends TableEntity<WebSessionRow, WebSessionNew> {
-  static readonly COOKIE = 'cairn_session';
+  static readonly COOKIE = 'moida_session';
   /** 로그인 유지: 마지막으로 쓴 날부터 (웹 UX U2). 쓸 때마다(마지막 접근을 적을 때) 끝나는 날이 늘어난다 */
   static readonly DAYS = 30;
   /**

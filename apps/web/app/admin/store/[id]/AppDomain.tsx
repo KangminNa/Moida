@@ -11,12 +11,12 @@ const CONFLICT = '이미 바뀐 앱이에요. 최신 내용을 다시 읽었어�
 const UNREACHABLE = '도메인에 닿지 못함. DNS · 프록시 설정을 확인한 뒤 다시';
 
 /**
- * 그 도메인의 연결 확인 값 (GET https://<도메인>/.well-known/cairn-domain). 이 브라우저가 직접 읽는다:
+ * 그 도메인의 연결 확인 값 (GET https://<도메인>/.well-known/moida-domain). 이 브라우저가 직접 읽는다:
  * 서버는 밖으로 요청하지 않는다. 서버가 사이트 주소의 출처만 읽게 하므로 콘솔은 사이트 주소로 열어야 한다
  */
 async function readProof(domain: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://${domain}/.well-known/cairn-domain`, {
+    const res = await fetch(`https://${domain}/.well-known/moida-domain`, {
       credentials: 'omit',
       cache: 'no-store',
     });

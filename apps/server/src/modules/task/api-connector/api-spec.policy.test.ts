@@ -22,7 +22,7 @@ const SPEC = {
         tags: { type: 'string[]' },
       },
       query: ['seed'],
-      body: { params: { text: '{prompt}', tags: '{tags}' }, label: 'cairn {model}' },
+      body: { params: { text: '{prompt}', tags: '{tags}' }, label: 'moida {model}' },
       pick: { id: 'request_id' },
       poll: {
         path: '/requests/{id}',
@@ -65,7 +65,7 @@ describe('ApiSpec', () => {
     assert.equal(req.url.toString(), 'https://api.example.com/v1/models/fast/images?seed=7');
     assert.deepEqual(JSON.parse(req.body ?? ''), {
       params: { text: '고양이' },
-      label: 'cairn fast',
+      label: 'moida fast',
     });
     const get = ApiSpec.from(SPEC).operation('me').request('https://api.example.com/v1', {});
     assert.deepEqual([get.method, get.body], ['GET', null]);

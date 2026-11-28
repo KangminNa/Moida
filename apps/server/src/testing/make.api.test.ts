@@ -90,7 +90,7 @@ async function anOutput(name: string, bytes: Buffer): Promise<Json> {
     method: 'PUT',
     headers: {
       'content-type': 'application/octet-stream',
-      'x-cairn-upload': String(ticket.body.token),
+      'x-moida-upload': String(ticket.body.token),
     },
     body: bytes,
   });
@@ -120,13 +120,13 @@ const makeTask = async (materials: unknown, kind = 'make', agentId = maker.id) =
 
 const download = (ticket: Download | null, token = ticket?.token) =>
   fetch(`${api.baseUrl}/api/outputs/download`, {
-    headers: token === undefined ? {} : { 'x-cairn-download': token },
+    headers: token === undefined ? {} : { 'x-moida-download': token },
   });
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-make-test-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
-  process.env.CAIRN_DISK_RESERVE_GB = '0';
+  dir = await mkdtemp(join(tmpdir(), 'moida-make-test-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
+  process.env.MOIDA_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
   // MCP는 사이트 주소가 있어야 연다 (다른 시험 파일이 먼저 바꿔 두었을 수 있다)
@@ -210,7 +210,7 @@ describe('주인이 파일을 올려 재료로 준다', () => {
       headers: {
         'content-type': 'application/octet-stream',
         ...('cookies' in as
-          ? { cookie: `cairn_session=${(as as TestUserLike).cookies.cairn_session}` }
+          ? { cookie: `moida_session=${(as as TestUserLike).cookies.moida_session}` }
           : as),
       },
       body,
@@ -252,7 +252,7 @@ describe('칸 러너가 재료를 받고 AI가 위키를 읽는다', () => {
     assert.equal(await lease(runner, String(task.id)), null);
     const job = await lease(slot, String(task.id));
     assert.ok(job, '칸이 빌린다');
-    assert.equal((job.skill_package as Json | null)?.name ?? job.skill, 'cairn-make');
+    assert.equal((job.skill_package as Json | null)?.name ?? job.skill, 'moida-make');
   });
 
   test('재료 결과물은 표로 받고, 재료가 아니거나 표가 없으면 받지 못한다', async () => {
@@ -267,7 +267,7 @@ describe('칸 러너가 재료를 받고 AI가 위키를 읽는다', () => {
     const ticket = res.body as unknown as Download;
     assert.deepEqual(
       [ticket.download_path, ticket.header, ticket.name, ticket.size, ticket.sha256],
-      ['/api/outputs/download', 'x-cairn-download', '사진.png', bytes.length, sha(bytes)],
+      ['/api/outputs/download', 'x-moida-download', '사진.png', bytes.length, sha(bytes)],
     );
     const got = await download(ticket);
     assert.equal(got.status, 200);
@@ -388,7 +388,7 @@ describe('만들기 위임', () => {
       method: 'PUT',
       headers: {
         'content-type': 'application/octet-stream',
-        'x-cairn-upload': String(ticket.body.token),
+        'x-moida-upload': String(ticket.body.token),
       },
       body: bytes,
     });

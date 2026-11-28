@@ -22,8 +22,8 @@ async function read(hash: string): Promise<Buffer> {
 }
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-blobs-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
+  dir = await mkdtemp(join(tmpdir(), 'moida-blobs-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
   store = new BlobStore(db);
 });
 

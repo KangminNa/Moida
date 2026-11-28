@@ -17,7 +17,7 @@ export interface AppDataFilter {
 // 지금 열려 있는 칸과 규칙을 말한다: 회원 쪽 API는 여기 있는 이름만 SQL에 쓰고, 값은 여기서 칸의 타입에 맞춰 검사한다.
 // 선언에서 빠진 표는 닫힌다(open false). 표 · 칸을 DB에서 지우지는 않는다 (원칙 2).
 export class AppTable extends TableEntity<AppTableRow, AppTableNew> {
-  /** 모든 표에 Cairn이 붙이는 칸 */
+  /** 모든 표에 Moida이 붙이는 칸 */
   static readonly BUILT_IN: readonly string[] = ['id', 'owner', 'created_at', 'updated_at'];
   /** 선언의 타입 → Postgres 타입 */
   static readonly SQL_TYPES: Readonly<Record<string, string>> = {

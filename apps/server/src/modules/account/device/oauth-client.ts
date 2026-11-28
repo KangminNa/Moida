@@ -51,7 +51,7 @@ export class OAuthClient extends BaseEntity {
       );
     for (const uri of redirectUris) OAuthClient.checkRedirect(uri, hostedApps);
     return new OAuthClient({
-      client_id: `cairn_${randomBytes(16).toString('hex')}`,
+      client_id: `moida_${randomBytes(16).toString('hex')}`,
       space_id: spaceId,
       client_name: clientName.trim().slice(0, 80) || 'AI 도구',
       redirect_uris: redirectUris,

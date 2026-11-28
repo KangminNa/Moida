@@ -35,7 +35,7 @@ export class SkillRepository extends TableRepository<SkillRow, Skill> {
 
   /**
    * 러너 스킬의 지금 판: 주인이 콘솔에서 고친 판이 있으면 그것, 없으면 저장소 판(repo, 서버 이미지의 skills/).
-   * 일을 빌려 줄 때 일의 스킬(러너가 CLI에 깐다)과 지시문 틀(cairn-runner, 러너가 채운다)이 같은 길로 간다
+   * 일을 빌려 줄 때 일의 스킬(러너가 CLI에 깐다)과 지시문 틀(moida-runner, 러너가 채운다)이 같은 길로 간다
    */
   async current(
     spaceId: string,

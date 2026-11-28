@@ -10,8 +10,8 @@ x-code-runner: &code-runner
     context: .
     target: code-runner
     args:
-      CAIRN_RUNNER_BUILD: ${CAIRN_RUNNER_BUILD:-unknown}   # 실행 기록에 남는 러너 빌드
-  image: cairn-code-runner:${CAIRN_IMAGE_TAG:-dev}
+      MOIDA_RUNNER_BUILD: ${MOIDA_RUNNER_BUILD:-${CAIRN_RUNNER_BUILD:-unknown}}   # 실행 기록에 남는 러너 빌드
+  image: moida-code-runner:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}
   restart: unless-stopped
   logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
   init: true                # AI CLI가 남긴 손자 프로세스를 거둔다
@@ -20,7 +20,7 @@ x-code-runner: &code-runner
   tmpfs:
     - /tmp:size=1g,mode=1777
     - /root:size=64m,mode=700   # 러너(root)의 홈. AI의 홈은 작업 자리 안에 따로 있다
-  user: "0:0"               # 러너는 root(아래 권한만), AI · setup · checks는 agent(1001, CAIRN_AGENT_USER)
+  user: "0:0"               # 러너는 root(아래 권한만), AI · setup · checks는 agent(1001, MOIDA_AGENT_USER)
   cap_drop: [ALL]
   cap_add: [CHOWN, SETUID, SETGID, KILL]   # 작업 자리를 agent에게 넘기기, agent로 띄우기, agent 프로세스 끄기
   group_add: ["1000"]       # 연결 값 파일(0640, node 그룹)을 읽으려고. agent는 이 그룹에 없다
@@ -30,7 +30,7 @@ x-code-runner: &code-runner
   pids_limit: 512
   networks: [code-internal]   # 바깥으로 가는 길 없음. 서버와 egress만 보인다
   volumes:
-    - code-pairing:/run/cairn-code:ro
+    - code-pairing:/run/moida-code:ro
     - /work                 # 칸마다 자기 작업 자리 (익명 볼륨: 메모리가 아니라 디스크). 작업이 끝나면 비운다
   depends_on:
     server:
@@ -39,11 +39,11 @@ x-code-runner: &code-runner
       condition: service_started
 
 x-code-runner-env: &code-runner-env
-  CAIRN_RUNNER_URL: http://cairn-server:4000
-  CAIRN_RUNNER_PAIRING_FILE: /run/cairn-code/pairing   # 칸 하나에 일 하나 (CAIRN_RUNNER_CONCURRENCY를 보지 않는다)
+  MOIDA_RUNNER_URL: http://moida-server:4000
+  MOIDA_RUNNER_PAIRING_FILE: /run/moida-code/pairing   # 칸 하나에 일 하나 (MOIDA_RUNNER_CONCURRENCY를 보지 않는다)
   HTTPS_PROXY: http://egress:3128   # git · npm · AI CLI는 프록시로만 나간다
   HTTP_PROXY: http://egress:3128    # 평문 HTTP는 프록시가 거절한다 (405)
-  NO_PROXY: cairn-server            # 러너 · AI CLI가 MCP로 서버에 닿을 때는 바로
+  NO_PROXY: moida-server            # 러너 · AI CLI가 MCP로 서버에 닿을 때는 바로
   NODE_USE_ENV_PROXY: "1"           # 러너의 fetch도 위 프록시 설정을 따른다: GitHub PR API는 프록시로, 서버는 NO_PROXY로 바로 (Node 24)
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"   # 허용 목록 밖의 텔레메트리 · 오류 보고를 보내지 않는다
 
@@ -52,19 +52,19 @@ services:
     <<: *code-runner
     environment:
       <<: *code-runner-env
-      CAIRN_RUNNER_SLOT: "1"
+      MOIDA_RUNNER_SLOT: "1"
 
   code-runner-2:
     <<: *code-runner
     environment:
       <<: *code-runner-env
-      CAIRN_RUNNER_SLOT: "2"
+      MOIDA_RUNNER_SLOT: "2"
 
   egress:
     build:
       context: .
       target: egress
-    image: cairn-egress:${CAIRN_IMAGE_TAG:-dev}
+    image: moida-egress:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}
     restart: unless-stopped
     logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
     read_only: true
@@ -74,16 +74,16 @@ services:
     pids_limit: 64
     networks: [default, code-internal]   # 두 망에 붙는 유일한 문
     volumes:
-      - ./egress/allow.txt:/etc/cairn/allow.txt:ro
+      - ./egress/allow.txt:/etc/moida/allow.txt:ro
 
   server:
     networks:
       code-internal:
-        aliases: [cairn-server]   # 칸이 MCP로 서버에 바로 닿게
+        aliases: [moida-server]   # 칸이 MCP로 서버에 바로 닿게
     environment:
-      CAIRN_CODE_PAIRING_FILE: /run/cairn-code/pairing   # 코드 러너 칸의 연결 값. 서버가 시작할 때 쓴다 (node만 읽는다)
+      MOIDA_CODE_PAIRING_FILE: /run/moida-code/pairing   # 코드 러너 칸의 연결 값. 서버가 시작할 때 쓴다 (node만 읽는다)
     volumes:
-      - code-pairing:/run/cairn-code   # 서버와 칸만 붙는다. 서버 러너는 이 볼륨을 보지 않는다
+      - code-pairing:/run/moida-code   # 서버와 칸만 붙는다. 서버 러너는 이 볼륨을 보지 않는다
 
 networks:
   code-internal:

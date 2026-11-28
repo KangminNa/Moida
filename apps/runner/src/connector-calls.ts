@@ -6,7 +6,7 @@ export type ConnectorCall = { name: string; calls: number; failures: number; err
 /**
  * 이 실행에서 커넥터(x-<이름> MCP 서버)의 도구를 부른 수와 실패 수 (2026-11-15 MCP 1단계, docs/MCP.md).
  * Claude는 tool_use(mcp__x-notion__search)와 그 결과의 is_error로, Codex는 mcp_tool_call 항목으로 센다.
- * 서버는 마지막 사용 · 실패만 커넥터에 적는다. 오류 글은 보내기 전에 지운다(Redactor, CairnServer.submit)
+ * 서버는 마지막 사용 · 실패만 커넥터에 적는다. 오류 글은 보내기 전에 지운다(Redactor, MoidaServer.submit)
  */
 export class ConnectorCalls {
   private static readonly ERROR_MAX = 300;

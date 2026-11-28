@@ -51,6 +51,7 @@ export { DomainEvent } from './base/event';
 export { EventCatalog } from './base/event-catalog';
 export { FileSniff } from './base/file-sniff';
 export { Idempotency } from './base/idempotency';
+export { LegacyEnv } from './base/legacy-env';
 export { McpEndpoint } from './base/mcp-endpoint';
 export { Command, Operation, Read, Work } from './base/operation';
 export { ChangeSignal, Outbox } from './base/outbox';

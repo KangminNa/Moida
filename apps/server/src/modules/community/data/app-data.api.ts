@@ -30,7 +30,7 @@ import { AppDataQuery } from './app-data.query';
 import { AppDataService } from './app-data.service';
 import type { AppRowsAddedView, AppRowsView, AppRowView, AppTablesView } from './app-data.view';
 
-// 앱 데이터 (스토어 12.4). 앱 도메인에서만 (기본 도메인은 404). 표 · 칸은 그 앱의 보이는 버전이 cairn.json에 선언한 것.
+// 앱 데이터 (스토어 12.4). 앱 도메인에서만 (기본 도메인은 404). 표 · 칸은 그 앱의 보이는 버전이 moida.json에 선언한 것.
 //   GET    api/community/data/:table?<칸>=<연산>.<값>&order=&limit=&offset=   줄 읽기 (읽기 규칙은 DB가 거른다)
 //   POST   api/community/data/:table           줄 만들기 { 칸: 값 } (회원, 쓰기 규칙 member · owner)
 //   PATCH  api/community/data/:table/:id       자기 줄 고치기 { 칸: 값 } (쓰기 규칙 owner)

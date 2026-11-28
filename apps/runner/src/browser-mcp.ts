@@ -43,7 +43,7 @@ export class BrowserMcp {
   static readonly PROBE_MS = 3_000;
 
   private constructor(
-    /** 서버 브라우저의 CDP 주소 (CAIRN_BROWSER_URL) */
+    /** 서버 브라우저의 CDP 주소 (MOIDA_BROWSER_URL) */
     readonly endpoint: string,
     readonly plan: BrowsePlan,
   ) {}

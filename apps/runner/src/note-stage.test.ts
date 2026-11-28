@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import type { CairnServer } from './cairn-server';
 import { Job } from './job';
 import { Json } from './json';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import { NoteSource } from './note-source';
 import { NoteStage } from './note-stage';
 import { Redactor } from './redactor';
@@ -45,7 +45,7 @@ class FakeServer {
   }
 }
 
-const stageOf = (server: FakeServer) => new NoteStage(job, server as unknown as CairnServer);
+const stageOf = (server: FakeServer) => new NoteStage(job, server as unknown as MoidaServer);
 const source = new NoteSource('산책 글 써 줘', 'claude-code', 'blog', '## 사람\n산책 글 써 줘');
 
 describe('세션 노트 일', () => {

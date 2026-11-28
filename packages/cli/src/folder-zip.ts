@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
 import { CliError } from './terminal';
 
-// 폴더 하나를 zip으로 (cairn app deploy가 빌드 결과를 올릴 때). Node 내장 모듈만 쓴다.
+// 폴더 하나를 zip으로 (moida app deploy가 빌드 결과를 올릴 때). Node 내장 모듈만 쓴다.
 // 숨김 파일(.으로 시작) · node_modules · 링크는 넣지 않고 무엇을 뺐는지 알려 준다. 이름은 폴더 기준의 / 경로, 순서는 이름순,
 // 시각은 고정이라 같은 폴더는 늘 같은 zip이 된다 (같은 묶음을 다시 올리면 서버가 같은 파일로 본다).
 export class FolderZip {

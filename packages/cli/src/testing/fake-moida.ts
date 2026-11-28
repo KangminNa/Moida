@@ -1,0 +1,228 @@
+import { createHash, randomBytes } from 'node:crypto';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
+/** 가짜 서버에 온 MCP 도구 호출 하나 */
+export class ToolCall {
+  constructor(
+    readonly tool: string,
+    readonly args: Record<string, unknown>,
+    /** Bearer 토큰 */
+    readonly token: string,
+  ) {}
+}
+
+/** 가짜 서버가 받은 앱 코드 묶음 하나 (PUT …/code/versions) */
+export class DeployedZip {
+  constructor(
+    readonly path: string,
+    /** 머리글 x-moida-deploy의 표 */
+    readonly ticket: string,
+    readonly bytes: Buffer,
+  ) {}
+}
+
+// 시험용 가짜 Moida 블로그 (127.0.0.1): 기기(소식 · 세션 저장 · 배포)를 만드는 OAuth(등록 → 승인 → 토큰 · 갱신 · 버리기)와
+// MCP agent_updates · save_transcript · app_code_upload(+ 그 표로 받는 PUT). 승인 화면 대신 /oauth/authorize가 바로 코드를 붙여 돌려보낸다. 도구의 답은 시험이 정한다.
+// 실제 서버의 규칙은 apps/server의 API 시험이 보고, 여기서는 moida connect · 훅 · 상태 줄 · 세션 저장의 순서만 본다.
+export class FakeMoida {
+  readonly calls: ToolCall[] = [];
+  /** 배포 표로 받은 묶음들 */
+  readonly deployed: DeployedZip[] = [];
+  /** 묶음을 받은 뒤의 답 (앱의 코드 상태). 상태 코드가 200이 아니면 거절 */
+  deployAnswer: { status: number; body: object } = {
+    status: 200,
+    body: { current: 1, pending: null, latest: 1 },
+  };
+  readonly revoked: string[] = [];
+  readonly refreshed: string[] = [];
+  /** 승인 요청에 실려 온 scope */
+  readonly asked: (string | null)[] = [];
+  /** 요청한 scope에 토큰이 돌려줄 권한 (세션 저장은 upload만. 옛 서버처럼 모르면 'upload read_public') */
+  grant: (scope: string | null) => string = (scope) =>
+    scope === 'collect' ? 'upload' : scope === 'deploy' ? 'write' : (scope ?? '');
+  /** agent_updates의 답. 함수면 부를 때마다 받은 인자로 만든다 */
+  updates: (args: Record<string, unknown>) => object = () => ({ news: [], cursor: 0, board: [] });
+  /** save_transcript의 답 */
+  transcripts: (args: Record<string, unknown>) => object = () => ({
+    session_id: 'sess-1',
+    status: 'saved',
+    seq: 1,
+    warnings: [],
+  });
+  /** agent_updates를 거절할 때: 받은 인자로 거절(code, message)이나 null(받아 줌)을 정한다 */
+  refuse: (args: Record<string, unknown>) => { code: string; message: string } | null = () => null;
+  /** 답을 늦출 시간 (훅의 2초 한도를 볼 때) */
+  delayMs = 0;
+  /** 갱신을 거절한다 (갱신 토큰이 죽음) */
+  refreshDead = false;
+  /** 0이 아니면 MCP가 이 HTTP 상태로만 답한다 (서버 오류) */
+  mcpStatus = 0;
+  /** 살아 있는 access 토큰 */
+  private readonly live = new Set<string>();
+  private readonly codes = new Map<
+    string,
+    { challenge: string; redirect: string; scope: string | null }
+  >();
+  private server: Server | null = null;
+  private static readonly DEPLOY_TICKET = 'deploy-ticket-1';
+
+  get origin(): string {
+    return `http://127.0.0.1:${(this.server?.address() as AddressInfo | undefined)?.port ?? 0}`;
+  }
+
+  async start(): Promise<void> {
+    const server = createServer((req, res) => void this.route(req, res));
+    this.server = server;
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  }
+
+  close(): void {
+    this.server?.close();
+    this.server?.closeAllConnections();
+  }
+
+  /** 시험이 직접 넣는 토큰 (credentials.json을 손으로 쓸 때) */
+  allow(token: string): void {
+    this.live.add(token);
+  }
+
+  /** agent_updates 호출의 인자들 */
+  get updateArgs(): Record<string, unknown>[] {
+    return this.calls.filter((c) => c.tool === 'agent_updates').map((c) => c.args);
+  }
+
+  /** save_transcript 호출들 */
+  get saves(): ToolCall[] {
+    return this.calls.filter((c) => c.tool === 'save_transcript');
+  }
+
+  private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url ?? '/', this.origin);
+    // 조각을 모아 한 번에 읽는다 (조각마다 읽으면 조각 사이에 걸친 한글이 깨진다)
+    const bytes = await new Promise<Buffer>((done) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      req.on('end', () => done(Buffer.concat(chunks)));
+    });
+    const raw = bytes.toString('utf8');
+    const json = (status: number, body: object) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+    if (req.method === 'PUT' && url.pathname.endsWith('/code/versions')) {
+      const ticket = String(req.headers['x-moida-deploy'] ?? '');
+      if (ticket !== FakeMoida.DEPLOY_TICKET)
+        return json(403, { code: 'deploy_ticket', message: '배포 표가 맞지 않아요' });
+      this.deployed.push(new DeployedZip(url.pathname, ticket, bytes));
+      return json(this.deployAnswer.status, this.deployAnswer.body);
+    }
+    if (url.pathname === '/.well-known/oauth-protected-resource/mcp')
+      return json(200, { resource: `${this.origin}/mcp`, resource_name: 'Moida' });
+    const form = new URLSearchParams(raw);
+    if (url.pathname === '/.well-known/oauth-authorization-server')
+      return json(200, {
+        issuer: this.origin,
+        authorization_endpoint: `${this.origin}/oauth/authorize`,
+        token_endpoint: `${this.origin}/oauth/token`,
+        registration_endpoint: `${this.origin}/oauth/register`,
+        revocation_endpoint: `${this.origin}/oauth/revoke`,
+      });
+    if (url.pathname === '/oauth/register')
+      return json(201, { client_id: `moida_${randomBytes(4).toString('hex')}` });
+    if (url.pathname === '/oauth/authorize') {
+      const q = url.searchParams;
+      this.asked.push(q.get('scope'));
+      const code = randomBytes(8).toString('hex');
+      this.codes.set(code, {
+        challenge: q.get('code_challenge') ?? '',
+        redirect: q.get('redirect_uri') ?? '',
+        scope: q.get('scope'),
+      });
+      const back = new URL(q.get('redirect_uri') ?? '');
+      back.searchParams.set('code', code);
+      back.searchParams.set('state', q.get('state') ?? '');
+      back.searchParams.set('iss', this.origin);
+      res.writeHead(302, { location: back.toString() }).end();
+      return;
+    }
+    if (url.pathname === '/oauth/token') return this.token(form, json);
+    if (url.pathname === '/oauth/revoke') {
+      this.revoked.push(form.get('token') ?? '');
+      return json(200, {});
+    }
+    if (url.pathname === '/mcp') return this.mcp(req, raw, json);
+    res.writeHead(404).end();
+  }
+
+  private token(form: URLSearchParams, json: (status: number, body: object) => void): void {
+    let scope: string | null = null;
+    if (form.get('grant_type') === 'refresh_token') {
+      this.refreshed.push(form.get('refresh_token') ?? '');
+      if (this.refreshDead) {
+        json(400, { error: 'invalid_grant' });
+        return;
+      }
+    } else {
+      const code = this.codes.get(form.get('code') ?? '');
+      const challenge = createHash('sha256')
+        .update(form.get('code_verifier') ?? '')
+        .digest('base64url');
+      if (!code || code.challenge !== challenge || code.redirect !== form.get('redirect_uri')) {
+        json(400, { error: 'invalid_grant' });
+        return;
+      }
+      scope = code.scope;
+    }
+    const access = `moida_at_${randomBytes(16).toString('hex')}`;
+    this.live.add(access);
+    json(200, {
+      access_token: access,
+      refresh_token: `moida_rt_${randomBytes(16).toString('hex')}`,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: this.grant(scope),
+    });
+  }
+
+  private async mcp(
+    req: IncomingMessage,
+    raw: string,
+    json: (status: number, body: object) => void,
+  ): Promise<void> {
+    const token = (req.headers.authorization ?? '').replace(/^Bearer /, '');
+    if (!this.live.has(token)) return json(401, { error: 'invalid_token' });
+    const { params } = JSON.parse(raw) as {
+      params: { name: string; arguments: Record<string, unknown> };
+    };
+    this.calls.push(new ToolCall(params.name, params.arguments, token));
+    if (this.mcpStatus) return json(this.mcpStatus, { error: 'unavailable' });
+    if (this.delayMs > 0) await new Promise((done) => setTimeout(done, this.delayMs));
+    const refused = this.refuse(params.arguments);
+    if (refused)
+      return json(200, {
+        jsonrpc: '2.0',
+        id: 1,
+        result: { isError: true, content: [{ type: 'text', text: JSON.stringify(refused) }] },
+      });
+    json(200, {
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        structuredContent:
+          params.name === 'save_transcript'
+            ? this.transcripts(params.arguments)
+            : params.name === 'app_code_upload'
+              ? {
+                  upload_path: `/api/apps/${String(params.arguments.app)}/code/versions`,
+                  header: 'x-moida-deploy',
+                  token: FakeMoida.DEPLOY_TICKET,
+                  expires_at: new Date(Date.now() + 600_000).toISOString(),
+                }
+              : this.updates(params.arguments),
+      },
+    });
+  }
+}

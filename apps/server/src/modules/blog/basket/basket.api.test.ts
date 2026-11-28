@@ -45,7 +45,7 @@ async function newSession(token: string, title: string): Promise<string> {
     request_id: randomUUID(),
     source_session_id: `basket-${randomUUID()}`,
     tool: 'claude-code',
-    project: 'cairn',
+    project: 'moida',
     title,
     did: '소재로 담을 세션',
   });

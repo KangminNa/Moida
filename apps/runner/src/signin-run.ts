@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChildExit } from './ai-process';
 import { Backoff, pause } from './backoff';
-import type { CairnServer, SigninReply } from './cairn-server';
 import { type EngineAdapter, EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer, SigninReply } from './moida-server';
 import { RunResult } from './progress';
 import type { Redactor, RunLog } from './redactor';
 import type { RunnerConfig } from './runner-config';
@@ -48,7 +48,7 @@ export class SigninRun {
   private static readonly TIMEOUT_MS = 5 * 60_000;
   /** 러너가 먼저 끄도록 터미널의 제한 시간은 조금 더 길게 */
   private static readonly LIMIT_SLACK_SECONDS = 30;
-  private static readonly DIR_PREFIX = 'cairn-signin-';
+  private static readonly DIR_PREFIX = 'moida-signin-';
   /** 이보다 오래된 로그인 폴더는 러너가 갑자기 죽어 남은 것이다 (로그인은 길어야 5분 반) */
   private static readonly STALE_MS = 10 * 60_000;
   /** 코드를 넣고 Enter를 따로 친다. 함께 보내면 붙여 넣기로 읽혀 제출되지 않는다 (Paperclip) */
@@ -60,7 +60,7 @@ export class SigninRun {
 
   constructor(
     private readonly job: Job,
-    private readonly server: Pick<CairnServer, 'aiSignin' | 'submit' | 'release'>,
+    private readonly server: Pick<MoidaServer, 'aiSignin' | 'submit' | 'release'>,
     private readonly config: RunnerConfig,
     private readonly log: RunLog,
     private readonly redactor: Redactor,

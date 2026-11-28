@@ -10,9 +10,9 @@ import { SigninRun } from './signin-run';
 
 describe('남은 로그인 폴더 치우기', () => {
   test('10분이 지난 폴더만 지운다. 이름이 다른 폴더는 건드리지 않는다', async () => {
-    const old = await mkdtemp(join(tmpdir(), 'cairn-signin-'));
-    const fresh = await mkdtemp(join(tmpdir(), 'cairn-signin-'));
-    const other = await mkdtemp(join(tmpdir(), 'not-cairn-'));
+    const old = await mkdtemp(join(tmpdir(), 'moida-signin-'));
+    const fresh = await mkdtemp(join(tmpdir(), 'moida-signin-'));
+    const other = await mkdtemp(join(tmpdir(), 'not-moida-'));
     await writeFile(join(old, 'auth.json'), '{}');
     const hourAgo = new Date(Date.now() - 60 * 60_000);
     await utimes(old, hourAgo, hourAgo);

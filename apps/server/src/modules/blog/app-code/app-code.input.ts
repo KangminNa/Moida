@@ -94,7 +94,7 @@ export class DeployCodeInput extends BaseRequest {
   }
 }
 
-/** PUT /api/apps/:id/code/versions: 배포 표(머리글 X-Cairn-Deploy)와 zip 본문 (application/zip) */
+/** PUT /api/apps/:id/code/versions: 배포 표(머리글 X-Moida-Deploy)와 zip 본문 (application/zip) */
 export class DeployedCodeInput extends BaseRequest {
   private constructor(
     readonly id: string,

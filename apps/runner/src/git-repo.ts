@@ -30,9 +30,9 @@ export class GitRepo {
   private static readonly LOCAL_MS = 2 * 60_000;
   private static readonly OUTPUT_MAX = 64 * 1024 * 1024;
   /** 러너가 올리는 브랜치는 이 아래만. 다른 브랜치는 덮어쓰지 않는다 */
-  private static readonly OWN_BRANCH = /^cairn\/[0-9a-f-]{36}$/;
+  private static readonly OWN_BRANCH = /^moida\/[0-9a-f-]{36}$/;
   /** 앞 PR의 끝을 받아 두는 ref (러너의 clone 안에서만) */
-  private static readonly PREVIOUS = 'refs/cairn/previous';
+  private static readonly PREVIOUS = 'refs/moida/previous';
   /** 충돌 표시가 남은 줄 (=======은 글에 흔해서 보지 않는다) */
   private static readonly MARKERS = '^(<<<<<<<|>>>>>>>)( |$)';
   /** 다시 해도 같은 실패 (영어로 받는다: LANG=C) */
@@ -72,7 +72,7 @@ export class GitRepo {
   ) {}
 
   /**
-   * 브랜치를 얕게 받는다: 보통은 기준 브랜치, "고쳐 달라"로 다시 온 일이면 이미 올린 cairn/<작업>(from).
+   * 브랜치를 얕게 받는다: 보통은 기준 브랜치, "고쳐 달라"로 다시 온 일이면 이미 올린 moida/<작업>(from).
    * auth는 저장소 토큰 (없으면 공개 저장소 · 시험용 서버).
    * 실패는 RepoUnreachable(돌려주고 기다림)이나 RepoRefused(실패로 끝냄)
    */
@@ -200,14 +200,14 @@ export class GitRepo {
   /** 바뀐 것을 커밋 하나로 묶고 그 커밋을 준다 */
   async commit(message: string, author: string): Promise<string> {
     await this.run(
-      ['-c', `user.name=${author}`, '-c', 'user.email=cairn@localhost', 'commit', '-q', '-F', '-'],
+      ['-c', `user.name=${author}`, '-c', 'user.email=moida@localhost', 'commit', '-q', '-F', '-'],
       message,
     );
     return (await this.run(['rev-parse', 'HEAD'])).trim();
   }
 
   /**
-   * 러너의 브랜치(cairn/<작업>)에만 올린다. 브랜치는 늘 base 위의 커밋 하나라 덮어쓴다.
+   * 러너의 브랜치(moida/<작업>)에만 올린다. 브랜치는 늘 base 위의 커밋 하나라 덮어쓴다.
    * expected가 있으면(앞 PR의 끝) 그사이 브랜치가 바뀌었을 때 덮지 않는다 (force-with-lease)
    */
   async push(
@@ -217,7 +217,7 @@ export class GitRepo {
     expected: string | null = null,
   ): Promise<void> {
     if (!GitRepo.OWN_BRANCH.test(branch))
-      throw new RepoRefused(`러너는 cairn/ 아래 브랜치에만 올려요: ${branch}`);
+      throw new RepoRefused(`러너는 moida/ 아래 브랜치에만 올려요: ${branch}`);
     const force =
       expected === null ? '--force' : `--force-with-lease=refs/heads/${branch}:${expected}`;
     await GitRepo.git(

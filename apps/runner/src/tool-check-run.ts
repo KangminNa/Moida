@@ -1,6 +1,6 @@
-import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import { McpProbe, ProbeFailed } from './mcp-probe';
+import type { MoidaServer } from './moida-server';
 import { RunResult } from './progress';
 import type { Redactor, RunLog } from './redactor';
 
@@ -11,7 +11,7 @@ import type { Redactor, RunLog } from './redactor';
 export class ToolCheckRun {
   constructor(
     private readonly job: Job,
-    private readonly server: Pick<CairnServer, 'submit'>,
+    private readonly server: Pick<MoidaServer, 'submit'>,
     private readonly redactor: Redactor,
     private readonly log: RunLog,
     private readonly signal: AbortSignal,

@@ -1,5 +1,5 @@
 // 러너 통합 테스트: 실제 서버(AppModule)와 러너 프로세스, 가짜 AI CLI를 함께 돌린다.
-// 서버 테스트처럼 앱 이미지 안에서, 개발 DB와 섞이지 않게 전용 DB(cairn_runner_test)를 새로 만들어 돌린다.
+// 서버 테스트처럼 앱 이미지 안에서, 개발 DB와 섞이지 않게 전용 DB(moida_runner_test)를 새로 만들어 돌린다.
 //
 //   pnpm slot 1 runner test:e2e                                    전부
 //   pnpm slot 1 runner test:e2e --test-name-pattern=취소            이름으로 골라서
@@ -11,13 +11,15 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 // 작업 트리에서는 .git이 파일이다. 슬롯 없이 돌리면 본 저장소의 개발 환경과 DB를 함께 쓰게 된다
-if (statSync(join(root, '.git')).isFile() && !process.env.CAIRN_SLOT) {
+if (statSync(join(root, '.git')).isFile() && !process.env.MOIDA_SLOT) {
   console.error('작업 트리에서는 pnpm slot <번호> runner test:e2e로 돌려 주세요');
   process.exit(1);
 }
 
+// DB 사용자 · 비밀번호의 기본은 cairn이다 (이미 만든 DB 볼륨을 그대로 쓰게, compose와 같다. 2026-11-28 이름 cairn → moida)
 const password = process.env.DB_PASSWORD ?? fromEnvFile('DB_PASSWORD') ?? 'cairn';
-const testDb = `postgres://cairn:${password}@cairn-db:5432/cairn_runner_test?sslmode=disable`;
+const user = process.env.MOIDA_DB_USER ?? fromEnvFile('MOIDA_DB_USER') ?? 'cairn';
+const testDb = `postgres://${user}:${password}@moida-db:5432/moida_runner_test?sslmode=disable`;
 const extra = process.argv.slice(2).filter((a) => a !== '--');
 
 const docker = (args) =>
@@ -31,11 +33,11 @@ docker([
   'psql',
   '-q',
   '-U',
-  'cairn',
+  user,
   '-d',
   'postgres',
   '-c',
-  'DROP DATABASE IF EXISTS cairn_runner_test',
+  'DROP DATABASE IF EXISTS moida_runner_test',
 ]);
 // 코어와 기능 패키지의 마이그레이션 (compose의 migrate가 plugins/*/migrations까지 넘긴다)
 docker(['run', '--rm', '-e', `DATABASE_URL=${testDb}`, 'migrate']);
@@ -49,7 +51,7 @@ docker([
   'server',
   'pnpm',
   '--filter',
-  '@cairn/server',
+  '@moida/server',
   'exec',
   'node',
   '--test',

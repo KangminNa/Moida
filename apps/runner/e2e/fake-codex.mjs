@@ -4,7 +4,7 @@
 //   exec --json …  -     지시문을 표준 입력으로 받아 사건을 JSONL로 낸다. 지시문 안의 표시로 할 일을 정한다:
 //     [fake:spy=<파일>]  받은 인자 · 환경 · 설정 · 지시문을 파일에 적는다 (--image로 붙인 사진의 sha256도: 작업 폴더 기준)
 //     [fake:rotate]      실행 중에 갱신 토큰이 바뀐 것처럼 auth.json을 바꾼다
-//     [fake:approval]    작업 토큰(환경 변수)으로 cairn MCP에 결재를 올린다
+//     [fake:approval]    작업 토큰(환경 변수)으로 moida MCP에 결재를 올린다
 //     [fake:shell]       셸 명령을 실행하려 한다 (셸을 꺼 두었으니 격리가 깨진 것)
 //     [fake:fail]        턴이 실패하고 코드 1로 끝난다
 //     [fake:leak]        auth.json의 갱신 토큰을 답에 섞는다 (러너가 지우는지)
@@ -31,7 +31,7 @@ if (command !== 'login' || flag !== '--device-auth') {
   process.exit(2);
 }
 const home = process.env.CODEX_HOME;
-const leaks = ['OPENAI_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CAIRN_RUNNER_TOKEN', 'DATABASE_URL'];
+const leaks = ['OPENAI_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'MOIDA_RUNNER_TOKEN', 'DATABASE_URL'];
 const config = home ? readFileSync(join(home, 'config.toml'), 'utf8') : '';
 const broken =
   !home ||
@@ -83,7 +83,7 @@ async function exec() {
   const config = readFileSync(join(home, 'config.toml'), 'utf8');
   const authPath = join(home, 'auth.json');
   const auth = JSON.parse(readFileSync(authPath, 'utf8'));
-  const leaks = ['OPENAI_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CAIRN_RUNNER_TOKEN', 'DATABASE_URL'];
+  const leaks = ['OPENAI_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'MOIDA_RUNNER_TOKEN', 'DATABASE_URL'];
   const isolated =
     config.includes('shell_tool = false') &&
     config.includes('unified_exec = false') &&
@@ -138,7 +138,7 @@ async function exec() {
       item: {
         id: 'item_1',
         type: 'mcp_tool_call',
-        server: 'cairn',
+        server: 'moida',
         tool: 'request_approval',
         arguments: {},
         status: 'in_progress',
@@ -149,7 +149,7 @@ async function exec() {
       headers: {
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
-        authorization: `Bearer ${process.env.CAIRN_RUN_TOKEN}`,
+        authorization: `Bearer ${process.env.MOIDA_RUN_TOKEN}`,
       },
       body: JSON.stringify({
         jsonrpc: '2.0',

@@ -14,7 +14,7 @@ export class PressOrder {
 
 /**
  * 누르기 계획의 러너 쪽 MCP 도구 (browser-tabs 0.9, F2 2026-11-21): 계획 붙잡기, AI가 요청한 누르기 가져가기 · 결과 남기기.
- * 모양의 원본은 plugins/browser-tabs/cairn-plugin.json의 tools다
+ * 모양의 원본은 plugins/browser-tabs/moida-plugin.json의 tools다
  */
 export class PressCalls {
   constructor(private readonly mcp: McpClient) {}

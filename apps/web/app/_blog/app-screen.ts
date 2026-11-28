@@ -57,7 +57,7 @@ function addDates(value: unknown): unknown {
 /** 앱 JS가 읽는 데이터 블록. </script>로 끝나지 않게 <를 바꿔 싣는다 */
 function dataBlock(data: Record<string, unknown>): string {
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  return `<script type="application/json" id="cairn-data">${json}</script>`;
+  return `<script type="application/json" id="moida-data">${json}</script>`;
 }
 
 /** 템플릿을 채운 HTML. ticket은 미리 보기 토큰. 템플릿 문법이 틀리면 Error (부르는 쪽이 500으로) */
@@ -87,7 +87,7 @@ const OPENING = /^\s*(?:<!doctype[^>]*>\s*)?(?:<html[^>]*>\s*)?(?:<head[^>]*>)?/
  * 정적 앱의 HTML 하나 (스토어 9.13): 템플릿으로 채우지 않고 그대로 내보낸다. 더하는 것은 둘뿐이다.
  *   <base>      파일이 있는 폴더의 주소. /<앱>/about 과 /<앱>/about/ 어디서 열든, 없는 화면 주소에서 첫 화면을 열든
  *               묶음 안의 상대 주소(assets/app.js)가 같은 파일을 가리킨다
- *   cairn-data  템플릿 앱과 같은 데이터 블록 (앱 JS가 읽는다)
+ *   moida-data  템플릿 앱과 같은 데이터 블록 (앱 JS가 읽는다)
  * file: 묶음 안의 이름 (about/index.html)
  */
 export function renderStaticScreen(
@@ -121,7 +121,7 @@ export function visitorData(
 
 /**
  * 앱 화면 · 앱 파일의 격리 머리글. 출처 없는 문서로 열려 앱의 스크립트가 로그인 · 콘솔 API에 닿지 못한다 (sandbox에
- * allow-same-origin 없음). 불러오기는 이 사이트와 그 버전의 cairn.json 바깥 주소만 (그림은 글 본문이 쓰는 https 어디서나).
+ * allow-same-origin 없음). 불러오기는 이 사이트와 그 버전의 moida.json 바깥 주소만 (그림은 글 본문이 쓰는 https 어디서나).
  * 출처 없는 문서에서 'self'가 맞지 않는 브라우저가 있어 사이트 주소를 그대로 적는다
  */
 export function appHeaders(
@@ -136,7 +136,7 @@ export function appHeaders(
   /**
    * 격리를 푼 화면의 브라우저 권한 (스토어 12.2). null이 아니면 그 앱의 확인한 도메인으로 연 공개 화면이다:
    * sandbox를 빼 저장소 · 회원 · 앱 데이터를 쓰게 하고(그 도메인은 콘솔과 다른 출처다), 선언서가 바란 권한만 연다.
-   * 바깥으로의 요청은 여전히 이 출처와 cairn.json의 hosts뿐이다
+   * 바깥으로의 요청은 여전히 이 출처와 moida.json의 hosts뿐이다
    */
   open: readonly string[] | null = null,
 ): Headers {

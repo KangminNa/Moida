@@ -4,7 +4,7 @@ import { Forbidden, type SecretBox } from '../../platform';
 // 올리기 표(UploadTicket)를 거울처럼 따른다: 기기 토큰은 REST에서 통하지 않고(ActorGuard), 파일 본문은 MCP의 JSON으로 보내지 않는다.
 // 서버 키로 봉인하고(용도 고정, 10분), 그 작업 · 실행 · 결과물에 묶인다: 다른 결과물을 받는 데 쓸 수 없다.
 export class DownloadTicket {
-  static readonly HEADER = 'x-cairn-download';
+  static readonly HEADER = 'x-moida-download';
   static readonly PATH = '/api/outputs/download';
   private static readonly PURPOSE = 'output-download';
   private static readonly TTL_SECONDS = 600;

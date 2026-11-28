@@ -3,7 +3,7 @@ import type { ApiError } from './types';
 // 브라우저에서 서버 API 부르기. 같은 주소(/api/…)라 쿠키가 함께 간다.
 export type ApiReply<T> = { ok: true; data: T } | { ok: false; status: number; error: ApiError };
 
-/** headers: 더 실을 머리글 (커뮤니티 회원 쓰기의 X-Cairn-CSRF, 스토어 3-2) */
+/** headers: 더 실을 머리글 (커뮤니티 회원 쓰기의 X-Moida-CSRF, 스토어 3-2) */
 export async function api<T>(
   method: string,
   path: string,
@@ -63,7 +63,7 @@ export async function downloadFile(path: string, fallback: string): Promise<ApiR
  * 401 · 403을 받았다는 신호 (웹 UX U2). 로그인이 끝난 콘솔의 관리 API는 403(관리자만)이다.
  * 콘솔 틀(admin/SignedOutBar)이 듣고 로그인이 정말 끝났는지 묻는다 (지금 비밀번호 틀림 · 권한 없음처럼 살아 있어도 오는 답이 있다)
  */
-export const DENIED_EVENT = 'cairn:denied';
+export const DENIED_EVENT = 'moida:denied';
 
 async function send<T>(path: string, init: RequestInit): Promise<ApiReply<T>> {
   try {

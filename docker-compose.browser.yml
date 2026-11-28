@@ -8,7 +8,7 @@ services:
     build:
       context: .
       dockerfile: browser/Dockerfile   # neko 3.2.0 (amd64 · arm64)
-    image: cairn-browser:${CAIRN_IMAGE_TAG:-dev}
+    image: moida-browser:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}
     restart: unless-stopped
     logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
     shm_size: 1g
@@ -21,9 +21,9 @@ services:
   server:
     networks:
       default:
-        aliases: [cairn-server]
+        aliases: [moida-server]
       browser:
-        aliases: [cairn-server]
+        aliases: [moida-server]
 
   runner:
     network_mode: service:browser
@@ -31,7 +31,7 @@ services:
       browser:
         condition: service_started
     environment:
-      CAIRN_BROWSER_URL: http://127.0.0.1:9222
+      MOIDA_BROWSER_URL: http://127.0.0.1:9222
 
 networks:
   browser: {}   # 서버 브라우저 전용 (바깥 인터넷은 나간다: 브라우저 · 서버 러너가 쓴다)

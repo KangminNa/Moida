@@ -30,7 +30,7 @@ export class McpProbe {
       {
         protocolVersion: McpProbe.PROTOCOL,
         capabilities: {},
-        clientInfo: { name: 'cairn-runner', version: '1' },
+        clientInfo: { name: 'moida-runner', version: '1' },
       },
       deadline,
     );

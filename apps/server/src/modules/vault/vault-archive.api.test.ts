@@ -146,7 +146,7 @@ before(async () => {
   const res = await download(owner);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'application/zip');
-  assert.match(res.headers.get('content-disposition') ?? '', /cairn-archive\.zip/);
+  assert.match(res.headers.get('content-disposition') ?? '', /moida-archive\.zip/);
   files = unzip(Buffer.from(await res.arrayBuffer()));
 });
 after(() => api.close());
@@ -158,17 +158,17 @@ describe('보관 형식 내보내기', () => {
     assert.equal(res.status, 403);
   });
 
-  test('cairn.json이 맨 위에 있다', () => {
-    assert.equal([...files.keys()][0], 'cairn.json');
-    const head = JSON.parse(files.get('cairn.json') ?? '{}');
-    assert.deepEqual([head.format, head.generator], [1, 'cairn']);
+  test('moida.json이 맨 위에 있다', () => {
+    assert.equal([...files.keys()][0], 'moida.json');
+    const head = JSON.parse(files.get('moida.json') ?? '{}');
+    assert.deepEqual([head.format, head.generator], [1, 'moida']);
   });
 
   test('경로는 모두 보관 형식 안에 있다', () => {
     for (const path of files.keys())
       assert.match(
         path,
-        /^(cairn\.json|vault\/categories\.yml|vault\/graph\.json|vault\/wikis\/[^/]+\.md|vault\/sessions\/[^/]+\/\d{4}-\d{2}-\d{2}-[^/]+\.md|vault\/transcripts\/[0-9a-f-]{36}\/[1-9]\d*\.md|blog\/apps\/[a-z0-9-]+\.yml|blog\/apps\/[a-z0-9-]+\/code\/[^/]+(?:\/[^/]+)*|blog\/posts\/\d{4}\/[^/]+\.md|assets\/[0-9a-f]{64}\.[a-z0-9]+)$/,
+        /^(moida\.json|vault\/categories\.yml|vault\/graph\.json|vault\/wikis\/[^/]+\.md|vault\/sessions\/[^/]+\/\d{4}-\d{2}-\d{2}-[^/]+\.md|vault\/transcripts\/[0-9a-f-]{36}\/[1-9]\d*\.md|blog\/apps\/[a-z0-9-]+\.yml|blog\/apps\/[a-z0-9-]+\/code\/[^/]+(?:\/[^/]+)*|blog\/posts\/\d{4}\/[^/]+\.md|assets\/[0-9a-f]{64}\.[a-z0-9]+)$/,
         path,
       );
     assert.ok(files.has('vault/categories.yml'));
@@ -177,10 +177,10 @@ describe('보관 형식 내보내기', () => {
 
   test('wiki: 앞부분과 본문', () => {
     const text = files.get(`vault/wikis/${wiki.slug}.md`) ?? '';
-    assert.match(text, /^---\ncairn_format: 1\ncairn_type: wiki\n/);
-    assert.match(text, new RegExp(`cairn_id: "?${wiki.id}"?\\n`));
+    assert.match(text, /^---\nmoida_format: 1\nmoida_type: wiki\n/);
+    assert.match(text, new RegExp(`moida_id: "?${wiki.id}"?\\n`));
     assert.match(text, /visibility: private\n/);
-    assert.match(text, new RegExp(`cairn_category: "?${category.id}"?\\n`));
+    assert.match(text, new RegExp(`moida_category: "?${category.id}"?\\n`));
     // 따옴표가 든 제목은 YAML 문자열로
     assert.ok(text.includes(`title: ${JSON.stringify(wiki.title)}\n`));
     assert.ok(text.endsWith('---\n\n## 배경\n\n[[다른 wiki]]와 잇는다'));
@@ -190,15 +190,15 @@ describe('보관 형식 내보내기', () => {
     const path = fileWith(session);
     assert.equal(path, 'vault/sessions/위험한-프로젝트/2026-10-31-보관-형식-만들기.md');
     const text = files.get(path) ?? '';
-    assert.match(text, /cairn_type: session\n/);
+    assert.match(text, /moida_type: session\n/);
     assert.match(text, /tool: claude-code\n/);
     assert.match(text, /visibility: private\n/);
-    assert.match(text, new RegExp(`cairn_wiki: "?${wiki.id}"?\\n`));
+    assert.match(text, new RegExp(`moida_wiki: "?${wiki.id}"?\\n`));
     assert.match(text, /tags: \[백업, 보관\]\n/);
     assert.match(text, /## 한 일\n/);
   });
 
-  test('노트 없는 세션: cairn_note: false, 본문 없음. 원문은 세션 id 폴더의 번호 파일에 그대로', () => {
+  test('노트 없는 세션: moida_note: false, 본문 없음. 원문은 세션 id 폴더의 번호 파일에 그대로', () => {
     const path = [...files.keys()].find(
       (p) => p.startsWith('vault/sessions/') && (files.get(p) ?? '').includes(noteless),
     );
@@ -206,13 +206,13 @@ describe('보관 형식 내보내기', () => {
     assert.match(String(path), /^vault\/sessions\/no-project\/2026-11-01-session[^/]*\.md$/);
     const text = files.get(String(path)) ?? '';
     assert.match(text, /title: null\n/);
-    assert.match(text, /cairn_note: false\n/);
-    assert.equal(text.includes('cairn_noted_seq'), false);
+    assert.match(text, /moida_note: false\n/);
+    assert.equal(text.includes('moida_noted_seq'), false);
     assert.ok(text.endsWith('\n---\n\n'), '본문이 없다');
 
     const kept = files.get(`vault/transcripts/${noteless}/1.md`) ?? '';
-    assert.match(kept, /^---\ncairn_format: 1\ncairn_type: transcript\n/);
-    assert.match(kept, new RegExp(`cairn_session: "?${noteless}"?\\n`));
+    assert.match(kept, /^---\nmoida_format: 1\nmoida_type: transcript\n/);
+    assert.match(kept, new RegExp(`moida_session: "?${noteless}"?\\n`));
     assert.match(kept, /seq: 1\ncreated: "[^"]+"\n---\n\n사람: 원문 \[지움: GitHub 토큰\]/);
     assert.ok(kept.endsWith('AI: ## 한 일\n원문 안의 소제목'), '쌓인 원문 그대로');
     assert.equal(
@@ -226,7 +226,7 @@ describe('보관 형식 내보내기', () => {
     const path = fileWith(post.id);
     assert.match(path, new RegExp(`^blog/posts/\\d{4}/${post.slug}\\.md$`));
     const text = files.get(path) ?? '';
-    assert.match(text, /cairn_type: post\n/);
+    assert.match(text, /moida_type: post\n/);
     assert.match(text, /status: draft\n/);
     assert.match(text, /published: null\n/);
     assert.ok(text.endsWith('글 본문'));
@@ -235,8 +235,8 @@ describe('보관 형식 내보내기', () => {
   test('카테고리 yml', () => {
     const text = files.get('vault/categories.yml') ?? '';
     assert.ok(
-      text.includes(`- cairn_id: ${JSON.stringify(category.id).slice(1, -1)}`) ||
-        text.includes(`- cairn_id: ${JSON.stringify(category.id)}`),
+      text.includes(`- moida_id: ${JSON.stringify(category.id).slice(1, -1)}`) ||
+        text.includes(`- moida_id: ${JSON.stringify(category.id)}`),
     );
     assert.ok(text.includes(`  name: ${JSON.stringify(category.name)}\n`));
     assert.ok(text.includes('  description: "여러 줄\\n기준"\n'));
@@ -255,7 +255,7 @@ describe('보관 형식 내보내기', () => {
       device,
       tidy,
       ownerPassword,
-      process.env.CAIRN_SECRET_KEY ?? 'nothing',
+      process.env.MOIDA_SECRET_KEY ?? 'nothing',
       'scrypt$',
       'token_hash',
       'password_hash',

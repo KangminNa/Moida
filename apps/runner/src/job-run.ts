@@ -2,7 +2,6 @@ import type { AiLogin } from './ai-login';
 import type { AiProcess, ChildExit } from './ai-process';
 import type { AiStream, AiTool } from './ai-tool';
 import { Backoff, pause } from './backoff';
-import type { CairnServer } from './cairn-server';
 import { CredentialWriteBack } from './credential-write-back';
 import { EngineAdapters } from './engine-adapter';
 import type { Job } from './job';
@@ -10,6 +9,7 @@ import { JobInputs } from './job-inputs';
 import { JobWorkspace } from './job-workspace';
 import { LineageStore } from './lineage-store';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import { OutputBatch } from './output-batch';
 import { OutputUploader } from './output-uploader';
 import { ProgressState, RunEvent, RunResult } from './progress';
@@ -67,7 +67,7 @@ export class JobRun {
   constructor(
     private readonly job: Job,
     private readonly login: AiLogin,
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly config: RunnerConfig,
     private readonly log: RunLog,
     redactor: Redactor,

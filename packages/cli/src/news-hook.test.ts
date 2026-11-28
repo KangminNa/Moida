@@ -14,14 +14,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { FakeCairn } from './testing/fake-cairn';
+import { FakeMoida } from './testing/fake-moida';
 
-// 소식 훅 · 상태 줄 스크립트 (packages/cli/hooks, cairn connect가 ~/.cairn/bin에 넣는다). 가짜 블로그에 붙여 프로세스로 돌린다.
-// HOME을 임시 폴더로 바꿔 ~/.cairn이 그 안에 생긴다. 지금 폴더는 git 원격이 있는 임시 저장소.
+// 소식 훅 · 상태 줄 스크립트 (packages/cli/hooks, moida connect가 ~/.moida/bin에 넣는다). 가짜 블로그에 붙여 프로세스로 돌린다.
+// HOME을 임시 폴더로 바꿔 ~/.moida이 그 안에 생긴다. 지금 폴더는 git 원격이 있는 임시 저장소.
 
 const HOOKS = join(__dirname, '../hooks');
-const SCRIPT = join(HOOKS, 'cairn-news.mjs');
-const TOKEN = 'cairn_at_hooktest';
+const SCRIPT = join(HOOKS, 'moida-news.mjs');
+const TOKEN = 'moida_at_hooktest';
 
 class Run {
   constructor(
@@ -31,7 +31,7 @@ class Run {
   ) {}
 }
 
-let blog: FakeCairn;
+let blog: FakeMoida;
 let home: string;
 let repo: string;
 
@@ -53,18 +53,18 @@ function run(mode: 'hook' | 'status', cwd = repo): Promise<Run> {
 }
 
 function writeCredentials(more: Record<string, unknown> = {}): void {
-  mkdirSync(join(home, '.cairn'), { recursive: true });
+  mkdirSync(join(home, '.moida'), { recursive: true });
   writeFileSync(
-    join(home, '.cairn', 'credentials.json'),
+    join(home, '.moida', 'credentials.json'),
     JSON.stringify({
       news: {
         site: blog.origin,
         mcp: `${blog.origin}/mcp`,
         token_endpoint: `${blog.origin}/oauth/token`,
-        client_id: 'cairn_x',
+        client_id: 'moida_x',
         device: 'mac · 소식',
         access_token: TOKEN,
-        refresh_token: 'cairn_rt_hooktest',
+        refresh_token: 'moida_rt_hooktest',
         expires_at: new Date(Date.now() + 3_600_000).toISOString(),
         ...more,
       },
@@ -74,7 +74,7 @@ function writeCredentials(more: Record<string, unknown> = {}): void {
 }
 
 const credentials = () =>
-  JSON.parse(readFileSync(join(home, '.cairn', 'credentials.json'), 'utf8')).news;
+  JSON.parse(readFileSync(join(home, '.moida', 'credentials.json'), 'utf8')).news;
 
 const item = (n: number, kind: string, text: string) => ({
   n,
@@ -93,13 +93,13 @@ const board = [
 ];
 
 before(async () => {
-  blog = new FakeCairn();
+  blog = new FakeMoida();
   await blog.start();
   blog.allow(TOKEN);
 });
 after(() => blog.close());
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), 'cairn-news-hook-'));
+  home = mkdtempSync(join(tmpdir(), 'moida-news-hook-'));
   repo = join(home, 'repo');
   mkdirSync(repo);
   execFileSync('git', ['init', '-q', repo]);
@@ -130,12 +130,12 @@ describe('프로젝트 (git 주소 → 서버와 같은 모양)', () => {
       ['https://github.com/only', null],
       ['', null],
     ];
-    // 스크립트는 ES 모듈이라 따로 띄운 node에서 부른다. 훅과 cairn-team의 보내기 전 검사가 같은 값을 내야
+    // 스크립트는 ES 모듈이라 따로 띄운 node에서 부른다. 훅과 moida-team의 보내기 전 검사가 같은 값을 내야
     // ask_agent의 project와 훅의 거르기가 맞는다
     const remotes = JSON.stringify(cases.map(([remote]) => remote));
     for (const file of [
       join(HOOKS, 'news-state.mjs'),
-      join(__dirname, '../../../skills/cairn-team/scripts/before-send.mjs'),
+      join(__dirname, '../../../skills/moida-team/scripts/before-send.mjs'),
     ]) {
       const url = JSON.stringify(pathToFileURL(file).href);
       const got = JSON.parse(
@@ -245,7 +245,7 @@ describe('훅 (말을 걸 때마다)', () => {
     blog.delayMs = 0;
     blog.refuse = () => ({ code: 'forbidden', message: "'news' 권한이 필요해요" });
     assert.deepEqual([(await run('hook')).code, (await run('hook')).stdout], [0, '']);
-    rmSync(join(home, '.cairn', 'credentials.json'));
+    rmSync(join(home, '.moida', 'credentials.json'));
     assert.deepEqual([(await run('hook')).code, (await run('hook')).stdout], [0, '']);
   });
 
@@ -274,7 +274,7 @@ describe('토큰 갱신 (따로 띄운 프로세스가 한다)', () => {
     }
   }
   const leftovers = () =>
-    readdirSync(join(home, '.cairn')).filter((f) => f.endsWith('.tmp') || f.endsWith('.lock'));
+    readdirSync(join(home, '.moida')).filter((f) => f.endsWith('.tmp') || f.endsWith('.lock'));
 
   test('끝나기 10분 전이면 지금 토큰으로 부르고, 따로 한 번 갱신해 0600 파일에 다시 쓴다', async () => {
     writeCredentials({ expires_at: new Date(Date.now() + 5 * 60_000).toISOString() });
@@ -282,11 +282,11 @@ describe('토큰 갱신 (따로 띄운 프로세스가 한다)', () => {
     assert.equal(blog.calls.at(-1)?.token, TOKEN, '아직 살아 있는 토큰');
     await until('갱신', () => credentials().access_token !== TOKEN);
     await until('잠금 풀림', () => leftovers().length === 0);
-    assert.deepEqual(blog.refreshed, ['cairn_rt_hooktest']);
-    assert.equal(statSync(join(home, '.cairn', 'credentials.json')).mode & 0o777, 0o600);
+    assert.deepEqual(blog.refreshed, ['moida_rt_hooktest']);
+    assert.equal(statSync(join(home, '.moida', 'credentials.json')).mode & 0o777, 0o600);
     await run('hook');
     assert.equal(blog.calls.at(-1)?.token, credentials().access_token);
-    assert.deepEqual(blog.refreshed, ['cairn_rt_hooktest'], '새 토큰은 다시 갱신하지 않는다');
+    assert.deepEqual(blog.refreshed, ['moida_rt_hooktest'], '새 토큰은 다시 갱신하지 않는다');
   });
 
   test('이미 끝난 토큰이면 이번에는 조용히 넘어가고, 갱신된 뒤부터 소식을 받는다', async () => {
@@ -300,7 +300,7 @@ describe('토큰 갱신 (따로 띄운 프로세스가 한다)', () => {
 
   test('다른 프로세스가 갱신 중(잠금)이면 띄우지 않는다 (같은 갱신 토큰을 두 번 내밀지 않게)', async () => {
     writeCredentials({ expires_at: new Date(Date.now() + 5 * 60_000).toISOString() });
-    writeFileSync(join(home, '.cairn', 'credentials.lock'), '');
+    writeFileSync(join(home, '.moida', 'credentials.lock'), '');
     await run('hook');
     await run('status');
     await new Promise((done) => setTimeout(done, 1_000));
@@ -308,9 +308,9 @@ describe('토큰 갱신 (따로 띄운 프로세스가 한다)', () => {
   });
 
   test('서버가 토큰을 받지 않으면 끝나지 않았어도 갱신한다', async () => {
-    writeCredentials({ access_token: 'cairn_at_revoked' });
+    writeCredentials({ access_token: 'moida_at_revoked' });
     assert.equal((await run('hook')).stdout, '');
-    await until('갱신', () => credentials().access_token !== 'cairn_at_revoked');
+    await until('갱신', () => credentials().access_token !== 'moida_at_revoked');
     await run('hook');
     assert.equal(blog.calls.at(-1)?.token, credentials().access_token);
   });
@@ -320,7 +320,7 @@ describe('토큰 갱신 (따로 띄운 프로세스가 한다)', () => {
     blog.refreshDead = true;
     assert.equal((await run('hook')).stdout, '');
     await until('끊김', () => credentials().dead === true);
-    assert.equal((await run('status')).stdout, 'Moida · 다시 연결 (cairn connect)\n');
+    assert.equal((await run('status')).stdout, 'Moida · 다시 연결 (moida connect)\n');
     await run('hook');
     await new Promise((done) => setTimeout(done, 500));
     assert.equal(blog.refreshed.length, 1, '죽은 갱신 토큰은 다시 내밀지 않는다');
@@ -350,6 +350,6 @@ describe('상태 줄', () => {
     const slow = await run('status');
     assert.equal(slow.stdout, 'Moida · 연결 안 됨\n');
     assert.ok(slow.ms < 3_000, `${slow.ms}ms`);
-    assert.ok(existsSync(join(home, '.cairn', 'news')));
+    assert.ok(existsSync(join(home, '.moida', 'news')));
   });
 });

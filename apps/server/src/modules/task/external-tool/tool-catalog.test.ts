@@ -95,7 +95,7 @@ describe('연결 확인 일 (ExternalTool.checkTask)', () => {
   });
 
   test('일에 싣는 도구에 지시문 줄이 붙는다 (확인한 목록에서)', () => {
-    const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+    const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
     const row = ExternalTool.open('space', 'notion', fields, NOW).unsaved as ExternalToolRow;
     const tool = ExternalTool.restore({
       ...row,

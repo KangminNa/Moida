@@ -118,7 +118,7 @@ async function lease(approvalActions: readonly string[] = ['blog.post.publish'])
     201,
   );
   const job = await take(task.id);
-  assert.equal(job.skill, 'cairn-write');
+  assert.equal(job.skill, 'moida-write');
   return { task, token: job.run_token };
 }
 
@@ -141,7 +141,7 @@ async function draftAndAsk(action = 'blog.post.publish') {
     request_id: 'first-draft',
     title,
     body_md: '소재에서 읽은 본문',
-    tags: ['cairn'],
+    tags: ['moida'],
     menu_id: menuId,
   });
   const asked = await call(token, 'request_approval', {
@@ -564,13 +564,13 @@ describe('공개하는 길', () => {
   });
 });
 
-describe('cairn-write 스킬', () => {
-  const SKILL = resolve(process.cwd(), '../../skills/cairn-write/SKILL.md');
+describe('moida-write 스킬', () => {
+  const SKILL = resolve(process.cwd(), '../../skills/moida-write/SKILL.md');
 
   test('스킬이 부르는 도구는 모두 있고, 초안을 쓰는 에이전트에게 보인다', async () => {
     assert.equal(existsSync(SKILL), true);
     const text = readFileSync(SKILL, 'utf8');
-    assert.match(text, /^---\nname: cairn-write\n/);
+    assert.match(text, /^---\nname: moida-write\n/);
     assert.equal(text.includes('scripts/'), false);
     const { token } = await lease();
     const names = await toolNames(token);
@@ -589,6 +589,6 @@ describe('cairn-write 스킬', () => {
   });
 
   test('앱용 묶음은 폴더만 있으면 만들어진다', async () => {
-    assert.equal((await api.get('/api/skills/cairn-write.zip', owner)).status, 200);
+    assert.equal((await api.get('/api/skills/moida-write.zip', owner)).status, 200);
   });
 });

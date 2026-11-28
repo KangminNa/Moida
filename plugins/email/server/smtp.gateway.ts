@@ -166,7 +166,7 @@ export class SmtpGateway extends BaseGateway {
       try {
         await session.expect(220);
         session.stage = '인사';
-        await session.command('EHLO cairn', 250);
+        await session.command('EHLO moida', 250);
         session.stage = '로그인';
         const plain = Buffer.from(`\u0000${this.user}\u0000${this.password}`, 'utf8');
         await session.command(`AUTH PLAIN ${plain.toString('base64')}`, 235);

@@ -27,7 +27,7 @@ export class AppCodeBaseTool extends BaseTool {
 }
 
 // MCP 도구 app_code_upload (앱 플랫폼, 스토어 12.5): 이 컴퓨터에서 빌드한 묶음(zip)을 올릴 표를 받는다.
-// cairn app deploy가 부른다 (배포 기기 · write). 묶음은 받은 표로 PUT한다 (기기 토큰은 /mcp에서만 요청자다)
+// moida app deploy가 부른다 (배포 기기 · write). 묶음은 받은 표로 PUT한다 (기기 토큰은 /mcp에서만 요청자다)
 @Injectable()
 export class AppCodeUploadTool extends BaseTool {
   readonly name = 'app_code_upload';

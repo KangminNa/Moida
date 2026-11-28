@@ -104,7 +104,7 @@ describe('보안 기록: 로그인', () => {
 
   test('로그인 · 로그아웃이 남는다', async () => {
     const res = await login(ApiClient.OWNER_LOGIN, ApiClient.OWNER_PASSWORD);
-    const session = new TestUser({ cairn_session: res.cookies().cairn_session ?? '' });
+    const session = new TestUser({ moida_session: res.cookies().moida_session ?? '' });
     assert.equal(res.status, 200);
     assert.equal(
       (await api.request('POST', '/api/auth/logout', session, undefined, headers)).status,
@@ -160,14 +160,14 @@ describe('로그인한 곳', () => {
       triesPerPlace: 10,
       windowSeconds: 60,
     });
-    assert.ok(!JSON.stringify(list).includes(owner.cookies.cairn_session ?? '-'), '토큰 없음');
+    assert.ok(!JSON.stringify(list).includes(owner.cookies.moida_session ?? '-'), '토큰 없음');
   });
 
   test('다른 곳의 로그인 하나를 끝내면 그 쿠키는 주인이 아니다. 지금 로그인은 422, 없는 로그인은 404', async () => {
     const other = new TestUser({
-      cairn_session:
+      moida_session:
         (await api.login(ApiClient.OWNER_LOGIN, ApiClient.OWNER_PASSWORD)).cookies()
-          .cairn_session ?? '',
+          .moida_session ?? '',
     });
     const list = ok(await api.get('/api/auth/sessions', owner)).sessions as Json[];
     const current = list.find((s) => s.current);
@@ -191,9 +191,9 @@ describe('로그인한 곳', () => {
 
   test('다른 곳 모두 로그아웃: 지금 로그인만 남는다', async () => {
     const other = new TestUser({
-      cairn_session:
+      moida_session:
         (await api.login(ApiClient.OWNER_LOGIN, ApiClient.OWNER_PASSWORD)).cookies()
-          .cairn_session ?? '',
+          .moida_session ?? '',
     });
     ok(await api.request('POST', '/api/auth/sessions/end-others', owner));
     assert.equal((await api.get('/api/auth/me', other)).status, 401);

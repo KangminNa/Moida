@@ -4,7 +4,7 @@
 // 출처가 그대로인지 보고, 해석한 모양을 돌려준다 (검사한 곳과 실제로 가는 곳이 같게)
 
 /** 웹의 proxy(proxy.ts)가 콘솔 요청에 붙이는 지금 주소 (서버에서 그리는 콘솔 틀이 로그인으로 보낼 때 돌아올 곳, 웹 UX U2) */
-export const RETURN_HEADER = 'x-cairn-path';
+export const RETURN_HEADER = 'x-moida-path';
 
 /** 로그인 화면 주소. 다시 로그인하면 back으로 돌아온다 (로그인 화면이 safeReturnPath로 다시 거른다) */
 export function loginPath(back: string): string {

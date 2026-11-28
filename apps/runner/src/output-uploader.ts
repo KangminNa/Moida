@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
 import { pause } from './backoff';
-import type { CairnServer } from './cairn-server';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import type { OutputFile } from './output-batch';
 import { RunEvent } from './progress';
 
@@ -18,7 +18,7 @@ export class OutputUploader {
   private static readonly SEND_MS = 10 * 60_000;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly serverUrl: string,
   ) {}
 

@@ -23,7 +23,7 @@
     "0.0.0.0",
     "169.254.169.254",
     "metadata.google.internal",
-    "cairn-server",
+    "moida-server",
     "server",
     "browser",
     "db",

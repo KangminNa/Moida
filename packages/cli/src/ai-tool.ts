@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { type Shell, ShellResult } from './shell';
 import { CliError } from './terminal';
 
-/** AI 도구에 등록된 cairn MCP 서버 하나 (도구의 `mcp get`·`mcp list`를 읽은 것) */
+/** AI 도구에 등록된 moida MCP 서버 하나 (도구의 `mcp get`·`mcp list`를 읽은 것) */
 export class McpServerState {
   constructor(
     readonly url: string | null,
@@ -19,8 +19,8 @@ export class McpServerState {
 // 이 컴퓨터에서 도는 AI 도구 하나 (Claude Code, Codex …): 스킬·검토자를 넣을 자리, MCP 등록·로그인 명령.
 // 로그인과 토큰 보관·갱신은 그 도구가 한다. 새 도구는 이것을 상속한 클래스 하나를 더한다.
 export abstract class AiTool {
-  /** MCP 서버 이름. 스킬이 부르는 도구 이름(예: mcp__cairn__save_session)과 맞아야 한다 */
-  static readonly SERVER = 'cairn';
+  /** MCP 서버 이름. 스킬이 부르는 도구 이름(예: mcp__moida__save_session)과 맞아야 한다 */
+  static readonly SERVER = 'moida';
 
   /** --tool 값이자 노트의 tool 값 (예: claude-code) */
   abstract readonly id: string;
@@ -56,7 +56,7 @@ export abstract class AiTool {
     protected readonly home: string = homedir(),
   ) {}
 
-  /** 등록된 cairn 서버. 없으면 null */
+  /** 등록된 moida 서버. 없으면 null */
   abstract server(): Promise<McpServerState | null>;
   /** 모든 프로젝트에서 쓰도록 등록한다 */
   abstract addServer(url: string): Promise<void>;

@@ -46,7 +46,7 @@ export class BlobStore {
   >();
 
   constructor(private readonly db: Database) {
-    this.dir = process.env.CAIRN_BLOBS_DIR ?? BlobStore.DEFAULT_DIR;
+    this.dir = process.env.MOIDA_BLOBS_DIR ?? BlobStore.DEFAULT_DIR;
   }
 
   /** 저장한다. 내용이 같으면 몇 번을 불러도 파일과 행은 하나다 */

@@ -17,17 +17,18 @@ const n = Number(slot);
 const webPort = 3000 + n * 100;
 const env = {
   ...process.env,
-  CAIRN_SLOT: slot,
-  COMPOSE_PROJECT_NAME: `cairn-s${slot}`,
-  CAIRN_IMAGE_TAG: `s${slot}`,
+  MOIDA_SLOT: slot,
+  COMPOSE_PROJECT_NAME: `moida-s${slot}`,
+  MOIDA_IMAGE_TAG: `s${slot}`,
   DB_PORT: String(5432 + n * 100),
   SERVER_PORT: String(4000 + n * 100),
   WEB_PORT: String(webPort),
-  CAIRN_WEB_URL: `http://localhost:${webPort}`,
+  MOIDA_WEB_URL: `http://localhost:${webPort}`,
   // 작업 트리에는 .env가 없다. 슬롯 DB에만 쓰는 값이라 비밀이 아니다
-  CAIRN_SECRET_KEY:
+  MOIDA_SECRET_KEY:
+    process.env.MOIDA_SECRET_KEY ??
     process.env.CAIRN_SECRET_KEY ??
-    createHash('sha256').update(`cairn-slot-${slot}`).digest('base64'),
+    createHash('sha256').update(`moida-slot-${slot}`).digest('base64'),
 };
 const result = spawnSync('pnpm', ['--silent', script, ...args], { stdio: 'inherit', env });
 process.exit(result.status ?? 1);

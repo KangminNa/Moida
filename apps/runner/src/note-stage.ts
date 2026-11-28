@@ -1,6 +1,6 @@
-import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import type { NoteSource } from './note-source';
 import { RunEvent, RunResult } from './progress';
 import type { PromptPack } from './prompt-pack';
@@ -23,7 +23,7 @@ export class NoteStage implements SandboxStage {
 
   constructor(
     private readonly job: Job,
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
   ) {}
 
   async prepare(signal: AbortSignal, note: Note, redactor: Redactor): Promise<RunEnding | null> {

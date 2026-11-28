@@ -15,7 +15,7 @@ import { ExternalToolRefreshJob } from './external-tool-refresh.job';
 // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 시험 (모양은 assert가 본다)
 type Json = Record<string, any>;
 /** OAuthGateway.TEST_LOOPBACK_ENV (모듈 안을 가져오지 않으려고 이름만) */
-const LOOPBACK = 'CAIRN_OAUTH_TEST_LOOPBACK';
+const LOOPBACK = 'MOIDA_OAUTH_TEST_LOOPBACK';
 const CALLBACK = '/api/external-tools/oauth/callback';
 
 let api: ApiClient;

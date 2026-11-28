@@ -199,7 +199,7 @@ export class JobService extends BaseService {
       const busy = [...running];
       const skills = new SkillRepository(tx);
       const packageOf = (name: string) => skills.current(spaceId, name, this.repoSkills.get(name));
-      // 지시문 틀(cairn-runner)의 지금 판: 에이전트의 일마다 함께 보내고 실행 기록에 남긴다
+      // 지시문 틀(moida-runner)의 지금 판: 에이전트의 일마다 함께 보내고 실행 기록에 남긴다
       const prompts = picked.length > 0 ? await packageOf(PromptTemplates.SKILL) : null;
       for (const task of picked) {
         if (jobs.length >= req.limit) break;

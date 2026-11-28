@@ -56,8 +56,8 @@ describe('OutputPolicy', () => {
     const fallback = OutputPolicy.fromEnv({});
     assert.equal(fallback.maxBytes, 80 * GB);
     assert.equal(fallback.reserveBytes, 20 * GB);
-    assert.equal(OutputPolicy.fromEnv({ CAIRN_OUTPUTS_MAX_GB: '0.5' }).maxBytes, GB / 2);
-    assert.throws(() => OutputPolicy.fromEnv({ CAIRN_OUTPUTS_MAX_GB: '많이' }));
-    assert.throws(() => OutputPolicy.fromEnv({ CAIRN_DISK_RESERVE_GB: '-1' }));
+    assert.equal(OutputPolicy.fromEnv({ MOIDA_OUTPUTS_MAX_GB: '0.5' }).maxBytes, GB / 2);
+    assert.throws(() => OutputPolicy.fromEnv({ MOIDA_OUTPUTS_MAX_GB: '많이' }));
+    assert.throws(() => OutputPolicy.fromEnv({ MOIDA_DISK_RESERVE_GB: '-1' }));
   });
 });

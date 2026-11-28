@@ -37,7 +37,7 @@ export class ZipEntry {
 }
 
 // zip의 파일 목록 읽기 (스토어 9.13: 앱 코드 일의 app.zip을 서버에 올리기 전에 러너가 본다). 러너에는 런타임 의존 패키지가 없어
-// 목록(central directory)만 직접 읽고, 내용은 node:zlib로 필요한 파일(cairn.json)만 푼다. 서버(AppCodeService.unzip)와 같은 눈으로:
+// 목록(central directory)만 직접 읽고, 내용은 node:zlib로 필요한 파일(moida.json)만 푼다. 서버(AppCodeService.unzip)와 같은 눈으로:
 // 운영체제가 넣는 파일은 건너뛰고, 폴더 하나로 감싼 zip이면 그 폴더를 벗긴다. zip64 · 암호 · 나뉜 zip은 읽지 않는다 (null)
 export class ZipIndex {
   private static readonly JUNK = /(^|\/)(__MACOSX\/|\.DS_Store$|Thumbs\.db$|desktop\.ini$)/i;

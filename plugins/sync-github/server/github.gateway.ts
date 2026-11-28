@@ -42,16 +42,17 @@ export class RemoteSnapshot {
     readonly files: ReadonlyMap<string, string>,
   ) {}
 
-  /** 보관 형식이 관리하는 파일인가 (README 같은 다른 파일은 건드리지 않는다) */
+  /** 보관 형식이 관리하는 파일인가 (README 같은 다른 파일은 건드리지 않는다).
+   *  옛 이름의 맨 위 파일 cairn.json(2026-11-28 이름 cairn → moida 전)도 관리한다: 다음 동기화에서 moida.json으로 바뀌며 지워진다 */
   static isManaged(path: string): boolean {
-    return path === 'cairn.json' || /^(blog|vault|assets)\//.test(path);
+    return path === 'moida.json' || path === 'cairn.json' || /^(blog|vault|assets)\//.test(path);
   }
 
   hasPrivateArea(): boolean {
     return [...this.files.keys()].some((p) => p.startsWith('vault/'));
   }
 
-  /** 지우면 안 되는 내용이 있는가 (세션·wiki·글·사진). cairn.json과 빈 목록만 있으면 없는 것이다 */
+  /** 지우면 안 되는 내용이 있는가 (세션·wiki·글·사진). moida.json과 빈 목록만 있으면 없는 것이다 */
   hasContent(): boolean {
     return [...this.files.keys()].some((p) => ArchiveFile.holdsContent(p));
   }
@@ -184,9 +185,9 @@ export class GithubGateway extends BaseGateway {
       await this.request('POST', '/git/refs', { ref: `refs/heads/${branch}`, sha: from.headSha });
     } else {
       const first =
-        files.find((f) => f.path === 'cairn.json') ?? ArchiveFile.text('cairn.json', '{}\n');
+        files.find((f) => f.path === 'moida.json') ?? ArchiveFile.text('moida.json', '{}\n');
       await this.request('PUT', `/contents/${first.path}`, {
-        message: 'cairn: 보관 저장소 시작',
+        message: 'moida: 보관 저장소 시작',
         content: first.body.toString('base64'),
         branch,
       });

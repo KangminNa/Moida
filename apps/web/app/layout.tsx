@@ -10,7 +10,7 @@ import { PAGE_FLIP_SCRIPT } from './admin/page-flip';
 /** 로고를 올리지 않았을 때의 탭 아이콘 (moida.svg/route.ts) */
 const MOIDA_ICON = '/moida.svg';
 
-/** 사이트 로고를 올렸으면 브라우저 탭 아이콘으로도 쓴다. 없으면 Cairn 표식 */
+/** 사이트 로고를 올렸으면 브라우저 탭 아이콘으로도 쓴다. 없으면 Moida 표식 */
 export async function generateMetadata() {
   const space = await serverGet<SpaceInfo>('/api/space', true);
   return {
@@ -24,7 +24,7 @@ export async function generateMetadata() {
 
 // 고른 테마 · 글자 크기를 첫 그림 전에 적용한다 (고르지 않았으면 기기 설정 · 보통)
 const THEME_SCRIPT =
-  "try{var d=document.documentElement,t=localStorage.getItem('cairn-theme'),x=localStorage.getItem('cairn-text');if(t==='light'||t==='dark')d.dataset.theme=t;if(x==='small'||x==='large')d.dataset.text=x}catch(e){}";
+  "try{var d=document.documentElement,t=localStorage.getItem('moida-theme'),x=localStorage.getItem('moida-text');if(t==='light'||t==='dark')d.dataset.theme=t;if(x==='small'||x==='large')d.dataset.text=x}catch(e){}";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

@@ -17,19 +17,19 @@ import type { SandboxRoom } from './sandbox-room';
 // Codex CLI를 부르는 법: 공식 `codex exec --json`을 ChatGPT 구독 로그인(auth.json)으로 그대로 띄운다.
 //
 // 격리: CODEX_HOME은 작업마다 새 설정 폴더(config/)라 사용자의 설정 · MCP · 규칙 · 기록을 물려받지 않는다.
-// 권한: 셸을 끈다 (features.shell_tool · unified_exec). 남는 것은 작업 폴더 안 파일 고치기(apply_patch)와 cairn MCP뿐이다.
+// 권한: 셸을 끈다 (features.shell_tool · unified_exec). 남는 것은 작업 폴더 안 파일 고치기(apply_patch)와 moida MCP뿐이다.
 //       sandbox는 workspace-write(작업 폴더만 쓰기, 네트워크 없음)로 둔다: 셸이 다시 열려도 두 번째 벽이 되게.
 //       읽기는 sandbox가 막지 않아서(실험으로 확인) 셸을 끄는 것이 첫 벽이다.
 //       --strict-config: 설정 이름이 바뀐 버전이면 셸이 조용히 열리지 않고 시작부터 실패한다.
 // 스킬: 셸이 없어 SKILL.md를 스스로 읽지 못하므로 지시문에 넣는다.
-// MCP: cairn (브라우저 작업이면 playwright, 허락한 외부 도구 x-*). 작업 토큰 · 외부 도구의 머리글 값은 환경 변수로만 넘기고
+// MCP: moida (브라우저 작업이면 playwright, 허락한 외부 도구 x-*). 작업 토큰 · 외부 도구의 머리글 값은 환경 변수로만 넘기고
 //      (bearer_token_env_var · env_http_headers), 셸 명령에는 기본만 넘긴다(shell_environment_policy).
 //      env_http_headers는 Codex 설정 문서의 이름이다. 버전이 바뀌어 모르는 이름이 되면 --strict-config가 시작부터 막는다 (토큰 없이 조용히 붙지 않는다).
 // 자격: auth.json은 쓸 때 갱신 토큰이 바뀐다. 끝난 뒤 바뀌었으면 서버에 되돌려 쓴다 (changedCredential → ai_login_refresh).
 // 설정 값은 Codex 0.164.0의 --strict-config로 이름을 확인했다.
 export class CodexCli implements AiTool {
   static readonly TOOL = 'codex';
-  private static readonly TOKEN_ENV = 'CAIRN_RUN_TOKEN';
+  private static readonly TOKEN_ENV = 'MOIDA_RUN_TOKEN';
   /** 사용자 환경에서 넘기는 것. 나머지(기기 토큰, 다른 API 키 포함)는 Codex에게 가지 않는다 */
   private static readonly PASSED_ENV = [
     'PATH',
@@ -141,7 +141,7 @@ export class CodexCli implements AiTool {
 
   /** 외부 도구 i의 머리글 j를 넘기는 환경 변수 이름 (설정 파일에는 이름만, 값은 환경으로) */
   private static toolEnv(i: number, j: number): string {
-    return `CAIRN_TOOL_${i}_${j}`;
+    return `MOIDA_TOOL_${i}_${j}`;
   }
 
   /** 외부 도구의 머리글 값들 (환경 변수 이름 → 값) */
@@ -276,7 +276,7 @@ export class CodexCli implements AiTool {
 export class CodexEngine implements EngineAdapter {
   readonly name = CodexCli.TOOL;
   readonly efforts = CodexCli.EFFORTS;
-  readonly bin = { env: 'CAIRN_RUNNER_CODEX_CLI', fallback: 'codex' };
+  readonly bin = { env: 'MOIDA_RUNNER_CODEX_CLI', fallback: 'codex' };
   readonly ownLogin = null;
   readonly resumes = false;
   /** 받은 사진을 codex exec --image로 지시에 붙인다 (셸이 없어 파일을 그림으로 읽는 길이 없다) */

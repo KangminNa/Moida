@@ -1,13 +1,13 @@
-// Cairn 기기의 열쇠와 서버 부르기 (cairn connect가 ~/.cairn/bin에 넣는다). Node 내장 모듈만 쓴다.
+// Moida 기기의 열쇠와 서버 부르기 (moida connect가 ~/.moida/bin에 넣는다). Node 내장 모듈만 쓴다.
 //
-//   ~/.cairn/credentials.json   기기마다 키 하나: { news: {…}, collect: {…}, deploy: {…} }
+//   ~/.moida/credentials.json   기기마다 키 하나: { news: {…}, collect: {…}, deploy: {…} }
 //                               { site, mcp, token_endpoint, client_id, device, access_token, refresh_token, expires_at, dead? }
-//                               0600. cairn connect가 쓰고, 갱신하면 여기서 다시 쓴다
-//   ~/.cairn/credentials.lock   갱신하는 동안만 있다. 기기가 여럿이어도 하나다: 한 파일을 함께 고쳐 쓰므로 갱신은 한 번에 하나
+//                               0600. moida connect가 쓰고, 갱신하면 여기서 다시 쓴다
+//   ~/.moida/credentials.lock   갱신하는 동안만 있다. 기기가 여럿이어도 하나다: 한 파일을 함께 고쳐 쓰므로 갱신은 한 번에 하나
 //                               (훅과 상태 줄이 같은 갱신 토큰을 두 번 내밀면 서버가 기기를 끊는다)
 //
 // 갱신 요청을 도중에 끊으면 서버는 갱신 토큰을 이미 바꿨는데 새 토큰을 잃는다 (다음 갱신이 재사용으로 보여 기기가 끊긴다).
-// 그래서 2초 안에 끝나야 하는 곳(소식 훅 · 상태 줄)은 끝나기 10분 전부터 갱신을 따로 띄우고(cairn-refresh.mjs),
+// 그래서 2초 안에 끝나야 하는 곳(소식 훅 · 상태 줄)은 끝나기 10분 전부터 갱신을 따로 띄우고(moida-refresh.mjs),
 // 그동안 아직 살아 있는 토큰을 쓴다. 기다릴 수 있는 곳(세션 저장의 떼어 낸 일꾼)은 patient로 불러 잠금이 풀리기를
 // 기다렸다 직접 갱신한다: 가끔 끝나는 세션은 늘 토큰이 끝나 있어서 다음으로 미루면 영영 올리지 못한다.
 // 토큰은 어디에도 찍지 않는다. 실패는 던지고, 부르는 쪽이 조용히 넘어간다.
@@ -37,15 +37,15 @@ const STALE_LOCK_MS = 30_000;
 /** patient: 다른 프로세스의 갱신이 끝나기를 기다리는 시간 */
 const LOCK_WAIT_MS = STALE_LOCK_MS + 5_000;
 
-/** ~/.cairn (HOME을 따른다) */
-export function cairnHome() {
-  return join(homedir(), '.cairn');
+/** ~/.moida (HOME을 따른다) */
+export function moidaHome() {
+  return join(homedir(), '.moida');
 }
 
-const credentialsFile = () => join(cairnHome(), 'credentials.json');
-const lockFile = () => join(cairnHome(), 'credentials.lock');
+const credentialsFile = () => join(moidaHome(), 'credentials.json');
+const lockFile = () => join(moidaHome(), 'credentials.lock');
 
-/** 서버가 기기를 받아 주지 않음 (없거나 끊겼거나 갱신 토큰이 죽음). cairn connect로 다시 만든다 */
+/** 서버가 기기를 받아 주지 않음 (없거나 끊겼거나 갱신 토큰이 죽음). moida connect로 다시 만든다 */
 export class Disconnected extends Error {}
 
 /** 파일 하나를 통째로 바꾼다 (반쯤 쓴 파일을 다른 프로세스가 읽지 않게) */
@@ -76,7 +76,7 @@ export function deviceCredential(key) {
 
 /** 잠금을 잡은 채로만 부른다 (다른 기기의 키를 옛 값으로 덮지 않게) */
 function saveDevice(key, device) {
-  mkdirSync(cairnHome(), { recursive: true, mode: 0o700 });
+  mkdirSync(moidaHome(), { recursive: true, mode: 0o700 });
   replaceFile(
     credentialsFile(),
     `${JSON.stringify({ ...readCredentials(), [key]: device }, null, 2)}\n`,
@@ -120,7 +120,7 @@ const expiring = (device) => Date.parse(device.expires_at ?? '') - Date.now() <=
 /** 갱신을 따로 띄운다 (이 프로세스가 끝나도 끝까지 간다). 이미 누가 갱신 중이면 띄우지 않는다 */
 function startRefresh(key, force) {
   if (locked()) return;
-  const script = join(dirname(fileURLToPath(import.meta.url)), 'cairn-refresh.mjs');
+  const script = join(dirname(fileURLToPath(import.meta.url)), 'moida-refresh.mjs');
   const child = spawn(process.execPath, [script, key, ...(force ? ['force'] : [])], {
     detached: true,
     stdio: 'ignore',
@@ -153,7 +153,7 @@ async function refreshLocked(key, need) {
   }
 }
 
-/** 따로 띄운 갱신 (cairn-refresh.mjs). force: 서버가 토큰을 받지 않았을 때 (끝나지 않았어도) */
+/** 따로 띄운 갱신 (moida-refresh.mjs). force: 서버가 토큰을 받지 않았을 때 (끝나지 않았어도) */
 export async function refreshNow(key, force) {
   await refreshLocked(key, (device) => force || expiring(device));
 }

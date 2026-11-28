@@ -1,30 +1,30 @@
 import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { CairnHome } from './cairn-home';
-import { CairnSite, SiteAddress } from './cairn-site';
 import { DeviceKind, type DeviceLogin } from './device-login';
 import { FolderZip } from './folder-zip';
+import { MoidaHome } from './moida-home';
+import { MoidaSite, SiteAddress } from './moida-site';
 import type { Shell } from './shell';
 import { CliError, type Terminal } from './terminal';
 
-// cairn app deploy <앱 주소> <폴더> [--site <블로그 주소>] [--note <메모>] (앱 플랫폼, docs/스토어.md 12.5):
+// moida app deploy <앱 주소> <폴더> [--site <블로그 주소>] [--note <메모>] (앱 플랫폼, docs/스토어.md 12.5):
 // 이 컴퓨터에서 빌드한 폴더를 앱 코드의 새 버전으로 올린다. 처음에는 브라우저로 배포 기기(쓰기만)를 승인받고
-// 그 열쇠를 ~/.cairn/credentials.json의 deploy에 둔다. 다음부터는 --site 없이 그 블로그로 올린다.
-// 올리기는 ~/.cairn/bin/cairn-deploy.mjs가 한다 (토큰 갱신을 훅 · 상태 줄과 같은 잠금으로 하게).
+// 그 열쇠를 ~/.moida/credentials.json의 deploy에 둔다. 다음부터는 --site 없이 그 블로그로 올린다.
+// 올리기는 ~/.moida/bin/moida-deploy.mjs가 한다 (토큰 갱신을 훅 · 상태 줄과 같은 잠금으로 하게).
 // 공개 앱의 새 버전은 확인 대기라 관리자가 콘솔에서 공개해야 보인다 (원칙 7).
 export class DeployCommand {
-  private static readonly SCRIPT = 'cairn-deploy.mjs';
+  private static readonly SCRIPT = 'moida-deploy.mjs';
   private static readonly KIND = DeviceKind.DEPLOY;
-  private readonly home: CairnHome;
+  private readonly home: MoidaHome;
 
   constructor(
     private readonly terminal: Terminal,
     private readonly shell: Shell,
     private readonly login: DeviceLogin,
-    cairnDir = join(homedir(), '.cairn'),
+    moidaDir = join(homedir(), '.moida'),
   ) {
-    this.home = new CairnHome(cairnDir);
+    this.home = new MoidaHome(moidaDir);
   }
 
   async run(app: string, folder: string, site: string | null, note: string | null): Promise<void> {
@@ -40,7 +40,7 @@ export class DeployCommand {
 
     const zip = FolderZip.pack(dir);
     if (zip.skipped.length > 0) t.say(`  넣지 않음: ${zip.skipped.join(' · ')}`);
-    const temp = mkdtempSync(join(tmpdir(), 'cairn-deploy-'));
+    const temp = mkdtempSync(join(tmpdir(), 'moida-deploy-'));
     try {
       const file = join(temp, 'app.zip');
       writeFileSync(file, zip.bytes, { mode: 0o600 });
@@ -65,7 +65,7 @@ export class DeployCommand {
 
   /** 올릴 블로그: --site가 있으면 그 블로그에 물어, 없으면 지난번에 배포한 블로그 */
   private async address(site: string | null): Promise<SiteAddress> {
-    if (site !== null) return CairnSite.parse(site).address();
+    if (site !== null) return MoidaSite.parse(site).address();
     const saved = this.saved();
     if (saved && typeof saved.site === 'string' && typeof saved.mcp === 'string')
       return new SiteAddress(saved.site, saved.mcp);
@@ -111,7 +111,7 @@ export class DeployCommand {
   }
 }
 
-/** cairn-deploy.mjs가 찍는 답 */
+/** moida-deploy.mjs가 찍는 답 */
 interface DeployResult {
   state?: { current?: unknown; pending?: unknown; latest?: unknown };
   refused?: { code: string; message: string };

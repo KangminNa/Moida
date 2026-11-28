@@ -29,20 +29,20 @@ const job = (more: object = {}): Job =>
       instruction: '글을 써 주세요',
       agent: { name: '글쓰기', role: '', tool: 'codex' },
       run_token: 'run-token-secret',
-      skill: 'cairn-write',
+      skill: 'moida-write',
       ...more,
     }),
   );
 
 before(async () => {
   skills = await mkdtemp(join(tmpdir(), 'codex-skills-'));
-  await rm(join(skills, 'cairn-write'), { recursive: true, force: true });
+  await rm(join(skills, 'moida-write'), { recursive: true, force: true });
   await writeFile(join(skills, 'README'), '');
-  const dir = join(skills, 'cairn-write');
+  const dir = join(skills, 'moida-write');
   await (await import('node:fs/promises')).mkdir(dir);
   await writeFile(
     join(dir, 'SKILL.md'),
-    '---\nname: cairn-write\n---\n초안은 blog_save_draft로 저장한다.\n',
+    '---\nname: moida-write\n---\n초안은 blog_save_draft로 저장한다.\n',
   );
 });
 
@@ -51,7 +51,7 @@ after(async () => {
 });
 
 describe('Codex 설정', () => {
-  test('셸을 끄고, 네트워크 없이 작업 폴더만 쓰고, MCP는 cairn 하나에 토큰은 환경 변수로', () => {
+  test('셸을 끄고, 네트워크 없이 작업 폴더만 쓰고, MCP는 moida 하나에 토큰은 환경 변수로', () => {
     const toml = CodexCli.configToml('http://127.0.0.1:4000/mcp');
     for (const want of [
       'shell_tool = false',
@@ -61,9 +61,9 @@ describe('Codex 설정', () => {
       'approval_policy = "never"',
       'web_search = "disabled"',
       'inherit = "core"',
-      '[mcp_servers.cairn]',
+      '[mcp_servers.moida]',
       'url = "http://127.0.0.1:4000/mcp"',
-      'bearer_token_env_var = "CAIRN_RUN_TOKEN"',
+      'bearer_token_env_var = "MOIDA_RUN_TOKEN"',
     ])
       assert.ok(toml.includes(want), want);
     assert.equal(toml.includes('run-token'), false, '토큰은 파일에 쓰지 않는다');
@@ -71,7 +71,7 @@ describe('Codex 설정', () => {
   });
 
   test('코드 러너 칸의 코드 작업만 셸을 연다: Codex sandbox는 끄고(칸이 벽) 셸에 환경을 넘긴다', () => {
-    const toml = CodexCli.configToml('http://cairn-server:4000/mcp', null, true);
+    const toml = CodexCli.configToml('http://moida-server:4000/mcp', null, true);
     for (const want of [
       'shell_tool = true',
       'sandbox_mode = "danger-full-access"',
@@ -86,14 +86,14 @@ describe('Codex 설정', () => {
     const tuned = job({
       agent: { name: '글쓰기', role: '', tool: 'codex', model: 'gpt-5.1', effort: 'high' },
     });
-    const toml = CodexCli.configToml('http://cairn/mcp', null, false, tuned.runtime);
+    const toml = CodexCli.configToml('http://moida/mcp', null, false, tuned.runtime);
     assert.match(toml, /^model = "gpt-5.1"$/m);
     assert.match(toml, /^model_reasoning_effort = "high"$/m);
     assert.ok(toml.indexOf('model = ') < toml.indexOf('['), '표보다 앞');
     const odd = job({
       agent: { name: '글쓰기', tool: 'codex', model: 'x"\n[evil]', effort: 'max' },
     });
-    const plain = CodexCli.configToml('http://cairn/mcp', null, false, odd.runtime);
+    const plain = CodexCli.configToml('http://moida/mcp', null, false, odd.runtime);
     assert.equal(plain.includes('model'), false, '모양이 틀린 모델 · 받지 않는 강도는 기본으로');
   });
 
@@ -119,15 +119,15 @@ describe('Codex 설정', () => {
     try {
       const env = cli.env(job(), workspace, {
         PATH: '/usr/bin',
-        CAIRN_RUNNER_TOKEN: 'device-secret',
+        MOIDA_RUNNER_TOKEN: 'device-secret',
         OPENAI_API_KEY: 'sk-other',
         HOME: '/home/owner',
       });
       assert.equal(env.CODEX_HOME, workspace.configDir);
       assert.equal(env.HOME, workspace.homeDir);
-      assert.equal(env.CAIRN_RUN_TOKEN, 'run-token-secret');
+      assert.equal(env.MOIDA_RUN_TOKEN, 'run-token-secret');
       assert.equal(env.PATH, '/usr/bin');
-      assert.equal('CAIRN_RUNNER_TOKEN' in env, false);
+      assert.equal('MOIDA_RUNNER_TOKEN' in env, false);
       assert.equal('OPENAI_API_KEY' in env, false);
       assert.deepEqual(cli.args(workspace).slice(0, 3), ['exec', '--json', '--strict-config']);
       assert.equal(cli.args(workspace).at(-1), '-', '지시문은 표준 입력으로');
@@ -138,7 +138,7 @@ describe('Codex 설정', () => {
 
   test('스킬은 셸 없이 읽을 수 없어 지시문에 넣는다', () => {
     const prompt = job().prompt(REPO_PROMPTS, false, '초안은 blog_save_draft로 저장한다.');
-    assert.match(prompt, /# 스킬: cairn-write/);
+    assert.match(prompt, /# 스킬: moida-write/);
     assert.match(prompt, /blog_save_draft로 저장한다/);
   });
 

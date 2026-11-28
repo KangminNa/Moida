@@ -32,7 +32,7 @@ export class AppCodeBase {
     /** 받은 코드의 버전. 0이면 종류의 시작 코드 */
     readonly seq: number,
     readonly files: readonly AppCodeFile[],
-    /** cairn.json의 바깥 주소 */
+    /** moida.json의 바깥 주소 */
     readonly hosts: readonly string[],
   ) {}
 

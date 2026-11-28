@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { SkillPackage } from './job';
 import type { RunLog } from './redactor';
 
-// 러너가 AI에게 주는 지시문의 글 (2차 1-0, 기획서 결정 2026-11-14). 글은 코드에 두지 않고 러너 스킬 cairn-runner의 틀에 둔다:
+// 러너가 AI에게 주는 지시문의 글 (2차 1-0, 기획서 결정 2026-11-14). 글은 코드에 두지 않고 러너 스킬 moida-runner의 틀에 둔다:
 // 서버가 일마다 그 스킬의 지금 판(주인이 스킬 메뉴에서 고친 판이 있으면 그것)을 보내고, 없거나 읽지 못하면 러너의 skills/ 판을 쓴다.
 // 코드는 어느 단락을 어떤 순서로 넣을지와 값만 정한다.
 //
@@ -78,7 +78,7 @@ export class PromptTemplate {
 
 /** 지시문 틀 한 벌. 이름으로 글을 채운다 */
 export class PromptPack {
-  static readonly SKILL = 'cairn-runner';
+  static readonly SKILL = 'moida-runner';
   private static readonly MARK = /^<!-- ([a-z][a-z0-9-]*) -->$/;
 
   private constructor(
@@ -116,7 +116,7 @@ export class PromptPack {
     return new PromptPack(source, templates);
   }
 
-  /** 러너의 skills/<cairn-runner>/references/*.md */
+  /** 러너의 skills/<moida-runner>/references/*.md */
   static read(skillsDir: string): PromptPack {
     const dir = join(skillsDir, PromptPack.SKILL, 'references');
     const files = new Map<string, string>();

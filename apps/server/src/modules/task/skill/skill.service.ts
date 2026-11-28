@@ -15,7 +15,7 @@ import { SkillRepository } from './skill.repository';
 import { SkillFiles } from './skill-files';
 
 // 러너 스킬 쓰기: 콘솔 판 쌓기, 쓸 판 옮기기. 주인만 (write 기기도 안 된다: 스킬은 AI의 지시문이다).
-// 고칠 수 있는 것은 저장소의 러너 전용 스킬뿐이다 (cairn-save · cairn-recall은 사람의 AI 도구에 복사해 넣는 스킬이라 서버가 보낼 길이 없다).
+// 고칠 수 있는 것은 저장소의 러너 전용 스킬뿐이다 (moida-save · moida-recall은 사람의 AI 도구에 복사해 넣는 스킬이라 서버가 보낼 길이 없다).
 @Injectable()
 export class SkillService extends EntityService<Skill> {
   private static readonly SAVE = 'save_skill_revision';

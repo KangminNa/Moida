@@ -1,5 +1,5 @@
 {
-  "name": "@cairn/egress",
+  "name": "@moida/egress",
   "version": "0.0.0",
   "private": true,
   "description": "코드 러너 칸의 나가는 프록시. 허용 목록의 호스트로만 HTTPS 터널(CONNECT)을 연다",

@@ -21,7 +21,7 @@ export class TelegramBot {
 
   /** 웹훅 주소의 열쇠 (봇 토큰의 sha256에서 40자) */
   static hookKey(token: string): string {
-    return createHash('sha256').update(`cairn-telegram-hook:${token}`).digest('hex').slice(0, 40);
+    return createHash('sha256').update(`moida-telegram-hook:${token}`).digest('hex').slice(0, 40);
   }
 
   /** 받은 열쇠가 맞는가 (시간이 같게 비교) */

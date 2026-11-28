@@ -158,7 +158,7 @@ export class AppCodeQuery extends BaseQuery {
   }
 
   /**
-   * 배포 도구(MCP app_code_upload, write 기기 · cairn app deploy): 그 앱에 묶음을 올릴 표 (스토어 12.5).
+   * 배포 도구(MCP app_code_upload, write 기기 · moida app deploy): 그 앱에 묶음을 올릴 표 (스토어 12.5).
    * 표는 그 앱 · 지금의 마지막 버전 · 크기 · sha256 · 메모에 묶인다 (10분)
    */
   async deployTicket(actor: Actor, req: DeployCodeInput, now: Date): Promise<AppCodeDeployView> {
@@ -225,17 +225,17 @@ export class AppCodeQuery extends BaseQuery {
     return starter ? starter.toString('utf8') : this.blobs.text(file.blobHash, max);
   }
 
-  /** 이 코드의 바깥 주소 (cairn.json의 hosts). 저장할 때 검사한 값이라 읽을 수 없으면 비운다 */
+  /** 이 코드의 바깥 주소 (moida.json의 hosts). 저장할 때 검사한 값이라 읽을 수 없으면 비운다 */
   async hostsOf(actor: Actor, code: AppCodeFiles): Promise<readonly string[]> {
     return (await this.manifestOf(actor, code)).hosts;
   }
 
-  /** 이 코드의 선언서 cairn.json (없거나 읽을 수 없으면 AppManifest.NONE: 바깥 주소 없음 · 템플릿) */
+  /** 이 코드의 선언서 moida.json (없거나 읽을 수 없으면 AppManifest.NONE: 바깥 주소 없음 · 템플릿) */
   async manifestOf(actor: Actor, code: AppCodeFiles): Promise<AppManifest> {
     const text = await this.textOf(
       actor,
       code,
-      AppCodeBundle.MANIFEST,
+      AppCodeBundle.manifestName((n) => code.files.find(n) !== null),
       AppCodeBundle.MANIFEST_BYTES_MAX,
     );
     if (text === null) return AppManifest.NONE;

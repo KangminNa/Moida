@@ -5,9 +5,9 @@ import { join } from 'node:path';
 import { pause } from '../backoff';
 
 // 테스트용 Chromium: 빈 프로필로 headless로 띄우고 CDP 주소를 알려 준다 (브라우저 탭 읽기의 단위 · 통합 테스트).
-// 없으면 테스트를 건너뛴다. 경로는 CAIRN_TEST_CHROMIUM으로 바꿀 수 있다.
+// 없으면 테스트를 건너뛴다. 경로는 MOIDA_TEST_CHROMIUM으로 바꿀 수 있다.
 export class TestChromium {
-  static readonly PATH = process.env.CAIRN_TEST_CHROMIUM ?? '/opt/pw-browsers/chromium';
+  static readonly PATH = process.env.MOIDA_TEST_CHROMIUM ?? '/opt/pw-browsers/chromium';
   /** node:test의 skip 값: 있으면 false, 없으면 이유 */
   static readonly skip = existsSync(TestChromium.PATH)
     ? false
@@ -22,7 +22,7 @@ export class TestChromium {
 
   /** 자기 프로세스 그룹으로 띄운다: 끌 때 도우미 프로세스(네트워크 · 저장소)까지 함께 끈다 */
   static async start(): Promise<TestChromium> {
-    const profile = mkdtempSync(join(tmpdir(), 'cairn-chromium-'));
+    const profile = mkdtempSync(join(tmpdir(), 'moida-chromium-'));
     const child = spawn(
       TestChromium.PATH,
       [

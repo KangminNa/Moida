@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { pause } from './backoff';
 import type { BrowserPages, BrowserTab } from './browser-page';
-import type { CairnServer } from './cairn-server';
 import { LoginForm } from './login-form';
 import type { LoginFormRef } from './login-form-ref';
+import type { MoidaServer } from './moida-server';
 
 /** 러너가 올릴 결재 하나 (작업 토큰으로, 에이전트의 이름으로) */
 export type AskedApproval = {
@@ -26,7 +26,7 @@ export class BrowseLogin {
   private static readonly OPEN_MS = 2_000;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly pages: BrowserPages,
     private readonly taskId: string,
   ) {}

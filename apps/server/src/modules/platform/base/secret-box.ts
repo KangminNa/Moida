@@ -9,12 +9,12 @@ export class SealedSecret {
 }
 
 // 비밀값(토큰 등)을 서버 키로 암호화한다. AES-256-GCM, 값마다 새 nonce.
-// 서버 키는 설치 때 만들어 환경 변수 CAIRN_SECRET_KEY(32바이트, base64)에 둔다. DB에는 키를 두지 않는다.
-// 키를 바꾸는 동안에는 옛 키를 CAIRN_SECRET_KEY_OLD에 함께 둔다. 옛 키로는 저장된 비밀값을 읽기만 하고,
+// 서버 키는 설치 때 만들어 환경 변수 MOIDA_SECRET_KEY(32바이트, base64)에 둔다. DB에는 키를 두지 않는다.
+// 키를 바꾸는 동안에는 옛 키를 MOIDA_SECRET_KEY_OLD에 함께 둔다. 옛 키로는 저장된 비밀값을 읽기만 하고,
 // 암호화와 derive·pack은 늘 지금 키로 한다. 그래서 키를 바꾸면 설치 코드가 바뀌고 이미 싼 값은 풀리지 않는다 (짧게 쓰는 값이라 괜찮다).
 export class SecretBox {
   private static readonly CANNOT_OPEN =
-    '비밀값을 풀 수 없어요. 서버 키(CAIRN_SECRET_KEY)가 바뀌었다면 옛 키를 CAIRN_SECRET_KEY_OLD에 넣어 주세요';
+    '비밀값을 풀 수 없어요. 서버 키(MOIDA_SECRET_KEY)가 바뀌었다면 옛 키를 MOIDA_SECRET_KEY_OLD에 넣어 주세요';
 
   private constructor(
     private readonly key: Buffer | null,
@@ -22,10 +22,10 @@ export class SecretBox {
   ) {}
 
   static fromEnv(env: Readonly<Record<string, string | undefined>>): SecretBox {
-    const key = SecretBox.readKey(env, 'CAIRN_SECRET_KEY');
-    const oldKey = SecretBox.readKey(env, 'CAIRN_SECRET_KEY_OLD');
+    const key = SecretBox.readKey(env, 'MOIDA_SECRET_KEY');
+    const oldKey = SecretBox.readKey(env, 'MOIDA_SECRET_KEY_OLD');
     if (oldKey && !key)
-      throw new Error('CAIRN_SECRET_KEY_OLD만 있어요. 새 키를 CAIRN_SECRET_KEY에 넣어 주세요');
+      throw new Error('MOIDA_SECRET_KEY_OLD만 있어요. 새 키를 MOIDA_SECRET_KEY에 넣어 주세요');
     return new SecretBox(key, oldKey);
   }
 
@@ -60,7 +60,7 @@ export class SecretBox {
 
   /** 서버 키에서 용도별 값을 만든다 (예: 설치 코드). 같은 키·같은 이름이면 늘 같은 값 */
   derive(label: string): Buffer {
-    return createHmac('sha256', this.requireKey()).update(`cairn:${label}`).digest();
+    return createHmac('sha256', this.requireKey()).update(`moida:${label}`).digest();
   }
 
   /**
@@ -150,7 +150,7 @@ export class SecretBox {
   }
 
   private requireKey(): Buffer {
-    if (!this.key) throw new Error('서버 키(CAIRN_SECRET_KEY)가 없어 비밀값을 다룰 수 없어요');
+    if (!this.key) throw new Error('서버 키(MOIDA_SECRET_KEY)가 없어 비밀값을 다룰 수 없어요');
     return this.key;
   }
 }

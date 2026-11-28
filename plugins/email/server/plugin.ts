@@ -20,12 +20,12 @@ import { MailGate, MailLimits, TakeMail } from './usage';
 //     관리자가 콘솔(운영 › 메일 구독)에서 보내기를 누르면 일꾼(deliver, 30초마다)이 하루 상한 안에서 보낸다
 //   확인 메일: 코어의 가입 · 비밀번호 다시 정하기 인증코드 (provideMail, 0.14)
 //   사용량 (2026-11-27, usage.ts): 모든 메일을 보내기 전에 하루 · 한 달 상한을 보고 센다. 한 통씩 가는 메일은
-//     cairn.own()으로 takeMail을, 소식 · 확인 메일은 claimMail이 같은 표에서 센다
+//     moida.own()으로 takeMail을, 소식 · 확인 메일은 claimMail이 같은 표에서 센다
 export default class EmailPlugin extends BasePlugin {
   static readonly DAILY_MAX = 300;
 
-  register(cairn: PluginContext): void {
-    const settings = cairn.settings();
+  register(moida: PluginContext): void {
+    const settings = moida.settings();
     const mail = NoticeMail.of(settings);
     const password = settings.get('password') ?? '';
     const port = Number(settings.get('port') || 465);
@@ -38,32 +38,32 @@ export default class EmailPlugin extends BasePlugin {
       MailLimits.count(settings.get('dailyMax'), EmailPlugin.DAILY_MAX),
       MailLimits.count(settings.get('monthlyMax'), 0),
     );
-    const gate = new MailGate(cairn.own());
+    const gate = new MailGate(moida.own());
     // 구독 칸은 관리자가 켜야 보이고, 메일을 보낼 수 있어야 받는다
     const open = settings.get('subscriptions') === 'true' && smtp !== null;
-    cairn.onEvent(NoticeSentHandler.TOPIC, new NoticeSentHandler(smtp, mail, gate));
-    cairn.onEvent(ChatSaidHandler.TOPIC, new ChatSaidHandler(smtp, mail, gate));
-    cairn.onEvent('blog.post.published', new PostPublished(mail?.site ?? null));
-    cairn.addOperation(new Subscribe(open));
-    cairn.addOperation(new Confirm());
-    cairn.addOperation(new Unsubscribe());
-    cairn.addOperation(new Overview(smtp !== null, open, limits));
-    cairn.addOperation(new RemoveSubscriber());
-    cairn.addOperation(new StartSend());
-    cairn.addOperation(new CancelSend());
-    cairn.addOperation(new ClaimMail(limits));
-    cairn.addOperation(new ReportMail());
-    cairn.addOperation(new TakeMail(limits));
-    cairn.every('30s', new DeliverJob(smtp, mail));
+    moida.onEvent(NoticeSentHandler.TOPIC, new NoticeSentHandler(smtp, mail, gate));
+    moida.onEvent(ChatSaidHandler.TOPIC, new ChatSaidHandler(smtp, mail, gate));
+    moida.onEvent('blog.post.published', new PostPublished(mail?.site ?? null));
+    moida.addOperation(new Subscribe(open));
+    moida.addOperation(new Confirm());
+    moida.addOperation(new Unsubscribe());
+    moida.addOperation(new Overview(smtp !== null, open, limits));
+    moida.addOperation(new RemoveSubscriber());
+    moida.addOperation(new StartSend());
+    moida.addOperation(new CancelSend());
+    moida.addOperation(new ClaimMail(limits));
+    moida.addOperation(new ReportMail());
+    moida.addOperation(new TakeMail(limits));
+    moida.every('30s', new DeliverJob(smtp, mail));
     // 가입자 소식 메일 (2026-11-27): 동의 맞추기 → 대표의 초안 → 결재 email.news.send → 승인되면 대기열
-    cairn.onEvent('community.account.news', new SyncAccountNews());
-    cairn.addOperation(new DraftNews());
-    cairn.addOperation(new GetNews());
-    cairn.onEvent('task.approval.granted', new SendApprovedNews());
+    moida.onEvent('community.account.news', new SyncAccountNews());
+    moida.addOperation(new DraftNews());
+    moida.addOperation(new GetNews());
+    moida.onEvent('task.approval.granted', new SendApprovedNews());
     for (const closed of ['rejected', 'revision_requested', 'cancelled'])
-      cairn.onEvent(`task.approval.${closed}`, new DropNews());
-    cairn.addAction('test', new TestAction(smtp, mail, gate));
+      moida.onEvent(`task.approval.${closed}`, new DropNews());
+    moida.addAction('test', new TestAction(smtp, mail, gate));
     // 코어의 확인 메일 (가입 · 비밀번호 다시 정하기의 인증코드): 보낼 수 있을 때만 길을 연다
-    if (smtp && mail) cairn.provideMail(new CodeMailer(smtp, mail.from, gate));
+    if (smtp && mail) moida.provideMail(new CodeMailer(smtp, mail.from, gate));
   }
 }

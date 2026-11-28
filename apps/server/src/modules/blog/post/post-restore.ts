@@ -28,17 +28,17 @@ import { SlugPolicy } from './slug.policy';
 export class RestoredPost extends BaseEntity {
   private static readonly FILE_REFERENCE = /\/api\/files\/([0-9a-f]{64})/g;
   private static readonly KNOWN: ReadonlySet<string> = new Set([
-    'cairn_format',
-    'cairn_type',
-    'cairn_id',
+    'moida_format',
+    'moida_type',
+    'moida_id',
     'title',
     'slug',
     'status',
     'published',
-    'cairn_app',
-    'cairn_main_wiki',
-    'cairn_ref_wikis',
-    'cairn_assets',
+    'moida_app',
+    'moida_main_wiki',
+    'moida_ref_wikis',
+    'moida_assets',
     'tags',
     'align',
   ]);
@@ -70,11 +70,11 @@ export class RestoredPost extends BaseEntity {
       head_text: content.searchText,
       tags: record.texts('tags'),
       align: record.has('align') ? record.oneOf('align', POST_ALIGN) : 'left',
-      main_wiki_id: record.optionalId('cairn_main_wiki'),
-      app_id: record.optionalId('cairn_app'),
+      main_wiki_id: record.optionalId('moida_main_wiki'),
+      app_id: record.optionalId('moida_app'),
       published_at: publishedAt,
     };
-    const refWikiIds = record.ids('cairn_ref_wikis');
+    const refWikiIds = record.ids('moida_ref_wikis');
     // 첫 판의 때. 임시 글의 연도 폴더가 이 값으로 정해지므로 내보낼 때 경로가 그대로다
     const writtenAt = publishedAt ?? record.createdAt;
     const photos = RestoredPost.photosOf(record);
@@ -100,7 +100,7 @@ export class RestoredPost extends BaseEntity {
     return this.fields.slug;
   }
 
-  /** 든 앱 (cairn_app). 앱 밖의 글은 null */
+  /** 든 앱 (moida_app). 앱 밖의 글은 null */
   get appId(): string | null {
     return this.fields.app_id ?? null;
   }
@@ -117,13 +117,13 @@ export class RestoredPost extends BaseEntity {
 
   /** 글에 붙은 사진. 목록이 없는 옛 백업은 본문이 쓰는 사진(/api/files/<해시>)으로 알아낸다 */
   private static photosOf(record: ArchiveRecord): readonly string[] {
-    if (!record.has('cairn_assets'))
+    if (!record.has('moida_assets'))
       return [
         ...new Set([...record.body.matchAll(RestoredPost.FILE_REFERENCE)].map((m) => m[1] ?? '')),
       ];
-    const hashes = record.texts('cairn_assets');
+    const hashes = record.texts('moida_assets');
     const bad = hashes.find((hash) => !Blob.isHash(hash));
-    if (bad !== undefined) throw record.problem(`cairn_assets의 해시가 틀렸어요: ${bad}`);
+    if (bad !== undefined) throw record.problem(`moida_assets의 해시가 틀렸어요: ${bad}`);
     return [...new Set(hashes)];
   }
 }

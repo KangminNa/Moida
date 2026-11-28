@@ -9,10 +9,10 @@ import { ArchiveQuery } from './archive.query';
 import type { ArchiveFile } from './archive-file';
 import { type ArchivePart, ArchiveReport } from './archive-part';
 
-// 보관 파일 묶음을 빈 Cairn에 들여온다 (docs/보관형식.md). GitHub와 zip이 같은 길을 쓴다: 둘 다 ArchiveFile 목록이 된다.
+// 보관 파일 묶음을 빈 Moida에 들여온다 (docs/보관형식.md). GitHub와 zip이 같은 길을 쓴다: 둘 다 ArchiveFile 목록이 된다.
 // 순서: 형식 검사 → 각 모듈이 전부 읽어 검사 → 개수 → (적용이면) 파일 → 트랜잭션 하나.
 // 읽기에서 실패하면 아무것도 쓰지 않는다. 파일은 내용 주소라 트랜잭션 밖에서 먼저 쓴다: 다시 해도 그대로다.
-// 트랜잭션 하나로 모듈을 묶어, 실패하면 Cairn은 비어 있는 채로 남는다. 모듈은 자기 스키마에만 쓴다.
+// 트랜잭션 하나로 모듈을 묶어, 실패하면 Moida은 비어 있는 채로 남는다. 모듈은 자기 스키마에만 쓴다.
 @Injectable()
 export class ArchiveRestoreService extends BaseService {
   private static readonly LOCK = 'platform.archive.restore';
@@ -94,8 +94,10 @@ export class ArchiveRestoreService extends BaseService {
       if (paths.has(path)) throw new RuleViolation(`같은 경로가 두 번 있어요: ${path}`);
       paths.add(path);
     }
-    const head = files.find((f) => f.path === 'cairn.json');
-    if (!head) throw new RuleViolation('보관 파일이 아니에요: cairn.json이 없어요');
+    // 옛 이름의 맨 위 파일 cairn.json도 받는다 (2026-11-28 이름 cairn → moida 전의 백업)
+    const head =
+      files.find((f) => f.path === 'moida.json') ?? files.find((f) => f.path === 'cairn.json');
+    if (!head) throw new RuleViolation('보관 파일이 아니에요: moida.json이 없어요');
     const format = ArchiveRestoreService.formatOf(head);
     if (format > ArchiveQuery.FORMAT)
       throw new RuleViolation(
@@ -108,11 +110,11 @@ export class ArchiveRestoreService extends BaseService {
     try {
       parsed = JSON.parse(head.asText());
     } catch {
-      throw new RuleViolation('cairn.json을 읽을 수 없어요');
+      throw new RuleViolation('moida.json을 읽을 수 없어요');
     }
     const format = (parsed as { format?: unknown } | null)?.format;
     if (!Number.isInteger(format) || (format as number) < 1)
-      throw new RuleViolation('cairn.json의 format이 틀렸어요');
+      throw new RuleViolation('moida.json의 format이 틀렸어요');
     return format as number;
   }
 

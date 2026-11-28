@@ -4,7 +4,7 @@ import type { OutputKind } from '../task.tables';
 // 결과물의 규칙 한 곳: 이름, 종류 · 형식, 미리 보기를 열어도 되는 형식, 한도 (기획서 결정 2026-11-10).
 // 형식은 파일의 앞부분(FileSniff)을 먼저 믿고, 앞부분에 표시가 없는 글자 파일 · 문서는 이름으로 정한다.
 // 이름으로 정한 형식은 미리 보기를 열지 않는다: 늘 내려받기(attachment)라 HTML · SVG가 우리 주소에서 열리지 않는다.
-// 한도: 파일 하나 · 실행 한 번은 고정, 공간 전체와 디스크 여유는 서버 설정(CAIRN_OUTPUTS_MAX_GB · CAIRN_DISK_RESERVE_GB).
+// 한도: 파일 하나 · 실행 한 번은 고정, 공간 전체와 디스크 여유는 서버 설정(MOIDA_OUTPUTS_MAX_GB · MOIDA_DISK_RESERVE_GB).
 export class OutputPolicy {
   static readonly FILE_MAX = 100 * 1024 * 1024;
   static readonly RUN_FILES_MAX = 200;
@@ -78,8 +78,8 @@ export class OutputPolicy {
       return Math.floor(parsed * OutputPolicy.GB);
     };
     return new OutputPolicy(
-      gb(env.CAIRN_OUTPUTS_MAX_GB, OutputPolicy.DEFAULT_MAX_GB),
-      gb(env.CAIRN_DISK_RESERVE_GB, OutputPolicy.DEFAULT_RESERVE_GB),
+      gb(env.MOIDA_OUTPUTS_MAX_GB, OutputPolicy.DEFAULT_MAX_GB),
+      gb(env.MOIDA_DISK_RESERVE_GB, OutputPolicy.DEFAULT_RESERVE_GB),
     );
   }
 

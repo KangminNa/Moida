@@ -16,7 +16,7 @@ import type { SharedCopy, SharedFolders } from './shared-folders';
 //   home/      빈 홈
 //   work/outputs/ AI가 사람에게 줄 파일을 두는 곳. 일이 잘 끝나면 러너가 결과물로 올린다 (OutputBatch)
 //   mcp.json   작업 토큰이 든 MCP 설정 (600). work 밖에 두어 AI가 파일로 읽지 못하게 한다. 연결 확인에는 없다
-//   work/.cairn/memo.md  인수인계 메모 (작업 세션에 기록하는 일, 2026-11-17). 러너가 끝에 읽어 save_run_record로 보낸다.
+//   work/.moida/memo.md  인수인계 메모 (작업 세션에 기록하는 일, 2026-11-17). 러너가 끝에 읽어 save_run_record로 보낸다.
 //                        칸의 일은 저장소 사본 밖의 memo/memo.md (커밋 · PR에 섞이지 않게)
 // CLI 세션을 남기는 일(LineagePlace)은 임시 자리 대신 세션 키의 고정 자리를 비우고 다시 쓴다: 같은 작업 폴더 경로라야 재개된다.
 // 코드 러너 칸의 일(코드 · 만들기)은 칸의 자리(SandboxRoom) 안에 둔다: work는 그 자리의 work/(코드 작업은 저장소 사본),
@@ -64,7 +64,7 @@ export class JobWorkspace {
     await place?.clear();
     const root = room
       ? room.aiDir
-      : (place?.root ?? (await mkdtemp(join(await realpath(tmpdir()), 'cairn-run-'))));
+      : (place?.root ?? (await mkdtemp(join(await realpath(tmpdir()), 'moida-run-'))));
     if (room) await mkdir(root, { mode: 0o700 });
     await chmod(root, 0o700);
     for (const dir of room ? ['config'] : ['work', 'config', 'home', join('work', 'outputs')])
@@ -145,7 +145,7 @@ export class JobWorkspace {
   /** 인수인계 메모 파일. 기록하지 않는 일이면 null */
   get memoPath(): string | null {
     if (!this.memoReady) return null;
-    return this.room ? join(this.root, 'memo', 'memo.md') : join(this.workDir, '.cairn', 'memo.md');
+    return this.room ? join(this.root, 'memo', 'memo.md') : join(this.workDir, '.moida', 'memo.md');
   }
 
   /** AI가 쓴 인수인계 메모 (앞뒤 공백 없이). 없거나 너무 길면 maxChars까지. 칸이면 agent 권한으로 읽는다 */

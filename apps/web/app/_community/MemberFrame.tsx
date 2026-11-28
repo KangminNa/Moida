@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { MemberPlace } from './member-page';
 
-// 고정 화면의 틀 (스토어 3-2): 앱 이름(첫 화면으로) · 회원 링크와 카드 하나. 앱 코드의 모양이 아니라 Cairn이 그린다:
+// 고정 화면의 틀 (스토어 3-2): 앱 이름(첫 화면으로) · 회원 링크와 카드 하나. 앱 코드의 모양이 아니라 Moida이 그린다:
 // 비밀번호를 넣는 화면이라 앱 코드(AI · 사람이 올린 것)가 손대지 못하게 한다.
 // 앱의 테마 (스토어 12.3, 선언서의 theme): 색 셋을 CSS 변수로 덮고 로고를 이름 앞에 둔다. 값은 서버가 #rrggbb · 파일 이름으로 걸렀다
 
