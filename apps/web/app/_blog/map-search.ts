@@ -14,11 +14,19 @@ const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
   'X-Content-Type-Options': 'nosniff',
   'Access-Control-Allow-Origin': '*',
-  'Cache-Control': 'no-store',
 };
+/**
+ * 찾은 답은 이 브라우저가 10분 기억한다 (2026-11-28 지도 빠르게: 같은 앱을 다시 열면 주소를 다시 묻지 않는다).
+ * 서버의 기억(MapLookup.REMEMBER_MS)과 같은 길이다: 회사 약관이 결과를 오래 두는 것을 막는다. 실패는 기억하지 않는다
+ */
+const REMEMBER = 'private, max-age=600';
 
 function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: HEADERS });
+  const cache = status === 200 ? REMEMBER : 'no-store';
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...HEADERS, 'Cache-Control': cache },
+  });
 }
 
 /** op: 주소의 마지막 마디 (search · geocode · reverse) */
