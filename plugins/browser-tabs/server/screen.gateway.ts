@@ -27,6 +27,8 @@ export type ScreenAction =
   | { type: 'key'; key: string }
   | { type: 'navigate'; url: string }
   | { type: 'back' }
+  | { type: 'forward' }
+  | { type: 'reload' }
   | { type: 'activate' };
 
 /** 보낼 수 있는 키 (키 이름 → Windows 키 코드 · 함께 들어가는 글자) */
@@ -218,14 +220,18 @@ export class BrowserScreenGateway extends BaseGateway {
       case 'navigate':
         await send('Page.navigate', { url: action.url });
         return;
-      case 'back': {
+      case 'back':
+      case 'forward': {
         const history = await send('Page.getNavigationHistory');
-        const index = Number(history.currentIndex);
-        const entries = history.entries as { id: number }[];
-        const previous = entries[index - 1];
-        if (previous) await send('Page.navigateToHistoryEntry', { entryId: previous.id });
+        const index = Number(history.currentIndex) + (action.type === 'back' ? -1 : 1);
+        const entry = (history.entries as { id: number }[])[index];
+        if (entry) await send('Page.navigateToHistoryEntry', { entryId: entry.id });
         return;
       }
+      // 새로고침 (2026-11-28): 캡차 · 만료된 양식처럼 페이지를 다시 받아야 풀리는 것
+      case 'reload':
+        await send('Page.reload', { ignoreCache: false });
+        return;
       case 'activate':
         await send('Page.bringToFront');
         return;

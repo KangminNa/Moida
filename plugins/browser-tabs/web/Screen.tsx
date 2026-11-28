@@ -173,6 +173,12 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
       <button type="button" className="ghost" onClick={() => send({ type: 'back' })}>
         뒤로
       </button>
+      <button type="button" className="ghost" onClick={() => send({ type: 'forward' })}>
+        앞으로
+      </button>
+      <button type="button" className="ghost" onClick={() => send({ type: 'reload' })}>
+        새로고침
+      </button>
       <button type="button" className="ghost" onClick={() => scrollBy(-SCROLL)}>
         위로
       </button>

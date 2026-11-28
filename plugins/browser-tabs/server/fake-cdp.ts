@@ -109,7 +109,7 @@ export class FakeCdp {
     if (method === 'Page.captureScreenshot')
       return { result: { data: Buffer.from('jpeg').toString('base64') } };
     if (method === 'Page.getNavigationHistory')
-      return { result: { currentIndex: 1, entries: [{ id: 11 }, { id: 12 }] } };
+      return { result: { currentIndex: 1, entries: [{ id: 11 }, { id: 12 }, { id: 13 }] } };
     if (method === 'Page.navigate') return { error: { message: 'Cannot navigate to invalid URL' } };
     return { result: {} };
   }

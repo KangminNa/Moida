@@ -99,12 +99,14 @@ export class ScreenControl extends Read<ControlInput> {
         return { type, url };
       }
       case 'back':
+      case 'forward':
+      case 'reload':
       case 'activate':
         return { type };
       default:
         f.reject(
           'type',
-          '동작은 click · scroll · text · key · navigate · back · activate 중 하나예요',
+          '동작은 click · scroll · text · key · navigate · back · forward · reload · activate 중 하나예요',
         );
         return { type: 'activate' };
     }

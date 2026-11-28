@@ -91,6 +91,18 @@ describe('서버 브라우저 화면', () => {
     assert.equal(cdp.calls[3]?.params.entryId, 11, '지금(1)의 앞 항목');
   });
 
+  test('앞으로 · 새로고침', async () => {
+    cdp.calls.length = 0;
+    await screen.control(A, { type: 'forward' });
+    await screen.control(A, { type: 'reload' });
+    assert.deepEqual(sent(A), [
+      'Page.getNavigationHistory',
+      'Page.navigateToHistoryEntry',
+      'Page.reload',
+    ]);
+    assert.equal(cdp.calls[1]?.params.entryId, 13, '지금(1)의 뒤 항목');
+  });
+
   test('닫힌 탭 · 브라우저가 거절한 명령 · 브라우저가 없음은 오류로', async () => {
     await assert.rejects(screen.control('Z'.repeat(32), { type: 'activate' }), /닫힌 탭이에요/);
     await assert.rejects(screen.control(A, { type: 'navigate', url: 'https://x' }), /invalid URL/);
@@ -116,6 +128,7 @@ describe('화면 동작의 입력', () => {
       y: 2,
     });
     assert.deepEqual(control.input({ tab: A, type: 'back' }).action, { type: 'back' });
+    assert.deepEqual(control.input({ tab: A, type: 'reload' }).action, { type: 'reload' });
   });
 
   test('모르는 종류 · 키, http(s)가 아닌 주소, 이상한 탭 id, 범위 밖 좌표는 400', () => {
