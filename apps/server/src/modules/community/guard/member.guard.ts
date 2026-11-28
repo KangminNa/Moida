@@ -25,13 +25,18 @@ export class MemberGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<HttpRequest>();
-    // 공통 앱 도메인의 앱 없는 요청(api/store의 로그인 · 로그아웃 · me, 2026-11-27)도 쓰기는 같은 세 겹으로 본다.
-    // 요청자는 만들지 않는다 (앱이 없어 회원이 아니다): 그 API가 쿠키로 계정을 직접 읽는다
+    // 공통 앱 도메인의 앱 없는 요청(api/store, 2026-11-27)도 쓰기는 같은 세 겹으로 본다.
+    // 요청자는 앱 없는 계정 (MemberActor의 appId null, 2026-11-28): 내 정보 · 비밀번호 바꾸기 · 계정 탈퇴를 앱 없이 한다
     if (request.appId === undefined && request.appsDomain !== true) return true;
     const token = Cookies.read(request, AccountSession.COOKIE);
     if (!MemberGuard.READS.has(request.method.toUpperCase())) this.assertSameSite(request, token);
-    if (!token || request.appId === undefined) return true;
-    const member = await this.query.actorFor(token, request.appId, request.appsDomain === true);
+    if (!token) return true;
+    const member =
+      request.appId !== undefined
+        ? await this.query.actorFor(token, request.appId, request.appsDomain === true)
+        : request.siteSpaceId
+          ? await this.query.sharedActorFor(token, request.siteSpaceId)
+          : null;
     if (!member) return true;
     request.actor = member;
     await this.accounts.seen(token, new Date());

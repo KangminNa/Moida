@@ -26,3 +26,21 @@ export function memberApi<T>(
     ...(csrf ? { 'x-cairn-csrf': csrf } : {}),
   });
 }
+
+/**
+ * 앱 없는 계정 API (공통 앱 도메인의 /_/reset · /_/me, 2026-11-28): api/store/…. 모양과 규칙은 memberApi의 같은 경로와 같다.
+ * 내 정보의 칸들이 앱 화면과 함께 쓴다 (shared면 이쪽)
+ */
+export function storeApi<T>(
+  csrf: string | null,
+  method: string,
+  path: string,
+  body?: object,
+): Promise<ApiReply<T>> {
+  return api<T>(method, `/api/store/${path}`, body, csrf ? { 'x-cairn-csrf': csrf } : {});
+}
+
+/** 앱 화면이면 memberApi, 공통 앱 도메인의 앱 없는 화면이면 storeApi */
+export function accountApi(shared: boolean): typeof memberApi {
+  return shared ? storeApi : memberApi;
+}

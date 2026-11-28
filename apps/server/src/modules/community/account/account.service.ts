@@ -34,7 +34,8 @@ import { LoginId } from './login-id.policy';
 // - 로그인 실패 문구는 하나다: 메일 · 아이디가 있는지 알려 주지 않고, 없어도 같은 시간을 들여 확인한다 (PasswordHasher.verify의 가짜 값)
 // - 틀린 시도는 메일 · 아이디마다 · 곳(IP, IPv6는 /64)마다 공간(스토어) 단위로 센다 (서버 메모리에만, IP는 저장하지 않는다). 넘으면 429
 // - 로그인할 때마다 새 세션 토큰. 비밀번호를 바꾸면 지금 로그인 말고 모든 앱의 다른 로그인이 끝난다
-// 모두 앱 도메인의 회원을 받는 공개 앱에서만 (Lookups 'member-app'), 정지 · 풀기는 관리자만 (기본 도메인)
+// 모두 앱 도메인의 회원을 받는 공개 앱에서만 (Lookups 'member-app'), 정지 · 풀기는 관리자만 (기본 도메인).
+// 비밀번호 바꾸기 · 소식 메일 · 계정 탈퇴는 공통 앱 도메인에서 앱 없이도 (SharedPlace, 2026-11-28): 계정의 일이라 앱이 필요 없다
 @Injectable()
 export class AccountService extends BaseService {
   /** 틀린 로그인: 한 계정에 15분에 5번, 한 곳에서 15분에 20번 */
@@ -111,7 +112,7 @@ export class AccountService extends BaseService {
    */
   async changePassword(
     actor: Actor,
-    place: MemberPlace,
+    place: MemberPlace | SharedPlace,
     req: PasswordInput,
     token: string | null,
   ): Promise<void> {
@@ -143,7 +144,7 @@ export class AccountService extends BaseService {
   }
 
   /** 소식 메일 받기 바꾸기 (내 정보, 2026-11-27): 바뀌면 메일 플러그인이 받는 사람 목록을 맞춘다 (community.account.news) */
-  async setNews(actor: Actor, place: MemberPlace, req: NewsInput): Promise<Account> {
+  async setNews(actor: Actor, place: MemberPlace | SharedPlace, req: NewsInput): Promise<Account> {
     const me = MemberActor.requireAccount(actor, place.appId);
     return this.transaction(async (tx) => {
       const accounts = new AccountRepository(tx);
@@ -174,7 +175,7 @@ export class AccountService extends BaseService {
    * 계정 탈퇴 (그 계정만): 지금 비밀번호가 맞아야 한다. 모든 앱에서 나가고(Member.leave) 계정의 개인정보를 지우고
    * 모든 로그인을 끝낸다 (Account.leave). 글 · 댓글은 앱마다 "탈퇴한 회원"으로 남는다. 잠그는 순서는 계정 → 회원
    */
-  async leave(actor: Actor, place: MemberPlace, req: LeaveInput): Promise<void> {
+  async leave(actor: Actor, place: MemberPlace | SharedPlace, req: LeaveInput): Promise<void> {
     const me = MemberActor.requireAccount(actor, place.appId);
     const current = await this.verified(place, me.accountId, req.password, 'password');
     await this.transaction(async (tx) => {
@@ -239,7 +240,7 @@ export class AccountService extends BaseService {
 
   /** 지금 비밀번호 확인 (비밀번호 바꾸기 · 탈퇴): 틀리면 로그인처럼 세고 그 칸의 오류 (422) */
   private async verified(
-    place: MemberPlace,
+    place: MemberPlace | SharedPlace,
     accountId: string,
     password: string,
     field: string,

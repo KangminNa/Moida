@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { memberApi } from '../../../../_community/member-api';
-import { useAction } from '../../../../_lib/use-action';
+import { useAction } from '../_lib/use-action';
+import { accountApi } from './member-api';
 
 /** 나가기의 두 가지 (스토어 계정, 2026-11-26) */
 const LEAVES = {
@@ -20,24 +20,27 @@ const LEAVES = {
 
 // 나가기 (스토어 3-4, 스토어 계정 2026-11-26): 지금 비밀번호를 넣고 한 번 더 묻는다. 되돌릴 수 없다.
 // 이 앱에서 나가기: 이 앱의 닉네임만 지우고 글 · 댓글은 "탈퇴한 회원"으로 남는다 (계정 · 로그인 · 다른 앱은 그대로).
-// 계정 탈퇴: 모든 앱에서 나가고 메일 · 아이디 · 비밀번호 정보를 바로 지우며 모든 로그인이 끝난다
+// 계정 탈퇴: 모든 앱에서 나가고 메일 · 아이디 · 비밀번호 정보를 바로 지우며 모든 로그인이 끝난다.
+// 공통 앱 도메인의 앱 없는 내 정보(shared, 2026-11-28)에서는 계정 탈퇴만
 export function LeavePanel({
   base,
   csrf,
   community,
+  shared = false,
 }: {
   base: string;
   csrf: string | null;
   community: boolean;
+  shared?: boolean;
 }) {
   const [password, setPassword] = useState('');
   const leave = useAction();
+  const call = accountApi(shared);
+  const kinds = shared ? (['account'] as const) : (['app', 'account'] as const);
 
   async function run(kind: keyof typeof LEAVES) {
     if (!window.confirm(LEAVES[kind].ask)) return;
-    const reply = await leave.run(kind, () =>
-      memberApi(csrf, 'POST', LEAVES[kind].path, { password }),
-    );
+    const reply = await leave.run(kind, () => call(csrf, 'POST', LEAVES[kind].path, { password }));
     // 바꿔치기: 뒤로 가기로 내 정보에 돌아가지 않게 (웹 UX U1)
     if (reply?.ok) window.location.replace(`${base}/`);
   }
@@ -46,7 +49,9 @@ export function LeavePanel({
     <form className="member-form" onSubmit={(e) => e.preventDefault()} aria-label="나가기">
       <b>나가기</b>
       <p className="member-hint">
-        이 앱에서만 나가거나, 이 사이트의 계정을 탈퇴할 수 있어요.
+        {shared
+          ? '계정을 탈퇴하면 모든 앱에서 나가요. 앱 하나에서만 나가려면 그 앱의 내 정보에서 해요.'
+          : '이 앱에서만 나가거나, 이 사이트의 계정을 탈퇴할 수 있어요.'}
         {community &&
           ' 쓴 글 · 댓글은 "탈퇴한 회원"으로 남으니, 남기고 싶지 않은 글은 먼저 지워 주세요.'}
       </p>
@@ -62,7 +67,7 @@ export function LeavePanel({
         />
       </label>
       {leave.problem && <p className="error">{leave.problem}</p>}
-      {(['app', 'account'] as const).map((kind) => (
+      {kinds.map((kind) => (
         <button
           key={kind}
           className="ghost"

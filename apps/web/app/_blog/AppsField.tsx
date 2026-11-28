@@ -148,7 +148,9 @@ export function AppsField({
         <nav className="fd-account" aria-label="계정">
           {signedIn ? (
             <>
-              <span className="fd-who">{signedIn.name}</span>
+              <a className="fd-who" href="/_/me" aria-label={`내 정보: ${signedIn.name}`}>
+                {signedIn.name}
+              </a>
               <button
                 type="button"
                 onClick={async () => {

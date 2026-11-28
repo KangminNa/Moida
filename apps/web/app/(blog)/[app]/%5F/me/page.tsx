@@ -1,3 +1,4 @@
+import { LeavePanel } from '../../../../_community/LeavePanel';
 import { MemberFrame } from '../../../../_community/MemberFrame';
 import {
   memberPlace,
@@ -6,10 +7,9 @@ import {
   signedIn,
   writeNotice,
 } from '../../../../_community/member-page';
+import { NewsMail } from '../../../../_community/NewsMail';
 import { AccountFill } from './AccountFill';
-import { LeavePanel } from './LeavePanel';
 import { MePanel } from './MePanel';
-import { NewsMail } from './NewsMail';
 
 // 내 정보 (스토어 3-2, 앱 도메인의 /_/me): 계정 · 이 앱의 닉네임 · 비밀번호 바꾸기, 로그아웃, 가입 대기 · 차단 안내,
 // 옛 계정의 빈 아이디 · 메일 채우기, 소식 메일 받기(2026-11-27), 이 앱에서 나가기 · 계정 탈퇴 (스토어 계정, 2026-11-26)

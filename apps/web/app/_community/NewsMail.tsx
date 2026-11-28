@@ -1,14 +1,24 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { memberApi } from '../../../../_community/member-api';
-import type { AccountSelf } from '../../../../_community/types';
-import { useAction } from '../../../../_lib/use-action';
+import { useAction } from '../_lib/use-action';
+import { accountApi } from './member-api';
+import type { AccountSelf } from './types';
 
 // 소식 메일 받기 (2026-11-27): 가입 때 고른 선택 동의를 내 정보에서 켜고 끈다. 메일이 없는 옛 계정은 메일을 먼저 등록한다.
 // 끄면 그 뒤로 소식 메일이 가지 않는다 (메일마다 있는 수신 거부 링크와 같다)
-export function NewsMail({ csrf, account }: { csrf: string | null; account: AccountSelf }) {
+// 앱의 내 정보와 공통 앱 도메인의 앱 없는 내 정보(shared, 2026-11-28)가 함께 쓴다
+export function NewsMail({
+  csrf,
+  account,
+  shared = false,
+}: {
+  csrf: string | null;
+  account: AccountSelf;
+  shared?: boolean;
+}) {
   const router = useRouter();
+  const call = accountApi(shared);
   const saving = useAction();
   if (!account.email) return null;
 
@@ -16,7 +26,7 @@ export function NewsMail({ csrf, account }: { csrf: string | null; account: Acco
     await saving.run(
       'news',
       () =>
-        memberApi(csrf, 'PUT', 'account/news', {
+        call(csrf, 'PUT', 'account/news', {
           version: account.version,
           agreed: !account.newsMail,
         }),
