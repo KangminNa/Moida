@@ -135,6 +135,26 @@ describe('세션 키의 자리 (LineageStore)', () => {
     assert.equal(await place.resumable('sess-1'), null, '앞 실행이 잘 끝나지 않았다');
   });
 
+  test('재개: 다른 도구 이름공간(옛 cairn)에서 남긴 세션은 새로 시작한다', async () => {
+    const place = new LineagePlace(join(dir, 'b2'));
+    mkdirSync(join(place.root, 'config', 'projects', '-work'), { recursive: true });
+    writeFileSync(join(place.root, 'config', 'projects', '-work', 'old.jsonl'), '{}');
+    const at = new Date().toISOString();
+    // 이름을 바꾸기 전의 러너가 남긴 meta: tools 칸이 없다
+    writeFileSync(
+      join(place.root, 'meta.json'),
+      JSON.stringify({ cliSession: 'old', endedOk: true, at }),
+    );
+    assert.equal(await place.resumable('old'), null, '옛 러너의 세션');
+    writeFileSync(
+      join(place.root, 'meta.json'),
+      JSON.stringify({ cliSession: 'old', endedOk: true, at, tools: 'cairn' }),
+    );
+    assert.equal(await place.resumable('old'), null, '도구 이름공간이 다르다');
+    await place.remember('old', true);
+    assert.equal(await place.resumable('old'), 'old', '지금 이름공간으로 남긴 것은 재개');
+  });
+
   test('실행 앞뒤로 세션 파일 · meta · lock만 남기고, 오래된 자리는 지운다', async () => {
     const store = new LineageStore(join(dir, 'c'));
     const place = await store.claim('chat:1:a');
