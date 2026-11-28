@@ -3,11 +3,12 @@ import { appOfHost } from './app/_blog/app-domains';
 import { appsOrigin, isAppsHost } from './app/_blog/apps-domain';
 import { appsPathKind, isAppsMemberScreen, movesToApps } from './app/_blog/apps-paths';
 import { hostOf } from './app/_blog/request-host';
+import { deployEnv } from './app/_lib/deploy-env';
 import { RETURN_HEADER } from './app/_lib/return-path';
 import { isAppScreenRoot, isMemberScreen, SCREEN_HEADERS } from './app/_lib/screen-headers';
 
 // 화면 요청이 지나는 곳. 아래 일을 한다.
-// 0. 공통 앱 도메인 (CAIRN_APPS_URL, 2026-11-27, apps-paths.ts): 그 도메인의 / 는 스토어 첫 화면, 앱은 /<앱>/…,
+// 0. 공통 앱 도메인 (MOIDA_APPS_URL, 2026-11-27, apps-paths.ts): 그 도메인의 / 는 스토어 첫 화면, 앱은 /<앱>/…,
 //    콘솔 · 로그인 같은 웹의 화면은 없는 주소. 기본 도메인의 / 와 앱 주소는 그 도메인으로 넘긴다 (308, 미리 보기 · 콘솔은 그대로)
 // 1. 앱 도메인 (스토어 3-0): 연결을 확인한 앱 도메인으로 온 요청은 그 앱의 주소(/<앱>/…)로 넘긴다 (rewrite: 주소창은 그대로).
 //    그래서 앱 도메인에서는 앱 화면 · 앱 파일 · 앱 RSS만 열리고, 콘솔 · 로그인 같은 웹의 화면은 그 앱 안의 없는 주소가 된다.
@@ -32,7 +33,7 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = `${prefix}${pathname === '/' ? '' : pathname}`;
     const res = NextResponse.rewrite(url);
-    // 커뮤니티의 고정 화면(/_/…, 스토어 3-2)은 Cairn이 그리는 화면이라 화면 머리글을 붙인다:
+    // 커뮤니티의 고정 화면(/_/…, 스토어 3-2)은 Moida이 그리는 화면이라 화면 머리글을 붙인다:
     // 로그인 · 가입 폼을 다른 사이트가 겹쳐 놓고 누르게 하지 못하게 (앱 화면은 격리 머리글을 그대로 둔다)
     if (isMemberScreen(pathname)) for (const h of SCREEN_HEADERS) res.headers.set(h.key, h.value);
     return res;
@@ -57,8 +58,9 @@ function appsAnswer(request: NextRequest): NextResponse {
   const kind = appsPathKind(pathname);
   if (kind === 'none') return new NextResponse('없는 주소예요', { status: 404 });
   if (kind === 'console') {
-    // 콘솔 · 로그인 · 설치는 기본 도메인(CAIRN_WEB_URL)에서만 연다: 이 도메인에 관리자 쿠키를 두지 않는다
-    const home = URL.canParse(process.env.CAIRN_WEB_URL ?? '') ? process.env.CAIRN_WEB_URL : null;
+    // 콘솔 · 로그인 · 설치는 기본 도메인(MOIDA_WEB_URL)에서만 연다: 이 도메인에 관리자 쿠키를 두지 않는다
+    const web = deployEnv('WEB_URL') ?? '';
+    const home = URL.canParse(web) ? web : null;
     if (home && !isAppsHost(new URL(home).hostname))
       return NextResponse.redirect(new URL(`${pathname}${request.nextUrl.search}`, home), 308);
     return new NextResponse('없는 주소예요', { status: 404 });

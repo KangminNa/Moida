@@ -13,10 +13,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 
-// cairn-save 스킬의 스크립트 (skills/cairn-save/scripts). 이 명령이 함께 넣으므로 여기서 시험한다.
+// moida-save 스킬의 스크립트 (skills/moida-save/scripts). 이 명령이 함께 넣으므로 여기서 시험한다.
 // 대화 원문은 Claude Code · Codex의 모양을 흉내 낸 작은 파일로, git이 없는 임시 폴더에서 돌린다.
 
-const SCRIPTS = join(__dirname, '../../../skills/cairn-save/scripts');
+const SCRIPTS = join(__dirname, '../../../skills/moida-save/scripts');
 const SESSION = '0192f0aa-1111-7000-8000-000000000001';
 
 /** 스크립트 하나를 돌린 결과: 종료 코드와 마지막 줄의 JSON */
@@ -68,7 +68,7 @@ const jsonl = (lines: readonly (object | string)[]) =>
   `${lines.map((l) => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n')}\n`;
 
 before(() => {
-  home = mkdtempSync(join(tmpdir(), 'cairn-scripts-test-'));
+  home = mkdtempSync(join(tmpdir(), 'moida-scripts-test-'));
   // Claude Code: <설정>/projects/<폴더>/<대화 id>.jsonl
   const claude = join(home, 'claude', 'projects', '-repo-blog');
   mkdirSync(claude, { recursive: true });
@@ -284,16 +284,16 @@ describe('context.mjs: 시작 값과 작업 폴더', () => {
     assert.ok(!existsSync(work));
   });
 
-  test('--clean은 이 스크립트가 만든 폴더(임시 폴더의 cairn-save-*)만 지운다', () => {
+  test('--clean은 이 스크립트가 만든 폴더(임시 폴더의 moida-save-*)만 지운다', () => {
     const other = newWork();
     assert.notEqual(run('context.mjs', ['--clean', other]).code, 0);
     assert.ok(existsSync(other));
   });
 });
 
-// cairn-team의 보내기 전 검사 (skills/cairn-team/scripts/before-send.mjs). cairn connect가 넣은 모양 그대로
-// 두 스킬(cairn-team · cairn-save)을 한 스킬 폴더에 두고, git 원격이 있는 임시 저장소에서 돌린다.
-describe('before-send.mjs: 보내기 전 비밀값 검사 (cairn-team)', () => {
+// moida-team의 보내기 전 검사 (skills/moida-team/scripts/before-send.mjs). moida connect가 넣은 모양 그대로
+// 두 스킬(moida-team · moida-save)을 한 스킬 폴더에 두고, git 원격이 있는 임시 저장소에서 돌린다.
+describe('before-send.mjs: 보내기 전 비밀값 검사 (moida-team)', () => {
   const SKILLS = join(__dirname, '../../../skills');
   let installed: string;
   let repo: string;
@@ -301,8 +301,8 @@ describe('before-send.mjs: 보내기 전 비밀값 검사 (cairn-team)', () => {
   before(() => {
     installed = mkdtempSync(join(home, 'skills-'));
     for (const [skill, file] of [
-      ['cairn-team', 'before-send.mjs'],
-      ['cairn-save', 'secrets.mjs'],
+      ['moida-team', 'before-send.mjs'],
+      ['moida-save', 'secrets.mjs'],
     ] as const) {
       mkdirSync(join(installed, skill, 'scripts'), { recursive: true });
       writeFileSync(
@@ -311,7 +311,7 @@ describe('before-send.mjs: 보내기 전 비밀값 검사 (cairn-team)', () => {
       );
     }
     writeFileSync(
-      join(installed, 'cairn-team', '.cairn.json'),
+      join(installed, 'moida-team', '.moida.json'),
       JSON.stringify({ site: 'https://blog.example.com' }),
     );
     repo = mkdtempSync(join(home, 'repo-'));
@@ -321,7 +321,7 @@ describe('before-send.mjs: 보내기 전 비밀값 검사 (cairn-team)', () => {
 
   function send(message: string): ScriptRun {
     try {
-      const script = join(installed, 'cairn-team', 'scripts', 'before-send.mjs');
+      const script = join(installed, 'moida-team', 'scripts', 'before-send.mjs');
       const out = execFileSync('node', [script], {
         cwd: repo,
         input: message,
@@ -362,9 +362,9 @@ describe('before-send.mjs: 보내기 전 비밀값 검사 (cairn-team)', () => {
     assert.equal(result.stdout.includes('hunter2abc1'), false);
   });
 
-  test('Moida 토큰은 서버와 같은 무늬로 본다: 접속 · 갱신 · 기기 · 러너(cairn_run_)', () => {
-    const tokens = ['at', 'rt', 'dt', 'run'].map((kind) => `cairn_${kind}_${'c'.repeat(24)}`);
-    const result = send(`토큰들\n${tokens.join('\n')}\ncairn_xx_${'c'.repeat(24)}`);
+  test('Moida 토큰은 서버와 같은 무늬로 본다: 접속 · 갱신 · 기기 · 러너(moida_run_)', () => {
+    const tokens = ['at', 'rt', 'dt', 'run'].map((kind) => `moida_${kind}_${'c'.repeat(24)}`);
+    const result = send(`토큰들\n${tokens.join('\n')}\nmoida_xx_${'c'.repeat(24)}`);
     assert.equal(result.code, 1);
     assert.deepEqual(result.json().found, [{ kind: 'Moida 토큰', count: 4 }]);
   });

@@ -25,7 +25,7 @@ import { PluginRegistry } from './plugin-registry';
 const db = new Database();
 const archive = new ArchiveQuery(db);
 const restore = new ArchiveRestoreService(db, archive, new BlobStore(db));
-const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 const owner = new OwnerActor('s', 'u');
 after(async () => {
   await db.sql`DELETE FROM platform.plugins WHERE name LIKE 'test-%'`;
@@ -40,7 +40,7 @@ function makePlugin(
 ): string {
   const dir = join(root, name);
   mkdirSync(join(dir, 'web'), { recursive: true });
-  writeFileSync(join(dir, 'cairn-plugin.json'), JSON.stringify(manifest));
+  writeFileSync(join(dir, 'moida-plugin.json'), JSON.stringify(manifest));
   for (const f of files)
     writeFileSync(join(dir, f), 'export default function X() { return null; }');
   return dir;
@@ -49,7 +49,7 @@ function makePlugin(
 const sample = (name: string) => ({
   name,
   version: '0.1.0',
-  cairn: '>=0.1',
+  moida: '>=0.1',
   settings: {
     repoId: { label: '저장소 ID', type: 'text', required: true, public: true },
     token: { label: '토큰', type: 'secret', required: true },
@@ -60,7 +60,7 @@ const sample = (name: string) => ({
 
 describe('PluginManifest', () => {
   test('올바른 목록 파일을 읽는다', () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     const m = PluginManifest.read(makePlugin(root, 'test-ok', sample('test-ok'), ['web/Box.tsx']));
     assert.deepEqual([...m.webSlots.keys()], ['post.after']);
     assert.equal(m.setting('token')?.isSecret, true);
@@ -68,13 +68,13 @@ describe('PluginManifest', () => {
   });
 
   test('패키지가 남길 수 있는 이벤트: 자기 이름은 늘, task.task.requested는 task:request를 허락받았을 때만', () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     const pkg = (name: string, uses: readonly string[]) => {
       const dir = join(root, name);
       mkdirSync(join(dir, 'server'), { recursive: true });
       mkdirSync(join(dir, 'migrations'));
       writeFileSync(join(dir, 'server/plugin.ts'), '');
-      const json = { name, version: '0.1.0', cairn: '>=0.2', server: 'server/plugin.ts' };
+      const json = { name, version: '0.1.0', moida: '>=0.2', server: 'server/plugin.ts' };
       return PluginManifest.read(
         makePlugin(root, name, { ...json, schema: 'test_pkg', uses: ['table', ...uses] }),
       );
@@ -98,11 +98,11 @@ describe('PluginManifest', () => {
   });
 
   test('틀린 곳을 모두 모아 알린다', () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     const bad = {
       name: 'Bad_Name',
       version: '1',
-      cairn: '>=9.0',
+      moida: '>=9.0',
       settings: {
         pick: { label: '고르기', type: 'select' },
         key: { label: '키', type: 'secret', public: true },
@@ -115,7 +115,7 @@ describe('PluginManifest', () => {
         [
           'name',
           'version',
-          'cairn',
+          'moida',
           'options가 없어요',
           '비밀 설정 "key"는 공개할 수 없어요',
           '모르는 화면 자리',
@@ -129,15 +129,15 @@ describe('SecretBox', () => {
     const sealed = box.seal('ghp_token');
     assert.notEqual(sealed.ciphertext.toString('utf8'), 'ghp_token');
     assert.equal(box.open(sealed), 'ghp_token');
-    const other = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+    const other = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
     assert.throws(() => other.open(sealed), /서버 키/);
-    assert.throws(() => SecretBox.fromEnv({}).seal('x'), /서버 키\(CAIRN_SECRET_KEY\)가 없어/);
+    assert.throws(() => SecretBox.fromEnv({}).seal('x'), /서버 키\(MOIDA_SECRET_KEY\)가 없어/);
   });
 });
 
 describe('PluginService (DB)', () => {
   test('켜기·설정·끄기가 DB에 남고, 비밀값은 암호화돼 저장된다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     makePlugin(root, 'test-giscus', sample('test-giscus'), ['web/Box.tsx']);
     const registry = await PluginRegistry.boot(root, db.sql, archive, box, restore);
     const plugins = new PluginService(db, registry, box);
@@ -166,8 +166,8 @@ describe('PluginService (DB)', () => {
   });
 
   test('새 버전이 확장 지점을 더 쓰면 다시 켤 때까지 동작하지 않는다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
-    const v1 = { name: 'test-grow', version: '0.1.0', cairn: '>=0.1' };
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
+    const v1 = { name: 'test-grow', version: '0.1.0', moida: '>=0.1' };
     makePlugin(root, 'test-grow', v1);
     const first = await PluginRegistry.boot(root, db.sql, archive, box, restore);
     await new PluginService(db, first, box).enable(owner, 'test-grow');
@@ -192,11 +192,11 @@ describe('PluginService (DB)', () => {
 
 describe('PluginRegistry: 운영 이미지', () => {
   test('컴파일한 .js가 .ts 옆에 있으면 .js를 불러 서버와 같은 BasePlugin으로 등록한다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     const dir = makePlugin(root, 'test-compiled', {
       name: 'test-compiled',
       version: '0.1.0',
-      cairn: '>=0.1',
+      moida: '>=0.1',
       server: 'server/plugin.ts',
       uses: ['action:hello'],
     });
@@ -205,7 +205,7 @@ describe('PluginRegistry: 운영 이미지', () => {
     writeFileSync(
       join(dir, 'server', 'plugin.js'),
       `const { BasePlugin } = require(${JSON.stringify(join(__dirname, '../../../plugin-api'))});
-       class Compiled extends BasePlugin { register(cairn) { cairn.addAction('hello', {}); } }
+       class Compiled extends BasePlugin { register(moida) { moida.addAction('hello', {}); } }
        exports.default = Compiled;`,
     );
     const registry = await PluginRegistry.boot(root, db.sql, archive, box, restore);
@@ -217,14 +217,14 @@ describe('PluginRegistry: 운영 이미지', () => {
 
 describe('PluginRegistry: 불러오기 실패', () => {
   test('서버 코드를 불러오지 못한 플러그인은 목록에 이유와 함께 동작 안 함으로, 방문자 목록 · 메뉴에서는 빠진다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     const dir = makePlugin(
       root,
       'test-broken',
       {
         name: 'test-broken',
         version: '0.1.0',
-        cairn: '>=0.1',
+        moida: '>=0.1',
         description: '깨진 서버 코드',
         server: 'server/plugin.ts',
         uses: ['action:hello'],
@@ -256,7 +256,7 @@ describe('PluginRegistry: 불러오기 실패', () => {
     writeFileSync(
       join(dir, 'server', 'plugin.ts'),
       `import { BasePlugin } from ${JSON.stringify(join(__dirname, '../../../plugin-api'))};
-       export default class Fixed extends BasePlugin { register(cairn) { cairn.addAction('hello', {}); } }`,
+       export default class Fixed extends BasePlugin { register(moida) { moida.addAction('hello', {}); } }`,
     );
     await registry.reload();
     assert.equal(registry.problem('test-broken'), null);
@@ -274,9 +274,9 @@ describe('PluginRegistry: 불러오기 실패', () => {
 describe('서버 키 교체 (DB)', () => {
   const oldKey = SecretBox.newKey();
   const newKey = SecretBox.newKey();
-  const oldBox = SecretBox.fromEnv({ CAIRN_SECRET_KEY: oldKey });
-  const rotating = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey, CAIRN_SECRET_KEY_OLD: oldKey });
-  const finished = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey });
+  const oldBox = SecretBox.fromEnv({ MOIDA_SECRET_KEY: oldKey });
+  const rotating = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey, MOIDA_SECRET_KEY_OLD: oldKey });
+  const finished = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey });
 
   /** 설정 하나의 저장된 모습 */
   async function storedSetting(plugin: string, key: string) {
@@ -304,7 +304,7 @@ describe('서버 키 교체 (DB)', () => {
   });
 
   test('켜진·꺼진·폴더가 없어진 플러그인의 비밀값을 모두 바꾸고, 두 번 돌려도 그대로다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     for (const name of ['test-on', 'test-off', 'test-gone'])
       makePlugin(root, name, sample(name), ['web/Box.tsx']);
     const before = await serviceFor(root, oldBox);
@@ -315,7 +315,7 @@ describe('서버 키 교체 (DB)', () => {
     await before.set(owner, 'test-gone', 'token', 'ghp_gone');
     const original = await sealedOf('test-on');
 
-    const later = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const later = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     for (const name of ['test-on', 'test-off'])
       makePlugin(later, name, sample(name), ['web/Box.tsx']);
     const service = await serviceFor(later, rotating);
@@ -338,10 +338,10 @@ describe('서버 키 교체 (DB)', () => {
   });
 
   test('풀리지 않는 값이 하나라도 있으면 아무것도 바꾸지 않고, 그 값을 다시 넣으면 이어서 된다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     for (const name of ['test-a', 'test-b']) makePlugin(root, name, sample(name), ['web/Box.tsx']);
     await (await serviceFor(root, oldBox)).set(owner, 'test-a', 'token', 'ghp_a');
-    const stranger = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+    const stranger = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
     await (await serviceFor(root, stranger)).set(owner, 'test-b', 'token', 'ghp_lost');
     const original = await sealedOf('test-a');
 
@@ -357,7 +357,7 @@ describe('서버 키 교체 (DB)', () => {
   });
 
   test('다른 곳에서 값을 바꾸는 동안 돌리면 끝나기를 기다려, 새 값을 옛 값으로 덮지 않는다', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-plugins-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
     const dir = makePlugin(root, 'test-race', sample('test-race'), ['web/Box.tsx']);
     await (await serviceFor(root, oldBox)).set(owner, 'test-race', 'token', 'ghp_before');
     const service = await serviceFor(root, rotating);

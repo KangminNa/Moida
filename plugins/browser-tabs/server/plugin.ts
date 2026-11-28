@@ -53,19 +53,19 @@ import { ManualRun } from './write-runs';
 //     MCP 3단계: 고장 자동 고치기(run-queue), 되풀이되는 일 제안(repeats), 쓰기 도구의 결재(write-runs) · 검토자 짝(reviews)
 // 코어를 고치지 않고 자기 표(browser_tabs) · API(/api/p/browser-tabs/…) · MCP 도구 · 콘솔 메뉴를 갖는다.
 export default class BrowserTabsPlugin extends BasePlugin {
-  register(cairn: PluginContext): void {
+  register(moida: PluginContext): void {
     // 위임 지킴이 (플러그인 API 0.9): 켜진 사이트 도구가 있는 사이트의 browse 위임은 도구를 먼저 쓰게 거절한다
-    cairn.guardDelegate('browser_site', new GuardSiteDelegation());
+    moida.guardDelegate('browser_site', new GuardSiteDelegation());
     const screen = new BrowserScreenGateway();
     const cast = new ScreenCastGateway(screen);
     // 로그인 카드의 값: 이 프로세스의 메모리에만 (DB에 남기지 않는다, 2026-11-19)
     const logins = new LoginInbox();
     // 고장 난 사이트 도구를 하루 한 번 저절로 다시 굳히는가 (설정 autoRepair, 기본 켬)
-    const autoRepair = cairn.settings().get('autoRepair') !== 'false';
+    const autoRepair = moida.settings().get('autoRepair') !== 'false';
     // 사이트 일에서 기록한 API로 사이트 도구를 저절로 만드는가 (설정 autoApiTools, 기본 켬, 2026-11-19 B3)
-    const autoApiTools = cairn.settings().get('autoApiTools') !== 'false';
+    const autoApiTools = moida.settings().get('autoApiTools') !== 'false';
     // 되풀이되는 읽기 일을 묻지 않고 사이트 도구로 굳히는가 (설정 autoRepeatTools, 기본 켬, 2026-11-24). 싫은 도구는 관리자가 지운다
-    const autoRepeatTools = cairn.settings().get('autoRepeatTools') !== 'false';
+    const autoRepeatTools = moida.settings().get('autoRepeatTools') !== 'false';
     for (const operation of [
       new ListReads(),
       new RequestRead(),
@@ -123,11 +123,11 @@ export default class BrowserTabsPlugin extends BasePlugin {
       new SaveReview(),
       new ManualRun(),
     ])
-      cairn.addOperation(operation);
-    cairn.onEvent('task.approval.granted', new ApprovalDecided('granted'));
-    cairn.onEvent('task.approval.revision_requested', new ApprovalDecided('revised'));
-    cairn.onEvent('task.approval.rejected', new ApprovalDecided('closed'));
-    cairn.onEvent('task.approval.cancelled', new ApprovalDecided('closed'));
-    cairn.onEvent('task.task.changed', new TaskSettled());
+      moida.addOperation(operation);
+    moida.onEvent('task.approval.granted', new ApprovalDecided('granted'));
+    moida.onEvent('task.approval.revision_requested', new ApprovalDecided('revised'));
+    moida.onEvent('task.approval.rejected', new ApprovalDecided('closed'));
+    moida.onEvent('task.approval.cancelled', new ApprovalDecided('closed'));
+    moida.onEvent('task.task.changed', new TaskSettled());
   }
 }

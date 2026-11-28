@@ -22,7 +22,7 @@ function shown(value: unknown): string {
   return typeof value === 'object' ? JSON.stringify(value) : String(value);
 }
 
-// 앱 관리 › 데이터 (앱 플랫폼, 스토어 12.4 · 12.5): 앱이 cairn.json에 선언한 표의 목록과 줄. 줄 넣기 · 지우기, 내보내기.
+// 앱 관리 › 데이터 (앱 플랫폼, 스토어 12.4 · 12.5): 앱이 moida.json에 선언한 표의 목록과 줄. 줄 넣기 · 지우기, 내보내기.
 // 표와 칸은 앱 코드의 선언으로만 생긴다 (여기서 만들지 않는다). 선언에서 빠진 표는 닫힌 채 줄이 남는다
 export function AppDataTab({ app }: { app: AdminApp }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function AppDataTab({ app }: { app: AdminApp }) {
       {list === null ? (
         !tables.error && <p className="label-mono loading">불러오는 중…</p>
       ) : list.length === 0 ? (
-        <p className="rows-empty">표 없음 · 앱 코드의 cairn.json에 tables를 선언하면 생겨요</p>
+        <p className="rows-empty">표 없음 · 앱 코드의 moida.json에 tables를 선언하면 생겨요</p>
       ) : (
         <ul className="list">
           {list.map((t) => (

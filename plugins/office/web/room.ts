@@ -1,4 +1,4 @@
-import { seatOf } from './cairn-feed';
+import { seatOf } from './moida-feed';
 import type { LoadedAssetData } from './pixel/layout/furnitureCatalog';
 import type { ColorValue, OfficeLayout, PlacedFurniture, SpriteData } from './pixel/types';
 import { TileType } from './pixel/types';

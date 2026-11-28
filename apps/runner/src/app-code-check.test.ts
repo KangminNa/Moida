@@ -8,12 +8,13 @@ import { deflateRawSync } from 'node:zlib';
 import { AgentUser } from './agent-user';
 import { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
-import type { CairnServer } from './cairn-server';
+import { AppManifestCheck } from './app-manifest-check';
 import { DesignCheck } from './design-check';
 import { DesignDocCheck } from './design-doc-check';
 import { Job } from './job';
 import { Json } from './json';
 import { MakeStage } from './make-stage';
+import type { MoidaServer } from './moida-server';
 import { PromptPack } from './prompt-pack';
 import { Redactor, RunLog } from './redactor';
 import { RunnerConfig } from './runner-config';
@@ -172,7 +173,7 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
     );
   });
 
-  test('묶음 규칙: index.html · 개수 · 크기 · cairn.json. 묶음과 문법만 일을 실패로 끝낸다', () => {
+  test('묶음 규칙: index.html · 개수 · 크기 · moida.json. 묶음과 문법만 일을 실패로 끝낸다', () => {
     const empty = codeOf([]);
     const noEntry = AppCodeCheck.checks(empty, [new AppCodeEntry('style.css', 10, null)]);
     assert.deepEqual(short(noEntry), [[AppCodeCheck.BUNDLE, false, '문제 1개']]);
@@ -185,30 +186,30 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
     assert.match(tail, /템플릿\(\.html\)은 합쳐 1MB까지/);
 
     const manifest = (text: string | null) =>
-      AppCodeCheck.checks(starter, [new AppCodeEntry('cairn.json', 40, text)])[0]?.tail ?? '';
-    assert.equal(manifest('{"cairn":1,"hosts":["fonts.example.com"]}'), '');
+      AppCodeCheck.checks(starter, [new AppCodeEntry('moida.json', 40, text)])[0]?.tail ?? '';
+    assert.equal(manifest('{"moida":1,"hosts":["fonts.example.com"]}'), '');
     assert.match(
-      manifest('{"cairn":1,"hosts":["*.example.com","10.0.0.1","a.com:443"]}'),
+      manifest('{"moida":1,"hosts":["*.example.com","10.0.0.1","a.com:443"]}'),
       /와일드카드/,
     );
     assert.equal(
-      manifest('{"cairn":1,"hosts":["*.example.com","10.0.0.1"]}').split('\n').length,
+      manifest('{"moida":1,"hosts":["*.example.com","10.0.0.1"]}').split('\n').length,
       2,
     );
     assert.match(
-      manifest('{"cairn":1,"hosts":["dapi.kakao.com"]}'),
-      /지도는 cairn\.map으로/,
+      manifest('{"moida":1,"hosts":["dapi.kakao.com"]}'),
+      /지도는 moida\.map으로/,
       '지도 회사의 스크립트를 직접 넣지 않는다 (2026-11-25)',
     );
     // 거절하는 호스트는 지도 플러그인의 회사 목록(providers.json의 sdkHosts) 전부다 (docs/지도.md MP-1)
     for (const host of mapSdkHosts())
-      assert.match(manifest(JSON.stringify({ cairn: 1, hosts: [host] })), /cairn\.map/, host);
+      assert.match(manifest(JSON.stringify({ moida: 1, hosts: [host] })), /moida\.map/, host);
     assert.equal(
-      manifest('{"cairn":1,"hosts":["fonts.googleapis.com"]}'),
+      manifest('{"moida":1,"hosts":["fonts.googleapis.com"]}'),
       '',
       '글꼴은 막지 않는다',
     );
-    assert.match(manifest('{"cairn":2}'), /데이터 약속\(cairn\)은 1/);
+    assert.match(manifest('{"moida":2}'), /데이터 약속\(moida\)은 1/);
     assert.match(manifest('nope'), /JSON이 아니에요/);
     assert.match(manifest(null), /읽지 못했어요/);
 
@@ -222,9 +223,9 @@ describe('앱 코드 검사 (AppCodeCheck.checks)', () => {
   });
 });
 
-// 정적 앱 (스토어 9.13): cairn.json에 "render": "static"이면 HTML이 템플릿이 아니라 그대로 나간다. 폴더가 든 결과는 app.zip 하나로 낸다
+// 정적 앱 (스토어 9.13): moida.json에 "render": "static"이면 HTML이 템플릿이 아니라 그대로 나간다. 폴더가 든 결과는 app.zip 하나로 낸다
 describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
-  const STATIC = '{"cairn":1,"render":"static"}';
+  const STATIC = '{"moida":1,"render":"static"}';
   const page = (files: object[]) =>
     AppCodeBase.from(
       Json.of({
@@ -244,19 +245,19 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     const made = [
       new AppCodeEntry('index.html', 200, '<div id="app">{{ count }}</div>{{#broken'),
       new AppCodeEntry('app.js', 900, null),
-      new AppCodeEntry('cairn.json', 30, STATIC),
+      new AppCodeEntry('moida.json', 30, STATIC),
     ];
     assert.deepEqual(short(AppCodeCheck.checks(empty, made)), [
       [AppCodeCheck.BUNDLE, true, '3개 · 1KB'],
     ]);
-    // 앞 버전이 정적 앱이면 cairn.json을 다시 내지 않아도 정적 앱이다
-    const before = page([{ name: 'cairn.json', size: 30, text: STATIC }]);
+    // 앞 버전이 정적 앱이면 moida.json을 다시 내지 않아도 정적 앱이다
+    const before = page([{ name: 'moida.json', size: 30, text: STATIC }]);
     const again = AppCodeCheck.checks(before, [new AppCodeEntry('index.html', 10, '{{#x')]);
     assert.deepEqual(short(again), [[AppCodeCheck.BUNDLE, true, '2개 · 40B']]);
 
     assert.equal(AppCodeCheck.checks(codeOf([]), made)[0]?.ok, true, '블로그 앱도 정적 앱이 된다');
     assert.match(
-      tail(AppCodeCheck.checks(empty, [new AppCodeEntry('cairn.json', 20, '{"render":"server"}')])),
+      tail(AppCodeCheck.checks(empty, [new AppCodeEntry('moida.json', 20, '{"render":"server"}')])),
       /render\)은 template · static/,
     );
   });
@@ -267,9 +268,9 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
       AppCodeCheck.checks(empty, [
         new AppCodeEntry('index.html', 100, '<div id="app"></div>'),
         new AppCodeEntry(
-          'cairn.json',
+          'moida.json',
           200,
-          JSON.stringify({ cairn: 1, render: 'static', ...manifest }),
+          JSON.stringify({ moida: 1, render: 'static', ...manifest }),
         ),
         ...extra,
       ]);
@@ -326,7 +327,7 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     const club = AppCodeCheck.checks(community, [
       new AppCodeEntry('index.html', 100, '<div id="app"></div>'),
       new AppCodeEntry(
-        'cairn.json',
+        'moida.json',
         100,
         JSON.stringify({
           render: 'static',
@@ -342,13 +343,13 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
       { name: 'index.html', size: 100, text: '<p>옛 화면</p>' },
       { name: 'assets/photo.png', size: 4000, text: null },
       { name: 'old.js', size: 50, text: 'x' },
-      { name: 'cairn.json', size: 30, text: STATIC },
+      { name: 'moida.json', size: 30, text: STATIC },
     ]);
     const inside = [
       new AppCodeEntry('index.html', 300, null),
       new AppCodeEntry('assets/app.js', 2000, null),
       new AppCodeEntry('about/index.html', 100, null),
-      new AppCodeEntry('cairn.json', 30, STATIC),
+      new AppCodeEntry('moida.json', 30, STATIC),
     ];
     // zip의 4개 + 내용을 받지 못한 그림 1개 (글로 받은 old.js는 zip에 없으면 사라진다)
     assert.deepEqual(short(AppCodeCheck.packed(before, inside)), [
@@ -356,7 +357,7 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     ]);
 
     const plain = AppCodeCheck.packed(before, [new AppCodeEntry('index.html', 10, null)]);
-    assert.match(tail(plain), /zip 안의 cairn\.json에 "render": "static"/);
+    assert.match(tail(plain), /zip 안의 moida\.json에 "render": "static"/);
     assert.equal(AppCodeCheck.fatal(plain)?.name, AppCodeCheck.BUNDLE);
     assert.match(tail(AppCodeCheck.packed(before, null)), /app\.zip을 읽지 못했어요/);
     const deep = new AppCodeEntry('a/b/c/d/e/f/g.js', 1, null);
@@ -380,16 +381,16 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
     assert.match(tail(nested), /폴더는 정적 앱만 써요: assets\/app\.js/);
   });
 
-  test('zip의 목록 읽기 (ZipIndex): 감싼 폴더를 벗기고, 운영체제 파일은 건너뛰고, cairn.json은 내용까지', () => {
+  test('zip의 목록 읽기 (ZipIndex): 감싼 폴더를 벗기고, 운영체제 파일은 건너뛰고, moida.json은 내용까지', () => {
     const files = {
       'dist/index.html': '<p>지도</p>',
       'dist/assets/app.js': 'console.log(1)'.repeat(200),
-      'dist/cairn.json': STATIC,
+      'dist/moida.json': STATIC,
       'dist/.DS_Store': 'x',
     };
     const index = ZipIndex.read(zipOf(files));
     assert.equal(
-      ZipIndex.read(zipOf(files, false))?.text('cairn.json', 100),
+      ZipIndex.read(zipOf(files, false))?.text('moida.json', 100),
       STATIC,
       '줄이지 않은 zip',
     );
@@ -399,10 +400,10 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
       [
         ['index.html', 13],
         ['assets/app.js', 2800],
-        ['cairn.json', STATIC.length],
+        ['moida.json', STATIC.length],
       ],
     );
-    assert.equal(index.text('cairn.json', 16 * 1024), STATIC);
+    assert.equal(index.text('moida.json', 16 * 1024), STATIC);
     assert.equal(index.text('assets/app.js', 100), null, '한도를 넘으면 풀지 않는다');
     assert.equal(index.text('none.txt', 100), null);
     assert.equal(ZipIndex.read(Buffer.from('zip이 아닌 글')), null);
@@ -410,7 +411,7 @@ describe('정적 앱 검사 (AppCodeCheck.checks · packed)', () => {
   });
 
   test('폴더가 든 앞 코드는 폴더째 inputs/app/에 둔다. 바깥을 가리키는 이름은 버린다', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'cairn-app-static-'));
+    const dir = await mkdtemp(join(tmpdir(), 'moida-app-static-'));
     try {
       const code = page([
         { name: 'index.html', size: 10, text: '<p>지도</p>' },
@@ -440,7 +441,7 @@ describe('앱 코드 일 (MakeStage)', () => {
         task: { id: id(70), kind: 'make', title: '블로그 꾸미기', payload },
         agent: { name: '만들기', role: '', tool: 'claude' },
         instruction: '글 목록을 카드로',
-        run_token: 'cairn_run_x',
+        run_token: 'moida_run_x',
       }),
     );
 
@@ -451,7 +452,7 @@ describe('앱 코드 일 (MakeStage)', () => {
   });
 
   test('지금 코드를 inputs/app/에 두고 지시 단락을 채우고, 검사가 그래도 틀리면 실패로 끝낸다', async () => {
-    const work = await mkdtemp(join(tmpdir(), 'cairn-app-code-'));
+    const work = await mkdtemp(join(tmpdir(), 'moida-app-code-'));
     const code = codeOf(
       [
         { name: 'index.html', size: 40, text: '{{> header}}{{#posts}}{{title}}{{/posts}}' },
@@ -462,7 +463,7 @@ describe('앱 코드 일 (MakeStage)', () => {
       ['fonts.example.com'],
     );
     const config = new RunnerConfig(
-      'http://cairn',
+      'http://moida',
       'device',
       {},
       {},
@@ -473,7 +474,7 @@ describe('앱 코드 일 (MakeStage)', () => {
       AgentUser.parse('self'),
       work,
     );
-    const server = { appCodeBase: async () => code } as unknown as CairnServer;
+    const server = { appCodeBase: async () => code } as unknown as MoidaServer;
     const redactor = new Redactor([]);
     const agent = AgentUser.parse('self') as AgentUser;
     const stage = new MakeStage(
@@ -549,7 +550,7 @@ describe('앱 코드 일 (MakeStage)', () => {
       const zip = zipOf({
         'index.html': '<p>지도</p>',
         'assets/app.js': 'console.log(1)',
-        'cairn.json': '{"cairn":1,"render":"static"}',
+        'moida.json': '{"moida":1,"render":"static"}',
       });
       await writeFile(join(room.outputsDir, 'app.zip'), zip);
       const packed = await stage.check();
@@ -566,5 +567,17 @@ describe('앱 코드 일 (MakeStage)', () => {
       await stage.close();
       await rm(work, { recursive: true, force: true });
     }
+  });
+});
+
+// 옛 이름의 선언서 (2026-11-28 이름 cairn → moida): 그 전에 만든 앱 코드의 cairn.json도 선언서로 읽는다 (서버 AppCodeBundle과 같게)
+describe('AppManifestCheck: 옛 이름의 선언서', () => {
+  test('moida.json이 없을 때만 cairn.json을 고르고, 데이터 약속은 옛 칸(cairn)도 받는다', () => {
+    const named = (...names: string[]) => names.map((name) => ({ name }));
+    assert.equal(AppManifestCheck.pick(named('index.html', 'cairn.json'))?.name, 'cairn.json');
+    assert.equal(AppManifestCheck.pick(named('cairn.json', 'moida.json'))?.name, 'moida.json');
+    assert.equal(AppManifestCheck.pick(named('index.html')), undefined);
+    assert.ok(AppManifestCheck.isManifest('cairn.json'));
+    assert.ok(AppManifestCheck.isStatic('{"cairn":1,"render":"static"}'));
   });
 });

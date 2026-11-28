@@ -46,7 +46,7 @@ const DRIZZLE = {
 const pluginsDir = join(root, 'plugins');
 const packages = existsSync(pluginsDir)
   ? readdirSync(pluginsDir).flatMap((name) => {
-      const file = join(pluginsDir, name, 'cairn-plugin.json');
+      const file = join(pluginsDir, name, 'moida-plugin.json');
       if (!existsSync(file)) return [];
       const schema = JSON.parse(readFileSync(file, 'utf8')).schema;
       return typeof schema === 'string' ? [[name, schema]] : [];
@@ -121,7 +121,17 @@ function readColumns(names) {
 function psql(sql) {
   const out = execFileSync(
     'docker',
-    ['compose', 'exec', '-T', 'db', 'psql', '-U', 'cairn', '-d', 'cairn', '-tA', '-c', sql],
+    [
+      'compose',
+      'exec',
+      '-T',
+      'db',
+      'sh',
+      '-c',
+      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tA -c "$1"',
+      'sh',
+      sql,
+    ],
     { cwd: root, encoding: 'utf8' },
   );
   return JSON.parse(out);

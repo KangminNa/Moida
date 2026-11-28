@@ -68,9 +68,9 @@ describe('ArchiveRecord', () => {
   test('틀린 모양은 어느 파일의 무엇인지 알려 준다', () => {
     const record = ArchiveRecord.ofMarkdown(
       'x.md',
-      '---\ncairn_id: 아이디\nwhen: 어제\nstatus: 이상함\ncount: 많음\n---\n\n',
+      '---\nmoida_id: 아이디\nwhen: 어제\nstatus: 이상함\ncount: 많음\n---\n\n',
     );
-    assert.throws(() => record.id(), /x\.md: cairn_id이\(가\) id 모양이 아니에요/);
+    assert.throws(() => record.id(), /x\.md: moida_id이\(가\) id 모양이 아니에요/);
     assert.throws(() => record.date('when'), /날짜가 아니에요/);
     assert.throws(() => record.oneOf('status', ['draft']), /draft 중 하나/);
     assert.throws(() => record.number('count'), /숫자여야/);
@@ -85,7 +85,7 @@ describe('ArchiveRecord', () => {
   test('UUIDv7 id에서 만든 때를 읽는다', () => {
     const record = ArchiveRecord.ofMarkdown(
       'x.md',
-      '---\ncairn_id: "019a2b3c-4d5e-7f00-8000-000000000001"\n---\n\n',
+      '---\nmoida_id: "019a2b3c-4d5e-7f00-8000-000000000001"\n---\n\n',
     );
     assert.deepEqual(record.createdAt, new Date(0x019a2b3c4d5e));
   });
@@ -102,5 +102,21 @@ describe('ArchiveRecord', () => {
     assert.equal(second?.optionalText('description'), null);
     assert.deepEqual(ArchiveRecord.listOfYaml('x.yml', '[]\n'), []);
     assert.throws(() => ArchiveRecord.listOfYaml('x.yml', '이상한 줄'), /읽을 수 없는 줄/);
+  });
+  test('옛 이름의 키(cairn_x)도 새 이름(moida_x)으로 읽는다 (2026-11-28 이름 바꾸기 전의 백업)', () => {
+    const old = ArchiveRecord.ofMarkdown(
+      'blog/x.md',
+      '---\ncairn_id: "019a2b3c-4d5e-7f00-8000-000000000001"\ncairn_type: post\ncairn_ref_wikis: []\n---\n\n본문',
+    );
+    assert.equal(old.id(), '019a2b3c-4d5e-7f00-8000-000000000001');
+    assert.equal(old.text('moida_type'), 'post');
+    assert.ok(old.has('moida_ref_wikis'));
+    assert.deepEqual(old.unknownKeys(new Set(['moida_id', 'moida_type', 'moida_ref_wikis'])), {});
+    const both = ArchiveRecord.ofJson('graph.json', { moida_type: 'new', cairn_type: 'old' });
+    assert.equal(both.text('moida_type'), 'new');
+    assert.equal(
+      ArchiveRecord.ofJson('graph.json', { cairn_type: 'old' }).text('moida_type'),
+      'old',
+    );
   });
 });

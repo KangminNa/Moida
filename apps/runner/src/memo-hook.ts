@@ -6,8 +6,8 @@ import { join } from 'node:path';
 // 훅은 CLI가 띄우는 별도 프로세스라 메모 경로와 막는 까닭(지시문 틀 memo-stop)은 환경 변수로 받는다.
 // 러너가 끄는 실행(승인 · 위임으로 기다림, 취소)은 훅이 돌지 않는다: 그래서 지시문(틀 memo)이 맡기기 전에 먼저 쓰라고 한다
 export class MemoHook {
-  static readonly FILE_ENV = 'CAIRN_MEMO_FILE';
-  static readonly REASON_ENV = 'CAIRN_MEMO_REASON';
+  static readonly FILE_ENV = 'MOIDA_MEMO_FILE';
+  static readonly REASON_ENV = 'MOIDA_MEMO_REASON';
   private static readonly DIR = 'hooks';
   private static readonly SCRIPT_NAME = 'memo-stop.cjs';
   private static readonly SCRIPT = `'use strict';

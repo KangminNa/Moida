@@ -1,7 +1,7 @@
 // 스킬 · 지침 문서 검사 (2026-11-24, 규칙은 agnix의 스킬 · 지침 검사에서 골라 다시 씀). pnpm check가 돌린다.
 //
-//   1. skills/<이름>/SKILL.md의 앞부분: name은 폴더 이름과 같고, 칸은 name · description · cairn-where만 (cairn-where는 runner만)
-//   2. description은 1~1024자, `<` `>` 없음 (Codex에도 깔린다), 언제 쓰는지("쓴다")가 들어 있다 (지시문 틀 cairn-runner는 빼고).
+//   1. skills/<이름>/SKILL.md의 앞부분: name은 폴더 이름과 같고, 칸은 name · description · moida-where만 (moida-where는 runner만)
+//   2. description은 1~1024자, `<` `>` 없음 (Codex에도 깔린다), 언제 쓰는지("쓴다")가 들어 있다 (지시문 틀 moida-runner는 빼고).
 //      모든 description을 합쳐 8000자 안 (AI 도구가 스킬 목록을 늘 싣는다)
 //   3. SKILL.md는 500줄까지 (Codex는 스킬 글 전체를 지시문에 싣는다: 길이가 곧 토큰)
 //   4. references/의 파일은 그 스킬 어딘가에서 가리킨다 (아무도 읽지 않는 참고 파일을 남기지 않는다)
@@ -20,8 +20,8 @@ const skillsDir = join(root, 'skills');
 const problems = [];
 const rel = (p) => relative(root, p);
 
-const KEYS = new Set(['name', 'description', 'cairn-where']);
-const TEMPLATE_SKILLS = new Set(['cairn-runner']);
+const KEYS = new Set(['name', 'description', 'moida-where']);
+const TEMPLATE_SKILLS = new Set(['moida-runner']);
 const OLD_WORDS = ['팀원', '팀장'];
 const SECRET = [/sk-ant-[A-Za-z0-9_-]{8}/, /ghp_[A-Za-z0-9]{20}/, /AKIA[0-9A-Z]{16}/];
 const PERSONAL_PATH = [/\/home\/(?!user\b)[a-z][\w-]*\//, /\/Users\/[\w-]+\//];
@@ -69,8 +69,8 @@ for (const name of readdirSync(skillsDir).filter((n) =>
     problems.push(`${rel(skillPath)}: name(${head.name})이 폴더 이름과 달라요`);
   for (const key of Object.keys(head))
     if (!KEYS.has(key)) problems.push(`${rel(skillPath)}: 모르는 앞부분 칸 ${key}`);
-  if (head['cairn-where'] !== undefined && head['cairn-where'] !== 'runner')
-    problems.push(`${rel(skillPath)}: cairn-where는 runner만 써요`);
+  if (head['moida-where'] !== undefined && head['moida-where'] !== 'runner')
+    problems.push(`${rel(skillPath)}: moida-where는 runner만 써요`);
   const description = head.description ?? '';
   descriptions += description.length;
   if (description.length < 1 || description.length > 1024)
@@ -98,7 +98,7 @@ for (const name of readdirSync(skillsDir).filter((n) =>
     if (PERSONAL_PATH.some((re) => re.test(body)))
       problems.push(`${rel(path)}: 개인 절대 경로가 있어요`);
   }
-  if (head['cairn-where'] === 'runner' || TEMPLATE_SKILLS.has(name)) {
+  if (head['moida-where'] === 'runner' || TEMPLATE_SKILLS.has(name)) {
     const sizes = files(dir, () => true).map((p) => [p, statSync(p).size]);
     for (const [path, size] of sizes)
       if (size > SKILL_FILE_MAX)
@@ -111,7 +111,7 @@ for (const name of readdirSync(skillsDir).filter((n) =>
         `skills/${name}: 파일을 합쳐 ${SKILL_TOTAL_MAX / 1024}KB를 넘어요 (${total}바이트)`,
       );
   }
-  if (head['cairn-where'] === 'runner' || TEMPLATE_SKILLS.has(name))
+  if (head['moida-where'] === 'runner' || TEMPLATE_SKILLS.has(name))
     for (const word of OLD_WORDS)
       if (joined.includes(word))
         problems.push(`skills/${name}: 옛 말 "${word}" (일꾼 · 대표로 써요)`);

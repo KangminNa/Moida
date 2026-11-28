@@ -190,7 +190,7 @@ describe('코드 작업 (코드 러너 칸)', () => {
     },
     instruction: '버그를 고쳐 주세요',
     agent: { name: '코드 담당', role: '', tool: 'claude' },
-    run_token: 'cairn_run_x',
+    run_token: 'moida_run_x',
   };
 
   /** 일 하나를 빌려 주고, 결과를 받으면 끝낸다 */

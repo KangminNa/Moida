@@ -6,7 +6,7 @@ import { NotFound } from '../base/errors';
 type AppPlace = readonly [string, string];
 /**
  * 앱 목록 읽기 (blog가 등록): domains = 모든 앱의 도메인(확인 전 것까지) → 앱, slugs = 모든 앱의 주소 → 앱
- * (공통 앱 도메인에서 x-cairn-app 머리글로 앱을 고른다, 2026-11-27)
+ * (공통 앱 도메인에서 x-moida-app 머리글로 앱을 고른다, 2026-11-27)
  */
 type AppHostsRead = (actor: Actor) => Promise<{
   domains: ReadonlyMap<string, AppPlace>;
@@ -52,8 +52,8 @@ class HostSnapshot {
 // - 기본 도메인으로 온 요청에는 request.siteSpaceId에 기본 도메인의 공간을 적는다 (스토어 가입이 어느 스토어인지, 2026-11-26)
 // 사이트 주소의 호스트는 앱 도메인으로 치지 않는다: 같은 값이 들어가도 콘솔이 막히지 않게 (blog도 그 값을 받지 않는다).
 // 둘 다 머리글을 하나 더 속여 보내면 더 막힐 뿐 더 열리지 않는다. 도메인 목록은 30초 동안 기억하고, 바뀌면 stale로 바로 다시 읽는다.
-// 공통 앱 도메인 (2026-11-27, 기획서 결정 "apps.moida.ai.kr"): 배포가 정한 CAIRN_APPS_URL의 호스트로 온 요청도 앱 도메인처럼
-// 등록한 경로만 지난다. 여러 앱이 한 도메인을 쓰므로 앱은 웹이 경로의 첫 칸에서 읽어 x-cairn-app 머리글(앱 주소)로 알린다:
+// 공통 앱 도메인 (2026-11-27, 기획서 결정 "apps.moida.ai.kr"): 배포가 정한 MOIDA_APPS_URL의 호스트로 온 요청도 앱 도메인처럼
+// 등록한 경로만 지난다. 여러 앱이 한 도메인을 쓰므로 앱은 웹이 경로의 첫 칸에서 읽어 x-moida-app 머리글(앱 주소)로 알린다:
 // 머리글을 속여도 같은 도메인의 다른 앱이 될 뿐이다 (그 앱들은 회원 쿠키 · 저장소를 이미 함께 쓴다). 머리글이 없으면 앱 없이
 // (스토어 가입 · 공통 약관처럼 공간의 일) request.siteSpaceId만 적는다.
 @Injectable()
@@ -104,15 +104,15 @@ export class HostGate {
     return (await this.read()).siteHost;
   }
 
-  /** 공통 앱 도메인의 호스트 (CAIRN_APPS_URL, 배포가 정한다). 없거나 틀린 주소면 null. 부를 때마다 읽는다 (테스트가 바꿔 본다) */
+  /** 공통 앱 도메인의 호스트 (MOIDA_APPS_URL, 배포가 정한다). 없거나 틀린 주소면 null. 부를 때마다 읽는다 (테스트가 바꿔 본다) */
   appsHost(): string | null {
-    const raw = process.env.CAIRN_APPS_URL ?? '';
+    const raw = process.env.MOIDA_APPS_URL ?? '';
     return URL.canParse(raw) ? HostGate.normalize(new URL(raw).host) : null;
   }
 
   /** 공통 앱 도메인의 출처 (https://apps.example.com). 없으면 null */
   appsOrigin(): string | null {
-    const raw = process.env.CAIRN_APPS_URL ?? '';
+    const raw = process.env.MOIDA_APPS_URL ?? '';
     return URL.canParse(raw) ? new URL(raw).origin : null;
   }
 
@@ -157,7 +157,7 @@ export class HostGate {
 
   /**
    * 요청이 앱 도메인으로 왔으면 [그 도메인, 앱 id, 공간 id]. Host와 X-Forwarded-Host를 모두 본다.
-   * 공통 앱 도메인이면 x-cairn-app 머리글의 앱 (모르는 앱 · 머리글 없음이면 앱 id · 공간 id가 빈 글자)
+   * 공통 앱 도메인이면 x-moida-app 머리글의 앱 (모르는 앱 · 머리글 없음이면 앱 id · 공간 id가 빈 글자)
    */
   private async appOf(headers: Record<string, unknown>): Promise<[string, string, string] | null> {
     const hosts = HostGate.hostsOf(headers);
@@ -165,7 +165,7 @@ export class HostGate {
     const known = await this.read();
     const shared = this.appsHost();
     if (shared !== null && shared !== known.siteHost && hosts.includes(shared)) {
-      const [appId, spaceId] = known.slugs.get(String(headers['x-cairn-app'] ?? '')) ?? ['', ''];
+      const [appId, spaceId] = known.slugs.get(String(headers['x-moida-app'] ?? '')) ?? ['', ''];
       return [shared, appId, spaceId];
     }
     const host = hosts.find((h) => h !== known.siteHost && known.apps.has(h));

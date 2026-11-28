@@ -7,7 +7,7 @@ import type { InstallStatusView } from './space.view';
 //   설치 통행증: 코드를 맞히면 10분 동안 쓰는 암호화한 쿠키. 이걸 가진 브라우저만 주인 계정을 만들 수 있다.
 // 주인이 정해지면 둘 다 쓸모가 없어진다.
 export class InstallPolicy {
-  static readonly COOKIE = 'cairn_install';
+  static readonly COOKIE = 'moida_install';
   static readonly PASS_SECONDS = 600;
   /** 설치 통행증의 용도 (SecretBox.pack): 다른 자리에서 싼 값이 통행증으로 풀리지 않게 */
   private static readonly PASS_PURPOSE = 'install';

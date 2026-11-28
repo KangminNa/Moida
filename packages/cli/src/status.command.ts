@@ -4,7 +4,7 @@ import type { DeviceSetup } from './device-setup';
 import { SkillFolder, type SkillPackage } from './skill';
 import type { Terminal } from './terminal';
 
-// cairn status: 넣은 스킬의 버전과 올릴 곳·검토자·교차 검토, AI 도구에 등록된 cairn 서버와 상태,
+// moida status: 넣은 스킬의 버전과 올릴 곳·검토자·교차 검토, AI 도구에 등록된 moida 서버와 상태,
 // 소식 기기 · 훅 · 상태 줄, 세션 저장 기기 · 훅 · 마지막 저장 · 못 올린 세션.
 export class StatusCommand {
   constructor(
@@ -26,7 +26,7 @@ export class StatusCommand {
       const newer =
         marker.version === skill.version
           ? ''
-          : ` · 새 버전 ${skill.version} (cairn connect로 바꾸기)`;
+          : ` · 새 버전 ${skill.version} (moida connect로 바꾸기)`;
       t.say(`  스킬 ${skill.name}: ${marker.version} · 올릴 곳 ${marker.site}${newer}`);
       t.say(`  검토자 ${marker.agents.length}명 · 교차 검토 ${marker.reviewWith ?? '없음'}`);
     }

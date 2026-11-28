@@ -10,7 +10,7 @@ import { hostOf } from './request-host';
 import { joinableApps, joinHref } from './StoreJoin';
 import type { Site } from './site';
 
-// 첫 화면 (C안 소개 + D1 넘겨 보는 앱 카드, 2026-11-28): 공통 앱 도메인(CAIRN_APPS_URL)의 / 와 기본 도메인의 / · /store가 모두 이것.
+// 첫 화면 (C안 소개 + D1 넘겨 보는 앱 카드, 2026-11-28): 공통 앱 도메인(MOIDA_APPS_URL)의 / 와 기본 도메인의 / · /store가 모두 이것.
 // 옛 스토어 첫 화면(StoreHome)은 지웠다 (사용자 "기존에 store에 만든건 지워줘", 2026-11-28). 서버에서 공개 앱마다 최근 공개 글 셋을
 // 붙여 AppsField에 넘긴다. 고정한 앱(첫 화면 앱)을 맨 앞에. 앱 링크는 이 도메인의 /<앱>(같은 출처)이거나 확인한 자기 도메인.
 // 로그인은 공통 앱 도메인에서만 앱 없는 /_/login (그 밖의 도메인은 앱마다 그 도메인에서). 로그인했으면 머리에 아이디와 로그아웃.

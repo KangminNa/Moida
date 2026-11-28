@@ -25,8 +25,11 @@ const pluginsDir = join(root, 'plugins');
 const target = join(root, 'apps/web/app/_plugins');
 const installed = join(target, 'installed');
 
+// 목록 파일은 moida-plugin.json, 없으면 옛 이름 cairn-plugin.json (2026-11-28 이름 cairn → moida 전의 플러그인, 서버 PluginManifest.fileIn과 같다)
+const manifestOf = (dir) =>
+  ['moida-plugin.json', 'cairn-plugin.json'].map((f) => join(dir, f)).find((f) => existsSync(f));
 const names = readdirSync(pluginsDir)
-  .filter((n) => existsSync(join(pluginsDir, n, 'cairn-plugin.json')))
+  .filter((n) => manifestOf(join(pluginsDir, n)))
   .sort();
 
 rmSync(installed, { recursive: true, force: true });
@@ -38,9 +41,8 @@ const packages = [];
 const pageImports = [];
 for (const name of names) {
   const dir = join(pluginsDir, name);
-  const manifestFile = join(dir, 'cairn-plugin.json');
-  if (!existsSync(manifestFile))
-    throw new Error(`플러그인 ${name}의 목록 파일이 없어요: ${manifestFile}`);
+  const manifestFile = manifestOf(dir);
+  if (!manifestFile) throw new Error(`플러그인 ${name}의 목록 파일이 없어요: ${dir}`);
   const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
   if (manifest.name !== name)
     throw new Error(`폴더 이름(${name})과 플러그인 이름(${manifest.name})이 달라요`);

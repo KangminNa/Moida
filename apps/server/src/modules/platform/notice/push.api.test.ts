@@ -8,7 +8,7 @@ import { Database } from '../base/database';
 import { NoticePushJob } from './notice-push.job';
 
 // 브라우저 푸시 (/api/push, 7단계)와 알림을 푸시로 보내는 일꾼. 푸시 서비스 대신 이 시험의 HTTP 서버가 받는다
-// (CAIRN_PUSH_EXTRA_ORIGINS로 그 출처만 허락). 받은 본문을 브라우저처럼 풀어 내용을 본다.
+// (MOIDA_PUSH_EXTRA_ORIGINS로 그 출처만 허락). 받은 본문을 브라우저처럼 풀어 내용을 본다.
 
 type Json = Record<string, unknown>;
 type Received = { path: string; headers: IncomingMessage['headers']; body: Buffer };
@@ -86,7 +86,7 @@ before(async () => {
   });
   await new Promise<void>((done) => push.listen(0, '127.0.0.1', done));
   origin = `http://127.0.0.1:${(push.address() as AddressInfo).port}`;
-  process.env.CAIRN_PUSH_EXTRA_ORIGINS = origin;
+  process.env.MOIDA_PUSH_EXTRA_ORIGINS = origin;
   api = await ApiClient.start();
   owner = await api.signIn();
   db = api.service(Database);
@@ -97,7 +97,7 @@ before(async () => {
 after(async () => {
   await api.close();
   push.close();
-  delete process.env.CAIRN_PUSH_EXTRA_ORIGINS;
+  delete process.env.MOIDA_PUSH_EXTRA_ORIGINS;
 });
 
 /** 앞 시험의 알림은 이미 다룬 것으로: 이번 시험이 만든 알림만 보내게 */

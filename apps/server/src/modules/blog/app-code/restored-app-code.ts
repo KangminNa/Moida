@@ -45,8 +45,11 @@ export class RestoredAppCode {
       const blobHash = createHash('sha256').update(file.body).digest('hex');
       entries.push({ name, blobHash, mime, sizeBytes: file.body.length });
       blobs.push(new ArchiveBlob(file.body, mime));
-      if (name === AppCodeBundle.MANIFEST && file.body.length <= AppCodeBundle.MANIFEST_BYTES_MAX)
-        manifest = file.body.toString('utf8');
+      const declared = name === AppCodeBundle.MANIFEST || name === AppCodeBundle.LEGACY_MANIFEST;
+      // 새 이름이 먼저다: 옛 이름은 아직 아무것도 읽지 않았을 때만 (2026-11-28 이름 바꾸기 전의 백업)
+      if (declared && file.body.length <= AppCodeBundle.MANIFEST_BYTES_MAX)
+        if (name === AppCodeBundle.MANIFEST || manifest === null)
+          manifest = file.body.toString('utf8');
     }
     try {
       const files = AppCodeBundle.files(entries.sort((a, b) => (a.name < b.name ? -1 : 1)));

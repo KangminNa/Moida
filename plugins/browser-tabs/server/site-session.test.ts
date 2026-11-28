@@ -9,10 +9,10 @@ import { after, before, describe, test } from 'node:test';
 import { BrowserScreenGateway } from './screen.gateway';
 
 // 사이트 세션 지우기 (2026-11-14)를 진짜 Chromium으로 본다: 그 사이트 호스트의 쿠키와 그 출처의 저장소만 지우고,
-// 다른 사이트의 로그인(쿠키 · localStorage)은 그대로 둔다. Chromium이 없으면 건너뛴다 (CAIRN_TEST_CHROMIUM).
+// 다른 사이트의 로그인(쿠키 · localStorage)은 그대로 둔다. Chromium이 없으면 건너뛴다 (MOIDA_TEST_CHROMIUM).
 // 쿠키는 포트를 가리지 않아서 두 사이트는 호스트 이름이 다르다 (127.0.0.1 · localhost).
 
-const CHROMIUM = process.env.CAIRN_TEST_CHROMIUM ?? '/opt/pw-browsers/chromium';
+const CHROMIUM = process.env.MOIDA_TEST_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const pause = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 let chrome: ChildProcess;
@@ -62,7 +62,7 @@ describe('사이트 세션 지우기 (진짜 Chromium)', {
     });
     await new Promise<void>((done) => site.listen(0, '127.0.0.1', done));
     sitePort = (site.address() as AddressInfo).port;
-    profile = mkdtempSync(join(tmpdir(), 'cairn-session-'));
+    profile = mkdtempSync(join(tmpdir(), 'moida-session-'));
     chrome = spawn(
       CHROMIUM,
       [

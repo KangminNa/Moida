@@ -11,7 +11,7 @@ import { Nickname } from './nickname.policy';
 
 const NOW = new Date('2026-11-19T00:00:00Z');
 const DAY = 86_400_000;
-const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 
 function row(more: Partial<MemberRow> = {}): MemberRow {
   return {
@@ -73,7 +73,7 @@ describe('Nickname', () => {
       '공식계정',
       '운영자김',
       'admin1',
-      'Cairn팀',
+      'Moida팀',
       'Moida팀',
     ])
       assert.throws(() => Nickname.clean(bad), RuleViolation, bad);
@@ -127,7 +127,7 @@ describe('MemberCsrf', () => {
     assert.equal(csrf.matches('cookie-1', token), true);
     assert.equal(csrf.matches('cookie-2', token), false);
     assert.equal(csrf.matches('cookie-1', undefined), false);
-    const other = new MemberCsrf(SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() }));
+    const other = new MemberCsrf(SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() }));
     assert.equal(other.matches('cookie-1', token), false);
   });
 });

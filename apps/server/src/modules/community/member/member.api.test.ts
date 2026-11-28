@@ -158,7 +158,7 @@ describe('메일 인증 가입', () => {
     assert.equal((self.account as Json).email, email);
     assert.equal((self.account as Json).loginId, CommunitySite.loginIdOf(email));
     assert.equal((self.member as Json).nickname, '마을사람');
-    assert.ok(res.cookies().cairn_member);
+    assert.ok(res.cookies().moida_member);
     assert.doesNotMatch(res.text, /scrypt/);
     const me = ok(await at('/api/community/me', { as: new TestUser(res.cookies()) }));
     assert.equal((me.member as Json).nickname, '마을사람');
@@ -253,7 +253,7 @@ describe('로그인', () => {
     const self = ok(res);
     assert.equal(self.email, CommunitySite.emailOf('login_ok'));
     assert.equal(self.loginId, CommunitySite.loginIdOf(CommunitySite.emailOf('login_ok')));
-    assert.ok(res.cookies().cairn_member);
+    assert.ok(res.cookies().moida_member);
     const wrong = await login(CommunitySite.emailOf('login_ok'), '틀린 비밀번호입니다');
     const missing = await login(CommunitySite.emailOf('nobody_here'), PASSWORD);
     assert.equal(wrong.status, 401);
@@ -318,7 +318,7 @@ describe('회원 정보 · 비밀번호 · 로그아웃', () => {
         method: 'PATCH',
         as: me,
         body: { nickname, version },
-        headers: { 'x-cairn-csrf': csrf },
+        headers: { 'x-moida-csrf': csrf },
       });
     const renamed = ok(await rename('바꾼사람', self.version));
     assert.equal(renamed.nickname, '바꾼사람');
@@ -342,7 +342,7 @@ describe('회원 정보 · 비밀번호 · 로그아웃', () => {
         method: 'PATCH',
         as: first,
         body: { current, next },
-        headers: { 'x-cairn-csrf': csrf },
+        headers: { 'x-moida-csrf': csrf },
       });
     assert.match(
       (await change('틀린 지금 비밀번호', '새로운 긴 비밀번호입니다')).text,
@@ -370,7 +370,7 @@ describe('회원 정보 · 비밀번호 · 로그아웃', () => {
         headers,
       });
     assert.equal((await again({})).status, 403, '쿠키를 실었으면 확인 값이 있어야');
-    assert.equal((await again({ 'x-cairn-csrf': String(stale.csrf) })).status, 200);
+    assert.equal((await again({ 'x-moida-csrf': String(stale.csrf) })).status, 200);
   });
 
   test('로그아웃하면 그 쿠키는 더 회원이 아니다', async () => {
@@ -379,7 +379,7 @@ describe('회원 정보 · 비밀번호 · 로그아웃', () => {
     const out = await at('/api/community/logout', {
       method: 'POST',
       as: me,
-      headers: { 'x-cairn-csrf': csrf },
+      headers: { 'x-moida-csrf': csrf },
     });
     assert.equal(out.status, 204, out.text);
     assert.equal(ok(await at('/api/community/me', { as: me })).member, null);
@@ -394,11 +394,11 @@ describe('쓰기 확인 (11.1 세션 탈취 · CSRF)', () => {
     const patch = (headers: Record<string, string>) =>
       api.viaHost('/api/community/me', HOST, { method: 'PATCH', as: me, body, headers });
     assert.equal(
-      (await patch({ 'sec-fetch-site': 'cross-site', 'x-cairn-csrf': csrf })).status,
+      (await patch({ 'sec-fetch-site': 'cross-site', 'x-moida-csrf': csrf })).status,
       403,
     );
     assert.equal(
-      (await patch({ origin: 'https://evil.example', 'x-cairn-csrf': csrf })).status,
+      (await patch({ origin: 'https://evil.example', 'x-moida-csrf': csrf })).status,
       403,
     );
     assert.equal((await patch({ origin: ORIGIN })).status, 403);

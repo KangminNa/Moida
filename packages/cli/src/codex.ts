@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { AiTool, McpServerState } from './ai-tool';
 
 // Codex: 스킬은 ~/.agents/skills (Codex·Gemini CLI가 함께 읽는 자리), 검토자는 ~/.codex/agents/*.toml,
-// MCP는 `codex mcp` (설정은 ~/.codex/config.toml의 [mcp_servers.cairn]). 문서: learn.chatgpt.com/docs/extend/mcp
+// MCP는 `codex mcp` (설정은 ~/.codex/config.toml의 [mcp_servers.moida]). 문서: learn.chatgpt.com/docs/extend/mcp
 // `codex mcp list`의 출력 모양은 공개된 약속이 아니라, 연결 확인은 Codex 안의 /mcp로 하라고 안내한다.
 export class Codex extends AiTool {
   readonly id = 'codex';
@@ -20,7 +20,7 @@ export class Codex extends AiTool {
     return join(this.env.CODEX_HOME || join(this.home, '.codex'), 'agents');
   }
 
-  /** `codex mcp list`에서 cairn 줄을 찾는다: 이름으로 시작하고 주소가 있는 줄 */
+  /** `codex mcp list`에서 moida 줄을 찾는다: 이름으로 시작하고 주소가 있는 줄 */
   async server(): Promise<McpServerState | null> {
     const res = await this.run(['mcp', 'list']);
     if (!res.ok) return null;

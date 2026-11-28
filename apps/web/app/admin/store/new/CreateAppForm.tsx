@@ -12,7 +12,7 @@ const ICON_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 /**
  * 쓸 기능 → 앱 종류 (서버 blog.tables의 APP_KIND). 종류는 화면에 내세우지 않는다 (2026-11-25 A4: 앱은 하나,
- * 화면은 모두 앱 코드). 글 · 호 · 회원처럼 Cairn이 주는 기능이 필요할 때만 고른다
+ * 화면은 모두 앱 코드). 글 · 호 · 회원처럼 Moida이 주는 기능이 필요할 때만 고른다
  */
 const FEATURES: readonly [AdminApp['kind'], string, string][] = [
   ['page', '화면만', '도구 · 소개 · 대시보드처럼 앱 코드가 전부인 앱'],
@@ -33,7 +33,7 @@ export type CreateAppBody = {
 
 // 앱 만들기 시트 (스토어 1-5 → 2026-11-25 A4 앱 하나로): 이름 · 주소 · 무엇을 하는 앱인지 · 쓸 기능 · 아이콘.
 // 종류를 고르는 카드는 없다: 화면은 모두 앱 코드이고, 새 앱은 빈 정적 앱에서 시작해 대화에서 맡기면 일꾼이
-// 참고할 화면을 찾아 디자인 문서를 쓰고 만든다 (스킬 cairn-make). 글은 시작 메뉴, 화면만이면 앱이 될 페이지(없어도 됨).
+// 참고할 화면을 찾아 디자인 문서를 쓰고 만든다 (스킬 moida-make). 글은 시작 메뉴, 화면만이면 앱이 될 페이지(없어도 됨).
 // 비공개로 만들어진다. 저장(만들기 → 아이콘 올리기)은 패널이 한다.
 export function CreateAppForm({
   origin,

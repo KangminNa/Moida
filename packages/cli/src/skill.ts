@@ -33,9 +33,9 @@ export class SkillPackage {
     return new SkillPackage(dir.split(/[/\\]/).pop() ?? '', files);
   }
 
-  /** 러너의 작업에서만 쓰는 스킬인가. 앞부분에 `cairn-where: runner`가 있다. 작업 토큰이 있어야 도는 스킬이라 사람의 AI 도구에 넣지 않는다 */
+  /** 러너의 작업에서만 쓰는 스킬인가. 앞부분에 `moida-where: runner`가 있다. 작업 토큰이 있어야 도는 스킬이라 사람의 AI 도구에 넣지 않는다 */
   get runnerOnly(): boolean {
-    return /^cairn-where: runner$/m.test(this.files.get('SKILL.md') ?? '');
+    return /^moida-where: runner$/m.test(this.files.get('SKILL.md') ?? '');
   }
 
   /** 이 명령에 함께 든 스킬 폴더. 저장소에서는 <저장소>/skills, 배포한 패키지에서는 <패키지>/skills */
@@ -82,11 +82,12 @@ export class SkillPackage {
 }
 
 /**
- * 넣은 스킬에 남기는 표시 (.cairn.json). 이 파일이 있으면 cairn connect가 넣은 폴더다.
+ * 넣은 스킬에 남기는 표시 (.moida.json). 이 파일이 있으면 moida connect가 넣은 폴더다.
  * 스킬의 스크립트가 site(미리보기의 올릴 곳)·tool·review_with(교차 검토 명령줄)를 읽는다.
  */
 export class SkillMarker {
-  static readonly FILE = '.cairn.json';
+  static readonly FILE = '.moida.json';
+  private static readonly LEGACY_FILE = '.cairn.json';
 
   constructor(
     readonly version: string,
@@ -101,10 +102,12 @@ export class SkillMarker {
 
   static read(dir: string): SkillMarker | null {
     try {
-      const raw = JSON.parse(readFileSync(join(dir, SkillMarker.FILE), 'utf8')) as Record<
-        string,
-        unknown
-      >;
+      // 옛 이름의 표시(.cairn.json, 2026-11-28 이름 cairn → moida 전에 넣은 스킬)도 읽는다: 옛 cairn-* 스킬 폴더를
+      // 이 명령이 넣은 것으로 알아보고, 이제 들지 않는 스킬로 지운다 (removeRetired)
+      const file = existsSync(join(dir, SkillMarker.FILE))
+        ? SkillMarker.FILE
+        : SkillMarker.LEGACY_FILE;
+      const raw = JSON.parse(readFileSync(join(dir, file), 'utf8')) as Record<string, unknown>;
       return new SkillMarker(
         String(raw.version ?? ''),
         String(raw.site ?? ''),
@@ -130,7 +133,7 @@ export class SkillMarker {
   }
 }
 
-/** AI 도구의 스킬 폴더 안의 한 자리 (예: ~/.claude/skills/cairn-save) */
+/** AI 도구의 스킬 폴더 안의 한 자리 (예: ~/.claude/skills/moida-save) */
 export class SkillFolder {
   constructor(readonly dir: string) {}
 

@@ -16,7 +16,7 @@ class RestoreStep {
   ) {}
 }
 
-// Cairn의 내용을 보관 형식 파일 묶음으로 만든다. 맨 위 cairn.json은 여기서, 내용은 각 모듈이 만든다.
+// Moida의 내용을 보관 형식 파일 묶음으로 만든다. 맨 위 moida.json은 여기서, 내용은 각 모듈이 만든다.
 // platform은 다른 모듈의 스키마를 모르므로, 내용을 가진 모듈이 onModuleInit에서 자기 파일을 만드는 방법을 등록한다.
 //
 //   archive.register('vault', (actor) => this.files(actor));
@@ -28,7 +28,7 @@ class RestoreStep {
 //   archive.registerRestore('blog', (files) => PostRestore.read(files), ['vault']);
 @Injectable()
 export class ArchiveQuery extends BaseQuery {
-  /** 앞부분의 `cairn_format` 값 */
+  /** 앞부분의 `moida_format` 값 */
   static readonly FORMAT = ARCHIVE_FORMAT;
 
   private readonly sources = new Map<string, (actor: Actor) => Promise<readonly ArchiveFile[]>>();
@@ -63,8 +63,8 @@ export class ArchiveQuery extends BaseQuery {
 
   async files(actor: Actor): Promise<readonly ArchiveFile[]> {
     actor.assertCan(Actor.READ_ALL);
-    const head = { format: ARCHIVE_FORMAT, generator: 'cairn', spec: 'docs/보관형식.md' };
-    const files = [ArchiveFile.text('cairn.json', `${JSON.stringify(head, null, 2)}\n`)];
+    const head = { format: ARCHIVE_FORMAT, generator: 'moida', spec: 'docs/보관형식.md' };
+    const files = [ArchiveFile.text('moida.json', `${JSON.stringify(head, null, 2)}\n`)];
     for (const read of this.sources.values()) files.push(...(await read(actor)));
     return files;
   }

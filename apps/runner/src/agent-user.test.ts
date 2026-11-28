@@ -111,7 +111,7 @@ describe('AI를 돌릴 사용자', () => {
   test('agent의 700 폴더는 agent 권한으로 읽는다 (이름의 공백 · 탭 포함)', {
     skip: process.getuid?.() !== 0,
   }, async () => {
-    const room = await mkdtemp(join(tmpdir(), 'cairn-agent-list-'));
+    const room = await mkdtemp(join(tmpdir(), 'moida-agent-list-'));
     try {
       await chmod(room, 0o711);
       const out = join(room, 'outputs');

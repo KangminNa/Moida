@@ -1,6 +1,6 @@
-import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 
 /** 일 하나에 쓸 AI 토큰. 메모리에만 있고 AI CLI에게는 환경 변수로만 넘긴다 */
 export class AiLogin {
@@ -28,7 +28,7 @@ export class AiLogins {
   private static readonly EMPTY = '서버의 답에 AI 토큰이 없어요';
 
   constructor(
-    private readonly server: Pick<CairnServer, 'aiLogin'>,
+    private readonly server: Pick<MoidaServer, 'aiLogin'>,
     /** 러너가 스스로 가진 로그인 (엔진 이름 → 토큰, RunnerConfig.ownLogins) */
     private readonly own: Readonly<Record<string, string>>,
   ) {}

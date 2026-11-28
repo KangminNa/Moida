@@ -6,7 +6,7 @@ import { useLiveValue } from '../../_lib/use-live';
 import type { WorkSession } from '../../_vault/types';
 
 /** 에이전트 실행의 기록인 세션의 도구 이름 (작업 세션, 2026-11-17) */
-export const WORK_TOOL = 'cairn-agent';
+export const WORK_TOOL = 'moida-agent';
 
 /** 요청의 열쇠(chat:<대화> · goal-run:<실행> · task:<작업>) → 콘솔 주소와 이름 */
 function requestLink(flow: string): [string, string] | null {

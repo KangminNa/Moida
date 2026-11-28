@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import type { AgentUser, FolderEntry } from './agent-user';
 import type { AppCodeBase } from './app-code-base';
 import { AppCodeCheck, AppCodeEntry } from './app-code-check';
-import type { CairnServer } from './cairn-server';
+import { AppManifestCheck } from './app-manifest-check';
 import { DesignCheck } from './design-check';
 import { DesignDocCheck } from './design-doc-check';
 import type { Job } from './job';
@@ -13,6 +13,7 @@ import {
   MaterialGone,
 } from './material-downloader';
 import { ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import { OutputBatch } from './output-batch';
 import type { PageBase } from './page-base';
 import { RunEvent, RunResult } from './progress';
@@ -58,12 +59,12 @@ export class MakeMaterials {
 //   뒤: agent 프로세스를 모두 끄고(띄워 둔 변환기 · 서버) 요약을 결과로. 올린 결과물이 없으면 JobRun이 실패로 끝낸다
 //       (검사를 지나도 서버가 받지 않으면 없을 수 있다)
 // 재료 위키는 받지 않는다: 작업 토큰에 봉인한 허락으로 AI가 get_wiki로 읽는다 (지시문에 id만).
-// 결재는 없다: Cairn 안에 보관하는 것은 발행이 아니다.
+// 결재는 없다: Moida 안에 보관하는 것은 발행이 아니다.
 export class MakeStage implements SandboxStage {
   private static readonly SUMMARY_MAX = 4_000;
   /** 페이지의 문 (서버의 PageOrder.ENTRY) */
   private static readonly ENTRY = 'index.html';
-  /** 앱 코드의 cairn.json 한도 (서버의 AppCodeBundle.MANIFEST_BYTES_MAX) */
+  /** 앱 코드의 moida.json 한도 (서버의 AppCodeBundle.MANIFEST_BYTES_MAX) */
   private static readonly MANIFEST_MAX = 16 * 1024;
   readonly awaitsApproval = false;
   readonly needsOutputs = true;
@@ -86,7 +87,7 @@ export class MakeStage implements SandboxStage {
     private readonly agent: AgentUser,
     private readonly log: RunLog,
     /** 기기 토큰으로 연 서버 (begin_download) */
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
   ) {
     this.materials = MakeMaterials.from(job.makePayload);
   }
@@ -256,7 +257,7 @@ export class MakeStage implements SandboxStage {
   }
 
   /**
-   * 앱 코드 일의 검사. app.zip을 냈으면 그 안이 묶음 전체다 (폴더가 든 정적 앱, 스토어 9.13): zip의 파일 목록과 cairn.json을 본다.
+   * 앱 코드 일의 검사. app.zip을 냈으면 그 안이 묶음 전체다 (폴더가 든 정적 앱, 스토어 9.13): zip의 파일 목록과 moida.json을 본다.
    * 그 밖에는 받은 코드 위에 낸 파일을 얹은 모양을 본다
    */
   private async codeChecks(
@@ -272,7 +273,6 @@ export class MakeStage implements SandboxStage {
     );
     const zip = bytes === null ? null : ZipIndex.read(bytes);
     if (zip === null) return AppCodeCheck.packed(code, null);
-    const manifest = AppCodeCheck.MANIFEST;
     return AppCodeCheck.packed(
       code,
       zip.entries.map(
@@ -280,8 +280,8 @@ export class MakeStage implements SandboxStage {
           new AppCodeEntry(
             e.name,
             e.size,
-            e.name === manifest
-              ? zip.text(manifest, MakeStage.MANIFEST_MAX)
+            AppManifestCheck.isManifest(e.name)
+              ? zip.text(e.name, MakeStage.MANIFEST_MAX)
               : e.name === DesignDocCheck.FILE
                 ? zip.text(e.name, DesignDocCheck.BYTES_MAX)
                 : null,
@@ -291,7 +291,7 @@ export class MakeStage implements SandboxStage {
   }
 
   /**
-   * 앱 코드 일에서 AI가 낸 파일: 크기와, 템플릿 · CSS · cairn.json의 글. 글은 agent 권한으로 읽는다 (AI가 둔 링크를 러너가 따라가지 않게).
+   * 앱 코드 일에서 AI가 낸 파일: 크기와, 템플릿 · CSS · moida.json의 글. 글은 agent 권한으로 읽는다 (AI가 둔 링크를 러너가 따라가지 않게).
    * 한도를 넘는 글은 null (검사가 떨어진다)
    */
   private async madeCode(dir: string, files: readonly FolderEntry[]): Promise<AppCodeEntry[]> {
@@ -302,7 +302,7 @@ export class MakeStage implements SandboxStage {
       const max =
         AppCodeCheck.isTemplate(name) || DesignCheck.isStyle(name)
           ? AppCodeCheck.TEMPLATE_BYTES_MAX
-          : name === AppCodeCheck.MANIFEST
+          : AppManifestCheck.isManifest(name)
             ? MakeStage.MANIFEST_MAX
             : name === DesignDocCheck.FILE
               ? DesignDocCheck.BYTES_MAX

@@ -1,12 +1,12 @@
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
-import { CairnHome } from './cairn-home';
-import type { SiteAddress } from './cairn-site';
 import { ClaudeSettings } from './claude-settings';
 import type { DeviceKind, DeviceLogin } from './device-login';
+import { MoidaHome } from './moida-home';
+import type { SiteAddress } from './moida-site';
 import { CliError, type Terminal } from './terminal';
 
-/** cairn status가 보일 기기 하나의 상태 */
+/** moida status가 보일 기기 하나의 상태 */
 export abstract class DeviceState {
   /** 기기 이름. 없으면 null */
   readonly device: string | null;
@@ -21,18 +21,18 @@ export abstract class DeviceState {
     this.dead = Boolean(saved?.dead);
   }
 
-  /** cairn status의 줄들 */
+  /** moida status의 줄들 */
   abstract get lines(): string[];
 
   protected deviceLine(kind: DeviceKind): string {
     const device = this.device
-      ? `${this.device} · ${this.site}${this.dead ? ' · 끊김 (cairn connect로 다시)' : ''}`
+      ? `${this.device} · ${this.site}${this.dead ? ' · 끊김 (moida connect로 다시)' : ''}`
       : '없음';
     return `  ${kind.label}: ${device}`;
   }
 }
 
-// cairn connect의 기기 단계 하나 (Claude Code만): 그 권한만 가진 기기 · ~/.cairn/bin의 스크립트 · settings.json의 훅.
+// moida connect의 기기 단계 하나 (Claude Code만): 그 권한만 가진 기기 · ~/.moida/bin의 스크립트 · settings.json의 훅.
 // 기기가 이미 있으면(같은 블로그, 끊기지 않음) 다시 만들지 않고, 사람이 없는 곳에서는 기기 없이 훅만 건다
 // (훅은 열쇠가 생기면 그때부터 돈다). 사용자의 훅 · 상태 줄은 지우거나 덮지 않는다.
 export abstract class DeviceSetup {
@@ -40,17 +40,17 @@ export abstract class DeviceSetup {
   /** 설정 파일을 읽지 못했을 때 "…을 걸지 않았어요"에 넣을 말 */
   protected abstract readonly hooksLabel: string;
   protected readonly settings: ClaudeSettings;
-  protected readonly home: CairnHome;
+  protected readonly home: MoidaHome;
 
   constructor(
     protected readonly terminal: Terminal,
     /** Claude Code의 사용자 설정 (~/.claude/settings.json) */
     settingsFile: string,
     private readonly login: DeviceLogin,
-    cairnDir = join(homedir(), '.cairn'),
+    moidaDir = join(homedir(), '.moida'),
   ) {
     this.settings = new ClaudeSettings(settingsFile);
-    this.home = new CairnHome(cairnDir);
+    this.home = new MoidaHome(moidaDir);
   }
 
   /** withDevice: 브라우저로 기기를 만들 수 있는 곳인가 (사람이 있는 터미널) */
@@ -62,7 +62,7 @@ export abstract class DeviceSetup {
       t.done(`${this.kind.label} ${String(saved.device)} · 이미 연결됨`);
     else if (!withDevice)
       t.say(
-        `${this.kind.label}는 직접 입력할 수 있는 터미널에서 cairn connect를 다시 실행하면 만들어요`,
+        `${this.kind.label}는 직접 입력할 수 있는 터미널에서 moida connect를 다시 실행하면 만들어요`,
       );
     else await this.createDevice(at);
     const settings = this.settings.read();
@@ -75,7 +75,7 @@ export abstract class DeviceSetup {
     if (this.attach(settings)) this.settings.write(settings);
   }
 
-  /** cairn status가 보일 것 */
+  /** moida status가 보일 것 */
   abstract state(): DeviceState;
 
   /** 설정에 훅(과 상태 줄)을 걸고 알린다. 설정을 바꿨으면 true (그때만 파일을 다시 쓴다) */

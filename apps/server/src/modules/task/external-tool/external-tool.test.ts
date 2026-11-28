@@ -9,7 +9,7 @@ import { ExternalToolUrl } from './external-tool-url.policy';
 // 외부 도구 (2차 7단계)의 규칙. DB 없이 돈다.
 
 const NOW = new Date('2026-11-16T00:00:00Z');
-const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 const fields = { title: 'Notion', url: 'https://mcp.notion.example.com/mcp' };
 
 function agentWith(scopes: readonly string[], tools: readonly string[] = []): Agent {

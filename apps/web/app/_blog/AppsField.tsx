@@ -167,7 +167,7 @@ export function AppsField({
                 type="button"
                 onClick={async () => {
                   const reply = await api('POST', '/api/store/logout', undefined, {
-                    'x-cairn-csrf': signedIn.csrf,
+                    'x-moida-csrf': signedIn.csrf,
                   });
                   if (reply.ok) window.location.reload();
                 }}

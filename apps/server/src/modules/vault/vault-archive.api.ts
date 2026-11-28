@@ -4,7 +4,7 @@ import { type Actor, ArchiveQuery, CurrentActor } from '../platform';
 // 백업: 보관 형식 그대로의 zip (주인만). 내려받는 파일이라 JSON 응답이 아니다.
 @Controller('api/archive.zip')
 export class ArchiveController {
-  private static readonly FILE_NAME = 'cairn-archive.zip';
+  private static readonly FILE_NAME = 'moida-archive.zip';
 
   constructor(private readonly archive: ArchiveQuery) {}
 

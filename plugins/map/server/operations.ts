@@ -8,7 +8,7 @@ import {
 import { MapLookup } from './map-lookup';
 import { AddressView, GeocodeCheckView, MapUsageView, PlaceListView } from './views';
 
-// 앱 코드의 cairn.map.search · geocode · reverse가 부르는 찾기 (docs/지도.md MP-2). 누구나 부른다 (공개 앱의 방문자):
+// 앱 코드의 moida.map.search · geocode · reverse가 부르는 찾기 (docs/지도.md MP-2). 누구나 부른다 (공개 앱의 방문자):
 // 서버 키는 서버에만 있고, 곳마다 분당 상한 · 하루 상한 · 10분 기억은 MapLookup이 맡는다.
 // 웹의 <앱 주소>/_/map/<동작>이 방문자 주소(x-forwarded-for)와 함께 /api/p/map/<동작>으로 넘긴다
 

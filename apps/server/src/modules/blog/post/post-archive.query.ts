@@ -42,7 +42,7 @@ interface ArchivedPost
 // 글의 보관 파일 (docs/보관형식.md): 앱 blog/apps/<주소>.yml과 보이는 코드 blog/apps/<주소>/code/<파일>(스토어 1-6c),
 // 글 blog/posts/<연도>/<주소>.md와 사진 · 앱 아이콘 assets/<sha256>.<확장자>.
 // 공개 저장소에는 공개 앱(과 그 코드)과, 공개 앱에 든 공개 글 · 그 사진만 (스토어 1-3).
-// 현재 판만, 휴지통 글과 휴지통 글에만 붙은 사진은 빼고. 글마다 붙은 사진 목록(cairn_assets)도 적어 복원 때 행이 그대로 돌아온다.
+// 현재 판만, 휴지통 글과 휴지통 글에만 붙은 사진은 빼고. 글마다 붙은 사진 목록(moida_assets)도 적어 복원 때 행이 그대로 돌아온다.
 // 카테고리·시리즈·표지는 그 기능이 생기는 단계에서 앞부분에 더한다.
 @Injectable()
 export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
@@ -85,7 +85,7 @@ export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
     return rows.map((r) => {
       const file = ArchiveFile.yamlList(`blog/apps/${r.slug}.yml`, [
         {
-          cairn_id: r.id,
+          moida_id: r.id,
           kind: r.kind,
           name: r.name,
           slug: r.slug,
@@ -151,19 +151,19 @@ export class PostArchiveQuery extends BaseQuery implements OnModuleInit {
       const file = ArchiveFile.markdown(
         `blog/posts/${year}/${r.slug}.md`,
         {
-          cairn_format: ArchiveQuery.FORMAT,
-          cairn_type: 'post',
-          cairn_id: r.id,
+          moida_format: ArchiveQuery.FORMAT,
+          moida_type: 'post',
+          moida_id: r.id,
           title: r.title,
           slug: r.slug,
           status: r.status,
           published: r.published_at,
-          ...(r.app_id === null ? {} : { cairn_app: r.app_id }),
-          ...(r.main_wiki_id === null ? {} : { cairn_main_wiki: r.main_wiki_id }),
-          ...(refs.length === 0 ? {} : { cairn_ref_wikis: refs }),
+          ...(r.app_id === null ? {} : { moida_app: r.app_id }),
+          ...(r.main_wiki_id === null ? {} : { moida_main_wiki: r.main_wiki_id }),
+          ...(refs.length === 0 ? {} : { moida_ref_wikis: refs }),
           ...(r.tags.length === 0 ? {} : { tags: r.tags }),
           align: r.align,
-          cairn_assets: r.assets ?? [],
+          moida_assets: r.assets ?? [],
         },
         r.body_md,
         ArchiveFile.keptIn(r.meta),

@@ -40,7 +40,7 @@ describe('LoginId', () => {
   });
 
   test('운영자 · 서비스로 보이는 아이디는 막는다', () => {
-    for (const bad of ['admin', 'moida', 'cairn', 'support'])
+    for (const bad of ['admin', 'moida', 'moida', 'support'])
       assert.throws(
         () => LoginId.clean(bad),
         (e: unknown) =>

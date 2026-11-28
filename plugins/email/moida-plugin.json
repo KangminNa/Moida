@@ -1,0 +1,153 @@
+{
+  "name": "email",
+  "version": "0.6.0",
+  "moida": ">=0.16",
+  "description": "콘솔의 알림과 \"메일로 받기\"를 켠 자동화의 결과를 관리자 메일로 보내고, 방문자가 첫 화면의 앱 보기에서 앱의 새 글 소식을 메일로 구독한다. 회원 가입 · 비밀번호 다시 정하기의 인증코드 메일도 이 SMTP로 나간다. Gmail 같은 메일 회사의 SMTP(465, TLS)로 보낸다. 구독은 확인 메일의 링크를 눌러야 시작되고(두 번 확인), 메일마다 해지 링크가 있다. 새 글 소식은 관리자가 콘솔(운영 › 메일 구독)에서 보내기를 눌러야 나간다",
+  "guide": {
+    "does": [
+      "콘솔 알림(승인 요청 · 작업 실패 등)을 관리자 메일로도 보내요",
+      "\"메일로 받기\"를 켠 자동화의 결과(답 · 실패)를 관리자 메일로 보내요",
+      "가입할 때 소식 메일 받기에 동의한 가입자에게, 대표가 쓰고 내가 승인한 소식 메일을 보내요",
+      "회원 가입 · 비밀번호 다시 정하기의 인증코드 메일을 보내요. 꺼 두면 회원 가입을 받지 않아요",
+      "방문자가 스토어에서 새 글 소식을 메일로 구독할 수 있어요. 소식은 내가 보내기를 눌러야 나가요",
+      "보내는 메일 수를 날 · 달마다 세고, 정한 상한(무료 한도)에 닿으면 더 보내지 않아요. 운영 › 메일 구독에서 사용량을 봐요"
+    ],
+    "setup": [
+      "메일을 보낼 계정을 정해요: Gmail · Google Workspace · 메일 발송 서비스 중 하나 (465 포트, TLS)",
+      "Gmail · Workspace는 계정의 2단계 인증을 켜고 앱 비밀번호(16자리)를 만들어요",
+      "아래에 SMTP 서버 · 보내는 계정 · 앱 비밀번호 · 이 사이트의 바깥 주소를 넣고 저장해요",
+      "\"테스트 메일 보내기\"를 눌러 받은편지함(없으면 스팸함)에 오는지 확인해요",
+      "잘 오면 \"스토어에 구독 칸 보이기\"를 켜요"
+    ]
+  },
+  "schema": "email",
+  "server": "server/plugin.ts",
+  "web": {
+    "store.after": "web/Subscribe.tsx"
+  },
+  "settings": {
+    "host": {
+      "label": "SMTP 서버",
+      "type": "text",
+      "default": "smtp.gmail.com",
+      "help": "https:// 없이 이름만 (예: smtp.gmail.com, smtp.naver.com, mail.example.com)"
+    },
+    "port": {
+      "label": "SMTP 포트",
+      "type": "text",
+      "default": "465",
+      "help": "TLS로 바로 붙는 포트(465)만 써요"
+    },
+    "user": {
+      "label": "보내는 계정",
+      "type": "text",
+      "required": true,
+      "help": "메일 주소 (예: me@gmail.com). 메일은 이 주소에서 나가요"
+    },
+    "password": {
+      "label": "앱 비밀번호",
+      "type": "secret",
+      "required": true,
+      "help": "계정 비밀번호가 아니라 앱 비밀번호예요. Gmail: Google 계정 › 보안 › 2단계 인증을 켠 뒤 앱 비밀번호(16자리)를 만들어요"
+    },
+    "to": {
+      "label": "받을 주소",
+      "type": "text",
+      "help": "알림을 받을 관리자의 메일 주소. 비우면 보내는 계정으로 보내요"
+    },
+    "siteUrl": {
+      "label": "이 Moida의 바깥 주소",
+      "type": "text",
+      "required": true,
+      "help": "메일 안 콘솔 링크의 앞부분 (예: https://blog.example.com)"
+    },
+    "detail": {
+      "label": "알림 본문도 싣기",
+      "type": "boolean",
+      "default": "false",
+      "help": "끄면 제목과 링크만 보내요. 메일은 메일 회사를 거치므로 대화의 답 같은 내용은 싣지 않는 편이 안전해요"
+    },
+    "subscriptions": {
+      "label": "스토어에 구독 칸 보이기",
+      "type": "boolean",
+      "default": "false",
+      "public": true,
+      "help": "켜면 첫 화면의 앱 카드 아래에 '새 글을 메일로 받기' 칸이 보여요. 테스트 메일이 잘 가는지 확인한 뒤 켜요"
+    },
+    "dailyMax": {
+      "label": "하루에 보내는 메일 수 상한",
+      "type": "text",
+      "default": "300",
+      "help": "모든 메일(인증코드 · 알림 · 자동화 결과 · 구독 · 소식)을 합친 수. 날은 UTC로 센다. 쓰는 메일 회사의 무료 한도보다 조금 낮게 둬요 (예: Gmail 약 500, Brevo 무료 300, Resend 무료 100). 구독 · 소식 메일은 이 수의 80%까지만 써서 인증코드가 막히지 않게 해요"
+    },
+    "monthlyMax": {
+      "label": "한 달에 보내는 메일 수 상한",
+      "type": "text",
+      "default": "0",
+      "help": "0이면 한 달 상한 없이 하루 상한만 봐요. 한 달 한도가 있는 메일 회사면 넣어요 (예: Resend 무료 3,000). 달은 UTC로 센다"
+    }
+  },
+  "tools": {
+    "mail_news_draft": {
+      "operation": "draftNews",
+      "description": "가입할 때 소식 메일을 받기로 한 가입자 모두에게 보낼 메일 한 통(제목 · 본문)을 남긴다. 보내지 않는다: 답의 send_id로 request_approval(action email.news.send, target_kind email_send, target_id send_id, target_version 1)을 올린다. 관리자가 결과 카드에서 승인하면 나간다(제목 앞에 (광고), 끝에 수신 거부 링크가 붙는다). 받을 가입자가 없으면 거절한다. 반려 · 수정 요청이면 고쳐서 새 request_id로 다시 쓴다. 관리자 한 사람에게 보내는 결과 메일은 이 도구가 아니라 자동화의 mail 칸이다.",
+      "input": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "이 요청의 id. 응답을 받지 못해 다시 보낼 때는 같은 값을 쓴다"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 150,
+            "description": "메일 제목 ((광고)는 서버가 붙인다)"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 20000,
+            "description": "메일 본문 (글자, 마크다운 기호 없이 읽히게). 개인 정보 · 비밀을 넣지 않는다"
+          }
+        },
+        "required": ["request_id", "subject", "body"]
+      }
+    }
+  },
+  "api": {
+    "POST /subscribe": "subscribe",
+    "POST /confirm/:token": "confirm",
+    "POST /unsubscribe/:token": "unsubscribe",
+    "GET /overview": "overview",
+    "POST /subscribers/:id/remove": "removeSubscriber",
+    "POST /sends/:id/start": "startSend",
+    "POST /sends/:id/cancel": "cancelSend",
+    "GET /news/:id": "getNews"
+  },
+  "menu": {
+    "group": "운영",
+    "name": "메일 구독",
+    "icon": "bell",
+    "page": "web/MailPage.tsx"
+  },
+  "uses": [
+    "table",
+    "api",
+    "menu",
+    "lookup:app",
+    "lookup:app-id",
+    "lookup:app-url",
+    "event:platform.notice.sent",
+    "event:task.chat.said",
+    "event:community.account.news",
+    "event:task.approval.granted",
+    "event:task.approval.rejected",
+    "event:task.approval.revision_requested",
+    "event:task.approval.cancelled",
+    "lookup:news-address",
+    "tool:mail_news_draft",
+    "event:blog.post.published",
+    "job:deliver",
+    "action:test",
+    "mail"
+  ]
+}

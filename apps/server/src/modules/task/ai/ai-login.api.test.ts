@@ -355,7 +355,7 @@ describe('ai_login', () => {
     await newTask(agent);
     const [job] = await lease();
     const runToken = String(job?.run_token);
-    assert.match(runToken, /^cairn_run_/);
+    assert.match(runToken, /^moida_run_/);
 
     assert.equal((await toolNames(runToken)).includes('ai_login'), false);
     const asked = await api.mcp(runToken, 'tools/call', {
@@ -454,7 +454,7 @@ describe('연결 확인', () => {
     assert.equal((await getTask(taskId)).agentId, null);
     const next = (await lease())[0] as Json;
     assert.equal((next.agent as Json).id, agent.id, '뒤의 일은 그대로 에이전트가 맡는다');
-    assert.match(String(next.run_token), /^cairn_run_/);
+    assert.match(String(next.run_token), /^moida_run_/);
   });
 
   test('성공하면 확인 시각을 남기고 앞의 오류를 지운다', async () => {
@@ -556,10 +556,10 @@ describe('서버 키 교체', () => {
     const counts = await api.service(SecretRotation).run(cliActor);
     assert.equal(counts.get('task.ai_logins'), 0, '등록되어 있고, 이미 지금 키다');
 
-    const oldKey = String(process.env.CAIRN_SECRET_KEY);
+    const oldKey = String(process.env.MOIDA_SECRET_KEY);
     const newKey = SecretBox.newKey();
-    const rotating = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey, CAIRN_SECRET_KEY_OLD: oldKey });
-    const finished = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey });
+    const rotating = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey, MOIDA_SECRET_KEY_OLD: oldKey });
+    const finished = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey });
     const [before] = await db.sql`SELECT secret, space_id FROM task.ai_logins`;
 
     const service = new AiLoginService(db, rotating, new AiLoginQuery(db, rotating));
@@ -580,7 +580,7 @@ describe('서버 키 교체', () => {
   test('풀리지 않는 값이 있으면 아무것도 바꾸지 않는다', async () => {
     await saveToken(newToken());
     const [before] = await db.sql`SELECT secret FROM task.ai_logins`;
-    const stranger = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+    const stranger = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 
     await assert.rejects(
       new AiLoginService(db, stranger, new AiLoginQuery(db, stranger)).resealSecrets(cliActor),

@@ -1,4 +1,4 @@
-// Pixel Agents의 core/src/transport.ts. 화면이 메시지를 받는 자리이고, Cairn에서는 cairn-feed.ts가 이 자리에 들어간다.
+// Pixel Agents의 core/src/transport.ts. 화면이 메시지를 받는 자리이고, Moida에서는 moida-feed.ts가 이 자리에 들어간다.
 // 화면이 서버로 보내는 메시지(ClientMessage)는 쓰지 않아서 send는 인자가 없다.
 import type { ServerMessage } from './messages';
 

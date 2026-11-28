@@ -5,7 +5,7 @@ import { ApiClient, type ApiResult, TestUser } from '../../../testing/api-client
 import { CommunitySite } from '../../../testing/community-site';
 import { Database, OutboxWorker, ZipReader } from '../../platform';
 
-// 앱 데이터 (앱 플랫폼, docs/스토어.md 12.4): 앱이 cairn.json에 선언한 표가 그 앱의 스키마에 생기고, 앱 도메인에서 읽고 쓴다.
+// 앱 데이터 (앱 플랫폼, docs/스토어.md 12.4): 앱이 moida.json에 선언한 표가 그 앱의 스키마에 생기고, 앱 도메인에서 읽고 쓴다.
 // 보는 사람별: 방문자 · 회원(쓴 회원 / 다른 회원) · 관리자. 규칙(anyone · member · owner · admin)은 DB의 행 수준 보안이 거른다
 
 type Json = Record<string, unknown>;
@@ -246,8 +246,8 @@ describe('DB가 거른다 (행 수준 보안)', () => {
       const [me] = await tx<{ id: string }[]>`
         SELECT m.id FROM community.members m JOIN community.accounts a ON a.id = m.account_id
         WHERE m.app_id = ${site.appId} AND a.email = ${CommunitySite.emailOf('ann_learner')}`;
-      await tx`SELECT set_config('cairn.member', ${me?.id ?? ''}, true)`;
-      await tx.unsafe('SET LOCAL ROLE cairn_app');
+      await tx`SELECT set_config('moida.member', ${me?.id ?? ''}, true)`;
+      await tx.unsafe('SET LOCAL ROLE moida_app');
       const rows = await tx.unsafe(`SELECT score FROM "${schema}"."progress"`);
       const updated = await tx.unsafe(`UPDATE "${schema}"."progress" SET score = 0`);
       return [rows.map((r) => r.score), updated.count];
@@ -255,7 +255,7 @@ describe('DB가 거른다 (행 수준 보안)', () => {
     assert.deepEqual(seen, [[50], 1], '조건 없는 SELECT · UPDATE도 자기 줄에만 닿는다');
     await assert.rejects(
       db.transaction(async (tx) => {
-        await tx.unsafe('SET LOCAL ROLE cairn_app');
+        await tx.unsafe('SET LOCAL ROLE moida_app');
         await tx.unsafe('SELECT count(*) FROM community.members');
       }),
       /permission denied/,

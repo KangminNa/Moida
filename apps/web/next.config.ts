@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { deployEnv } from './app/_lib/deploy-env';
 import { devOrigins } from './app/_lib/dev-origins';
 import { APP_SCREEN_ROOTS, SCREEN_HEADERS, WEB_ROUTES } from './app/_lib/screen-headers';
 
@@ -9,7 +10,7 @@ const server = process.env.API_URL ?? 'http://localhost:4000';
 // 개발 서버는 정해 둔 주소가 아니면 화면 스크립트를 막아서, 127.0.0.1로 열면 버튼이 눌리지 않는다.
 // 사이트 주소의 쓰기 확인도 한 주소만 받으므로 다른 이름으로 열지 않게 정해 둔 주소로 보낸다.
 function localHostRedirect() {
-  const home = process.env.CAIRN_WEB_URL;
+  const home = deployEnv('WEB_URL');
   if (process.env.NODE_ENV !== 'development' || !home?.includes('//localhost')) return [];
   return [
     {

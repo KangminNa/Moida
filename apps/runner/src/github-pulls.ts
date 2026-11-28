@@ -3,7 +3,7 @@ import { pause } from './backoff';
 /** GitHub가 거절함 (권한 · 저장소 없음 · 틀린 요청). 다시 해도 같다 */
 export class PullRefused extends Error {}
 
-// 러너가 여는 PR (코드 작업 4단계). push한 cairn/<작업> 브랜치로 draft PR을 열고, 이미 있으면 본문만 고친다.
+// 러너가 여는 PR (코드 작업 4단계). push한 moida/<작업> 브랜치로 draft PR을 열고, 이미 있으면 본문만 고친다.
 // 토큰은 code_credential로 받은 것이고 러너의 메모리에만 있다 (AI에게 가지 않는다). 칸 안에서는 나가는 프록시를 거친다
 // (fetch가 HTTPS_PROXY를 쓰도록 칸에 NODE_USE_ENV_PROXY=1). 외부 라이브러리 없이 REST 두세 번이다.
 export class GitHubPulls {
@@ -80,7 +80,7 @@ export class GitHubPulls {
             authorization: `Bearer ${this.token}`,
             accept: 'application/vnd.github+json',
             'x-github-api-version': '2022-11-28',
-            'user-agent': 'cairn-runner',
+            'user-agent': 'moida-runner',
             ...(payload ? { 'content-type': 'application/json' } : {}),
           },
           body: payload ? JSON.stringify(payload) : undefined,

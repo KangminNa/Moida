@@ -6,7 +6,7 @@ export class LoginIdentity {
   ) {}
 }
 
-// 로그인 방법 하나 (예: GitHub, Google). 로그인 플러그인이 하위 클래스를 만들어 `cairn.addLogin(이름, …)`으로 등록한다.
+// 로그인 방법 하나 (예: GitHub, Google). 로그인 플러그인이 하위 클래스를 만들어 `moida.addLogin(이름, …)`으로 등록한다.
 // 플러그인은 "누구인지"만 알려주고, 확인값(state)·로그인 쿠키·주인인지 판단은 코어(account)가 한다.
 // 그래서 플러그인이 아무 계정이나 주인으로 만들 수 없다: 주인이 먼저 연결해 둔 계정으로만 로그인된다.
 export abstract class BaseLogin {

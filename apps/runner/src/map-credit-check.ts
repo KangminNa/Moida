@@ -3,7 +3,7 @@ import { StageCheck } from './stage-check';
 
 // 지도 출처 표시 검사 (docs/지도.md MP-3, 2026-11-27): 지도 회사 약관은 지도 위의 출처 · 로고를 늘 보이게 한다
 // (OSM 타일 정책 · 네이버 로고 · 카카오 로고 · 구글 표시). 이번에 낸 CSS · HTML이 그 요소를 숨기는 규칙을 가졌으면 문제로 낸다.
-// 화면에서는 cairn.map이 그린 뒤 가려졌는지도 한 번 더 보고 콘솔에 알린다 (웹 cairn-map.ts). 글만 훑는다: 실제로 가려지는지는 브라우저가 안다
+// 화면에서는 moida.map이 그린 뒤 가려졌는지도 한 번 더 보고 콘솔에 알린다 (웹 moida-map.ts). 글만 훑는다: 실제로 가려지는지는 브라우저가 안다
 export class MapCreditCheck {
   static readonly NAME = '지도 출처 표시';
   /** 출처 · 로고 요소 (Leaflet 출처 칸 · 회사 로고): 회사 SDK가 쓰는 이름 가운데 흔히 숨기려 드는 것 */

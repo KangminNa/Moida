@@ -11,7 +11,7 @@ export class Runner extends TableEntity<RunnerRow, RunnerNew> {
    * AI 토큰이 없는 동안은 ai_login으로 길게는 60초마다 닿는다
    */
   static readonly ONLINE_MS = 90_000;
-  /** 동시에 하는 일의 상한 (러너의 CAIRN_RUNNER_CONCURRENCY와 같다). 일 하나가 AI CLI 하나다 */
+  /** 동시에 하는 일의 상한 (러너의 MOIDA_RUNNER_CONCURRENCY와 같다). 일 하나가 AI CLI 하나다 */
   static readonly SLOTS_MAX = 8;
 
   static restore(row: RunnerRow): Runner {
@@ -35,7 +35,7 @@ export class Runner extends TableEntity<RunnerRow, RunnerNew> {
   }
 
   /**
-   * 동시에 하는 일의 수 (2026-11-20, 러너 메뉴). null이면 러너가 띄울 때의 값(CAIRN_RUNNER_CONCURRENCY)을 쓴다.
+   * 동시에 하는 일의 수 (2026-11-20, 러너 메뉴). null이면 러너가 띄울 때의 값(MOIDA_RUNNER_CONCURRENCY)을 쓴다.
    * 러너는 next_jobs의 답으로 받아 바로 바꾼다. 코드 러너 칸은 늘 1이라 정하지 않는다 (DB CHECK runners_sandbox_single)
    */
   setConcurrency(slots: number | null): void {

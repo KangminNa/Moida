@@ -4,11 +4,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
 import { AgentUser } from './agent-user';
-import type { CairnServer } from './cairn-server';
 import { ClaudeCli } from './claude-cli';
 import { Job } from './job';
 import { Json } from './json';
 import { MakeMaterials, MakeStage } from './make-stage';
+import type { MoidaServer } from './moida-server';
 import { PageBase } from './page-base';
 import { PromptPack } from './prompt-pack';
 import { Redactor, RunLog } from './redactor';
@@ -37,7 +37,7 @@ describe('만들기 작업', () => {
           task: { id: id(99), kind, title: '발표', payload },
           agent: { name: '만들기', role: '', tool: 'claude' },
           instruction: '만들어 주세요',
-          run_token: 'cairn_run_x',
+          run_token: 'moida_run_x',
         }),
       ) as Json;
     const make = Job.from(raw('make', { make: { outputs: [id(1)], wikis: [] } }));
@@ -60,7 +60,7 @@ describe('만들기 작업', () => {
           task: { id: id(98), kind: 'make', title: '데이트 코스', payload },
           agent: { name: '만들기', role: '', tool: 'claude' },
           instruction: '이번 주 서울 데이트 코스 짜 줘',
-          run_token: 'cairn_run_x',
+          run_token: 'moida_run_x',
         }),
       ) as Json;
     const page = Job.from(raw({ page: { title: '서울 데이트 코스' } }));
@@ -71,7 +71,7 @@ describe('만들기 작업', () => {
       const cli = new ClaudeCli(
         'claude',
         'oauth-token',
-        'http://cairn-server:4000/mcp',
+        'http://moida-server:4000/mcp',
         '/nowhere',
       );
       const workspace = await cli.open(job);
@@ -88,7 +88,7 @@ describe('만들기 작업', () => {
           task: { id: id(97), kind: 'general', title: '일', payload: { page: {} } },
           agent: { name: '일반', role: '', tool: 'claude' },
           instruction: '해 주세요',
-          run_token: 'cairn_run_x',
+          run_token: 'moida_run_x',
         }),
       ) as Json,
     );
@@ -104,7 +104,7 @@ describe('만들기 작업', () => {
         }),
       ) as Json,
     );
-    const cli = new ClaudeCli('claude', 'oauth-token', 'http://cairn-server:4000/mcp', '/nowhere');
+    const cli = new ClaudeCli('claude', 'oauth-token', 'http://moida-server:4000/mcp', '/nowhere');
     const workspace = await cli.open(probe);
     assert.equal(cli.args(workspace).includes('WebSearch'), false);
     await workspace.remove();
@@ -139,7 +139,7 @@ describe('자라는 페이지의 지금 판 (page_base)', () => {
   });
 
   test('글 파일만 inputs/page/에 쓰고, 지시문은 바뀐 파일만 내라고 알린다', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'cairn-page-base-'));
+    const dir = await mkdtemp(join(tmpdir(), 'moida-page-base-'));
     try {
       const page = base({
         page_id: id(6),
@@ -188,7 +188,7 @@ describe('만들기 작업의 검사 (검증 고리 V)', () => {
           task: { id: id(n), kind: 'make', title: '발표', payload },
           agent: { name: '만들기', role: '', tool: 'claude' },
           instruction: '만들어 주세요',
-          run_token: 'cairn_run_x',
+          run_token: 'moida_run_x',
         }),
       ) as Json,
     );
@@ -198,9 +198,9 @@ describe('만들기 작업의 검사 (검증 고리 V)', () => {
     made: (outputs: string) => Promise<void>,
     page: PageBase | null = null,
   ) => {
-    const work = await mkdtemp(join(tmpdir(), 'cairn-make-check-'));
+    const work = await mkdtemp(join(tmpdir(), 'moida-make-check-'));
     const config = new RunnerConfig(
-      'http://cairn',
+      'http://moida',
       'device',
       {},
       {},
@@ -211,7 +211,7 @@ describe('만들기 작업의 검사 (검증 고리 V)', () => {
       AgentUser.parse('self'),
       work,
     );
-    const server = { pageBase: async () => page } as unknown as CairnServer;
+    const server = { pageBase: async () => page } as unknown as MoidaServer;
     const redactor = new Redactor([]);
     const stage = new MakeStage(
       job,

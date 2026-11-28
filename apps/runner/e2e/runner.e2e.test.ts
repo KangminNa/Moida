@@ -71,10 +71,10 @@ class RunnerProcess {
           HOME: process.env.HOME,
           // AI CLI에게 가면 안 되는 값
           DATABASE_URL: process.env.DATABASE_URL,
-          CAIRN_RUNNER_URL: url,
-          CAIRN_RUNNER_TOKEN: deviceToken,
-          CAIRN_RUNNER_CLI: FAKE_CLI,
-          CAIRN_RUNNER_CODEX_CLI: FAKE_CODEX,
+          MOIDA_RUNNER_URL: url,
+          MOIDA_RUNNER_TOKEN: deviceToken,
+          MOIDA_RUNNER_CLI: FAKE_CLI,
+          MOIDA_RUNNER_CODEX_CLI: FAKE_CODEX,
           CLAUDE_CODE_OAUTH_TOKEN: OAUTH_TOKEN,
           ...env,
         } as NodeJS.ProcessEnv,
@@ -339,9 +339,9 @@ const tokens = (task: Json): number => events(task).reduce((sum, e) => sum + Num
 before(async () => {
   chmodSync(FAKE_CLI, 0o755);
   chmodSync(FAKE_CODEX, 0o755);
-  spyDir = mkdtempSync(join(tmpdir(), 'cairn-e2e-'));
+  spyDir = mkdtempSync(join(tmpdir(), 'moida-e2e-'));
   // 결과물: 시험 컴퓨터의 디스크가 작아도 받게 (기본은 20GB를 늘 남긴다)
-  process.env.CAIRN_DISK_RESERVE_GB = '0';
+  process.env.MOIDA_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
   db = api.service(Database);
@@ -413,8 +413,8 @@ describe('러너가 일을 처리한다', () => {
     assert.ok(String(runs[0]?.runnerBuild).length > 0);
     assert.equal(
       (runs[0]?.skill as { name?: string } | null)?.name,
-      'cairn-work',
-      '일반 작업은 cairn-work (2026-11-23)',
+      'moida-work',
+      '일반 작업은 moida-work (2026-11-23)',
     );
   });
 
@@ -477,12 +477,12 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, OAUTH_TOKEN);
     assert.equal(env.ENABLE_CLAUDEAI_MCP_SERVERS, 'false');
     assert.equal(Object.values(env).includes(deviceToken), false);
-    assert.equal(env.CAIRN_RUNNER_TOKEN, undefined);
+    assert.equal(env.MOIDA_RUNNER_TOKEN, undefined);
     assert.equal(env.DATABASE_URL, undefined);
     assert.notEqual(env.HOME, process.env.HOME);
-    // 빈 작업 폴더에 결과물 폴더와 인수인계 메모 자리(.cairn)만, 설정 폴더에는 권한 설정 · 메모 훅 (2026-11-17)과
-    // 일반 작업의 스킬 cairn-work (2026-11-23)만
-    assert.deepEqual([...(seen.cwdEntries as string[])].sort(), ['.cairn', 'outputs']);
+    // 빈 작업 폴더에 결과물 폴더와 인수인계 메모 자리(.moida)만, 설정 폴더에는 권한 설정 · 메모 훅 (2026-11-17)과
+    // 일반 작업의 스킬 moida-work (2026-11-23)만
+    assert.deepEqual([...(seen.cwdEntries as string[])].sort(), ['.moida', 'outputs']);
     assert.deepEqual([...(seen.configEntries as string[])].sort(), [
       'hooks',
       'settings.json',
@@ -499,7 +499,7 @@ describe('러너가 일을 처리한다', () => {
     assert.equal(
       args[args.indexOf('--tools') + 1],
       'Read,Write,Edit,WebSearch,Skill',
-      '스킬(cairn-work)을 깔았으면 Skill 도구',
+      '스킬(moida-work)을 깔았으면 Skill 도구',
     );
 
     // 세션 키의 고정 자리: 작업 폴더 · 홈 · 작업 토큰은 지우고, 설정 폴더에는 CLI의 세션 파일(projects)만 남는다.
@@ -527,13 +527,13 @@ describe('러너가 일을 처리한다', () => {
     assert.ok(JSON.stringify(task).includes('[지움: 토큰]'));
   });
 
-  test('정리 작업은 cairn-tidy를 설정 폴더에 넣고 그 권한의 에이전트가 맡는다', async () => {
+  test('정리 작업은 moida-tidy를 설정 폴더에 넣고 그 권한의 에이전트가 맡는다', async () => {
     const agent = await newAgent({ scopes: ['read_all', 'tidy'] });
     const spy = new Spy();
     const created = await newTask(agent, spy.mark, { kind: 'tidy_session', title: '정리' });
     const seen = await spy.seen();
     await taskIn(created.id, 'done');
-    assert.ok(String(seen.prompt).includes('cairn-tidy 스킬을 따릅니다'));
+    assert.ok(String(seen.prompt).includes('moida-tidy 스킬을 따릅니다'));
     assert.ok((seen.configEntries as string[]).includes('skills'));
   });
 
@@ -543,7 +543,7 @@ describe('러너가 일을 처리한다', () => {
     const created = await newTask(agent, spy.mark, { kind: 'draft_post', title: '초안' });
     const seen = await spy.seen();
     await taskIn(created.id, 'done');
-    assert.ok(String(seen.prompt).includes('cairn-write 스킬을 따릅니다'));
+    assert.ok(String(seen.prompt).includes('moida-write 스킬을 따릅니다'));
     assert.ok((seen.configEntries as string[]).includes('skills'));
     const args = seen.argv as string[];
     assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write,Edit,WebSearch,Skill');
@@ -669,7 +669,7 @@ describe('러너가 일을 처리한다', () => {
     const [session] = await db.sql`
       SELECT s.transcript_count, t.text FROM vault.sessions s
       JOIN vault.session_transcripts t ON t.session_id = s.node_id
-      WHERE s.tool = 'cairn-agent' AND s.source_session_id = ${`task:${created.id}`}`;
+      WHERE s.tool = 'moida-agent' AND s.source_session_id = ${`task:${created.id}`}`;
     assert.equal(session?.transcript_count, 1);
     assert.match(String(session?.text), /- 도구: Read notes\.md/);
     assert.equal(String(session?.text).includes(OAUTH_TOKEN), false, '토큰은 원문에 남지 않는다');
@@ -1044,8 +1044,8 @@ describe('서버 러너는 연결 값으로 스스로 연결한다', () => {
     const file = join(spyDir, 'pairing');
     writeFileSync(file, api.service(ServerRunnerPolicy).secret());
     const runner = RunnerProcess.start(api.baseUrl, {
-      CAIRN_RUNNER_TOKEN: '',
-      CAIRN_RUNNER_PAIRING_FILE: file,
+      MOIDA_RUNNER_TOKEN: '',
+      MOIDA_RUNNER_PAIRING_FILE: file,
     });
     try {
       await runner.logged('서버 러너로 연결했어요');
@@ -1083,11 +1083,11 @@ describe('코드 러너 칸', () => {
     writeFileSync(file, secret);
     const slots = ['1', '2'].map((slot) =>
       RunnerProcess.start(api.baseUrl, {
-        CAIRN_RUNNER_TOKEN: '',
-        CAIRN_RUNNER_PAIRING_FILE: file,
-        CAIRN_RUNNER_SLOT: slot,
-        CAIRN_SANDBOX: '1',
-        CAIRN_AGENT_USER: 'self',
+        MOIDA_RUNNER_TOKEN: '',
+        MOIDA_RUNNER_PAIRING_FILE: file,
+        MOIDA_RUNNER_SLOT: slot,
+        MOIDA_SANDBOX: '1',
+        MOIDA_AGENT_USER: 'self',
       }),
     );
     try {
@@ -1124,7 +1124,7 @@ describe('코드 러너 칸', () => {
   });
 });
 
-// 코드 작업 (docs/코드작업.md 3단계): 칸이 저장소를 받아 AI에게 셸과 함께 맡기고, 맡긴 경로 안의 변경만 cairn/<작업>에 올린다.
+// 코드 작업 (docs/코드작업.md 3단계): 칸이 저장소를 받아 AI에게 셸과 함께 맡기고, 맡긴 경로 안의 변경만 moida/<작업>에 올린다.
 // GitHub 대신 이 컴퓨터의 시험용 git 서버(http-backend)에 붙는다. AI 사용자는 self(시험용): 사용자 나누기는 Docker 시험에서 본다.
 describe('코드 작업 (작업 공간)', () => {
   let git: GitServer;
@@ -1148,16 +1148,16 @@ describe('코드 작업 (작업 공간)', () => {
   before(async () => {
     git = await GitServer.start();
     repoUrl = git.create('app', { 'src/a.ts': 'export const a = 1;\n', 'README.md': '# app\n' });
-    work = mkdtempSync(join(tmpdir(), 'cairn-work-'));
+    work = mkdtempSync(join(tmpdir(), 'moida-work-'));
     const file = join(spyDir, 'code-pairing-3');
     writeFileSync(file, api.service(ServerRunnerPolicy).codeSecret());
     slot = RunnerProcess.start(api.baseUrl, {
-      CAIRN_RUNNER_TOKEN: '',
-      CAIRN_RUNNER_PAIRING_FILE: file,
-      CAIRN_RUNNER_SLOT: '3',
-      CAIRN_SANDBOX: '1',
-      CAIRN_AGENT_USER: 'self',
-      CAIRN_WORK_DIR: work,
+      MOIDA_RUNNER_TOKEN: '',
+      MOIDA_RUNNER_PAIRING_FILE: file,
+      MOIDA_RUNNER_SLOT: '3',
+      MOIDA_SANDBOX: '1',
+      MOIDA_AGENT_USER: 'self',
+      MOIDA_WORK_DIR: work,
     });
     await slot.logged('코드 러너 칸 3로 연결했어요');
     coder = await newAgent({
@@ -1173,13 +1173,13 @@ describe('코드 작업 (작업 공간)', () => {
     rmSync(work, { recursive: true, force: true });
   });
 
-  test('저장소를 받아 셸과 함께 고치고, 맡긴 경로 안의 변경만 커밋 하나로 cairn/<작업>에 올린다', async () => {
+  test('저장소를 받아 셸과 함께 고치고, 맡긴 경로 안의 변경만 커밋 하나로 moida/<작업>에 올린다', async () => {
     const spy = new Spy();
     const created = await codeTask(
       `[fake:edit=src/a.ts] [fake:edit=src/new/b.ts] [fake:outputs] ${spy.mark}`,
     );
     const task = await taskIn(created.id, 'done');
-    const branch = `cairn/${created.id}`;
+    const branch = `moida/${created.id}`;
     const text = String(resultOf(task).text);
     assert.match(text, new RegExp(`${branch} 브랜치에 올렸어요`));
     assert.match(text, /- test -f src\/a.ts: 통과/);
@@ -1202,9 +1202,9 @@ describe('코드 작업 (작업 공간)', () => {
     );
     assert.match(String(seen.cwd), /\/work$/, 'AI는 저장소 사본에서 돈다');
     assert.match(String(seen.prompt), /# 고칠 수 있는 곳\n- src/);
-    assert.match(String(seen.prompt), /cairn-code 스킬을 따릅니다/);
+    assert.match(String(seen.prompt), /moida-code 스킬을 따릅니다/);
     const env = seen.env as Record<string, string>;
-    assert.equal(env.CAIRN_RUNNER_PAIRING_FILE, undefined, '러너의 설정은 AI에게 가지 않는다');
+    assert.equal(env.MOIDA_RUNNER_PAIRING_FILE, undefined, '러너의 설정은 AI에게 가지 않는다');
     const bodies = events(task).map((e) => String(e.body));
     assert.ok(bodies.includes('setup 통과'), bodies.join(' | '));
     assert.ok(bodies.some((b) => b.startsWith(`${branch}에 올렸어요`)));
@@ -1215,7 +1215,7 @@ describe('코드 작업 (작업 공간)', () => {
     const created = await codeTask('[fake:edit=src/ok.ts] [fake:edit=README.md]');
     const task = await taskIn(created.id, 'failed');
     assert.match(String(resultOf(task).error), /맡긴 경로 밖을 고쳐서 올리지 않았어요: README.md/);
-    assert.equal(git.head('app', `cairn/${created.id}`), null);
+    assert.equal(git.head('app', `moida/${created.id}`), null);
     await roomsLeft();
   });
 
@@ -1223,7 +1223,7 @@ describe('코드 작업 (작업 공간)', () => {
     const created = await codeTask('[fake:edit=.github/workflows/ci.yml]', { paths: ['.'] });
     const task = await taskIn(created.id, 'failed');
     assert.match(String(resultOf(task).error), /\.github\/workflows\/ci.yml/);
-    assert.equal(git.head('app', `cairn/${created.id}`), null);
+    assert.equal(git.head('app', `moida/${created.id}`), null);
   });
 
   test('setup이 실패하면 AI를 띄우지 않는다', async () => {
@@ -1247,7 +1247,7 @@ describe('코드 작업 (작업 공간)', () => {
     assert.match(text, /- test -f src\/c.ts: 통과/);
     assert.match(text, /- echo 테스트 망함 >&2; exit 1: 코드 1/);
     assert.match(text, /테스트 망함/);
-    assert.ok(git.head('app', `cairn/${created.id}`));
+    assert.ok(git.head('app', `moida/${created.id}`));
   });
 
   // 검증 고리 V: 검사에 떨어지면 같은 작업 폴더에서 AI를 한 번 더 띄워 떨어진 출력을 보이고, 다시 검사한 뒤 끝낸다
@@ -1275,7 +1275,7 @@ describe('코드 작업 (작업 공간)', () => {
       String(result.text),
       /검사 \(떨어져 AI가 한 번 더 고친 뒤\):\n- test -f src\/d.ts: 통과\n- test -f src\/fixed.ts: 통과/,
     );
-    const branch = `cairn/${created.id}`;
+    const branch = `moida/${created.id}`;
     assert.deepEqual([...git.changed('app', branch)].sort(), ['src/d.ts', 'src/fixed.ts']);
     // 두 번째 실행의 지시문: 처음 지시와 앞 답, 떨어진 검사만
     const prompt = String((await spy.seen()).prompt);
@@ -1302,7 +1302,7 @@ describe('코드 작업 (작업 공간)', () => {
       { name: 'echo 여전히 망함 >&2; exit 1', ok: false, how: '코드 1', retried: true },
     ]);
     assert.match(String(result.text), /--- echo 여전히 망함 >&2; exit 1의 끝부분 ---\n여전히 망함/);
-    assert.ok(git.head('app', `cairn/${created.id}`), '떨어져도 지금처럼 올린다');
+    assert.ok(git.head('app', `moida/${created.id}`), '떨어져도 지금처럼 올린다');
     assert.equal(runs.count(), 2, 'AI는 두 번까지만');
     await roomsLeft();
   });
@@ -1325,7 +1325,7 @@ describe('코드 작업 (작업 공간)', () => {
     const task = await getTask(created.id);
     assert.equal(task.status, 'cancelled');
     assert.equal(task.result, null);
-    assert.equal(git.head('app', `cairn/${created.id}`), null, '올리지 않는다');
+    assert.equal(git.head('app', `moida/${created.id}`), null, '올리지 않는다');
     await roomsLeft();
   });
 
@@ -1333,7 +1333,7 @@ describe('코드 작업 (작업 공간)', () => {
     const quiet = await codeTask('');
     const done = await taskIn(quiet.id, 'done');
     assert.match(String(resultOf(done).text), /바꾼 파일이 없어 올리지 않았어요/);
-    assert.equal(git.head('app', `cairn/${quiet.id}`), null);
+    assert.equal(git.head('app', `moida/${quiet.id}`), null);
 
     const missing = await codeTask('', { repo: { url: `${git.baseUrl}/없음.git`, base: 'main' } });
     const failed = await taskIn(missing.id, 'failed');
@@ -1393,7 +1393,7 @@ describe('코드 작업 (작업 공간)', () => {
       const prompt = String(seen.prompt);
       assert.match(prompt, /# 재료/);
       assert.match(prompt, new RegExp(`- wiki_id: ${wiki.id}`));
-      assert.match(prompt, /cairn-make 스킬을 따릅니다/);
+      assert.match(prompt, /moida-make 스킬을 따릅니다/);
       const bodies = events(task).map((e) => String(e.body));
       assert.ok(bodies.includes('재료 파일 1개를 받았어요'), bodies.join(' | '));
       await roomsLeft();
@@ -1561,7 +1561,7 @@ describe('코드 작업 (작업 공간)', () => {
     test('토큰으로 push하고 draft PR을 열어 결재를 올린다. 주인이 승인하면 작업이 끝난다', async () => {
       const taskId = await ask('[fake:edit=src/a.ts]');
       await taskIn(taskId, 'waiting');
-      const branch = `cairn/${taskId}`;
+      const branch = `moida/${taskId}`;
       assert.deepEqual([...git.changed('me/app', branch)], ['src/a.ts']);
       const pull = github.open.find((p) => p.head === branch);
       assert.ok(pull, 'PR이 열림');
@@ -1597,7 +1597,7 @@ describe('코드 작업 (작업 공간)', () => {
       const taskId = await ask('[fake:edit=src/a.ts]');
       await taskIn(taskId, 'waiting');
       const first = await approvalOf(taskId);
-      const branch = `cairn/${taskId}`;
+      const branch = `moida/${taskId}`;
       ok(
         await api.request('POST', `/api/approvals/${first.id}/decide`, owner, {
           version: first.version,
@@ -1641,16 +1641,16 @@ describe('코드 작업 (작업 공간)', () => {
       const member = await newAgent({ name: '코드 일꾼', approvalActions: ['code.pr.merge'] });
       // 테스트용 CLI는 대표의 지시문에 실린 첫 일꾼에게 나눠 맡긴다: 이 일꾼만 남긴다
       const restore = await onlyWorkers([member]);
-      const work2 = mkdtempSync(join(tmpdir(), 'cairn-work-'));
+      const work2 = mkdtempSync(join(tmpdir(), 'moida-work-'));
       const pairing = join(spyDir, 'code-pairing-4');
       writeFileSync(pairing, api.service(ServerRunnerPolicy).codeSecret());
       const slot2 = RunnerProcess.start(api.baseUrl, {
-        CAIRN_RUNNER_TOKEN: '',
-        CAIRN_RUNNER_PAIRING_FILE: pairing,
-        CAIRN_RUNNER_SLOT: '4',
-        CAIRN_SANDBOX: '1',
-        CAIRN_AGENT_USER: 'self',
-        CAIRN_WORK_DIR: work2,
+        MOIDA_RUNNER_TOKEN: '',
+        MOIDA_RUNNER_PAIRING_FILE: pairing,
+        MOIDA_RUNNER_SLOT: '4',
+        MOIDA_SANDBOX: '1',
+        MOIDA_AGENT_USER: 'self',
+        MOIDA_WORK_DIR: work2,
       });
       try {
         await slot2.logged('코드 러너 칸 4로 연결했어요');
@@ -1676,7 +1676,7 @@ describe('코드 작업 (작업 공간)', () => {
         const children = parent.children as Json[];
         for (const child of children) await taskIn(child.id, 'waiting');
 
-        const branches = children.map((c) => `cairn/${c.id}`);
+        const branches = children.map((c) => `moida/${c.id}`);
         const changed = branches.map((b) => [...git.changed('me/split', b)]);
         for (const files of changed) assert.equal(files.length, 1, '하위 작업마다 제 경로만');
         assert.deepEqual(changed.flat().sort(), ['docs/x.ts', 'src/one/x.ts', 'src/two/x.ts']);
@@ -1879,17 +1879,17 @@ describe('Codex로 일한다', () => {
     const skill = run.skill as Json;
     assert.deepEqual(
       { name: skill.name, source: skill.source },
-      { name: 'cairn-write', source: 'repo' },
+      { name: 'moida-write', source: 'repo' },
     );
     const env = seen.env as Json;
     assert.ok(String(env.CODEX_HOME).length > 0);
     assert.notEqual(env.HOME, process.env.HOME, '빈 홈');
-    assert.ok(String(env.CAIRN_RUN_TOKEN).length > 0, '작업 토큰은 환경 변수로만');
-    assert.equal(env.CAIRN_RUNNER_TOKEN, undefined);
+    assert.ok(String(env.MOIDA_RUN_TOKEN).length > 0, '작업 토큰은 환경 변수로만');
+    assert.equal(env.MOIDA_RUNNER_TOKEN, undefined);
     assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, undefined);
     assert.ok(String(seen.config).includes('shell_tool = false'));
-    assert.ok(String(seen.config).includes('[mcp_servers.cairn]'));
-    assert.ok(String(seen.prompt).includes('# 스킬: cairn-write'), '셸이 없어 스킬은 지시문으로');
+    assert.ok(String(seen.config).includes('[mcp_servers.moida]'));
+    assert.ok(String(seen.prompt).includes('# 스킬: moida-write'), '셸이 없어 스킬은 지시문으로');
   });
 
   test('대화의 사진은 codex exec --image로 지시에 붙인다 (대화에 사진 넣기)', async () => {
@@ -1967,7 +1967,7 @@ describe('Codex로 일한다', () => {
     assert.notEqual((after.tokens as Json).refresh_token, (before.tokens as Json).refresh_token);
   });
 
-  test('작업 토큰(환경 변수)으로 cairn MCP에 결재를 올린다', async () => {
+  test('작업 토큰(환경 변수)으로 moida MCP에 결재를 올린다', async () => {
     const created = await newTask(await codexAgent(), '[fake:approval]');
     await taskIn(created.id, 'waiting');
   });
@@ -1985,8 +1985,8 @@ describe('Codex로 일한다', () => {
   });
 });
 
-// browser-tabs 패키지: 주인이 콘솔(REST)에서 주소를 맡기면, 브라우저(CAIRN_BROWSER_URL)가 있는 러너가
-// MCP로 받아 탭으로 열어 읽고 남긴다. 실제 Chromium으로 본다. 없으면 건너뛴다 (CAIRN_TEST_CHROMIUM으로 경로를 줄 수 있다)
+// browser-tabs 패키지: 주인이 콘솔(REST)에서 주소를 맡기면, 브라우저(MOIDA_BROWSER_URL)가 있는 러너가
+// MCP로 받아 탭으로 열어 읽고 남긴다. 실제 Chromium으로 본다. 없으면 건너뛴다 (MOIDA_TEST_CHROMIUM으로 경로를 줄 수 있다)
 const TAB_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>오늘의 글</title></head>
 <body><h1>탭으로 읽은 본문</h1><p style="display:none">숨은 글자</p></body></html>`;
 
@@ -2027,7 +2027,7 @@ describe('브라우저 탭을 읽는다', { skip: TestChromium.skip }, () => {
     }
 
     const runner = RunnerProcess.start(api.baseUrl, {
-      CAIRN_BROWSER_URL: `${chromium.endpoint}/`,
+      MOIDA_BROWSER_URL: `${chromium.endpoint}/`,
     });
     try {
       await runner.logged('브라우저 탭 읽기를 켰어요');
@@ -2052,7 +2052,7 @@ describe('브라우저 탭을 읽는다', { skip: TestChromium.skip }, () => {
   });
 });
 
-// 브라우저 작업(browse, 2차 3단계): 서버 러너가 브라우저(CAIRN_BROWSER_URL)에 붙어 있을 때만 받고, browser_job으로 어디서 돌지 받아
+// 브라우저 작업(browse, 2차 3단계): 서버 러너가 브라우저(MOIDA_BROWSER_URL)에 붙어 있을 때만 받고, browser_job으로 어디서 돌지 받아
 // AI CLI에 Playwright MCP를 붙인다. 가짜 CLI([fake:browse])는 Playwright MCP 대신 CDP로 직접 시작 주소를 열어 채우고 멈춘다.
 // 그 뒤는 진짜다: 러너가 버튼을 다시 찾아 붙잡고 결재를 올리고, 승인되면 같은 버튼인지 보고 누른다 (진짜 Chromium + 시험 사이트).
 // 브라우저에 닿지 못하면 실패로 끝내지 않고 돌려준다.
@@ -2114,9 +2114,9 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
     const file = join(spyDir, `pairing-${randomUUID()}`);
     writeFileSync(file, api.service(ServerRunnerPolicy).secret());
     return RunnerProcess.start(api.baseUrl, {
-      CAIRN_RUNNER_TOKEN: '',
-      CAIRN_RUNNER_PAIRING_FILE: file,
-      CAIRN_BROWSER_URL: browserUrl,
+      MOIDA_RUNNER_TOKEN: '',
+      MOIDA_RUNNER_PAIRING_FILE: file,
+      MOIDA_BROWSER_URL: browserUrl,
     });
   };
   const stopRunner = async (runner: RunnerProcess): Promise<void> => {
@@ -2263,7 +2263,7 @@ describe('브라우저 작업', { skip: TestChromium.skip }, () => {
       assert.equal(
         JSON.stringify(playwright).includes(String(seen.runToken)),
         false,
-        '작업 토큰은 cairn에만',
+        '작업 토큰은 moida에만',
       );
 
       const approval = await pendingOf(task.id);
@@ -2503,7 +2503,7 @@ describe('러너를 멈춘다', () => {
 
   test('동시에 2개면 두 일이 함께 돌고, 멈추면 AI CLI를 모두 끄고 둘 다 돌려준다', async () => {
     const agent = await newAgent();
-    const runner = RunnerProcess.start(api.baseUrl, { CAIRN_RUNNER_CONCURRENCY: '2' });
+    const runner = RunnerProcess.start(api.baseUrl, { MOIDA_RUNNER_CONCURRENCY: '2' });
     await runner.logged('동시에 하는 일: 2개까지');
     const spies = [new Spy(), new Spy()];
     const created: Json[] = [];
@@ -2547,8 +2547,8 @@ describe('러너를 멈춘다', () => {
   test('설치된 AI CLI가 없으면 일을 받지 않고 알린다. 일은 대기열에 그대로 남는다', async () => {
     const created = await newTask(await newAgent(), '');
     const bare = RunnerProcess.start(api.baseUrl, {
-      CAIRN_RUNNER_CLI: '/없는/claude',
-      CAIRN_RUNNER_CODEX_CLI: '/없는/codex',
+      MOIDA_RUNNER_CLI: '/없는/claude',
+      MOIDA_RUNNER_CODEX_CLI: '/없는/codex',
     });
     await bare.logged('쓸 수 있는 AI CLI가 없어요');
     await new Promise((done) => setTimeout(done, 1_500));
@@ -2576,22 +2576,22 @@ describe('러너를 멈춘다', () => {
   });
 
   test('기기 토큰이 틀리면 바로 멈춘다', async () => {
-    const denied = RunnerProcess.start(api.baseUrl, { CAIRN_RUNNER_TOKEN: 'cairn_wrong' });
+    const denied = RunnerProcess.start(api.baseUrl, { MOIDA_RUNNER_TOKEN: 'moida_wrong' });
     assert.equal(await denied.exited(), 1);
     assert.ok(denied.logs.includes('기기 토큰이 맞지 않아요'), denied.logs);
   });
 
   test('run 권한이 없는 기기는 바로 멈춘다', async () => {
     const laptop = await api.connectDevice(owner, 'e2e-laptop');
-    const denied = RunnerProcess.start(api.baseUrl, { CAIRN_RUNNER_TOKEN: laptop });
+    const denied = RunnerProcess.start(api.baseUrl, { MOIDA_RUNNER_TOKEN: laptop });
     assert.equal(await denied.exited(), 1);
     assert.ok(denied.logs.includes("'run' 권한"), denied.logs);
   });
 
   test('설정이 빠지면 짧은 문구로 멈춘다', async () => {
-    const blank = RunnerProcess.start(api.baseUrl, { CAIRN_RUNNER_TOKEN: '' });
+    const blank = RunnerProcess.start(api.baseUrl, { MOIDA_RUNNER_TOKEN: '' });
     assert.equal(await blank.exited(), 1);
-    assert.ok(blank.logs.includes('러너 설정이 빠졌어요: CAIRN_RUNNER_TOKEN'), blank.logs);
+    assert.ok(blank.logs.includes('러너 설정이 빠졌어요: MOIDA_RUNNER_TOKEN'), blank.logs);
   });
 
   // 끊긴 긴 폴링이 서버에 남으므로 일을 쓰는 테스트는 이 앞에 둔다

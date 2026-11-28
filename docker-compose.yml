@@ -1,32 +1,34 @@
-# Cairn 개발 환경
+# Moida 개발 환경
 #   docker compose up --build   →  db → migrate(마이그레이션 적용 후 종료) → server · worker → web · runner
 #   docker compose build        →  db 이미지와 앱 이미지를 함께 빌드
 #
-# 서로 부르는 이름은 cairn-db · cairn-server · cairn-web (cairn- 이 붙은 별명).
+# 서로 부르는 이름은 moida-db · moida-server · moida-web (moida- 이 붙은 별명).
 # 다른 프로젝트와 같이 쓰는 네트워크(프록시용)에 붙여도 db · server 같은 흔한 이름과 섞이지 않게.
 # 프록시 네트워크에 붙이는 설정은 서버에만 두는 docker-compose.override.yml로 한다 (docs/설치.md)
 # 병렬 작업은 pnpm slot <번호> …으로 프로젝트·포트·이미지 태그를 나눈다 (scripts/slot.mjs)
+# 프로젝트 이름은 옛 이름 그대로: Docker 볼륨 이름(cairn_db-data 같은)이 여기서 나온다.
+# 바꾸면 기존 DB · 파일이 새 빈 볼륨으로 갈린다 (2026-11-28 이름을 moida로 바꿀 때 일부러 남김)
 name: cairn
 
-x-db-url: &db-url postgres://cairn:${DB_PASSWORD:-cairn}@cairn-db:5432/cairn?sslmode=disable
+x-db-url: &db-url postgres://${MOIDA_DB_USER:-cairn}:${DB_PASSWORD:-cairn}@moida-db:5432/${MOIDA_DB_NAME:-cairn}?sslmode=disable
 
 services:
   db:
     build: ./db
-    image: cairn-db:${CAIRN_IMAGE_TAG:-dev}
+    image: moida-db:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}
     networks:
       default:
-        aliases: [cairn-db]
+        aliases: [moida-db]
     environment:
-      POSTGRES_USER: cairn
+      POSTGRES_USER: ${MOIDA_DB_USER:-cairn}   # DB 사용자 · 이름은 옛 이름이 기본 (이미 만든 DB 볼륨이 이 이름)
       POSTGRES_PASSWORD: ${DB_PASSWORD:-cairn}
-      POSTGRES_DB: cairn
+      POSTGRES_DB: ${MOIDA_DB_NAME:-cairn}
     ports:
       - "127.0.0.1:${DB_PORT:-5432}:5432"   # 이 컴퓨터에서만 (같은 와이파이의 다른 기기는 못 붙음)
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cairn -d cairn"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -57,24 +59,24 @@ services:
     build:
       context: .
       target: dev
-    image: cairn-app:${CAIRN_IMAGE_TAG:-dev}
+    image: moida-app:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}
     networks:
       default:
-        aliases: [cairn-server]
-    command: ["pnpm", "--filter", "@cairn/server", "dev"]
+        aliases: [moida-server]
+    command: ["pnpm", "--filter", "@moida/server", "dev"]
     env_file:
-      - path: .env          # 서버 키(CAIRN_SECRET_KEY) 등 인프라 설정. 플러그인 설정은 DB에
+      - path: .env          # 서버 키(MOIDA_SECRET_KEY) 등 인프라 설정. 플러그인 설정은 DB에
         required: false
     environment:
       DATABASE_URL: *db-url
       PORT: 4000
-      CAIRN_WEB_URL: ${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}   # 사람이 여는 웹 주소 (설치 코드 안내에 씀)
-      CAIRN_APPS_URL: ${CAIRN_APPS_URL:-}   # 공통 앱 도메인 (비우면 앱은 기본 도메인의 /<앱>, 격리). .env.example
-      CAIRN_BLOBS_DIR: /data/blobs   # 올린 사진. 파일 이름은 내용의 sha256
-      CAIRN_OUTPUTS_MAX_GB: ${CAIRN_OUTPUTS_MAX_GB:-80}   # 결과물을 모두 더한 한도
-      CAIRN_DISK_RESERVE_GB: ${CAIRN_DISK_RESERVE_GB:-5}  # 디스크에 늘 남길 몫 (개발 컴퓨터는 작게)
-      CAIRN_SECRET_KEY: ${CAIRN_SECRET_KEY:-}   # .env 값. 슬롯은 scripts/slot.mjs가 넘긴다
-      CAIRN_RUNNER_PAIRING_FILE: /run/cairn-runner/pairing   # 서버 러너의 연결 값. 서버가 시작할 때 쓴다
+      MOIDA_WEB_URL: ${MOIDA_WEB_URL:-${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}}   # 사람이 여는 웹 주소 (설치 코드 안내에 씀)
+      MOIDA_APPS_URL: ${MOIDA_APPS_URL:-${CAIRN_APPS_URL:-}}   # 공통 앱 도메인 (비우면 앱은 기본 도메인의 /<앱>, 격리). .env.example
+      MOIDA_BLOBS_DIR: /data/blobs   # 올린 사진. 파일 이름은 내용의 sha256
+      MOIDA_OUTPUTS_MAX_GB: ${MOIDA_OUTPUTS_MAX_GB:-${CAIRN_OUTPUTS_MAX_GB:-80}}   # 결과물을 모두 더한 한도
+      MOIDA_DISK_RESERVE_GB: ${MOIDA_DISK_RESERVE_GB:-${CAIRN_DISK_RESERVE_GB:-5}}  # 디스크에 늘 남길 몫 (개발 컴퓨터는 작게)
+      MOIDA_SECRET_KEY: ${MOIDA_SECRET_KEY:-${CAIRN_SECRET_KEY:-}}   # .env 값. 슬롯은 scripts/slot.mjs가 넘긴다
+      MOIDA_RUNNER_PAIRING_FILE: /run/moida-runner/pairing   # 서버 러너의 연결 값. 서버가 시작할 때 쓴다
     ports:
       - "127.0.0.1:${SERVER_PORT:-4000}:4000"   # 이 컴퓨터에서만. 웹은 컨테이너끼리 server:4000으로 부른다
     volumes:
@@ -82,7 +84,7 @@ services:
       - ./plugins:/repo/plugins
       - ./skills:/repo/skills   # 앱에 올릴 스킬 묶음(관리 화면 → 기기 → 스킬 받기)을 여기서 만든다
       - blob-data:/data/blobs
-      - runner-pairing:/run/cairn-runner   # 서버와 러너만 붙는다
+      - runner-pairing:/run/moida-runner   # 서버와 러너만 붙는다
     # 운영 구성과 같은 상태 확인. 코드 러너(docker-compose.code.yml)는 서버가 healthy가 된 뒤에 뜬다:
     # 이것이 없으면 개발 구성에 코드 러너를 더했을 때 코드 러너 컨테이너가 만들어지기만 하고 시작하지 않는다.
     # 개발 서버는 처음 컴파일이 길어 시작 여유를 크게 둔다
@@ -97,18 +99,18 @@ services:
         condition: service_completed_successfully
 
   worker:
-    image: cairn-app:${CAIRN_IMAGE_TAG:-dev}          # 일꾼: 이벤트 넘기기와 플러그인 반복 작업. 하나만 띄운다
+    image: moida-app:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}          # 일꾼: 이벤트 넘기기와 플러그인 반복 작업. 하나만 띄운다
     pull_policy: never
-    command: ["pnpm", "--filter", "@cairn/server", "worker"]
+    command: ["pnpm", "--filter", "@moida/server", "worker"]
     env_file:
       - path: .env
         required: false
     environment:
       DATABASE_URL: *db-url
-      CAIRN_SECRET_KEY: ${CAIRN_SECRET_KEY:-}
-      CAIRN_WEB_URL: ${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}   # 브라우저 푸시의 연락처 (https일 때)
-      CAIRN_APPS_URL: ${CAIRN_APPS_URL:-}   # 공통 앱 도메인 (비우면 앱은 기본 도메인의 /<앱>, 격리). .env.example
-      CAIRN_BLOBS_DIR: /data/blobs   # 서버와 같은 파일 저장소: 이벤트를 받는 쪽이 파일을 읽고 쓴다 (앱 코드 버전 · 페이지 · 안 쓰는 파일 지우기)
+      MOIDA_SECRET_KEY: ${MOIDA_SECRET_KEY:-${CAIRN_SECRET_KEY:-}}
+      MOIDA_WEB_URL: ${MOIDA_WEB_URL:-${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}}   # 브라우저 푸시의 연락처 (https일 때)
+      MOIDA_APPS_URL: ${MOIDA_APPS_URL:-${CAIRN_APPS_URL:-}}   # 공통 앱 도메인 (비우면 앱은 기본 도메인의 /<앱>, 격리). .env.example
+      MOIDA_BLOBS_DIR: /data/blobs   # 서버와 같은 파일 저장소: 이벤트를 받는 쪽이 파일을 읽고 쓴다 (앱 코드 버전 · 페이지 · 안 쓰는 파일 지우기)
     volumes:
       - ./apps/server/src:/repo/apps/server/src
       - ./plugins:/repo/plugins
@@ -120,20 +122,20 @@ services:
         condition: service_started
 
   web:
-    image: cairn-app:${CAIRN_IMAGE_TAG:-dev}          # server가 빌드한 같은 이미지를 씀
+    image: moida-app:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}          # server가 빌드한 같은 이미지를 씀
     networks:
       default:
-        aliases: [cairn-web]
+        aliases: [moida-web]
     pull_policy: never
-    command: ["pnpm", "--filter", "@cairn/web", "dev"]
+    command: ["pnpm", "--filter", "@moida/web", "dev"]
     env_file:
       - path: .env
         required: false
     environment:
-      API_URL: http://cairn-server:4000
-      CAIRN_WEB_URL: ${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}   # 이 주소에서 연 화면만 개발 서버가 받아 준다
-      CAIRN_APPS_URL: ${CAIRN_APPS_URL:-}   # 공통 앱 도메인 (비우면 앱은 기본 도메인의 /<앱>, 격리). .env.example
-      CAIRN_DEV_ORIGINS: ${CAIRN_DEV_ORIGINS:-}   # 더 받아 줄 호스트 (쉼표). 앱 도메인 <이름>.test는 늘 받는다
+      API_URL: http://moida-server:4000
+      MOIDA_WEB_URL: ${MOIDA_WEB_URL:-${CAIRN_WEB_URL:-http://localhost:${WEB_PORT:-3000}}}   # 이 주소에서 연 화면만 개발 서버가 받아 준다
+      MOIDA_APPS_URL: ${MOIDA_APPS_URL:-${CAIRN_APPS_URL:-}}   # 공통 앱 도메인 (비우면 앱은 기본 도메인의 /<앱>, 격리). .env.example
+      MOIDA_DEV_ORIGINS: ${MOIDA_DEV_ORIGINS:-${CAIRN_DEV_ORIGINS:-}}   # 더 받아 줄 호스트 (쉼표). 앱 도메인 <이름>.test는 늘 받는다
       WATCHPACK_POLLING: "true"
     ports:
       - "127.0.0.1:${WEB_PORT:-3000}:3000"   # 이 컴퓨터에서만. 서버에 올리면 앞의 https 프록시(Caddy 등)만 밖에 연다
@@ -151,8 +153,8 @@ services:
       context: .
       target: runner
       args:
-        CAIRN_RUNNER_BUILD: ${CAIRN_RUNNER_BUILD:-unknown}   # 실행 기록에 남는 러너 빌드 (git rev-parse --short HEAD)
-    image: cairn-runner:${CAIRN_IMAGE_TAG:-dev}
+        MOIDA_RUNNER_BUILD: ${MOIDA_RUNNER_BUILD:-${CAIRN_RUNNER_BUILD:-unknown}}   # 실행 기록에 남는 러너 빌드 (git rev-parse --short HEAD)
+    image: moida-runner:${MOIDA_IMAGE_TAG:-${CAIRN_IMAGE_TAG:-dev}}
     restart: unless-stopped
     init: true
     stop_grace_period: 40s
@@ -164,12 +166,12 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      CAIRN_RUNNER_URL: http://cairn-server:4000
-      CAIRN_RUNNER_PAIRING_FILE: /run/cairn-runner/pairing
-      CAIRN_RUNNER_LINEAGES_DIR: /tmp/cairn-runner/lineages   # 세션 키 폴더 (CLI 세션 · 실행 중 작업 폴더). 홈(64MB)이 아니라 /tmp(512MB)에
-      CAIRN_RUNNER_CONCURRENCY: ${CAIRN_RUNNER_CONCURRENCY:-3}   # 동시에 하는 일의 기본 (1~8). 일마다 AI CLI 하나. 콘솔의 러너 메뉴에서 정하면 그 값이 먼저
+      MOIDA_RUNNER_URL: http://moida-server:4000
+      MOIDA_RUNNER_PAIRING_FILE: /run/moida-runner/pairing
+      MOIDA_RUNNER_LINEAGES_DIR: /tmp/moida-runner/lineages   # 세션 키 폴더 (CLI 세션 · 실행 중 작업 폴더). 홈(64MB)이 아니라 /tmp(512MB)에
+      MOIDA_RUNNER_CONCURRENCY: ${MOIDA_RUNNER_CONCURRENCY:-${CAIRN_RUNNER_CONCURRENCY:-3}}   # 동시에 하는 일의 기본 (1~8). 일마다 AI CLI 하나. 콘솔의 러너 메뉴에서 정하면 그 값이 먼저
     volumes:
-      - runner-pairing:/run/cairn-runner:ro
+      - runner-pairing:/run/moida-runner:ro
     depends_on:
       server:
         condition: service_started

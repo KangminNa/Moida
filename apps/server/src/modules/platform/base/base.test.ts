@@ -701,8 +701,8 @@ describe('입력 읽기 (M1)', () => {
 });
 
 describe('SecretBox: 값 만들기와 짧은 값 싸기 (M1)', () => {
-  const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
-  const other = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+  const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
+  const other = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 
   test('같은 키·같은 이름이면 늘 같은 값, 키가 다르면 다른 값', () => {
     assert.deepEqual(box.derive('install-code'), box.derive('install-code'));
@@ -759,9 +759,9 @@ describe('SecretBox: 값 만들기와 짧은 값 싸기 (M1)', () => {
 describe('서버 키 교체', () => {
   const oldKey = SecretBox.newKey();
   const newKey = SecretBox.newKey();
-  const before = SecretBox.fromEnv({ CAIRN_SECRET_KEY: oldKey });
-  const rotating = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey, CAIRN_SECRET_KEY_OLD: oldKey });
-  const finished = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey });
+  const before = SecretBox.fromEnv({ MOIDA_SECRET_KEY: oldKey });
+  const rotating = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey, MOIDA_SECRET_KEY_OLD: oldKey });
+  const finished = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey });
 
   test('옛 키로 잠근 값도 읽고, 새로 잠글 때는 지금 키만 쓴다', () => {
     assert.equal(rotating.open(before.seal('ghp_old')), 'ghp_old');
@@ -776,8 +776,8 @@ describe('서버 키 교체', () => {
     assert.equal(finished.open(resealed), 'ghp_old');
     assert.equal(rotating.reseal(resealed), null, '두 번째는 건너뛴다');
 
-    const stranger = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() }).seal('ghp_lost');
-    assert.throws(() => rotating.reseal(stranger), /CAIRN_SECRET_KEY_OLD/);
+    const stranger = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() }).seal('ghp_lost');
+    assert.throws(() => rotating.reseal(stranger), /MOIDA_SECRET_KEY_OLD/);
     assert.throws(() => finished.reseal(before.seal('x')), /풀 수 없어요/, '옛 키를 넣지 않음');
   });
 
@@ -790,11 +790,11 @@ describe('서버 키 교체', () => {
 
   test('키 설정이 틀리면 시작하지 않고, 빈 옛 키는 없는 것으로 본다', () => {
     assert.throws(
-      () => SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey, CAIRN_SECRET_KEY_OLD: 'short' }),
-      /CAIRN_SECRET_KEY_OLD는 32바이트/,
+      () => SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey, MOIDA_SECRET_KEY_OLD: 'short' }),
+      /MOIDA_SECRET_KEY_OLD는 32바이트/,
     );
-    assert.throws(() => SecretBox.fromEnv({ CAIRN_SECRET_KEY_OLD: oldKey }), /새 키를/);
-    const blank = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey, CAIRN_SECRET_KEY_OLD: ' ' });
+    assert.throws(() => SecretBox.fromEnv({ MOIDA_SECRET_KEY_OLD: oldKey }), /새 키를/);
+    const blank = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey, MOIDA_SECRET_KEY_OLD: ' ' });
     assert.throws(() => blank.open(before.seal('x')), /풀 수 없어요/);
   });
 

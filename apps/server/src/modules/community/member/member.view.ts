@@ -67,7 +67,7 @@ export class AccountSelfView {
 /**
  * 이 브라우저가 누구인가 (GET /api/community/me · 가입 · 로그인 · 참여의 답).
  * account: 이 앱 도메인에 로그인한 스토어 계정, member: 그 계정의 이 앱 회원 (참여 전이면 null).
- * csrf: 쓰기 요청의 X-Cairn-CSRF 값 (회원 쿠키가 없으면 null, 가입 · 로그인의 답에서는 null이라 웹이 me를 다시 읽는다)
+ * csrf: 쓰기 요청의 X-Moida-CSRF 값 (회원 쿠키가 없으면 null, 가입 · 로그인의 답에서는 null이라 웹이 me를 다시 읽는다)
  */
 export class MemberMeView {
   constructor(

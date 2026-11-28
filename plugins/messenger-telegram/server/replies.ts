@@ -7,7 +7,7 @@ export class Replies {
   static readonly SEND = 'plugin.telegram.send';
 
   constructor(
-    /** 이 Cairn의 바깥 주소 (설정 siteUrl, 끝의 /는 뺀다) */
+    /** 이 Moida의 바깥 주소 (설정 siteUrl, 끝의 /는 뺀다) */
     private readonly site: string,
   ) {}
 

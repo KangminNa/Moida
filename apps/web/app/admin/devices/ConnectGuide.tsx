@@ -8,7 +8,7 @@ import { useAction } from '../../_lib/use-action';
 import { CopyButton } from '../../_ui/CopyButton';
 
 // 기기 화면 맨 위의 "연결하는 법". 도구마다 길이 다르다.
-//   이 컴퓨터의 도구(Claude Code · Codex): cairn connect가 스킬·검토자를 넣고 MCP 등록·로그인까지 한다
+//   이 컴퓨터의 도구(Claude Code · Codex): moida connect가 스킬·검토자를 넣고 MCP 등록·로그인까지 한다
 //   앱(Claude 앱 · ChatGPT): 회사 서버가 블로그로 들어오므로 "앱 연결 허용"을 켜고, 공개 https 주소가 있어야 한다.
 //     스킬은 블로그가 내주는 zip(스크립트 없이 SKILL.md와 규칙만)을 사용자가 직접 올린다
 const TABS = [
@@ -20,7 +20,7 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]['id'];
 
-const SKILL_ZIP = '/api/skills/cairn-save.zip';
+const SKILL_ZIP = '/api/skills/moida-save.zip';
 
 /** 앱의 회사 서버가 들어올 수 있는 주소인가 (https이고, 이 컴퓨터·집 안 네트워크 주소가 아님) */
 function isPublicHttps(url: string | null): boolean {
@@ -76,40 +76,40 @@ export function ConnectGuide({
       <div className="howto" role="tabpanel">
         {tab === 'claude-code' && (
           <>
-            <CopyLine text={`pnpm cairn connect ${site}`} />
+            <CopyLine text={`pnpm moida connect ${site}`} />
             <small>
               Moida 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 다른
               회사 모델로 교차 검토하려면 끝에 <code>--review-with codex</code>
             </small>
             <Manual>
               <li>
-                저장소의 <code>skills/cairn-save</code>를 <code>~/.claude/skills/</code>에 복사
+                저장소의 <code>skills/moida-save</code>를 <code>~/.claude/skills/</code>에 복사
               </li>
               <li>
-                <code>claude mcp add --transport http --scope user cairn {mcp}</code>
+                <code>claude mcp add --transport http --scope user moida {mcp}</code>
               </li>
               <li>
-                Claude Code에서 <code>/mcp</code> → cairn → 로그인
+                Claude Code에서 <code>/mcp</code> → moida → 로그인
               </li>
             </Manual>
           </>
         )}
         {tab === 'codex' && (
           <>
-            <CopyLine text={`pnpm cairn connect ${site} --tool codex`} />
+            <CopyLine text={`pnpm moida connect ${site} --tool codex`} />
             <small>
               Moida 저장소에서 실행. 스킬·검토자 넣기 → MCP 등록 → 브라우저 승인까지 한 번에. 교차
               검토는 끝에 <code>--review-with claude</code>
             </small>
             <Manual>
               <li>
-                저장소의 <code>skills/cairn-save</code>를 <code>~/.agents/skills/</code>에 복사
+                저장소의 <code>skills/moida-save</code>를 <code>~/.agents/skills/</code>에 복사
               </li>
               <li>
-                <code>codex mcp add cairn --url {mcp}</code>
+                <code>codex mcp add moida --url {mcp}</code>
               </li>
               <li>
-                <code>codex mcp login cairn</code>
+                <code>codex mcp login moida</code>
               </li>
             </Manual>
           </>
@@ -223,7 +223,7 @@ function AppSteps({
         <li>
           {app === 'claude-app' ? '설정 → 기능 → 스킬에 ' : '스킬을 쓸 수 있으면 '}
           <a href={SKILL_ZIP} download>
-            cairn-save.zip
+            moida-save.zip
           </a>{' '}
           올리기
           {app === 'chatgpt' && ' (없어도 저장 순서는 연결 안내에 들어 있어요)'}

@@ -249,7 +249,7 @@ describe('code-github: 칸 러너의 토큰과 PR, 결재', () => {
     const repo = await newRepo();
     const job = await leasedJob(repo);
     const taskId = String((job.task as Json).id);
-    const opened = (head: string, branch = `cairn/${taskId}`) =>
+    const opened = (head: string, branch = `moida/${taskId}`) =>
       tool(slot, 'code_pull_opened', {
         task_id: taskId,
         number: 12,
@@ -258,14 +258,14 @@ describe('code-github: 칸 러너의 토큰과 PR, 결재', () => {
         head_sha: head,
         checks: [{ command: 'pnpm check', ok: true }],
       });
-    assert.equal((await opened(SHA(1), 'cairn/other')).ok, false, '그 작업의 브랜치만');
+    assert.equal((await opened(SHA(1), 'moida/other')).ok, false, '그 작업의 브랜치만');
     const first = await opened(SHA(1));
     assert.equal(first.body.version, 1);
     assert.equal((await opened(SHA(1))).body.version, 1);
     const second = await opened(SHA(2));
     assert.deepEqual([second.body.pull_id, second.body.version], [first.body.pull_id, 2]);
     const credential = await tool(slot, 'code_credential', { task_id: taskId });
-    assert.deepEqual(credential.body.pull, { number: 12, branch: `cairn/${taskId}` });
+    assert.deepEqual(credential.body.pull, { number: 12, branch: `moida/${taskId}` });
     const pull = ok(await api.get(`${BASE}/pulls/${first.body.pull_id}`, owner));
     assert.deepEqual(
       [pull.repoName, pull.number, pull.headSha, pull.status],
@@ -285,7 +285,7 @@ describe('code-github: 칸 러너의 토큰과 PR, 결재', () => {
         task_id: taskId,
         number: 3,
         url: `https://github.com/me/${repo.name}/pull/3`,
-        branch: `cairn/${taskId}`,
+        branch: `moida/${taskId}`,
         head_sha: SHA(3),
         checks: [],
       });
@@ -429,7 +429,7 @@ describe('코드 작업 5단계: 나눠 맡기기와 겹침', () => {
       task_id: taskId,
       number: 9,
       url: `https://github.com/me/${repo.name}/pull/9`,
-      branch: `cairn/${taskId}`,
+      branch: `moida/${taskId}`,
       head_sha: SHA(9),
       checks: [],
     });

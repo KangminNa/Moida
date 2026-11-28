@@ -2,11 +2,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { BaseEntity, TableEntity } from '../../platform';
 import type { AccountSessionNew, AccountSessionRow } from '../community.tables';
 
-// 스토어 계정의 로그인 한 번 (community.account_sessions, 2026-11-26). 앱 도메인의 cairn_member 쿠키다: Domain 없이 그 도메인에만 실려
+// 스토어 계정의 로그인 한 번 (community.account_sessions, 2026-11-26). 앱 도메인의 moida_member 쿠키다: Domain 없이 그 도메인에만 실려
 // 로그인은 앱 도메인마다 따로다 (같은 계정이어도 앱마다 다시 로그인). 세션은 계정과 그 앱을 가리키고, 앱에 참여하기 전에도 열린다.
-// 관리자 로그인(account WebSession · cairn_session)과 쿠키 · 표가 따로다 (원칙 10). 토큰 원문은 만든 순간에만 메모리에 있고 DB에는 해시만
+// 관리자 로그인(account WebSession · moida_session)과 쿠키 · 표가 따로다 (원칙 10). 토큰 원문은 만든 순간에만 메모리에 있고 DB에는 해시만
 export class AccountSession extends TableEntity<AccountSessionRow, AccountSessionNew> {
-  static readonly COOKIE = 'cairn_member';
+  static readonly COOKIE = 'moida_member';
   /** 로그인 유지: 마지막으로 쓴 날부터 (관리자 로그인과 같다) */
   static readonly DAYS = 30;
   /** 쿠키는 브라우저가 지키는 가장 긴 기간으로 두고, 살아 있는지는 서버의 expires_at이 정한다 */

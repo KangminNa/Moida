@@ -17,7 +17,7 @@ export async function serverFetch<T>(
   path: string,
   asVisitor = false,
   host: string | null = null,
-  /** 공통 앱 도메인의 앱 (x-cairn-app, 2026-11-27: 한 도메인에 앱이 여럿이라 서버에 알린다) */
+  /** 공통 앱 도메인의 앱 (x-moida-app, 2026-11-27: 한 도메인에 앱이 여럿이라 서버에 알린다) */
   app: string | null = null,
 ): Promise<ServerReply<T>> {
   const jar = await cookies();
@@ -35,7 +35,7 @@ export async function serverFetch<T>(
         ...(cookie ? { cookie } : {}),
         ...(forwarded ? { 'x-forwarded-for': forwarded } : {}),
         ...(host ? { 'x-forwarded-host': host } : {}),
-        ...(app ? { 'x-cairn-app': app } : {}),
+        ...(app ? { 'x-moida-app': app } : {}),
       },
     });
     return { status: res.status, data: (await res.json().catch(() => null)) as T | null };

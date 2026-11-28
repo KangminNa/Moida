@@ -118,7 +118,7 @@ describe('멈춘 자리 (browser-stop.json)', () => {
   });
 
   test('없으면 null, JSON이 아니거나 링크면 문제', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-stop-'));
+    const dir = mkdtempSync(join(tmpdir(), 'moida-stop-'));
     try {
       assert.equal(await BrowserStop.read(join(dir, BrowserStop.FILE)), null);
       writeFileSync(join(dir, 'bad.json'), '{');

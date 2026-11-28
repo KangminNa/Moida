@@ -11,14 +11,14 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, test } from 'node:test';
-import { SiteAddress } from './cairn-site';
 import { DeviceLogin } from './device-login';
+import { SiteAddress } from './moida-site';
 import { NewsSetup } from './news-setup';
 import { Shell } from './shell';
 import { Terminal } from './terminal';
-import { FakeCairn } from './testing/fake-cairn';
+import { FakeMoida } from './testing/fake-moida';
 
-// cairn connect의 소식 단계: 소식 기기(OAuth scope=news) · 훅 · 상태 줄. 블로그는 가짜(FakeCairn), 브라우저는 fetch로 흉내 낸다.
+// moida connect의 소식 단계: 소식 기기(OAuth scope=news) · 훅 · 상태 줄. 블로그는 가짜(FakeMoida), 브라우저는 fetch로 흉내 낸다.
 
 /** 브라우저 대신: 승인 주소를 열면 가짜 블로그가 곧바로 이 컴퓨터의 주소로 돌려보낸다 */
 class FakeBrowser extends Shell {
@@ -38,28 +38,28 @@ class FakeTerminal extends Terminal {
   }
 }
 
-let blog: FakeCairn;
+let blog: FakeMoida;
 let dir: string;
 let terminal: FakeTerminal;
 let browser: FakeBrowser;
 let at: SiteAddress;
 
 const settingsFile = () => join(dir, '.claude', 'settings.json');
-const cairnDir = () => join(dir, '.cairn');
+const moidaDir = () => join(dir, '.moida');
 const settings = () => JSON.parse(readFileSync(settingsFile(), 'utf8'));
-const credentials = () => JSON.parse(readFileSync(join(cairnDir(), 'credentials.json'), 'utf8'));
+const credentials = () => JSON.parse(readFileSync(join(moidaDir(), 'credentials.json'), 'utf8'));
 const setup = () =>
-  new NewsSetup(terminal, settingsFile(), new DeviceLogin(terminal, browser, 5_000), cairnDir());
-const script = () => join(cairnDir(), 'bin', 'cairn-news.mjs');
+  new NewsSetup(terminal, settingsFile(), new DeviceLogin(terminal, browser, 5_000), moidaDir());
+const script = () => join(moidaDir(), 'bin', 'moida-news.mjs');
 
 before(async () => {
-  blog = new FakeCairn();
+  blog = new FakeMoida();
   await blog.start();
   at = new SiteAddress(blog.origin, `${blog.origin}/mcp`);
 });
 after(() => blog.close());
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'cairn-news-setup-'));
+  dir = mkdtempSync(join(tmpdir(), 'moida-news-setup-'));
   terminal = new FakeTerminal();
   browser = new FakeBrowser();
   blog.grant = (scope) => (scope === 'collect' ? 'upload' : (scope ?? ''));
@@ -76,11 +76,11 @@ describe('소식 기기', () => {
     const news = credentials().news;
     assert.equal(news.site, blog.origin);
     assert.equal(news.mcp, `${blog.origin}/mcp`);
-    assert.match(news.access_token, /^cairn_at_/);
-    assert.match(news.refresh_token, /^cairn_rt_/);
+    assert.match(news.access_token, /^moida_at_/);
+    assert.match(news.refresh_token, /^moida_rt_/);
     assert.match(news.device, / · 소식$/);
-    assert.equal(statSync(join(cairnDir(), 'credentials.json')).mode & 0o777, 0o600);
-    assert.equal(statSync(cairnDir()).mode & 0o777, 0o700);
+    assert.equal(statSync(join(moidaDir(), 'credentials.json')).mode & 0o777, 0o600);
+    assert.equal(statSync(moidaDir()).mode & 0o777, 0o700);
     const printed = terminal.lines.join('\n');
     assert.equal(printed.includes(news.access_token), false);
     assert.equal(printed.includes(news.refresh_token), false);
@@ -88,8 +88,8 @@ describe('소식 기기', () => {
   });
 
   test('이미 있으면 다시 만들지 않고, 다른 열쇠는 그대로 둔다', async () => {
-    mkdirSync(cairnDir(), { recursive: true });
-    writeFileSync(join(cairnDir(), 'credentials.json'), JSON.stringify({ other: { keep: 1 } }));
+    mkdirSync(moidaDir(), { recursive: true });
+    writeFileSync(join(moidaDir(), 'credentials.json'), JSON.stringify({ other: { keep: 1 } }));
     await setup().run(at, true);
     await setup().run(at, true);
     assert.equal(browser.opened.length, 1, '두 번째는 승인을 묻지 않는다');
@@ -101,7 +101,7 @@ describe('소식 기기', () => {
     blog.grant = () => 'upload read_public';
     await setup().run(at, true);
     assert.equal(blog.revoked.length, 2, 'access · refresh 둘 다 버린다');
-    assert.equal(existsSync(join(cairnDir(), 'credentials.json')), false);
+    assert.equal(existsSync(join(moidaDir(), 'credentials.json')), false);
     assert.ok(terminal.lines.some((l) => l.startsWith('✗ ') && l.includes('모르는 버전')));
     assert.ok(existsSync(settingsFile()), '훅 · 상태 줄은 건다');
   });
@@ -109,7 +109,7 @@ describe('소식 기기', () => {
   test('사람이 없는 곳에서는 기기를 만들지 않고 훅 · 상태 줄만 건다', async () => {
     await setup().run(at, false);
     assert.equal(browser.opened.length, 0);
-    assert.equal(existsSync(join(cairnDir(), 'credentials.json')), false);
+    assert.equal(existsSync(join(moidaDir(), 'credentials.json')), false);
     assert.ok(existsSync(script()));
     assert.ok(settings().statusLine);
   });
@@ -144,6 +144,23 @@ describe('훅 · 상태 줄', () => {
     assert.ok(terminal.lines.includes('✓ 훅 · 이미 있음'));
   });
 
+  test('옛 이름의 훅 · 상태 줄(cairn-news.mjs)은 우리 것으로 보고 새 스크립트로 바꾼다 (둘이 함께 돌지 않게)', async () => {
+    mkdirSync(join(dir, '.claude'), { recursive: true });
+    const old = 'node "/home/u/.cairn/bin/cairn-news.mjs"';
+    writeFileSync(
+      settingsFile(),
+      JSON.stringify({
+        hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: `${old} hook` }] }] },
+        statusLine: { type: 'command', command: `${old} status`, padding: 0 },
+      }),
+    );
+    await setup().run(at, false);
+    const s = settings();
+    assert.equal(s.hooks.UserPromptSubmit.length, 1);
+    assert.equal(s.hooks.UserPromptSubmit[0].hooks[0].command, `node "${script()}" hook`);
+    assert.equal(s.statusLine.command, `node "${script()}" status`);
+  });
+
   test('사용자의 상태 줄은 덮지 않고 붙이는 법을 알린다', async () => {
     mkdirSync(join(dir, '.claude'), { recursive: true });
     const own = { type: 'command', command: '~/bin/my-status' };
@@ -163,7 +180,7 @@ describe('훅 · 상태 줄', () => {
     assert.ok(terminal.lines.some((l) => l.includes('읽지 못해 훅 · 상태 줄을 걸지 않았어요')));
   });
 
-  test('cairn status는 소식 기기 · 훅 · 상태 줄을 보인다', async () => {
+  test('moida status는 소식 기기 · 훅 · 상태 줄을 보인다', async () => {
     assert.deepEqual(setup().state().lines, [
       '  소식 기기: 없음',
       '  소식 훅: 없음 · 상태 줄: 없음',

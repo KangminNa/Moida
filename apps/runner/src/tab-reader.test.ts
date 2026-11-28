@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { type BrowserTabs, BrowserUnavailable, TabText, TabUnreadable } from './browser-tabs';
-import type { CairnServer } from './cairn-server';
 import { ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import { Redactor, RunLog } from './redactor';
 import { TabReader } from './tab-reader';
 
@@ -28,7 +28,7 @@ function fakes(
     async saveTab(id: string, r: object) {
       saved.push({ id, read: r });
     },
-  } as unknown as CairnServer;
+  } as unknown as MoidaServer;
   const browser = {
     async read(url: string, _stop: AbortSignal, proxy: string | null, shot = false) {
       return read(url, proxy, shot);

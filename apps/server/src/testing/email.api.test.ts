@@ -79,7 +79,7 @@ describe('알림 메일 (email)', () => {
           port: String(port),
           user: USER,
           password: PASSWORD,
-          siteUrl: 'https://cairn.example',
+          siteUrl: 'https://moida.example',
         },
       }),
     );
@@ -126,7 +126,7 @@ describe('앱 소식 구독 (email)', () => {
           port: String(port),
           user: USER,
           password: PASSWORD,
-          siteUrl: 'https://cairn.example',
+          siteUrl: 'https://moida.example',
           subscriptions: 'true',
         },
       }),
@@ -196,7 +196,7 @@ describe('앱 소식 구독 (email)', () => {
     assert.ok(send);
     assert.equal(send.status, 'ready');
     assert.equal(send.total, 1);
-    assert.equal(send.link, `https://cairn.example/blog/posts/${encodeURIComponent(post.slug)}`);
+    assert.equal(send.link, `https://moida.example/blog/posts/${encodeURIComponent(post.slug)}`);
     assert.equal((await api.get(`${BASE}/overview`, TestUser.visitor)).status, 403);
     assert.equal((await visitor(`sends/${send.id}/start`)).status, 403);
 
@@ -235,7 +235,7 @@ describe('메일 사용량 · 한도 (email, 2026-11-27)', () => {
         port: String(port),
         user: USER,
         password: PASSWORD,
-        siteUrl: 'https://cairn.example',
+        siteUrl: 'https://moida.example',
         subscriptions: 'true',
         ...extra,
       },

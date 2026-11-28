@@ -141,7 +141,7 @@ describe('입구에서 busy로 바꾸기', () => {
       }
     }
     const endpoint = new McpEndpoint(
-      'cairn',
+      'moida',
       'test',
       () => [new SlowTool()],
       '',

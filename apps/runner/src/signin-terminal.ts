@@ -10,7 +10,7 @@ import { ChildExit } from './ai-process';
 export class SigninTerminal {
   private static readonly COLUMNS = 1000;
   private static readonly ROWS = 50;
-  private static readonly BIN_ENV = 'CAIRN_SIGNIN_BIN';
+  private static readonly BIN_ENV = 'MOIDA_SIGNIN_BIN';
   private static readonly WORD = /^(?:--)?[a-z][a-z-]*$/;
   private static readonly KILL_GRACE_MS = 3_000;
 

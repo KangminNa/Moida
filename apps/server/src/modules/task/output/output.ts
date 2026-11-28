@@ -8,7 +8,7 @@ import type { UploadTicket } from './upload-ticket';
 // 주인이 재료로 쓰려고 올린 파일도 여기에 둔다 (2026-11-13, 작업 · 실행 없음).
 // 파일 자체는 platform.blobs에 있고 값으로 가리킨다. 이 줄은 어느 작업 · 실행이 만들었는지와 이름 · 종류를 든다.
 // 주인만 지우고(휴지통 30일) 되살린다. 휴지통에서 바로 지우거나 30일이 지나면 줄을 지우고,
-// 아무도 쓰지 않게 된 파일은 platform의 BlobSweepJob이 지운다. Cairn 안에 두는 것은 발행이 아니라 결재가 없다.
+// 아무도 쓰지 않게 된 파일은 platform의 BlobSweepJob이 지운다. Moida 안에 두는 것은 발행이 아니라 결재가 없다.
 export class Output extends TableEntity<OutputRow, OutputNew> {
   static readonly TRASH_DAYS = 30;
   /** 휴지통 기간이 지난 결과물을 지우는 마감 작업 (OutputPurgeJob). 지울 때(purge_after)가 바뀌면 저장이 깨운다 */

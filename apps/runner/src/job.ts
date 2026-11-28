@@ -126,7 +126,7 @@ export class Job {
     readonly chat: ChatTurn | null = null,
     /** 이 러너에 묶인 에이전트의 일 (서버가 알린다). 이때만 이 러너가 나눈 폴더를 연다 (SharedFolders) */
     readonly bound = false,
-    /** 서버가 실어 보낸 지시문 틀(cairn-runner)의 지금 판. 옛 서버면 null (그때는 러너의 skills/) */
+    /** 서버가 실어 보낸 지시문 틀(moida-runner)의 지금 판. 옛 서버면 null (그때는 러너의 skills/) */
     readonly promptPackage: SkillPackage | null = null,
     /** 에이전트가 정한 모델 · 생각 강도 (2차 7단계). 비면 CLI의 기본 */
     readonly runtime: CliRuntime = CliRuntime.NONE,
@@ -311,7 +311,7 @@ export class Job {
   }
 
   /**
-   * AI CLI에게 줄 글. 글은 지시문 틀(prompts, 러너 스킬 cairn-runner)에서 오고, 여기서는 어느 단락을 어떤 순서로 넣을지만 정한다.
+   * AI CLI에게 줄 글. 글은 지시문 틀(prompts, 러너 스킬 moida-runner)에서 오고, 여기서는 어느 단락을 어떤 순서로 넣을지만 정한다.
    * skillReady: 스킬을 CLI의 스킬 폴더에 넣어 두었는가 (Claude).
    * skillText: 스킬 폴더를 읽지 못하는 CLI(셸이 없는 Codex)에게 지시문으로 넣을 SKILL.md.
    * outputsDir: 사람에게 줄 파일을 둘 폴더 (일이 잘 끝나면 러너가 결과물로 올린다).

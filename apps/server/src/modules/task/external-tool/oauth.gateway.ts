@@ -19,7 +19,7 @@ export class OAuthGateway extends PublicHttpsGateway {
   static readonly MAX_BYTES = 256 * 1024;
   static readonly MAX_HOPS = 3;
   protected readonly name = 'OAuth 로그인 서버';
-  protected readonly agent = 'Cairn/1.0 (MCP OAuth client)';
+  protected readonly agent = 'Moida/1.0 (MCP OAuth client)';
   protected override readonly timeoutMs = 10_000;
 
   /** 주소들을 차례로 GET해 처음으로 200과 JSON을 준 곳의 본문. 모두 없으면(404 등) null */

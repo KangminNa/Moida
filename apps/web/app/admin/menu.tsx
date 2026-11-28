@@ -16,7 +16,7 @@ export const LIBRARY_HREF = '/admin/library';
 export const SETTINGS_HREF = '/admin/ai';
 
 /** 옆 칸(대화 목록 · 설정 메뉴)을 접어 둔 것을 기억하는 쿠키. 콘솔 틀(layout)이 서버에서 읽어 처음부터 그 모양으로 그린다 */
-export const SIDE_COOKIE = 'cairn_side';
+export const SIDE_COOKIE = 'moida_side';
 
 /** 새 대화 (대화 목록 맨 위) */
 export const NEW_CHAT = { href: CHAT_HREF, name: '새 대화', icon: 'new' };

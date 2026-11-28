@@ -283,10 +283,10 @@ describe('가짜 러너', () => {
     const job = await take();
     assert.equal(job.task.id, task.id);
     assert.equal(job.instruction, '세션으로 글을 써 주세요');
-    assert.equal(job.skill, 'cairn-write');
+    assert.equal(job.skill, 'moida-write');
     assert.deepEqual(job.target, { kind: 'post', id: postId, version: 3 });
     assert.equal(job.agent.tool, 'claude');
-    assert.match(job.run_token, /^cairn_run_/);
+    assert.match(job.run_token, /^moida_run_/);
     assert.equal((await getTask(task.id)).status, 'running');
 
     const progress = await tool(runner, 'report_progress', {
@@ -560,7 +560,7 @@ describe('일 요청 이벤트', () => {
 
     const job = await take();
     assert.equal(job.task.id, rows[0]?.id);
-    assert.equal(job.skill, 'cairn-tidy');
+    assert.equal(job.skill, 'moida-tidy');
     assert.deepEqual(job.target, { kind: 'session', id: targetId, version: 2 });
   });
 
@@ -596,7 +596,7 @@ describe('일의 종류와 권한', () => {
     assert.equal(rest.length, 0);
     assert.equal((job?.task as Json | undefined)?.id, tidy.id);
     assert.equal((job?.agent as Json | undefined)?.id, first.id);
-    assert.equal(job?.skill, 'cairn-tidy');
+    assert.equal(job?.skill, 'moida-tidy');
     assert.equal((await getTask(tidy.id)).agentId, first.id);
   });
 
@@ -907,7 +907,7 @@ describe('작업 토큰', () => {
   test('없는 토큰이나 고친 토큰은 401', async () => {
     await newTask(await newAgent());
     const job = await take();
-    assert.equal((await api.mcp('cairn_run_nosuchtoken', 'tools/list')).status, 401);
+    assert.equal((await api.mcp('moida_run_nosuchtoken', 'tools/list')).status, 401);
     assert.equal((await api.mcp(`${job.run_token}x`, 'tools/list')).status, 401);
   });
 

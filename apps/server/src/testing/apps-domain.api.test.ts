@@ -4,8 +4,8 @@ import { after, before, describe, test } from 'node:test';
 import { ApiClient, type ApiResult, TestUser } from './api-client';
 import { CommunitySite } from './community-site';
 
-// 공통 앱 도메인 (2026-11-27, 기획서 결정 "apps.moida.ai.kr"): CAIRN_APPS_URL의 호스트로 온 요청은 앱 도메인처럼 등록한 경로만 지나고,
-// 앱은 웹이 경로의 첫 칸에서 읽어 x-cairn-app 머리글로 알린다. 그 도메인으로 연 공개 화면은 격리를 풀고(open),
+// 공통 앱 도메인 (2026-11-27, 기획서 결정 "apps.moida.ai.kr"): MOIDA_APPS_URL의 호스트로 온 요청은 앱 도메인처럼 등록한 경로만 지나고,
+// 앱은 웹이 경로의 첫 칸에서 읽어 x-moida-app 머리글로 알린다. 그 도메인으로 연 공개 화면은 격리를 풀고(open),
 // 계정 하나로 로그인하면 그 도메인의 모든 앱에 같은 쿠키로 참여한다. 자기 도메인 앱 · 기본 도메인은 지금 그대로
 
 const APPS = 'apps.example.com';
@@ -24,7 +24,7 @@ function shared(
   return api.viaHost(path, APPS, {
     ...options,
     headers: {
-      ...(app ? { 'x-cairn-app': app } : {}),
+      ...(app ? { 'x-moida-app': app } : {}),
       ...(write ? { origin: `http://${APPS}`, 'x-forwarded-for': CommunitySite.nextPlace() } : {}),
       ...options.headers,
     },
@@ -59,7 +59,7 @@ async function sharedApp(slug: string, open = true): Promise<{ id: string; slug:
 }
 
 before(async () => {
-  process.env.CAIRN_APPS_URL = `http://${APPS}`;
+  process.env.MOIDA_APPS_URL = `http://${APPS}`;
   api = await ApiClient.start();
   owner = await api.signIn();
   CommunitySite.mailbox(api);
@@ -68,7 +68,7 @@ before(async () => {
   apps.push(await sharedApp(`one-${mark}`), await sharedApp(`two-${mark}`));
 });
 after(async () => {
-  delete process.env.CAIRN_APPS_URL;
+  delete process.env.MOIDA_APPS_URL;
   await api.close();
 });
 
@@ -94,6 +94,15 @@ describe('공통 앱 도메인', () => {
     // 앱을 알리지 않은 회원 API는 어느 앱인지 몰라 없는 주소
     assert.equal((await shared('/api/community/me', null)).status, 404);
     assert.equal((await shared('/api/community/me', 'no-such-app')).status, 404);
+  });
+
+  test('옛 이름의 머리글(x-cairn-app, 2026-11-28 이름 바꾸기 전의 웹 · 앱 스크립트)도 앱을 알린다', async () => {
+    const [one] = apps as unknown as [{ slug: string }];
+    const old = await api.viaHost('/api/community/me', APPS, {
+      headers: { 'x-cairn-app': one.slug },
+    });
+    assert.equal(old.status, 200, old.text);
+    assert.equal((await shared('/api/community/me', one.slug)).status, 200);
   });
 
   test('한 번 로그인하면 같은 쿠키로 공통 도메인의 다른 앱에도 참여한다', async () => {
@@ -137,7 +146,7 @@ describe('공통 앱 도메인', () => {
       method: 'POST',
       as: member,
       body: { nickname: '두번째앱', ...agreed },
-      headers: { 'x-cairn-csrf': String(meTwo.csrf) },
+      headers: { 'x-moida-csrf': String(meTwo.csrf) },
     });
     assert.equal(entered.status, 201, entered.text);
     assert.equal(

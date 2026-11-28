@@ -1,14 +1,14 @@
 import { DeviceKind } from './device-login';
 import { DeviceSetup, DeviceState } from './device-setup';
 
-/** 이 컴퓨터의 세션 저장 상태 (cairn status) */
+/** 이 컴퓨터의 세션 저장 상태 (moida status) */
 export class CollectState extends DeviceState {
   constructor(
     saved: Record<string, unknown> | undefined,
     readonly hook: boolean,
     /** 마지막으로 세션을 올린 때 */
     readonly lastSaved: Date | null,
-    /** 아직 올리지 못한 세션 수 (~/.cairn/outbox) */
+    /** 아직 올리지 못한 세션 수 (~/.moida/outbox) */
     readonly waiting: number,
   ) {
     super(saved);
@@ -30,12 +30,12 @@ export class CollectState extends DeviceState {
   }
 }
 
-// cairn connect의 세션 저장 단계 (2차 4, Claude Code만): 세션 저장 기기(세션 올리기만, 권한 upload) · SessionEnd 훅.
+// moida connect의 세션 저장 단계 (2차 4, Claude Code만): 세션 저장 기기(세션 올리기만, 권한 upload) · SessionEnd 훅.
 //   ~/.claude/settings.json    SessionEnd 훅을 더한다 (있던 훅은 그대로)
-// 훅(~/.cairn/bin/cairn-collect.mjs)은 일꾼을 떼어 띄우고 곧바로 끝난다. 일꾼이 그 세션을 글로 바꿔 블로그에 올린다.
-// 저장소마다 끄려면 저장소 맨 위의 .cairn.json에 "collect": false.
+// 훅(~/.moida/bin/moida-collect.mjs)은 일꾼을 떼어 띄우고 곧바로 끝난다. 일꾼이 그 세션을 글로 바꿔 블로그에 올린다.
+// 저장소마다 끄려면 저장소 맨 위의 .moida.json에 "collect": false.
 export class CollectSetup extends DeviceSetup {
-  private static readonly SCRIPT = 'cairn-collect.mjs';
+  private static readonly SCRIPT = 'moida-collect.mjs';
   private static readonly EVENT = 'SessionEnd';
   /** Claude Code가 훅을 기다리는 시간(초). 훅은 일꾼만 띄우고 1초 안에 끝낸다 */
   private static readonly HOOK_SECONDS = 5;
@@ -55,7 +55,7 @@ export class CollectSetup extends DeviceSetup {
       return false;
     }
     this.terminal.done('세션 저장 훅 · Claude Code 세션이 끝나면 블로그에 올려요');
-    this.terminal.say('  저장소마다 끄려면 저장소 맨 위의 .cairn.json에 {"collect": false}');
+    this.terminal.say('  저장소마다 끄려면 저장소 맨 위의 .moida.json에 {"collect": false}');
     return true;
   }
 

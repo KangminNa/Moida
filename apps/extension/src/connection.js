@@ -53,7 +53,8 @@ export class Connection {
   async connect(origin) {
     const about = await this.request(`${origin}/.well-known/oauth-protected-resource/mcp`);
     const mcp = typeof about.resource === 'string' ? about.resource : '';
-    if (about.resource_name !== 'Cairn' || !mcp.endsWith('/mcp'))
+    // 옛 이름(Cairn)으로 답하는 블로그도 받는다 (2026-11-28 이름 cairn → moida 전에 배포한 서버)
+    if (!['Moida', 'Cairn'].includes(about.resource_name) || !mcp.endsWith('/mcp'))
       throw new Problem(`Moida 블로그가 아니에요: ${origin}`);
     const site = mcp.slice(0, -'/mcp'.length);
     if (new URL(site).origin !== origin)

@@ -38,7 +38,7 @@ function note(source: string, did: string, more: Record<string, unknown> = {}) {
     request_id: randomUUID(),
     source_session_id: source,
     tool: 'claude-code',
-    project: 'cairn',
+    project: 'moida',
     title: '세션 저장 만들기',
     did,
     ...more,
@@ -312,7 +312,7 @@ describe('관리 화면 API (api/sessions)', () => {
     const first = (list.sessions as Record<string, unknown>[])[0];
     assert.equal(first?.id, latest.body.session_id);
     assert.equal(first?.title, '세션 저장 만들기');
-    assert.equal(first?.project, 'cairn');
+    assert.equal(first?.project, 'moida');
     assert.equal(first?.visibility, 'private');
   });
 
@@ -690,7 +690,7 @@ describe('세션 읽기 도구 (search_sessions · get_session)', () => {
       assert.deepEqual(rest, {
         session_id: id,
         title: '세션 저장 만들기',
-        project: 'cairn',
+        project: 'moida',
         tool: 'claude-code',
         started_at: '2026-10-01T09:00:00.000Z',
         revision: 2,

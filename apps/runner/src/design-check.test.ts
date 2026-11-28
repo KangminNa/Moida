@@ -5,7 +5,7 @@ import { describe, test } from 'node:test';
 import { AppCodeEntry } from './app-code-check';
 import { DesignCheck } from './design-check';
 
-// 디자인 기준 검사 (2026-11-24, 스킬 cairn-make의 references/design.md 6장)
+// 디자인 기준 검사 (2026-11-24, 스킬 moida-make의 references/design.md 6장)
 
 const file = (name: string, text: string) => new AppCodeEntry(name, text.length, text);
 const GOOD_HEAD =
@@ -20,12 +20,12 @@ describe('디자인 기준 검사', () => {
     const made = [file('index.html', GOOD_HEAD), file('style.css', GOOD_CSS)];
     const check = DesignCheck.check(made, made);
     assert.equal(check?.ok, true, check?.tail);
-    assert.equal(DesignCheck.check([file('cairn.json', '{}')], []), null);
+    assert.equal(DesignCheck.check([file('moida.json', '{}')], []), null);
   });
 
   test('스킬의 토큰 본보기(3장)는 밝은 · 어두운 화면 모두 대비 4.5:1을 넘는다 (문서와 검사가 어긋나지 않게)', () => {
     const doc = readFileSync(
-      resolve(__dirname, '../../../skills/cairn-make/references/design.md'),
+      resolve(__dirname, '../../../skills/moida-make/references/design.md'),
       'utf8',
     );
     const css = /```css\n([\s\S]*?)```/.exec(doc)?.[1] ?? '';

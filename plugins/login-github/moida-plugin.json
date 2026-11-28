@@ -1,0 +1,46 @@
+{
+  "name": "login-github",
+  "version": "0.1.0",
+  "moida": ">=0.1",
+  "description": "GitHub 계정으로 로그인할 수 있게 한다. 계정 화면에서 먼저 연결한 GitHub 계정만 로그인된다",
+  "guide": {
+    "does": [
+      "콘솔에 GitHub 계정으로도 로그인할 수 있게 해요",
+      "설정 › 계정에서 미리 연결해 둔 GitHub 계정만 로그인돼요. 다른 사람의 GitHub로는 들어올 수 없어요"
+    ],
+    "setup": [
+      "GitHub › Settings › Developer settings › OAuth Apps에서 새 앱을 만들어요",
+      "Authorization callback URL에 \"사이트 주소/api/auth/login/github/callback\"을 넣어요",
+      "받은 Client ID와 Client secret을 아래에 넣고 저장해요",
+      "설정 › 계정에서 내 GitHub 계정을 연결하면, 다음부터 로그인 화면에 GitHub 단추가 생겨요"
+    ]
+  },
+  "server": "server/plugin.ts",
+  "uses": ["login:github"],
+  "settings": {
+    "clientId": {
+      "label": "Client ID",
+      "type": "text",
+      "required": true,
+      "help": "GitHub → Settings → Developer settings → OAuth Apps에서 앱을 만들어요. Authorization callback URL은 <사이트 주소>/api/auth/login/github/callback"
+    },
+    "clientSecret": {
+      "label": "Client secret",
+      "type": "secret",
+      "required": true,
+      "help": "서버 키로 암호화해서 저장하고, 다시 보여주지 않아요"
+    },
+    "githubUrl": {
+      "label": "GitHub 주소",
+      "type": "text",
+      "default": "https://github.com",
+      "help": "GitHub Enterprise를 쓸 때만 바꿔요"
+    },
+    "apiUrl": {
+      "label": "GitHub API 주소",
+      "type": "text",
+      "default": "https://api.github.com",
+      "help": "GitHub Enterprise를 쓸 때만 바꿔요"
+    }
+  }
+}

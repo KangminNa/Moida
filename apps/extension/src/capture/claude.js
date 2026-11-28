@@ -7,7 +7,7 @@
 const PERSON = '[data-testid="user-message"]';
 const AI = '.font-claude-response, .font-claude-message';
 
-globalThis.cairnWatch({
+globalThis.moidaWatch({
   tool: 'claude-web',
   conversationId: (path) => /\/chat\/([\w-]+)/.exec(path)?.[1] ?? null,
   streaming: () => document.querySelector('[data-is-streaming="true"]') !== null,

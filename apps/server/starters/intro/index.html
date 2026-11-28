@@ -647,7 +647,7 @@ svg text { font-family: var(--ui); }
 </footer>
 
 <script>
-const page = (() => { try { return JSON.parse(document.getElementById('cairn-data').textContent); } catch { return {}; } })();
+const page = (() => { try { return JSON.parse(document.getElementById('moida-data').textContent); } catch { return {}; } })();
 const SITE_NAME = (page.site && page.site.name) || 'MOIDA';
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (id) => document.getElementById(id);
@@ -1076,7 +1076,7 @@ document.querySelectorAll('.tile').forEach((t) => t.addEventListener('click', ()
     cli: {
       name: 'CLI',
       draw: () => {
-        inBox.innerHTML = '<pre class="term"><i>$</i> pnpm cairn app deploy https://travel.moida.example ./dist</pre>';
+        inBox.innerHTML = '<pre class="term"><i>$</i> pnpm moida app deploy https://travel.moida.example ./dist</pre>';
         const go = document.createElement('button'); go.className = 'go'; go.type = 'button'; go.textContent = '실행';
         go.addEventListener('click', async () => {
           go.remove();

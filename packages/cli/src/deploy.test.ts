@@ -10,10 +10,10 @@ import { DeviceLogin } from './device-login';
 import { FolderZip } from './folder-zip';
 import { Shell } from './shell';
 import { CliError, Terminal } from './terminal';
-import { FakeCairn } from './testing/fake-cairn';
+import { FakeMoida } from './testing/fake-moida';
 
-// cairn app deploy: 빌드한 폴더를 zip으로 묶어, 배포 기기(OAuth scope=deploy → 권한 write만)로 표를 받아 올린다.
-// 블로그는 테스트용 서버(FakeCairn), 브라우저는 fetch로 대신한다. 올리기 스크립트(~/.cairn/bin/cairn-deploy.mjs)는 실제로 돈다.
+// moida app deploy: 빌드한 폴더를 zip으로 묶어, 배포 기기(OAuth scope=deploy → 권한 write만)로 표를 받아 올린다.
+// 블로그는 테스트용 서버(FakeMoida), 브라우저는 fetch로 대신한다. 올리기 스크립트(~/.moida/bin/moida-deploy.mjs)는 실제로 돈다.
 
 /** 브라우저 대신: 승인 주소를 열면 테스트용 블로그가 곧바로 이 컴퓨터의 주소로 돌려보낸다 */
 class FakeBrowser extends Shell {
@@ -53,16 +53,16 @@ function unzip(bytes: Buffer): Record<string, string> {
   return files;
 }
 
-let blog: FakeCairn;
+let blog: FakeMoida;
 let dir: string;
 let home: string | undefined;
 let terminal: FakeTerminal;
 let browser: FakeBrowser;
 
-const cairnDir = () => join(dir, '.cairn');
-const credentials = () => JSON.parse(readFileSync(join(cairnDir(), 'credentials.json'), 'utf8'));
+const moidaDir = () => join(dir, '.moida');
+const credentials = () => JSON.parse(readFileSync(join(moidaDir(), 'credentials.json'), 'utf8'));
 const command = () =>
-  new DeployCommand(terminal, browser, new DeviceLogin(terminal, browser, 5_000), cairnDir());
+  new DeployCommand(terminal, browser, new DeviceLogin(terminal, browser, 5_000), moidaDir());
 /** 빌드 결과 폴더 하나 */
 function build(files: Record<string, string>): string {
   const root = join(dir, 'dist');
@@ -74,13 +74,13 @@ function build(files: Record<string, string>): string {
 }
 
 before(async () => {
-  blog = new FakeCairn();
+  blog = new FakeMoida();
   await blog.start();
 });
 after(() => blog.close());
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'cairn-deploy-test-'));
-  // 올리기 스크립트는 ~/.cairn을 읽는다: 이 테스트의 폴더를 집으로
+  dir = mkdtempSync(join(tmpdir(), 'moida-deploy-test-'));
+  // 올리기 스크립트는 ~/.moida을 읽는다: 이 테스트의 폴더를 집으로
   home = process.env.HOME;
   process.env.HOME = dir;
   terminal = new FakeTerminal();
@@ -115,7 +115,7 @@ describe('FolderZip', () => {
   });
 });
 
-describe('cairn app deploy', () => {
+describe('moida app deploy', () => {
   test('처음에는 배포 기기를 승인받고, 표를 받아 묶음을 올린다', async () => {
     const root = build({ 'index.html': '<html>앱</html>', 'assets/app.js': 'a' });
     await command().run('lingo', root, blog.origin, '첫 배포');
@@ -141,7 +141,7 @@ describe('cairn app deploy', () => {
     const out = terminal.lines.join('\n');
     assert.match(out, /lingo 버전 1 · 파일 2개/);
     assert.match(out, /바로 보여요/);
-    assert.doesNotMatch(out, /cairn_at_|cairn_rt_|deploy-ticket/, '토큰 · 표를 찍지 않는다');
+    assert.doesNotMatch(out, /moida_at_|moida_rt_|deploy-ticket/, '토큰 · 표를 찍지 않는다');
   });
 
   test('다음부터는 --site 없이 같은 블로그로, 다시 승인받지 않는다. 공개 앱은 확인 대기를 알린다', async () => {

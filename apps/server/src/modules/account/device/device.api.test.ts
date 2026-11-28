@@ -85,7 +85,7 @@ describe('AI 도구가 찾아오기', () => {
       resource: `${site}/mcp`,
       authorization_servers: [site],
       bearer_methods_supported: ['header'],
-      resource_name: 'Cairn',
+      resource_name: 'Moida',
     });
     const meta = (await api.get('/.well-known/oauth-authorization-server')).json();
     assert.equal(meta.issuer, site);
@@ -127,7 +127,7 @@ describe('AI 도구가 찾아오기', () => {
         201,
         uri,
       );
-    assert.match(await registerClient(), /^cairn_[0-9a-f]{32}$/);
+    assert.match(await registerClient(), /^moida_[0-9a-f]{32}$/);
   });
 
   test('스스로 등록은 한 곳(IP)에서 1시간에 20번까지. 21번째는 429 (OAuth 오류 모양)', async () => {
@@ -186,7 +186,7 @@ describe('AI 도구가 찾아오기', () => {
 describe('승인 요청', () => {
   test('등록 안 된 클라이언트나 다른 돌려보낼 주소는 돌려보내지 않고 400', async () => {
     const { challenge } = pkce();
-    assert.equal((await api.get(authorizePath('cairn_nobody', challenge))).status, 400);
+    assert.equal((await api.get(authorizePath('moida_nobody', challenge))).status, 400);
     const clientId = await registerClient();
     const other = authorizePath(clientId, challenge).replace(
       encodeURIComponent(REDIRECT),
@@ -378,7 +378,7 @@ describe('코드를 토큰으로', () => {
     assert.equal(ok.header('cache-control'), 'no-store');
     assert.equal(ok.json().token_type, 'Bearer');
     assert.equal(ok.json().scope, 'upload read_public');
-    assert.match(String(ok.json().access_token), /^cairn_at_/);
+    assert.match(String(ok.json().access_token), /^moida_at_/);
     const again = await api.form('/oauth/token', { ...body, code_verifier: verifier });
     assert.equal(again.json().error, 'invalid_grant');
   });
@@ -405,7 +405,7 @@ describe('MCP', () => {
     });
     assert.equal(init.status, 200, init.text);
     const result = init.json().result as { serverInfo: { name: string } };
-    assert.equal(result.serverInfo.name, 'cairn');
+    assert.equal(result.serverInfo.name, 'moida');
     const tools = await api.mcp(access, 'tools/list');
     assert.equal(tools.status, 200, tools.text);
     const names = (tools.json().result as { tools: { name: string }[] }).tools.map((t) => t.name);
@@ -462,7 +462,7 @@ describe('MCP', () => {
   });
 });
 
-// cairn connect가 만드는 소식 기기 (2차 1-3): 승인 요청에 scope=news를 실으면 소식만 읽는 기기가 따로 생긴다.
+// moida connect가 만드는 소식 기기 (2차 1-3): 승인 요청에 scope=news를 실으면 소식만 읽는 기기가 따로 생긴다.
 describe('소식 기기 (scope=news)', () => {
   /** 이 파일의 다른 등록과 세지 않게 등록만 새 서버(같은 DB)에서 한다 */
   let fresh: ApiClient;
@@ -597,7 +597,7 @@ describe('소식 기기 (scope=news)', () => {
     };
     const local = await register();
     assert.deepEqual((await shownFor(local, 'collect')).scopes, ['upload']);
-    // 배포 기기 (cairn app deploy, 스토어 12.5): 쓰기만. 승인 화면에 그 권한이 보인다
+    // 배포 기기 (moida app deploy, 스토어 12.5): 쓰기만. 승인 화면에 그 권한이 보인다
     assert.deepEqual((await shownFor(local, 'deploy')).scopes, ['write']);
 
     const extension = `https://${'b'.repeat(32)}.chromiumapp.org/`;
@@ -663,7 +663,7 @@ describe('러너 추가', () => {
     assert.equal(res.status, 201, res.text);
     const runner = res.json() as { id: string; scopes: string[]; token: string };
     assert.deepEqual(runner.scopes, ['run']);
-    assert.match(runner.token, /^cairn_dt_/);
+    assert.match(runner.token, /^moida_dt_/);
 
     const tools = await api.mcp(runner.token, 'tools/list');
     const names = (tools.json().result as { tools: { name: string }[] }).tools.map((t) => t.name);
@@ -720,7 +720,7 @@ describe('서버 러너 (연결 값으로 스스로 연결)', () => {
     const runner = first.json() as { id: string; name: string; scopes: string[]; token: string };
     assert.equal(runner.name, '서버 러너');
     assert.deepEqual(runner.scopes, ['run']);
-    assert.match(runner.token, /^cairn_dt_/);
+    assert.match(runner.token, /^moida_dt_/);
     assert.equal((await api.mcp(runner.token, 'tools/list')).status, 200);
 
     const again = (await pair(secret())).json() as { id: string; token: string };
@@ -905,7 +905,7 @@ describe('갱신과 끊기', () => {
 
     const issued = await api.request('POST', `/api/devices/${device.id}/token`, owner);
     const spare = String(issued.json().token);
-    assert.match(spare, /^cairn_dt_/);
+    assert.match(spare, /^moida_dt_/);
     assert.equal((await api.mcp(spare, 'tools/list')).status, 200, '예비 토큰으로도 들어온다');
 
     assert.equal(

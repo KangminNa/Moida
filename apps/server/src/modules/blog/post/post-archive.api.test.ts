@@ -80,8 +80,8 @@ const inZip = (files: [string, Buffer][], path: string): Buffer[] =>
   files.filter(([name]) => name === path).map(([, body]) => body);
 
 before(async () => {
-  blobs = await mkdtemp(join(tmpdir(), 'cairn-archive-test-'));
-  process.env.CAIRN_BLOBS_DIR = blobs;
+  blobs = await mkdtemp(join(tmpdir(), 'moida-archive-test-'));
+  process.env.MOIDA_BLOBS_DIR = blobs;
   api = await ApiClient.start();
   owner = await api.signIn();
   const { version } = (await api.get('/api/space')).json() as { version: number };

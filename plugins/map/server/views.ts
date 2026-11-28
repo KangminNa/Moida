@@ -1,6 +1,6 @@
 import type { MapPlace } from './map-search.gateway';
 
-// 이 패키지가 내보내는 모양 (앱 코드의 cairn.map이 받는다)
+// 이 패키지가 내보내는 모양 (앱 코드의 moida.map이 받는다)
 
 /** 찾은 장소들과 찾은 회사 · 출처 표시 (회사의 결과임을 화면에 적게) */
 export class PlaceListView {

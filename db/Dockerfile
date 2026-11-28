@@ -1,4 +1,4 @@
-# Cairn DB 이미지: Postgres 17 + pgvector(의미 검색) + pg_bigm(한국어 키워드 검색)
+# Moida DB 이미지: Postgres 17 + pgvector(의미 검색) + pg_bigm(한국어 키워드 검색)
 FROM pgvector/pgvector:pg17
 
 ARG PG_MAJOR=17

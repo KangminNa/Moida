@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { AiStream } from './ai-tool';
-import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import type { JobLineage, RunMemo } from './job-lineage';
 import type { JobWorkspace } from './job-workspace';
 import type { LineagePlace, LineageStore } from './lineage-store';
+import type { MoidaServer } from './moida-server';
 import type { Redactor, RunLog } from './redactor';
 
 /** save_run_record의 본문. 다시 보내도 한 번만 쌓이게 request_id를 들고 있다 */
@@ -44,7 +44,7 @@ export class RunRecorder {
   private lineage: JobLineage | null = null;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly store: LineageStore,
     /** 엔진이 CLI 세션을 남기고 재개하는가 (EngineAdapter.resumes) */
     private readonly resumes: boolean,

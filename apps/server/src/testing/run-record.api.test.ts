@@ -155,7 +155,7 @@ describe('실행 기록 (save_run_record · run_memos)', () => {
         session.transcriptCount,
         session.revisionCount,
       ],
-      ['산책 글 정리', 'cairn-agent', `task:${task.id}`, 1, 1],
+      ['산책 글 정리', 'moida-agent', `task:${task.id}`, 1, 1],
     );
     assert.equal(session.visibility, 'private');
     assert.equal(session.head.actorType, 'system');

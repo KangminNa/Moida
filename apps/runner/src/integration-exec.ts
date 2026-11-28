@@ -55,7 +55,7 @@ export class IntegrationExec {
     if (problems.length > 0)
       return { ok: false, error: `규칙 검사: ${problems.join(' · ')}`, kind: 'code', ms: 0 };
     const playwright = await realpath(IntegrationExec.playwrightCore());
-    const scratch = await mkdtemp(join(await realpath(tmpdir()), 'cairn-site-'));
+    const scratch = await mkdtemp(join(await realpath(tmpdir()), 'moida-site-'));
     try {
       const job = {
         code,

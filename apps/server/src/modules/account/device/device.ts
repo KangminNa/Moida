@@ -32,7 +32,7 @@ export class DeviceCredential {
   ) {}
 
   static issue(kind: string, lifetimeMs: number | null, now: Date): DeviceCredential {
-    const prefix = { access: 'cairn_at_', refresh: 'cairn_rt_', device: 'cairn_dt_' }[kind] ?? '';
+    const prefix = { access: 'moida_at_', refresh: 'moida_rt_', device: 'moida_dt_' }[kind] ?? '';
     const token = `${prefix}${randomBytes(32).toString('base64url')}`;
     const expires = lifetimeMs === null ? null : new Date(now.getTime() + lifetimeMs);
     return new DeviceCredential(kind, DeviceCredential.hash(token), expires, null, token);
@@ -51,7 +51,7 @@ export class DeviceCredential {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  /** 화면에 보일 앞부분 (예: cairn_dt_AbC…) */
+  /** 화면에 보일 앞부분 (예: moida_dt_AbC…) */
   get prefix(): string {
     return this.token ? `${this.token.slice(0, 14)}…` : '';
   }

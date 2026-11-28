@@ -1,14 +1,14 @@
 import { RuleViolation } from '../../platform';
 import type { SkillFiles } from './skill-files';
 
-// AI에게 가는 지시문의 틀 (러너 스킬 cairn-runner, 2차 1-0 · 기획서 결정 2026-11-14). 글은 코드에 두지 않는다.
+// AI에게 가는 지시문의 틀 (러너 스킬 moida-runner, 2차 1-0 · 기획서 결정 2026-11-14). 글은 코드에 두지 않는다.
 // 러너가 대부분을 채우고(apps/runner의 PromptPack, 같은 문법), 서버도 자기가 만드는 지시(목표 실행의 회차 지시,
 // read_url의 알림)를 여기서 채운다. 주인이 스킬 메뉴에서 쌓은 판이 저장소 판 위에 얹힌다 (없는 틀은 저장소 판에서).
 //
 // 문법 (references/*.md): `<!-- 이름 -->` 줄부터 다음 표시 전까지가 틀 하나. {{자리}}는 값,
 // {{#자리}}…{{/자리}}는 값이 있을 때만, {{^자리}}…{{/자리}}는 없을 때만 (없음: 빈 글 · 0 · false · null). 여닫는 표시만 있는 줄은 줄째 빠진다
 export class PromptTemplates {
-  static readonly SKILL = 'cairn-runner';
+  static readonly SKILL = 'moida-runner';
   private static readonly MARK = /^<!-- ([a-z][a-z0-9-]*) -->$/;
   private static readonly TAG = /\{\{([#^/]?)([a-zA-Z][a-zA-Z0-9]*)\}\}/g;
   private static readonly STANDALONE = /^[ \t]*(\{\{[#^/][a-zA-Z][a-zA-Z0-9]*\}\})[ \t]*\n/gm;

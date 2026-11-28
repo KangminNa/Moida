@@ -74,7 +74,7 @@ export class CodeSpec {
 
   /** 이 작업이 올리는 브랜치. 러너만 쓰고, 다시 하면 같은 이름에 덮어쓴다 */
   get branch(): string {
-    return `cairn/${this.taskId}`;
+    return `moida/${this.taskId}`;
   }
 
   /** 이 파일을 고쳐도 되는가 (git이 주는 저장소 안의 경로) */

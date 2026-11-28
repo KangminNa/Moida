@@ -15,26 +15,26 @@ function read(...lines: string[]) {
 }
 
 describe('codex exec --json', () => {
-  test('cairn 도구는 읽기 · 쓰기로, 마지막 답과 토큰은 턴이 끝날 때', () => {
+  test('moida 도구는 읽기 · 쓰기로, 마지막 답과 토큰은 턴이 끝날 때', () => {
     const { stream, events } = read(
       line({ type: 'thread.started', thread_id: 't1' }),
       line({ type: 'turn.started' }),
       item('started', {
         type: 'mcp_tool_call',
-        server: 'cairn',
+        server: 'moida',
         tool: 'search_sessions',
         arguments: { query: '러너' },
         status: 'in_progress',
       }),
       item('completed', {
         type: 'mcp_tool_call',
-        server: 'cairn',
+        server: 'moida',
         tool: 'search_sessions',
         status: 'completed',
       }),
       item('started', {
         type: 'mcp_tool_call',
-        server: 'cairn',
+        server: 'moida',
         tool: 'blog_save_draft',
         arguments: { title: '초안' },
       }),
@@ -63,7 +63,7 @@ describe('codex exec --json', () => {
     const { events } = read(
       item('completed', {
         type: 'mcp_tool_call',
-        server: 'cairn',
+        server: 'moida',
         tool: 'blog_get_post',
         status: 'failed',
         error: { message: '없는 글이에요' },

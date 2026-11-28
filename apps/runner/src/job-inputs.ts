@@ -1,7 +1,7 @@
-import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import { JobPhotos, type PhotoSight } from './job-photos';
 import type { JobWorkspace } from './job-workspace';
+import type { MoidaServer } from './moida-server';
 import { RunEvent } from './progress';
 
 // 일에 붙는 입력 받기: 대화에 넣은 사진(JobPhotos)과 앱 화면 공개를 검수하는 일의 코드 (서버 ChatInspect, 2026-11-20).
@@ -13,7 +13,7 @@ export class JobInputs {
 
   constructor(
     private readonly job: Job,
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     serverUrl: string,
     sight: PhotoSight | null,
   ) {

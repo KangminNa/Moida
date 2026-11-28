@@ -55,7 +55,7 @@ describe('IntegrationRules (쓰기 도구)', () => {
 
 describe('IntegrationExec.outcomeOf', () => {
   test('마지막 결과 줄을 읽고, 없거나 객체가 아니면 실패', () => {
-    const line = (m: object) => `로그\n@@cairn-site-result@@${JSON.stringify(m)}\n`;
+    const line = (m: object) => `로그\n@@moida-site-result@@${JSON.stringify(m)}\n`;
     assert.deepEqual(IntegrationExec.outcomeOf(line({ ok: true, output: { a: 1 } }), 5), {
       ok: true,
       output: { a: 1 },

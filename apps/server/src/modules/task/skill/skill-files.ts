@@ -12,15 +12,15 @@ export class SkillFiles {
   static readonly TOTAL_MAX = 128 * 1024;
   /** 러너가 깔 수 있는 경로 (스킬 폴더 밖이나 실행 파일은 없다) */
   private static readonly PATH = /^(SKILL\.md|references\/[a-z0-9][a-z0-9._-]{0,60}\.md)$/;
-  /** 러너 전용 스킬의 표시 (cairn connect가 사람의 AI 도구에 넣지 않는다) */
-  private static readonly RUNNER = /^cairn-where: runner$/m;
+  /** 러너 전용 스킬의 표시 (moida connect가 사람의 AI 도구에 넣지 않는다) */
+  private static readonly RUNNER = /^moida-where: runner$/m;
   private static readonly FRONT = /^---\n([\s\S]*?)\n---\n/;
 
   private constructor(private readonly files: ReadonlyMap<string, string>) {}
 
   /**
    * 주인이 보낸 파일들. 규칙을 어기면 RuleViolation: 경로는 SKILL.md와 references/*.md만, 개수 · 크기 한도,
-   * SKILL.md 앞부분의 name이 스킬 이름과 같고 cairn-where: runner가 남아 있어야 한다
+   * SKILL.md 앞부분의 name이 스킬 이름과 같고 moida-where: runner가 남아 있어야 한다
    */
   static of(name: string, raw: Readonly<Record<string, string>>): SkillFiles {
     const entries = Object.entries(raw);
@@ -48,7 +48,7 @@ export class SkillFiles {
     return new SkillFiles(new Map(Object.entries(raw)));
   }
 
-  /** 러너 전용 스킬인가 (SKILL.md 앞부분의 cairn-where: runner) */
+  /** 러너 전용 스킬인가 (SKILL.md 앞부분의 moida-where: runner) */
   static isRunnerSkill(skillMd: string): boolean {
     return SkillFiles.RUNNER.test(SkillFiles.FRONT.exec(skillMd)?.[1] ?? '');
   }
@@ -78,6 +78,6 @@ export class SkillFiles {
     if (/^name: (.*)$/m.exec(head)?.[1]?.trim() !== name)
       throw new RuleViolation(`SKILL.md 앞부분의 name은 ${name}이어야 해요`);
     if (!SkillFiles.RUNNER.test(head))
-      throw new RuleViolation('SKILL.md 앞부분에 cairn-where: runner를 남겨 두어야 해요');
+      throw new RuleViolation('SKILL.md 앞부분에 moida-where: runner를 남겨 두어야 해요');
   }
 }

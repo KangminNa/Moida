@@ -22,8 +22,8 @@ export function TextSize() {
     if (next === 'normal') delete document.documentElement.dataset.text;
     else document.documentElement.dataset.text = next;
     try {
-      if (next === 'normal') localStorage.removeItem('cairn-text');
-      else localStorage.setItem('cairn-text', next);
+      if (next === 'normal') localStorage.removeItem('moida-text');
+      else localStorage.setItem('moida-text', next);
     } catch {
       // 저장이 막힌 브라우저에서는 지금 화면에만 적용한다
     }

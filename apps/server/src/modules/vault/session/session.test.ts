@@ -18,7 +18,7 @@ const github = `gh${'p_'}${'A1b2C3d4'.repeat(5)}`;
 function note(did: string, extra: Partial<Record<string, string>> = {}): SessionNote {
   return SessionNote.write(
     '세션 저장 만들기',
-    ['cairn'],
+    ['moida'],
     new Map(Object.entries({ did, ...extra })),
   );
 }
@@ -88,7 +88,7 @@ describe('SensitivePolicy', () => {
   });
 
   test('Moida의 작업 토큰도 지운다', () => {
-    const clean = scrub(note(`작업 토큰 cairn_${'run'}_${'a'.repeat(40)}-${'b'.repeat(40)} 사용`));
+    const clean = scrub(note(`작업 토큰 moida_${'run'}_${'a'.repeat(40)}-${'b'.repeat(40)} 사용`));
     assert.equal(clean.section('did'), '작업 토큰 [지움: Moida 토큰] 사용');
   });
 
@@ -99,7 +99,7 @@ describe('SensitivePolicy', () => {
           'DB_PASSWORD 설정: password=hunter2025',
           'api_key: "abcdefghijklmnopqrstuv"',
           'password: string;',
-          'token: process.env.CAIRN_TOKEN',
+          'token: process.env.MOIDA_TOKEN',
         ].join('\n'),
       ),
     );
@@ -109,7 +109,7 @@ describe('SensitivePolicy', () => {
         'DB_PASSWORD 설정: password=[지움: 비밀번호·키 값]',
         'api_key: "[지움: 비밀번호·키 값]"',
         'password: string;',
-        'token: process.env.CAIRN_TOKEN',
+        'token: process.env.MOIDA_TOKEN',
       ].join('\n'),
     );
   });
@@ -156,7 +156,7 @@ describe('Session', () => {
     assert.throws(() => Session.open(device, 'Claude Code', 'abc', null, null), RuleViolation);
   });
 
-  test('작업 세션의 도구 이름(cairn-agent)은 에이전트 실행의 기록만 쓴다', () => {
+  test('작업 세션의 도구 이름(moida-agent)은 에이전트 실행의 기록만 쓴다', () => {
     assert.throws(
       () => Session.open(device, Session.AGENT_TOOL, 'chat:x', null, null),
       RuleViolation,
@@ -166,7 +166,7 @@ describe('Session', () => {
   });
 
   test('새 내용이면 판이 쌓이고, 이미 있는 내용이면 판을 만들지 않는다. 새 세션은 늘 비공개', () => {
-    const session = Session.open(device, 'claude-code', 'conv-1', 'cairn', null);
+    const session = Session.open(device, 'claude-code', 'conv-1', 'moida', null);
     assert.equal(session.unsaved.visibility, Session.PRIVATE);
     const now = new Date('2026-10-10T10:00:00Z');
     const first = session.receive(note('하나'), device, now);

@@ -67,8 +67,8 @@ async function photoOf(post: Saved, body = png()): Promise<Uploaded> {
 }
 
 before(async () => {
-  blobs = await mkdtemp(join(tmpdir(), 'cairn-asset-test-'));
-  process.env.CAIRN_BLOBS_DIR = blobs;
+  blobs = await mkdtemp(join(tmpdir(), 'moida-asset-test-'));
+  process.env.MOIDA_BLOBS_DIR = blobs;
   api = await ApiClient.start();
   owner = await api.signIn();
   const { version } = (await api.get('/api/space')).json() as { version: number };

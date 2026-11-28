@@ -17,10 +17,10 @@ import type { SandboxRoom } from './sandbox-room';
 
 // Claude Code를 부르는 법. 엔진 어댑터(ClaudeEngine)는 맨 아래에 있다 (리팩토링 E2).
 //
-// 격리: 설정·홈은 빈 임시 폴더, MCP는 --strict-mcp-config로 넘긴 것만 (cairn, 브라우저 작업의 playwright, 허락한 외부 도구 x-*), claude.ai 연결은 끈다.
+// 격리: 설정·홈은 빈 임시 폴더, MCP는 --strict-mcp-config로 넘긴 것만 (moida, 브라우저 작업의 playwright, 허락한 외부 도구 x-*), claude.ai 연결은 끈다.
 // 브라우저 작업(browse)에서만 playwright를 더한다 (BrowserMcp: 서버 브라우저에 CDP로, 사이트의 허용 출처만).
 // --bare는 쓰지 않는다: CLAUDE_CODE_OAUTH_TOKEN을 읽지 않는다.
-// 권한: 셸을 주지 않는다. 내장 도구는 파일 도구만, 쓰기는 acceptEdits라 work 폴더 안에서만, MCP는 cairn만 묻지 않고 허락한다.
+// 권한: 셸을 주지 않는다. 내장 도구는 파일 도구만, 쓰기는 acceptEdits라 work 폴더 안에서만, MCP는 moida만 묻지 않고 허락한다.
 // 예외: 코드 러너 칸의 일(코드 · 만들기)은 셸 · 찾기(Bash · Glob · Grep)를 묻지 않고 허락한다. 칸 안의 agent로 돌고 바깥은 허용 목록뿐이다.
 // -p는 물을 사람이 없어서 그 밖의 것은 거절된다. 작업 폴더 밖 읽기도 그렇다: Claude가 허락을 묻고, 답할 사람이 없어 거절된다.
 // 그래도 주인의 홈은 settings.json의 deny로 막는다 (ClaudeCli.settings): 거절이 더 확실하고 권한 모드가 바뀌어도 남는다.
@@ -301,7 +301,7 @@ export class ClaudeCli implements AiTool {
 export class ClaudeEngine implements EngineAdapter {
   readonly name = ClaudeCli.TOOL;
   readonly efforts = ClaudeCli.EFFORTS;
-  readonly bin = { env: 'CAIRN_RUNNER_CLI', fallback: 'claude' };
+  readonly bin = { env: 'MOIDA_RUNNER_CLI', fallback: 'claude' };
   readonly ownLogin = 'CLAUDE_CODE_OAUTH_TOKEN';
   readonly resumes = true;
   /** 작업 폴더의 photos/에 받은 사진을 Read로 본다 (그림 파일을 읽으면 그림으로 받는다) */

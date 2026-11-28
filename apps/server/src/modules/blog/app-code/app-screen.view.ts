@@ -1,7 +1,7 @@
 import type { AppRow, IssueRow, MenuRow, PageRow, PostRow } from '../blog.tables';
 
-// 앱 화면 하나의 데이터 (스토어 1-6, 데이터 약속 cairn: 1, docs/스토어.md 9.3). 웹이 앱 코드의 템플릿(Mustache)에 채우고,
-// 같은 값을 <script id="cairn-data">로 싣는다. 약속은 이름을 더하기만 한다 (빼거나 바꾸면 cairn: 2).
+// 앱 화면 하나의 데이터 (스토어 1-6, 데이터 약속 moida: 1, docs/스토어.md 9.3). 웹이 앱 코드의 템플릿(Mustache)에 채우고,
+// 같은 값을 <script id="moida-data">로 싣는다. 약속은 이름을 더하기만 한다 (빼거나 바꾸면 moida: 2).
 // 방문자 데이터만 담는다: 누가 보든(관리자 · 미리 보기 토큰도) 같은 모양이고, 보이는지는 Query가 앱을 정할 때 이미 걸렀다.
 // 웹이 더하는 것: 날짜 글자(dateText), 글 본문의 HTML(post.html), 사이트 이름(site.name).
 // 앱 도메인으로 연 화면(스토어 3-0)은 그 앱의 주소가 도메인의 뿌리(/)이고, 기본 도메인에 있는 것(사이트 첫 화면 · 로그인 · 그래프 ·
@@ -117,7 +117,7 @@ export class AppScreenDataView {
       current: r.id === app.id,
     }));
     return {
-      cairn: 1,
+      moida: 1,
       screen: this.screen,
       isHome: this.screen === 'home',
       isPost: this.screen === 'post',
@@ -285,7 +285,7 @@ export class AppScreenView {
     private readonly status: number,
     /** 그린 코드의 버전. 0이면 종류의 시작 코드 */
     private readonly seq: number,
-    /** 채울 템플릿. 없으면(앱 안의 없는 주소인데 404.html이 없다) 웹이 Cairn의 404를 그린다 */
+    /** 채울 템플릿. 없으면(앱 안의 없는 주소인데 404.html이 없다) 웹이 Moida의 404를 그린다 */
     private readonly template: string | null,
     private readonly templates: ReadonlyMap<string, string>,
     private readonly hosts: readonly string[],
@@ -312,7 +312,7 @@ export class AppScreenView {
 }
 
 /**
- * 정적 앱의 화면 (스토어 9.13, cairn.json의 "render": "static"): 템플릿을 채우지 않고 묶음의 파일을 그대로 내보낸다.
+ * 정적 앱의 화면 (스토어 9.13, moida.json의 "render": "static"): 템플릿을 채우지 않고 묶음의 파일을 그대로 내보낸다.
  * file은 이 주소가 가리키는 파일 (없는 주소 중 확장자가 없는 것은 index.html: 앱 안의 화면 전환), 없는 파일이면 null(404).
  * HTML이면 글(text)을 함께 준다: 웹이 주소 기준(<base>)과 데이터 블록을 넣어 격리 머리글과 함께 보낸다.
  * 그 밖의 파일은 웹이 파일 주소(files/<경로>)에서 받아 넘긴다

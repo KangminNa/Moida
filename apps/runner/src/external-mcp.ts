@@ -2,7 +2,7 @@ import type { Json } from './json';
 
 /**
  * 외부 도구 하나 (2차 7단계): 에이전트에게 허락한 바깥 서비스의 원격 MCP 서버. 서버가 일과 함께 보낸다 (next_jobs의 tools).
- * 러너 안의 서버 이름은 x-<name>이라 cairn · playwright와 겹치지 않는다. 머리글 값(토큰)은 로그와 기록에서 지울 값이다.
+ * 러너 안의 서버 이름은 x-<name>이라 moida · playwright와 겹치지 않는다. 머리글 값(토큰)은 로그와 기록에서 지울 값이다.
  * 서버가 거른 값이지만 CLI 설정에 그대로 쓰므로 모양을 다시 본다: 틀린 도구는 붙이지 않는다.
  */
 export class ExternalMcp {

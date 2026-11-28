@@ -25,20 +25,20 @@ describe('쿠키 앞머리', () => {
       HTTPS,
     );
     assert.equal(res.status, 200, res.text);
-    const line = res.setCookies().find((l) => l.startsWith('__Host-cairn_session='));
+    const line = res.setCookies().find((l) => l.startsWith('__Host-moida_session='));
     assert.ok(line, res.setCookies().join(' | '));
     assert.match(line, /;\s*Secure/i);
     assert.match(line, /;\s*Path=\/(;|$)/);
     assert.doesNotMatch(line, /Domain=/i);
-    const token = res.cookies()['__Host-cairn_session'] ?? '';
+    const token = res.cookies()['__Host-moida_session'] ?? '';
 
-    const prefixed = new TestUser({ '__Host-cairn_session': token });
+    const prefixed = new TestUser({ '__Host-moida_session': token });
     assert.equal(
       (await api.request('GET', '/api/auth/me', prefixed, undefined, HTTPS)).status,
       200,
     );
     // 하위 도메인이 심을 수 있는 앞머리 없는 이름은 https에서 읽지 않는다
-    const planted = new TestUser({ cairn_session: token });
+    const planted = new TestUser({ moida_session: token });
     assert.notEqual(
       (await api.request('GET', '/api/auth/me', planted, undefined, HTTPS)).status,
       200,
@@ -48,7 +48,22 @@ describe('쿠키 앞머리', () => {
   test('http에서는 앞머리 없이 그대로 (개발 서버)', async () => {
     const res = await api.login(ApiClient.OWNER_LOGIN, ApiClient.OWNER_PASSWORD);
     assert.equal(res.status, 200);
-    assert.ok(res.cookies().cairn_session);
-    assert.equal(res.cookies()['__Host-cairn_session'], undefined);
+    assert.ok(res.cookies().moida_session);
+    assert.equal(res.cookies()['__Host-moida_session'], undefined);
+  });
+  test('옛 이름의 쿠키(cairn_session, 2026-11-28 이름 바꾸기 전의 로그인)도 끝날 때까지 읽는다', async () => {
+    const res = await api.login(ApiClient.OWNER_LOGIN, ApiClient.OWNER_PASSWORD);
+    const token = res.cookies().moida_session ?? '';
+    assert.ok(token);
+    const old = new TestUser({ cairn_session: token });
+    assert.equal((await api.request('GET', '/api/auth/me', old)).status, 200);
+    // https에서는 옛 이름도 __Host- 이름만 읽는다 (하위 도메인이 심은 앞머리 없는 이름은 아니다)
+    const hosted = new TestUser({ '__Host-cairn_session': token });
+    assert.equal((await api.request('GET', '/api/auth/me', hosted, undefined, HTTPS)).status, 200);
+    const planted = new TestUser({ cairn_session: token });
+    assert.notEqual(
+      (await api.request('GET', '/api/auth/me', planted, undefined, HTTPS)).status,
+      200,
+    );
   });
 });

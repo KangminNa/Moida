@@ -1,11 +1,11 @@
 import { Forbidden, type SecretBox } from '../../platform';
 
 // 앱 코드 배포 표 (앱 플랫폼, 스토어 12.5). 배포 기기가 MCP(app_code_upload)로 받아 PUT api/apps/<앱>/code/versions의
-// 머리글(X-Cairn-Deploy)로 낸다. 기기 토큰은 /mcp에서만 요청자가 되고 JSON 본문은 512KB까지라, 묶음(zip)은 이 표로 받는다
+// 머리글(X-Moida-Deploy)로 낸다. 기기 토큰은 /mcp에서만 요청자가 되고 JSON 본문은 512KB까지라, 묶음(zip)은 이 표로 받는다
 // (결과물의 UploadTicket과 같은 방식). 서버 키로 봉인하고(용도 고정, 10분) 그 앱 · 그때의 마지막 버전 · 크기 · sha256 ·
 // 메모에 묶인다: 다른 파일이나 다른 앱에는 쓸 수 없고, 그사이 다른 버전이 생겼으면 받지 않는다.
 export class DeployTicket {
-  static readonly HEADER = 'x-cairn-deploy';
+  static readonly HEADER = 'x-moida-deploy';
   private static readonly PURPOSE = 'app-deploy';
   private static readonly TTL_SECONDS = 600;
 

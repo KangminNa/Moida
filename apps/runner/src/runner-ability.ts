@@ -10,13 +10,13 @@ import { SigninTerminal } from './signin-terminal';
 //   tools        일할 수 있는 AI CLI: 설치돼 있고 이 러너가 그 도구로 일할 줄 안다
 //   signinTools  웹 로그인을 대신 돌릴 수 있는 CLI: 설치돼 있고 PTY(script)를 만들 수 있다
 //   ownLogins    러너가 스스로 가진 로그인 (엔진의 환경 변수 토큰, 지금은 Claude의 CLAUDE_CODE_OAUTH_TOKEN)
-//   browser      서버 브라우저에 붙어 있는가: 서버 러너(연결 값 파일)이고 CAIRN_BROWSER_URL이 있을 때만.
+//   browser      서버 브라우저에 붙어 있는가: 서버 러너(연결 값 파일)이고 MOIDA_BROWSER_URL이 있을 때만.
 //                내 컴퓨터 러너의 브라우저는 탭 읽기에만 쓴다 (평소 쓰는 계정에 가까워 AI에게 맡기지 않는다).
 //                사이트 일(대상이 있는 브라우저 작업)이 도는 동안은 알리지 않는다 (withoutBrowser: 한 번에 하나, 둘러보기는 여럿)
-//   runnerBuild  러너의 빌드 (이미지의 CAIRN_RUNNER_BUILD, 내 컴퓨터는 git 커밋): 어느 단락을 넣는지(Job.prompt)의 판이라 실행 기록에 남는다.
-//                지시문의 글은 러너 스킬 cairn-runner의 틀이고 그 판은 서버가 따로 남긴다
+//   runnerBuild  러너의 빌드 (이미지의 MOIDA_RUNNER_BUILD, 내 컴퓨터는 git 커밋): 어느 단락을 넣는지(Job.prompt)의 판이라 실행 기록에 남는다.
+//                지시문의 글은 러너 스킬 moida-runner의 틀이고 그 판은 서버가 따로 남긴다
 //   cliVersions  도구마다 CLI 버전 (--version). 실행 기록에 남는다
-//   slot         코드 러너 칸의 번호 (CAIRN_RUNNER_SLOT). 칸은 코드 작업만 받는다. next_jobs에는 싣지 않는다:
+//   slot         코드 러너 칸의 번호 (MOIDA_RUNNER_SLOT). 칸은 코드 작업만 받는다. next_jobs에는 싣지 않는다:
 //                칸인지는 서버가 기기의 권한(sandbox)으로 정한다 (러너가 말한 값을 믿지 않게)
 // 설치는 시작할 때 한 번 본다. CLI를 새로 깔면 러너를 다시 켠다.
 export class RunnerAbility {
@@ -50,7 +50,7 @@ export class RunnerAbility {
       EngineAdapters.names().filter((name) => Object.hasOwn(config.ownLogins, name)),
       config.browserUrl !== null && config.pairingFile !== null && config.slot === null,
       config.slot,
-      env.CAIRN_RUNNER_BUILD?.trim() || RunnerAbility.gitBuild() || 'unknown',
+      env.MOIDA_RUNNER_BUILD?.trim() || RunnerAbility.gitBuild() || 'unknown',
       Object.fromEntries(
         clis.flatMap((engine) => {
           const version = RunnerAbility.versionOf(config.binOf(engine), env);

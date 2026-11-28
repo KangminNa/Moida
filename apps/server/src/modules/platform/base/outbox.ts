@@ -8,7 +8,7 @@ import { Trace } from './trace';
  * 내용은 담지 않는다: 화면은 신호를 받고 REST로 다시 읽고, 러너는 다음 조회에서 찾는다.
  */
 export class ChangeSignal {
-  static readonly CHANNEL = 'cairn_changes';
+  static readonly CHANNEL = 'moida_changes';
 
   constructor(
     readonly spaceId: string,
@@ -33,7 +33,7 @@ export class ChangeSignal {
 // 일꾼을 깨우는 신호는 따로 보낸다: 변경 신호에는 실행 기록도 섞여 있어 일꾼이 헛돌게 된다.
 // 지금 하는 일의 추적 번호(Trace: 요청 번호, 일꾼에서는 그 이벤트의 번호)를 trace_id에 적어 일꾼까지 잇는다 (리팩토링 R1).
 export class Outbox {
-  static readonly CHANNEL = 'cairn_outbox';
+  static readonly CHANNEL = 'moida_outbox';
   /** 마감 작업을 깨우는 신호의 앞부분 (`due:<작업 이름>`). 빈 신호는 outbox를 비우라는 뜻이다 */
   static readonly DUE = 'due:';
 

@@ -21,7 +21,7 @@ export class ApiCallGateway extends PublicHttpsGateway {
   /** 파일 하나를 받는 시간 */
   static readonly FILE_MS = 5 * 60_000;
   protected readonly name = 'API 커넥터';
-  protected readonly agent = 'Cairn/1.0 (API connector)';
+  protected readonly agent = 'Moida/1.0 (API connector)';
   protected override readonly timeoutMs = 30_000;
 
   /** 요청 하나. 2xx가 아니면 실패 (상태 코드 · 짧은 까닭) */

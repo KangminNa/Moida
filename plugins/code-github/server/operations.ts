@@ -362,8 +362,9 @@ export class PullOpened extends Command<OpenedInput> {
   async run(work: Work, actor: Actor, input: OpenedInput): Promise<PullOpenedView> {
     const { repo, taskId } = await leasedCode(work, actor, input.taskId);
     const space = actor.requireSpace();
-    if (input.branch !== `cairn/${taskId}`)
-      throw new RuleViolation(`이 작업의 브랜치는 cairn/${taskId}예요`);
+    // 옛 이름의 브랜치(cairn/<작업>)도 받는다: 2026-11-28 이름 cairn → moida 전의 러너 · 그때 연 PR
+    if (input.branch !== `moida/${taskId}` && input.branch !== `cairn/${taskId}`)
+      throw new RuleViolation(`이 작업의 브랜치는 moida/${taskId}예요`);
     if (!/^[0-9a-f]{40}$/.test(input.headSha)) throw new RuleViolation('head_sha가 틀려요');
     if (!/^https?:\/\//.test(input.url)) throw new RuleViolation('PR 주소가 틀려요');
     const before = await work.row(pulls, { task_id: taskId, space_id: space });

@@ -70,7 +70,7 @@ describe('AgentRunRecord', () => {
     });
     const note = run.note([memo(3, '세 번째 메모'), memo(2, '두 번째'), memo(1, '첫 번째')]);
     assert.equal(note.title, '매일 아침 블로그 글');
-    assert.deepEqual(note.tags, ['cairn-agent']);
+    assert.deepEqual(note.tags, ['moida-agent']);
     const did = note.section('did');
     assert.ok(did.indexOf('첫 번째') < did.indexOf('두 번째'));
     assert.ok(did.indexOf('두 번째') < did.indexOf('세 번째 메모'));

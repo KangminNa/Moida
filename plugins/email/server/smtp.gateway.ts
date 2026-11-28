@@ -134,7 +134,7 @@ export class SmtpGateway extends BaseGateway {
       signal.addEventListener('abort', stop, { once: true });
       try {
         await session.expect(220);
-        await session.command('EHLO cairn', 250);
+        await session.command('EHLO moida', 250);
         const plain = Buffer.from(`\u0000${this.user}\u0000${this.password}`, 'utf8');
         await session.command(`AUTH PLAIN ${plain.toString('base64')}`, 235);
         await session.command(`MAIL FROM:<${message.from}>`, 250);

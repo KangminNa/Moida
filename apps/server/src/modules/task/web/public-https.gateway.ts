@@ -21,7 +21,7 @@ class PinnedTarget {
 // 인증서는 원래 이름으로 확인한다. 시험에서만(TEST_LOOPBACK_ENV=1) 127.0.0.1 · [::1]를 그대로 적은 주소를 http로 연다
 export abstract class PublicHttpsGateway extends BaseGateway {
   /** 시험에서만 켠다 (운영에서 켜지 않는다) */
-  static readonly TEST_LOOPBACK_ENV = 'CAIRN_OAUTH_TEST_LOOPBACK';
+  static readonly TEST_LOOPBACK_ENV = 'MOIDA_OAUTH_TEST_LOOPBACK';
   protected abstract readonly agent: string;
 
   /** 붙을 곳을 정한다: https인지 보고 이름을 풀어 막을 주소가 아닌지 확인한다 */

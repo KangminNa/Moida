@@ -22,7 +22,7 @@ const size = (bytes: number) =>
 
 // 앱 관리 › 코드 (스토어 1-6, 시안 9번): 이 앱만의 HTML · CSS · JS 묶음과 버전.
 // 공개 앱의 새 버전(AI 작업 · zip 올리기 · 시작 코드로)은 확인 대기로 남고, 미리 본 뒤 "이 버전 공개"를 눌러야 방문자에게 보인다.
-// 버전은 지우지 않고 쌓여 앞 버전으로 되돌릴 수 있다. 바깥 주소는 그 버전의 cairn.json이 정한다 (읽기만).
+// 버전은 지우지 않고 쌓여 앞 버전으로 되돌릴 수 있다. 바깥 주소는 그 버전의 moida.json이 정한다 (읽기만).
 export function AppCodeTab({ app }: { app: AdminApp }) {
   const code = useAppCode(app.id);
   const action = useAction();
@@ -253,8 +253,8 @@ export function AppCodeTab({ app }: { app: AdminApp }) {
         <b>바깥 주소</b>
         <p className="note">
           {c.hosts.length === 0
-            ? '이 사이트만 (바꾸려면 cairn.json의 hosts를 고친 새 버전)'
-            : `${c.hosts.join(' · ')} (바꾸려면 cairn.json을 고친 새 버전)`}
+            ? '이 사이트만 (바꾸려면 moida.json의 hosts를 고친 새 버전)'
+            : `${c.hosts.join(' · ')} (바꾸려면 moida.json을 고친 새 버전)`}
         </p>
       </section>
     </>

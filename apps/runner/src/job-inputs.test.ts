@@ -3,11 +3,11 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { AppCodeBase } from './app-code-base';
-import type { CairnServer } from './cairn-server';
 import { Job } from './job';
 import { JobInputs } from './job-inputs';
 import { JobWorkspace } from './job-workspace';
 import { Json } from './json';
+import type { MoidaServer } from './moida-server';
 import type { RunEvent } from './progress';
 
 // 앱 화면 공개를 검수하는 일 (2026-11-20): 러너가 공개될 코드를 작업 폴더의 app/에 받는다. 다른 일은 받지 않는다
@@ -30,7 +30,7 @@ const inspectJob = (action: string): Job =>
     }),
   );
 
-const serverWith = (asked: string[], fail = false): CairnServer =>
+const serverWith = (asked: string[], fail = false): MoidaServer =>
   ({
     async appCodeBase(taskId: string) {
       asked.push(taskId);
@@ -50,9 +50,9 @@ const serverWith = (asked: string[], fail = false): CairnServer =>
         }),
       );
     },
-  }) as unknown as CairnServer;
+  }) as unknown as MoidaServer;
 
-async function receive(job: Job, server: CairnServer) {
+async function receive(job: Job, server: MoidaServer) {
   const workspace = await JobWorkspace.open(null, null, null, '');
   const notes: string[] = [];
   try {

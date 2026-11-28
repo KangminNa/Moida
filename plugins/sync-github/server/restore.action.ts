@@ -6,7 +6,7 @@ import {
 } from '../../../apps/server/src/plugin-api';
 import type { GithubGateway } from './github.gateway';
 
-// 저장소에서 복원: 브랜치의 보관 파일을 받아 빈 Cairn에 들여온다. 비어 있지 않으면 아무것도 쓰지 않고 멈춘다.
+// 저장소에서 복원: 브랜치의 보관 파일을 받아 빈 Moida에 들여온다. 비어 있지 않으면 아무것도 쓰지 않고 멈춘다.
 export class RestoreAction extends BaseAction {
   readonly label = '저장소에서 복원';
 

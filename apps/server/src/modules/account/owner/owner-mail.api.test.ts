@@ -55,7 +55,7 @@ describe('비밀번호를 잊었을 때 (방문자)', () => {
     assert.equal((await api.login(EMAIL, ApiClient.OWNER_PASSWORD)).status, 401);
     const back = await api.login(EMAIL, NEW_PASSWORD);
     assert.equal(back.status, 200);
-    owner = new TestUser({ cairn_session: back.cookies().cairn_session ?? '' });
+    owner = new TestUser({ moida_session: back.cookies().moida_session ?? '' });
     assert.equal(
       (await reset({ password: '한 번 더 바꾸기 비밀번호' })).status,
       400,

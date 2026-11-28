@@ -8,7 +8,7 @@
 //      응답 타입은 서버 view에서 import type으로 만든다 (ReturnType<XxxView['toJSON']>, app/_<모듈>/types.ts)
 //   5. 웹의 최상위 경로(app/의 폴더 · (묶음) 안의 폴더, next.config의 rewrites)는 앱 주소로 못 쓰는 이름(App.RESERVED)이다:
 //      빠지면 그 이름의 앱 주소(/<앱>)가 웹의 화면에 가려진다 (docs/스토어.md 8.7)
-//   6. compose의 일꾼(worker)은 서버와 같은 파일 저장소(blob-data · CAIRN_BLOBS_DIR)를 붙인다: 이벤트를 받는 쪽이 파일을 읽고 쓴다.
+//   6. compose의 일꾼(worker)은 서버와 같은 파일 저장소(blob-data · MOIDA_BLOBS_DIR)를 붙인다: 이벤트를 받는 쪽이 파일을 읽고 쓴다.
 //      빠지면 일꾼이 서버가 받은 파일을 찾지 못한다 (2026-11-23 배포 서버: task.app_code.built가 "파일을 찾을 수 없어요"로 멈춤)
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -205,8 +205,8 @@ function checkCompose() {
         problems.push(
           `${name}의 ${service}에 파일 저장소(blob-data:/data/blobs)가 붙어 있지 않아요`,
         );
-      if (!/^\s*CAIRN_BLOBS_DIR: \/data\/blobs\b/m.test(block))
-        problems.push(`${name}의 ${service}에 CAIRN_BLOBS_DIR: /data/blobs가 없어요`);
+      if (!/^\s*MOIDA_BLOBS_DIR: \/data\/blobs\b/m.test(block))
+        problems.push(`${name}의 ${service}에 MOIDA_BLOBS_DIR: /data/blobs가 없어요`);
     }
   }
 }

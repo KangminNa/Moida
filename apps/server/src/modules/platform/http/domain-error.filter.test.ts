@@ -80,7 +80,7 @@ describe('오류 필터: 거부된 접근 기록', () => {
   test('403 · 429는 내민 것이 없어도 남기고, 요청자의 공간을 적는다', () => {
     const forbidden = run(new Forbidden('origin'), {
       originalUrl: '/api/agents',
-      headers: { cookie: 'cairn_session=x' },
+      headers: { cookie: 'moida_session=x' },
       actor: new OwnerActor('space-1', 'user-1'),
     });
     assert.equal(forbidden.recorded[0]?.space_id, 'space-1');

@@ -14,7 +14,7 @@ function fakeBlog({ scope = 'upload delegate inbox', resource = `${SITE}/mcp` } 
   let issued = 0;
   return new FakeFetch({
     [`GET ${SITE}/.well-known/oauth-protected-resource/mcp`]: () => ({
-      body: { resource, resource_name: 'Cairn' },
+      body: { resource, resource_name: 'Moida' },
     }),
     [`GET ${SITE}/.well-known/oauth-authorization-server`]: () => ({
       body: {

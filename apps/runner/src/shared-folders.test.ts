@@ -17,7 +17,7 @@ import { REPO_PROMPTS } from './testing/repo-prompts';
 
 // 내 컴퓨터 러너가 나눠 주는 폴더: 설정 검사와 복사 규칙 (숨김 · .git · node_modules · 링크 빼기, 한도).
 
-const root = mkdtempSync(join(tmpdir(), 'cairn-share-'));
+const root = mkdtempSync(join(tmpdir(), 'moida-share-'));
 after(() => rmSync(root, { recursive: true, force: true }));
 
 /** project/ 와 docs/ 두 폴더 */
@@ -38,13 +38,13 @@ function tree(): { project: string; docs: string } {
   return { project, docs };
 }
 
-const env = { CAIRN_RUNNER_URL: 'https://blog.example', CAIRN_RUNNER_TOKEN: 't', HOME: '/home/me' };
+const env = { MOIDA_RUNNER_URL: 'https://blog.example', MOIDA_RUNNER_TOKEN: 't', HOME: '/home/me' };
 
-describe('나눠 주는 폴더 (CAIRN_RUNNER_FOLDERS)', () => {
+describe('나눠 주는 폴더 (MOIDA_RUNNER_FOLDERS)', () => {
   test('쉼표로 여럿, 절대 경로의 있는 폴더만. 없으면 null', () => {
     const { project, docs } = tree();
     assert.equal(RunnerConfig.fromEnv(env).folders, null);
-    const config = RunnerConfig.fromEnv({ ...env, CAIRN_RUNNER_FOLDERS: ` ${project} , ${docs} ` });
+    const config = RunnerConfig.fromEnv({ ...env, MOIDA_RUNNER_FOLDERS: ` ${project} , ${docs} ` });
     assert.deepEqual(config.folders?.paths, [project, docs]);
     assert.deepEqual(config.withToken('x').folders?.paths, [project, docs], '토큰을 받은 뒤에도');
   });
@@ -56,14 +56,14 @@ describe('나눠 주는 폴더 (CAIRN_RUNNER_FOLDERS)', () => {
     const hidden = join(root, '.secret');
     mkdirSync(hidden, { recursive: true });
     const cases: [Record<string, string>, RegExp][] = [
-      [{ CAIRN_RUNNER_FOLDERS: 'project' }, /절대 경로/],
-      [{ CAIRN_RUNNER_FOLDERS: join(root, 'nope') }, /없어요/],
-      [{ CAIRN_RUNNER_FOLDERS: hidden }, /숨김/],
-      [{ CAIRN_RUNNER_FOLDERS: root, HOME: join(root, 'me') }, /홈 폴더 전체나 그 위/],
-      [{ CAIRN_RUNNER_FOLDERS: join(root, 'me'), HOME: join(root, 'me') }, /홈 폴더 전체/],
-      [{ CAIRN_RUNNER_FOLDERS: '/' }, /홈 폴더 전체나 그 위/],
-      [{ CAIRN_RUNNER_FOLDERS: `${project},${other}` }, /이름이 겹쳐요: project/],
-      [{ CAIRN_RUNNER_FOLDERS: project, CAIRN_SANDBOX: '1' }, /내 컴퓨터 러너에서만/],
+      [{ MOIDA_RUNNER_FOLDERS: 'project' }, /절대 경로/],
+      [{ MOIDA_RUNNER_FOLDERS: join(root, 'nope') }, /없어요/],
+      [{ MOIDA_RUNNER_FOLDERS: hidden }, /숨김/],
+      [{ MOIDA_RUNNER_FOLDERS: root, HOME: join(root, 'me') }, /홈 폴더 전체나 그 위/],
+      [{ MOIDA_RUNNER_FOLDERS: join(root, 'me'), HOME: join(root, 'me') }, /홈 폴더 전체/],
+      [{ MOIDA_RUNNER_FOLDERS: '/' }, /홈 폴더 전체나 그 위/],
+      [{ MOIDA_RUNNER_FOLDERS: `${project},${other}` }, /이름이 겹쳐요: project/],
+      [{ MOIDA_RUNNER_FOLDERS: project, MOIDA_SANDBOX: '1' }, /내 컴퓨터 러너에서만/],
     ];
     mkdirSync(join(root, 'me'), { recursive: true });
     for (const [more, message] of cases)

@@ -2,7 +2,7 @@ import { ClaudeSettings } from './claude-settings';
 import { DeviceKind } from './device-login';
 import { DeviceSetup, DeviceState } from './device-setup';
 
-/** 이 컴퓨터의 소식 단계 상태 (cairn status) */
+/** 이 컴퓨터의 소식 단계 상태 (moida status) */
 export class NewsState extends DeviceState {
   constructor(
     saved: Record<string, unknown> | undefined,
@@ -24,11 +24,11 @@ export class NewsState extends DeviceState {
   }
 }
 
-// cairn connect의 소식 단계 (2차 1-3, Claude Code만): 소식 기기(소식 읽기만) · 훅 · 상태 줄.
+// moida connect의 소식 단계 (2차 1-3, Claude Code만): 소식 기기(소식 읽기만) · 훅 · 상태 줄.
 //   ~/.claude/settings.json    UserPromptSubmit 훅을 더하고(있던 훅은 그대로), 상태 줄이 없을 때만 건다
-// 훅 · 상태 줄은 ~/.cairn/bin/cairn-news.mjs (기기 · 스크립트 · 열쇠 파일은 DeviceSetup).
+// 훅 · 상태 줄은 ~/.moida/bin/moida-news.mjs (기기 · 스크립트 · 열쇠 파일은 DeviceSetup).
 export class NewsSetup extends DeviceSetup {
-  private static readonly SCRIPT = 'cairn-news.mjs';
+  private static readonly SCRIPT = 'moida-news.mjs';
   private static readonly EVENT = 'UserPromptSubmit';
   /** Claude Code가 훅을 기다리는 시간(초). 스크립트는 2초 안에 스스로 끝낸다 */
   private static readonly HOOK_SECONDS = 5;

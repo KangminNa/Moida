@@ -8,7 +8,7 @@ import { App } from './app';
  */
 export class RestoredApp extends BaseEntity {
   private static readonly KNOWN: ReadonlySet<string> = new Set([
-    'cairn_id',
+    'moida_id',
     'kind',
     'name',
     'slug',

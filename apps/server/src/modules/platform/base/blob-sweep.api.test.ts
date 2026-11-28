@@ -28,8 +28,8 @@ const sweep = () => store.sweep(new SystemActor(), new Date(Date.now() - 7 * DAY
 const onDisk = async (hash: string) => (await readdir(dir)).includes(hash);
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-sweep-test-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
+  dir = await mkdtemp(join(tmpdir(), 'moida-sweep-test-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
   api = await ApiClient.start();
   owner = await api.signIn();
   store = api.service(BlobStore);

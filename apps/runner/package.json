@@ -1,5 +1,5 @@
 {
-  "name": "@cairn/runner",
+  "name": "@moida/runner",
   "version": "0.0.0",
   "private": true,
   "description": "서버에서 일을 빌려 AI CLI로 처리하는 러너. MCP로만 서버와 이야기하고 DB에 닿지 않는다",

@@ -58,10 +58,10 @@ export abstract class ArchivePart {
   /** md 보관 파일 하나를 읽는다. 종류와 형식 버전을 함께 본다 */
   protected static document(file: ArchiveFile, type: string, format: number): ArchiveRecord {
     const record = ArchiveRecord.ofMarkdown(file.path, ArchivePart.textOf(file));
-    if (record.text('cairn_type') !== type)
-      throw record.problem(`종류가 ${type}이어야 해요: ${record.text('cairn_type')}`);
-    if (record.number('cairn_format') > format)
-      throw record.problem(`더 새로운 형식이에요 (${record.number('cairn_format')})`);
+    if (record.text('moida_type') !== type)
+      throw record.problem(`종류가 ${type}이어야 해요: ${record.text('moida_type')}`);
+    if (record.number('moida_format') > format)
+      throw record.problem(`더 새로운 형식이에요 (${record.number('moida_format')})`);
     return record;
   }
 

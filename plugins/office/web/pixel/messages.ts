@@ -1,5 +1,5 @@
 // Pixel Agents의 core/src/messages.ts에서 이 플러그인이 쓰는 서버 → 화면 메시지만 옮겼다.
-// AgentCreated의 seatId만 Cairn이 더한 칸이다: 나중에 생긴 에이전트도 다시 열었을 때 같은 자리에 앉게 한다.
+// AgentCreated의 seatId만 Moida이 더한 칸이다: 나중에 생긴 에이전트도 다시 열었을 때 같은 자리에 앉게 한다.
 
 export interface ProviderCapabilities {
   type: 'providerCapabilities';

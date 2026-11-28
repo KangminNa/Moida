@@ -6,13 +6,13 @@ import { type AppDataFilter, AppTable } from './app-table';
 // community.app_tables ↔ AppTable, 그리고 앱마다의 스키마(app_<앱 id>)에 있는 실제 표의 SQL (스토어 12.4).
 // load · lock의 첫 값은 앱 id다. 이름은 모두 선언 목록(AppTable)에서 온 것만 SQL에 쓴다: 요청의 글자는 값(매개변수)으로만 간다.
 // 줄에는 엔티티가 없다 (칸을 앱이 정한다): 값은 AppTable.checked가 타입에 맞춘 것만 받는다.
-// 회원 쪽 쿼리는 asMember 뒤에 한다: 그 트랜잭션은 역할 cairn_app으로 돌아 행 수준 보안(ensure가 건 정책)이 걸린다.
+// 회원 쪽 쿼리는 asMember 뒤에 한다: 그 트랜잭션은 역할 moida_app으로 돌아 행 수준 보안(ensure가 건 정책)이 걸린다.
 export class AppTableRepository extends TableRepository<AppTableRow, AppTable> {
   protected readonly table = appTables;
   protected readonly noun = '표';
-  private static readonly ROLE = 'cairn_app';
+  private static readonly ROLE = 'moida_app';
   /** 지금 회원 (없으면 NULL): asMember가 정한 값 */
-  private static readonly ME = `nullif(current_setting('cairn.member', true), '')`;
+  private static readonly ME = `nullif(current_setting('moida.member', true), '')`;
 
   protected toEntity(row: AppTableRow): AppTable {
     return AppTable.restore(row);
@@ -65,16 +65,16 @@ export class AppTableRepository extends TableRepository<AppTableRow, AppTable> {
     const reads = { anyone: 'true', member: `${me} IS NOT NULL`, owner: mine, admin: 'false' };
     const inserts = table.writeRule === 'admin' ? 'false' : `${me} IS NOT NULL AND ${mine}`;
     const edits = table.writeRule === 'owner' ? mine : 'false';
-    for (const name of ['cairn_read', 'cairn_insert', 'cairn_update', 'cairn_delete'])
+    for (const name of ['moida_read', 'moida_insert', 'moida_update', 'moida_delete'])
       await run(`DROP POLICY IF EXISTS ${name} ON ${at}`);
     await run(
-      `CREATE POLICY cairn_read ON ${at} FOR SELECT TO ${role} USING (${reads[table.readRule]})`,
+      `CREATE POLICY moida_read ON ${at} FOR SELECT TO ${role} USING (${reads[table.readRule]})`,
     );
-    await run(`CREATE POLICY cairn_insert ON ${at} FOR INSERT TO ${role} WITH CHECK (${inserts})`);
+    await run(`CREATE POLICY moida_insert ON ${at} FOR INSERT TO ${role} WITH CHECK (${inserts})`);
     await run(
-      `CREATE POLICY cairn_update ON ${at} FOR UPDATE TO ${role} USING (${edits}) WITH CHECK (${edits})`,
+      `CREATE POLICY moida_update ON ${at} FOR UPDATE TO ${role} USING (${edits}) WITH CHECK (${edits})`,
     );
-    await run(`CREATE POLICY cairn_delete ON ${at} FOR DELETE TO ${role} USING (${edits})`);
+    await run(`CREATE POLICY moida_delete ON ${at} FOR DELETE TO ${role} USING (${edits})`);
   }
 
   /**
@@ -82,7 +82,7 @@ export class AppTableRepository extends TableRepository<AppTableRow, AppTable> {
    * 이 뒤에는 community의 다른 표를 읽지 못하므로 회원 행 확인은 이 앞에서 한다. 쿼리는 5초까지
    */
   async asMember(memberId: string | null): Promise<void> {
-    await this.sql`SELECT set_config('cairn.member', ${memberId ?? ''}, true)`;
+    await this.sql`SELECT set_config('moida.member', ${memberId ?? ''}, true)`;
     await this.sql.unsafe(`SET LOCAL statement_timeout = 5000`);
     await this.sql.unsafe(`SET LOCAL ROLE ${AppTableRepository.ROLE}`);
   }
@@ -127,7 +127,7 @@ export class AppTableRepository extends TableRepository<AppTableRow, AppTable> {
     return [Number(all?.n ?? 0), Number(own?.n ?? 0)];
   }
 
-  /** 줄 하나 넣기. id는 서버가 만든다 (역할 cairn_app은 기본값 함수를 부르지 못한다). 넣은 줄을 돌려준다 */
+  /** 줄 하나 넣기. id는 서버가 만든다 (역할 moida_app은 기본값 함수를 부르지 못한다). 넣은 줄을 돌려준다 */
   async insertRow(
     table: AppTable,
     ownerId: string | null,

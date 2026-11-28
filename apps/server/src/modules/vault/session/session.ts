@@ -41,7 +41,7 @@ export interface LoadedSession extends SessionRow {
 // 판(session_revisions)은 추가만 한다. 원본(origin)은 AI 도구가 올린 노트다. 사람 판·합친 판은 관리 화면 편집 때 생긴다.
 // 원문(session_transcripts, 2차 4단계)도 추가만 한다: 수집 훅 · 확장이 원문을 올리면 노트 없이 세션이 생기고,
 // 서버 러너가 그 원문으로 쓴 노트가 원본 판이 된다 (세션 노트 일, 에이전트 없이 서버의 로그인으로).
-// 작업 세션(도구 cairn-agent, 2026-11-17): 에이전트의 요청 하나가 세션 하나다. 실행마다 원문 한 줄과 인수인계 메모를 쌓고,
+// 작업 세션(도구 moida-agent, 2026-11-17): 에이전트의 요청 하나가 세션 하나다. 실행마다 원문 한 줄과 인수인계 메모를 쌓고,
 // 노트는 메모를 이어 붙여 시스템이 쓴다. 세션 노트 일 · 자동 정리 · 세션 알림은 부르지 않는다 (정리는 끝난 요청만, S2).
 export class Session extends TrashTarget<LoadedSession, NewNode<SessionNew>> {
   static readonly PRIVATE: SessionVisibility = 'private';
@@ -51,7 +51,7 @@ export class Session extends TrashTarget<LoadedSession, NewNode<SessionNew>> {
   /** 도구 이름: claude-code, codex … */
   private static readonly TOOL = /^[a-z0-9][a-z0-9-]{0,39}$/;
   /** 작업 세션의 도구 이름. 기기의 저장(save_session · save_transcript)은 쓰지 못한다 */
-  static readonly AGENT_TOOL = 'cairn-agent';
+  static readonly AGENT_TOOL = 'moida-agent';
   /** AI 도구가 올린 판 (session_revisions.kind) */
   private static readonly ORIGIN = 'origin';
   /**

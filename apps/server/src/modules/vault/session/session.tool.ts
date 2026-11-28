@@ -17,7 +17,7 @@ import type {
 import { SessionNote } from './session-note';
 
 // 세션의 MCP 도구 네 개. 답은 session.view.ts의 AI용 모양(snake_case)이다.
-// 도구의 설명 · 칸 설명은 vault.tools.ko.json에. 칸을 바꾸면 cairn-save · cairn-recall 스킬도 함께 고친다.
+// 도구의 설명 · 칸 설명은 vault.tools.ko.json에. 칸을 바꾸면 moida-save · moida-recall 스킬도 함께 고친다.
 
 // MCP 도구 save_session: AI 도구가 작업한 세션의 노트를 저장한다. mcp 모듈이 모아서 연다.
 @Injectable()

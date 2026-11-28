@@ -5,7 +5,7 @@ import { HostGate } from './host-gate';
 import type { HttpRequest } from './http-types';
 import { type RequestLogSink, RequestTrace } from './request-trace';
 
-// 서버와 API 테스트 도구가 똑같이 거는 HTTP 설정 (CairnApp.api가 건다).
+// 서버와 API 테스트 도구가 똑같이 거는 HTTP 설정 (MoidaApp.api가 건다).
 // - 맨 앞에서 요청 번호를 붙이고 요청 로그를 남긴다 (RequestTrace, 리팩토링 6단계).
 // - 본문을 읽은 뒤 그 번호 안에서 다음 단계를 부른다 (Trace, 리팩토링 R1): 이 요청이 남긴 이벤트가 같은 번호로 일꾼까지 간다.
 //   본문 읽기보다 앞에서 걸면 읽기의 콜백에서 번호가 끊길 수 있어 뒤에 건다.
@@ -49,9 +49,10 @@ export class HttpSetup {
     express.set('trust proxy', 'loopback, linklocal, uniquelocal');
     express.use(RequestTrace.middleware(log) as never);
     express.disable('x-powered-by');
-    express.use((_req, res, next) => {
+    express.use((req, res, next) => {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      HttpSetup.legacyHeaders(req as unknown as HttpRequest);
       next();
     });
     express.use(app.get(HostGate).middleware() as never);
@@ -71,6 +72,19 @@ export class HttpSetup {
       else next();
     });
     express.use(HttpSetup.tooLarge);
+  }
+
+  /**
+   * 옛 이름의 머리글 (2026-11-28 이름 cairn → moida): 옛 러너 · 명령줄 · 앱 화면이 보내는 x-cairn-*을 x-moida-*로 읽는다.
+   * 새 이름이 있으면 그대로 둔다. 그 뒤의 코드는 새 이름만 본다
+   */
+  private static legacyHeaders(req: HttpRequest): void {
+    const headers = req.headers as Record<string, string | string[] | undefined>;
+    for (const name of Object.keys(headers)) {
+      if (!name.startsWith('x-cairn-')) continue;
+      const next = `x-moida-${name.slice('x-cairn-'.length)}`;
+      if (headers[next] === undefined) headers[next] = headers[name];
+    }
   }
 
   private static isImageUpload(req: UploadRequest): boolean {

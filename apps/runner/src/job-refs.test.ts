@@ -5,7 +5,7 @@ import { JobRefs } from './job-refs';
 import { Json } from './json';
 import { PromptPack } from './prompt-pack';
 
-// 대화의 참조 (2026-11-15 B): payload.refs를 거르고 지시문 단락을 만든다. 저장소의 지시문 틀(cairn-runner)로 본다
+// 대화의 참조 (2026-11-15 B): payload.refs를 거르고 지시문 단락을 만든다. 저장소의 지시문 틀(moida-runner)로 본다
 const PACK = PromptPack.read(resolve(__dirname, '../../../skills'));
 const WIKI = '0190a000-0000-7000-8000-000000000001';
 const OUTPUT = '0190a000-0000-7000-8000-000000000003';

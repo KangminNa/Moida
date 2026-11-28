@@ -25,7 +25,7 @@ export abstract class Operation<I = unknown> {
   static readonly ANYONE = 'anyone';
   /** 주인만 (관리 일) */
   static readonly OWNER = 'owner';
-  /** 서버 자신만: 이벤트로 도는 동작 (cairn.onEvent에 넘긴 Command). REST · MCP로는 누구도 부르지 못한다 */
+  /** 서버 자신만: 이벤트로 도는 동작 (moida.onEvent에 넘긴 Command). REST · MCP로는 누구도 부르지 못한다 */
   static readonly SYSTEM = 'system';
 
   /** 패키지 안에서 유일한 이름. 목록 파일의 api · tools가 이 이름으로 가리킨다 */

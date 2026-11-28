@@ -38,9 +38,9 @@ const share = async (outputId: unknown, days = 7, requestId = randomUUID()) =>
 const open = (path: string) => api.get(`/api/output-shares/open/${path.replace('/share/', '')}`);
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-share-test-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
-  process.env.CAIRN_DISK_RESERVE_GB = '0';
+  dir = await mkdtemp(join(tmpdir(), 'moida-share-test-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
+  process.env.MOIDA_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
 });

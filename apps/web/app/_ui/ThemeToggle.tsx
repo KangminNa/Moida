@@ -16,7 +16,7 @@ export function ThemeToggle() {
     const next = dark ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     try {
-      localStorage.setItem('cairn-theme', next);
+      localStorage.setItem('moida-theme', next);
     } catch {
       // 저장이 막힌 브라우저에서는 지금 화면에만 적용한다
     }

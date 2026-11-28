@@ -84,7 +84,7 @@ describe('로그인 방법', () => {
     assert.equal(res.status, 302);
     assert.equal(new URL(res.location ?? '', 'http://x').pathname, '/login');
     assert.match(errorOf(res) ?? '', /연결하지 않은 계정이에요/);
-    assert.equal(res.cookies().cairn_session, undefined);
+    assert.equal(res.cookies().moida_session, undefined);
   });
 });
 
@@ -97,7 +97,7 @@ describe('계정 연결', () => {
     const res = await roundTrip('/api/auth/links/github/start?return=/', OWNER_GITHUB, owner);
     assert.equal(res.status, 302);
     assert.equal(res.location, '/');
-    assert.equal(res.cookies().cairn_session, undefined, '연결은 새 로그인을 만들지 않는다');
+    assert.equal(res.cookies().moida_session, undefined, '연결은 새 로그인을 만들지 않는다');
     const links = (await api.get('/api/auth/links', owner)).json().links as Record<
       string,
       unknown
@@ -116,7 +116,7 @@ describe('계정 연결', () => {
     );
     assert.equal(res.status, 302);
     assert.equal(res.location, '/');
-    const session = new TestUser({ cairn_session: res.cookies().cairn_session ?? '' });
+    const session = new TestUser({ moida_session: res.cookies().moida_session ?? '' });
     const me = (await api.get('/api/auth/me', session)).json();
     assert.equal(me.login, ApiClient.OWNER_LOGIN, '연결한 계정의 주인으로 로그인');
   });

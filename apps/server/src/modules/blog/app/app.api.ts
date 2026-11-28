@@ -105,7 +105,7 @@ export class AppController {
     return (await this.service.update(actor, UpdateAppInput.from(id, body))).view();
   }
 
-  /** 도메인 연결 확인 (스토어 3-0): 관리자의 브라우저가 그 도메인의 /.well-known/cairn-domain에서 읽은 값 */
+  /** 도메인 연결 확인 (스토어 3-0): 관리자의 브라우저가 그 도메인의 /.well-known/moida-domain에서 읽은 값 */
   @HttpCode(200)
   @Post(':id/domain/check')
   async checkDomain(
@@ -154,7 +154,7 @@ export class AppController {
 export class AppDomainController {
   constructor(private readonly query: AppQuery) {}
 
-  @Get('cairn-domain')
+  @Get('moida-domain')
   async proof(
     @CurrentActor() actor: Actor,
     @Req() req: HttpRequest,

@@ -2,7 +2,7 @@ import MAPS from '../../../../plugins/map/providers.json';
 import { serverRaw } from '../_lib/server-api';
 import type { PluginPublicSettings } from '../_platform/types';
 
-// 지도 플러그인 (2026-11-23, 2차 MP-1 2026-11-25 docs/지도.md): 관리자가 플러그인 map에 등록한 지도 API를 앱 화면에 준다 (cairn.js의 cairn.map).
+// 지도 플러그인 (2026-11-23, 2차 MP-1 2026-11-25 docs/지도.md): 관리자가 플러그인 map에 등록한 지도 API를 앱 화면에 준다 (moida.js의 moida.map).
 // 회사마다 키 칸 · 스크립트 주소 · 호스트는 plugins/map/providers.json 한 곳에 있고, 여기는 그 파일과 공개 설정을 합친다.
 // 키가 있는 지도(카카오 · 네이버 · 구글)는 회사 콘솔에 등록한 도메인에서 온 요청만 받는다. 격리된 화면(출처 없는 문서)과 키가 빈 경우는
 // 키가 필요 없는 OpenStreetMap으로 그린다. 설정은 30초 기억한다 (앱 화면마다 부르므로). 서버에 닿지 못하거나 플러그인이 꺼져 있으면 OpenStreetMap

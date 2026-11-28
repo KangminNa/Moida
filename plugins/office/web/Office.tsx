@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CairnFeed, type Desk, type DeskState } from './cairn-feed';
-import { CairnReader, watchCairn } from './cairn-read';
+import { type Desk, type DeskState, MoidaFeed } from './moida-feed';
+import { MoidaReader, watchMoida } from './moida-read';
 
 // 콘솔의 오피스 자리(task.office). 왼쪽은 픽셀 사무실, 옆은 같은 내용의 목록이다: 캔버스로만 보이는 것을 두지 않는다.
 // 이 파일은 글 화면의 번들에도 함께 들어가므로(화면 자리 목록이 한 곳이다) 무거운 그리기 코드는 켜졌을 때만 불러온다.
@@ -50,12 +50,12 @@ export default function Office() {
   const [noArt, setNoArt] = useState(false);
 
   useEffect(() => {
-    const feed = new CairnFeed();
-    const reader = new CairnReader();
+    const feed = new MoidaFeed();
+    const reader = new MoidaReader();
     let gone = false;
     let stopStage = () => {};
 
-    const stopWatching = watchCairn(async () => {
+    const stopWatching = watchMoida(async () => {
       try {
         const snapshot = await reader.read();
         if (gone) return;
