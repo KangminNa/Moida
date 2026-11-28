@@ -1,6 +1,7 @@
 import { AppCodeBase } from './app-code-base';
 import { ApprovedClick, BrowseJob } from './browse-job';
 import type { HeldButton } from './browser-page';
+import type { ClickConfirm } from './click-confirm';
 import { Job } from './job';
 import { RunMemo } from './job-lineage';
 import type { Json } from './json';
@@ -335,6 +336,7 @@ export class CairnServer {
       reason: string | null;
       afterUrl: string | null;
       image: string | null;
+      confirm: ClickConfirm | null;
     },
   ): Promise<void> {
     await this.mcp.call('browser_click_save', {
@@ -346,6 +348,7 @@ export class CairnServer {
         ? { after_url: result.afterUrl.slice(0, 2000) }
         : {}),
       ...(result.image ? { image: result.image } : {}),
+      ...(result.confirm ? { confirm: result.confirm.toJSON() } : {}),
     });
   }
 

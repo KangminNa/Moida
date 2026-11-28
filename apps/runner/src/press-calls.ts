@@ -73,6 +73,7 @@ export class PressCalls {
           }
         : {}),
       ...(result.image ? { after_image: result.image } : {}),
+      ...(result.confirm ? { confirm: result.confirm.toJSON() } : {}),
     });
   }
 }
