@@ -4,6 +4,7 @@ import type { GoalRun } from '../goal-run/goal-run';
 import { Task } from '../task/task';
 import type { ApprovalNew, ApprovalRow, ApprovalStatus } from '../task.tables';
 import { ApprovalProposedView, ApprovalRequestedView, ApprovalView } from './approval.view';
+import { DecisionAsk } from './decision-ask.policy';
 
 // 결재 하나. 위험한 동작을 대상·판 번호와 함께 저장만 하고, 주인이 승인한 뒤에 다른 모듈이 실행한다.
 //   pending → approved · rejected · revision_requested · cancelled
@@ -289,8 +290,24 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
 
   /** 관리자가 대화에 직접 쓴 말을 근거로 대표가 승인한다 (2026-11-24 원칙 7의 예외, OwnerAsk). 사람의 클릭이 아니라 agent_decided */
   grantAsked(leadId: string, quote: string, now: Date): void {
+    this.grantBy(leadId, `대화에서 관리자가 요청: «${quote}»`, now);
+  }
+
+  /** 사람이 아니라 서버 · 에이전트가 승인한다 (agent_decided): 관리자의 말(grantAsked) · 기한이 지난 판단(L3, 추천안으로) */
+  grantBy(agentId: string, note: string, now: Date): void {
     this.put('agent_decided', true);
-    this.approve(leadId, `대화에서 관리자가 요청: «${quote}»`, now);
+    this.approve(agentId, note, now);
+  }
+
+  /** 답을 기다리는 기한 (L3 판단 승인). 지나면 DecisionLapseJob이 정한 대로 한다 */
+  expireAt(at: Date | null): void {
+    this.put('expires_at', at);
+  }
+
+  /** 판단 승인(DecisionAsk)에서 고른 안을 적는다 (승인 전에, null이면 추천안). 다른 결재면 그대로 */
+  choose(choice: number | null): void {
+    if (this.row.action !== DecisionAsk.ACTION) return;
+    this.put('payload', DecisionAsk.picked(this.row.payload, choice));
   }
 
   reject(deciderId: string, note: string | null, now: Date): void {
@@ -315,7 +332,11 @@ export class Approval extends TableEntity<ApprovalRow, ApprovalNew> {
   /** 결정을 작업에 옮긴다: 승인이면 실행을 기다리고, 고칠 일이면 에이전트에게 돌아가고, 거절이면 멈춘다 */
   applyTo(task: Task, now: Date): void {
     const r = this.row;
-    if (r.status === Approval.APPROVED) task.resume();
+    // 판단 승인은 대상이 작업 자신이라 실행할 모듈이 없다: 고른 안 · 고쳐 말한 것을 받아 바로 다시 대기열로 (DecisionAsk)
+    if (r.action === DecisionAsk.ACTION && r.status !== Approval.REJECTED) {
+      task.reopen(Task.WAIT_APPROVAL);
+      task.declare(DecisionAsk.answered(r.payload, r.note, r.agent_decided));
+    } else if (r.status === Approval.APPROVED) task.resume();
     else if (r.status === Approval.REVISION_REQUESTED)
       task.returnForRevision(r.note, r.target_kind, r.target_id, r.target_version);
     else if (r.status === Approval.REJECTED) task.cancel(now);

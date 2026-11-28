@@ -65,7 +65,10 @@ export class ApprovalIdInput extends BaseRequest {
   }
 }
 
-/** POST /api/approvals/:id/decide { version, decision, note?, picked? }. picked는 결과 카드에서 고른 항목 id (비우면 모두) */
+/**
+ * POST /api/approvals/:id/decide { version, decision, note?, picked?, choice? }. picked는 결과 카드에서 고른 항목 id (비우면 모두),
+ * choice는 판단 승인(task.decision)에서 고른 안 (0 추천안, 1~ 다른 안. 비우면 추천안, L3)
+ */
 export class DecideApprovalInput extends BaseRequest {
   /** 카드 하나에 실리는 항목 수의 한도 */
   private static readonly PICK_MAX = 200;
@@ -76,6 +79,7 @@ export class DecideApprovalInput extends BaseRequest {
     readonly decision: string,
     readonly note: string | null,
     readonly picked: readonly string[] | null,
+    readonly choice: number | null,
   ) {
     super();
   }
@@ -90,6 +94,7 @@ export class DecideApprovalInput extends BaseRequest {
           f.text('decision', 20),
           f.optionalText('note', 8000),
           f.optionalTextList('picked', DecideApprovalInput.PICK_MAX, 40),
+          f.optionalInteger('choice', 0, 3),
         ),
     );
   }

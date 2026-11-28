@@ -38,13 +38,15 @@ export class Agent extends TableEntity<AgentRow, AgentNew> {
   private static readonly SERVER_ACTION = 'task.agent.raise_limit';
   /** 새 에이전트의 처음 승인 동작: 모든 일꾼이 브라우저를 써서 사이트 클릭 · 로그인 승인을 올린다 (2026-11-21) */
   /**
-   * 어느 에이전트나 올리는 결재 (2026-11-24 도구를 찾아 붙이기): 도구 붙이기 제안 · API 커넥터 · API 부르기.
+   * 어느 에이전트나 올리는 결재 (2026-11-24 도구를 찾아 붙이기): 도구 붙이기 제안 · API 커넥터 · API 부르기,
+   * 확인 필요 판단 (L3, post_update의 decision.confirm이 멈출 때 서버가 올린다).
    * 붙이고 부르는 것은 관리자의 승인이 정하므로 승인 동작 목록으로 막지 않는다 (API 커넥터 둘은 서버만 올린다, ApiApproval)
    */
   private static readonly ANY_ACTIONS: readonly string[] = [
     'task.tool.plug',
     'task.api.plug',
     'task.api.call',
+    'task.decision',
   ];
   private static readonly BROWSE_ACTIONS: readonly string[] = [
     'browser.site.publish',

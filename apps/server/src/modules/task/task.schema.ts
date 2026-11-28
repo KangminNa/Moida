@@ -2,7 +2,7 @@
 // 조건 규칙(platform/base의 TableQuery)이 쓰는 Drizzle 표: 표 이름 · 칸 · 행 타입. 칸 이름은 DB 그대로다.
 // drizzle-orm을 직접 가져오는 곳은 이 생성 파일들과 platform/base뿐이다 (모듈 경계 검사).
 import { bigint, boolean, customType, integer, jsonb, pgSchema, real, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApiCallEffect, ApiCallHeldReason, ApiCallStatus, ApiConnectorStatus, ApprovalStatus, ChatDeliver, ChatEffort, ChatUpdateKind, ExternalToolAuth, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
+import type { AgentEffort, AgentScope, AgentStatus, AgentTool, AiLoginTool, ApiCallEffect, ApiCallHeldReason, ApiCallStatus, ApiConnectorStatus, ApprovalStatus, ChatDeliver, ChatEffort, ChatStopMode, ChatUpdateKind, ExternalToolAuth, ExternalToolStatus, GoalRunCheckpoint, GoalRunStatus, GoalStatus, OutputKind, PlanUsagePeriod, PlanUsageStatus, PlanUsageTool, ScheduleDeliver, ScheduleDestination, ScheduleMode, ScheduleTrigger, TaskEventKind, TaskRunPromptSource, TaskRunSkillSource, TaskStatus, TaskWaitReason, VerdictKind, VerdictVerdict } from './task.tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const xid8Column = customType<{ data: string }>({ dataType: () => 'xid8' });
@@ -132,6 +132,7 @@ export const approvals = taskSchema.table('approvals', {
   payload: jsonb('payload'),
   inspected_at: timestamp('inspected_at', { withTimezone: true }),
   agent_decided: boolean('agent_decided').notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true }),
 });
 
 /** task.chat_updates */
@@ -171,6 +172,7 @@ export const chats = taskSchema.table('chats', {
   pending_refs: jsonb('pending_refs'),
   app_id: uuid('app_id'),
   deleted_at: timestamp('deleted_at', { withTimezone: true }),
+  stop_mode: text('stop_mode').$type<ChatStopMode>().notNull(),
 });
 
 /** task.external_tools */

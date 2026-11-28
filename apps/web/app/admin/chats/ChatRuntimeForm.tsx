@@ -1,23 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { EFFORT_LABELS } from '../../_task/labels';
+import { EFFORT_LABELS, STOP_LABELS } from '../../_task/labels';
 import { useEngines } from '../../_task/live';
+import type { Chat } from '../../_task/types';
 
 // 대화의 모델 · 생각 강도 (2026-11-15 B): 맡은 에이전트의 도구가 받는 것만. 비우면 에이전트의 설정.
-// 도구는 대화에서 바꾸지 않는다. 고를 모델 목록이 있는 엔진(엔진 목록의 models)은 고르고, 없으면 모델 이름을 적는다
+// 도구는 대화에서 바꾸지 않는다. 고를 모델 목록이 있는 엔진(엔진 목록의 models)은 고르고, 없으면 모델 이름을 적는다.
+// 멈춤 기준 (L3): 일꾼의 판단에서 어디까지 멈춰 고를지 (되돌리기 어려운 판단은 늘 멈춘다)
 export function ChatRuntimeForm({
   tool,
-  model,
-  effort,
+  chat: { model, effort, stopMode },
   busy,
   onSubmit,
 }: {
   tool: string;
-  model: string | null;
-  effort: string | null;
+  chat: Pick<Chat, 'model' | 'effort' | 'stopMode'>;
   busy: boolean;
-  onSubmit: (body: { model: string | null; effort: string | null }) => void;
+  onSubmit: (body: { model: string | null; effort: string | null; stop_mode?: string }) => void;
 }) {
   const [typed, setTyped] = useState(model ?? '');
   const engine = useEngines().find((e) => e.name === tool);
@@ -66,6 +66,20 @@ export function ChatRuntimeForm({
         {efforts.map((e) => (
           <option key={e} value={e}>
             생각 {EFFORT_LABELS[e] ?? e}
+          </option>
+        ))}
+      </select>
+      <select
+        className="input small"
+        aria-label="멈춤 기준"
+        title="되돌리기 어려운 판단은 늘 멈춰요"
+        value={stopMode}
+        disabled={busy}
+        onChange={(e) => onSubmit({ model, effort, stop_mode: e.target.value })}
+      >
+        {Object.entries(STOP_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
           </option>
         ))}
       </select>

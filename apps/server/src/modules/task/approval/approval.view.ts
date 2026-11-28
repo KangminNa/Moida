@@ -23,6 +23,23 @@ function settingOf(payload: unknown): string | null {
   return typeof setting === 'string' ? setting : null;
 }
 
+/**
+ * 확인 필요 판단 (L3, task.decision): 판단 한 줄 · 고른 안(추천안) · 다른 안 · 까닭 · 확인 필요의 까닭 · 대화 · 정해진 안.
+ * 다른 결재는 null. 서버가 적은 값이라 모양만 맞춘다 (DecisionAsk.payload)
+ */
+function decisionOf(action: string, payload: unknown) {
+  if (action !== 'task.decision' || payload === null || typeof payload !== 'object') return null;
+  return payload as {
+    text: string;
+    chosen: string;
+    alternatives: string[];
+    why: string;
+    confirm: string | null;
+    chatId: string;
+    picked?: string;
+  };
+}
+
 /** 결재 하나. 읽기와 쓰기가 같은 모양이다 */
 export class ApprovalView {
   constructor(private readonly row: Readonly<ApprovalRow>) {}
@@ -46,6 +63,9 @@ export class ApprovalView {
       createdAt: r.created_at.toISOString(),
       changes: changesOf(r.payload),
       setting: settingOf(r.payload),
+      /** 답을 기다리는 기한 (L3). 지나면 서버가 정한 대로 한다 (판단은 추천안). 기한 없으면 null */
+      expiresAt: r.expires_at?.toISOString() ?? null,
+      decision: decisionOf(r.action, r.payload),
     };
   }
 }

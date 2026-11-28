@@ -118,6 +118,8 @@ export class ChatView {
       /** 대화의 모델 · 생각 강도 (2026-11-15 B). null이면 상대 에이전트의 설정 */
       model: r.model ?? null,
       effort: r.effort ?? null,
+      /** 멈춤 기준 (L3): all 판단마다 · confirm 확인 필요 판단만 · end 끝에서만 */
+      stopMode: r.stop_mode,
       /** 맡기 전 첫 메시지의 참조 (맡으면 첫 회차로 옮겨져 빈다) */
       pendingRefs: refsOf(r.pending_refs),
       version: r.version,

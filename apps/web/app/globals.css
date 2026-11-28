@@ -4810,6 +4810,27 @@ ul.picked > .chip {
   gap: 6px;
 }
 
+/* 확인 필요 판단의 승인 (L3): 판단 한 줄 · 까닭 · 남은 시간, 고를 안은 버튼 줄 */
+.decision-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.decision-ask small {
+  color: var(--muted);
+}
+
+.decide .choices {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* 고정 화면의 앱 테마 (스토어 12.3): 로고는 앱 이름 앞에 작게 */
 .member-theme input[type="checkbox"] {
   accent-color: var(--accent);

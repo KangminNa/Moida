@@ -69,6 +69,12 @@ export class PostUpdateTool extends BaseTool {
           why: { type: 'string', maxLength: DecisionNote.WHY_MAX },
           weight: { type: 'string', enum: [...DecisionNote.WEIGHTS] },
           step: { type: 'string', maxLength: DecisionNote.STEP_MAX },
+          confirm: { type: 'string', enum: [...DecisionNote.CONFIRMS] },
+          wait_minutes: {
+            type: 'integer',
+            minimum: DecisionNote.WAIT_MIN,
+            maximum: DecisionNote.WAIT_MAX,
+          },
         },
         required: ['chosen'],
       },
@@ -81,7 +87,7 @@ export class PostUpdateTool extends BaseTool {
   }
 
   async handle(actor: Actor, raw: unknown): Promise<PostedUpdateView> {
-    return new PostedUpdateView(await this.updates.post(actor, PostUpdateInput.from(raw)));
+    return this.updates.post(actor, PostUpdateInput.from(raw));
   }
 }
 

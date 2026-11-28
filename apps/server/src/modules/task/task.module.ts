@@ -20,6 +20,7 @@ import { ApprovalController } from './approval/approval.api';
 import { ApprovalQuery } from './approval/approval.query';
 import { ApprovalService } from './approval/approval.service';
 import { ApprovalResultHandler } from './approval/approval-result.handler';
+import { DecisionLapseJob } from './approval/decision-lapse.job';
 import { AppCodeCardHandler } from './chat/app-code-card.handler';
 import { ChatController } from './chat/chat.api';
 import { ChatQuery } from './chat/chat.query';
@@ -143,6 +144,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     ApprovalResultHandler,
     LeaseJob,
     SubtaskWaitJob,
+    DecisionLapseJob,
     // 저장소 skills/의 러너 스킬 (서버 이미지에 함께 든 판). 처음 한 번 읽는다
     { provide: RepoSkillGateway, useFactory: () => RepoSkillGateway.fromEnv() },
     SkillQuery,
@@ -239,6 +241,7 @@ export class TaskModule implements OnModuleInit {
     private readonly results: ApprovalResultHandler,
     private readonly leases: LeaseJob,
     private readonly waits: SubtaskWaitJob,
+    private readonly lapses: DecisionLapseJob,
     private readonly schedules: ScheduleJob,
     private readonly rotation: SecretRotation,
     private readonly logins: AiLoginService,
@@ -288,6 +291,7 @@ export class TaskModule implements OnModuleInit {
     for (const topic of ApprovalResultHandler.TOPICS) this.workers.on(topic, this.results);
     this.workers.due(this.leases, Task.CHANGED);
     this.workers.due(this.waits, Task.CHANGED);
+    this.workers.due(this.lapses, DecisionLapseJob.TOPIC);
     this.workers.due(this.schedules);
     this.rotation.register('task.ai_logins', (actor) => this.logins.resealSecrets(actor));
     // 외부 도구 (2차 7단계): 제안의 결재가 정해지면 붙이거나 지우고, 서버 키를 바꾸면 토큰을 다시 잠근다

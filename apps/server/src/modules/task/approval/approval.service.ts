@@ -22,6 +22,7 @@ import type {
   RequestApprovalInput,
 } from './approval.input';
 import { ApprovalRepository } from './approval.repository';
+import { DecisionAsk } from './decision-ask.policy';
 
 // 결재 쓰기: 에이전트가 올리고, 주인이 정하고, 실행 결과로 작업을 끝낸다.
 // 결재와 작업은 함께 바뀌어야 해서 같은 트랜잭션에서 두 묶음을 쓴다 (객체설계 9장).
@@ -69,6 +70,7 @@ export class ApprovalService extends BaseService {
       seen.assertOwnDecision();
       const { approval, tasks, task } = await this.lockWithTask(tx, spaceId, req.id);
       approval.assertVersion(req.version);
+      if (req.decision === Approval.APPROVE) approval.choose(req.choice);
       approval.decide(req.decision, deciderId, req.note, now);
       if (task) {
         approval.applyTo(task, now);
@@ -83,6 +85,25 @@ export class ApprovalService extends BaseService {
       }
       return approval;
     });
+  }
+
+  /**
+   * 기한이 지난 결재 (L3, DecisionLapseJob): 판단 승인은 추천안으로 승인하고 일을 잇는다. 하나씩 잠가 다시 본다
+   * (그사이 사람이 정했으면 그대로). 기한이 있는 결재는 지금 판단 승인뿐이다
+   */
+  async lapse(actor: Actor, due: readonly { space_id: string; id: string }[], now: Date) {
+    if (!(actor instanceof SystemActor)) throw new Forbidden('system');
+    for (const { space_id: spaceId, id } of due)
+      await this.transaction(async (tx) => {
+        const { approval, tasks, task } = await this.lockWithTask(tx, spaceId, id);
+        // 그사이 사람이 정했으면 그대로 (기한은 바뀌지 않는다: 목록에서 이미 지난 것만 왔다)
+        if (approval.status !== Approval.PENDING) return;
+        approval.choose(null);
+        approval.grantBy(approval.agentId ?? approval.targetId, DecisionAsk.LAPSED, now);
+        if (task) approval.applyTo(task, now);
+        if (task) await tasks.save(task);
+        await new ApprovalRepository(tx).save(approval);
+      });
   }
 
   /**
