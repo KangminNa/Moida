@@ -128,7 +128,7 @@ export function DevicesPanel({
           <div className="copy" style={{ marginTop: 8 }}>
             <code>{spare.token}</code>
           </div>
-          {spare.runner && <p className="note">러너의 CAIRN_RUNNER_TOKEN에 넣어요</p>}
+          {spare.runner && <p className="note">러너의 MOIDA_RUNNER_TOKEN에 넣어요</p>}
         </div>
       )}
       {devices === null ? (

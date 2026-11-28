@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { SiteAddress } from './cairn-site';
+import type { SiteAddress } from './moida-site';
 import type { Shell } from './shell';
 import { CliError, type Terminal } from './terminal';
 
-/** cairn connect가 만드는 기기의 종류: 요청할 권한, 블로그가 줘야 하는 권한, 화면 이름 */
+/** moida connect가 만드는 기기의 종류: 요청할 권한, 블로그가 줘야 하는 권한, 화면 이름 */
 export class DeviceKind {
   /** 팀 소식 읽기 (2차 1-3) */
   static readonly NEWS = new DeviceKind('news', 'news', '소식 기기', '소식', '소식 읽기만');
@@ -40,7 +40,7 @@ export class DeviceKind {
   ) {}
 }
 
-/** 기기의 열쇠 (~/.cairn/credentials.json의 news · collect · deploy). 토큰은 화면에 찍지 않는다 */
+/** 기기의 열쇠 (~/.moida/credentials.json의 news · collect · deploy). 토큰은 화면에 찍지 않는다 */
 export class DeviceCredential {
   constructor(
     readonly site: string,

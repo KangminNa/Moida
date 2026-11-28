@@ -21,9 +21,9 @@ export class RunnerConfig {
    */
   private static readonly DEFAULT_LINEAGES_DIR = join(
     realpathSync(tmpdir()),
-    `cairn-runner-lineages-${userInfo().uid}`,
+    `moida-runner-lineages-${userInfo().uid}`,
   );
-  /** 동시에 하는 일의 수 (CAIRN_RUNNER_CONCURRENCY). 서버의 next_jobs는 한 번에 10개까지 빌려 준다 */
+  /** 동시에 하는 일의 수 (MOIDA_RUNNER_CONCURRENCY). 서버의 next_jobs는 한 번에 10개까지 빌려 준다 */
   private static readonly CONCURRENCY_MAX = 8;
   /** 서버 러너(연결 값 파일로 스스로 붙는 러너)의 기본값. 내 컴퓨터 러너는 1 */
   private static readonly SERVER_CONCURRENCY = 3;
@@ -50,20 +50,20 @@ export class RunnerConfig {
     readonly browserUrl: string | null = null,
     /**
      * 코드 러너 칸의 번호 (docs/코드작업.md). 있으면 칸 기기로 연결해 코드 작업만 받는다.
-     * 코드 러너 이미지(CAIRN_SANDBOX=1)에서 연결 값 파일로만 쓴다
+     * 코드 러너 이미지(MOIDA_SANDBOX=1)에서 연결 값 파일로만 쓴다
      */
     readonly slot: string | null = null,
-    /** 칸에서 AI · setup · checks를 돌릴 사용자 (CAIRN_AGENT_USER). 칸이 아니면 null */
+    /** 칸에서 AI · setup · checks를 돌릴 사용자 (MOIDA_AGENT_USER). 칸이 아니면 null */
     readonly agentUser: AgentUser | null = null,
-    /** 칸의 작업 자리들을 둘 폴더 (CAIRN_WORK_DIR, 기본 /work) */
+    /** 칸의 작업 자리들을 둘 폴더 (MOIDA_WORK_DIR, 기본 /work) */
     readonly workDir: string = RunnerConfig.DEFAULT_WORK_DIR,
-    /** 이 러너에 묶인 에이전트에게 나눠 줄 폴더 (CAIRN_RUNNER_FOLDERS, 내 컴퓨터 러너만). 없으면 null */
+    /** 이 러너에 묶인 에이전트에게 나눠 줄 폴더 (MOIDA_RUNNER_FOLDERS, 내 컴퓨터 러너만). 없으면 null */
     readonly folders: SharedFolders | null = null,
-    /** 동시에 하는 일의 수 (CAIRN_RUNNER_CONCURRENCY). 코드 러너 칸은 늘 1 */
+    /** 동시에 하는 일의 수 (MOIDA_RUNNER_CONCURRENCY). 코드 러너 칸은 늘 1 */
     readonly concurrency = 1,
     /**
      * 세션 키마다 CLI 세션 파일을 24시간 남기는 폴더 (LineageStore, 2026-11-17). 실행 중에는 작업 폴더도 여기 생긴다.
-     * CAIRN_RUNNER_LINEAGES_DIR, 기본은 러너 사용자의 임시 폴더 아래(홈 밖: Claude가 홈을 막는다). 서버 러너는 compose가 /tmp 아래로 정한다
+     * MOIDA_RUNNER_LINEAGES_DIR, 기본은 러너 사용자의 임시 폴더 아래(홈 밖: Claude가 홈을 막는다). 서버 러너는 compose가 /tmp 아래로 정한다
      */
     readonly lineagesDir: string = RunnerConfig.DEFAULT_LINEAGES_DIR,
   ) {}
@@ -73,24 +73,24 @@ export class RunnerConfig {
     env: Readonly<Record<string, string | undefined>>,
     uid: number = process.getuid?.() ?? -1,
   ): RunnerConfig {
-    const token = env.CAIRN_RUNNER_TOKEN?.trim() || null;
-    const pairingFile = env.CAIRN_RUNNER_PAIRING_FILE?.trim() || null;
+    const token = env.MOIDA_RUNNER_TOKEN?.trim() || null;
+    const pairingFile = env.MOIDA_RUNNER_PAIRING_FILE?.trim() || null;
     const missing = [
-      ...(env.CAIRN_RUNNER_URL?.trim() ? [] : ['CAIRN_RUNNER_URL']),
-      ...(token || pairingFile ? [] : ['CAIRN_RUNNER_TOKEN']),
+      ...(env.MOIDA_RUNNER_URL?.trim() ? [] : ['MOIDA_RUNNER_URL']),
+      ...(token || pairingFile ? [] : ['MOIDA_RUNNER_TOKEN']),
     ];
     if (missing.length > 0)
       throw new ConfigProblem(`러너 설정이 빠졌어요: ${missing.join(', ')} (.env.example 참고)`);
     const slot = RunnerConfig.slotOf(env, token);
     const paired = token ? null : pairingFile;
     return new RunnerConfig(
-      RunnerConfig.address(env.CAIRN_RUNNER_URL ?? ''),
+      RunnerConfig.address(env.MOIDA_RUNNER_URL ?? ''),
       token,
       RunnerConfig.ownLoginsOf(env),
       RunnerConfig.binsOf(env),
-      env.CAIRN_SKILLS_DIR?.trim() || RunnerConfig.DEFAULT_SKILLS,
+      env.MOIDA_SKILLS_DIR?.trim() || RunnerConfig.DEFAULT_SKILLS,
       paired,
-      env.CAIRN_BROWSER_URL?.trim() ? RunnerConfig.browser(env.CAIRN_BROWSER_URL) : null,
+      env.MOIDA_BROWSER_URL?.trim() ? RunnerConfig.browser(env.MOIDA_BROWSER_URL) : null,
       slot,
       slot === null ? null : RunnerConfig.agentOf(env, uid),
       RunnerConfig.workDirOf(env),
@@ -130,7 +130,7 @@ export class RunnerConfig {
       : engine.bin.fallback;
   }
 
-  /** 엔진마다 실행 파일 (CAIRN_RUNNER_CLI · CAIRN_RUNNER_CODEX_CLI). 비었으면 기본값 */
+  /** 엔진마다 실행 파일 (MOIDA_RUNNER_CLI · MOIDA_RUNNER_CODEX_CLI). 비었으면 기본값 */
   private static binsOf(env: Readonly<Record<string, string | undefined>>): Record<string, string> {
     return Object.fromEntries(
       EngineAdapters.list().map((e) => [e.name, env[e.bin.env]?.trim() || e.bin.fallback]),
@@ -150,18 +150,18 @@ export class RunnerConfig {
   }
 
   /**
-   * 나눠 줄 폴더 (CAIRN_RUNNER_FOLDERS, 쉼표로 여럿). 내 컴퓨터 러너만 (칸은 셸이 있어 받지 않는다).
+   * 나눠 줄 폴더 (MOIDA_RUNNER_FOLDERS, 쉼표로 여럿). 내 컴퓨터 러너만 (칸은 셸이 있어 받지 않는다).
    * 절대 경로의 있는 폴더만, 숨김 폴더 · 홈 전체(와 그 위)는 받지 않는다: 홈을 통째로 열면 홈 막기가 뜻이 없다.
    * 이름(마지막 칸)이 겹치면 작업 폴더에서 구별되지 않아 받지 않는다
    */
   private static foldersOf(
     env: Readonly<Record<string, string | undefined>>,
   ): SharedFolders | null {
-    const raw = env.CAIRN_RUNNER_FOLDERS?.trim() ?? '';
+    const raw = env.MOIDA_RUNNER_FOLDERS?.trim() ?? '';
     if (!raw) return null;
-    if (env.CAIRN_SANDBOX === '1')
+    if (env.MOIDA_SANDBOX === '1')
       throw new ConfigProblem(
-        'CAIRN_RUNNER_FOLDERS는 내 컴퓨터 러너에서만 써요 (코드 러너 칸은 안 돼요)',
+        'MOIDA_RUNNER_FOLDERS는 내 컴퓨터 러너에서만 써요 (코드 러너 칸은 안 돼요)',
       );
     const home = env.HOME?.replace(/\/+$/, '') ?? '';
     const paths = raw
@@ -189,22 +189,22 @@ export class RunnerConfig {
   }
 
   /**
-   * 칸 번호 (CAIRN_RUNNER_SLOT). 칸은 셸이 있는 일을 받으므로 코드 러너 이미지에서만, 연결 값으로만 붙는다:
+   * 칸 번호 (MOIDA_RUNNER_SLOT). 칸은 셸이 있는 일을 받으므로 코드 러너 이미지에서만, 연결 값으로만 붙는다:
    * 내 컴퓨터에서 칸 번호를 잘못 넣어도 시작하지 않는다 (서버도 칸 기기에만 코드 작업을 준다)
    */
   private static slotOf(
     env: Readonly<Record<string, string | undefined>>,
     token: string | null,
   ): string | null {
-    const slot = env.CAIRN_RUNNER_SLOT?.trim() || null;
+    const slot = env.MOIDA_RUNNER_SLOT?.trim() || null;
     if (slot === null) return null;
     if (!RunnerConfig.SLOT.test(slot))
-      throw new ConfigProblem(`CAIRN_RUNNER_SLOT은 1~99예요: ${slot}`);
-    if (env.CAIRN_SANDBOX !== '1')
-      throw new ConfigProblem('CAIRN_RUNNER_SLOT은 코드 러너 이미지(CAIRN_SANDBOX=1)에서만 써요');
-    if (token !== null || !env.CAIRN_RUNNER_PAIRING_FILE?.trim())
+      throw new ConfigProblem(`MOIDA_RUNNER_SLOT은 1~99예요: ${slot}`);
+    if (env.MOIDA_SANDBOX !== '1')
+      throw new ConfigProblem('MOIDA_RUNNER_SLOT은 코드 러너 이미지(MOIDA_SANDBOX=1)에서만 써요');
+    if (token !== null || !env.MOIDA_RUNNER_PAIRING_FILE?.trim())
       throw new ConfigProblem(
-        '코드 러너 칸은 연결 값 파일(CAIRN_RUNNER_PAIRING_FILE)로만 붙어요. CAIRN_RUNNER_TOKEN은 비워 두세요',
+        '코드 러너 칸은 연결 값 파일(MOIDA_RUNNER_PAIRING_FILE)로만 붙어요. MOIDA_RUNNER_TOKEN은 비워 두세요',
       );
     return slot;
   }
@@ -217,17 +217,17 @@ export class RunnerConfig {
     env: Readonly<Record<string, string | undefined>>,
     uid: number,
   ): AgentUser {
-    const raw = env.CAIRN_AGENT_USER?.trim() ?? '';
+    const raw = env.MOIDA_AGENT_USER?.trim() ?? '';
     const agent = AgentUser.parse(raw);
     if (agent === null)
       throw new ConfigProblem(
-        `CAIRN_AGENT_USER는 "uid:gid"(예: 1001:1001)나 self(시험용)예요: ${raw || '(비어 있음)'}`,
+        `MOIDA_AGENT_USER는 "uid:gid"(예: 1001:1001)나 self(시험용)예요: ${raw || '(비어 있음)'}`,
       );
     if (agent.isSelf) return agent;
     if (uid !== 0)
       throw new ConfigProblem('AI를 다른 사용자로 돌리려면 코드 러너 칸의 러너가 root여야 해요');
     if (agent.uid === 0 || agent.gid === 0)
-      throw new ConfigProblem('CAIRN_AGENT_USER는 root가 아닌 사용자여야 해요');
+      throw new ConfigProblem('MOIDA_AGENT_USER는 root가 아닌 사용자여야 해요');
     return agent;
   }
 
@@ -239,27 +239,27 @@ export class RunnerConfig {
     env: Readonly<Record<string, string | undefined>>,
     serverRunner: boolean,
   ): number {
-    const raw = env.CAIRN_RUNNER_CONCURRENCY?.trim() ?? '';
+    const raw = env.MOIDA_RUNNER_CONCURRENCY?.trim() ?? '';
     if (!raw) return serverRunner ? RunnerConfig.SERVER_CONCURRENCY : 1;
     const value = Number(raw);
     if (!/^[0-9]+$/.test(raw) || value < 1 || value > RunnerConfig.CONCURRENCY_MAX)
       throw new ConfigProblem(
-        `CAIRN_RUNNER_CONCURRENCY는 1~${RunnerConfig.CONCURRENCY_MAX}예요: ${raw}`,
+        `MOIDA_RUNNER_CONCURRENCY는 1~${RunnerConfig.CONCURRENCY_MAX}예요: ${raw}`,
       );
     return value;
   }
 
   private static workDirOf(env: Readonly<Record<string, string | undefined>>): string {
-    const dir = env.CAIRN_WORK_DIR?.trim() || RunnerConfig.DEFAULT_WORK_DIR;
+    const dir = env.MOIDA_WORK_DIR?.trim() || RunnerConfig.DEFAULT_WORK_DIR;
     if (!isAbsolute(dir) || dir === '/')
-      throw new ConfigProblem(`CAIRN_WORK_DIR은 / 밖의 절대 경로여야 해요: ${dir}`);
+      throw new ConfigProblem(`MOIDA_WORK_DIR은 / 밖의 절대 경로여야 해요: ${dir}`);
     return dir.replace(/\/+$/, '');
   }
 
   private static lineagesDirOf(env: Readonly<Record<string, string | undefined>>): string {
-    const dir = env.CAIRN_RUNNER_LINEAGES_DIR?.trim() || RunnerConfig.DEFAULT_LINEAGES_DIR;
+    const dir = env.MOIDA_RUNNER_LINEAGES_DIR?.trim() || RunnerConfig.DEFAULT_LINEAGES_DIR;
     if (!isAbsolute(dir) || dir === '/')
-      throw new ConfigProblem(`CAIRN_RUNNER_LINEAGES_DIR은 / 밖의 절대 경로여야 해요: ${dir}`);
+      throw new ConfigProblem(`MOIDA_RUNNER_LINEAGES_DIR은 / 밖의 절대 경로여야 해요: ${dir}`);
     return dir.replace(/\/+$/, '');
   }
 
@@ -268,7 +268,7 @@ export class RunnerConfig {
     const text = raw.trim().replace(/\/+$/, '');
     if (!/^https?:\/\/[^/]/i.test(text) || !URL.canParse(text))
       throw new ConfigProblem(
-        `CAIRN_BROWSER_URL은 브라우저의 CDP 주소여야 해요 (예: http://127.0.0.1:9222): ${text}`,
+        `MOIDA_BROWSER_URL은 브라우저의 CDP 주소여야 해요 (예: http://127.0.0.1:9222): ${text}`,
       );
     return text;
   }
@@ -276,7 +276,7 @@ export class RunnerConfig {
   private static address(raw: string): string {
     const text = raw.trim().replace(/\/+$/, '');
     if (!/^https?:\/\/[^/]/i.test(text) || !URL.canParse(text))
-      throw new ConfigProblem(`CAIRN_RUNNER_URL은 http(s) 주소여야 해요: ${text}`);
+      throw new ConfigProblem(`MOIDA_RUNNER_URL은 http(s) 주소여야 해요: ${text}`);
     return text;
   }
 }

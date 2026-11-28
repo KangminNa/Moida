@@ -8,10 +8,10 @@ import type { SessionTranscriptNew } from '../vault.tables';
 // 원문 표에는 meta가 없어 모르는 앞부분 키를 보관할 곳이 없다: 조용히 버리지 않고 멈춘다.
 export class RestoredTranscript extends BaseEntity {
   private static readonly KNOWN: ReadonlySet<string> = new Set([
-    'cairn_format',
-    'cairn_type',
-    'cairn_id',
-    'cairn_session',
+    'moida_format',
+    'moida_type',
+    'moida_id',
+    'moida_session',
     'seq',
     'created',
   ]);
@@ -40,7 +40,7 @@ export class RestoredTranscript extends BaseEntity {
     return new RestoredTranscript(
       {
         id: record.id(),
-        session_id: record.id('cairn_session'),
+        session_id: record.id('moida_session'),
         seq,
         text,
         content_hash: SessionTranscript.restore(text).hash,

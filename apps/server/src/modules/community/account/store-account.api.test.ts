@@ -24,7 +24,7 @@ function shared(
   return api.viaHost(path, APPS, {
     ...options,
     headers: {
-      ...(app ? { 'x-cairn-app': app } : {}),
+      ...(app ? { 'x-moida-app': app } : {}),
       ...(write ? { origin: `http://${APPS}`, 'x-forwarded-for': CommunitySite.nextPlace() } : {}),
       ...options.headers,
     },
@@ -32,7 +32,7 @@ function shared(
 }
 
 before(async () => {
-  process.env.CAIRN_APPS_URL = `http://${APPS}`;
+  process.env.MOIDA_APPS_URL = `http://${APPS}`;
   api = await ApiClient.start();
   owner = await api.signIn();
   CommunitySite.mailbox(api);
@@ -86,7 +86,7 @@ before(async () => {
   assert.equal(joined.status, 201, joined.text);
 });
 after(async () => {
-  delete process.env.CAIRN_APPS_URL;
+  delete process.env.MOIDA_APPS_URL;
   await api.close();
 });
 
@@ -166,14 +166,14 @@ describe('앱 없는 계정 일', () => {
       method: 'PATCH',
       as: who,
       body: { current: '틀린 비밀번호입니다 정말로', next },
-      headers: { 'x-cairn-csrf': csrf },
+      headers: { 'x-moida-csrf': csrf },
     });
     assert.equal(wrong.status, 400, wrong.text);
     const done = await shared('/api/store/me/password', {
       method: 'PATCH',
       as: who,
       body,
-      headers: { 'x-cairn-csrf': csrf },
+      headers: { 'x-moida-csrf': csrf },
     });
     assert.equal(done.status, 204, done.text);
     password = next;
@@ -190,7 +190,7 @@ describe('앱 없는 계정 일', () => {
         method: 'PUT',
         as: who,
         body: { version, agreed },
-        headers: { 'x-cairn-csrf': csrf },
+        headers: { 'x-moida-csrf': csrf },
       });
     const on = await put(me.version, !me.newsMail);
     assert.equal(on.status, 200, on.text);
@@ -205,7 +205,7 @@ describe('앱 없는 계정 일', () => {
         method: 'POST',
         as: who,
         body: { password: pw },
-        headers: { 'x-cairn-csrf': csrf },
+        headers: { 'x-moida-csrf': csrf },
       });
     assert.equal((await leave('틀린 비밀번호입니다 정말로')).status, 400);
     const done = await leave(password);

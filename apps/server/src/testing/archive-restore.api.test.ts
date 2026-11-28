@@ -19,8 +19,8 @@ import {
 import { ApiClient, type ApiResult, type TestUser } from './api-client';
 import { FreshDatabase } from './fresh-database';
 
-// 복원 (docs/보관형식.md). 진짜 데이터로 채운 Cairn을 내보내고, 새 DB의 빈 Cairn에 들여와 다시 내보내 바이트까지 비교한다.
-// 테스트 전용 DB는 다른 테스트의 데이터로 차 있어서, 파일 하나가 쓰는 Cairn마다 새 DB를 만든다.
+// 복원 (docs/보관형식.md). 진짜 데이터로 채운 Moida을 내보내고, 새 DB의 빈 Moida에 들여와 다시 내보내 바이트까지 비교한다.
+// 테스트 전용 DB는 다른 테스트의 데이터로 차 있어서, 파일 하나가 쓰는 Moida마다 새 DB를 만든다.
 
 type Json = Record<string, unknown>;
 
@@ -34,7 +34,7 @@ function ok(res: ApiResult, status = 200): Json {
   return res.json();
 }
 
-/** 새 DB와 새 사진 폴더로 뜬 Cairn 하나 (설치까지 끝남) */
+/** 새 DB와 새 사진 폴더로 뜬 Moida 하나 (설치까지 끝남) */
 class Moida {
   private constructor(
     readonly database: FreshDatabase,
@@ -44,15 +44,15 @@ class Moida {
   ) {}
 
   static async boot(name: string): Promise<Moida> {
-    const database = await FreshDatabase.create(`cairn_restore_${name}`);
-    const blobs = await mkdtemp(join(tmpdir(), 'cairn-restore-'));
-    const before = process.env.CAIRN_BLOBS_DIR;
-    process.env.CAIRN_BLOBS_DIR = blobs;
+    const database = await FreshDatabase.create(`moida_restore_${name}`);
+    const blobs = await mkdtemp(join(tmpdir(), 'moida-restore-'));
+    const before = process.env.MOIDA_BLOBS_DIR;
+    process.env.MOIDA_BLOBS_DIR = blobs;
     const previous = process.env.DATABASE_URL;
     process.env.DATABASE_URL = database.url;
     const api = await ApiClient.start();
     process.env.DATABASE_URL = previous;
-    process.env.CAIRN_BLOBS_DIR = before;
+    process.env.MOIDA_BLOBS_DIR = before;
     const owner = await api.signIn();
     const { version } = (await api.get('/api/space')).json() as { version: number };
     ok(
@@ -403,7 +403,7 @@ async function fill(c: Moida): Promise<void> {
   await c.code(seed.hiddenApp, {
     'index.html': '{{> part}}',
     'part.html': '<b>비공개</b>',
-    'cairn.json': '{"cairn":1,"hosts":["fonts.example.com"]}',
+    'moida.json': '{"moida":1,"hosts":["fonts.example.com"]}',
   });
   const inside = await c.post('비공개 앱의 글', '앱이 닫혀 있다', 'published', {
     appId: seed.hiddenApp,
@@ -486,9 +486,9 @@ let tampered: readonly ArchiveFile[];
 const opened: Moida[] = [];
 
 const boot = async (name: string): Promise<Moida> => {
-  const cairn = await Moida.boot(name);
-  opened.push(cairn);
-  return cairn;
+  const moida = await Moida.boot(name);
+  opened.push(moida);
+  return moida;
 };
 
 before(async () => {
@@ -506,7 +506,7 @@ before(async () => {
 });
 
 after(async () => {
-  for (const cairn of [source, target, ...opened]) await cairn?.close();
+  for (const moida of [source, target, ...opened]) await moida?.close();
 });
 
 describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
@@ -541,29 +541,45 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     assert.equal(row?.n, 0);
   });
 
-  test('cairn.json이 없거나 형식이 틀리면 멈춘다', async () => {
+  test('옛 이름의 보관 파일(cairn.json · cairn_ 키, 2026-11-28 이름 바꾸기 전의 백업)도 같은 개수로 읽는다', async () => {
+    // 글자 파일(md · yml · json)만 옛 이름으로 되돌린다: 사진 · 그림은 그대로
+    const old = exported.map((f) => {
+      const path = f.path.replace(/(^|\/)moida\.json$/, '$1cairn.json');
+      if (!/\.(md|ya?ml|json)$/.test(f.path))
+        return path === f.path ? f : ArchiveFile.text(path, f.asText());
+      return ArchiveFile.text(path, f.asText().replace(/\bmoida_/g, 'cairn_'));
+    });
+    assert.ok(old.some((f) => f.path === 'cairn.json'));
+    assert.ok(!old.some((f) => f.path.endsWith('moida.json')));
+    const report = await target.restores.preview(system, old);
+    const expected = await target.restores.preview(system, exported);
+    assert.deepEqual([...report.counts], [...expected.counts]);
+    assert.equal(await target.rows(), 0);
+  });
+
+  test('moida.json이 없거나 형식이 틀리면 멈춘다', async () => {
     await refuses(
-      exported.filter((f) => f.path !== 'cairn.json'),
-      /cairn\.json이 없어요/,
+      exported.filter((f) => f.path !== 'moida.json'),
+      /moida\.json이 없어요/,
     );
     await refuses(
-      swap(exported, 'cairn.json', () => '깨진 내용'),
-      /cairn\.json을 읽을 수 없어요/,
+      swap(exported, 'moida.json', () => '깨진 내용'),
+      /moida\.json을 읽을 수 없어요/,
     );
     await refuses(
-      swap(exported, 'cairn.json', () => '{"format":"하나"}'),
+      swap(exported, 'moida.json', () => '{"format":"하나"}'),
       /format이 틀렸어요/,
     );
   });
 
   test('더 새로운 형식은 멈춘다', async () => {
     await refuses(
-      swap(exported, 'cairn.json', () => '{"format":2,"generator":"cairn"}'),
+      swap(exported, 'moida.json', () => '{"format":2,"generator":"moida"}'),
       /더 새로운 형식이에요 \(형식 2, 이 Moida는 1까지\)/,
     );
     await refuses(
       swap(exported, pathOf(exported, seed.aiWiki), (t) =>
-        t.replace('cairn_format: 1', 'cairn_format: 2'),
+        t.replace('moida_format: 1', 'moida_format: 2'),
       ),
       /더 새로운 형식이에요 \(2\)/,
     );
@@ -589,7 +605,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     );
     await refuses(
       swap(exported, pathOf(exported, seed.aiWiki), (t) =>
-        t.replace('cairn_type: wiki', 'cairn_type: post'),
+        t.replace('moida_type: wiki', 'moida_type: post'),
       ),
       /종류가 wiki이어야/,
     );
@@ -607,7 +623,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
       /앱 hidden의 코드: index\.html이 없어요/,
     );
     await refuses(
-      swap(exported, 'blog/apps/hidden/code/cairn.json', () => '{"cairn":1,"hosts":["*.x.com"]}'),
+      swap(exported, 'blog/apps/hidden/code/moida.json', () => '{"moida":1,"hosts":["*.x.com"]}'),
       /앱 hidden의 코드: 바깥 주소는 정확한 호스트 이름만/,
     );
     await refuses(
@@ -627,7 +643,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
       /글 [^:]+: 없는 앱을 가리켜요/,
     );
     await refuses(
-      swap(exported, pathOf(exported, '앱이 닫혀 있다'), (t) => t.replace(/^cairn_app: .*\n/m, '')),
+      swap(exported, pathOf(exported, '앱이 닫혀 있다'), (t) => t.replace(/^moida_app: .*\n/m, '')),
       /앱 밖의 글은 공개할 수 없어요/,
     );
     await refuses(
@@ -673,11 +689,11 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
     );
     await refuses(
       swap(exported, pathOf(exported, seed.noteless), (t) => `${t}## 한 일\n\n손으로 씀\n`),
-      /노트 없는 세션\(cairn_note: false\)인데 본문 · 태그가 있어요/,
+      /노트 없는 세션\(moida_note: false\)인데 본문 · 태그가 있어요/,
     );
     await refuses(
       swap(exported, pathOf(exported, seed.transcripted), (t) =>
-        t.replace('cairn_noted_seq: 2', 'cairn_noted_seq: 3'),
+        t.replace('moida_noted_seq: 2', 'moida_noted_seq: 3'),
       ),
       /노트를 쓴 원문\(3번\)이 없어요/,
     );
@@ -702,7 +718,7 @@ describe('복원하기 전: 실패하면 아무것도 쓰지 않는다', () => {
 
   test('들여올 내용이 없으면 멈춘다', async () => {
     await refuses(
-      exported.filter((f) => f.path === 'cairn.json'),
+      exported.filter((f) => f.path === 'moida.json'),
       /들여올 내용이 없어요/,
     );
   });
@@ -748,7 +764,7 @@ describe('왕복: 내보내기 → 빈 Moida에 복원 → 다시 내보내기',
     assert.equal(exported.filter((f) => f.path.startsWith('assets/')).length, 4, '아이콘 포함');
     const dangling = exported.find((f) => f.asText().includes('지운 wiki의 세션'))?.asText();
     assert.ok(dangling);
-    assert.equal(dangling.includes('cairn_wiki'), false);
+    assert.equal(dangling.includes('moida_wiki'), false);
   });
 
   test('결과를 알린다', () => {
@@ -967,8 +983,8 @@ describe('왕복: 내보내기 → 빈 Moida에 복원 → 다시 내보내기',
       [
         ['blog/apps/blog/code/index.html', false],
         ['blog/apps/blog/code/style.css', false],
-        ['blog/apps/hidden/code/cairn.json', true],
         ['blog/apps/hidden/code/index.html', true],
+        ['blog/apps/hidden/code/moida.json', true],
         ['blog/apps/hidden/code/part.html', true],
       ],
     );
@@ -1106,16 +1122,16 @@ describe('왕복: 내보내기 → 빈 Moida에 복원 → 다시 내보내기',
 
 describe('두 복원이 겹치면', () => {
   test('하나만 들어가고 다른 하나는 비어 있지 않아 거절된다', async () => {
-    const cairn = await boot('race');
-    const results = await Promise.allSettled([cairn.restore(exported), cairn.restore(exported)]);
+    const moida = await boot('race');
+    const results = await Promise.allSettled([moida.restore(exported), moida.restore(exported)]);
     assert.deepEqual(results.map((r) => r.status).sort(), ['fulfilled', 'rejected']);
     const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
     assert.match(failed.reason.message, /빈 Moida에만/);
-    assertSameFiles(await cairn.files(), exported);
+    assertSameFiles(await moida.files(), exported);
   });
 
   test('복원 중에는 내보내기가 끝나기를 기다린다: 절반만 복원된 모습을 보지 않는다', async () => {
-    const cairn = await boot('steady');
+    const moida = await boot('steady');
     let release = (): void => {};
     const hold = new Promise<void>((resolve) => {
       release = resolve;
@@ -1124,14 +1140,14 @@ describe('두 복원이 겹치면', () => {
     const taken = new Promise<void>((resolve) => {
       locked = resolve;
     });
-    const restoring = cairn.api.service(Database).transaction(async (tx) => {
+    const restoring = moida.api.service(Database).transaction(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtextextended('platform.archive.restore', 0))`;
       locked();
       await hold;
     });
     await taken;
     let read = false;
-    const reading = cairn.restores.steadyRead(async () => {
+    const reading = moida.restores.steadyRead(async () => {
       read = true;
     });
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -1145,32 +1161,32 @@ describe('두 복원이 겹치면', () => {
 
 describe('다른 묶음', () => {
   test('옛 백업: 사람이 고친 표시가 없으면 사람의 것으로 두고, 사진 행은 본문에서 찾는다', async () => {
-    const cairn = await boot('old');
+    const moida = await boot('old');
     const strip = (text: string): string =>
       text
-        .replace(/^(cairn_origin|cairn_pinned|cairn_assets): .*\n/gm, '')
+        .replace(/^(moida_origin|moida_pinned|moida_assets): .*\n/gm, '')
         .replace(/^ {2}(origin|pinned): .*\n/gm, '');
     const old = exported.map((f) =>
       f.path.endsWith('.md') || f.path.endsWith('.yml')
         ? ArchiveFile.text(f.path, strip(f.asText()))
         : f,
     );
-    const report = await cairn.restore(old);
+    const report = await moida.restore(old);
     assert.ok(
       report.notes.some((n) => /어느 글에도 붙지 않은 사진 1개/.test(n)),
       report.notes.join(),
     );
-    const [wiki] = await cairn.sql`
+    const [wiki] = await moida.sql`
       SELECT origin, pinned_sections FROM vault.wikis WHERE node_id = ${seed.aiWiki}`;
     assert.equal(wiki?.origin, 'human');
     assert.deepEqual(wiki?.pinned_sections, ['#title', '칸']);
-    const [session] = await cairn.sql`
+    const [session] = await moida.sql`
       SELECT pinned_sections FROM vault.sessions WHERE node_id = ${seed.session}`;
     assert.deepEqual(session?.pinned_sections, ['#wiki']);
-    const [category] = await cairn.sql`SELECT origin, pinned FROM vault.categories LIMIT 1`;
+    const [category] = await moida.sql`SELECT origin, pinned FROM vault.categories LIMIT 1`;
     assert.deepEqual([category?.origin, category?.pinned], ['human', true]);
     const assets =
-      await cairn.sql`SELECT blob_hash FROM blog.assets WHERE post_id = ${seed.published}`;
+      await moida.sql`SELECT blob_hash FROM blog.assets WHERE post_id = ${seed.published}`;
     assert.deepEqual(
       assets.map((a) => a.blob_hash),
       [sha256(seed.openPhoto)],
@@ -1178,9 +1194,9 @@ describe('다른 묶음', () => {
   });
 
   test('공개 저장소의 묶음: 글과 사진만 들어오고 글 → wiki 연결 값은 남는다', async () => {
-    const cairn = await boot('public');
+    const moida = await boot('public');
     const open = exported.filter((f) => !f.isPrivateArea());
-    const report = await cairn.restore(open);
+    const report = await moida.restore(open);
     assert.ok(report.notes.some((n) => /vault 파일이 없어요/.test(n)));
     assert.equal(report.counts.get('세션'), undefined);
     assert.equal(report.counts.get('앱'), 1, '공개 앱만');
@@ -1191,67 +1207,67 @@ describe('다른 묶음', () => {
       false,
     );
     const [post] =
-      await cairn.sql`SELECT main_wiki_id FROM blog.posts WHERE id = ${seed.published}`;
+      await moida.sql`SELECT main_wiki_id FROM blog.posts WHERE id = ${seed.published}`;
     assert.equal(post?.main_wiki_id, seed.openWiki);
     const [mark] =
-      await cairn.sql`SELECT main_wiki_id FROM vault.post_marks WHERE post_id = ${seed.published}`;
+      await moida.sql`SELECT main_wiki_id FROM vault.post_marks WHERE post_id = ${seed.published}`;
     assert.equal(mark?.main_wiki_id, null, 'wiki가 없으니 그래프에는 나오지 않는다');
-    const after = await cairn.files();
+    const after = await moida.files();
     const wanted = new Map(open.map((f) => [f.path, f.asText()]));
     for (const file of after.filter((f) => !f.isPrivateArea() && f.path.startsWith('blog/')))
       assert.equal(file.asText(), wanted.get(file.path));
   });
 
-  /** 앱이 생기기 전의 묶음: 앱 파일과 글의 cairn_app이 없다 */
+  /** 앱이 생기기 전의 묶음: 앱 파일과 글의 moida_app이 없다 */
   const beforeApps = (files: readonly ArchiveFile[]): readonly ArchiveFile[] =>
     files
       .filter((f) => !f.path.startsWith('blog/apps/'))
       .map((f) =>
         f.path.startsWith('blog/posts/')
-          ? ArchiveFile.text(f.path, f.asText().replace(/^cairn_app: .*\n/m, ''))
+          ? ArchiveFile.text(f.path, f.asText().replace(/^moida_app: .*\n/m, ''))
           : f,
       );
 
   test('앱이 생기기 전의 백업: 글은 모두 기본 앱(id = 공간 id, /blog, 공개)에 들고 방문자 그래프에도 나온다', async () => {
-    const cairn = await boot('before_apps');
-    const report = await cairn.restore(beforeApps(exported));
+    const moida = await boot('before_apps');
+    const report = await moida.restore(beforeApps(exported));
     assert.equal(report.counts.get('앱'), 1);
     assert.ok(
       report.notes.includes('앱이 생기기 전의 백업이라 글 5개를 블로그 앱(/blog)에 넣었어요'),
       report.notes.join(),
     );
-    const spaceId = await cairn.spaceId;
-    const apps = await cairn.sql`SELECT id, kind, name, slug, visibility FROM blog.apps`;
+    const spaceId = await moida.spaceId;
+    const apps = await moida.sql`SELECT id, kind, name, slug, visibility FROM blog.apps`;
     assert.deepEqual(
       apps.map((a) => ({ ...a })),
       [{ id: spaceId, kind: 'blog', name: '블로그', slug: 'blog', visibility: 'public' }],
     );
-    const [posts] = await cairn.sql`
+    const [posts] = await moida.sql`
       SELECT array_agg(DISTINCT p.app_id) AS apps, array_agg(DISTINCT m.app_id) AS marks
       FROM blog.posts p JOIN vault.post_marks m ON m.post_id = p.id`;
     assert.deepEqual([posts?.apps, posts?.marks], [[spaceId], [spaceId]]);
-    const marks = await cairn.sql`SELECT app_id, public, app_version FROM vault.app_marks`;
+    const marks = await moida.sql`SELECT app_id, public, app_version FROM vault.app_marks`;
     assert.deepEqual(
       marks.map((m) => ({ ...m })),
       [{ app_id: spaceId, public: true, app_version: 1 }],
     );
-    assert.ok((await cairn.api.get('/api/graph/public')).text.includes('공개 글'));
-    assert.ok((await cairn.api.get('/api/posts')).text.includes('공개 글'));
+    assert.ok((await moida.api.get('/api/graph/public')).text.includes('공개 글'));
+    assert.ok((await moida.api.get('/api/posts')).text.includes('공개 글'));
   });
 
   test('앱 파일도 공개 · 링크 공개 글도 없는 묶음: 임시 글은 앱 밖에 들고 기본 앱을 만들지 않는다', async () => {
-    const cairn = await boot('drafts_only');
+    const moida = await boot('drafts_only');
     const drafts = beforeApps(exported).filter(
       (f) => !f.path.startsWith('blog/posts/') || /^status: draft$/m.test(f.asText()),
     );
-    const report = await cairn.restore(drafts);
+    const report = await moida.restore(drafts);
     assert.equal(report.counts.get('앱'), undefined);
     assert.equal(report.counts.get('글'), 2);
     assert.equal(
       report.notes.some((n) => /블로그 앱/.test(n)),
       false,
     );
-    const [counts] = await cairn.sql`
+    const [counts] = await moida.sql`
       SELECT (SELECT count(*)::int FROM blog.apps) AS apps, (SELECT count(*)::int FROM vault.app_marks) AS marks,
              (SELECT count(*)::int FROM blog.posts WHERE app_id IS NOT NULL)
            + (SELECT count(*)::int FROM vault.post_marks WHERE app_id IS NOT NULL) AS placed`;
@@ -1259,14 +1275,14 @@ describe('다른 묶음', () => {
   });
 
   test('없는 것을 가리키는 값은 빼고 알려 주고, 고정한 점 위치는 보기가 있을 때만 돌아온다', async () => {
-    const cairn = await boot('dangling');
-    await cairn.sql`
+    const moida = await boot('dangling');
+    await moida.sql`
       INSERT INTO vault.graph_views (space_id, name, audience)
-      VALUES (${await cairn.spaceId}, '내 보기', 'owner')`;
+      VALUES (${await moida.spaceId}, '내 보기', 'owner')`;
     const missing = randomUUID();
     const graph = swap(exported, 'vault/graph.json', (t) => {
       const parsed = JSON.parse(t) as { edges: Json[]; pinned_nodes: Json[] };
-      parsed.edges.push({ ...parsed.edges[0], cairn_id: randomUUID(), src: missing });
+      parsed.edges.push({ ...parsed.edges[0], moida_id: randomUUID(), src: missing });
       parsed.pinned_nodes = [
         { view: '내 보기', node: seed.aiWiki, x: 1.5, y: -2 },
         { view: '없는 보기', node: seed.aiWiki, x: 3, y: 4 },
@@ -1276,7 +1292,7 @@ describe('다른 묶음', () => {
     const files = swap(graph, pathOf(graph, seed.session), (t) =>
       t.replace(seed.openWiki, missing),
     ).filter((f) => f.path !== `assets/${sha256(seed.draftPhoto)}.png`);
-    const report = await cairn.restore(files);
+    const report = await moida.restore(files);
     assert.ok(
       report.notes.some((n) => /묶음에 없는 사진 1개/.test(n)),
       report.notes.join(),
@@ -1286,7 +1302,7 @@ describe('다른 묶음', () => {
       report.notes.join(),
     );
     const placed = JSON.parse(
-      (await cairn.files()).find((f) => f.path === 'vault/graph.json')?.asText() ?? '{}',
+      (await moida.files()).find((f) => f.path === 'vault/graph.json')?.asText() ?? '{}',
     ) as { pinned_nodes: Json[] };
     assert.deepEqual(placed.pinned_nodes, [{ view: '내 보기', node: seed.aiWiki, x: 1.5, y: -2 }]);
     assert.ok(
@@ -1298,48 +1314,48 @@ describe('다른 묶음', () => {
       report.notes.join(),
     );
     const [session] =
-      await cairn.sql`SELECT wiki_id FROM vault.sessions WHERE node_id = ${seed.session}`;
+      await moida.sql`SELECT wiki_id FROM vault.sessions WHERE node_id = ${seed.session}`;
     assert.equal(session?.wiki_id, null);
   });
 });
 
-describe('cairn-admin restore (표준 입력의 zip)', () => {
-  const admin = (cairn: Moida, args: readonly string[], input: Buffer) =>
+describe('moida-admin restore (표준 입력의 zip)', () => {
+  const admin = (moida: Moida, args: readonly string[], input: Buffer) =>
     spawnSync('node', ['-r', '@swc-node/register', 'src/main.cli.ts', 'restore', ...args], {
       input,
       encoding: 'utf8',
       maxBuffer: 1024 * 1024,
-      env: { ...process.env, DATABASE_URL: cairn.database.url, CAIRN_BLOBS_DIR: cairn.blobs },
+      env: { ...process.env, DATABASE_URL: moida.database.url, MOIDA_BLOBS_DIR: moida.blobs },
     });
 
   test('기본은 미리 보기, --apply로 들여오고, 깨진 zip은 짧게 알린다', async () => {
-    const cairn = await boot('cli');
+    const moida = await boot('cli');
     const zip = zipOf(exported);
-    const preview = admin(cairn, [], zip);
+    const preview = admin(moida, [], zip);
     assert.equal(preview.status, 0, preview.stderr);
     assert.match(
       preview.stdout,
       /들어올 내용: .*세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 앱 코드 2개 · 글 5개 · 사진 4개/,
     );
     assert.match(preview.stdout, /--apply/);
-    assert.equal(await cairn.rows(), 0);
+    assert.equal(await moida.rows(), 0);
 
-    const broken = admin(cairn, ['--apply'], Buffer.from('zip이 아님'));
+    const broken = admin(moida, ['--apply'], Buffer.from('zip이 아님'));
     assert.equal(broken.status, 1);
     assert.match(broken.stderr, /zip 파일이 아니에요/);
-    assert.equal(await cairn.rows(), 0);
+    assert.equal(await moida.rows(), 0);
 
-    const unknown = admin(cairn, ['--force'], zip);
+    const unknown = admin(moida, ['--force'], zip);
     assert.equal(unknown.status, 1);
     assert.match(unknown.stderr, /모르는 옵션/);
 
-    const applied = admin(cairn, ['--apply'], zip);
+    const applied = admin(moida, ['--apply'], zip);
     assert.equal(applied.status, 0, applied.stderr);
     assert.match(applied.stdout, /✔ 복원했어요: /);
     assert.match(applied.stdout, /기기는 다시 연결해 주세요/);
-    assertSameFiles(await cairn.files(), exported);
+    assertSameFiles(await moida.files(), exported);
 
-    const twice = admin(cairn, ['--apply'], zip);
+    const twice = admin(moida, ['--apply'], zip);
     assert.equal(twice.status, 1);
     assert.match(twice.stderr, /빈 Moida에만/);
   });
@@ -1357,8 +1373,8 @@ describe('sync-github: 저장소에서 복원', () => {
   let fake: FakeGithub;
   let apiUrl: string;
 
-  const connect = async (cairn: Moida): Promise<void> => {
-    const { api, owner } = cairn;
+  const connect = async (moida: Moida): Promise<void> => {
+    const { api, owner } = moida;
     ok(await api.request('POST', '/api/plugins/sync-github/enable', owner));
     ok(
       await api.request('PUT', '/api/plugins/sync-github/settings', owner, {
@@ -1366,8 +1382,8 @@ describe('sync-github: 저장소에서 복원', () => {
       }),
     );
   };
-  const run = (cairn: Moida, action: string) =>
-    cairn.api.request('POST', `/api/plugins/sync-github/actions/${action}`, cairn.owner);
+  const run = (moida: Moida, action: string) =>
+    moida.api.request('POST', `/api/plugins/sync-github/actions/${action}`, moida.owner);
 
   before(async () => {
     const entry = resolve(process.cwd(), '../../plugins/sync-github/server/fake-github');
@@ -1381,50 +1397,50 @@ describe('sync-github: 저장소에서 복원', () => {
   after(() => fake.stop());
 
   test('빈 Moida의 동기화는 백업을 지우지 않고 복원을 가리킨다', async () => {
-    const cairn = await boot('plugin');
-    await connect(cairn);
+    const moida = await boot('plugin');
+    await connect(moida);
     const backup = fake.filesAt('main');
-    const refused = ok(await run(cairn, 'sync-now'));
+    const refused = ok(await run(moida, 'sync-now'));
     assert.equal(refused.ok, false);
     assert.match(String(refused.message), /비어 있는 Moida라 동기화를 멈췄어요/);
     assert.match(String(refused.details), /restore-preview/);
     assert.deepEqual(fake.filesAt('main'), backup);
 
-    const preview = ok(await run(cairn, 'restore-preview'));
+    const preview = ok(await run(moida, 'restore-preview'));
     assert.equal(preview.ok, true, preview.message as string);
     assert.match(
       String(preview.message),
       /세션 7개 · 원문 3개 · 선 3개 · 앱 2개 · 앱 코드 2개 · 글 5개 · 사진 4개/,
     );
-    assert.equal(await cairn.rows(), 0);
+    assert.equal(await moida.rows(), 0);
 
-    const restored = ok(await run(cairn, 'restore'));
+    const restored = ok(await run(moida, 'restore'));
     assert.equal(restored.ok, true, restored.message as string);
     assert.match(String(restored.details), /기기는 다시 연결/);
-    assertSameFiles(await cairn.files(), exported);
+    assertSameFiles(await moida.files(), exported);
 
-    const synced = ok(await run(cairn, 'sync-now'));
+    const synced = ok(await run(moida, 'sync-now'));
     assert.equal(synced.message, '바뀐 것이 없어요');
     assert.deepEqual(fake.filesAt('main'), backup);
 
-    const twice = await run(cairn, 'restore');
+    const twice = await run(moida, 'restore');
     assert.equal(twice.status, 422);
     assert.match(twice.text, /빈 Moida에만/);
-    const visitor = await cairn.api.request('POST', '/api/plugins/sync-github/actions/restore');
+    const visitor = await moida.api.request('POST', '/api/plugins/sync-github/actions/restore');
     assert.equal(visitor.status, 403);
   });
 
   test('write 권한을 가진 기기도 복원하지 못한다 (주인만)', async () => {
-    const cairn = await boot('writer');
-    await connect(cairn);
-    const writer = await cairn.device('writer', ['write']);
+    const moida = await boot('writer');
+    await connect(moida);
+    const writer = await moida.device('writer', ['write']);
     for (const action of ['restore-preview', 'restore']) {
-      const res = await fetch(`${cairn.api.baseUrl}/api/plugins/sync-github/actions/${action}`, {
+      const res = await fetch(`${moida.api.baseUrl}/api/plugins/sync-github/actions/${action}`, {
         method: 'POST',
         headers: { authorization: `Bearer ${writer}` },
       });
       assert.equal(res.status, 403, await res.text());
     }
-    assert.equal(await cairn.rows(), 0);
+    assert.equal(await moida.rows(), 0);
   });
 });

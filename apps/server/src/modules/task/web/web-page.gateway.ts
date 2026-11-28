@@ -35,7 +35,7 @@ export class WebImage {
 // 한도: 받기 MAX_BYTES (넘으면 앞부분만), AI에게 주는 글자 TEXT_MAX, 시간 timeoutMs. 글자가 아닌 형식(PDF · 그림)은 열지 않는다.
 export class WebPageGateway extends BaseGateway {
   /** 시험에서만: 127.0.0.1 · ::1의 가짜 사이트를 열게 한다 (운영에서 켜지 않는다) */
-  static readonly TEST_LOOPBACK_ENV = 'CAIRN_READ_URL_TEST_LOOPBACK';
+  static readonly TEST_LOOPBACK_ENV = 'MOIDA_READ_URL_TEST_LOOPBACK';
   static readonly MAX_HOPS = 3;
   static readonly MAX_BYTES = 2 * 1024 * 1024;
   static readonly TEXT_MAX = 60_000;
@@ -52,7 +52,7 @@ export class WebPageGateway extends BaseGateway {
   private static readonly TEXT_TYPES =
     /^(text\/|application\/(xhtml\+xml|xml|json|ld\+json|rss\+xml|atom\+xml)\b)/i;
   private static readonly HTML_TYPES = /^(text\/html|application\/xhtml\+xml)\b/i;
-  private static readonly AGENT = 'Mozilla/5.0 (compatible; CairnReader/1.0; +read_url)';
+  private static readonly AGENT = 'Mozilla/5.0 (compatible; MoidaReader/1.0; +read_url)';
 
   /** 주소 하나를 연다. allow는 주소마다(리다이렉트 포함) 목줄을 묻는다 (안 되면 던진다) */
   async read(start: URL, allow: (url: URL) => void): Promise<WebPage> {

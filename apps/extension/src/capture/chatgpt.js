@@ -5,7 +5,7 @@
 //   제목        문서 제목 (새 대화는 "ChatGPT")
 const ROLES = { user: 'person', assistant: 'ai' };
 
-globalThis.cairnWatch({
+globalThis.moidaWatch({
   tool: 'chatgpt-web',
   conversationId: (path) => /\/c\/([\w-]+)/.exec(path)?.[1] ?? null,
   streaming: () => document.querySelector('[data-testid="stop-button"]') !== null,

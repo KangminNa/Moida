@@ -106,7 +106,7 @@ export class AppCodeService extends EntityService<AppCode> {
   }
 
   /**
-   * 배포 표로 받은 묶음을 새 버전으로 (PUT …/code/versions, cairn app deploy, 스토어 12.5). 요청자는 표다:
+   * 배포 표로 받은 묶음을 새 버전으로 (PUT …/code/versions, moida app deploy, 스토어 12.5). 요청자는 표다:
    * 표가 묶인 앱 · 크기 · sha256과 맞아야 하고, 표를 받은 뒤 다른 버전이 생겼으면 409.
    * AI가 만든 버전과 같은 규칙이다: 공개 앱은 확인 대기(관리자가 공개), 비공개 앱은 바로 보인다
    */
@@ -147,7 +147,7 @@ export class AppCodeService extends EntityService<AppCode> {
       ...kept.filter((f) => !files.has(f.name)),
       ...[...files].map(([name, data]) => AppCodeService.entryOf(name, data)),
     ]);
-    const manifest = files.get(AppCodeBundle.MANIFEST);
+    const manifest = files.get(AppCodeBundle.manifestName((n) => files.has(n)));
     const bundle = AppCodeBundle.of(listed, manifest ? manifest.toString('utf8') : null);
     if (kind !== undefined) bundle.assertFits(kind);
     for (const [name, data] of files) await this.blobs.save(data, PageFiles.typeOf(name));
@@ -250,7 +250,7 @@ export class AppCodeService extends EntityService<AppCode> {
 
   /**
    * 새 버전이 될 목록의 묶음 규칙 검사. 바탕이 시작 코드면 그 파일을 BlobStore에 먼저 쓴다
-   * (같은 내용이면 같은 해시라 목록이 그대로 맞는다). cairn.json은 BlobStore에서 읽는다
+   * (같은 내용이면 같은 해시라 목록이 그대로 맞는다). moida.json은 BlobStore에서 읽는다
    */
   private async bundleOf(files: PageFiles, base: AppCodeFiles): Promise<AppCodeBundle> {
     if (base.isStarter)
@@ -258,7 +258,7 @@ export class AppCodeService extends EntityService<AppCode> {
         const bytes = base.starterBytes(f.name);
         if (bytes) await this.blobs.save(bytes, f.mime);
       }
-    const manifest = files.find(AppCodeBundle.MANIFEST);
+    const manifest = files.find(AppCodeBundle.manifestName((n) => files.find(n) !== null));
     const text = manifest
       ? await this.blobs.text(manifest.blobHash, AppCodeBundle.MANIFEST_BYTES_MAX)
       : null;

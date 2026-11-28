@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { CairnServer } from './cairn-server';
 import { ClaudeStream } from './claude-stream';
 import { McpClient, ServerUnreachable } from './mcp-client';
+import { MoidaServer } from './moida-server';
 import {
   type PlanWindow,
   type ProgressBatch,
@@ -14,7 +14,7 @@ import { ProgressReporter } from './progress-reporter';
 import { Redactor } from './redactor';
 
 /** 보낸 묶음을 적어 두는 서버. failures만큼 닿지 못한다 */
-class RecordingServer extends CairnServer {
+class RecordingServer extends MoidaServer {
   readonly batches: ProgressBatch[] = [];
   lease: Date | null = new Date(Date.now() + 60_000);
 
@@ -29,7 +29,7 @@ class RecordingServer extends CairnServer {
   }
 }
 
-const reporterOn = (server: CairnServer, redactor = new Redactor([])) =>
+const reporterOn = (server: MoidaServer, redactor = new Redactor([])) =>
   new ProgressReporter(server, 'task', redactor, new Date(Date.now() + 60_000));
 
 const read = (body: string, tokens = 0) => new RunEvent(RunEvent.READ, body, tokens);

@@ -76,7 +76,7 @@ describe('러너가 할 수 있는 것', () => {
       {},
       { claude, codex: '/없는/codex' },
       '/없는',
-      '/run/cairn-code/pairing',
+      '/run/moida-code/pairing',
       'http://browser:9222',
       '1',
     );
@@ -90,13 +90,13 @@ describe('러너가 할 수 있는 것', () => {
 });
 
 describe('실행 기록에 남기는 것', () => {
-  test('CLI 버전은 --version의 첫 줄, 실행하지 못하면 뺀다. 빌드는 CAIRN_RUNNER_BUILD가 먼저', async () => {
+  test('CLI 버전은 --version의 첫 줄, 실행하지 못하면 뺀다. 빌드는 MOIDA_RUNNER_BUILD가 먼저', async () => {
     const claude = join(bin, 'claude-v');
     await writeFile(claude, '#!/bin/sh\necho "2.1.302 (Claude Code)"\necho 둘째줄\n');
     await chmod(claude, 0o755);
     const ability = RunnerAbility.detect(config(claude, '/없는/codex'), {
       PATH: process.env.PATH,
-      CAIRN_RUNNER_BUILD: 'abc1234',
+      MOIDA_RUNNER_BUILD: 'abc1234',
     });
     assert.deepEqual(ability.cliVersions, { claude: '2.1.302 (Claude Code)' });
     assert.equal(ability.runnerBuild, 'abc1234');

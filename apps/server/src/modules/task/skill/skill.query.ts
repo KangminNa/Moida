@@ -69,12 +69,16 @@ export class SkillQuery extends BaseQuery {
    */
   private async scores(spaceId: string, name: string, now: Date): Promise<SkillScoreRow[]> {
     const since = SkillScore.since(now);
+    // 실행 기록은 추가만 하는 표라 2026-11-28 이름 cairn → moida 전의 실행은 옛 이름(cairn-…)으로 남아 있다: 함께 센다
+    const names = name.startsWith('moida-')
+      ? [name, `cairn-${name.slice('moida-'.length)}`]
+      : [name];
     return this.sql<SkillScoreRow[]>`
       WITH firsts AS (
         SELECT DISTINCT ON (r.task_id) r.task_id, r.skill_source, r.skill_revision, r.skill_hash,
           r.started_at
         FROM task.task_runs r
-        WHERE r.space_id = ${spaceId} AND r.skill = ${name} AND r.started_at >= ${since}
+        WHERE r.space_id = ${spaceId} AND r.skill = ANY(${names}::text[]) AND r.started_at >= ${since}
         ORDER BY r.task_id, r.seq
       ), per_task AS (
         SELECT f.*, t.status,
@@ -134,7 +138,7 @@ export class SkillQuery extends BaseQuery {
   }
 
   /**
-   * AI에게 가는 지시문 틀의 지금 판 (cairn-runner: 콘솔 판, 그 판에 없는 틀은 저장소 판).
+   * AI에게 가는 지시문 틀의 지금 판 (moida-runner: 콘솔 판, 그 판에 없는 틀은 저장소 판).
    * 서버가 만드는 지시(목표 실행의 회차 지시 · read_url의 알림)가 쓴다. 지시문 글이라 누구든 자기 공간의 것을 읽는다 (일꾼은 공간을 받아서)
    */
   async prompts(actor: Actor, spaceId: string): Promise<PromptTemplates> {

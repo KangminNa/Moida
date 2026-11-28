@@ -98,7 +98,7 @@ export class AppCodeController {
   }
 
   /**
-   * 배포 (cairn app deploy, 스토어 12.5): 본문이 zip 그대로, 머리글 x-cairn-deploy에 app_code_upload의 표 (로그인 없음).
+   * 배포 (moida app deploy, 스토어 12.5): 본문이 zip 그대로, 머리글 x-moida-deploy에 app_code_upload의 표 (로그인 없음).
    * 표가 그 앱 · 크기 · sha256에 묶여 있어 다른 묶음에는 쓸 수 없다
    */
   @Put('versions')

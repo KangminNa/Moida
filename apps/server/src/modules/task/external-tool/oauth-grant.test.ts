@@ -8,7 +8,7 @@ import type { OAuthServer } from './oauth-metadata.policy';
 
 const NOW = new Date('2026-11-21T00:00:00Z');
 const TOOL = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
-const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 const server: OAuthServer = {
   issuer: 'https://auth.example.com',
   authorization_endpoint: 'https://auth.example.com/authorize?tenant=a',

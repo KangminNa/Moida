@@ -5,7 +5,7 @@ import { JobRunView } from './job.view';
 import { RunLineage } from './run-lineage.policy';
 
 // 실행 기록 한 줄 (task.task_runs): 이번 실행이 어떤 규칙으로 돌았나.
-// 에이전트 설정 판, 스킬 판(출처 · 판 번호 · 해시), 지시문 틀(cairn-runner)의 판, 러너 빌드, CLI 버전, 세션 키(RunLineage).
+// 에이전트 설정 판, 스킬 판(출처 · 판 번호 · 해시), 지시문 틀(moida-runner)의 판, 러너 빌드, CLI 버전, 세션 키(RunLineage).
 // 일을 빌려 줄 때 한 번 만든다. CLI 세션 id · 재개했는지는 러너의 첫 보고가 채운다 (TaskRepository.noteRun)
 export class RunRecord {
   /** row()가 만든 줄과 그 작업의 종류 (일을 빌려 줄 때 한 번 만든다) */

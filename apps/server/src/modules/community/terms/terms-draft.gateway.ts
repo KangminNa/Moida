@@ -4,7 +4,7 @@ import { BaseGateway } from '../../platform';
 import type { TermKind } from '../community.tables';
 
 // 약관의 처음 초안 (스토어 3-4). 저장소 apps/server/starters/terms/<종류>.md이고 서버 이미지에 함께 든다 (Dockerfile이 starters를 복사).
-// Cairn이 회원에게서 무엇을 받는지(아이디 · 닉네임 · 비밀번호 해시 · 글 · 신고, IP · 이메일은 받지 않음)에 맞춘 뼈대일 뿐이라
+// Moida이 회원에게서 무엇을 받는지(아이디 · 닉네임 · 비밀번호 해시 · 글 · 신고, IP · 이메일은 받지 않음)에 맞춘 뼈대일 뿐이라
 // 관리자가 운영자 · 연락처 · 시행일을 채우고 읽어 본 뒤 공개한다. {{app}}은 앱 이름으로 바꾼다
 export class TermsDraftGateway extends BaseGateway {
   protected readonly name = '약관 초안';

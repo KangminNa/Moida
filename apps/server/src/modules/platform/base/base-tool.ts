@@ -33,7 +33,7 @@ export abstract class BaseTool {
    * (MCP annotations의 readOnlyHint. Claude 앱 커넥터는 모든 도구에 이 표시를 요구한다)
    */
   abstract readonly readOnly: boolean;
-  /** 이미 있는 것을 지우거나 덮어쓰는가 (destructiveHint). Cairn의 도구는 추가만 해서 기본은 false */
+  /** 이미 있는 것을 지우거나 덮어쓰는가 (destructiveHint). Moida의 도구는 추가만 해서 기본은 false */
   readonly destructive: boolean = false;
   /** 같은 입력을 다시 보내도 결과가 같은가 (idempotentHint) */
   readonly idempotent: boolean = false;

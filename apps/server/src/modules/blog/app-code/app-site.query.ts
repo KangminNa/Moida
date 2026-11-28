@@ -39,7 +39,7 @@ export class AppFileAnswer {
 @Injectable()
 export class AppSiteQuery extends BaseQuery {
   private static readonly MISSING = '없는 앱이에요';
-  /** 화면 → 템플릿. 없으면 index.html (앱 안의 없는 주소만 404.html이고, 없으면 Cairn의 404) */
+  /** 화면 → 템플릿. 없으면 index.html (앱 안의 없는 주소만 404.html이고, 없으면 Moida의 404) */
   private static readonly TEMPLATES: Readonly<Record<string, string>> = {
     [AppScreenQuery.POST]: 'post.html',
     [AppScreenQuery.MENU]: 'list.html',

@@ -18,13 +18,13 @@ const refused = (changes: Record<string, unknown>, label: string) =>
   assert.throws(() => spec(changes), CodeSpecProblem, label);
 
 describe('코드 작업의 저장소 정보', () => {
-  test('맞는 모양을 읽는다. 경로 끝의 /는 떼고, 브랜치는 cairn/<작업>', () => {
+  test('맞는 모양을 읽는다. 경로 끝의 /는 떼고, 브랜치는 moida/<작업>', () => {
     const s = spec();
     assert.equal(s.repoUrl, 'https://github.com/me/app');
     assert.equal(s.base, 'main');
     assert.deepEqual(s.paths, ['apps/server/src/modules/blog', 'README.md']);
     assert.deepEqual(s.checks, ['pnpm check', 'pnpm test']);
-    assert.equal(s.branch, `cairn/${TASK}`);
+    assert.equal(s.branch, `moida/${TASK}`);
     assert.equal(spec({ setup: null, checks: undefined }).setup, null);
     assert.equal(spec({ setup: '' }).setup, null, '빈 setup은 없는 것');
     assert.deepEqual(spec({ checks: undefined }).checks, []);

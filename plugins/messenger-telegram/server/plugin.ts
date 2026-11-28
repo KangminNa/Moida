@@ -14,21 +14,21 @@ import { TelegramGateway } from './telegram.gateway';
 export default class MessengerTelegramPlugin extends BasePlugin {
   static readonly API_URL = 'https://api.telegram.org';
 
-  register(cairn: PluginContext): void {
-    const settings = cairn.settings();
+  register(moida: PluginContext): void {
+    const settings = moida.settings();
     const token = settings.get('token') ?? '';
     const site = (settings.get('siteUrl') ?? '').trim().replace(/\/+$/, '');
     const telegram = token
       ? new TelegramGateway(token, settings.get('apiUrl') || MessengerTelegramPlugin.API_URL)
       : null;
     const replies = new Replies(site);
-    cairn.addOperation(new Receive(token, replies));
-    cairn.addOperation(new ListLinks(telegram !== null && site !== ''));
-    cairn.addOperation(new CreatePairing());
-    cairn.addOperation(new Unlink());
-    cairn.onEvent('task.chat.said', new SendSaid(replies));
-    cairn.onEvent('task.approval.requested', new SendCard(replies));
-    cairn.onEvent('plugin.telegram.*', new SendHandler(telegram));
-    cairn.addAction('connect', new ConnectAction(telegram, token, site));
+    moida.addOperation(new Receive(token, replies));
+    moida.addOperation(new ListLinks(telegram !== null && site !== ''));
+    moida.addOperation(new CreatePairing());
+    moida.addOperation(new Unlink());
+    moida.onEvent('task.chat.said', new SendSaid(replies));
+    moida.onEvent('task.approval.requested', new SendCard(replies));
+    moida.onEvent('plugin.telegram.*', new SendHandler(telegram));
+    moida.addAction('connect', new ConnectAction(telegram, token, site));
   }
 }

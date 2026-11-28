@@ -144,13 +144,13 @@ describe('Claude 출력 읽기', () => {
         assistant('a', {}, { type: 'tool_use', name: 'Read', input: { file_path: 'a.md' } }),
       ),
       ...stream.read(
-        assistant('b', {}, { type: 'tool_use', name: 'mcp__cairn__get_session', input: {} }),
+        assistant('b', {}, { type: 'tool_use', name: 'mcp__moida__get_session', input: {} }),
       ),
       ...stream.read(
         assistant(
           'c',
           {},
-          { type: 'tool_use', name: 'mcp__cairn__blog_save_draft', input: { body: '비밀 본문' } },
+          { type: 'tool_use', name: 'mcp__moida__blog_save_draft', input: { body: '비밀 본문' } },
         ),
       ),
       ...stream.read(assistant('d', {}, { type: 'tool_use', name: '새도구', input: {} })),
@@ -248,14 +248,14 @@ describe('Claude 출력 읽기', () => {
     );
   });
 
-  test('cairn 말고 다른 MCP 서버가 붙으면 알아챈다', () => {
+  test('moida 말고 다른 MCP 서버가 붙으면 알아챈다', () => {
     const stream = new ClaudeStream();
     stream.read(
       line({
         type: 'system',
         subtype: 'init',
         mcp_servers: [
-          { name: 'cairn', status: 'connected' },
+          { name: 'moida', status: 'connected' },
           { name: 'claude.ai Gmail', status: 'connected' },
         ],
       }),
@@ -263,10 +263,10 @@ describe('Claude 출력 읽기', () => {
     assert.deepEqual(stream.stray, ['claude.ai Gmail']);
   });
 
-  test('cairn에 붙지 못하면 기록에 남긴다', () => {
+  test('moida에 붙지 못하면 기록에 남긴다', () => {
     const stream = new ClaudeStream();
     const events = stream.read(
-      line({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'cairn', status: 'failed' }] }),
+      line({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'moida', status: 'failed' }] }),
     );
     assert.deepEqual(stream.stray, []);
     assert.equal(events[0]?.kind, 'error');
@@ -328,10 +328,10 @@ describe('셸', () => {
 });
 
 describe('인수인계 메모로 끝난 답 (2026-11-28)', () => {
-  const MEMO = '/work/.cairn/memo.md';
+  const MEMO = '/work/.moida/memo.md';
   const usage = { input_tokens: 1, output_tokens: 1 };
   const answer = '공릉 카페: 1) 카페 A — 조용해요 2) 카페 B — 디저트. 음식점: 1) 식당 C 2) 식당 D';
-  const ack = '인수인계 메모를 .cairn/memo.md에 썼습니다. 추천 내용은 앞의 답 그대로입니다.';
+  const ack = '인수인계 메모를 .moida/memo.md에 썼습니다. 추천 내용은 앞의 답 그대로입니다.';
   const writeMemo = (id: string) =>
     assistant(id, usage, {
       type: 'tool_use',

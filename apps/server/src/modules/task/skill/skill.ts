@@ -44,7 +44,7 @@ export class Skill extends TableEntity<SkillRow, SkillNew> {
 
   /**
    * 주인이 고친 새 판을 쌓고 바로 그 판을 쓴다. based_on은 그때 저장소 판(repo)의 해시.
-   * 지시문 틀(cairn-runner)은 저장소 판과 틀 이름 · 자리가 맞아야 한다: 러너와 서버가 이름으로 찾고 아는 자리만 채운다
+   * 지시문 틀(moida-runner)은 저장소 판과 틀 이름 · 자리가 맞아야 한다: 러너와 서버가 이름으로 찾고 아는 자리만 채운다
    */
   addRevision(files: SkillFiles, repo: SkillFiles, note: string, now: Date): void {
     const text = note.trim();

@@ -20,11 +20,11 @@ export class DeviceScopes {
   };
   /**
    * 앱이 승인 요청의 scope에 이름 하나를 실어 고르는 기기 모양 (이름 → 권한). 섞어 요청하지 못한다 (AuthorizationPolicy).
-   *   news: 소식 기기 (2차 1-3, cairn connect의 훅 · 상태 줄). 다른 권한과 함께 두지 않아 관리자가 주거나 바꾸지 못한다
+   *   news: 소식 기기 (2차 1-3, moida connect의 훅 · 상태 줄). 다른 권한과 함께 두지 않아 관리자가 주거나 바꾸지 못한다
    *     (ALL_SCOPES에 없음, DB CHECK devices_news_only)
    *   collect: 수집 기기 (2차 4단계, 세션이 끝날 때 원문을 올리는 훅). 올리기만
    *   extension: 브라우저 확장 (2차 4단계). 원문 · 페이지 올리기, 서버 팀에 맡기기, 기다리는 결재 · 질문 보기
-   *   deploy: 배포 기기 (앱 플랫폼, 스토어 12.5, cairn app deploy). 쓰기만: 앱 코드의 새 버전을 올린다
+   *   deploy: 배포 기기 (앱 플랫폼, 스토어 12.5, moida app deploy). 쓰기만: 앱 코드의 새 버전을 올린다
    *     (공개 앱의 새 버전은 관리자가 확인해야 보인다)
    */
   static readonly PROFILES: Readonly<Record<string, DeviceRow['scopes']>> = {

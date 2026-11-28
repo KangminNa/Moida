@@ -27,7 +27,7 @@ export class NoticeMail {
     return new NoticeMail(from, to, site, settings.get('detail') === 'true');
   }
 
-  /** 알림 하나의 메일. 링크는 이 Cairn 안의 경로만 (아니면 콘솔 첫 화면) */
+  /** 알림 하나의 메일. 링크는 이 Moida 안의 경로만 (아니면 콘솔 첫 화면) */
   notice(title: string, body: string, link: string): MailMessage {
     const path = /^\/(?!\/)[^\s]*$/.test(link) ? link : '/admin';
     const lines = [title, ...(this.detail && body ? ['', body] : []), '', `${this.site}${path}`];

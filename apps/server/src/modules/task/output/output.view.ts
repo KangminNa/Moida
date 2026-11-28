@@ -75,7 +75,7 @@ export class OutputPageView {
   }
 }
 
-/** begin_upload의 답: 러너가 PUT {서버}{upload_path}에 머리글 x-cairn-upload: token으로 본문을 보낸다 */
+/** begin_upload의 답: 러너가 PUT {서버}{upload_path}에 머리글 x-moida-upload: token으로 본문을 보낸다 */
 export class UploadTicketView {
   constructor(
     private readonly path: string,

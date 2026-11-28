@@ -18,7 +18,7 @@ import { RunTranscript } from './run-transcript';
 // 진짜 답을 덮었다. 그래서 메모 쓰기가 마지막 도구면, 메모 전에 도구 없이 끝낸 글(끝내려던 답)이 더 길 때 그것을 답으로 둔다
 export class ClaudeStream implements AiStream {
   /** 늘 허락하는 MCP 서버. 브라우저 작업에서만 playwright를 더한다 (BrowserMcp) */
-  static readonly SERVER = 'cairn';
+  static readonly SERVER = 'moida';
   private static readonly SERVER_PREFIX = `mcp__${ClaudeStream.SERVER}__`;
   private static readonly BROWSER_PREFIX = 'mcp__playwright__';
   private static readonly READ_TOOLS: ReadonlySet<string> = new Set([
@@ -174,7 +174,7 @@ export class ClaudeStream implements AiStream {
     const broken = servers.filter(
       (server) => server.text('name') === ClaudeStream.SERVER && server.text('status') === 'failed',
     );
-    return broken.length > 0 ? [new RunEvent(RunEvent.ERROR, 'cairn MCP에 붙지 못했어요', 0)] : [];
+    return broken.length > 0 ? [new RunEvent(RunEvent.ERROR, 'moida MCP에 붙지 못했어요', 0)] : [];
   }
 
   private assistant(event: Json): readonly RunEvent[] {

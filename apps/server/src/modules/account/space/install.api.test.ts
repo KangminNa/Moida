@@ -52,7 +52,7 @@ describe('처음 설치', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(res.json(), { verified: true, expiresIn: 600 });
     browser = new TestUser(res.cookies());
-    assert.ok(browser.cookies.cairn_install);
+    assert.ok(browser.cookies.moida_install);
     assert.equal((await api.get('/api/install', browser)).json().step, 'owner');
   });
 
@@ -76,9 +76,9 @@ describe('처음 설치', () => {
     });
     assert.equal(res.status, 200);
     const cookies = res.cookies();
-    assert.ok(cookies.cairn_session);
-    assert.equal(cookies.cairn_install, '', '통행증은 다 썼으니 지운다');
-    owner = new TestUser({ cairn_session: cookies.cairn_session ?? '' });
+    assert.ok(cookies.moida_session);
+    assert.equal(cookies.moida_install, '', '통행증은 다 썼으니 지운다');
+    owner = new TestUser({ moida_session: cookies.moida_session ?? '' });
     assert.deepEqual((await api.get('/api/auth/me', owner)).json(), {
       login: 'owner@example.com',
       displayName: null,
@@ -118,7 +118,7 @@ describe('설치가 끝난 뒤', () => {
   test('관리자는 메일 · 비밀번호로 로그인한다 (대문자로 넣어도 된다)', async () => {
     const res = await api.login('OWNER@Example.com', PASSWORD);
     assert.equal(res.status, 200);
-    assert.ok(res.cookies().cairn_session);
+    assert.ok(res.cookies().moida_session);
   });
 
   test('사이트 주소를 정하기 전에는 요청이 온 주소(앞의 프록시가 넘긴 주소 포함)로 연 화면만 쓸 수 있다', async () => {
@@ -248,7 +248,7 @@ describe('블로그 정보', () => {
       'http://localhost:3000',
       'http://127.0.0.1:4000',
       'http://[::1]:3000',
-      'http://cairn.localhost',
+      'http://moida.localhost',
     ])
       assert.equal((await put(local)).status, 200, local);
     assert.equal((await put('https://blog.example.com')).status, 200);
@@ -266,8 +266,8 @@ describe('표시 이름과 로고', () => {
       method: 'PUT',
       headers: {
         'content-type': type,
-        ...(as.cookies.cairn_session
-          ? { cookie: `cairn_session=${as.cookies.cairn_session}` }
+        ...(as.cookies.moida_session
+          ? { cookie: `moida_session=${as.cookies.moida_session}` }
           : {}),
       },
       body,
@@ -357,10 +357,10 @@ describe('보안 머리글과 쓰기 요청 출처', () => {
     assert.equal(res.header('x-powered-by'), null);
   });
 
-  test('로그인 쿠키는 HttpOnly · SameSite=Lax. 앞단 프록시가 https를 알리거나 사이트 주소(CAIRN_WEB_URL)가 https면 Secure (웹 보안 S2)', async () => {
-    const before = process.env.CAIRN_WEB_URL;
+  test('로그인 쿠키는 HttpOnly · SameSite=Lax. 앞단 프록시가 https를 알리거나 사이트 주소(MOIDA_WEB_URL)가 https면 Secure (웹 보안 S2)', async () => {
+    const before = process.env.MOIDA_WEB_URL;
     const cookieOf = async (site: string, headers: Record<string, string> = {}) => {
-      process.env.CAIRN_WEB_URL = site;
+      process.env.MOIDA_WEB_URL = site;
       const res = await api.request(
         'POST',
         '/api/auth/login',
@@ -380,8 +380,8 @@ describe('보안 머리글과 쓰기 요청 출처', () => {
       assert.match(proxied, /Secure/, '이 컴퓨터의 프록시가 https를 알리면');
       assert.match(await cookieOf('https://blog.example'), /Secure/, '사이트 주소가 https면 늘');
     } finally {
-      if (before === undefined) delete process.env.CAIRN_WEB_URL;
-      else process.env.CAIRN_WEB_URL = before;
+      if (before === undefined) delete process.env.MOIDA_WEB_URL;
+      else process.env.MOIDA_WEB_URL = before;
     }
   });
 
@@ -453,7 +453,7 @@ describe('비밀번호 바꾸기', () => {
 
   test('바꾸면 지금 로그인만 남고 다른 로그인은 끝난다. 새 비밀번호로만 로그인된다', async () => {
     const other = new TestUser({
-      cairn_session: (await api.login(LOGIN, PASSWORD)).cookies().cairn_session ?? '',
+      moida_session: (await api.login(LOGIN, PASSWORD)).cookies().moida_session ?? '',
     });
     assert.equal((await api.get('/api/auth/me', other)).status, 200);
     const res = await api.request('PUT', '/api/auth/password', owner, {
@@ -474,14 +474,14 @@ describe('비밀번호 바꾸기', () => {
     assert.equal((await api.get('/api/auth/me', owner)).status, 401);
     const back = await api.login(LOGIN, PASSWORD);
     assert.equal(back.status, 200);
-    owner = new TestUser({ cairn_session: back.cookies().cairn_session ?? '' });
+    owner = new TestUser({ moida_session: back.cookies().moida_session ?? '' });
   });
 });
 
 describe('로그아웃과 시도 제한', () => {
   test('로그아웃하면 그 쿠키로는 주인이 아니다', async () => {
-    const extra = (await api.login(LOGIN, PASSWORD)).cookies().cairn_session;
-    const session = new TestUser({ cairn_session: extra ?? '' });
+    const extra = (await api.login(LOGIN, PASSWORD)).cookies().moida_session;
+    const session = new TestUser({ moida_session: extra ?? '' });
     assert.equal((await api.request('POST', '/api/auth/logout', session)).status, 200);
     assert.equal((await api.get('/api/auth/me', session)).status, 401);
     assert.equal((await api.get('/api/auth/me', owner)).status, 200, '다른 로그인은 그대로');
@@ -490,8 +490,8 @@ describe('로그아웃과 시도 제한', () => {
   test('로그인은 마지막으로 쓴 날부터 30일: 쓰면 끝나는 날이 늘고, 끝난 로그인은 되살아나지 않는다. 쿠키는 400일 (웹 UX U2)', async () => {
     const res = await api.login(LOGIN, PASSWORD);
     assert.match(String(res.header('set-cookie')), /Max-Age=34560000/, '400일');
-    const token = res.cookies().cairn_session ?? '';
-    const session = new TestUser({ cairn_session: token });
+    const token = res.cookies().moida_session ?? '';
+    const session = new TestUser({ moida_session: token });
     const db = api.service(Database);
     const daysLeft = async () => {
       const [row] = await db.sql<{ days: number }[]>`

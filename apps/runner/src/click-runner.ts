@@ -2,8 +2,8 @@ import { Backoff, pause } from './backoff';
 import type { ApprovedClick } from './browse-job';
 import type { BrowserPages } from './browser-page';
 import type { BrowserSlot } from './browser-slot';
-import type { CairnServer } from './cairn-server';
 import { AccessDenied, ServerUnreachable, ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import type { RunLog } from './redactor';
 
 // 결재된 클릭의 러너 쪽 (2차 3단계, 2026-11-14). 서버 브라우저가 있는 서버 러너만 돈다. 작업 대기열과 따로 돈다:
@@ -22,7 +22,7 @@ export class ClickRunner {
   private off = false;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly pages: BrowserPages,
     private readonly slot: BrowserSlot,
     private readonly log: RunLog,

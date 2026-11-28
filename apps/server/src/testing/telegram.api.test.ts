@@ -13,8 +13,8 @@ import { ApiClient, type ApiResult, TestUser } from './api-client';
 type Json = Record<string, any>;
 const BASE = '/api/p/messenger-telegram';
 const TOKEN = '123456:test-only-telegram-token';
-const KEY = createHash('sha256').update(`cairn-telegram-hook:${TOKEN}`).digest('hex').slice(0, 40);
-const SITE = 'https://cairn.example';
+const KEY = createHash('sha256').update(`moida-telegram-hook:${TOKEN}`).digest('hex').slice(0, 40);
+const SITE = 'https://moida.example';
 
 let api: ApiClient;
 let owner: TestUser;

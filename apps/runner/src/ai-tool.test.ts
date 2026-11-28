@@ -12,7 +12,7 @@ import { RunnerConfig } from './runner-config';
 import { REPO_PROMPTS } from './testing/repo-prompts';
 
 // AI CLI 어댑터의 계약 (2차 7단계). 러너가 아는 모든 엔진(EngineAdapters.list())이 같은 약속을 지킨다:
-// 빈 설정 홈, 허락한 MCP만(cairn · 허락한 외부 도구), 모르는 서버가 보이면 격리 깨짐, 비밀은 명령줄에 없고 지울 값에 있다,
+// 빈 설정 홈, 허락한 MCP만(moida · 허락한 외부 도구), 모르는 서버가 보이면 격리 깨짐, 비밀은 명령줄에 없고 지울 값에 있다,
 // 모델 · 생각 강도가 CLI에 닿는다(받지 않는 강도는 넘기지 않는다), 셸이 있는 일에는 외부 도구를 붙이지 않는다.
 // 진짜 CLI 대신 받은 명령줄 · 환경 · 표준 입력을 그대로 돌려주는 가짜 CLI를 띄우고, 어댑터가 쓴 설정 파일까지 읽어 본다.
 // 어댑터는 엔진 등록부에서 만든다 (EngineAdapter.tool). 새 엔진은 SAMPLES에 한 줄을 더해야 이 시험이 통과한다 (maintainer의 PR도 같다).
@@ -57,7 +57,7 @@ const SAMPLES: Readonly<Record<string, Sample>> = {
 /** 등록부의 어댑터로 이 엔진의 실행 어댑터를 만든다. 실행 파일은 가짜 CLI */
 function make(engine: EngineAdapter): AiTool {
   const config = new RunnerConfig(
-    'https://cairn.test',
+    'https://moida.test',
     'device',
     {},
     { [engine.name]: bin },
@@ -159,10 +159,10 @@ describe('AI CLI 어댑터의 계약', () => {
         assert.equal(seen.env.HOME, seen.home);
       });
 
-      test('MCP는 cairn과 허락한 외부 도구(x-<이름>)만. 지시문에 외부 도구의 답은 자료라는 단락', async () => {
+      test('MCP는 moida과 허락한 외부 도구(x-<이름>)만. 지시문에 외부 도구의 답은 자료라는 단락', async () => {
         const seen = await launch(make(engine), job(tool));
         const given = `${seen.argv.join(' ')}\n${seen.config}`;
-        assert.ok(given.includes('https://cairn.test/mcp'), 'cairn');
+        assert.ok(given.includes('https://moida.test/mcp'), 'moida');
         assert.ok(given.includes('x-notion'), '외부 도구의 서버 이름');
         assert.ok(given.includes('https://mcp.notion.example.com/mcp'), '외부 도구의 주소');
         assert.match(seen.stdin, /# 외부 도구/);

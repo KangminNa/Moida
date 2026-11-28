@@ -9,7 +9,7 @@
 //   5. 패턴 목록(객체설계 11장)이 본보기로 가리키는 파일이 실제로 있다
 //   6. AI가 읽는 글은 코드에 두지 않는다 (2차 1-0): MCP 도구(*.tool.ts)의 설명 · 칸 설명은 <모듈>.tools.ko.json에
 //   7. 지시문의 글도 코드에 두지 않는다 (2차 1-0): 러너와 task 모듈의 코드에 마크다운 제목('# …')으로 시작하는 글자를 쓰지 않는다.
-//      글은 러너 스킬 cairn-runner의 틀(skills/cairn-runner/references/prompts.md)에
+//      글은 러너 스킬 moida-runner의 틀(skills/moida-runner/references/prompts.md)에
 //   8. 웹이 들인 라이브러리는 정해 둔 한 파일에서만 가져온다 (객체설계 10장 "고치는 범위"): mustache → _blog/app-screen.ts
 //   9. 새 탭은 연 쪽 창을 건드리지 못하고 주소가 Referer로 새지 않게 (웹 UX U3): target="_blank"에는 rel="noopener noreferrer",
 //      window.open에는 'noopener,noreferrer'
@@ -213,7 +213,7 @@ else {
 
 // --- AI가 읽는 글 ---
 // 도구의 설명과 입력 칸 설명은 설명서 파일(<모듈>.tools.ko.json)에 둔다. 콘솔에서 고친 판이 그 위에 얹힌다 (mcp 모듈)
-// 기능 패키지의 도구(platform/plugin/package.tool.ts)는 글을 목록 파일(cairn-plugin.json)에서 받아 와서 뺀다
+// 기능 패키지의 도구(platform/plugin/package.tool.ts)는 글을 목록 파일(moida-plugin.json)에서 받아 와서 뺀다
 const toolFiles = walk(join(root, 'apps/server/src')).filter(
   (f) => f.endsWith('.tool.ts') && !at(f).startsWith('apps/server/src/modules/platform/'),
 );
@@ -225,7 +225,7 @@ for (const file of toolFiles) {
     );
 }
 
-// 지시문의 글은 러너 스킬 cairn-runner의 틀에 둔다 (러너는 PromptPack, 서버는 PromptTemplates로 채운다).
+// 지시문의 글은 러너 스킬 moida-runner의 틀에 둔다 (러너는 PromptPack, 서버는 PromptTemplates로 채운다).
 // 코드에 남기 쉬운 단락 제목('# 할 일' · '## 지시')을 본다: 글자 안의 줄 첫머리에 # 하나~셋과 빈칸
 const promptCode = [
   ...walk(join(root, 'apps/runner/src')),
@@ -237,7 +237,7 @@ for (const file of promptCode) {
     if (/^\s*\/\//.test(line) || /^\s*\*/.test(line)) return;
     if (/(['"`]|\\n)#{1,3} /.test(line))
       problems.push(
-        `${at(file)}:${i + 1}: 지시문의 글은 코드에 두지 않아요. skills/cairn-runner/references/prompts.md의 틀에 적어요`,
+        `${at(file)}:${i + 1}: 지시문의 글은 코드에 두지 않아요. skills/moida-runner/references/prompts.md의 틀에 적어요`,
       );
   });
 }

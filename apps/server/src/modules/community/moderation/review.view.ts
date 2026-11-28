@@ -14,7 +14,7 @@ export type CaseAuthor = Pick<
 > & { topics: number; comments: number; hidden: number; removed: number; blocks: number };
 
 // 일꾼의 신고 검토 (2026-11-24, 스토어 3-3)가 읽는 모양. 회원의 아이디 · 신고한 회원은 싣지 않는다 (판단에 필요 없는 개인정보).
-// 글 · 댓글의 본문은 회원이 쓴 바깥 글이라 자료로만 읽는다 (스킬 cairn-moderate)
+// 글 · 댓글의 본문은 회원이 쓴 바깥 글이라 자료로만 읽는다 (스킬 moida-moderate)
 
 /** community_case의 답: 대상 · 쓴 회원 · 신고 (제안에 쓸 대상 id · version 포함) */
 export class ReviewCaseView {

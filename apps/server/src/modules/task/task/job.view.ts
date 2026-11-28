@@ -216,7 +216,7 @@ export class JobView {
     private readonly skillPackage: JobSkillView | null = null,
   ) {}
 
-  /** 지시문 틀(러너 스킬 cairn-runner)의 지금 판. 에이전트 없는 일(연결 확인 · 웹 로그인)은 null */
+  /** 지시문 틀(러너 스킬 moida-runner)의 지금 판. 에이전트 없는 일(연결 확인 · 웹 로그인)은 null */
   private promptPackage: JobSkillView | null = null;
 
   withPrompt(prompt: JobSkillView | null): this {

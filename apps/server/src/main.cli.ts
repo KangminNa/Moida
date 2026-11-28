@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { CairnApp } from './cairn-app';
 import { InstallPolicy, OwnerService, SpaceQuery } from './modules/account';
 import {
   ArchiveFile,
@@ -17,6 +16,7 @@ import {
   TooLarge,
   ZipLimits,
 } from './modules/platform';
+import { MoidaApp } from './moida-app';
 
 // 명령줄. 서버에 접속할 수 있는 사람 = 주인으로 본다. 관리 화면·설치 마법사도 같은 Service를 부른다.
 //
@@ -29,16 +29,16 @@ import {
 //   pnpm plugin <플러그인> <동작>                  관리 동작 (예: sync-github check)
 //   pnpm secret:rotate                           저장된 비밀값을 지금 서버 키로 다시 암호화 (순서는 .env.example)
 //   pnpm run restore < 백업.zip                  백업 zip을 검사하고 무엇이 몇 개 들어올지 보여줌. 아무것도 쓰지 않음
-//   pnpm run restore --apply < 백업.zip          빈 Cairn에 정말 들여옴
+//   pnpm run restore --apply < 백업.zip          빈 Moida에 정말 들여옴
 //   pnpm run events failed                       8번 실패해 멈춘 이벤트 (최근 50개)
 //   pnpm run events retry <번호|--all>            멈춘 이벤트를 다시 시도 (웹의 설정 › 일 › 처리 실패와 같다)
 //
-// 컨테이너 안에서는 개발·운영 모두 cairn-admin <명령>으로 부른다 (Dockerfile).
+// 컨테이너 안에서는 개발·운영 모두 moida-admin <명령>으로 부른다 (Dockerfile).
 const owner = new OwnerActor('local', 'cli');
 
 async function main() {
   const [command, ...args] = process.argv.slice(2);
-  const app = await CairnApp.cli();
+  const app = await MoidaApp.cli();
   try {
     if (command === 'install-code')
       return await installCode(app.get(SpaceQuery), app.get(InstallPolicy));
@@ -71,7 +71,7 @@ async function installCode(spaces: SpaceQuery, install: InstallPolicy): Promise<
   }
   console.log(`설치 코드: ${install.code()}`);
   console.log(
-    `브라우저에서 ${process.env.CAIRN_WEB_URL ?? 'http://localhost:3000'}/install 을 열고 이 코드를 넣으세요`,
+    `브라우저에서 ${process.env.MOIDA_WEB_URL ?? 'http://localhost:3000'}/install 을 열고 이 코드를 넣으세요`,
   );
 }
 
@@ -86,7 +86,7 @@ async function resetPassword(owners: OwnerService): Promise<void> {
 async function rotateSecrets(rotation: SecretRotation): Promise<void> {
   const counts = await rotation.run(owner);
   for (const [name, count] of counts) console.log(`✔ ${name}: ${count}개를 다시 암호화했어요`);
-  console.log('모든 비밀값이 지금 서버 키로 풀려요. CAIRN_SECRET_KEY_OLD를 지워도 돼요');
+  console.log('모든 비밀값이 지금 서버 키로 풀려요. MOIDA_SECRET_KEY_OLD를 지워도 돼요');
 }
 
 /** 멈춘 이벤트 보기 · 다시 시도 (리팩토링 R1). 서버 자신(SystemActor)이라 모든 공간을 본다 */
@@ -144,7 +144,7 @@ async function restore(
   const report = await restores.apply(system, spaceId, files);
   console.log(`✔ 복원했어요: ${report.summary}`);
   for (const note of report.notes) console.log(`  ${note}`);
-  console.log('기기는 다시 연결해 주세요: pnpm cairn connect <블로그 주소>');
+  console.log('기기는 다시 연결해 주세요: pnpm moida connect <블로그 주소>');
 }
 
 async function plugin(

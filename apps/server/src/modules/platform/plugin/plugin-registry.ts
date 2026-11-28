@@ -66,7 +66,7 @@ export class PluginRegistry {
     if (!existsSync(pluginsDir)) return catalog;
     for (const name of readdirSync(pluginsDir).sort()) {
       const dir = join(pluginsDir, name);
-      if (!statSync(dir).isDirectory() || !existsSync(join(dir, 'cairn-plugin.json'))) continue;
+      if (!statSync(dir).isDirectory() || PluginManifest.fileIn(dir) === null) continue;
       const manifest = PluginManifest.read(dir);
       if (manifest.name !== name) {
         throw new Error(`폴더 이름(${name})과 플러그인 이름(${manifest.name})이 달라요`);

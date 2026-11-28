@@ -48,8 +48,8 @@ import { SpaceService } from './space/space.service';
       useFactory: (policy: ServerRunnerPolicy) =>
         new ServerRunnerGateway(
           policy,
-          process.env.CAIRN_RUNNER_PAIRING_FILE?.trim() || null,
-          process.env.CAIRN_CODE_PAIRING_FILE?.trim() || null,
+          process.env.MOIDA_RUNNER_PAIRING_FILE?.trim() || null,
+          process.env.MOIDA_CODE_PAIRING_FILE?.trim() || null,
         ),
       inject: [ServerRunnerPolicy],
     },

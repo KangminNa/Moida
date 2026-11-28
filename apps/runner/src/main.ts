@@ -1,3 +1,4 @@
+import { LegacyEnv } from './legacy-env';
 import { Redactor, RunLog } from './redactor';
 import { Runner, RunnerHalted, TokenRejected } from './runner';
 import { ConfigProblem, RunnerConfig } from './runner-config';
@@ -7,6 +8,7 @@ import { ServerPairing } from './server-pairing';
 // 기기 토큰이 있으면 그 토큰으로 돈다. 서버 러너(토큰 없이 연결 값 파일)는 연결 값으로 토큰을 받고,
 // 토큰이 거절되면(주인이 끊음, 다른 러너가 다시 연결함) 다시 받아 이어 간다.
 async function main(): Promise<void> {
+  LegacyEnv.adopt(process.env);
   const config = RunnerConfig.fromEnv(process.env);
   const stopper = new AbortController();
   let current: Runner | null = null;

@@ -10,6 +10,7 @@ export class ArchiveRecord {
   private static readonly KEY = /^([^\s#:-][^:]*):(?=\s|$)(.*)$/;
   private static readonly MARKDOWN = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n(?:\r?\n)?|$)([\s\S]*)$/;
   private static readonly NUMBER = /^-?\d+(?:\.\d+)?$/;
+  private static readonly OLD_PREFIX = 'cairn_';
 
   private constructor(
     readonly path: string,
@@ -46,7 +47,24 @@ export class ArchiveRecord {
   static ofJson(path: string, value: unknown): ArchiveRecord {
     if (typeof value !== 'object' || value === null || Array.isArray(value))
       throw new RuleViolation(`${path}: 항목의 모양이 틀렸어요`);
-    return new ArchiveRecord(path, new Map(), new Map(Object.entries(value)), '');
+    return new ArchiveRecord(
+      path,
+      new Map(),
+      ArchiveRecord.renamed(new Map(Object.entries(value))),
+      '',
+    );
+  }
+
+  /** 옛 이름의 키(cairn_x, 2026-11-28 이름 cairn → moida 전의 보관 파일)를 새 이름(moida_x)으로 읽는다. 둘 다 있으면 새 이름 */
+  private static renamed<V>(map: Map<string, V>): Map<string, V> {
+    for (const [key, value] of [...map]) {
+      if (!key.startsWith(ArchiveRecord.OLD_PREFIX)) continue;
+      const next = `moida_${key.slice(ArchiveRecord.OLD_PREFIX.length)}`;
+      if (map.has(next)) continue;
+      map.delete(key);
+      map.set(next, value);
+    }
+    return map;
   }
 
   private static keys(path: string, lines: readonly string[]): ReadonlyMap<string, string> {
@@ -64,7 +82,7 @@ export class ArchiveRecord {
         throw new RuleViolation(`${path}: 읽을 수 없는 줄이에요: ${line.slice(0, 80)}`);
       }
     }
-    return raw;
+    return ArchiveRecord.renamed(raw);
   }
 
   /** 틀린 내용을 알리는 오류 */
@@ -106,7 +124,7 @@ export class ArchiveRecord {
     return value;
   }
 
-  id(key = 'cairn_id'): string {
+  id(key = 'moida_id'): string {
     const value = this.optionalId(key);
     if (value === null) throw this.problem(`${key}이(가) 없어요`);
     return value;

@@ -13,7 +13,7 @@ import { ApiClient, type TestUser } from './api-client';
 
 type Json = Record<string, unknown>;
 /** WebPageGateway.TEST_LOOPBACK_ENV (모듈 안을 가져오지 않으려고 이름만) */
-const LOOPBACK = 'CAIRN_READ_URL_TEST_LOOPBACK';
+const LOOPBACK = 'MOIDA_READ_URL_TEST_LOOPBACK';
 
 let api: ApiClient;
 let owner: TestUser;

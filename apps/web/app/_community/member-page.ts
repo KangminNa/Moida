@@ -12,7 +12,7 @@ import type { AccountSelf, MemberMe, MemberSelf, Term, TopicDetail } from './typ
 // 기본 도메인의 /<앱>/_/…와 회원을 받지 않는 앱의 도메인은 없는 주소(404). 가입 · 로그인 · 내 정보는 회원을 받는 모든 앱
 // (커뮤니티 앱과 선언서에 members를 적은 앱, 스토어 12.3), 글쓰기 · 댓글 · 신고는 커뮤니티 앱만. 앱 도메인의 브라우저 쿠키는 그 도메인의
 // 회원 쿠키뿐이라 그대로 넘겨 이 브라우저의 회원과 쓰기 확인 값(csrf)을 읽는다.
-// 공통 앱 도메인(CAIRN_APPS_URL, 2026-11-27)에서는 고정 화면이 /<앱>/_/… 아래에 있고(base = /<앱>), 서버에는 x-cairn-app으로 앱을 알린다
+// 공통 앱 도메인(MOIDA_APPS_URL, 2026-11-27)에서는 고정 화면이 /<앱>/_/… 아래에 있고(base = /<앱>), 서버에는 x-moida-app으로 앱을 알린다
 
 /** 고정 화면 하나의 바탕: 앱 · 이 브라우저에 로그인한 계정 · 그 계정의 이 앱 회원(참여 전이면 null) · 쓰기 확인 값 */
 export type MemberPlace = {
@@ -20,7 +20,7 @@ export type MemberPlace = {
   host: string;
   /** 이 앱 화면의 뿌리: 자기 도메인은 '', 공통 앱 도메인은 /<앱>. 고정 화면의 주소는 `${base}/_/…` */
   base: string;
-  /** 서버에 알릴 앱 (공통 앱 도메인에서만, x-cairn-app) */
+  /** 서버에 알릴 앱 (공통 앱 도메인에서만, x-moida-app) */
   appHeader: string | null;
   account: AccountSelf | null;
   member: MemberSelf | null;

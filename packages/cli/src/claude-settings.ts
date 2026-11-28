@@ -22,7 +22,7 @@ export class ClaudeSettings {
   /** 통째로 바꿔 쓴다 (Claude Code가 반쯤 쓴 파일을 읽지 않게) */
   write(settings: Record<string, unknown>): void {
     mkdirSync(join(this.file, '..'), { recursive: true });
-    const temp = `${this.file}.cairn.tmp`;
+    const temp = `${this.file}.moida.tmp`;
     writeFileSync(temp, `${JSON.stringify(settings, null, 2)}\n`);
     renameSync(temp, this.file);
   }
@@ -53,9 +53,12 @@ export class ClaudeSettings {
     return true;
   }
 
-  /** 우리 스크립트를 부르는 명령인가 */
+  /** 우리 스크립트를 부르는 명령인가. 옛 이름의 스크립트(cairn-news.mjs …, 2026-11-28 이름 cairn → moida 전에 건 훅)도
+   *  우리 것으로 본다: 다시 연결하면 그 훅의 명령을 새 스크립트로 바꿔 둘이 함께 돌지 않게 */
   static ours(command: unknown, script: string): boolean {
-    return typeof command === 'string' && command.includes(script);
+    if (typeof command !== 'string') return false;
+    const legacy = script.startsWith('moida-') ? `cairn-${script.slice('moida-'.length)}` : null;
+    return command.includes(script) || (legacy !== null && command.includes(legacy));
   }
 
   private entries(settings: Record<string, unknown>, event: string): { command?: unknown }[] {

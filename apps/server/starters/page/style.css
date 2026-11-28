@@ -1,4 +1,4 @@
-/* 페이지 앱의 시작 코드: 디자인 기준(스킬 cairn-make의 references/design.md)의 토큰 이름을 미리 둔다.
+/* 페이지 앱의 시작 코드: 디자인 기준(스킬 moida-make의 references/design.md)의 토큰 이름을 미리 둔다.
    값은 tool 스타일이다. 앱의 목적에 맞는 스타일을 골라 토큰 값만 바꾸고, 화면 코드는 토큰만 쓴다 */
 :root {
   color-scheme: light dark;

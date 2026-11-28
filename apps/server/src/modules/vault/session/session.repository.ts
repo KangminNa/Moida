@@ -58,7 +58,7 @@ export class SessionRepository extends NodeRepository<LoadedSession, Session> {
   }
 
   /**
-   * 작업 세션(에이전트 요청 하나, 도구 cairn-agent)을 찾아 잠근다. 없으면 null.
+   * 작업 세션(에이전트 요청 하나, 도구 moida-agent)을 찾아 잠근다. 없으면 null.
    * 러너 기기와 상관없이 하나라서(sessions_agent_flow) 기기 없이 자리를 잠근다 (lockBySource와 같은 까닭)
    */
   async lockByFlow(spaceId: string, flow: string): Promise<Session | null> {

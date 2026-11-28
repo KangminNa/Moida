@@ -5,7 +5,7 @@ import { describe, test } from 'node:test';
 import type { AppRow, IssueRow, MenuRow } from '../blog.tables';
 import { AppScreenDataView } from './app-screen.view';
 
-// 데이터 약속 cairn: 1 (docs/스토어.md 9.3)의 이름은 러너의 앱 코드 검사(apps/runner/src/app-code-check.ts의 NAMES)가
+// 데이터 약속 moida: 1 (docs/스토어.md 9.3)의 이름은 러너의 앱 코드 검사(apps/runner/src/app-code-check.ts의 NAMES)가
 // 모두 알아야 한다: 모르는 이름은 "약속에 없는 이름"으로 AI에게 다시 고치게 한다. 약속에 이름을 더하면 그 목록에도 더한다.
 
 const NOW = new Date('2026-11-18T00:00:00Z');
@@ -85,7 +85,7 @@ function keysOf(value: unknown, into = new Set<string>()): Set<string> {
   return into;
 }
 
-describe('앱 화면 데이터의 이름 (cairn: 1)', () => {
+describe('앱 화면 데이터의 이름 (moida: 1)', () => {
   test('모든 화면의 데이터 이름을 러너의 앱 코드 검사가 안다', () => {
     const view = (screen: string) =>
       new AppScreenDataView(screen, app, '/cafe', [app, { ...app, id: 'a2' }], [menu], true);
@@ -139,7 +139,7 @@ describe('앱 도메인의 주소 (스토어 3-0)', () => {
 
   test('앱 도메인으로 연 화면: 앱 주소는 도메인의 뿌리, 기본 도메인에 있는 것은 사이트 주소로', () => {
     const own = { ...blog, domain: 'blog.example.com', domain_checked_at: NOW };
-    const site = 'https://cairn.example.com';
+    const site = 'https://moida.example.com';
     const data = new AppScreenDataView(
       'home',
       own,

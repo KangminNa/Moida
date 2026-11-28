@@ -4,7 +4,7 @@ import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AgentUser } from './agent-user';
 
-// 코드 러너 칸에서 일 하나의 자리 <CAIRN_WORK_DIR>/<작업 id>. 코드 작업(docs/코드작업.md 3단계)과 만들기 작업(결과물 2차)이 함께 쓴다.
+// 코드 러너 칸에서 일 하나의 자리 <MOIDA_WORK_DIR>/<작업 id>. 코드 작업(docs/코드작업.md 3단계)과 만들기 작업(결과물 2차)이 함께 쓴다.
 //   runner/clean/ 러너만 (root 700): 코드 작업의 깨끗한 clone. 여기서만 commit · push한다 (GitRepo)
 //   git-home/     러너만: 러너의 git이 쓰는 빈 홈
 //   change.patch  러너만: agent가 만든 변경을 받아 둔 파일

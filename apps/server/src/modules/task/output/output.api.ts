@@ -63,7 +63,7 @@ export class OutputController {
     });
   }
 
-  /** 러너: 만들기 작업의 재료 결과물 하나. 머리글 x-cairn-download에 begin_download의 표 (로그인 없음) */
+  /** 러너: 만들기 작업의 재료 결과물 하나. 머리글 x-moida-download에 begin_download의 표 (로그인 없음) */
   @Get('download')
   async download(
     @Req() req: HttpRequest,
@@ -80,7 +80,7 @@ export class OutputController {
     });
   }
 
-  /** 러너: 본문이 파일 그대로. 머리글 x-cairn-upload에 begin_upload의 표 */
+  /** 러너: 본문이 파일 그대로. 머리글 x-moida-upload에 begin_upload의 표 */
   @Put('upload')
   async upload(@Req() req: HttpUpload): Promise<OutputSavedView> {
     const token = req.headers[UploadTicket.HEADER];

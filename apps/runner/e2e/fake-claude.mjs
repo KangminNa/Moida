@@ -19,7 +19,7 @@
 //   [fake:browse]       브라우저 작업의 AI처럼: playwright 설정의 CDP 주소로 지시문의 시작 주소를 새 탭으로 열고, 로그인 화면이면
 //                       browser-stop.json에 login을, 아니면 제목 칸을 채우고 단계 화면 하나를 --output-dir에 두고 final_click을 쓴다
 //   [fake:login-form]   (browse와 함께) 로그인 화면이면 login에 로그인 칸(아이디 · 비밀번호 · 로그인 단추)을 함께 적는다
-//   [fake:memo=<글>]    인수인계 메모 파일(CAIRN_MEMO_FILE)에 그 글을 쓴다 (작업 세션, 2026-11-17)
+//   [fake:memo=<글>]    인수인계 메모 파일(MOIDA_MEMO_FILE)에 그 글을 쓴다 (작업 세션, 2026-11-17)
 //   [fake:deliver=<값>] 대표의 회차(O-3): 지시문이 받을 것을 정하라고 하면 set_deliver로 그 값을 정한다 (정해진 회차면 부르지 않는다)
 //   [fake:automate=<제목>] 대표의 회차(O-3): 받을 것을 setting으로 정하고 이 대화로 보내는 매일 08:00 자동화를 제안한다
 // --no-session-persistence가 없으면 세션 파일을 설정 폴더의 projects/<작업 폴더>/<세션 id>.jsonl에 남기고,
@@ -54,7 +54,7 @@ async function setupToken() {
   const leaks = [
     'CLAUDE_CODE_OAUTH_TOKEN',
     'ANTHROPIC_API_KEY',
-    'CAIRN_RUNNER_TOKEN',
+    'MOIDA_RUNNER_TOKEN',
     'DATABASE_URL',
   ];
   const config = process.env.CLAUDE_CONFIG_DIR;
@@ -151,7 +151,7 @@ if (!process.argv.includes('--mcp-config')) {
 
 const mcpConfigPath = process.argv[process.argv.indexOf('--mcp-config') + 1];
 const mcpServers = JSON.parse(readFileSync(mcpConfigPath, 'utf8')).mcpServers;
-const cairn = mcpServers.cairn;
+const moida = mcpServers.moida;
 
 const spy = /\[fake:spy=([^\]]+)\]/.exec(prompt)?.[1];
 if (spy) {
@@ -174,10 +174,10 @@ if (spy) {
       configEntries: readdirSync(process.env.CLAUDE_CONFIG_DIR),
       mcpConfigPath,
       mcpConfigMode: statSync(mcpConfigPath).mode & 0o777,
-      mcpUrl: cairn.url,
-      runToken: cairn.headers.Authorization.replace('Bearer ', ''),
+      mcpUrl: moida.url,
+      runToken: moida.headers.Authorization.replace('Bearer ', ''),
       mcpServers: Object.fromEntries(
-        Object.entries(mcpServers).filter(([name]) => name !== 'cairn'),
+        Object.entries(mcpServers).filter(([name]) => name !== 'moida'),
       ),
       prompt,
     }),
@@ -197,7 +197,7 @@ if (!process.argv.includes('--no-session-persistence')) {
   );
 }
 const memo = /\[fake:memo=([^\]]+)\]/.exec(prompt)?.[1];
-if (memo && process.env.CAIRN_MEMO_FILE) writeFileSync(process.env.CAIRN_MEMO_FILE, memo);
+if (memo && process.env.MOIDA_MEMO_FILE) writeFileSync(process.env.MOIDA_MEMO_FILE, memo);
 
 const runs = /\[fake:runs=([^\]]+)\]/.exec(prompt)?.[1];
 if (runs) appendFileSync(runs, `${process.pid}\n`);
@@ -241,7 +241,7 @@ say({
   model: 'fake',
   permissionMode: 'acceptEdits',
   apiKeySource: 'none',
-  tools: ['Read', 'Write', 'Edit', 'mcp__cairn__request_approval'],
+  tools: ['Read', 'Write', 'Edit', 'mcp__moida__request_approval'],
   mcp_servers: servers,
 });
 if (has('stray')) await forever();
@@ -269,20 +269,20 @@ assistant(
   {
     type: 'tool_use',
     id: 'toolu_2',
-    name: 'mcp__cairn__blog_save_draft',
+    name: 'mcp__moida__blog_save_draft',
     input: { title: '초안', body: '본문은 기록에 남기지 않는다' },
   },
 );
 toolResult('toolu_2', `토큰 ${process.env.CLAUDE_CODE_OAUTH_TOKEN} 때문에 실패`, true);
 
-/** 작업 토큰으로 cairn 도구 하나를 부른다. 실패하면 코드 4로 끝난다 */
+/** 작업 토큰으로 moida 도구 하나를 부른다. 실패하면 코드 4로 끝난다 */
 async function callTool(name, args) {
-  const res = await fetch(cairn.url, {
+  const res = await fetch(moida.url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
-      ...cairn.headers,
+      ...moida.headers,
     },
     body: JSON.stringify({
       jsonrpc: '2.0',
@@ -353,12 +353,12 @@ if (automate && choosing) {
 }
 
 if (has('approval')) {
-  const res = await fetch(cairn.url, {
+  const res = await fetch(moida.url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
-      ...cairn.headers,
+      ...moida.headers,
     },
     body: JSON.stringify({
       jsonrpc: '2.0',

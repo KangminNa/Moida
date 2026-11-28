@@ -82,7 +82,7 @@ async function newSession(open: boolean, wikiId: unknown = null, title = named('
     request_id: randomUUID(),
     source_session_id: randomUUID(),
     tool: 'claude-code',
-    project: 'cairn',
+    project: 'moida',
     title,
     did: '한 일',
   });

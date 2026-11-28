@@ -1,5 +1,5 @@
 {
-  "$comment": "지도 회사 정보 한 파일 (docs/지도.md MP-1 · MP-2). 웹(_blog/map-config.ts · cairn-map.ts)과 이 플러그인의 서버(server/)가 읽고, 서버 AppManifest · 러너 AppManifestCheck의 sdkHosts는 테스트가 이 파일과 맞춰 본다. 키 이름 · 주소가 바뀌면 여기만 고친다",
+  "$comment": "지도 회사 정보 한 파일 (docs/지도.md MP-1 · MP-2). 웹(_blog/map-config.ts · moida-map.ts)과 이 플러그인의 서버(server/)가 읽고, 서버 AppManifest · 러너 AppManifestCheck의 sdkHosts는 테스트가 이 파일과 맞춰 본다. 키 이름 · 주소가 바뀌면 여기만 고친다",
   "providers": {
     "kakao": {
       "label": "카카오맵",
@@ -30,7 +30,7 @@
     "google": {
       "label": "구글 지도",
       "keySetting": "googleBrowserKey",
-      "script": "https://maps.googleapis.com/maps/api/js?loading=async&callback=__cairnMapReady&key={key}",
+      "script": "https://maps.googleapis.com/maps/api/js?loading=async&callback=__moidaMapReady&key={key}",
       "sdkHosts": ["maps.googleapis.com", "maps.gstatic.com"],
       "hosts": [
         "maps.googleapis.com",

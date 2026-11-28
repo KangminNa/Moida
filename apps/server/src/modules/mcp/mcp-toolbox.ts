@@ -20,7 +20,7 @@ export class McpToolbox {
   /**
    * AI 도구가 붙을 때 받는 안내 (MCP instructions). 글은 코드가 아니라 mcp.instructions.ko.json에 둔다 (AI가 읽는 글).
    * 스킬이 없는 도구도 이것만 보고 저장할 수 있게 앞 512자 안에 순서가 다 들어가게 쓴다 (Codex는 앞부분만 읽는다).
-   * 순서를 바꾸면 skills/cairn-save도 함께 고친다
+   * 순서를 바꾸면 skills/moida-save도 함께 고친다
    */
   static readonly INSTRUCTIONS = instructions.instructions.join('\n');
 
@@ -47,7 +47,7 @@ export class McpToolbox {
   }
 
   /**
-   * 도구의 기본 글: 코어 도구는 설명서, 기능 패키지의 도구는 목록 파일(cairn-plugin.json)의 글.
+   * 도구의 기본 글: 코어 도구는 설명서, 기능 패키지의 도구는 목록 파일(moida-plugin.json)의 글.
    * 주인이 콘솔 "도구 설명"에서 쌓은 판이 그 위에 얹힌다 (ToolTextQuery.describe)
    */
   defaultText(tool: BaseTool): ToolTextBody {

@@ -22,7 +22,7 @@ test('기본 도메인: 첫 화면과 앱 주소만 넘기고 미리 보기 · �
     '/admin',
     '/login',
     '/words/~abc',
-    '/words/~abc/_/cairn.js',
+    '/words/~abc/_/moida.js',
     '/sw.js',
     '/share/x',
   ])

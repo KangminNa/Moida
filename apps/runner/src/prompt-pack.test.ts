@@ -6,7 +6,7 @@ import { Json } from './json';
 import { PromptPack, PromptProblem, PromptTemplate } from './prompt-pack';
 import { Redactor, RunLog } from './redactor';
 
-// 지시문의 글은 러너 스킬 cairn-runner의 틀에서 온다 (2차 1-0)
+// 지시문의 글은 러너 스킬 moida-runner의 틀에서 온다 (2차 1-0)
 
 const SKILLS = resolve(__dirname, '../../../skills');
 
@@ -26,11 +26,11 @@ class HeardLog extends RunLog {
 const shipped = (prompts: string, source = 'console') =>
   SkillPackage.from(
     Json.of({
-      name: 'cairn-runner',
+      name: 'moida-runner',
       source,
       revision: 3,
       hash: 'abcdef0123',
-      files: { 'SKILL.md': '---\nname: cairn-runner\n---\n', 'references/prompts.md': prompts },
+      files: { 'SKILL.md': '---\nname: moida-runner\n---\n', 'references/prompts.md': prompts },
     }),
   );
 

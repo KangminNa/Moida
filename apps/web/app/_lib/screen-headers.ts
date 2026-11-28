@@ -50,7 +50,7 @@ export function isAppScreenRoot(pathname: string): boolean {
   return APP_SCREEN_ROOTS.includes(first);
 }
 
-/** 앱 도메인에서 Cairn이 그리는 커뮤니티 고정 화면 (/_/…, 스토어 3-2): 화면 머리글을 proxy.ts가 붙인다 */
+/** 앱 도메인에서 Moida이 그리는 커뮤니티 고정 화면 (/_/…, 스토어 3-2): 화면 머리글을 proxy.ts가 붙인다 */
 export function isMemberScreen(pathname: string): boolean {
   return pathname === '/_' || pathname.startsWith('/_/');
 }

@@ -1,10 +1,10 @@
 import { mkdir, open, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { CairnServer } from './cairn-server';
 import type { Job } from './job';
 import { RefPhotos } from './job-refs';
 import type { JobWorkspace } from './job-workspace';
 import { MaterialDownloader } from './material-downloader';
+import type { MoidaServer } from './moida-server';
 import { RunEvent } from './progress';
 
 /** AI CLI가 사진을 보는 법: read 받은 파일을 읽는다 (Claude Read) · attach 지시에 붙인다 (codex exec --image) */
@@ -34,7 +34,7 @@ export class JobPhotos {
 
   constructor(
     private readonly job: Job,
-    server: CairnServer,
+    server: MoidaServer,
     serverUrl: string,
     /** 이 엔진이 사진을 보는 법. null이면 보지 못한다: 받지 않고 모두 받지 못한 사진으로 적는다 */
     private readonly sight: PhotoSight | null,

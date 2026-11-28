@@ -18,8 +18,8 @@ export class Nickname {
   /** 이 말로 시작하면 막는다 (badminton처럼 가운데 든 것은 둔다) */
   private static readonly RESERVED_PREFIXES: readonly string[] = [
     'admin',
-    'cairn',
     'moida',
+    'cairn',
     'moderator',
     'official',
     'operator',

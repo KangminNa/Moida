@@ -8,7 +8,7 @@ import { ExploreProxy } from './explore-proxy';
 import { TestChromium } from './testing/test-chromium';
 
 // 실제 Chromium으로 CDP 흐름을 본다: 새 탭 → 다 뜨면 제목과 보이는 글자 → 탭 닫기.
-// Chromium이 없으면 건너뛴다 (CAIRN_TEST_CHROMIUM으로 경로를 줄 수 있다).
+// Chromium이 없으면 건너뛴다 (MOIDA_TEST_CHROMIUM으로 경로를 줄 수 있다).
 const { skip } = TestChromium;
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>탭 시험</title></head><body>

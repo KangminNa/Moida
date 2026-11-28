@@ -93,7 +93,7 @@ async function build(
       method: 'PUT',
       headers: {
         'content-type': 'application/octet-stream',
-        'x-cairn-upload': String(ticket.token),
+        'x-moida-upload': String(ticket.token),
       },
       body: bytes,
     });
@@ -117,15 +117,15 @@ const site = (path: string, as: TestUser = TestUser.visitor) =>
   fetch(`${api.baseUrl}/api/pages/site/${path}`, {
     redirect: 'manual',
     headers:
-      as === TestUser.visitor ? {} : { cookie: `cairn_session=${owner.cookies.cairn_session}` },
+      as === TestUser.visitor ? {} : { cookie: `moida_session=${owner.cookies.moida_session}` },
   });
 /** 바깥 주소의 Location(/pages/…)을 서버 경로(api/pages/site/…)로 */
 const follow = (location: string | null) => String(location).replace(/^\/pages\//, '');
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-page-test-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
-  process.env.CAIRN_DISK_RESERVE_GB = '0';
+  dir = await mkdtemp(join(tmpdir(), 'moida-page-test-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
+  process.env.MOIDA_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
   worker = api.service(OutboxWorker);

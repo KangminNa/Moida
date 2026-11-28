@@ -8,12 +8,12 @@ import { BrowserPages, type BrowserTab } from './browser-page';
 import type { BrowserSlot } from './browser-slot';
 import { BrowserStop, BrowserStopProblem } from './browser-stop';
 import { BrowserUnavailable } from './browser-tabs';
-import { CairnServer } from './cairn-server';
 import { ExploreProxy } from './explore-proxy';
 import { IntegrationExec } from './integration-exec';
 import type { Job } from './job';
 import type { LoginFormRef } from './login-form-ref';
 import { McpClient, ServerUnreachable, ToolRefused } from './mcp-client';
+import { MoidaServer } from './moida-server';
 import { NetworkTap } from './network-tap';
 import { PressLoop } from './press-loop';
 import { RunEvent, RunResult } from './progress';
@@ -63,7 +63,7 @@ export class BrowseStage implements SandboxStage {
   constructor(
     private readonly job: Job,
     private readonly config: RunnerConfig,
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly slot: BrowserSlot,
     private readonly pages: BrowserPages,
   ) {
@@ -90,7 +90,7 @@ export class BrowseStage implements SandboxStage {
       this.unreachable = true;
       return RunEnding.release(`서버에 닿지 못해 돌려줘요: ${error.message}`);
     }
-    this.dir = await mkdtemp(join(await realpath(tmpdir()), 'cairn-browse-'));
+    this.dir = await mkdtemp(join(await realpath(tmpdir()), 'moida-browse-'));
     await mkdir(join(this.dir, 'steps'));
     const { site } = this.plan;
     if (site === null) {
@@ -243,7 +243,7 @@ export class BrowseStage implements SandboxStage {
     if (asked === null || signal.aborted) return null;
     const failed = (error: string) => RunEnding.submit(error, RunResult.failed(error, redactor));
     if (!this.job.runToken) return failed('작업 토큰이 없어 결재를 올리지 못했어요');
-    const asAgent = new CairnServer(new McpClient(this.config.mcpUrl, this.job.runToken));
+    const asAgent = new MoidaServer(new McpClient(this.config.mcpUrl, this.job.runToken));
     try {
       await asAgent.requestApproval(asked);
       return null;

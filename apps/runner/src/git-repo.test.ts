@@ -50,7 +50,7 @@ after(async () => {
 });
 
 describe('러너의 깨끗한 clone', () => {
-  test('받고, patch를 옮기고, 커밋 하나로 cairn/<작업>에 올린다', async () => {
+  test('받고, patch를 옮기고, 커밋 하나로 moida/<작업>에 올린다', async () => {
     const repo = await GitRepo.clone(specFor(url), join(dir, 'clean-1'), dir, null);
     assert.equal(repo.baseSha, server.head('app', 'main'));
     const patch = await patchOf(async (work) => {
@@ -59,10 +59,10 @@ describe('러너의 깨끗한 clone', () => {
     });
     const files = await repo.apply(patch, false);
     assert.deepEqual([...files].sort(), ['src/a.ts', 'src/b.bin']);
-    const head = await repo.commit('cairn: 고침\n\n요약', '코드 담당 (Moida)');
-    await repo.push(`cairn/${TASK}`, null);
-    assert.equal(server.head('app', `cairn/${TASK}`), head);
-    assert.equal(server.show('app', `cairn/${TASK}`, 'src/a.ts'), 'export const a = 2;\n');
+    const head = await repo.commit('moida: 고침\n\n요약', '코드 담당 (Moida)');
+    await repo.push(`moida/${TASK}`, null);
+    assert.equal(server.head('app', `moida/${TASK}`), head);
+    assert.equal(server.show('app', `moida/${TASK}`, 'src/a.ts'), 'export const a = 2;\n');
     assert.equal(server.head('app', 'main'), repo.baseSha, '기준 브랜치는 그대로');
   });
 
@@ -88,10 +88,10 @@ describe('러너의 깨끗한 clone', () => {
     }
   });
 
-  test('cairn/ 아래가 아닌 브랜치에는 올리지 않는다', async () => {
+  test('moida/ 아래가 아닌 브랜치에는 올리지 않는다', async () => {
     const repo = await GitRepo.clone(specFor(url), join(dir, 'clean-3'), dir, null);
     await assert.rejects(repo.push('main', null), RepoRefused);
-    await assert.rejects(repo.push('cairn/../main', null), RepoRefused);
+    await assert.rejects(repo.push('moida/../main', null), RepoRefused);
   });
 
   test('없는 저장소 · 브랜치는 거절(실패), 닿지 못하면 닿지 못함(기다림)', async () => {
@@ -111,7 +111,7 @@ describe('러너의 깨끗한 clone', () => {
 });
 
 describe('이어서 고치기: 최신 기준 위에 앞 PR을 다시 얹기 (코드 작업 5단계)', () => {
-  const BRANCH = `cairn/${TASK}`;
+  const BRANCH = `moida/${TASK}`;
   let n = 0;
 
   /** 저장소 하나를 만들고 첫 실행처럼 src/a.ts를 바꿔 브랜치에 올린다 */
@@ -129,7 +129,7 @@ describe('이어서 고치기: 최신 기준 위에 앞 PR을 다시 얹기 (코
     const patch = join(dir, `${name}.patch`);
     await writeFile(patch, stdout);
     await repo.apply(patch, false);
-    const head = await repo.commit('cairn: 처음', '에이전트');
+    const head = await repo.commit('moida: 처음', '에이전트');
     await repo.push(BRANCH, null);
     return { name, url: repoUrl, head };
   }
@@ -185,7 +185,7 @@ describe('이어서 고치기: 최신 기준 위에 앞 PR을 다시 얹기 (코
   test('브랜치가 없으면(주인이 지움) null', async () => {
     const first = await firstRun();
     const repo = await GitRepo.clone(specFor(first.url), join(dir, `${first.name}-2`), dir, null);
-    const other = `cairn/${TASK.replace('a1', 'b2')}`;
+    const other = `moida/${TASK.replace('a1', 'b2')}`;
     assert.equal(await repo.replay(other, join(dir, `${first.name}-r.patch`), null), null);
   });
 
@@ -198,7 +198,7 @@ describe('이어서 고치기: 최신 기준 위에 앞 PR을 다시 얹기 (코
       await writeFile(join(work, 'src/a.ts'), 'a-pr\na-more\n');
     });
     await repo.apply(change, false);
-    await repo.commit('cairn: 다시', '에이전트');
+    await repo.commit('moida: 다시', '에이전트');
     server.commit(first.name, BRANCH, { 'src/c.ts': '누가 올림\n' });
     await assert.rejects(repo.push(BRANCH, null, undefined, replayed?.head ?? null), RepoRefused);
     assert.notEqual(server.show(first.name, BRANCH, 'src/c.ts'), null, '남이 올린 것은 그대로');

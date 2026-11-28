@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Database } from '../modules/platform';
 
-// 마이그레이션까지 마친 새 DB. 테스트 전용 DB(cairn_test)는 테스트 파일들이 함께 써서 비어 있지 않다.
-// 복원처럼 빈 Cairn이 있어야 하는 테스트가 따로 만들어 쓴다.
+// 마이그레이션까지 마친 새 DB. 테스트 전용 DB(moida_test)는 테스트 파일들이 함께 써서 비어 있지 않다.
+// 복원처럼 빈 Moida이 있어야 하는 테스트가 따로 만들어 쓴다.
 export class FreshDatabase {
   private static readonly MIGRATIONS = resolve(process.cwd(), '../../db/migrations');
   private static readonly NAME = /^[a-z_]+$/;

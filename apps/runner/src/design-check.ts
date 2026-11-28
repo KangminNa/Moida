@@ -6,7 +6,7 @@ class TokenBlock {
   constructor(readonly colors: ReadonlyMap<string, string>) {}
 }
 
-// 앱 화면 · 페이지의 디자인 기준 검사 (2026-11-24, 스킬 cairn-make의 references/design.md 6장).
+// 앱 화면 · 페이지의 디자인 기준 검사 (2026-11-24, 스킬 moida-make의 references/design.md 6장).
 // AI가 낸 HTML · CSS의 글을 훑어 기계로 볼 수 있는 것만 본다: 색 토큰 짝의 대비 · viewport · lang · 포커스 · 작은 글자 · alt · 움직임 줄이기.
 // 떨어지면 JobRun이 AI에게 한 번 더 맡기고, 그래도 떨어지면 결과에 적기만 한다 (일을 실패로 끝내지 않는다: 보기의 문제라서).
 // 앞 코드(받은 것)의 문제는 묻지 않는다: 이번에 낸 파일만 본다. viewport · lang은 화면 전체(앞 코드 + 낸 것)에서 찾는다 (머리 조각에 있을 수 있다)

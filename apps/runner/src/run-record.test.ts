@@ -33,7 +33,7 @@ import { REPO_PROMPTS } from './testing/repo-prompts';
 
 let dir: string;
 before(() => {
-  dir = mkdtempSync(join(tmpdir(), 'cairn-lineage-'));
+  dir = mkdtempSync(join(tmpdir(), 'moida-lineage-'));
 });
 after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -190,10 +190,10 @@ describe('인수인계 메모와 재개 (지시문 · Claude 인자)', () => {
     assert.equal(plain.lineage?.key, 'task:t-1');
     const memo = new RunMemo('2026-11-17T01:00:00Z', '정리', '산책 글', 1, '사진 셋을 골랐다');
     const started = plain.withLineage(plain.lineage?.started(null, [memo]) ?? null);
-    const text = started.prompt(REPO_PROMPTS, false, null, null, '/w/.cairn/memo.md');
+    const text = started.prompt(REPO_PROMPTS, false, null, null, '/w/.moida/memo.md');
     assert.match(text, /# 지난 인수인계 메모 \(자료\)/);
     assert.match(text, /## 2026-11-17T01:00:00Z · 정리 · 산책 글 \(1번째 실행\)\n사진 셋을 골랐다/);
-    assert.match(text, /# 인수인계 메모\n이 실행을 끝내기 전에 .* \/w\/\.cairn\/memo\.md 파일에/);
+    assert.match(text, /# 인수인계 메모\n이 실행을 끝내기 전에 .* \/w\/\.moida\/memo\.md 파일에/);
     assert.equal(text.includes('# 이어서 하는 실행'), false);
     assert.equal(job(null).lineage, null, '기록하지 않는 일');
     assert.equal(job(null).prompt(REPO_PROMPTS, false).includes('인수인계'), false);
@@ -232,7 +232,7 @@ describe('인수인계 메모와 재개 (지시문 · Claude 인자)', () => {
     assert.equal(args.includes('--no-session-persistence'), false);
     assert.equal(args[args.indexOf('--resume') + 1], 's1');
     assert.equal(workspace.workDir, join(place.root, 'work'), '세션 키마다 같은 작업 폴더');
-    assert.equal(workspace.memoPath, join(place.root, 'work', '.cairn', 'memo.md'));
+    assert.equal(workspace.memoPath, join(place.root, 'work', '.moida', 'memo.md'));
     assert.equal(readFileSync(workspace.memoPath ?? '', 'utf8'), '');
     const settings = JSON.parse(readFileSync(join(workspace.configDir, 'settings.json'), 'utf8'));
     assert.ok(settings.hooks.Stop[0].hooks[0].command.includes('memo-stop.cjs'));
@@ -271,7 +271,7 @@ describe('인수인계 메모와 재개 (지시문 · Claude 인자)', () => {
     const codex = new CodexCli('codex', '{"tokens":{}}', 'https://blog/mcp', dir);
     const workspace = await codex.open(job({ lineage: 'task:t-1', keep: true, resume: null }));
     assert.ok(codex.args(workspace).includes('--ephemeral'));
-    assert.equal(workspace.memoPath, join(workspace.workDir, '.cairn', 'memo.md'));
+    assert.equal(workspace.memoPath, join(workspace.workDir, '.moida', 'memo.md'));
     await workspace.remove();
   });
 });

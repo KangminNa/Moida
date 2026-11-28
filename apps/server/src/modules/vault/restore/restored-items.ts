@@ -70,14 +70,14 @@ export class RestoredCategory extends BaseEntity {
 /** vault/wikis/<주소>.md 하나. 주소는 파일 이름이다 */
 export class RestoredWiki extends BaseEntity {
   private static readonly KNOWN: ReadonlySet<string> = new Set([
-    'cairn_format',
-    'cairn_type',
-    'cairn_id',
+    'moida_format',
+    'moida_type',
+    'moida_id',
     'title',
     'visibility',
-    'cairn_category',
-    'cairn_origin',
-    'cairn_pinned',
+    'moida_category',
+    'moida_origin',
+    'moida_pinned',
   ]);
 
   private constructor(
@@ -98,13 +98,13 @@ export class RestoredWiki extends BaseEntity {
       slug: record.attempt(() => SlugPolicy.check(name)),
       title: record.text('title'),
       visibility: record.oneOf('visibility', WIKI_VISIBILITY),
-      category_id: record.optionalId('cairn_category'),
-      origin: record.has('cairn_origin')
-        ? record.oneOf('cairn_origin', WIKI_ORIGIN)
+      category_id: record.optionalId('moida_category'),
+      origin: record.has('moida_origin')
+        ? record.oneOf('moida_origin', WIKI_ORIGIN)
         : ChangeWork.HUMAN,
       // 옛 백업에는 사람이 고친 칸의 표시가 없다. 모두 사람의 것으로 두어 AI가 바로 덮지 못하게 한다
-      pinned_sections: record.has('cairn_pinned')
-        ? record.texts('cairn_pinned')
+      pinned_sections: record.has('moida_pinned')
+        ? record.texts('moida_pinned')
         : [Wiki.TITLE_KEY, ...body.sections.map((s) => s.key)],
     };
     const at = record.createdAt;
@@ -217,7 +217,7 @@ export class RestoredPostMark extends BaseEntity {
     private readonly fields: Omit<PostMarkNew, 'space_id' | 'main_wiki_id' | 'app_id'>,
     /** 글 파일이 가리키는 대표 wiki. 그 wiki가 복원되지 않으면 비운다 (외래키) */
     readonly mainWikiId: string | null,
-    /** 든 앱 (cairn_app). 앱 밖의 글이나 앱이 생기기 전의 백업은 null */
+    /** 든 앱 (moida_app). 앱 밖의 글이나 앱이 생기기 전의 백업은 null */
     readonly appId: string | null,
     /** 방문자에게 보이는 상태인가 (공개 · 링크 공개). 옛 백업을 알아보는 데 쓴다 */
     readonly shown: boolean,
@@ -233,13 +233,13 @@ export class RestoredPostMark extends BaseEntity {
       title: record.text('title'),
       slug: record.text('slug'),
       status: published ? RestoredPostMark.PUBLISHED : RestoredPostMark.DRAFT,
-      ref_wiki_ids: record.ids('cairn_ref_wikis'),
+      ref_wiki_ids: record.ids('moida_ref_wikis'),
       post_version: 1,
     };
     return new RestoredPostMark(
       fields,
-      record.optionalId('cairn_main_wiki'),
-      record.optionalId('cairn_app'),
+      record.optionalId('moida_main_wiki'),
+      record.optionalId('moida_app'),
       status !== RestoredPostMark.DRAFT,
     );
   }

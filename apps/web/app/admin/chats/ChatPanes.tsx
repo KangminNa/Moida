@@ -16,7 +16,7 @@ import { ChatThreadPanel } from './ChatThreadPanel';
 import { CHAT_DRAG, clampRatio, mainChatOf, SIDE_RATIO, sideChatOf, withSide } from './chat-panes';
 
 /** 옆 칸 너비를 이 브라우저에 기억하는 이름 (없거나 읽지 못하면 반반) */
-const RATIO_KEY = 'cairn.chat-side-ratio';
+const RATIO_KEY = 'moida.chat-side-ratio';
 
 // 대화 화면 나누기 (2026-11-25 사용자 요청): 대화 목록의 대화를 끌어 이 자리에 놓으면 오른쪽에 그 대화가 열린다.
 // 옆 대화는 주소의 ?side=<id>라 새로고침 · 뒤로 가기가 된다. 가운데 줄을 끌거나(키보드는 ← →) 너비를 바꾸고,

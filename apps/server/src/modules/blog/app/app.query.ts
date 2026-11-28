@@ -39,7 +39,7 @@ export class AppIconFile {
   ) {}
 }
 
-/** 도메인 연결 확인 값 (GET /.well-known/cairn-domain). 기본 도메인의 화면만 읽게 그 출처를 함께 준다 (CORS) */
+/** 도메인 연결 확인 값 (GET /.well-known/moida-domain). 기본 도메인의 화면만 읽게 그 출처를 함께 준다 (CORS) */
 export class AppDomainProofAnswer {
   constructor(
     private readonly token: string,

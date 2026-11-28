@@ -5,7 +5,7 @@ import { Session } from './session';
 import type { ReadSessionInput } from './session.input';
 import { WorkSessionView } from './work-session.view';
 
-// 작업 세션 화면 (S2, 2026-11-28): 에이전트 실행의 기록(도구 cairn-agent)에만 있는 것. 요청의 열쇠(대화 · 목표 실행 · 작업),
+// 작업 세션 화면 (S2, 2026-11-28): 에이전트 실행의 기록(도구 moida-agent)에만 있는 것. 요청의 열쇠(대화 · 목표 실행 · 작업),
 // 정리할 판(끝난 요청까지) · 정리를 요청한 판, 인수인계 메모(최근 MEMOS개, 새것부터). 관리자만
 @Injectable()
 export class WorkSessionQuery extends BaseQuery {

@@ -148,7 +148,7 @@ export class RemoveAppInput extends BaseRequest {
   }
 }
 
-/** POST /api/apps/:id/domain/check { version, token }: 관리자의 브라우저가 앱 도메인의 /.well-known/cairn-domain에서 읽은 값 */
+/** POST /api/apps/:id/domain/check { version, token }: 관리자의 브라우저가 앱 도메인의 /.well-known/moida-domain에서 읽은 값 */
 export class CheckDomainInput extends BaseRequest {
   private constructor(
     readonly id: string,
@@ -167,7 +167,7 @@ export class CheckDomainInput extends BaseRequest {
   }
 }
 
-/** GET /.well-known/cairn-domain: 앱 도메인으로 온 요청의 도메인 (HostGate가 적는다). 기본 도메인이면 null (Query가 404) */
+/** GET /.well-known/moida-domain: 앱 도메인으로 온 요청의 도메인 (HostGate가 적는다). 기본 도메인이면 null (Query가 404) */
 export class DomainProofInput extends BaseRequest {
   private constructor(
     readonly host: string | null,

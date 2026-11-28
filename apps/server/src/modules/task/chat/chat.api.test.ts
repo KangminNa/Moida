@@ -893,7 +893,7 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
     assert.deepEqual([refused.ok, refused.body.code], [false, 'rule_violation']);
   });
 
-  test('소식 기기(news, cairn connect의 훅 · 상태 줄)는 모든 대화의 소식을 읽기만 한다', async () => {
+  test('소식 기기(news, moida connect의 훅 · 상태 줄)는 모든 대화의 소식을 읽기만 한다', async () => {
     const mac = await device(`n-mac-${randomUUID().slice(0, 6)}`, ['delegate']);
     const hook = await api.connectDevice(owner, `n-hook-${randomUUID().slice(0, 6)}`, 'news');
     const list = await api.mcp(hook, 'tools/list');

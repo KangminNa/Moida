@@ -15,7 +15,7 @@ export class GitServer {
   ) {}
 
   static async start(): Promise<GitServer> {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-git-'));
+    const root = mkdtempSync(join(tmpdir(), 'moida-git-'));
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       const child = spawn('git', ['http-backend'], {
@@ -38,7 +38,7 @@ export class GitServer {
           ...(req.headers['git-protocol']
             ? { GIT_PROTOCOL: String(req.headers['git-protocol']) }
             : {}),
-          REMOTE_USER: 'cairn-test', // receive-pack(push)을 허락한다
+          REMOTE_USER: 'moida-test', // receive-pack(push)을 허락한다
           REMOTE_ADDR: '127.0.0.1',
         },
         stdio: ['pipe', 'pipe', 'ignore'],

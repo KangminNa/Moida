@@ -9,12 +9,12 @@ import { ApiCallJob } from './api-call.job';
 
 // API 커넥터 (2026-11-24 도구를 찾아 붙이기): 일꾼의 propose_api → 결재(task.api.plug, 서버가 올림) → 관리자가 키 →
 // api_tools · api_run(서버가 정의서대로 부름) → 상태 묻기 · 파일 받기(ApiCallJob) → 결과물. 쓰기 · 한도를 넘은 부르기는 승인 뒤.
-// 바깥 서비스는 루프백의 가짜 서버다 (CAIRN_OAUTH_TEST_LOOPBACK=1일 때만 http · 127.0.0.1을 연다). AI는 띄우지 않는다.
+// 바깥 서비스는 루프백의 가짜 서버다 (MOIDA_OAUTH_TEST_LOOPBACK=1일 때만 http · 127.0.0.1을 연다). AI는 띄우지 않는다.
 
 // biome-ignore lint/suspicious/noExplicitAny: 응답 JSON을 여러 겹 읽는 테스트 (모양은 assert가 본다)
 type Json = Record<string, any>;
 
-const LOOPBACK = 'CAIRN_OAUTH_TEST_LOOPBACK';
+const LOOPBACK = 'MOIDA_OAUTH_TEST_LOOPBACK';
 const KEY = 'svc-key-0123456789';
 const PNG = Buffer.from(
   '89504e470d0a1a0a0000000d4948445200000001000000010806000000' +
@@ -190,7 +190,7 @@ before(async () => {
   });
   await new Promise<void>((done) => fake.listen(0, '127.0.0.1', done));
   base = `http://127.0.0.1:${(fake.address() as AddressInfo).port}`;
-  process.env.CAIRN_TOOL_REGISTRY_URL = base;
+  process.env.MOIDA_TOOL_REGISTRY_URL = base;
   api = await ApiClient.start();
   owner = await api.signIn();
   db = api.service(Database);
@@ -218,7 +218,7 @@ after(async () => {
   await api.close();
   fake.close();
   delete process.env[LOOPBACK];
-  delete process.env.CAIRN_TOOL_REGISTRY_URL;
+  delete process.env.MOIDA_TOOL_REGISTRY_URL;
 });
 
 describe('API 커넥터', () => {

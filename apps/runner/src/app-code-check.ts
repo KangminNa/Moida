@@ -5,7 +5,7 @@ import { DesignDocCheck } from './design-doc-check';
 import { MapCreditCheck } from './map-credit-check';
 import { StageCheck } from './stage-check';
 
-/** 검사할 파일 하나: 앞 코드의 것이거나 AI가 낸 것. text는 읽은 글(템플릿 · cairn.json)만, 못 읽었으면 null */
+/** 검사할 파일 하나: 앞 코드의 것이거나 AI가 낸 것. text는 읽은 글(템플릿 · moida.json)만, 못 읽었으면 null */
 export class AppCodeEntry {
   constructor(
     readonly name: string,
@@ -21,17 +21,16 @@ class TemplateScan {
 }
 
 // 앱 코드를 고치는 만들기 일의 검사 (스토어 1-6c, docs/스토어.md 9.6). 앞 코드 위에 AI가 낸 파일을 얹은 모양을 본다:
-//   묶음 규칙 (서버의 AppCodeBundle과 같은 한도: 100개 · 합 20MB · 템플릿 합 1MB · index.html) · cairn.json
+//   묶음 규칙 (서버의 AppCodeBundle과 같은 한도: 100개 · 합 20MB · 템플릿 합 1MB · index.html) · moida.json
 //   템플릿 문법 (Mustache: 여닫는 짝 · 없는 조각 · {{{ }}}는 html 값에만 · 구분자 바꾸기 금지)
-//   데이터 이름 (약속 cairn: 1에 없는 이름은 빈 칸으로 그려진다)
-// 정적 앱 (cairn.json의 "render": "static", 스토어 9.13)은 템플릿이 아니라 파일 그대로 나가므로 묶음 규칙만 본다
-// (500개 · 경로 여섯 마디 · HTML 하나 1MB, 어느 종류의 앱이든). 선언서(cairn.json)의 모양은 AppManifestCheck가 본다. 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
+//   데이터 이름 (약속 moida: 1에 없는 이름은 빈 칸으로 그려진다)
+// 정적 앱 (moida.json의 "render": "static", 스토어 9.13)은 템플릿이 아니라 파일 그대로 나가므로 묶음 규칙만 본다
+// (500개 · 경로 여섯 마디 · HTML 하나 1MB, 어느 종류의 앱이든). 선언서(moida.json)의 모양은 AppManifestCheck가 본다. 폴더가 든 결과는 app.zip 하나로 내고, 그 안이 묶음 전체다 (packed).
 // 떨어지면 JobRun이 AI에게 한 번 더 맡긴다 (검증 고리 V). 그래도 묶음 · 문법이 틀리면 MakeStage가 일을 실패로 끝낸다:
 // 서버는 Mustache를 읽지 않아 틀린 템플릿도 버전이 되고, 비공개 앱은 바로 방문자(관리자)에게 보이기 때문이다.
 // 러너에는 런타임 의존 패키지가 없어 Mustache 라이브러리 대신 태그만 훑는다 (웹은 mustache 4로 그린다).
 export class AppCodeCheck {
   static readonly ENTRY = 'index.html';
-  static readonly MANIFEST = AppManifestCheck.FILE;
   /** 폴더가 든 묶음 전체를 내는 zip의 이름 (서버의 AppCodeService.BUILD_ZIP) */
   static readonly PACKED = 'app.zip';
   static readonly FILES_MAX = 100;
@@ -46,14 +45,14 @@ export class AppCodeCheck {
   static readonly SYNTAX = '템플릿 문법';
   static readonly DATA = '데이터 이름';
   /**
-   * 데이터 약속 cairn: 1의 이름 (docs/스토어.md 9.3, 서버 app-screen.view.ts + 웹이 더하는 html · dateText · site.name,
+   * 데이터 약속 moida: 1의 이름 (docs/스토어.md 9.3, 서버 app-screen.view.ts + 웹이 더하는 html · dateText · site.name,
    * 커뮤니티의 topics · topic · community는 웹이 회원 API로 채운다: 스토어 3-2).
    * 섹션 안에서는 항목의 칸을 이름만으로 쓰므로 어느 깊이의 이름이든 받는다. 약속은 이름을 더하기만 한다:
    * 서버 테스트(app-code.api.test)가 실제 화면 데이터의 이름이 모두 여기 있는지 본다
    */
   // biome-ignore format: 줄마다 데이터의 한 덩어리
   static readonly NAMES: readonly string[] = [
-    'cairn', 'screen', 'isHome', 'isPost', 'isMenu', 'isIssue', 'title', 'base', 'files',
+    'moida', 'screen', 'isHome', 'isPost', 'isMenu', 'isIssue', 'title', 'base', 'files',
     'site', 'home', 'store', 'loginUrl', 'graphUrl', 'name',
     'app', 'description', 'kind', 'url', 'iconUrl', 'rssUrl',
     'apps', 'others', 'current', 'menus', 'active',
@@ -79,7 +78,7 @@ export class AppCodeCheck {
     const all = new Map<string, AppCodeEntry>();
     for (const f of base.files) all.set(f.name, new AppCodeEntry(f.name, f.size, f.text));
     for (const f of made) all.set(f.name, f);
-    const fixed = AppManifestCheck.isStatic(all.get(AppCodeCheck.MANIFEST)?.text ?? null);
+    const fixed = AppManifestCheck.isStatic(AppManifestCheck.pick(all.values())?.text ?? null);
     const checks = [AppCodeCheck.bundle([...all.values()], made, fixed, base.kind)];
     // 디자인 기준 (references/design.md): 낸 HTML · CSS가 있을 때만
     const design = DesignCheck.check(made, [...all.values()]);
@@ -116,7 +115,7 @@ export class AppCodeCheck {
         AppCodeCheck.DATA,
         unknown,
         '모두 약속에 있음',
-        '데이터 약속(cairn: 1)에 없는 이름은 빈 칸으로 그려져요. 스킬의 references/app-code.md의 이름을 써요',
+        '데이터 약속(moida: 1)에 없는 이름은 빈 칸으로 그려져요. 스킬의 references/app-code.md의 이름을 써요',
       ),
     );
     return checks;
@@ -124,7 +123,7 @@ export class AppCodeCheck {
 
   /**
    * app.zip을 낸 일: zip 안이 묶음 전체다 (스토어 9.13). 앞 코드에서 내용을 받지 못한 파일(그림 · 큰 파일)은 zip에 없어도
-   * 서버가 남긴다. entries: zip 안의 파일 (cairn.json · design.md만 글까지). 읽지 못한 zip이면 null
+   * 서버가 남긴다. entries: zip 안의 파일 (moida.json · design.md만 글까지). 읽지 못한 zip이면 null
    */
   static packed(base: AppCodeBase, entries: readonly AppCodeEntry[] | null): StageCheck[] {
     const zip = AppCodeCheck.PACKED;
@@ -141,12 +140,12 @@ export class AppCodeCheck {
     const kept = base.files
       .filter((f) => f.text === null && !inside.has(f.name))
       .map((f) => new AppCodeEntry(f.name, f.size, null));
-    const manifest = entries.find((f) => f.name === AppCodeCheck.MANIFEST);
+    const manifest = AppManifestCheck.pick(entries);
     const fixed = AppManifestCheck.isStatic(manifest?.text ?? null);
     const extra = fixed
       ? []
       : [
-          `${zip}은 정적 앱의 묶음 전체예요. zip 안의 cairn.json에 "render": "static"을 넣어요 (템플릿 앱은 바뀐 파일만 그대로 내요)`,
+          `${zip}은 정적 앱의 묶음 전체예요. zip 안의 moida.json에 "render": "static"을 넣어요 (템플릿 앱은 바뀐 파일만 그대로 내요)`,
         ];
     const checks = [AppCodeCheck.bundle([...kept, ...entries], entries, fixed, base.kind, extra)];
     const doc = DesignDocCheck.check(entries, [
@@ -185,13 +184,13 @@ export class AppCodeCheck {
         problems.push('템플릿(.html)은 합쳐 1MB까지예요');
       const nested = all.find((f) => f.name.includes('/'));
       if (nested)
-        problems.push(`폴더는 정적 앱만 써요: ${nested.name} (cairn.json에 "render": "static")`);
+        problems.push(`폴더는 정적 앱만 써요: ${nested.name} (moida.json에 "render": "static")`);
     }
     if (!all.some((f) => f.name === AppCodeCheck.ENTRY))
       problems.push(
         `${AppCodeCheck.ENTRY}가 없어요 (${fixed ? '앱의 첫 화면' : '모든 화면의 기본 템플릿'})`,
       );
-    const manifest = made.find((f) => f.name === AppCodeCheck.MANIFEST);
+    const manifest = AppManifestCheck.pick(made);
     if (manifest)
       problems.push(
         ...AppManifestCheck.problems(manifest.text, kind, new Set(all.map((f) => f.name))),

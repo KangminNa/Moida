@@ -48,7 +48,7 @@ export class ExternalTool extends TableEntity<ExternalToolRow, ExternalToolNew> 
   static readonly TITLE_MAX = 60;
   static readonly NOTE_MAX = 1000;
   static readonly SECRET_MAX = 4000;
-  /** 러너 안의 MCP 서버 이름 앞부분: cairn · playwright와 겹치지 않게 */
+  /** 러너 안의 MCP 서버 이름 앞부분: moida · playwright와 겹치지 않게 */
   static readonly SERVER_PREFIX = 'x-';
   private static readonly NAME = /^[a-z][a-z0-9-]{1,29}$/;
   private static readonly HEADER = /^[A-Za-z0-9-]{1,40}$/;

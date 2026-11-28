@@ -1,0 +1,386 @@
+/* 앱 보기 (D1 "넘겨 보는 앱 카드", AppsDeck): 소개와 같은 어두운 점 바탕 위에 밝은 카드가 옆으로 늘어선다.
+   색은 globals.css의 --field-* 토큰만 쓴다 */
+
+.dk {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 84px 0 104px;
+  animation: fd-fade 0.7s ease 0.1s both;
+}
+.dk-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 32px;
+  padding: 0 32px;
+}
+.dk-head p {
+  margin: 0 0 8px;
+}
+.dk-h2 {
+  margin: 0;
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.dk-news {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+.dk-news li {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--field-paper) 8%, transparent);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.dk-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--field-paper);
+}
+.dk-empty {
+  margin: 0;
+  padding: 24px 32px;
+}
+.dk-track {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  flex: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 32px 10px;
+  scroll-padding-left: 32px;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.dk-track::-webkit-scrollbar {
+  display: none;
+}
+/* 끝 여백: 마지막 카드도 왼쪽 자리까지 넘어가 멈추게 (없으면 뒤쪽 카드를 골라도 끝까지 밀려 마지막 카드가 잡힌다) */
+.dk-track::after {
+  content: "";
+  flex: none;
+  width: max(0px, calc(100vw - 64px - min(680px, 58vw) - 16px));
+}
+.fd-root .dk-card {
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(680px, 58vw);
+  height: min(520px, 58vh);
+  min-height: 380px;
+  padding: 24px;
+  border-radius: 28px;
+  background: var(--field-paper);
+  color: var(--field-ink);
+  text-decoration: none;
+  scroll-snap-align: start;
+  opacity: 0.42;
+  transform: scale(0.96);
+  transform-origin: left center;
+  transition:
+    opacity 0.45s,
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.fd-root .dk-card.is-on,
+.fd-root .dk-card:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+.dk-card:focus-visible {
+  outline: 2px solid var(--field-paper);
+  outline-offset: 4px;
+}
+.dk-row,
+.dk-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.dk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dk-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--field-ink) 7%, transparent);
+  color: var(--field-dim-day);
+  font-size: 0.75rem;
+}
+.dk-path {
+  overflow: hidden;
+  color: var(--field-dim-day);
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+.dk-name {
+  display: block;
+  font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.dk-desc {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--field-dim-day);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.dk-peek {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--field-ink) 5%, transparent);
+  overflow: hidden;
+}
+.dk-peek.is-art {
+  padding: 0;
+  background:
+    radial-gradient(
+      circle,
+      color-mix(in srgb, var(--field-ink) 22%, transparent) 0 1px,
+      transparent 1.5px
+    )
+    0 0 / 11px 11px,
+    color-mix(in srgb, var(--field-ink) 4%, transparent);
+}
+.dk-post {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--field-ink) 8%, transparent);
+  font-size: 0.9375rem;
+}
+.dk-post:last-child {
+  border-bottom: 0;
+}
+.dk-post span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dk-post .fd-mono {
+  flex: none;
+  color: var(--field-dim-day);
+}
+.dk-foot {
+  color: var(--field-dim-day);
+  font-size: 0.875rem;
+}
+.dk-open {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--field-ink);
+  color: var(--field-paper);
+  font-weight: 500;
+}
+.dk-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 32px;
+}
+.dk-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dk-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 120px;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--field-dim);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+.dk-step:hover,
+.dk-step.is-on {
+  color: var(--field-paper);
+}
+.dk-bar {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--field-paper) 18%, transparent);
+  overflow: hidden;
+}
+.dk-bar span {
+  display: block;
+  height: 100%;
+  background: var(--field-paper);
+  animation: dk-fill 0.6s ease both;
+}
+.dk-count {
+  display: none;
+}
+.dk-arrows {
+  display: flex;
+  gap: 8px;
+}
+.dk-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--field-paper) 10%, transparent);
+  color: var(--field-paper);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.dk-arrow:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--field-paper) 18%, transparent);
+}
+.dk-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.dk-step:focus-visible,
+.dk-arrow:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.dk-extra {
+  padding: 24px 32px 0;
+}
+.dk-extra:empty {
+  display: none;
+}
+.dk-extra :is(.store-subscribe, .store-mail-link) {
+  margin: 0;
+  background: var(--field-paper);
+  color: var(--field-ink);
+}
+@keyframes dk-fill {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dk,
+  .dk-bar span {
+    animation: none;
+  }
+  .fd-root .dk-card {
+    transition: none;
+  }
+}
+@media (max-width: 720px) {
+  .dk {
+    gap: 16px;
+    padding: 68px 0 96px;
+  }
+  .dk-head,
+  .dk-nav,
+  .dk-extra {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .dk-h2 {
+    font-size: 1.75rem;
+  }
+  .dk-track {
+    gap: 12px;
+    padding: 6px 20px 10px;
+    scroll-padding-left: 20px;
+  }
+  .dk-track::after {
+    width: max(0px, calc(100vw - 40px - min(330px, 100vw - 56px) - 12px));
+  }
+  /* 폰은 카드 · 점 · 아래 버튼이 한 화면에 들게: 소식 줄은 숨기고 카드 높이를 화면에 맞춘다 */
+  .dk-news {
+    display: none;
+  }
+  .fd-root .dk-card {
+    width: min(330px, calc(100vw - 56px));
+    height: clamp(300px, calc(100dvh - 312px), 460px);
+    min-height: 0;
+    padding: 18px;
+    border-radius: 22px;
+  }
+  .dk-path {
+    display: none;
+  }
+  .dk-steps {
+    gap: 8px;
+  }
+  .dk-step {
+    min-width: 0;
+    width: 24px;
+    min-height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .dk-step .fd-mono,
+  .dk-step-name {
+    display: none;
+  }
+  .dk-count {
+    display: inline;
+    color: var(--field-dim);
+  }
+  .dk-arrows {
+    display: none;
+  }
+}

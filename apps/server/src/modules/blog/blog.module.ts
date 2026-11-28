@@ -179,7 +179,7 @@ export class BlogModule implements OnModuleInit {
     this.gate.openPaths([
       /^\/api\/files\/[^/]+$/,
       /^\/api\/apps\/by-slug\/[^/]+\/icon$/,
-      /^\/\.well-known\/cairn-domain$/,
+      /^\/\.well-known\/moida-domain$/,
     ]);
     // 결과 카드 전에 발행의 빠진 점 (2차 6단계): 메뉴에 올리지 않은 글
     this.checks.register(PostPublish.ACTION, (a, id) => this.posts.publishProblem(a, id));

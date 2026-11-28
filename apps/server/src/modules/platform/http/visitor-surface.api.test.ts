@@ -23,7 +23,7 @@ const VISITOR_GET: Readonly<Record<string, number>> = {
   'GET /api/apps': 200,
   // 스토어 3-0: 도메인으로 여는 공개 앱 (웹이 Host로 앱을 고른다). 연결 확인 값은 앱 도메인에서만 (기본 도메인은 404)
   'GET /api/apps/domains': 200,
-  'GET /.well-known/cairn-domain': 404,
+  'GET /.well-known/moida-domain': 404,
   // 스토어 3-1: 커뮤니티 회원 API는 앱 도메인에서만 (기본 도메인에서는 없는 주소)
   'GET /api/community/me': 404,
   'GET /api/community/topics': 404,
@@ -165,7 +165,7 @@ const FILL: Readonly<Record<string, string>> = {
   slug: 'no-such-post',
   name: 'no-such-plugin',
   method: 'no-such-login',
-  file: 'cairn-save.zip',
+  file: 'moida-save.zip',
 };
 
 let api: ApiClient;

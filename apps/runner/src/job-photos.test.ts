@@ -5,13 +5,13 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
-import type { CairnServer } from './cairn-server';
 import { CodexCli } from './codex-cli';
 import { Job } from './job';
 import { JobPhotos } from './job-photos';
 import { JobWorkspace } from './job-workspace';
 import { Json } from './json';
 import { ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 import type { RunEvent } from './progress';
 import { REPO_PROMPTS } from './testing/repo-prompts';
 
@@ -33,7 +33,7 @@ let http: Server;
 let url: string;
 const bodies = new Map<string, Buffer>();
 
-function serverWith(files: ReadonlyMap<string, Served>, asked: string[] = []): CairnServer {
+function serverWith(files: ReadonlyMap<string, Served>, asked: string[] = []): MoidaServer {
   return {
     async beginDownload(_task: string, outputId: string) {
       asked.push(outputId);
@@ -42,19 +42,19 @@ function serverWith(files: ReadonlyMap<string, Served>, asked: string[] = []): C
       bodies.set(outputId, file.body);
       return {
         path: '/api/outputs/download',
-        header: 'x-cairn-download',
+        header: 'x-moida-download',
         token: outputId,
         name: '서버의 이름.png',
         size: file.size ?? file.body.length,
         sha256: sha(file.body),
       };
     },
-  } as unknown as CairnServer;
+  } as unknown as MoidaServer;
 }
 
 before(async () => {
   http = createServer((req, res) => {
-    const body = bodies.get(String(req.headers['x-cairn-download']));
+    const body = bodies.get(String(req.headers['x-moida-download']));
     if (body === undefined) return res.writeHead(403).end();
     res.writeHead(200).end(body);
   });

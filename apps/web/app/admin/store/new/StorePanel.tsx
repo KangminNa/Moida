@@ -16,7 +16,7 @@ import { type CreateAppBody, CreateAppForm } from './CreateAppForm';
 const STORE_NEW_HREF = `${STORE_HREF}/new`;
 
 // 스토어 (스토어 1-5 → 2026-11-25 A4 앱 하나로): 종류 카드 없이 "새 앱" 하나로 만든다. 만들면 앱 관리로 간다.
-// 화면은 모두 앱 코드이고, 대화에서 맡기면 일꾼이 참고할 화면을 찾아 디자인 문서를 쓰고 만든다 (스킬 cairn-make).
+// 화면은 모두 앱 코드이고, 대화에서 맡기면 일꾼이 참고할 화면을 찾아 디자인 문서를 쓰고 만든다 (스킬 moida-make).
 // 시트는 주소(?make=1, page.tsx가 넘김)에 둔다 (웹 UX U1): 열기는 기록을 하나 쌓고, 닫기는 여기서 연 것이면 뒤로 ·
 // 주소로 바로 들어왔으면 바꿔치기, 만든 뒤에는 앱 관리로 바꿔치기한다 (뒤로 가기가 다시 시트를 열지 않게)
 export function StorePanel({ make }: { make: string | null }) {

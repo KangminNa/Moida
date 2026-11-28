@@ -84,7 +84,7 @@ const GOOD = {
 };
 
 before(async () => {
-  work = await mkdtemp(join(tmpdir(), 'cairn-site-build-'));
+  work = await mkdtemp(join(tmpdir(), 'moida-site-build-'));
 });
 after(async () => {
   await rm(work, { recursive: true, force: true });

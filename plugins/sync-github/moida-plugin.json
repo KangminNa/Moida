@@ -1,0 +1,53 @@
+{
+  "name": "sync-github",
+  "version": "0.2.0",
+  "moida": ">=0.1",
+  "description": "Moida의 내용을 GitHub 저장소에 보관 형식(md·yml·사진)으로 내보내 이력과 백업을 남기고, 빈 Moida에 저장소에서 복원한다. vault는 저장소가 private일 때만 보낸다",
+  "guide": {
+    "does": [
+      "글 · 위키 · 설정을 GitHub 저장소에 파일(md · yml · 사진)로 내보내 백업과 변경 이력을 남겨요",
+      "새 서버에 Moida를 설치한 뒤 이 저장소에서 그대로 복원할 수 있어요",
+      "비공개 내용(보관함)은 저장소가 private일 때만 보내요"
+    ],
+    "setup": [
+      "백업용 GitHub 저장소를 private으로 하나 만들어요",
+      "Fine-grained token을 그 저장소만 골라 Contents: Read and write로 만들어요",
+      "저장소 이름(소유자/이름)과 토큰을 아래에 넣고 저장해요. 브랜치는 비우면 main이에요"
+    ]
+  },
+  "server": "server/plugin.ts",
+  "uses": [
+    "archive:read",
+    "archive:restore",
+    "job:sync",
+    "action:check",
+    "action:sync-now",
+    "action:restore-preview",
+    "action:restore"
+  ],
+  "settings": {
+    "repo": {
+      "label": "저장소 (owner/name)",
+      "type": "text",
+      "required": true,
+      "help": "private 저장소를 권해요. 공개 저장소면 블로그만 보내요"
+    },
+    "token": {
+      "label": "GitHub 토큰",
+      "type": "secret",
+      "required": true,
+      "help": "Fine-grained token, 그 저장소의 Contents 읽기·쓰기 권한"
+    },
+    "branch": {
+      "label": "브랜치",
+      "type": "text",
+      "default": "main"
+    },
+    "apiUrl": {
+      "label": "GitHub API 주소",
+      "type": "text",
+      "default": "https://api.github.com",
+      "help": "GitHub Enterprise를 쓸 때만 바꿔요"
+    }
+  }
+}

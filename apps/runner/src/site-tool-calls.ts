@@ -38,7 +38,7 @@ export type BuildVerdict = {
 
 /**
  * 사이트 도구의 러너 쪽 MCP 도구 (browser-tabs 0.5, 2026-11-16 MCP 2단계): 실행 꺼내기 · 남기기, 굳힌 결과 남기기.
- * 모양의 원본은 plugins/browser-tabs/cairn-plugin.json의 tools다. 오류 글은 부르는 쪽이 지운 뒤 넘긴다
+ * 모양의 원본은 plugins/browser-tabs/moida-plugin.json의 tools다. 오류 글은 부르는 쪽이 지운 뒤 넘긴다
  */
 export class SiteToolCalls {
   private static readonly ORIGIN = /^https?:\/\/[^/\s;]+$/i;

@@ -1,4 +1,4 @@
-import type { CairnServer } from './cairn-server';
+import type { MoidaServer } from './moida-server';
 import {
   type PlanWindow,
   ProgressBatch,
@@ -28,7 +28,7 @@ export class ProgressReporter {
   private lease: Date | null;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly taskId: string,
     private readonly redactor: Redactor,
     leaseUntil: Date | null,

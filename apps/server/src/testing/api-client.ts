@@ -1,9 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
-import { CairnApp } from '../cairn-app';
 import { InstallPolicy, ServerRunnerPolicy } from '../modules/account';
 import { Database, type RequestLogSink, SecretBox } from '../modules/platform';
+import { MoidaApp } from '../moida-app';
 
 /** 테스트에서 요청하는 사람: 쿠키 묶음. 방문자는 쿠키가 없다 */
 export class TestUser {
@@ -78,18 +78,18 @@ export class ApiClient {
    * 시험 파일마다 프로세스가 따로지만 시험 DB는 하나다: 프로세스마다 무작위 키를 쓰면 앞 파일이 잠근 값을
    * 뒤 파일의 키 교체(SecretRotation)가 풀지 못한다 (CI에서만 드러났다. 로컬은 .env의 키 하나로 돌았다)
    */
-  private static readonly TEST_KEY = createHash('sha256').update('cairn-test-db').digest('base64');
+  private static readonly TEST_KEY = createHash('sha256').update('moida-test-db').digest('base64');
 
   private constructor(
     private readonly app: INestApplication,
     readonly baseUrl: string,
   ) {}
 
-  /** 운영과 같은 길(CairnApp.api)로 서버를 띄운다. log: 요청 로그를 모아 볼 때 */
+  /** 운영과 같은 길(MoidaApp.api)로 서버를 띄운다. log: 요청 로그를 모아 볼 때 */
   static async start(options: { log?: RequestLogSink } = {}): Promise<ApiClient> {
     // compose는 값이 없으면 빈 문자열로 넘긴다
-    process.env.CAIRN_SECRET_KEY ||= ApiClient.TEST_KEY;
-    const app = await CairnApp.api({
+    process.env.MOIDA_SECRET_KEY ||= ApiClient.TEST_KEY;
+    const app = await MoidaApp.api({
       port: 0,
       host: '127.0.0.1',
       quiet: true,
@@ -233,10 +233,10 @@ export class ApiClient {
           email: ApiClient.OWNER_LOGIN,
           password: ApiClient.OWNER_PASSWORD,
         });
-    const session = done.cookies().cairn_session;
+    const session = done.cookies().moida_session;
     if (done.status !== 200 || !session)
       throw new Error(`로그인 실패: ${done.status} ${done.text}`);
-    return new TestUser({ cairn_session: session });
+    return new TestUser({ moida_session: session });
   }
 
   /**

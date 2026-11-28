@@ -54,8 +54,8 @@ function breakLines(node: MdNode): MdNode[] {
   return out;
 }
 
-/** Cairn 글 문법을 HTML 모양으로 */
-function cairnBlocks() {
+/** Moida 글 문법을 HTML 모양으로 */
+function moidaBlocks() {
   const walk = (node: MdNode): MdNode => {
     if (node.type === 'textDirective') return asText(node, ':');
     if (node.type === 'leafDirective') return { type: 'paragraph', children: [asText(node, '::')] };
@@ -106,7 +106,7 @@ function externalLinks(ugc: boolean) {
   };
 }
 
-/** 기본 거르기 + Cairn 블록의 class 두 개만 더 허락 */
+/** 기본 거르기 + Moida 블록의 class 두 개만 더 허락 */
 const schema: typeof defaultSchema = {
   ...defaultSchema,
   attributes: {
@@ -122,7 +122,7 @@ const processorOf = (ugc: boolean) =>
     .use(remarkGfm)
     .use(remarkCjkFriendly)
     .use(remarkDirective)
-    .use(cairnBlocks)
+    .use(moidaBlocks)
     .use(remarkRehype)
     .use(rehypeSanitize, schema)
     .use(externalLinks(ugc))

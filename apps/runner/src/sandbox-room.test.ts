@@ -35,7 +35,7 @@ describe('칸의 작업 자리', () => {
     assert.equal(env.HOME, room.homeDir);
     assert.equal(env.TMPDIR, room.tmpDir);
     assert.equal(
-      Object.keys(env).some((k) => k.startsWith('CAIRN_')),
+      Object.keys(env).some((k) => k.startsWith('MOIDA_')),
       false,
       '러너의 설정은 넘기지 않는다',
     );

@@ -6,9 +6,9 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, beforeEach, describe, test } from 'node:test';
-import type { CairnServer } from './cairn-server';
 import { MaterialBroken, MaterialDownloader, MaterialGone } from './material-downloader';
 import { ToolRefused } from './mcp-client';
+import type { MoidaServer } from './moida-server';
 
 // 재료 결과물 받기: 표를 받고 → 표의 주소에서 받으며 크기 · sha256을 맞춘다. 서버는 이 시험의 작은 HTTP 서버다.
 
@@ -25,7 +25,7 @@ let dir: string;
 /** begin_download 흉내: 이름 · 크기 · 해시를 표에 적고 토큰으로 본문을 고른다 */
 function serverWith(
   ticket: { name: string; body: Buffer | number; size?: number; sha256?: string } | Error,
-): CairnServer {
+): MoidaServer {
   return {
     async beginDownload() {
       if (ticket instanceof Error) throw ticket;
@@ -34,19 +34,19 @@ function serverWith(
       const bytes = typeof ticket.body === 'number' ? Buffer.alloc(0) : ticket.body;
       return {
         path: '/api/outputs/download',
-        header: 'x-cairn-download',
+        header: 'x-moida-download',
         token,
         name: ticket.name,
         size: ticket.size ?? bytes.length,
         sha256: ticket.sha256 ?? sha(bytes),
       };
     },
-  } as unknown as CairnServer;
+  } as unknown as MoidaServer;
 }
 
 before(async () => {
   http = createServer((req, res) => {
-    const body = served.get(String(req.headers['x-cairn-download']));
+    const body = served.get(String(req.headers['x-moida-download']));
     if (body === undefined) return res.writeHead(403).end();
     if (typeof body === 'number') return res.writeHead(body).end();
     res.writeHead(200).end(body);

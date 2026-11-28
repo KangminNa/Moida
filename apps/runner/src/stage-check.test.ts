@@ -26,7 +26,7 @@ const codeJob = () =>
         },
         agent: { name: '코드 담당', role: '고친다', tool: 'claude' },
         instruction: '로그인이 깨졌어요 [표시]',
-        run_token: 'cairn_run_x',
+        run_token: 'moida_run_x',
       }),
     ) as Json,
   ).withBrief('# 저장소\n시험 저장소');

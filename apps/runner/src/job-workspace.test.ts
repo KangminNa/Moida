@@ -23,8 +23,8 @@ import { REPO_PROMPTS } from './testing/repo-prompts';
 let skillsDir: string;
 
 before(() => {
-  skillsDir = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
-  const skill = join(skillsDir, 'cairn-write');
+  skillsDir = mkdtempSync(join(tmpdir(), 'moida-skills-'));
+  const skill = join(skillsDir, 'moida-write');
   mkdirSync(join(skill, 'references'), { recursive: true });
   mkdirSync(join(skill, 'agents', 'claude'), { recursive: true });
   writeFileSync(join(skill, 'SKILL.md'), '# 글쓰기\n{{SKILL_DIR}}/references/style.md를 읽는다');
@@ -54,9 +54,9 @@ describe('일의 자리', () => {
   });
 
   test('스킬이 있으면 설정 폴더에 넣고 하위 에이전트와 숨김 파일은 뺀다', async () => {
-    const workspace = await open('cairn-write');
+    const workspace = await open('moida-write');
     assert.equal(workspace.skillReady, true);
-    const to = join(workspace.configDir, 'skills', 'cairn-write');
+    const to = join(workspace.configDir, 'skills', 'moida-write');
     assert.equal(
       readFileSync(join(to, 'SKILL.md'), 'utf8'),
       `# 글쓰기\n${to}/references/style.md를 읽는다`,
@@ -68,7 +68,7 @@ describe('일의 자리', () => {
   });
 
   test('스킬이 없거나 이름이 수상하면 스킬 없이 만든다', async () => {
-    for (const skill of ['cairn-tidy', 'not-a-skill', '../cairn-write', '/etc', 'A B']) {
+    for (const skill of ['moida-tidy', 'not-a-skill', '../moida-write', '/etc', 'A B']) {
       const workspace = await open(skill);
       assert.equal(workspace.skillReady, false, skill);
       await workspace.remove();
@@ -79,7 +79,7 @@ describe('일의 자리', () => {
 describe('AI CLI 부르기', () => {
   const cli = new ClaudeCli('claude', 'oauth-token');
 
-  test('MCP 설정에 작업 토큰과 cairn 서버 하나만 적는다', () => {
+  test('MCP 설정에 작업 토큰과 moida 서버 하나만 적는다', () => {
     const settings = JSON.parse(ClaudeCli.settings('/Users/owner/'));
     assert.deepEqual(settings.permissions.deny, [
       'Read(//Users/owner/**)',
@@ -92,7 +92,7 @@ describe('AI CLI 부르기', () => {
     const config = JSON.parse(ClaudeCli.mcpConfig('https://blog/mcp', 'run-token'));
     assert.deepEqual(config, {
       mcpServers: {
-        cairn: {
+        moida: {
           type: 'http',
           url: 'https://blog/mcp',
           headers: { Authorization: 'Bearer run-token' },
@@ -101,11 +101,11 @@ describe('AI CLI 부르기', () => {
     });
   });
 
-  test('셸을 주지 않고 cairn MCP만 허락한다', async () => {
+  test('셸을 주지 않고 moida MCP만 허락한다', async () => {
     const workspace = await open();
     const args = [...cli.args(workspace)];
     assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write,Edit');
-    assert.equal(args[args.indexOf('--allowedTools') + 1], 'mcp__cairn__*');
+    assert.equal(args[args.indexOf('--allowedTools') + 1], 'mcp__moida__*');
     assert.equal(args[args.indexOf('--mcp-config') + 1], workspace.mcpConfigPath);
     assert.equal(args[args.indexOf('--permission-mode') + 1], 'acceptEdits');
     for (const banned of ['--bare', '--dangerously-skip-permissions', 'Bash'])
@@ -194,7 +194,7 @@ describe('AI CLI 부르기', () => {
   });
 
   test('스킬이 있을 때만 Skill 도구를 준다', async () => {
-    const workspace = await open('cairn-write');
+    const workspace = await open('moida-write');
     const args = [...cli.args(workspace)];
     assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write,Edit,Skill');
     assert.ok(args.includes('Skill'));
@@ -206,7 +206,7 @@ describe('AI CLI 부르기', () => {
     const env = cli.env(workspace, {
       PATH: '/bin',
       HOME: '/Users/me',
-      CAIRN_RUNNER_TOKEN: 'device-token',
+      MOIDA_RUNNER_TOKEN: 'device-token',
       ANTHROPIC_API_KEY: 'api-key',
       CLAUDE_CONFIG_DIR: '/Users/me/.claude',
     });
@@ -214,7 +214,7 @@ describe('AI CLI 부르기', () => {
     assert.equal(env.HOME, workspace.homeDir);
     assert.equal(env.CLAUDE_CONFIG_DIR, workspace.configDir);
     assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, 'oauth-token');
-    assert.equal(env.CAIRN_RUNNER_TOKEN, undefined);
+    assert.equal(env.MOIDA_RUNNER_TOKEN, undefined);
     assert.equal(env.ANTHROPIC_API_KEY, undefined);
     await workspace.remove();
   });
@@ -262,9 +262,9 @@ describe('지시문', () => {
   });
 
   test('스킬은 넣어 둔 때만 말한다', () => {
-    const skilled = job({ skill: 'cairn-write' });
-    assert.ok(skilled.prompt(REPO_PROMPTS, true).includes('cairn-write'));
-    assert.equal(skilled.prompt(REPO_PROMPTS, false).includes('cairn-write'), false);
+    const skilled = job({ skill: 'moida-write' });
+    assert.ok(skilled.prompt(REPO_PROMPTS, true).includes('moida-write'));
+    assert.equal(skilled.prompt(REPO_PROMPTS, false).includes('moida-write'), false);
   });
 
   test('목표 사슬, 내 팀과 위임하는 법, 하위 작업의 결과를 담는다', () => {
@@ -661,11 +661,11 @@ describe('코드 러너 칸의 코드 작업', () => {
   const self = AgentUser.parse('self') as AgentUser;
 
   test('칸의 자리 안에서 셸과 찾기를 묻지 않고 허락한다. 작업 폴더는 저장소 사본, 홈 · 임시는 그 자리', async () => {
-    const base = mkdtempSync(join(tmpdir(), 'cairn-room-'));
+    const base = mkdtempSync(join(tmpdir(), 'moida-room-'));
     const room = await SandboxRoom.open(base, TASK, self);
     mkdirSync(room.cleanDir);
     await room.handOver();
-    const cli = new ClaudeCli('claude', 'oauth-token', 'http://cairn-server:4000/mcp', skillsDir);
+    const cli = new ClaudeCli('claude', 'oauth-token', 'http://moida-server:4000/mcp', skillsDir);
     const workspace = await cli.open(codeJob(), room);
     await workspace.handOver();
     const args = [...cli.args(workspace)];
@@ -676,12 +676,12 @@ describe('코드 러너 칸의 코드 작업', () => {
     const env = cli.env(workspace, {
       PATH: '/bin',
       HTTPS_PROXY: 'http://egress:3128',
-      CAIRN_RUNNER_TOKEN: 'x',
+      MOIDA_RUNNER_TOKEN: 'x',
     });
     assert.equal(env.HOME, room.homeDir);
     assert.equal(env.TMPDIR, room.tmpDir);
     assert.equal(env.HTTPS_PROXY, 'http://egress:3128', '바깥은 나가는 프록시로');
-    assert.equal(env.CAIRN_RUNNER_TOKEN, undefined);
+    assert.equal(env.MOIDA_RUNNER_TOKEN, undefined);
     await workspace.remove();
     assert.ok(existsSync(workspace.mcpConfigPath), '칸의 자리는 SandboxRoom이 지운다');
     await room.close();
@@ -689,7 +689,7 @@ describe('코드 러너 칸의 코드 작업', () => {
   });
 
   test('칸의 자리 밖이면 코드 작업이어도 셸을 열지 않는다', async () => {
-    const cli = new ClaudeCli('claude', 'oauth-token', 'http://cairn-server:4000/mcp', skillsDir);
+    const cli = new ClaudeCli('claude', 'oauth-token', 'http://moida-server:4000/mcp', skillsDir);
     const workspace = await cli.open(codeJob());
     const args = cli.args(workspace).join(' ');
     assert.equal(args.includes('Bash'), false);
@@ -705,18 +705,18 @@ describe('서버가 실어 보낸 스킬', () => {
         instruction: '글을 써 주세요',
         agent: { name: '글쓰기', role: '', tool: 'claude' },
         run_token: 'run-token',
-        skill: 'cairn-write',
+        skill: 'moida-write',
         skill_package: pkg,
       }),
     );
   const pkg = {
-    name: 'cairn-write',
+    name: 'moida-write',
     source: 'console',
     revision: 3,
     hash: 'a'.repeat(64),
     files: {
       'SKILL.md':
-        '---\nname: cairn-write\ncairn-where: runner\n---\n콘솔 판. {{SKILL_DIR}}/references/style.md를 읽는다',
+        '---\nname: moida-write\nmoida-where: runner\n---\n콘솔 판. {{SKILL_DIR}}/references/style.md를 읽는다',
       'references/style.md': '콘솔 문체',
     },
   };
@@ -726,7 +726,7 @@ describe('서버가 실어 보낸 스킬', () => {
     assert.equal(job.skillPackage?.revision, 3);
     const cli = new ClaudeCli('claude', 'oauth-token', 'http://x/mcp', skillsDir);
     const workspace = await cli.open(job);
-    const to = join(workspace.configDir, 'skills', 'cairn-write');
+    const to = join(workspace.configDir, 'skills', 'moida-write');
     assert.equal(workspace.skillReady, true);
     assert.equal(
       readFileSync(join(to, 'SKILL.md'), 'utf8').includes(`${to}/references/style.md`),
@@ -752,7 +752,7 @@ describe('서버가 실어 보낸 스킬', () => {
     const workspace = await new ClaudeCli('claude', 'oauth-token', 'http://x/mcp', skillsDir).open(
       old,
     );
-    assert.equal(workspace.skillReady, true, '옛 서버: 디스크의 cairn-write');
+    assert.equal(workspace.skillReady, true, '옛 서버: 디스크의 moida-write');
     await workspace.remove();
   });
 });

@@ -9,7 +9,7 @@ import { SkillFiles } from './skill-files';
 
 const files = (prompts: string) =>
   SkillFiles.trusted({
-    'SKILL.md': '---\nname: cairn-runner\n---\n',
+    'SKILL.md': '---\nname: moida-runner\n---\n',
     'references/prompts.md': prompts,
   });
 const repo = files(
@@ -59,9 +59,9 @@ describe('PromptTemplates', () => {
     );
   });
 
-  test('저장소 판(skills/cairn-runner)은 읽히고, 서버가 채우는 틀이 있다', () => {
+  test('저장소 판(skills/moida-runner)은 읽히고, 서버가 채우는 틀이 있다', () => {
     const skill = RepoSkillGateway.fromEnv().get(PromptTemplates.SKILL);
-    assert.ok(skill, '저장소에 cairn-runner가 없다');
+    assert.ok(skill, '저장소에 moida-runner가 없다');
     const t = PromptTemplates.of(skill);
     // 서버가 fill로 채우는 틀이 모두 있다 (틀을 지울 때 이웃 틀까지 지우지 않게, 2026-11-21)
     for (const name of [

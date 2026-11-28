@@ -60,7 +60,7 @@ interface ArchivedPin extends Pick<NodeLayoutRow, 'node_id' | 'x' | 'y'> {
 }
 
 // vault의 보관 파일 (docs/보관형식.md): 카테고리, wiki, 세션, 세션 원문, 선. 현재 판만 파일이 되고 지난 판은 git 이력으로 본다.
-// 노트가 아직 없는 세션도 파일이 된다 (`cairn_note: false`, 본문 없음). 원문은 추가만 하는 표라 경로를 세션 id로 둬서 바뀌지 않는다.
+// 노트가 아직 없는 세션도 파일이 된다 (`moida_note: false`, 본문 없음). 원문은 추가만 하는 표라 경로를 세션 id로 둬서 바뀌지 않는다.
 // 검색 조각·임베딩·스냅샷은 다시 계산되는 값이라 뺀다. 첨부(assets/)는 파일 저장소가 생긴 뒤에 더한다.
 // 세션의 `device`(기기 이름)는 account 모듈의 것이라 넣지 않는다 (앞부분의 "있으면" 칸).
 @Injectable()
@@ -101,7 +101,7 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
     return ArchiveFile.yamlList(
       'vault/categories.yml',
       rows.map((r) => ({
-        cairn_id: r.node_id,
+        moida_id: r.node_id,
         name: r.name,
         slug: r.slug,
         color: r.color,
@@ -126,14 +126,14 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
       ArchiveFile.markdown(
         `vault/wikis/${r.slug}.md`,
         {
-          cairn_format: ArchiveQuery.FORMAT,
-          cairn_type: 'wiki',
-          cairn_id: r.node_id,
+          moida_format: ArchiveQuery.FORMAT,
+          moida_type: 'wiki',
+          moida_id: r.node_id,
           title: r.title,
           visibility: r.visibility,
-          ...(r.category_id === null ? {} : { cairn_category: r.category_id }),
-          cairn_origin: r.origin,
-          cairn_pinned: r.pinned_sections,
+          ...(r.category_id === null ? {} : { moida_category: r.category_id }),
+          moida_origin: r.origin,
+          moida_pinned: r.pinned_sections,
         },
         r.body_md,
         ArchiveFile.keptIn(r.meta),
@@ -164,19 +164,19 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
       return ArchiveFile.markdown(
         `vault/sessions/${name}.md`,
         {
-          cairn_format: ArchiveQuery.FORMAT,
-          cairn_type: 'session',
-          cairn_id: r.node_id,
+          moida_format: ArchiveQuery.FORMAT,
+          moida_type: 'session',
+          moida_id: r.node_id,
           title: r.head_title,
           visibility: r.visibility,
           tool: r.tool,
           started,
-          ...(r.wiki_id === null ? {} : { cairn_wiki: r.wiki_id }),
+          ...(r.wiki_id === null ? {} : { moida_wiki: r.wiki_id }),
           ...(r.project === null ? {} : { project: r.project }),
           ...(tags.length === 0 ? {} : { tags }),
-          cairn_pinned: r.pinned_sections,
-          ...(noted ? {} : { cairn_note: false }),
-          ...(r.noted_seq > 0 ? { cairn_noted_seq: r.noted_seq } : {}),
+          moida_pinned: r.pinned_sections,
+          ...(noted ? {} : { moida_note: false }),
+          ...(r.noted_seq > 0 ? { moida_noted_seq: r.noted_seq } : {}),
         },
         r.body_md ?? '',
         ArchiveFile.keptIn(r.meta),
@@ -197,10 +197,10 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
       ArchiveFile.markdown(
         `${VaultArchiveQuery.TRANSCRIPTS}/${r.session_id}/${r.seq}.md`,
         {
-          cairn_format: ArchiveQuery.FORMAT,
-          cairn_type: 'transcript',
-          cairn_id: r.id,
-          cairn_session: r.session_id,
+          moida_format: ArchiveQuery.FORMAT,
+          moida_type: 'transcript',
+          moida_id: r.id,
+          moida_session: r.session_id,
           seq: r.seq,
           created: r.created_at,
         },
@@ -229,7 +229,7 @@ export class VaultArchiveQuery extends BaseQuery implements OnModuleInit {
       ORDER BY v.name, l.node_id`;
     const graph = {
       edges: edges.map((e) => ({
-        cairn_id: e.id,
+        moida_id: e.id,
         src: e.src,
         dst: e.dst,
         kind: e.kind,

@@ -1,6 +1,6 @@
 import type { AiTool } from './ai-tool';
-import type { CairnServer } from './cairn-server';
 import type { JobWorkspace } from './job-workspace';
+import type { MoidaServer } from './moida-server';
 import type { RunLog } from './redactor';
 
 /**
@@ -13,7 +13,7 @@ export class CredentialWriteBack {
   private written: string | null = null;
 
   constructor(
-    private readonly server: CairnServer,
+    private readonly server: MoidaServer,
     private readonly taskId: string,
     private readonly log: RunLog,
     /** 서버에 있는 로그인의 판. 되돌려 쓸 때마다 새 판이 된다 */

@@ -149,7 +149,7 @@ export class ProtectedResourceView {
       resource: this.at.resource,
       authorization_servers: [this.at.issuer],
       bearer_methods_supported: ['header'],
-      resource_name: 'Cairn',
+      resource_name: 'Moida',
     };
   }
 }

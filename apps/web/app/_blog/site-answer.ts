@@ -1,8 +1,8 @@
-// 앱 화면 주소(/<앱>/…)에서 앱 코드를 거치지 않고 Cairn이 직접 내는 답 (스토어 1-6): 없는 페이지 · 그리지 못한 화면.
+// 앱 화면 주소(/<앱>/…)에서 앱 코드를 거치지 않고 Moida이 직접 내는 답 (스토어 1-6): 없는 페이지 · 그리지 못한 화면.
 // route handler는 React 화면을 그리지 않으므로 not-found.tsx와 같은 모양을 HTML 글로 둔다.
 // 없는 앱 · 비공개 앱 · 틀린 토큰 · 웹의 다른 없는 주소가 모두 이 한 답이라 앱이 있다는 사실이 드러나지 않는다 (원칙 5).
 
-/** Cairn이 그리는 화면의 머리글 (next.config의 화면 머리글과 같다: 다른 사이트가 겹쳐 놓지 못하게) */
+/** Moida이 그리는 화면의 머리글 (next.config의 화면 머리글과 같다: 다른 사이트가 겹쳐 놓지 못하게) */
 const SCREEN_HEADERS: Readonly<Record<string, string>> = {
   'Content-Type': 'text/html; charset=utf-8',
   'Content-Security-Policy':

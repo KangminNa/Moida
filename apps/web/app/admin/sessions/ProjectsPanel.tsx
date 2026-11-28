@@ -9,7 +9,7 @@ import type { ProjectRules } from '../../_vault/types';
 const TOPICS = ['vault.session.*'];
 
 // 프로젝트별 원문 모으기 (2차 4단계): 수집 훅 · 확장이 올린 원문을 프로젝트마다 받을지. 끄면 다음 원문부터 쌓지 않는다.
-// 저장소의 .cairn.json에 "collect": false가 있으면 내 컴퓨터에서부터 올리지 않는다 (이 화면과 따로)
+// 저장소의 .moida.json에 "collect": false가 있으면 내 컴퓨터에서부터 올리지 않는다 (이 화면과 따로)
 export function ProjectsPanel() {
   const rules = useLiveValue(
     'project-rules',

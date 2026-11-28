@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { BaseGateway } from '../../platform';
 import { SkillFiles } from './skill-files';
 
-// 저장소 skills/의 러너 전용 스킬 (SKILL.md 앞부분에 cairn-where: runner). 서버 이미지에 함께 든 판이라
+// 저장소 skills/의 러너 전용 스킬 (SKILL.md 앞부분에 moida-where: runner). 서버 이미지에 함께 든 판이라
 // 프로세스가 도는 동안 바뀌지 않는다: 처음 한 번 읽어 둔다. 러너가 깔 수 있는 SKILL.md와 references/*.md만 읽는다.
 // 폴더는 저장소의 skills/ (앱용 zip의 SkillQuery와 같은 곳, 서버는 apps/server에서 돈다).
 export class RepoSkillGateway extends BaseGateway {

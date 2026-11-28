@@ -19,29 +19,29 @@ import {
 export default class CodeGithubPlugin extends BasePlugin {
   static readonly API_URL = 'https://api.github.com';
 
-  register(cairn: PluginContext): void {
-    const settings = cairn.settings();
-    cairn.addOperation(new ListRepos());
-    cairn.addOperation(new CreateRepo());
-    cairn.addOperation(new UpdateRepo());
-    cairn.addOperation(new ArchiveRepo());
-    cairn.addOperation(new RequestCode());
-    cairn.addOperation(new ListPulls());
-    cairn.addOperation(new GetPull());
-    cairn.addOperation(
+  register(moida: PluginContext): void {
+    const settings = moida.settings();
+    moida.addOperation(new ListRepos());
+    moida.addOperation(new CreateRepo());
+    moida.addOperation(new UpdateRepo());
+    moida.addOperation(new ArchiveRepo());
+    moida.addOperation(new RequestCode());
+    moida.addOperation(new ListPulls());
+    moida.addOperation(new GetPull());
+    moida.addOperation(
       new Credential(
         settings.get('token') ?? '',
         settings.get('apiUrl') || CodeGithubPlugin.API_URL,
       ),
     );
-    cairn.addOperation(new PullOpened());
-    cairn.onEvent('task.approval.granted', new ConfirmMerge());
+    moida.addOperation(new PullOpened());
+    moida.onEvent('task.approval.granted', new ConfirmMerge());
     // 코드 작업 열기 (2026-11-15 C): 에이전트의 요청 → 결재 code.task.start → 승인되면 코드 작업을 연다
-    cairn.addOperation(new ListAgentRepos());
-    cairn.addOperation(new AskTask());
-    cairn.addOperation(new GetAsk());
-    cairn.onEvent('task.approval.granted', new StartAsked());
+    moida.addOperation(new ListAgentRepos());
+    moida.addOperation(new AskTask());
+    moida.addOperation(new GetAsk());
+    moida.onEvent('task.approval.granted', new StartAsked());
     for (const closed of ['rejected', 'revision_requested', 'cancelled'])
-      cairn.onEvent(`task.approval.${closed}`, new DropAsked());
+      moida.onEvent(`task.approval.${closed}`, new DropAsked());
   }
 }

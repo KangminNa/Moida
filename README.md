@@ -26,7 +26,7 @@
 
 Claude Code나 Codex로 일하면 세션이 컴퓨터마다 흩어지고, 같은 문제를 또 처음부터 풉니다. Moida는 그 세션을 내 서버로 모아 위키와 그래프로 정리하고, 다음 작업이 그것을 찾아 쓰게 합니다. 이름은 '모이다'에서 왔습니다. 흩어진 기록과 일, 사이트와 사람이 한곳에 모입니다.
 
-> 이름을 Cairn에서 Moida로 바꾸는 중입니다. 명령(`pnpm cairn`) · 선언서(`cairn.json`) · 환경 변수(`CAIRN_*`) 같은 식별자는 아직 예전 이름 그대로입니다.
+> 이름을 Moida에서 Moida로 바꾸는 중입니다. 명령(`pnpm moida`) · 선언서(`moida.json`) · 환경 변수(`MOIDA_*`) 같은 식별자는 아직 예전 이름 그대로입니다.
 
 | | |
 |---|---|
@@ -45,7 +45,7 @@ Claude Code나 Codex로 일하면 세션이 컴퓨터마다 흩어지고, 같은
 **1. 서버 띄우기**
 
 ```bash
-git clone https://github.com/KangminNa/cairn.git && cd cairn
+git clone https://github.com/KangminNa/moida.git && cd moida
 cp .env.example .env
 ```
 
@@ -53,8 +53,8 @@ cp .env.example .env
 # .env
 COMPOSE_FILE=docker-compose.prod.yml
 DB_PASSWORD=<긴 임의 값>
-CAIRN_SECRET_KEY=<openssl rand -base64 32 결과>
-CAIRN_WEB_URL=https://cairn.example.com
+MOIDA_SECRET_KEY=<openssl rand -base64 32 결과>
+MOIDA_WEB_URL=https://moida.example.com
 ```
 
 ```bash
@@ -67,20 +67,20 @@ Moida는 컨테이너 여러 개(db · migrate · server · worker · web · run
 **2. https 프록시 연결** (Caddy 예시. 서버 · 웹 포트는 127.0.0.1에서만 열립니다)
 
 ```caddyfile
-cairn.example.com {
+moida.example.com {
 	@server path /api/* /mcp /oauth/* /.well-known/*
 	reverse_proxy @server 127.0.0.1:4000
 	reverse_proxy 127.0.0.1:3000
 }
 ```
 
-**3. 설치 마법사**: `https://cairn.example.com/install`에서 설치 코드 → 관리자 계정 → 사이트 정보 → 플러그인 순서로 진행합니다.
+**3. 설치 마법사**: `https://moida.example.com/install`에서 설치 코드 → 관리자 계정 → 사이트 정보 → 플러그인 순서로 진행합니다.
 
 **4. 작업하는 컴퓨터 연결** (이 저장소를 받아 `pnpm install` 한 뒤)
 
 ```bash
-pnpm cairn connect https://cairn.example.com               # Claude Code
-pnpm cairn connect https://cairn.example.com --tool codex  # Codex
+pnpm moida connect https://moida.example.com               # Claude Code
+pnpm moida connect https://moida.example.com --tool codex  # Codex
 ```
 
 **5. 러너 로그인**: 콘솔 › 설정 › AI 계정에서 "브라우저로 로그인"을 눌러 Claude 또는 ChatGPT 구독으로 로그인하면 서버의 러너가 일을 시작합니다.
@@ -92,7 +92,7 @@ pnpm cairn connect https://cairn.example.com --tool codex  # Codex
 
 ```bash
 pnpm install
-cp .env.example .env     # CAIRN_SECRET_KEY= 뒤에 pnpm secret:new 결과
+cp .env.example .env     # MOIDA_SECRET_KEY= 뒤에 pnpm secret:new 결과
 pnpm dev                 # db → migrate → server(:4000) · worker → web(:3000)
 pnpm install-code        # http://localhost:3000/install 에 넣을 코드
 ```
@@ -115,7 +115,7 @@ Moida의 에이전트 구조는 세 가지 결정에서 나왔습니다.
 flowchart LR
   subgraph laptop [내 컴퓨터]
     CC[Claude Code / Codex]
-    CLI["cairn connect<br/>MCP 등록 · 스킬 · 훅"]
+    CLI["moida connect<br/>MCP 등록 · 스킬 · 훅"]
   end
   subgraph server [내 서버]
     MCP["/mcp<br/>코어 도구 50여 개"]
@@ -131,7 +131,7 @@ flowchart LR
   CON -- "승인 · 반려" --> CORE
 ```
 
-### 내 컴퓨터: `cairn connect`
+### 내 컴퓨터: `moida connect`
 
 `packages/cli`의 연결 명령 하나가 AI 도구를 Moida에 붙입니다.
 
@@ -139,10 +139,10 @@ flowchart LR
 |---|---|---|
 | MCP 서버 등록 | `claude mcp add --transport http` | `codex mcp add` |
 | 로그인 | 브라우저에서 OAuth 2.1, 기기마다 권한을 골라 승인 | 같음 |
-| 스킬 | `cairn-save` · `cairn-recall` · `cairn-team` → `~/.claude/skills` | 같은 스킬 → `~/.agents/skills` |
-| 훅 | `SessionEnd`: 세션 원문 저장 (못 올리면 `~/.cairn/outbox`에 두었다 다음에)<br>`UserPromptSubmit`: 서버 팀의 새 소식을 대화에 덧붙이고 상태 줄에 표시 | 없음 |
+| 스킬 | `moida-save` · `moida-recall` · `moida-team` → `~/.claude/skills` | 같은 스킬 → `~/.agents/skills` |
+| 훅 | `SessionEnd`: 세션 원문 저장 (못 올리면 `~/.moida/outbox`에 두었다 다음에)<br>`UserPromptSubmit`: 서버 팀의 새 소식을 대화에 덧붙이고 상태 줄에 표시 | 없음 |
 
-그다음부터는 평소처럼 쓰면 됩니다. "이 세션 저장해"는 `cairn-save` 스킬이 노트를 써서 `save_session`으로 보내고, "전에 어떻게 했지?"는 `cairn-recall`이 `search_sessions` · `search_wikis`로 찾습니다.
+그다음부터는 평소처럼 쓰면 됩니다. "이 세션 저장해"는 `moida-save` 스킬이 노트를 써서 `save_session`으로 보내고, "전에 어떻게 했지?"는 `moida-recall`이 `search_sessions` · `search_wikis`로 찾습니다.
 
 ### 서버: 러너가 일을 처리하는 순서
 
@@ -168,7 +168,7 @@ sequenceDiagram
 
 러너(`apps/runner`)는 CLI를 띄울 때 이렇게 가둡니다.
 
-- **빈 설정, 빈 홈**: 사용자의 설정과 다른 MCP 연결을 읽지 않습니다. `--strict-mcp-config`로 넘긴 MCP만 붙습니다 (cairn, 브라우저 일의 Playwright, 관리자가 허락한 커넥터).
+- **빈 설정, 빈 홈**: 사용자의 설정과 다른 MCP 연결을 읽지 않습니다. `--strict-mcp-config`로 넘긴 MCP만 붙습니다 (moida, 브라우저 일의 Playwright, 관리자가 허락한 커넥터).
 - **도구 목록 고정**: 기본은 파일 읽기 · 쓰기와 MCP뿐이고 셸이 없습니다. 쓰기는 작업 폴더 안에서만(`acceptEdits`) 됩니다. 셸은 코드 작업의 칸(Docker 컨테이너, 바깥으로는 `egress` 허용 목록뿐)에서만 엽니다.
 - **작업 토큰**: 일마다 새로 만들고, 그 일의 종류가 허락한 도구만 보입니다(`task-kinds.json`). 일이 끝나면 쓸 수 없습니다. 로그인 토큰은 파일이 아니라 환경 변수로만 넘깁니다.
 - **세션 이어 가기**: 같은 일의 다음 실행은 CLI 세션을 재개(`--resume`)하고, 인수인계 메모를 남겨 다음 일꾼이 이어받습니다.
@@ -187,8 +187,8 @@ sequenceDiagram
 
 AI에게 가는 글은 코드에 흩어 두지 않습니다.
 
-- `skills/`: 일의 종류마다 하는 법 (`cairn-work` 일반, `cairn-code` 코드, `cairn-make` 결과물과 앱, `cairn-browse` 브라우저, `cairn-write` 글 …). 러너는 서버가 일과 함께 준 스킬 버전을 씁니다. 콘솔에서 고친 버전이 저장소 판 위에 쌓이고, 버전마다 첫 판정 통과율을 봅니다.
-- `skills/cairn-runner/references/prompts.md`: 지시문 틀. 러너와 서버는 값만 채웁니다.
+- `skills/`: 일의 종류마다 하는 법 (`moida-work` 일반, `moida-code` 코드, `moida-make` 결과물과 앱, `moida-browse` 브라우저, `moida-write` 글 …). 러너는 서버가 일과 함께 준 스킬 버전을 씁니다. 콘솔에서 고친 버전이 저장소 판 위에 쌓이고, 버전마다 첫 판정 통과율을 봅니다.
+- `skills/moida-runner/references/prompts.md`: 지시문 틀. 러너와 서버는 값만 채웁니다.
 - `apps/server/src/modules/*/<모듈>.tools.ko.json`: MCP 도구 설명. 콘솔에서 고칠 수 있습니다.
 
 ### 모델이 지키는 규칙과 런타임이 막는 규칙
@@ -219,7 +219,7 @@ apps/
   runner/      일을 빌려 Claude Code · Codex CLI로 처리. MCP로만 서버와 이야기하고 DB에 닿지 않음
   egress/      코드 러너 칸이 나가는 프록시 (허용 목록의 호스트로만 HTTPS)
   extension/   브라우저 확장 (Chrome MV3). 웹 AI 대화 모으기, 맡기기
-packages/cli/  cairn connect · status · app deploy
+packages/cli/  moida connect · status · app deploy
 plugins/       코어를 고치지 않는 기능 (지도 · 텔레그램 · 서버 브라우저 · GitHub 연동 …)
 skills/        AI에게 가는 하는 법과 지시문 틀
 db/            Postgres 17 이미지(pgvector · pg_bigm)와 SQL 마이그레이션
@@ -283,7 +283,7 @@ flowchart LR
 
 ### 확장: 플러그인
 
-코어가 몰라도 되는 기능은 `plugins/<이름>/`에 둡니다. 목록 파일(`cairn-plugin.json`)에 적은 확장 지점만 쓸 수 있고, 서버 코드는 `apps/server/src/plugin-api.ts`만 가져옵니다. 기능 패키지는 자기 스키마, REST 경로(`/api/p/<이름>/…`), MCP 도구, 콘솔 메뉴를 가질 수 있습니다. 예: 서버 브라우저(`browser-tabs`), 코드 작업(`code-github`), 텔레그램(`messenger-telegram`), 지도와 장소 찾기(`map`).
+코어가 몰라도 되는 기능은 `plugins/<이름>/`에 둡니다. 목록 파일(`moida-plugin.json`)에 적은 확장 지점만 쓸 수 있고, 서버 코드는 `apps/server/src/plugin-api.ts`만 가져옵니다. 기능 패키지는 자기 스키마, REST 경로(`/api/p/<이름>/…`), MCP 도구, 콘솔 메뉴를 가질 수 있습니다. 예: 서버 브라우저(`browser-tabs`), 코드 작업(`code-github`), 텔레그램(`messenger-telegram`), 지도와 장소 찾기(`map`).
 
 ---
 

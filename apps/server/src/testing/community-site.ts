@@ -71,7 +71,7 @@ export class CommunitySite {
   }
 
   /**
-   * 회원 · 표를 선언한 공개 페이지 앱 하나 (앱 플랫폼, 스토어 12장): 선언서(cairn.json)가 든 정적 앱 코드를 올리고
+   * 회원 · 표를 선언한 공개 페이지 앱 하나 (앱 플랫폼, 스토어 12장): 선언서(moida.json)가 든 정적 앱 코드를 올리고
    * 도메인을 연결해 공개한 뒤, 일꾼을 돌려 선언한 표를 맞춘다. 파일은 index.html 하나와 선언서
    */
   static async openPage(
@@ -108,7 +108,7 @@ export class CommunitySite {
     };
     const zip = new ZipFile();
     zip.add('index.html', '<!doctype html><html><head></head><body>앱</body></html>');
-    zip.add('cairn.json', JSON.stringify({ cairn: 1, render: 'static', ...manifest }));
+    zip.add('moida.json', JSON.stringify({ moida: 1, render: 'static', ...manifest }));
     const before = await appOf();
     const res = await fetch(
       `${this.api.baseUrl}/api/apps/${this.appId}/code/versions?version=${before.version}&note=test`,
@@ -175,7 +175,7 @@ export class CommunitySite {
     const set = await expect(
       api.request('PATCH', `/api/apps/${app.id}`, owner, { version: app.version, domain: host }),
     );
-    const { token } = await expect(api.viaHost('/.well-known/cairn-domain', host));
+    const { token } = await expect(api.viaHost('/.well-known/moida-domain', host));
     const checked = await expect(
       api.request('POST', `/api/apps/${app.id}/domain/check`, owner, {
         version: set.version,
@@ -215,7 +215,7 @@ export class CommunitySite {
   /** 회원의 쓰기: Origin과 그 회원의 CSRF 값을 붙인다 */
   async write(as: TestUser, method: string, path: string, body?: object): Promise<ApiResult> {
     const csrf = String((await this.at('/api/community/me', { as })).json().csrf);
-    return this.at(path, { method, as, body, headers: { 'x-cairn-csrf': csrf } });
+    return this.at(path, { method, as, body, headers: { 'x-moida-csrf': csrf } });
   }
 
   /**

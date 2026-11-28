@@ -1,11 +1,11 @@
 import { Forbidden, type SecretBox } from '../../platform';
 
-// 결과물 올리기 표. 러너가 MCP(begin_upload)로 받아 PUT api/outputs/upload의 머리글(X-Cairn-Upload)로 낸다.
+// 결과물 올리기 표. 러너가 MCP(begin_upload)로 받아 PUT api/outputs/upload의 머리글(X-Moida-Upload)로 낸다.
 // AI 토큰은 /mcp에서만 요청자가 되므로(ActorGuard) 파일 본문은 이 표로 받는다: S3의 미리 서명한 주소와 같은 방식.
 // 서버 키로 봉인하고(용도 고정, 10분), 그 작업 · 실행 · 이름 · 크기 · sha256에 묶인다: 다른 파일이나 큰 본문에는 쓸 수 없다.
 // 주소가 아니라 머리글로 낸다: 프록시 · 접속 기록에 남지 않게.
 export class UploadTicket {
-  static readonly HEADER = 'x-cairn-upload';
+  static readonly HEADER = 'x-moida-upload';
   static readonly PATH = '/api/outputs/upload';
   private static readonly PURPOSE = 'output-upload';
   private static readonly TTL_SECONDS = 600;

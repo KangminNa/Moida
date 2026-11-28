@@ -172,7 +172,9 @@ export class DeviceActor extends Actor {
  * 토큰은 서버 키로 싸서 저장하지 않는다. 작업이 살아 있는지는 호출마다 mcp 모듈이 task에 묻는다.
  */
 export class AgentActor extends Actor {
-  private static readonly PREFIX = 'cairn_run_';
+  private static readonly PREFIX = 'moida_run_';
+  /** 옛 이름(2026-11-28 cairn → moida 전)으로 나간 작업 토큰. 길이가 같아 같은 자리에서 자른다 */
+  private static readonly OLD_PREFIX = 'cairn_run_';
   /** 다른 용도로 싼 값이 작업 토큰으로 풀리지 않게 안쪽에 붙이는 표시 */
   private static readonly PURPOSE = 'agent-run';
   readonly kind = 'agent';
@@ -191,7 +193,7 @@ export class AgentActor extends Actor {
   }
 
   static isToken(bearer: string): boolean {
-    return bearer.startsWith(AgentActor.PREFIX);
+    return bearer.startsWith(AgentActor.PREFIX) || bearer.startsWith(AgentActor.OLD_PREFIX);
   }
 
   /** 작업 토큰을 푼다. 이 서버 키로 싼 작업 토큰이고 만료 전일 때만 */

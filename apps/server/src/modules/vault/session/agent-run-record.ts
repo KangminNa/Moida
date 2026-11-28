@@ -22,7 +22,7 @@ export class AgentRunRecord {
   /** run_memos가 돌려주는 같은 세션 키의 최근 메모 수 */
   static readonly LINEAGE_MEMOS = 5;
   /** 작업 세션 노트의 태그 */
-  private static readonly TAG = 'cairn-agent';
+  private static readonly TAG = 'moida-agent';
   private static readonly UNTITLED = '에이전트 작업';
 
   private constructor(

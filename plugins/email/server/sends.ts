@@ -31,7 +31,7 @@ export class PostPublished extends Command<PublishedInput> {
   readonly name = 'postPublished';
   readonly allow = Operation.SYSTEM;
 
-  /** site: 이 Cairn의 바깥 주소 (앱 도메인이 없는 앱의 글 링크 앞부분). 없으면 소식을 만들지 않는다 */
+  /** site: 이 Moida의 바깥 주소 (앱 도메인이 없는 앱의 글 링크 앞부분). 없으면 소식을 만들지 않는다 */
   constructor(private readonly site: string | null) {
     super();
   }

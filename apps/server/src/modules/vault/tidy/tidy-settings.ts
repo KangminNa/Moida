@@ -27,7 +27,7 @@ export type TidySessionRow = Pick<
 export class TidySettings extends TableEntity<LoadedTidySettings, NewNode<TidySettingNew>> {
   /** 하루 한 번 몰아서 요청하는 마감 작업 (TidyDailyJob). 설정을 저장하면 깨운다 */
   static readonly DAILY_JOB = 'vault.tidy-daily';
-  /** task 모듈이 받는 일 요청. 러너는 kind로 cairn-tidy 스킬을 고른다 */
+  /** task 모듈이 받는 일 요청. 러너는 kind로 moida-tidy 스킬을 고른다 */
   private static readonly REQUESTED = 'task.task.requested';
   private static readonly KIND = 'tidy_session';
   /** 작업 제목의 상한 (task의 입력 검사와 같다) */

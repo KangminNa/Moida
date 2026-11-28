@@ -6,7 +6,7 @@ import { hostOf } from './request-host';
 import type { AppScreen, AppScreenPage, AppScreenRedirect, AppScreenStatic } from './types';
 
 // 앱 코드가 부르는 화면 데이터 (2026-11-25, docs/스토어.md 14장 A3): GET <앱 주소>/_/data?path=<주소>&cursor=<다음 쪽>.
-// 그 주소의 데이터 약속(cairn: 1: 앱 · 메뉴 · 글 목록 · 글 · 호)을 화면의 데이터 블록과 같은 모양(글 본문은 html)으로 준다. 앱 JS가 템플릿 없이 글 · 메뉴 · 호를 그린다 (cairn.data).
+// 그 주소의 데이터 약속(moida: 1: 앱 · 메뉴 · 글 목록 · 글 · 호)을 화면의 데이터 블록과 같은 모양(글 본문은 html)으로 준다. 앱 JS가 템플릿 없이 글 · 메뉴 · 호를 그린다 (moida.data).
 // 방문자 데이터만 있다 (초안은 미리 보기에도 없다): 쿠키를 넘기지 않고, 격리된 화면(출처 없는 문서)도 읽게 모든 출처에 연다.
 // 없는 앱 · 비공개 앱 · 틀린 토큰은 모두 같은 404다
 

@@ -179,16 +179,21 @@ describe('MapLookup', () => {
     );
   });
 
-  test('곳(IP)마다 1분에 30번까지', async () => {
+  test('곳(IP)마다 1분에 30번까지, 기억한 답은 세지 않는다', async () => {
     const lookup = new MapLookup(new MapSearchGateway('kakao', KEYS, bases), 'kakao', 1_000_000);
     const now = Date.now();
     for (let i = 0; i < MapLookup.PER_MINUTE; i++)
-      await lookup.answer('198.51.100.9', 'same', async () => 'x', now);
+      await lookup.answer('198.51.100.9', `minute:${i}`, async () => 'x', now);
     await assert.rejects(
-      lookup.answer('198.51.100.9', 'same', async () => 'x', now),
+      lookup.answer('198.51.100.9', 'minute:new', async () => 'x', now),
       /너무 많이/,
     );
-    assert.equal(await lookup.answer('198.51.100.10', 'same', async () => 'x', now), 'x');
+    assert.equal(
+      await lookup.answer('198.51.100.9', 'minute:0', async () => 'y', now),
+      'x',
+      '이미 찾은 주소는 한도를 다 써도 기억한 답',
+    );
+    assert.equal(await lookup.answer('198.51.100.10', 'minute:new', async () => 'x', now), 'x');
   });
 });
 

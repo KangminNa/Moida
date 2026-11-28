@@ -14,7 +14,7 @@ const sourceOf = (s: { source: string; revision: number | null }) =>
   s.source === 'console' ? `콘솔 버전 ${s.revision}` : '저장소 버전';
 const dateOf = (iso: string) => new Date(iso).toLocaleString('ko-KR');
 
-// 스킬: 러너가 일할 때 따르는 지침(cairn-write 등). 저장소 판 위에 콘솔 판을 쌓고, 쓸 판을 골라 되돌린다.
+// 스킬: 러너가 일할 때 따르는 지침(moida-write 등). 저장소 판 위에 콘솔 판을 쌓고, 쓸 판을 골라 되돌린다.
 // 저장하면 다음 작업부터 모든 러너가 그 판을 받는다 (서버가 일과 함께 실어 보낸다).
 export function SkillPanel() {
   const skills = useLiveValue(

@@ -5,15 +5,15 @@
 관리자 계정(account)과 표 · 쿠키 · 권한을 나눈다 (원칙 10: 회원은 관리자가 아니다). 3-1a: 회원 · 가입 · 로그인 · 세션. 3-1b: 글 · 글 버전 · 댓글 · 쓰기 규칙. 3-1c: 신고 · 임시 가림 · 관리자 결정 · 차단 · 비밀번호 초기화 · 알림.
 화면(3-2, 스토어 11.6)은 웹이 이 API로 그린다: 목록 · 글은 앱 코드의 템플릿에 웹이 `me` · `topics` · `topics/:id`를 앱 도메인으로 읽어 채우고, 가입 · 로그인 · 글쓰기 · 댓글 · 신고는 앱 도메인의 고정 화면 `/_/…`, 관리는 앱 관리의 커뮤니티 탭. 응답 모양은 웹이 view의 `toJSON` 반환 타입으로 쓴다 (`toJSON(): object`로 적지 않고 안쪽 view는 `.toJSON()`으로 펼친다)
 
-앱 플랫폼 (스토어 12장, 2026-11-22)부터 이 모듈은 "앱의 회원 쪽 전체"다: 회원은 커뮤니티 앱뿐 아니라 선언서(`cairn.json`)에 `members`를 적은 모든 앱이 받고(Lookups `member-app`), 앱이 선언한 표의 데이터(`data/`)도 여기 있다. 글 · 댓글 · 신고는 지금처럼 커뮤니티 앱만(`community-app`).
+앱 플랫폼 (스토어 12장, 2026-11-22)부터 이 모듈은 "앱의 회원 쪽 전체"다: 회원은 커뮤니티 앱뿐 아니라 선언서(`moida.json`)에 `members`를 적은 모든 앱이 받고(Lookups `member-app`), 앱이 선언한 표의 데이터(`data/`)도 여기 있다. 글 · 댓글 · 신고는 지금처럼 커뮤니티 앱만(`community-app`).
 
 - `data/`: 앱 데이터 (스토어 12.4). 앱마다 Postgres 스키마 `app_<앱 id 16진 32자>`에 선언한 표가 실제 표로 생긴다. 열린 표 · 칸 · 규칙의 목록은 `community.app_tables`(`AppTable`: 값 검사 `checked` · 조건 `filterOf` · 정렬 `assertSortable` · 한도).
-  맞추기: `blog.app_code.shown`(`AppTablesHandler`) → `AppDataService.apply`가 없는 스키마 · 표 · 칸을 더하고 정책(`cairn_read` · `cairn_insert` · `cairn_update` · `cairn_delete`)을 다시 건다 (`AppTableRepository.ensure`). 지우는 DDL은 없다: 선언에서 빠진 표는 닫기만 한다(`open = false`, 줄은 남는다).
-  회원 쪽 `api/community/data/:table`(`AppDataController`, 앱 도메인 · `MemberGuard`): 읽기 · 넣기 · 고치기 · 지우기. 쿼리는 트랜잭션 안에서 `cairn.member`(회원 id) · 5초 제한 · `SET LOCAL ROLE cairn_app`을 정한 뒤 돈다(`AppTableRepository.asMember`): 규칙(`anyone` · `member` · `owner` · `admin`)은 DB의 행 수준 보안이 거른다. 이 뒤에는 community의 다른 표를 읽지 못하므로 회원 확인은 그 앞에서 한다.
+  맞추기: `blog.app_code.shown`(`AppTablesHandler`) → `AppDataService.apply`가 없는 스키마 · 표 · 칸을 더하고 정책(`moida_read` · `moida_insert` · `moida_update` · `moida_delete`)을 다시 건다 (`AppTableRepository.ensure`). 지우는 DDL은 없다: 선언에서 빠진 표는 닫기만 한다(`open = false`, 줄은 남는다).
+  회원 쪽 `api/community/data/:table`(`AppDataController`, 앱 도메인 · `MemberGuard`): 읽기 · 넣기 · 고치기 · 지우기. 쿼리는 트랜잭션 안에서 `moida.member`(회원 id) · 5초 제한 · `SET LOCAL ROLE moida_app`을 정한 뒤 돈다(`AppTableRepository.asMember`): 규칙(`anyone` · `member` · `owner` · `admin`)은 DB의 행 수준 보안이 거른다. 이 뒤에는 community의 다른 표를 읽지 못하므로 회원 확인은 그 앞에서 한다.
   관리자 `api/community/admin/:appId/data`(표 목록 · 줄 읽기 · 넣기 · 지우기) · `…/export`(`tables.json` · `schema.sql` · `data.sql` · `members.json`의 zip). 역할을 바꾸지 않는다.
   남은 데이터 (2026-11-23, 나눔 2026-11-27): `AppDataQuery.heldMembers` · `heldRows`가 앱마다 회원 수 · 앱 데이터 줄 수를 세어 Lookups `app-members` · `app-rows`로 준다 (관리자만, 없는 앱은 빠짐). blog가 앱을 지우기 전에 묻는다: 회원이 있으면 지우지 않고, 줄은 관리자가 내보낸 뒤 함께 지우기(`withData`)를 골랐을 때만 지운다. 지운 앱은 `AppRemovedHandler`(`blog.app.changed`의 deleted)가 `AppDataService.dropApp`으로 앱 스키마(`DROP SCHEMA … CASCADE`)와 `app_tables` 줄을 지운다 (서버 자신만, 두 번 받아도 같다). 앱이 살아 있는 동안에는 지우는 DDL이 여전히 없다.
   일꾼의 넣기는 설정 바꾸기 제안 `app_data`(`AppDataService.SETTING` · `rehearseSetting` · `applySetting`, `community-settings.ts`가 등록, 승인 뒤 반영: 원칙 7). 넣기만 한다.
-- `account/`: 스토어 계정 (2026-11-26). `Account`(공간에 하나: 메일 · 아이디 · 비밀번호 해시 · 공통 약관 동의 · 정지 · 탈퇴) · 로그인(`AccountSession`, `cairn_member` 쿠키, 계정과 그 앱 도메인을 가리켜 앱에 참여하기 전에도 열림).
+- `account/`: 스토어 계정 (2026-11-26). `Account`(공간에 하나: 메일 · 아이디 · 비밀번호 해시 · 공통 약관 동의 · 정지 · 탈퇴) · 로그인(`AccountSession`, `moida_member` 쿠키, 계정과 그 앱 도메인을 가리켜 앱에 참여하기 전에도 열림).
   규칙: 메일 `EmailAddress`(platform, 소문자로, 공간에서 하나) · 아이디 `LoginId`(영문 소문자로 시작하는 4~20자, 운영자 · 서비스로 보이는 아이디 막기, 공간에서 하나) · 둘 다 바꾸지 않고 옮겨 온 옛 계정의 빈 칸만 한 번 채운다(`setLoginId` · `setEmail`) · 비밀번호 `MemberPassword`(아이디 · 메일의 @ 앞 · 닉네임과 같은 값 막기, `passwordNames`) · 정지(`suspended_until`, 무기한은 `Account.FOREVER`)면 로그인 403 · 세션이 요청자로 안 된다 · 탈퇴(`leave`)는 메일 · 아이디 · 해시 · 마지막 접근을 지우고 모든 로그인을 끝낸다.
   `AccountMailService`: 가입 코드(`sendJoinCode`, 공통 약관이 공개 전이면 409, 가입한 메일이면 코드 대신 안내 메일) · 가입(`join`, 코드 확인 → 계정 + 이 앱 참여(`Member.enter`) + 첫 세션을 한 트랜잭션에, 약관은 `TermsConsent`) · 비밀번호 다시 정하기(`sendResetCode` · `resetPassword`, 모든 로그인 끝냄) · 옛 계정의 메일 등록(`sendEmailCode` · `setEmail`). 코드 열쇠 · 시도 제한은 공간마다. `AccountService`: 로그인(메일이나 아이디) · 비밀번호 바꾸기 · 아이디 정하기 · 계정 탈퇴(계정 → 모든 회원 잠그고 `Member.leave` · `Account.leave`) · 로그아웃 · 마지막 접근 · 관리자의 정지 · 풀기. `AccountQuery`: 관리 목록. `AccountRepository`: `load` · `lock`의 첫 값은 공간 id, 세션 넣기 · 끝내기, 마지막 접근은 계정과 그 앱의 회원에 함께.
   소식 메일 수신 동의 (2026-11-27): 가입(`newsMail`, 선택) · 내 정보(`PUT account/news`)가 `Account.setNews`로 `news_agreed_at`을 적고 `community.account.news { accountId, agreed }`(메일 주소 없음)를 남긴다. 탈퇴도 동의를 지우고 알린다. 메일 플러그인이 받아 받는 사람 목록을 맞추고, 주소는 Lookups `news-address`(`AccountQuery.newsAddresses`, 서버 자신에게만, 동의한 탈퇴 전 계정)로 묻는다. 플러그인의 해지 링크로 끊으면 `plugin.email.unsubscribed { accountId }` → `NewsUnsubscribedHandler` → `AccountService.newsUnsubscribed`(이벤트 없이 동의만 지움)
@@ -34,12 +34,12 @@
 - `terms/`: 약관 (3-4, 2026-11-24, 스토어 11.8). `Term`(추가만 하는 버전, 앱마다 `terms` · `privacy`, 공개된 것은 마지막 버전). `TermsService.publish`(관리자, 본 버전 다음으로만 · 낡으면 409) · `rehearseSetting` · `applySetting`(설정 제안 `terms`, 승인 뒤 · 제안 때 본 본문과 지금 본문이 다르면 실패). `TermsQuery`: 회원 화면(`published`, 없으면 404) · 관리(지금 버전 · 초안 · `ready`) · 가입 확인(`versions`). 초안은 `TermsDraftGateway`(`apps/server/starters/terms/*.md`, `{{app}}`). `api/community/terms/:kind`(`TermsController`, 앱 도메인 · `MemberGuard`) · `api/community/admin/:appId/terms[/:kind]`(`TermsAdminController`)
   약관은 공간의 공통 약관(`space_id`, 2026-11-26: 가입 조건, 계정 행에 동의 버전)과 앱의 약관(공개했을 때만 참여할 때 동의, 회원 행에). 맞춰 보기는 `TermsConsent`. 공통 약관 관리 `api/community/admin/terms[/:kind]`(`StoreTermsAdminController`), 회원 화면 `GET terms/store/:kind`. 나간 회원 · 탈퇴한 계정의 관리 view 아이디는 null, 닉네임 정책은 "탈퇴"를 막는다
 - `community-notices.ts`(`CommunityNotices`): 신고로 가림(즉시, 관리자가 그 대상을 정하면 읽음) · 새 신고(묶어서, 앱마다 한 알림). 주소는 앱 관리의 커뮤니티 탭(`/admin/store/<앱>?tab=community`, 화면은 3-2)
-- `guard/member.guard.ts`: 커뮤니티 컨트롤러에만 붙는 요청자 정하기. 앱 도메인 요청(platform `HostGate`의 `appId`)에서만 회원 쿠키를 읽어 `MemberActor`로. 쓰기는 cross-site 403 · Origin이 있으면 그 앱 도메인 · 회원 쿠키를 실었으면 `X-Cairn-CSRF`(`MemberCsrf`, 서버 키 `member-csrf` HMAC)
+- `guard/member.guard.ts`: 커뮤니티 컨트롤러에만 붙는 요청자 정하기. 앱 도메인 요청(platform `HostGate`의 `appId`)에서만 회원 쿠키를 읽어 `MemberActor`로. 쓰기는 cross-site 403 · Origin이 있으면 그 앱 도메인 · 회원 쿠키를 실었으면 `X-Moida-CSRF`(`MemberCsrf`, 서버 키 `member-csrf` HMAC)
 - 모든 회원 API는 앱 도메인의 공개된 커뮤니티 앱에서만: 요청이 온 곳은 `MemberPlace`(앱 id · 출처 · IP, 기본 도메인이면 404), 공개된 커뮤니티 앱인지는 blog가 주는 Lookups `community-app`으로 (아니면 404)
 
 ## 소유 데이터
 스키마 `community`: accounts, account_sessions, members, topics, topic_revisions(추가만), comments, reports, decisions(추가만), terms(추가만), app_tables
-스키마 `app_<앱 id>` (앱마다, 실행 중에 생긴다): 앱이 선언한 표. 마이그레이션 · 표 인터페이스에 없고 `AppTableRepository`만 다룬다. 역할 `cairn_app`(로그인 없음, 이 스키마들에만 권한)은 마이그레이션이 만든다
+스키마 `app_<앱 id>` (앱마다, 실행 중에 생긴다): 앱이 선언한 표. 마이그레이션 · 표 인터페이스에 없고 `AppTableRepository`만 다룬다. 역할 `moida_app`(로그인 없음, 이 스키마들에만 권한)은 마이그레이션이 만든다
 
 ## 데이터 묶음
 - 계정: accounts + account_sessions (가입은 계정과 첫 세션을 한 저장에, 로그인은 세션 하나를 더하고, 비밀번호를 바꾸거나 정지 · 탈퇴하면 세션을 끝낸다. `AccountRepository`의 `load` · `lock` 첫 값은 공간 id)

@@ -18,7 +18,7 @@ import { RunTranscript } from './run-transcript';
 // 도중에 끈 실행(취소 등)은 토큰을 알 수 없다. 구독 사용률은 exec가 알려 주지 않아 아직 읽지 않는다.
 export class CodexStream implements AiStream {
   /** 늘 허락하는 MCP 서버. 브라우저 작업에서만 playwright를 더한다 (BrowserMcp) */
-  static readonly SERVER = 'cairn';
+  static readonly SERVER = 'moida';
   /** 커넥터(x-<이름>)를 부른 수 · 실패 */
   private readonly calls = new ConnectorCalls();
   private static readonly READ_TOOLS: ReadonlySet<string> = new Set([

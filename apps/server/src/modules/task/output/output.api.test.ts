@@ -10,7 +10,7 @@ import { Output } from './output';
 import { OutputPurgeJob } from './output-purge.job';
 
 // 결과물: 러너가 begin_upload로 표를 받아 PUT api/outputs/upload로 파일을 보내고, 주인이 결과물 메뉴에서 보고 지운다.
-// 공간 한도는 시험에서 64KB로, 디스크 여유는 0으로 둔다 (서버 설정 CAIRN_OUTPUTS_MAX_GB · CAIRN_DISK_RESERVE_GB).
+// 공간 한도는 시험에서 64KB로, 디스크 여유는 0으로 둔다 (서버 설정 MOIDA_OUTPUTS_MAX_GB · MOIDA_DISK_RESERVE_GB).
 
 type Json = Record<string, unknown>;
 type Ticket = { upload_path: string; header: string; token: string; expires_at: string };
@@ -90,7 +90,7 @@ async function put(ticket: Ticket | null, body: Buffer, token = ticket?.token): 
     method: 'PUT',
     headers: {
       'content-type': 'application/octet-stream',
-      ...(token === undefined ? {} : { 'x-cairn-upload': token }),
+      ...(token === undefined ? {} : { 'x-moida-upload': token }),
     },
     body,
   });
@@ -105,10 +105,10 @@ async function upload(taskId: string, name: string, bytes: Buffer): Promise<Json
 const list = async (query = '', as = owner) => ok(await api.get(`/api/outputs${query}`, as));
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-output-test-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
-  process.env.CAIRN_OUTPUTS_MAX_GB = String((64 * 1024) / GB);
-  process.env.CAIRN_DISK_RESERVE_GB = '0';
+  dir = await mkdtemp(join(tmpdir(), 'moida-output-test-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
+  process.env.MOIDA_OUTPUTS_MAX_GB = String((64 * 1024) / GB);
+  process.env.MOIDA_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
   // MCP는 사이트 주소가 있어야 연다 (다른 시험 파일이 먼저 바꿔 두었을 수 있다)

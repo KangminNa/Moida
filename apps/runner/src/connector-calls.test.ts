@@ -16,11 +16,11 @@ describe('ConnectorCalls', () => {
     calls.called('x-notion', 'c1');
     calls.called('x-notion', 'c1');
     calls.called('x-notion', 'c2');
-    calls.called('cairn', 'c3');
+    calls.called('moida', 'c3');
     calls.called('x-linear');
     calls.failed('c2', '  권한이\n없어요 ');
     calls.failed('x-linear', '시간 초과');
-    calls.failed('cairn', '세지 않음');
+    calls.failed('moida', '세지 않음');
     assert.deepEqual(calls.lines, [
       { name: 'notion', calls: 2, failures: 1, error: '권한이 없어요' },
       { name: 'linear', calls: 1, failures: 1, error: '시간 초과' },
@@ -44,7 +44,7 @@ describe('스트림에서 세기', () => {
           content: [
             { type: 'tool_use', id: 't1', name: 'mcp__x-notion__search', input: {} },
             { type: 'tool_use', id: 't2', name: 'mcp__x-notion__fetch', input: {} },
-            { type: 'tool_use', id: 't3', name: 'mcp__cairn__get_session', input: {} },
+            { type: 'tool_use', id: 't3', name: 'mcp__moida__get_session', input: {} },
           ],
         },
       }),
@@ -65,7 +65,7 @@ describe('스트림에서 세기', () => {
   });
 
   test('Codex: mcp_tool_call 시작으로 세고 실패한 완료로 실패', () => {
-    const stream = new CodexStream(['cairn', 'x-linear']);
+    const stream = new CodexStream(['moida', 'x-linear']);
     const item = (phase: string, id: string, body: object) =>
       line({ type: `item.${phase}`, item: { id, type: 'mcp_tool_call', ...body } });
     stream.read(item('started', 'i1', { server: 'x-linear', tool: 'list_issues' }));

@@ -41,13 +41,13 @@ describe('작업 종류 목록', () => {
       make: ['make'],
     });
     assert.deepEqual(TaskKinds.SKILLS, {
-      general: 'cairn-work',
-      draft_post: 'cairn-write',
-      tidy_session: 'cairn-tidy',
-      browse: 'cairn-browse',
-      code: 'cairn-code',
-      make: 'cairn-make',
-      community_review: 'cairn-moderate',
+      general: 'moida-work',
+      draft_post: 'moida-write',
+      tidy_session: 'moida-tidy',
+      browse: 'moida-browse',
+      code: 'moida-code',
+      make: 'moida-make',
+      community_review: 'moida-moderate',
     });
   });
 

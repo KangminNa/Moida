@@ -39,7 +39,7 @@ async function bareApp(slug: string): Promise<{ id: string; host: string }> {
       domain: host,
     }),
   );
-  const { token } = ok(await api.viaHost('/.well-known/cairn-domain', host));
+  const { token } = ok(await api.viaHost('/.well-known/moida-domain', host));
   const checked = ok(
     await api.request('POST', `/api/apps/${app.id}/domain/check`, owner, {
       version: set.version,

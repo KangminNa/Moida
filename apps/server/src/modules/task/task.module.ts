@@ -149,7 +149,7 @@ import { WebPageGateway } from './web/web-page.gateway';
     { provide: RepoSkillGateway, useFactory: () => RepoSkillGateway.fromEnv() },
     SkillQuery,
     SkillService,
-    // 결과물의 공간 한도 · 디스크 여유 (CAIRN_OUTPUTS_MAX_GB · CAIRN_DISK_RESERVE_GB)
+    // 결과물의 공간 한도 · 디스크 여유 (MOIDA_OUTPUTS_MAX_GB · MOIDA_DISK_RESERVE_GB)
     { provide: OutputPolicy, useFactory: () => OutputPolicy.fromEnv() },
     OutputQuery,
     OutputService,

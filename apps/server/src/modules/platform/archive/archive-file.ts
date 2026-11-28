@@ -5,11 +5,12 @@ import { ZipLimits, ZipReader } from '../base/zip-reader';
 // 보관 형식(docs/보관형식.md)의 파일 하나. 경로와 내용만 가진다 (경계를 넘는 데이터).
 // 각 모듈이 자기 데이터를 이 파일들로 만들고, 동기화 플러그인은 이 파일들을 그대로 옮긴다.
 export class ArchiveFile {
-  private static readonly PATH = /^(cairn\.json|(blog|vault|assets)\/[^\0]+)$/;
+  /** 맨 위 파일은 moida.json, 옛 백업(2026-11-28 이름 cairn → moida 전)은 cairn.json (복원이 읽는다) */
+  private static readonly PATH = /^((moida|cairn)\.json|(blog|vault|assets)\/[^\0]+)$/;
   /** 따옴표 없이 쓸 수 있는 YAML 글자: 글자로 시작하고 기호가 뜻을 갖지 않는 것 */
   private static readonly PLAIN = /^\p{L}[\p{L}\p{N} _./-]*(?<![ ])$/u;
   private static readonly RESERVED = /^(?:null|true|false|yes|no|on|off|y|n)$/i;
-  /** 쌓인 내용을 담는 경로. 나머지(cairn.json, 빈 카테고리 목록, 빈 선 목록)만 있으면 빈 Cairn이다 */
+  /** 쌓인 내용을 담는 경로. 나머지(moida.json, 빈 카테고리 목록, 빈 선 목록)만 있으면 빈 Moida이다 */
   private static readonly CONTENT = /^(?:vault\/wikis|vault\/sessions|blog\/posts|assets)\//;
   /** 모르는 앞부분 키를 보관하는 meta 칸 */
   private static readonly META_KEY = 'frontmatter';

@@ -1,15 +1,15 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AiTool } from './ai-tool';
-import { CairnSite, type SiteAddress } from './cairn-site';
 import type { DeviceSetup } from './device-setup';
+import { MoidaSite, type SiteAddress } from './moida-site';
 import { SkillFolder, SkillMarker, type SkillPackage } from './skill';
 import { CliError, type Terminal } from './terminal';
 
 /** 교차 검토에 쓸 수 있는 다른 AI 명령줄 */
 export const REVIEWERS = ['claude', 'codex', 'gemini'] as const;
 
-// cairn connect <블로그 주소>: 블로그 확인 → AI 도구 찾기 → 스킬·검토자 넣기(이제 없는 스킬은 지우기) → MCP 등록 → 로그인 → 연결 확인
+// moida connect <블로그 주소>: 블로그 확인 → AI 도구 찾기 → 스킬·검토자 넣기(이제 없는 스킬은 지우기) → MCP 등록 → 로그인 → 연결 확인
 // → (Claude Code) 소식 기기 · 훅 · 상태 줄 (NewsSetup), 세션 저장 기기 · 훅 (CollectSetup).
 // 이미 된 단계는 건너뛰므로 여러 번 불러도 된다 (스킬을 새 버전으로 바꿀 때도 이것을 다시 부른다).
 export class ConnectCommand {
@@ -25,7 +25,7 @@ export class ConnectCommand {
 
   async run(input: string): Promise<void> {
     const t = this.terminal;
-    const site = CairnSite.parse(input);
+    const site = MoidaSite.parse(input);
     const at = await site.address();
     if (at.site !== site.origin) t.say(`사이트 주소 기준으로 연결해요: ${at.site}`);
     t.done(`Moida 블로그 · ${at.mcp}`);
@@ -65,7 +65,7 @@ export class ConnectCommand {
         t.say('남은 일 하나: 로그인. 직접 입력할 수 있는 터미널에서 실행해 주세요');
         t.say(`  ${await this.tool.loginCommand()}`);
         t.say(
-          `또는 ${this.tool.label}에서 /mcp → ${AiTool.SERVER} → 로그인. 끝나면 cairn status로 확인해요`,
+          `또는 ${this.tool.label}에서 /mcp → ${AiTool.SERVER} → 로그인. 끝나면 moida status로 확인해요`,
         );
         for (const device of this.devices) await device.run(at, false);
         return;
@@ -75,7 +75,7 @@ export class ConnectCommand {
       );
       if (!(await this.tool.login()))
         throw new CliError(
-          `로그인을 마치지 못했어요. 터미널에서 ${await this.tool.loginCommand()}, 또는 ${this.tool.label}에서 /mcp → cairn으로 다시 할 수 있어요`,
+          `로그인을 마치지 못했어요. 터미널에서 ${await this.tool.loginCommand()}, 또는 ${this.tool.label}에서 /mcp → moida으로 다시 할 수 있어요`,
         );
     }
 
@@ -83,13 +83,13 @@ export class ConnectCommand {
       const after = await this.tool.server();
       if (!after?.connected)
         throw new CliError(
-          `연결을 확인하지 못했어요 (${after?.status ?? '등록 안 됨'}). ${this.tool.label}에서 /mcp로 cairn 상태를 봐 주세요`,
+          `연결을 확인하지 못했어요 (${after?.status ?? '등록 안 됨'}). ${this.tool.label}에서 /mcp로 moida 상태를 봐 주세요`,
         );
       t.done('연결됨');
-    } else t.done(`로그인 끝 · ${this.tool.label}에서 /mcp로 cairn이 연결됐는지 한 번 봐 주세요`);
+    } else t.done(`로그인 끝 · ${this.tool.label}에서 /mcp로 moida이 연결됐는지 한 번 봐 주세요`);
     for (const device of this.devices) await device.run(at, t.interactive);
     t.say();
-    t.say(`작업을 마치면 ${this.tool.label}에서 "이 세션 저장해" 또는 /cairn-save`);
+    t.say(`작업을 마치면 ${this.tool.label}에서 "이 세션 저장해" 또는 /moida-save`);
   }
 
   /** 스킬 하나와 그 검토자들을 넣는다. 이 명령이 넣지 않은 같은 이름의 폴더·파일이 있으면 묻는다 */
@@ -127,8 +127,8 @@ export class ConnectCommand {
   }
 
   /**
-   * 이 명령이 넣었지만 이제 함께 들지 않는 스킬(예: cairn-team에 합친 cairn-review)을 지운다.
-   * 표시(.cairn.json)가 있는 폴더만, 그 스킬이 넣은 검토자 파일과 함께
+   * 이 명령이 넣었지만 이제 함께 들지 않는 스킬(예: moida-team에 합친 moida-review)을 지운다.
+   * 표시(.moida.json)가 있는 폴더만, 그 스킬이 넣은 검토자 파일과 함께
    */
   private removeRetired(): void {
     if (!existsSync(this.tool.skillsDir)) return;

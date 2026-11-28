@@ -10,7 +10,7 @@ const STOP = [
   'button[aria-label="Stop response"]',
 ].join(', ');
 
-globalThis.cairnWatch({
+globalThis.moidaWatch({
   tool: 'gemini-web',
   conversationId: (path) => /\/app\/([\w-]+)/.exec(path)?.[1] ?? null,
   streaming: () => document.querySelector(STOP) !== null,

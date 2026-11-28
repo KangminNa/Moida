@@ -14,7 +14,7 @@ import type { RestoredTranscript } from './restored-transcript';
 // 보관 파일에서 읽은 세션 (restored-items.ts의 다른 항목들과 같은 길). 지금 판이 첫 판이 되고(판 번호 1), 판을 만든 쪽은 system이다.
 // 칸 · 해시 · 찾기용 글은 저장할 때와 같은 객체(SessionNote)로 다시 만든다. 판 id는 파일에 없어 새로 짓는다.
 
-/** vault/sessions/…/<날짜>-<주소>.md 하나. `cairn_note: false`면 노트(판)가 아직 없는 세션이라 판 없이 되살린다 */
+/** vault/sessions/…/<날짜>-<주소>.md 하나. `moida_note: false`면 노트(판)가 아직 없는 세션이라 판 없이 되살린다 */
 export class RestoredSession extends BaseEntity {
   /**
    * 기기는 복원하지 않고 내보낸 파일에도 기기 id가 없다. device_id는 값이라(외래키 없음) 이 고정 값을 넣는다.
@@ -24,19 +24,19 @@ export class RestoredSession extends BaseEntity {
    */
   static readonly NO_DEVICE = '00000000-0000-7000-8000-000000000000';
   private static readonly KNOWN: ReadonlySet<string> = new Set([
-    'cairn_format',
-    'cairn_type',
-    'cairn_id',
+    'moida_format',
+    'moida_type',
+    'moida_id',
     'title',
     'visibility',
     'tool',
     'started',
-    'cairn_wiki',
-    'cairn_pinned',
+    'moida_wiki',
+    'moida_pinned',
     'project',
     'tags',
-    'cairn_note',
-    'cairn_noted_seq',
+    'moida_note',
+    'moida_noted_seq',
   ]);
   /** 복원한 판을 만든 쪽 (actor_type) */
   private static readonly SYSTEM: SessionRevisionActorType = 'system';
@@ -56,15 +56,15 @@ export class RestoredSession extends BaseEntity {
   }
 
   static read(record: ArchiveRecord): RestoredSession {
-    const wikiId = record.optionalId('cairn_wiki');
+    const wikiId = record.optionalId('moida_wiki');
     const fields = {
       node_id: record.id(),
       visibility: record.oneOf('visibility', SESSION_VISIBILITY),
       tool: record.text('tool'),
       project: record.optionalText('project'),
       started_at: record.date('started'),
-      pinned_sections: record.has('cairn_pinned')
-        ? record.texts('cairn_pinned')
+      pinned_sections: record.has('moida_pinned')
+        ? record.texts('moida_pinned')
         : wikiId === null
           ? []
           : [Session.WIKI_KEY],
@@ -79,10 +79,10 @@ export class RestoredSession extends BaseEntity {
       last_revision_at: at,
       meta,
     };
-    if (!record.flag('cairn_note', true)) {
-      // 본문을 조용히 버리지 않는다: 사람이 노트를 써 넣었다면 cairn_note를 지워야 판이 된다
+    if (!record.flag('moida_note', true)) {
+      // 본문을 조용히 버리지 않는다: 사람이 노트를 써 넣었다면 moida_note를 지워야 판이 된다
       if (record.body !== '' || record.texts('tags').length > 0)
-        throw record.problem('노트 없는 세션(cairn_note: false)인데 본문 · 태그가 있어요');
+        throw record.problem('노트 없는 세션(moida_note: false)인데 본문 · 태그가 있어요');
       const title = record.optionalText('title');
       return new RestoredSession(
         { ...base, head_revision_id: null, head_title: title, head_text: null, revision_count: 0 },
@@ -127,9 +127,9 @@ export class RestoredSession extends BaseEntity {
 
   /** 지금 노트를 쓴 원문의 번호 (없으면 0) */
   private static notedSeq(record: ArchiveRecord): number {
-    const seq = record.optionalNumber('cairn_noted_seq') ?? 0;
+    const seq = record.optionalNumber('moida_noted_seq') ?? 0;
     if (!Number.isInteger(seq) || seq < 0)
-      throw record.problem(`cairn_noted_seq는 0 이상의 정수예요: ${seq}`);
+      throw record.problem(`moida_noted_seq는 0 이상의 정수예요: ${seq}`);
     return seq;
   }
 

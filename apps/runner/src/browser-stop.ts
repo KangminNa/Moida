@@ -6,7 +6,7 @@ import { PageChecks } from './page-checks';
 /** 멈춘 자리를 읽지 못함 (모양이 틀림). 누를 것을 붙잡지 않는다 */
 export class BrowserStopProblem extends Error {}
 
-// AI가 멈춘 자리 (cairn-browse 스킬). AI는 결재를 올리지 않고 작업 폴더에 browser-stop.json을 쓰고 끝낸다:
+// AI가 멈춘 자리 (moida-browse 스킬). AI는 결재를 올리지 않고 작업 폴더에 browser-stop.json을 쓰고 끝낸다:
 //   { "stop": "final_click", "page_url": "...", "button": { "role": "button", "name": "게시", "nth": 0 }, "note": "...",
 //     "check": ["홍길동", "50,000원"], "human": ["카드 번호", "인증 번호"] }
 //   { "stop": "login", "page_url": "...", "reason": "캡차" }

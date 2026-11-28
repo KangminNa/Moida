@@ -11,7 +11,7 @@ import type { OAuthServer } from './oauth-metadata.policy';
 
 const NOW = new Date('2026-11-21T00:00:00Z');
 const URL_ = 'https://mcp.example.com/mcp';
-const box = SecretBox.fromEnv({ CAIRN_SECRET_KEY: SecretBox.newKey() });
+const box = SecretBox.fromEnv({ MOIDA_SECRET_KEY: SecretBox.newKey() });
 const server: OAuthServer = {
   issuer: 'https://auth.example.com',
   authorization_endpoint: 'https://auth.example.com/authorize',
@@ -98,13 +98,13 @@ describe('로그인 방식 (ExternalTool, C1)', () => {
 
   test('서버 키를 바꾸면 OAuth 토큰도 다시 잠근다', () => {
     const [oldKey, newKey] = [SecretBox.newKey(), SecretBox.newKey()];
-    const sealed = SecretBox.fromEnv({ CAIRN_SECRET_KEY: oldKey }).seal(
+    const sealed = SecretBox.fromEnv({ MOIDA_SECRET_KEY: oldKey }).seal(
       JSON.stringify({ access: 'at-1', refresh: 'rt-1' }),
     );
     const tool = ExternalTool.restore(row({ token: sealed.ciphertext, token_nonce: sealed.nonce }));
-    const rotated = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey, CAIRN_SECRET_KEY_OLD: oldKey });
+    const rotated = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey, MOIDA_SECRET_KEY_OLD: oldKey });
     assert.equal(tool.reseal(rotated), true);
-    const fresh = SecretBox.fromEnv({ CAIRN_SECRET_KEY: newKey });
+    const fresh = SecretBox.fromEnv({ MOIDA_SECRET_KEY: newKey });
     assert.deepEqual(tool.jobView(fresh).toJSON().headers, { Authorization: 'Bearer at-1' });
     assert.equal(tool.reseal(rotated), false, '이미 지금 키');
   });

@@ -1,10 +1,10 @@
 import { renderMarkdown } from '../_lib/markdown.ts';
 import type { MemberMe, TopicDetail, TopicList } from './types';
 
-// 커뮤니티 화면의 템플릿 데이터 (스토어 3-2, 약속 cairn: 1에 더하는 이름: skills/cairn-make/references/app-code.md).
+// 커뮤니티 화면의 템플릿 데이터 (스토어 3-2, 약속 moida: 1에 더하는 이름: skills/moida-make/references/app-code.md).
 // 서버의 블로그 화면 API는 틀(index · topic)만 주고, 글 · 댓글 · 회원은 웹이 회원 API로 읽어 여기서 템플릿 데이터로 바꾼다.
 // 회원 정보는 최소한만 싣는다: 닉네임과 내 것인지(mine). 아이디 · 회원 id · 쓰기 확인 값은 앱 JS가 읽을 수 있어 싣지 않는다.
-// 쓰기(가입 · 로그인 · 글 · 댓글 · 신고)는 템플릿이 아니라 Cairn이 그리는 고정 화면(/_/…)이 한다: 격리된 앱 화면에는 쿠키가 없다
+// 쓰기(가입 · 로그인 · 글 · 댓글 · 신고)는 템플릿이 아니라 Moida이 그리는 고정 화면(/_/…)이 한다: 격리된 앱 화면에는 쿠키가 없다
 
 /** 고정 화면의 주소 앞부분 (앱 도메인의 뿌리 아래) */
 /** 고정 화면의 앞부분: 앱 안 주소의 '/_' (앱 도메인은 '/_', 공통 앱 도메인은 '/<앱>/_', 2026-11-27) */

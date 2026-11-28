@@ -12,7 +12,7 @@
  * @param {() => string} site.title 대화 제목 (모르면 빈 글자)
  * @param {() => { role: 'person' | 'ai', text: string }[]} site.messages 화면의 메시지들 (위에서 아래로)
  */
-globalThis.cairnWatch = (site) => {
+globalThis.moidaWatch = (site) => {
   let quietMs = 20_000;
   let timer;
   /** 마지막으로 보낸 대화. 같으면 다시 보내지 않는다 */

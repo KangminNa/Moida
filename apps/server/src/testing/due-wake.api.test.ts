@@ -5,7 +5,7 @@ import { Database, Notices, Outbox } from '../modules/platform';
 import { ApiClient, type ApiResult, type TestUser } from './api-client';
 
 // 마감을 바꾸는 쓰기는 같은 트랜잭션에서 그 마감 작업을 깨운다 (리팩토링 2단계 worker 정책).
-// 일꾼이 듣는 채널(cairn_outbox)을 함께 듣고, 진짜 API로 쓸 때마다 `due:<작업>` 신호가 오는지 본다.
+// 일꾼이 듣는 채널(moida_outbox)을 함께 듣고, 진짜 API로 쓸 때마다 `due:<작업>` 신호가 오는지 본다.
 // 일꾼은 쉬는 동안 조회하지 않으므로, 여기서 빠진 깨우기는 다음 마감까지(없으면 영영) 일이 늦는다는 뜻이다.
 // 작업 이름은 신호의 약속이라 글자로 적는다 (모듈 안쪽을 가져오지 않는다): 바꾸면 여기도 함께 바꾼다.
 

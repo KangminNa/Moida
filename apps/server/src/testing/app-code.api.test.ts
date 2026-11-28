@@ -146,7 +146,7 @@ async function deliver(
       method: 'PUT',
       headers: {
         'content-type': 'application/octet-stream',
-        'x-cairn-upload': String(ticket.token),
+        'x-moida-upload': String(ticket.token),
       },
       body: bytes,
     });
@@ -183,9 +183,9 @@ async function build(
 }
 
 before(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'cairn-app-code-test-'));
-  process.env.CAIRN_BLOBS_DIR = dir;
-  process.env.CAIRN_DISK_RESERVE_GB = '0';
+  dir = await mkdtemp(join(tmpdir(), 'moida-app-code-test-'));
+  process.env.MOIDA_BLOBS_DIR = dir;
+  process.env.MOIDA_DISK_RESERVE_GB = '0';
   api = await ApiClient.start();
   owner = await api.signIn();
   worker = api.service(OutboxWorker);
@@ -247,7 +247,7 @@ describe('앱 화면 (/api/apps/site/:slug)', () => {
       /<link rel="icon" href="[^"]*\{\{files\}\}\/icon\.svg/,
     );
     const data = home.data as Json;
-    assert.deepEqual([data.cairn, data.isHome, data.base], [1, true, `/${app.slug}`]);
+    assert.deepEqual([data.moida, data.isHome, data.base], [1, true, `/${app.slug}`]);
     assert.equal((data.app as Json).name, app.name);
     assert.deepEqual(
       (data.posts as Json[]).map((p) => p.title),
@@ -363,7 +363,7 @@ describe('페이지 앱 (P1, 2026-11-20): 블로그 틀 없는 화면 · 화면�
     const files = ((await code(app)).files as Json[]).map((f) => f.name).sort();
     assert.deepEqual(
       files,
-      ['cairn.json', 'icon.svg', 'index.html', 'style.css'],
+      ['icon.svg', 'index.html', 'moida.json', 'style.css'],
       '머리 · 메뉴 · 꼬리 · 글 목록 없음, 정적 앱 선언',
     );
 
@@ -475,15 +475,15 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
       'index.html':
         '<!doctype html><title>{{app.name}}</title><p>{{#posts}}{{title}}{{/posts}}</p>',
       'style.css': 'p{color:red}',
-      'cairn.json': JSON.stringify({ cairn: 1, hosts: ['fonts.googleapis.com'] }),
+      'moida.json': JSON.stringify({ moida: 1, hosts: ['fonts.googleapis.com'] }),
     };
-    // 지도 회사의 스크립트는 바깥 주소에 받지 않는다: 지도는 cairn.map (2026-11-25)
+    // 지도 회사의 스크립트는 바깥 주소에 받지 않는다: 지도는 moida.map (2026-11-25)
     const kakao = await upload(
       app,
-      zipOf({ ...files, 'cairn.json': JSON.stringify({ cairn: 1, hosts: ['dapi.kakao.com'] }) }),
+      zipOf({ ...files, 'moida.json': JSON.stringify({ moida: 1, hosts: ['dapi.kakao.com'] }) }),
     );
     assert.equal(kakao.status, 422, kakao.text);
-    assert.match(kakao.text, /cairn\.map/);
+    assert.match(kakao.text, /moida\.map/);
     const state = ok(await upload(app, zipOf(files)), 201);
     assert.deepEqual([state.current, state.pending, state.latest], [null, 1, 1]);
     // 방문자는 아직 시작 코드
@@ -505,7 +505,7 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
     const changes = ok(await api.get(`/api/apps/${app.id}/code/versions/1/changes`, owner));
     assert.deepEqual(changes.hostsAdded, ['fonts.googleapis.com']);
     assert.ok((changes.removed as string[]).includes('post.html'), JSON.stringify(changes));
-    assert.ok((changes.added as string[]).includes('cairn.json'));
+    assert.ok((changes.added as string[]).includes('moida.json'));
 
     const shown = ok(
       await api.request('POST', `/api/apps/${app.id}/code/current`, owner, {
@@ -535,7 +535,7 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
     });
     assert.equal(res.status, 200);
     const names = [...ZipReader.read(Buffer.from(await res.arrayBuffer())).keys()].sort();
-    assert.deepEqual(names, ['cairn.json', 'index.html', 'style.css']);
+    assert.deepEqual(names, ['index.html', 'moida.json', 'style.css']);
   });
 
   test('비공개 앱의 새 버전은 바로 보이는 버전이 된다. 시작 코드로 되돌리기도 새 버전', async () => {
@@ -566,7 +566,7 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
     );
     assert.deepEqual([made.current, made.latest], [1, 1]);
     const names = ((await code(page)).files as Json[]).map((f) => f.name).sort();
-    assert.deepEqual(names, ['cairn.json', 'icon.svg', 'index.html']);
+    assert.deepEqual(names, ['icon.svg', 'index.html', 'moida.json']);
     const wrong = await api.request('POST', `/api/apps/${page.id}/code/starter`, owner, {
       version: (await appOf(page.id)).version,
       template: 'nope',
@@ -589,7 +589,7 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
     for (const hosts of [['*.example.com'], ['127.0.0.1'], ['example.com:443']]) {
       const res = await upload(
         app,
-        zipOf({ 'index.html': 'x', 'cairn.json': JSON.stringify({ hosts }) }),
+        zipOf({ 'index.html': 'x', 'moida.json': JSON.stringify({ hosts }) }),
       );
       assert.equal(res.status, 422, `${hosts} ${res.text}`);
     }
@@ -620,17 +620,17 @@ describe('앱 코드 (/api/apps/:id/code)', () => {
   });
 });
 
-// 정적 앱 (스토어 9.13, 2026-11-21 "템플릿 없는 자유로운 앱"): cairn.json에 "render": "static"이면 템플릿을 거치지 않고
+// 정적 앱 (스토어 9.13, 2026-11-21 "템플릿 없는 자유로운 앱"): moida.json에 "render": "static"이면 템플릿을 거치지 않고
 // 묶음의 파일을 그대로 내보낸다. 폴더가 든 이름 · 앱 안의 화면 전환(없는 주소 → index.html). 어느 종류의 앱이든 (2026-11-25 A4)
 describe('정적 앱 ("render": "static")', () => {
-  const STATIC = JSON.stringify({ cairn: 1, render: 'static' });
+  const STATIC = JSON.stringify({ moida: 1, render: 'static' });
   const site = {
     'index.html': '<html><head><title>지도</title></head><body><div id="app"></div></body></html>',
     'assets/app.js': 'console.log("app")',
     'assets/img/pin.svg': '<svg xmlns="http://www.w3.org/2000/svg"/>',
     'about/index.html': '<html><head></head><body>소개</body></html>',
     'design.md': '# 디자인 문서: 지도\n## 참고한 곳\n- https://maps.example/',
-    'cairn.json': STATIC,
+    'moida.json': STATIC,
   };
 
   test('폴더가 든 묶음을 그대로 내보낸다: 주소 → 파일, 폴더는 그 안의 index.html, 없는 화면 주소는 첫 화면', async () => {
@@ -696,7 +696,7 @@ describe('정적 앱 ("render": "static")', () => {
 
   test('규칙: 블로그 앱도 정적 앱이 된다, 폴더는 정적 앱만, 모르는 render · 너무 깊은 폴더 · 숨김 파일은 422', async () => {
     const blog = await newApp(`static-b-${mark}`);
-    const onBlog = await upload(blog, zipOf({ 'index.html': 'x', 'cairn.json': STATIC }));
+    const onBlog = await upload(blog, zipOf({ 'index.html': 'x', 'moida.json': STATIC }));
     assert.equal(onBlog.status, 201, onBlog.text);
     const page = await newApp(`static-c-${mark}`, 'page');
     const folders = await upload(
@@ -706,9 +706,9 @@ describe('정적 앱 ("render": "static")', () => {
     assert.equal(folders.status, 422, folders.text);
     assert.match(folders.text, /render/);
     const bad: Record<string, string>[] = [
-      { 'index.html': 'x', 'cairn.json': JSON.stringify({ render: 'server' }) },
-      { 'index.html': 'x', 'a/b/c/d/e/f/g.js': 'y', 'cairn.json': STATIC },
-      { 'index.html': 'x', 'assets/.secret': 'y', 'cairn.json': STATIC },
+      { 'index.html': 'x', 'moida.json': JSON.stringify({ render: 'server' }) },
+      { 'index.html': 'x', 'a/b/c/d/e/f/g.js': 'y', 'moida.json': STATIC },
+      { 'index.html': 'x', 'assets/.secret': 'y', 'moida.json': STATIC },
     ];
     for (const files of bad) {
       const res = await upload(page, zipOf(files));
@@ -749,7 +749,7 @@ describe('배포 도구 (MCP app_code_upload → PUT …/code/versions, 스토�
   const site = {
     'index.html': '<html><head></head><body>배포</body></html>',
     'assets/app.js': 'console.log(1)',
-    'cairn.json': JSON.stringify({ cairn: 1, render: 'static' }),
+    'moida.json': JSON.stringify({ moida: 1, render: 'static' }),
   };
   const token = () => (writer.authorization ?? '').replace('Bearer ', '');
   const begin = (bearer: string, slug: string, zip: Buffer, note?: string) =>
@@ -775,7 +775,7 @@ describe('배포 도구 (MCP app_code_upload → PUT …/code/versions, 스토�
     const zip = zipOf(site);
     const ticket = await begin(token(), slug, zip);
     assert.equal(ticket.upload_path, `/api/apps/${app.id}/code/versions`);
-    assert.equal(ticket.header, 'x-cairn-deploy');
+    assert.equal(ticket.header, 'x-moida-deploy');
     const first = await put(ticket, zip);
     assert.equal(first.status, 200, first.text);
     const state = JSON.parse(first.text) as Json;

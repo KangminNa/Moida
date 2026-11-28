@@ -106,7 +106,7 @@ export type AppDomainList = ReturnType<AppDomainListView['toJSON']>;
 export type AppScreen = ReturnType<AppScreenView['toJSON']>;
 export type AppScreenRedirect = ReturnType<AppScreenRedirectView['toJSON']>;
 export type AppScreenPage = ReturnType<AppScreenPageView['toJSON']>;
-/** 정적 앱의 화면 (cairn.json의 "render": "static", 스토어 9.13): 묶음의 파일 하나 */
+/** 정적 앱의 화면 (moida.json의 "render": "static", 스토어 9.13): 묶음의 파일 하나 */
 export type AppScreenStatic = ReturnType<AppScreenStaticView['toJSON']>;
 export type AppScreenData = AppScreen['data'];
 /** 앱 코드 (스토어 1-6, 관리자): 코드 탭 · 버전 한 줄 · 바뀐 점 · 미리 보기 주소 · 쓰기 결과 */

@@ -33,7 +33,7 @@ export class ExternalStartInput extends BaseRequest {
  * 쿠키에는 "확인값|방식|돌아갈 곳|연결하는 주인"이 들어 있다. 다른 사람이 만든 링크로는 로그인·연결되지 않는다.
  */
 export class ExternalCallbackInput extends BaseRequest {
-  static readonly COOKIE = 'cairn_login';
+  static readonly COOKIE = 'moida_login';
   static readonly SECONDS = 600;
   /** 쿠키 값의 용도 (SecretBox.pack). 로그인 방법까지 묶어 다른 방법의 콜백이나 다른 자리에서 싼 값으로 풀리지 않게 */
   private static readonly PURPOSE = 'external-login';

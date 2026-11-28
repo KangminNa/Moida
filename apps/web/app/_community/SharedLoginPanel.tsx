@@ -35,7 +35,7 @@ export function SharedLoginPanel({
         'POST',
         '/api/store/login',
         { login, password },
-        csrf ? { 'x-cairn-csrf': csrf } : {},
+        csrf ? { 'x-moida-csrf': csrf } : {},
       ),
     );
     if (reply?.ok) window.location.replace(returnTo);

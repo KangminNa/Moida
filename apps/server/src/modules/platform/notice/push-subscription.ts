@@ -4,7 +4,7 @@ import type { PushSubscriptionNew, PushSubscriptionRow } from '../platform.table
 
 // 브라우저 하나의 푸시 구독 (7단계). 브라우저가 pushManager.subscribe로 받은 주소(endpoint)와 키를 주인이 맡긴다.
 // 서버는 이 주소로 직접 POST하므로, 알려진 푸시 서비스(https)만 받는다: 구독이 서버를 아무 주소에나 닿게 하는 길이 되지 않게.
-// CAIRN_PUSH_EXTRA_ORIGINS(쉼표로 나눈 출처)는 시험과 직접 운영하는 푸시 서비스만을 위한 것이다.
+// MOIDA_PUSH_EXTRA_ORIGINS(쉼표로 나눈 출처)는 시험과 직접 운영하는 푸시 서비스만을 위한 것이다.
 export class PushSubscription extends BaseEntity {
   /** 브라우저들의 푸시 서비스 (호스트가 이것이거나 이것으로 끝난다) */
   static readonly SERVICES: readonly string[] = [
@@ -48,9 +48,9 @@ export class PushSubscription extends BaseEntity {
     });
   }
 
-  /** CAIRN_PUSH_EXTRA_ORIGINS를 읽는다 (쉼표로 나눈 출처) */
+  /** MOIDA_PUSH_EXTRA_ORIGINS를 읽는다 (쉼표로 나눈 출처) */
   static extraOrigins(env: Readonly<Record<string, string | undefined>>): readonly string[] {
-    return (env.CAIRN_PUSH_EXTRA_ORIGINS ?? '')
+    return (env.MOIDA_PUSH_EXTRA_ORIGINS ?? '')
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean);

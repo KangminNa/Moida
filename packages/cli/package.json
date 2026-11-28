@@ -1,11 +1,11 @@
 {
-  "name": "@cairn/cli",
+  "name": "@moida/cli",
   "version": "0.0.0",
   "private": true,
-  "description": "작업하는 컴퓨터를 Cairn 블로그에 연결한다 (cairn connect). npm 배포 시기는 미정 (기획서 13장)",
+  "description": "작업하는 컴퓨터를 Moida 블로그에 연결한다 (moida connect). npm 배포 시기는 미정 (기획서 13장)",
   "license": "AGPL-3.0-only",
   "scripts": {
-    "cairn": "node -r @swc-node/register src/main.ts",
+    "moida": "node -r @swc-node/register src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test -r @swc-node/register \"src/**/*.test.ts\""
   },

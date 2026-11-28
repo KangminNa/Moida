@@ -46,13 +46,13 @@
     }
   },
   "app_code_base": {
-    "description": "쥔 만들기 일이 고칠 앱(payload.appCode.appId)의 지금 코드를 받는다: 가장 새 버전(확인 대기 포함), 버전이 없으면 앱 종류의 시작 코드(seq 0). 글 파일(html · css · js · json · md · csv · svg)은 내용까지, 그림 등은 이름 · 크기만. 템플릿(.html)은 Mustache이고 채우는 데이터는 cairn-make 스킬의 references/app-code.md를 따른다. 새 버전에는 다시 낸 파일만 바뀌고 내지 않은 파일은 그대로 남는다. 바깥 주소(hosts)는 cairn.json에 적은 것만 열린다. 고칠 앱이 없는 일이면 app_id가 null.",
+    "description": "쥔 만들기 일이 고칠 앱(payload.appCode.appId)의 지금 코드를 받는다: 가장 새 버전(확인 대기 포함), 버전이 없으면 앱 종류의 시작 코드(seq 0). 글 파일(html · css · js · json · md · csv · svg)은 내용까지, 그림 등은 이름 · 크기만. 템플릿(.html)은 Mustache이고 채우는 데이터는 moida-make 스킬의 references/app-code.md를 따른다. 새 버전에는 다시 낸 파일만 바뀌고 내지 않은 파일은 그대로 남는다. 바깥 주소(hosts)는 moida.json에 적은 것만 열린다. 고칠 앱이 없는 일이면 app_id가 null.",
     "input": {
       "task_id": "쥔 만들기 일의 id"
     }
   },
   "app_code_upload": {
-    "description": "이 컴퓨터에서 빌드한 앱 묶음(zip)을 앱 코드의 새 버전으로 올릴 표를 받는다. AI가 직접 부르지 않고 cairn app deploy <앱 주소> <폴더> 명령이 부른다. 답의 upload_path로 zip을 PUT한다 (Content-Type: application/zip, 머리글 header에 token, 10분 안에). zip 안이 묶음 전체가 된다(index.html이 꼭 있고, 폴더가 있으면 cairn.json에 \"render\": \"static\"). 공개 앱은 확인 대기 버전이 되어 관리자가 공개해야 보이고, 비공개 앱은 바로 보인다.",
+    "description": "이 컴퓨터에서 빌드한 앱 묶음(zip)을 앱 코드의 새 버전으로 올릴 표를 받는다. AI가 직접 부르지 않고 moida app deploy <앱 주소> <폴더> 명령이 부른다. 답의 upload_path로 zip을 PUT한다 (Content-Type: application/zip, 머리글 header에 token, 10분 안에). zip 안이 묶음 전체가 된다(index.html이 꼭 있고, 폴더가 있으면 moida.json에 \"render\": \"static\"). 공개 앱은 확인 대기 버전이 되어 관리자가 공개해야 보이고, 비공개 앱은 바로 보인다.",
     "input": {
       "app": "앱의 주소 (/<주소>의 주소)",
       "size": "zip 파일의 크기 (바이트, 20MB까지)",
