@@ -14,7 +14,7 @@ export interface LoadedTidySettings extends TidySettingRow {
   id: string;
 }
 
-/** 정리를 맡길 세션 한 줄. revision_count는 지금 판 번호라 일 요청의 requestId가 된다 */
+/** 정리를 맡길 세션 한 줄. revision_count는 정리할 판 번호(작업 세션은 끝난 요청까지, S2)라 일 요청의 requestId가 된다 */
 export type TidySessionRow = Pick<
   SessionRow,
   'node_id' | 'head_title' | 'revision_count' | 'version'

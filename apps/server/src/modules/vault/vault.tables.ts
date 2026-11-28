@@ -329,6 +329,7 @@ export interface SessionRow {
   tidy_requested_seq: number;
   transcript_count: number;
   noted_seq: number;
+  settled_seq: number;
 }
 export type SessionNew = Partial<SessionRow> & Pick<SessionRow, 'node_id' | 'space_id' | 'device_id' | 'tool' | 'source_session_id'>;
 

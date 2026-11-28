@@ -43,6 +43,17 @@ export class RunRecordTarget {
   ) {}
 }
 
+/**
+ * 끝난 요청 (S2, 2026-11-28): 작업 세션(flow) 하나의 요청이 끝났는지. done이면 그때까지의 기록을 wiki로 정리하고,
+ * 아니면(취소 · 실패 · 결과 카드 반려) 원문으로만 둔다. 아직 결과 카드를 기다리면 묻는 쪽에 null이 간다
+ */
+export class SettledFlow {
+  constructor(
+    readonly flow: string,
+    readonly done: boolean,
+  ) {}
+}
+
 // 임대 확인 (기능 패키지 API 0.3): 패키지는 코어의 표를 읽지 못하므로, 러너가 부른 도구가
 // "이 러너가 지금 그 일을 쥐고 있는가"를 물을 길을 둔다. 일을 빌려 주는 모듈이 시작할 때 확인하는 길을 등록하고,
 // 패키지는 work.leased(id)로 묻는다. platform은 누가 등록하는지 모른다 (SecretRotation · BlobStore.registerUse와 같은 방식).
@@ -50,6 +61,35 @@ export class RunRecordTarget {
 export class Leases {
   private check: ((actor: Actor, id: string) => Promise<LeasedWork>) | null = null;
   private recordCheck: ((actor: Actor, id: string) => Promise<RunRecordTarget>) | null = null;
+  private settledCheck:
+    | ((
+        actor: Actor,
+        spaceId: string,
+        taskId: string,
+        card: boolean,
+      ) => Promise<SettledFlow | null>)
+    | null = null;
+
+  /**
+   * 일을 빌려 주는 모듈이 한 번 등록한다 (S2): 상태가 바뀐 작업(id) · 정한 결재(card면 id가 결재)로 작업 세션의 요청이
+   * 끝났는지. 요청의 맨 위가 아니거나 아직 끝나지 않았으면 null
+   */
+  registerSettled(
+    check: (
+      actor: Actor,
+      spaceId: string,
+      id: string,
+      card: boolean,
+    ) => Promise<SettledFlow | null>,
+  ): void {
+    if (this.settledCheck) throw new Error('끝난 요청의 확인은 한 곳만 등록해요');
+    this.settledCheck = check;
+  }
+
+  /** 끝난 요청. 확인할 모듈이 없으면 null (작업 세션을 정리하지 않는다) */
+  settled(actor: Actor, spaceId: string, id: string, card: boolean): Promise<SettledFlow | null> {
+    return this.settledCheck ? this.settledCheck(actor, spaceId, id, card) : Promise.resolve(null);
+  }
 
   /**
    * 일을 빌려 주는 모듈이 한 번 등록한다: 러너가 실행의 기록을 올릴 수 있는 작업인지 (그 러너가 잡았고 점유 시간이 남았으며,

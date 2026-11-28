@@ -22,9 +22,32 @@ export class RunLineage {
   /** 작업 세션의 키. root는 맨 위 작업 */
   static flowOf(root: TaskRow): string {
     const chat = RunLineage.chatOf(root);
-    if (chat !== null) return `chat:${chat}`;
+    if (chat !== null) return RunLineage.chatFlow(chat);
     const run = GoalRun.runIdOfRequest(root.request_id);
     return run === null ? `task:${root.id}` : `goal-run:${run}`;
+  }
+
+  /** 대화 하나의 작업 세션 키 (결과 카드는 대화에 묶인다) */
+  static chatFlow(chatId: string): string {
+    return `chat:${chatId}`;
+  }
+
+  /**
+   * 맨 위 작업이 바뀌었을 때 그 요청의 결말 (S2, 기획서 결정 2026-11-17 "wiki 정리는 끝난 요청만"): 완료면 true,
+   * 실패 · 취소면 false(원문으로만), 아직이면 null. 기록한 실행이 없으면(세션 정리 · 에이전트 없는 일) 작업 세션이 없어 null.
+   * 대화의 일은 완료여도 대화가 가라앉지 않았거나 결과 카드를 기다리면(open) null: 카드를 정할 때 다시 묻는다
+   */
+  static settledOf(root: TaskRow, recorded: boolean, open: boolean): boolean | null {
+    if (!recorded || root.parent_id !== null) return null;
+    if (root.status === 'failed' || root.status === 'cancelled') return false;
+    if (root.status !== 'done') return null;
+    return RunLineage.chatOf(root) !== null && open ? null : true;
+  }
+
+  /** 결과 카드를 정했을 때: 승인이면 끝난 요청, 반려 · 취소면 원문으로만, 수정 요청이면 다음 회차를 기다린다 */
+  static settledCard(status: string): boolean | null {
+    if (status === 'approved') return true;
+    return status === 'rejected' || status === 'cancelled' ? false : null;
   }
 
   /**

@@ -15,6 +15,8 @@ const REGISTRIES = {
     of: ['asks', 'leases'],
     registerRecord: ['provides', 'run-records'],
     forRecord: ['asks', 'run-records'],
+    registerSettled: ['provides', 'run-records'],
+    settled: ['asks', 'run-records'],
   },
   PluginChats: { register: ['provides', 'plugin-chats'], send: ['asks', 'plugin-chats'] },
   SettingKinds: {

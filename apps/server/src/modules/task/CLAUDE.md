@@ -91,7 +91,7 @@
 - 러너: runners (러너 기기마다 한 줄, 처음 닿을 때 생긴다)
 
 ## 공개 API (`index.ts`)
-`TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다. 도구 클래스 목록 `TaskTools.PROVIDERS`를 `TaskModule`이 providers에 펼친다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상 · 지시 · 관리자가 쓴 지시 `TaskQuery.ownerText`)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). vault에게는 platform `Leases.registerRecord`에 `TaskQuery.recordTarget`을 등록해 실행 기록의 자리(그 러너의 마지막 실행 · 세션 키 · 작업 세션 키와 제목 · 에이전트)를 알려 준다 (2026-11-17, 작업 세션). 기능 패키지의 대화 입구는 platform `PluginChats`에 `ChatTalk.fromPlugin`을 등록한다 (플러그인 API 0.10, 2026-11-23 텔레그램)
+`TaskModule`, `TaskTools`(mcp 모듈이 모아서 연다. 도구 클래스 목록 `TaskTools.PROVIDERS`를 `TaskModule`이 providers에 펼친다), `TaskQuery`(`isLive`: mcp 입구가 호출마다 작업 토큰이 살아 있는지 묻는다). 기능 패키지에게는 platform의 `Leases`에 `TaskQuery.leasedWork`를 등록해 "이 러너가 지금 쥔 작업"(id · 종류 · 보인 입력 · 대상 · 지시 · 관리자가 쓴 지시 `TaskQuery.ownerText`)을 알려 준다 (`work.leased`, code-github · browser-tabs의 사이트 · 클릭). vault에게는 platform `Leases.registerRecord`에 `TaskQuery.recordTarget`을 등록해 실행 기록의 자리(그 러너의 마지막 실행 · 세션 키 · 작업 세션 키와 제목 · 에이전트)를 알려 준다 (2026-11-17, 작업 세션). `Leases.registerSettled`에는 `TaskQuery.settledFlow`를 등록해 작업 세션의 요청이 끝났는지(맨 위 작업 완료 · 대화는 가라앉고 카드를 기다리지 않음 · 결과 카드 승인 → 끝, 실패 · 취소 · 카드 반려 → 원문으로만, 판단은 `RunLineage.settledOf` · `settledCard`)를 알려 준다 (S2, 2026-11-28). 기능 패키지의 대화 입구는 platform `PluginChats`에 `ChatTalk.fromPlugin`을 등록한다 (플러그인 API 0.10, 2026-11-23 텔레그램)
 
 ## 내보내는 이벤트
 칸의 원본은 `task.events.json` (리팩토링 R3c): 여기는 뜻을 적고, 칸이 바뀌면 그 파일을 고친다. 목록에 없는 주제 · 칸은 내보낼 때 막힌다.

@@ -17,17 +17,21 @@ import type {
   TranscriptView,
 } from './session.view';
 import type { SessionTrashedView, SessionTrashView } from './session-trash.view';
+import { WorkSessionQuery } from './work-session.query';
+import type { WorkSessionView } from './work-session.view';
 
 // 관리 화면의 세션 시트가 부르는 API. 저장은 MCP 도구(save_session · save_transcript · save_note)로만 들어온다.
 // 휴지통(2026-11-19 휴지통 A, 관리자만): 넣기 · 꺼내기는 변경 묶음(ChangeService.edit)으로 남아 되돌릴 수 있다.
 //   GET  api/sessions/trash             휴지통의 세션
 //   POST api/sessions/:id/trash         { version } 휴지통으로
 //   POST api/sessions/:id/restore       { version } 되살리기
+// 작업 세션 (S2, 관리자만): GET api/sessions/:id/work  요청 · 정리할 판 · 인수인계 메모
 @Controller('api/sessions')
 export class SessionController {
   constructor(
     private readonly sessions: SessionQuery,
     private readonly changes: ChangeService,
+    private readonly works: WorkSessionQuery,
   ) {}
 
   /** 최근에 저장한 순서. ?project=로 거르고, 응답의 next를 ?cursor=로 보내면 다음 쪽 */
@@ -44,6 +48,11 @@ export class SessionController {
   @Get(':id')
   get(@CurrentActor() actor: Actor, @Param() params: unknown): Promise<SessionDetailView> {
     return this.sessions.get(actor, ReadSessionInput.from(params));
+  }
+
+  @Get(':id/work')
+  work(@CurrentActor() actor: Actor, @Param() params: unknown): Promise<WorkSessionView> {
+    return this.works.get(actor, ReadSessionInput.from(params));
   }
 
   @Get(':id/revisions/:seq')

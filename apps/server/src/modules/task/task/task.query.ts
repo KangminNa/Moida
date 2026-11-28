@@ -8,8 +8,10 @@ import {
   NotFound,
   RuleViolation,
   RunRecordTarget,
+  SettledFlow,
 } from '../../platform';
-import { taskRuns, tasks } from '../task.schema';
+import { Approval } from '../approval/approval';
+import { approvals, taskRuns, tasks } from '../task.schema';
 import type { GoalRow, OutputRow, TaskEventRow, TaskRow, TaskRunRow } from '../task.tables';
 import { RunLineage } from './run-lineage.policy';
 import { SubtaskWait } from './subtask-wait.policy';
@@ -25,6 +27,9 @@ import {
   TaskView,
 } from './task.view';
 import { TaskSignin } from './task-signin';
+
+/** 끝난 요청인지 볼 맨 위 작업: 기록한 실행이 있는지, 대화의 일이면 아직 가라앉지 않았거나 결과 카드를 기다리는지 */
+type SettledRootRow = TaskRow & { recorded: boolean; open: boolean };
 
 /** 실행 기록의 자리: 맨 위 작업의 줄에 대화 · 목표 실행의 제목과 일한 에이전트를 더한 모양 */
 type RecordRootRow = TaskRow & {
@@ -237,6 +242,46 @@ export class TaskQuery extends BaseQuery {
       root.agent_name ?? '에이전트',
       root.agent_tool ?? '',
     );
+  }
+
+  /**
+   * 끝난 요청 (S2, platform Leases.registerSettled에 등록, vault가 작업 세션을 wiki로 정리할지 묻는다).
+   * card면 id는 결정한 결과 카드, 아니면 상태가 바뀐 작업. 대화의 열린 것: 끝나지 않은 맨 위 일 · 기다리는 결재(카드 포함) ·
+   * 카드에 아직 싣지 않은 결과물 (곧 카드가 생긴다). 판단은 RunLineage
+   */
+  async settledFlow(
+    actor: Actor,
+    spaceId: string,
+    id: string,
+    card: boolean,
+  ): Promise<SettledFlow | null> {
+    actor.assertOwnerOrSystem();
+    if (card) {
+      const approval = await this.row(approvals, { space_id: spaceId, id });
+      if (approval?.action !== Approval.CARD || approval.chat_id === null) return null;
+      const done = RunLineage.settledCard(approval.status);
+      return done === null ? null : new SettledFlow(RunLineage.chatFlow(approval.chat_id), done);
+    }
+    const [root] = await this.sql<SettledRootRow[]>`
+      WITH chat AS (SELECT payload->'chat'->>'chatId' AS id FROM task.tasks
+          WHERE space_id = ${spaceId} AND id = ${id}),
+        tree AS (
+          SELECT t.id, t.payload FROM task.tasks t, chat
+          WHERE chat.id IS NOT NULL AND t.space_id = ${spaceId} AND t.request_id LIKE 'chat:' || chat.id || ':%')
+      SELECT t.*,
+        EXISTS (SELECT 1 FROM task.task_runs r WHERE r.task_id = t.id AND r.lineage IS NOT NULL) AS recorded,
+        EXISTS (SELECT 1 FROM tree JOIN task.tasks o ON o.id = tree.id
+            WHERE o.status IN (${Task.QUEUED}, ${Task.RUNNING}, ${Task.WAITING}))
+          OR EXISTS (SELECT 1 FROM task.approvals a, chat
+            WHERE a.space_id = ${spaceId} AND a.chat_id::text = chat.id AND a.status = ${Approval.PENDING})
+          OR EXISTS (SELECT 1 FROM task.outputs o WHERE o.card_id IS NULL AND o.deleted_at IS NULL
+            AND o.task_id IN (
+              WITH RECURSIVE down AS (SELECT id, payload FROM tree UNION ALL
+                SELECT c.id, c.payload FROM task.tasks c JOIN down ON c.parent_id = down.id)
+              SELECT id FROM down WHERE NOT coalesce(payload ? 'appCode', false))) AS open
+      FROM task.tasks t WHERE t.space_id = ${spaceId} AND t.id = ${id}`;
+    const done = root ? RunLineage.settledOf(root, root.recorded, root.open) : null;
+    return done === null || !root ? null : new SettledFlow(RunLineage.flowOf(root), done);
   }
 
   /** 이 러너가 임대를 쥔 작업. 진행 중이 아니거나 · 다른 러너의 것이거나 · 임대가 끝났으면 RuleViolation */

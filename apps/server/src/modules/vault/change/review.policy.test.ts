@@ -78,6 +78,7 @@ function session(wikiId: string | null, pinned: readonly string[] = []): Session
     meta: {},
     wiki_id: wikiId,
     tidy_requested_seq: 0,
+    settled_seq: 0,
     deleted_at: null,
   });
 }

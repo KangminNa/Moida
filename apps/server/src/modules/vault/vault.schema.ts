@@ -250,6 +250,7 @@ export const sessions = vaultSchema.table('sessions', {
   tidy_requested_seq: integer('tidy_requested_seq').notNull(),
   transcript_count: integer('transcript_count').notNull(),
   noted_seq: integer('noted_seq').notNull(),
+  settled_seq: integer('settled_seq').notNull(),
 });
 
 /** vault.stale_wikis */

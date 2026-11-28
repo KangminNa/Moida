@@ -9,6 +9,7 @@ import { ProjectsPanel } from './ProjectsPanel';
 import { SESSION_TOPICS, SessionPanel, when } from './SessionPanel';
 import { SessionTrashPanel } from './SessionTrashPanel';
 import { TidyPanel } from './TidyPanel';
+import { WORK_TOOL } from './WorkSessionPanel';
 
 function mergePages(before: SessionPage, more: SessionPage): SessionPage {
   return { ...more, sessions: [...before.sessions, ...more.sessions] };
@@ -120,7 +121,7 @@ export function SessionsPanel({ initialId }: { initialId: string | null }) {
                 <small>
                   {[
                     s.project ?? '프로젝트 없음',
-                    devices[s.deviceId] ?? s.tool,
+                    s.tool === WORK_TOOL ? '작업 세션' : (devices[s.deviceId] ?? s.tool),
                     s.revisionCount > 0 ? `버전 ${s.revisionCount}` : '노트 쓰는 중',
                     when(s.lastRevisionAt),
                   ].join(' · ')}
