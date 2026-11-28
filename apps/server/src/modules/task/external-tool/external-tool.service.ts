@@ -96,7 +96,8 @@ export class ExternalToolService extends EntityService<ExternalTool> {
       await tools.save(tool);
       const agents = new AgentRepository(tx);
       for (const agent of await agents.lockAll(spaceId)) {
-        if (agent.toolProblem(preset.name) !== null) continue;
+        // 대표는 커넥터를 쓰지 않는다 (맡기기만, 고치는 칸은 AgentLead.assertEdit). 일꾼에게만
+        if (agent.lead || agent.toolProblem(preset.name) !== null) continue;
         agent.plugTool(preset.name);
         await agents.save(agent);
       }

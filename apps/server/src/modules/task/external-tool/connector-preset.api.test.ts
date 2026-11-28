@@ -45,6 +45,16 @@ describe('추천 커넥터 (C2)', () => {
       }),
       201,
     );
+    // 대표가 있어도 대표에게는 허락하지 않는다 (대표는 맡기기만, 고치는 칸이 정해져 있다)
+    if (ok(await api.get('/api/agents/lead', owner)).lead === null)
+      ok(
+        await api.request('POST', '/api/chats', owner, {
+          requestId: randomUUID(),
+          message: '대표를 만드는 첫 대화',
+        }),
+        201,
+      );
+    const lead = ok(await api.get('/api/agents/lead', owner)).lead as Json;
     const requestId = randomUUID();
     const body = { requestId };
     assert.equal(
@@ -66,6 +76,8 @@ describe('추천 커넥터 (C2)', () => {
     assert.equal(again.id, made.id, '같은 requestId는 처음 만든 것');
     const [allowed] = await db.sql`SELECT external_tools FROM task.agents WHERE id = ${worker.id}`;
     assert.ok((allowed as Json).external_tools.includes('notion'), '일꾼에게 허락');
+    const [boss] = await db.sql`SELECT external_tools FROM task.agents WHERE id = ${lead.id}`;
+    assert.ok(!(boss as Json).external_tools.includes('notion'), '대표에게는 허락하지 않음');
 
     assert.equal(
       (
