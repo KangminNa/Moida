@@ -281,6 +281,16 @@ export class PluginRegistry {
     );
   }
 
+  /** 동작 중인 플러그인이 앱 라이브러리에 더하는 것 (목록 파일 client, 2026-11-28): 앱 코드 일의 "쓸 수 있는 라이브러리" */
+  libraries(): readonly { plugin: string; provides: readonly string[] }[] {
+    return [...this.catalog.values()].flatMap((m) => {
+      const state = this.states.get(m.name) ?? null;
+      return m.client && this.isRunning(m, state)
+        ? [{ plugin: m.name, provides: m.client.provides }]
+        : [];
+    });
+  }
+
   /** 동작 중인 기능 패키지의 콘솔 메뉴 */
   packageMenus(): readonly { plugin: string; menu: NonNullable<PluginManifest['menu']> }[] {
     return [...this.catalog.values()].flatMap((m) => {

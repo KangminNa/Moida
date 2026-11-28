@@ -133,6 +133,7 @@ export class MakeStage implements SandboxStage {
       appDir: app?.dir ?? null,
       appFiles: app?.code.listing ?? null,
       appHosts: app?.code.hosts.join(' · ') || null,
+      appLibrary: app?.code.libraryLine ?? null,
     });
   }
 

@@ -852,6 +852,10 @@ describe('AI로 고치기 (payload.appCode → task.app_code.built)', () => {
     const names = (base.files as Json[]).map((f) => f.name);
     assert.ok(names.includes('index.html') && names.includes('header.html'), names.join());
     assert.ok((base.files as Json[]).every((f) => typeof f.text === 'string'));
+    // 켜진 플러그인이 moida.js에 주는 것 (2026-11-28): 플러그인 이름과 이름들
+    assert.ok(Array.isArray(base.library));
+    for (const l of base.library as Json[])
+      assert.ok(typeof l.plugin === 'string' && Array.isArray(l.provides), JSON.stringify(l));
 
     const detail = await code(app);
     assert.deepEqual([detail.current, detail.pending], [null, 1]);

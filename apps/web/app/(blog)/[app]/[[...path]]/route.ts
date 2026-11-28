@@ -57,7 +57,7 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
     parts[0] === '_' &&
     (parts[1] === 'moida.js' || parts[1] === 'cairn.js')
   )
-    return moidaAnswer(false, await mapFor(false));
+    return moidaAnswer(false);
   // 미리 보기 주소 아래의 화면 데이터 (/<앱>/~<토큰>/_/data, moida.data): 그 토큰의 버전 그대로
   if (ticket !== null && parts.length === 2 && parts[0] === '_' && parts[1] === 'data')
     return appDataAnswer(request, app, ticket);

@@ -72,6 +72,15 @@ export interface PackageMenu {
   readonly page: string;
 }
 
+/**
+ * 앱 라이브러리에 더하는 것 (목록 파일 client, 2026-11-28): 앱 코드의 moida.js에 붙는 브라우저 스크립트(file, client/ 안, 없어도 된다)와
+ * 그것이 주는 이름(provides: moida.<모듈> · <moida-부품>). 켜진 플러그인의 것만 moida.js에 붙고 앱 코드 일의 "쓸 수 있는 라이브러리"에 적힌다
+ */
+export interface PluginClient {
+  readonly file: string | null;
+  readonly provides: readonly string[];
+}
+
 /** 설정 항목 하나. 설치 마법사·관리 화면의 칸이 이것으로 만들어진다 */
 export class PluginSettingSpec {
   constructor(
@@ -128,6 +137,8 @@ export class PluginManifest {
     readonly guideDoes: readonly string[] = [],
     /** 쉬운 말 안내 (guide.setup): 설정 순서, 한 줄에 한 단계 */
     readonly guideSetup: readonly string[] = [],
+    /** 앱 라이브러리에 더하는 것 (목록 파일 client). 없으면 null */
+    readonly client: PluginClient | null = null,
   ) {}
 
   /** guide의 목록 하나: 글자만, 한 줄 300자 · 12줄까지 (넘으면 목록 파일 문제) */
@@ -324,6 +335,8 @@ export class PluginManifest {
     const guideDoes = PluginManifest.lines(guide.does, 'does', problems);
     const guideSetup = PluginManifest.lines(guide.setup, 'setup', problems);
 
+    const client = PluginManifest.clientOf(raw.client, dir, problems);
+
     if (problems.length > 0) {
       throw new Error(`플러그인 ${name || dir} 목록 파일 문제:\n- ${problems.join('\n- ')}`);
     }
@@ -342,7 +355,25 @@ export class PluginManifest {
       menu,
       guideDoes,
       guideSetup,
+      client,
     );
+  }
+
+  /** 목록 파일 client: file은 client/ 안의 .js, provides는 moida.<이름> · <moida-이름>의 목록 (1~20개) */
+  private static clientOf(raw: unknown, dir: string, problems: string[]): PluginClient | null {
+    if (raw === undefined) return null;
+    const c = (raw ?? {}) as Record<string, unknown>;
+    const file = typeof c.file === 'string' ? c.file : null;
+    if (
+      c.file !== undefined &&
+      (!file?.startsWith('client/') || !file.endsWith('.js') || !existsSync(join(dir, file)))
+    )
+      problems.push(`client.file이 client/ 안의 .js가 아니에요: ${String(c.file)}`);
+    const provides = Array.isArray(c.provides) ? c.provides.map(String) : [];
+    const name = /^(moida\.[a-z][a-zA-Z0-9.]*|<moida-[a-z][a-z0-9-]*>)$/;
+    if (provides.length === 0 || provides.length > 20 || !provides.every((p) => name.test(p)))
+      problems.push('client.provides는 moida.<이름> · <moida-이름> 1~20개예요');
+    return { file, provides };
   }
 
   /** 지금은 ">=0.1" 형태만 받는다 */

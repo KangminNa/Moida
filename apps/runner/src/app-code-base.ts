@@ -34,6 +34,8 @@ export class AppCodeBase {
     readonly files: readonly AppCodeFile[],
     /** moida.json의 바깥 주소 */
     readonly hosts: readonly string[],
+    /** 이 서버에서 켜진 플러그인이 moida.js에 주는 것 (플러그인 이름 → 이름들, 2026-11-28) */
+    readonly library: readonly { plugin: string; provides: readonly string[] }[],
   ) {}
 
   /** app_code_base의 답. 고칠 앱이 없는 일이면 null */
@@ -52,6 +54,10 @@ export class AppCodeBase {
       body.number('seq'),
       files,
       body.texts('hosts'),
+      body
+        .list('library')
+        .map((l) => ({ plugin: l.text('plugin'), provides: l.texts('provides') }))
+        .filter((l) => l.provides.length > 0),
     );
   }
 
@@ -76,6 +82,14 @@ export class AppCodeBase {
           `- ${f.name}${f.text === null ? ' (그대로 남아요. 바꿀 때만 같은 이름으로 내요)' : ''}`,
       )
       .join('\n');
+  }
+
+  /** 지시문에 넣을 플러그인 라이브러리 한 줄 (예: "moida.map · <moida-place-list> (플러그인 map)"). 없으면 null */
+  get libraryLine(): string | null {
+    const line = this.library
+      .map((l) => `${l.provides.join(' · ')} (플러그인 ${l.plugin})`)
+      .join(', ');
+    return line === '' ? null : line;
   }
 
   /** 지시문에 넣을 버전 이름 */

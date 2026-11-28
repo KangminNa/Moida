@@ -1,7 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { appHeaderOf, opensApp } from '../../../../_blog/apps-domain';
 import { slugFrom } from '../../../../_blog/format';
-import { mapFor } from '../../../../_blog/map-config';
 import { moidaAnswer } from '../../../../_blog/moida-client';
 import { hostOf } from '../../../../_blog/request-host';
 
@@ -16,5 +15,5 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   const app = slugFrom((await params).app);
   const host = hostOf(request.headers);
   const open = await opensApp(host, app);
-  return moidaAnswer(open, await mapFor(open), appHeaderOf(host, app));
+  return moidaAnswer(open, appHeaderOf(host, app));
 }

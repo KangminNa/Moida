@@ -30,6 +30,7 @@
       "entry": [
         "app/**/{page,layout,route,manifest}.{ts,tsx}",
         "app/_plugins/slot-types.ts",
+        "app/_plugins/client-types.ts",
         "app/**/*.test.ts",
         "../../plugins/*/web/**/*.{ts,tsx}"
       ],

@@ -111,5 +111,6 @@
     "icon": "compass",
     "page": "web/MapPage.tsx"
   },
+  "client": { "provides": ["moida.map", "<moida-map>", "<moida-place-list>"] },
   "uses": ["api", "tool:map_geocode", "menu"]
 }

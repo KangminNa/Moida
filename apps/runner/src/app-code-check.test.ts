@@ -36,7 +36,7 @@ const id = (n: number) => `00000000-0000-7000-8000-${String(n).padStart(12, '0')
 const STARTERS = resolve(__dirname, '../../server/starters');
 const scan = (text: string, partials: readonly string[] = []) =>
   AppCodeCheck.scan(text, (name) => partials.includes(name));
-const codeOf = (files: object[], hosts: string[] = []) =>
+const codeOf = (files: object[], hosts: string[] = [], library: object[] = []) =>
   AppCodeBase.from(
     Json.of({
       app_id: id(1),
@@ -46,6 +46,7 @@ const codeOf = (files: object[], hosts: string[] = []) =>
       seq: 0,
       files,
       hosts,
+      library,
     }),
   ) as AppCodeBase;
 // 디자인 기준 · 디자인 문서 검사는 design-check.test · design-doc-check.test에서 본다: 여기 본보기 코드는 화면 조각이다
@@ -461,6 +462,10 @@ describe('앱 코드 일 (MakeStage)', () => {
         { name: 'photo.jpg', size: 9000, text: null },
       ],
       ['fonts.example.com'],
+      [
+        { plugin: 'map', provides: ['moida.map', '<moida-place-list>'] },
+        { plugin: 'empty', provides: [] },
+      ],
     );
     const config = new RunnerConfig(
       'http://moida',
@@ -507,6 +512,12 @@ describe('앱 코드 일 (MakeStage)', () => {
       );
       assert.match(prompt, /- photo\.jpg \(그대로 남아요/);
       assert.match(prompt, /\(지금: fonts\.example\.com\)/);
+      // 켜진 플러그인의 라이브러리 (2026-11-28): 준 것이 없는 플러그인은 빠진다
+      assert.match(prompt, /references\/library\.md\)/);
+      assert.match(
+        prompt,
+        /켜진 플러그인이 주는 것: moida\.map · <moida-place-list> \(플러그인 map\)\n/,
+      );
       assert.doesNotMatch(prompt, /# 재료/);
 
       await writeFile(join(room.outputsDir, 'list.html'), '{{#posts}}<b>{{title}}</b>');

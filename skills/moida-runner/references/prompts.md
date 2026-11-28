@@ -547,6 +547,7 @@ AI에게 가는 지시문의 글이다. 러너가 일마다 채우고, 서버도
 - 화면은 정해 둔 틀에서 고르지 않아요. 지금 코드에 design.md가 없으면 moida-make 스킬의 references/design-research.md대로 같은 분야의 잘 만든 화면 3~5곳을 찾아 보고(browser_read에 shot: true) 이 앱의 design.md부터 써요. 있으면 그 문서의 방향 · 토큰대로 고쳐요
 - 지금 코드에서 시작해 바뀐 파일만 결과물 폴더에 내요. 내지 않은 파일은 그대로 새 버전에 남아요
 - 같은 이름으로 낸 파일은 통째로 바뀌어요: 고친 전체를 내요 (바뀐 줄만 내지 않아요)
+- 화면은 먼저 moida.js의 부품 · 함수로 짜요 (<moida-place-list> · <moida-rows> · <moida-account> 같은 태그 한 줄, 목록은 moida-make 스킬의 references/library.md). 부품으로 안 되는 것만 직접 짜요{{#appLibrary}}. 이 서버에서 켜진 플러그인이 주는 것: {{appLibrary}}{{/appLibrary}}
 - .html 파일은 웹이 데이터를 채우는 템플릿이에요. 화면마다 쓰는 템플릿 · 데이터 이름 · 문법은 moida-make 스킬의 references/app-code.md를 따라요
 - 페이지 · 커뮤니티 앱은 템플릿 없이 정적 앱으로 만들 수 있어요: moida.json에 "render": "static"을 넣으면 .html이 고쳐지지 않고 그대로 나가고 폴더도 쓸 수 있어요 (references/app-code.md의 "정적 앱"). 도구 · 지도처럼 스크립트가 화면을 그리는 앱, 빌드한 결과는 이쪽이 맞아요
 - 정적 앱이 아니면 하위 폴더는 쓸 수 없어요. 폴더가 든 정적 앱은 결과물 폴더에 app.zip 하나로 내요: zip 안이 묶음 전체가 돼요 (내용 없이 이름만 받은 파일은 zip에 없어도 남아요)
