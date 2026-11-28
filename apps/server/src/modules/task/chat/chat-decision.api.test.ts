@@ -151,7 +151,8 @@ describe('중간 판단 알림', () => {
     await tool(sub.run_token, 'post_update', { kind: 'decision', text: '모양 없는 판단' });
 
     const room = await detail(chat.id);
-    const said = room.news.filter((n: Json) => n.kind === 'decision');
+    // 나눠 맡긴 계획(D3, decision.planned)은 서버가 남긴 판단이라 따로 본다 (delegate-assign.api.test)
+    const said = room.news.filter((n: Json) => n.kind === 'decision' && !n.decision?.planned);
     assert.deepEqual(
       said.map((n: Json) => [n.text, n.decision]),
       [

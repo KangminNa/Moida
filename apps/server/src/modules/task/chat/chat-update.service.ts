@@ -15,6 +15,7 @@ import { ApprovalRepository } from '../approval/approval.repository';
 import { DecisionAsk } from '../approval/decision-ask.policy';
 import { TaskRepository } from '../task/task.repository';
 import { ChatRepository } from './chat.repository';
+import { ChatPlan } from './chat-plan.policy';
 import type { AskBriefInput, PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
 import { BriefAskedView, DeliverSetView, PostedUpdateView } from './chat-update.view';
@@ -39,6 +40,26 @@ export class ChatUpdateService extends BaseService {
       if (!place || !said || (await chats.hasUpdate(taskId, said.kind))) return;
       const chat = await chats.load(place.space_id, place.chat_id);
       chat.settled(said, taskId, place.agent_id, now);
+      await chats.save(chat);
+    });
+  }
+
+  /**
+   * 위임을 계획 판단으로 (D3, ChatUpdateHandler가 task.task.changed의 waiting에서 부른다): 대화의 일이 하위 작업을
+   * 기다리기 시작했고 앞 계획 뒤로 새로 맡긴 것이 있으면 판단 소식 하나 (ChatPlan). 두 번 와도 planned로 하나
+   */
+  async notePlan(actor: Actor, taskId: string): Promise<void> {
+    if (!(actor instanceof SystemActor)) throw new Forbidden('system');
+    const now = new Date();
+    await this.transaction(async (tx) => {
+      const chats = new ChatRepository(tx);
+      const place = await chats.placeOf(taskId);
+      if (!place) return;
+      const { parent, children, names, noted } = await chats.planOf(place.space_id, taskId);
+      const said = parent?.agent_id ? ChatPlan.line(parent, children, names, noted) : null;
+      if (!said || !parent?.agent_id) return;
+      const chat = await chats.load(place.space_id, place.chat_id);
+      chat.post(ChatPlan.KIND, said, taskId, parent.agent_id, 0, now);
       await chats.save(chat);
     });
   }

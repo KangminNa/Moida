@@ -18,7 +18,8 @@ export class SubtaskOrder extends BaseRequest {
 
   private constructor(
     readonly requestId: string,
-    readonly toAgentId: string,
+    /** 받는 일꾼. 비우면 서버가 덜 바쁜 일꾼을 고른다 (D3, DelegationPolicy.assign → assigned) */
+    readonly toAgentId: string | null,
     /** MCP 입력은 칸 이름 그대로다. 대상의 판(base_version)만 target_version으로 받는다 */
     readonly fields: Omit<TaskNew, 'id' | 'space_id'>,
     /** code 일의 고칠 수 있는 곳 (위 code 작업의 경로 안). 다른 일에는 없다 */
@@ -43,6 +44,11 @@ export class SubtaskOrder extends BaseRequest {
     super();
   }
 
+  /** 서버가 고른 일꾼을 적은 하위 작업 (받은 모양에도 적어 앞 단계 뒤에 만들 때 같은 일꾼) */
+  assigned(agentId: string): SubtaskOrder {
+    return SubtaskOrder.saved({ ...this.raw, to_agent_id: agentId });
+  }
+
   /** 위 작업에 적어 둔 하위 작업을 다시 읽는다 (앞 단계가 끝났을 때) */
   static saved(raw: unknown): SubtaskOrder {
     return BaseRequest.read({ order: raw }, (f) => SubtaskOrder.from(f.nested('order'), raw));
@@ -52,7 +58,7 @@ export class SubtaskOrder extends BaseRequest {
     const targetKind = f.optionalText('target_kind', 40);
     return new SubtaskOrder(
       f.text('request_id', 200),
-      f.uuid('to_agent_id'),
+      f.optionalText('to_agent_id', 36) === null ? null : f.uuid('to_agent_id'),
       {
         kind: f.optionalText('kind', 100) ?? 'general',
         title: f.text('title', 200),

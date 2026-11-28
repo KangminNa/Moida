@@ -121,9 +121,20 @@ export class TaskService extends BaseService {
     return this.transaction(async (tx) => {
       const tasks = new TaskRepository(tx);
       const parent = await tasks.lock(spaceId, taskId);
+      const agents = new AgentRepository(tx);
+      const org = await agents.all(spaceId);
+      const manager = org.find((a) => a.id === agentId);
+      if (!manager) throw new Forbidden(Actor.AGENT);
+      // 담당을 비운 하위 작업은 덜 바쁜 일꾼에게 (D3)
+      const orders = DelegationPolicy.assign(
+        manager,
+        org,
+        await agents.loads(spaceId),
+        req.subtasks,
+      );
       // 순서가 있는 위임 (D2): after가 있는 하위 작업은 앞 단계가 끝나면 서버가 만든다 (SubtaskService)
-      const { now: first, later } = SubtaskAfter.split(req.subtasks);
-      const kinds = req.subtasks.map((s) => String(s.fields.kind ?? Task.GENERAL));
+      const { now: first, later } = SubtaskAfter.split(orders);
+      const kinds = orders.map((s) => String(s.fields.kind ?? Task.GENERAL));
       TaskKinds.assertReady(kinds, this.plugins.packageTools());
       const keyOf = (requestId: string) => DelegationPolicy.requestIdOf(parent.id, requestId);
       const keys = first.map((s) => keyOf(s.requestId));
@@ -136,9 +147,6 @@ export class TaskService extends BaseService {
       }
       const siblings = await tasks.children(parent.id);
       parent.assertCanDelegate(agentId, req.subtasks.length, siblings.length, now);
-      const org = await new AgentRepository(tx).all(spaceId);
-      const manager = org.find((a) => a.id === agentId);
-      if (!manager) throw new Forbidden(Actor.AGENT);
       const order = (s: SubtaskOrder) =>
         parent.subtask(manager, org.find((a) => a.id === s.toAgentId) ?? null, s, now);
       later.forEach(order); // 받는 쪽 · 종류 · 한도는 지금 본다 (만들기는 앞 단계 뒤)
