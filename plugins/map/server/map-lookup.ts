@@ -23,7 +23,10 @@ export class MapLookup {
     private readonly dailyLimit: number,
   ) {}
 
-  /** 이 회사로 같은 질문을 10분 안에 다시 하면 기억한 답, 아니면 하루 상한을 세고 회사에 묻는다 */
+  /**
+   * 이 회사로 같은 질문을 10분 안에 다시 하면 기억한 답, 아니면 곳마다 분당 상한 · 하루 상한을 세고 회사에 묻는다.
+   * 기억한 답은 상한에서 세지 않는다 (2026-11-28: 같은 앱을 다시 열거나 여러 사람이 열 때 주소 찾기로 한도가 깎여 핀이 끊기던 것)
+   */
   async answer<T>(
     place: string | null,
     key: string,
@@ -32,10 +35,10 @@ export class MapLookup {
   ): Promise<T> {
     if (!this.gateway)
       throw new NotFound('지도 찾기를 켜지 않았어요 (지도 플러그인의 장소 · 주소 찾기)');
-    MapLookup.places.hit(place ?? 'unknown', now);
     const full = `${this.provider}:${key}`;
     const kept = MapLookup.remembered.get(full);
     if (kept && now - kept.at < MapLookup.REMEMBER_MS) return kept.value as T;
+    MapLookup.places.hit(place ?? 'unknown', now);
     this.spend(now);
     const value = await ask(this.gateway);
     MapLookup.remember(full, value, now);

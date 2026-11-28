@@ -157,7 +157,7 @@
 
 ## 지도 (cairn.map, 지도 플러그인)
 
-장소가 나오는 앱(맛집 · 코스 · 매장 · 여행)은 `cairn.map`으로 지도를 그린다. 어느 회사 지도인지(OpenStreetMap · 카카오 · 네이버 · 구글)는 관리자가 지도 플러그인에서 정하고, 앱 코드는 모른다. 지도 회사의 스크립트 · 키를 앱 코드에 직접 넣지 않는다.
+장소가 나오는 앱(맛집 · 코스 · 매장 · 여행)은 `cairn.map`으로 지도를 그린다. **장소가 중심인 앱은 [map-app.md](map-app.md)의 본보기에서 시작한다** (화면 구성 · 데이터 둘 곳 · 거르기 · 지도 실패가 정해져 있다). 아래는 약속만이다. 어느 회사 지도인지(OpenStreetMap · 카카오 · 네이버 · 구글)는 관리자가 지도 플러그인에서 정하고, 앱 코드는 모른다. 지도 회사의 스크립트 · 키를 앱 코드에 직접 넣지 않는다.
 
 ```html
 <div id="map" style="height:360px"></div>
@@ -172,7 +172,8 @@
 </script>
 ```
 
-- `cairn.map.create(자리, { places, zoom?, cluster?, onSelect? })` → `{ provider, map, sdk, select(i) }`. 자리에는 높이를 준다. 좌표가 있는 장소만 핀이 되고, 핀을 누르면 이름이 뜨고 `onSelect(i, place)`가 불린다. 목록에서 `select(i)`로 그 핀을 연다.
+- `cairn.map.create(자리, { places, zoom?, cluster?, onSelect? })` → `{ provider, map, sdk, select(i), update(places), pinned() }`. 자리에는 높이를 준다. 좌표가 있는(또는 주소를 찾은) 장소만 핀이 되고, 핀을 누르면 이름이 뜨고 `onSelect(i, place)`가 불린다. 목록에서 `select(i)`로 그 핀을 연다 (핀이 없는 장소면 `false`). **번호 `i`는 늘 넘긴 `places`의 번호다** (주소를 못 찾아 핀이 빠져도 어긋나지 않는다).
+- 거르기 · 찾기로 보일 장소가 바뀌면 `update(places)`로 핀만 바꾼다 (핀이 된 수를 돌려준다). 지도를 지우고 `create`를 다시 부르지 않는다. 핀이 된 장소의 번호는 `pinned()`.
 - 장소가 수십 곳 넘게 몰리면 `cluster: true`로 가까운 핀을 숫자 하나로 묶는다 (OpenStreetMap · 카카오 · 구글. 네이버는 묶지 않고 그대로 그린다). 묶기 라이브러리를 받지 못해도 핀은 그린다.
 - 지도 위의 출처 · 로고(`.leaflet-control-attribution`, 회사 로고)는 지도 회사 약관상 숨기지 않는다: `display:none` · `visibility:hidden` · `opacity:0`으로 가리면 러너 검사가 거절한다.
 - 카카오 · 네이버 · 구글 지도는 그 앱의 도메인으로 연 화면에서만 돈다 (회사 콘솔에 그 도메인을 등록한 키). 미리 보기 · 기본 도메인처럼 격리된 화면에서는 같은 코드가 OpenStreetMap으로 그린다. 고른 회사의 지도를 받지 못해도 OpenStreetMap으로 그리고, 그것도 못 받으면 Error를 던진다: 목록이 남게 한다.
