@@ -12,7 +12,7 @@ import {
 } from '../../../apps/server/src/plugin-api';
 import { siteToolName } from './api-tools';
 import { requestBuild } from './integrations';
-import { SuggestionListView } from './review-views';
+import { RETRY_DAYS, SuggestionListView } from './review-views';
 import { browseSeen, clickPlans, clicks, integrations, sites, suggestions } from './schema';
 import type { SiteRow, SuggestionRow } from './tables';
 
@@ -70,9 +70,15 @@ export async function noteBrowse(
   if (count < REPEATS) return;
   const sample = instruction.trim().slice(0, SAMPLE_MAX);
   const found = await work.row(suggestions, { site_id: site.id, key });
-  if (found && found.status !== 'open') return;
+  // 못 만든 제안은 30일이 지나야 다시 연다 (그동안은 브라우저로 한다)
+  const retry = found?.status === 'failed' && retryAt(found) <= new Date();
+  if (found && found.status !== 'open' && !retry) return;
   if (found)
-    await work.updateRows(suggestions, { count, sample, last_seen_at: Rule.now }, { id: found.id });
+    await work.updateRows(
+      suggestions,
+      { count, sample, last_seen_at: Rule.now, ...(retry ? { status: 'open' } : {}) },
+      { id: found.id },
+    );
   else
     await work.insertRows(suggestions, {
       space_id: site.space_id,
@@ -95,6 +101,21 @@ async function buildRepeat(
   open: Readonly<SuggestionRow>,
 ): Promise<void> {
   if (await work.exists(integrations, { site_id: site.id, status: 'building' })) return;
+  // 못 만들어 꺼 둔 도구가 있으면 그 도구를 다시 굳힌다 (새 도구를 늘리지 않는다)
+  const old = open.integration_id
+    ? await work.row(integrations, { id: open.integration_id, status: 'off' })
+    : null;
+  if (old) {
+    const next = { ...old, status: 'building' as const, version: old.version + 1 };
+    await work.updateRows(
+      integrations,
+      { status: 'building', version: next.version, updated_at: Rule.now },
+      { id: old.id, version: old.version },
+    );
+    await suggestionMade(work, site.space_id, open.id, old.id);
+    requestBuild(work, site.space_id, next, `repeat:${open.id}:${next.version}`, null);
+    return;
+  }
   const name = await siteToolName(work, site.space_id, site, 'repeat');
   await work.insertRows(integrations, {
     space_id: site.space_id,
@@ -178,7 +199,7 @@ export async function suggestWriteTool(
   return true;
 }
 
-/** GET /api/p/browser-tabs/suggestions: 열린 제안 (관리자, 최근 것부터) */
+/** GET /api/p/browser-tabs/suggestions: 열린 제안과 못 만든 제안 (관리자, 최근 것부터) */
 export class ListSuggestions extends Read<null> {
   readonly name = 'suggestions';
   readonly allow = Operation.OWNER;
@@ -193,7 +214,7 @@ export class ListSuggestions extends Read<null> {
       suggestions,
       {
         space_id: space,
-        status: 'open',
+        status: ['open', 'failed'],
         last_seen_at: Rule.after(new Date(Date.now() - 60 * DAY_MS)),
       },
       { order: ['last_seen_at desc'], limit: 20 },
@@ -224,6 +245,33 @@ export class DismissSuggestion extends Command<{ id: string; version: number }> 
     if (changed === 0) throw new Conflict('다른 곳에서 먼저 고쳤어요. 새로 불러와 주세요');
     return new ListSuggestions().run(work, actor);
   }
+}
+
+/** 못 만든 제안을 다시 굳힐 수 있는 때 */
+function retryAt(row: Readonly<Pick<SuggestionRow, 'failed_at'>>): Date {
+  return new Date((row.failed_at?.getTime() ?? 0) + RETRY_DAYS * DAY_MS);
+}
+
+/**
+ * 그 도구를 굳히지 못했다 (굳히기 작업이 실패 · 취소로 끝남, buildSettled): 그 도구로 닫은 제안을 failed로 두고 까닭 · 때를 남긴다.
+ * 30일 동안 다시 굳히지 않는다 (noteBrowse). 제안 없이 관리자가 만든 도구면 아무것도 하지 않는다
+ */
+export async function suggestionFailed(
+  work: Work,
+  space: string,
+  integrationId: string,
+  reason: string,
+): Promise<void> {
+  await work.updateRows(
+    suggestions,
+    {
+      status: 'failed',
+      failed_at: Rule.now,
+      fail_reason: reason.slice(0, 300),
+      updated_at: Rule.now,
+    },
+    { space_id: space, integration_id: integrationId, status: 'made' },
+  );
 }
 
 /** 도구를 만들었다: 그 제안을 닫는다 (BuildIntegration). 없는 제안이면 아무것도 하지 않는다 */

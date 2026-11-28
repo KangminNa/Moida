@@ -10,6 +10,7 @@ import {
 import { endpointsFor } from './api-tools';
 import { BuildPartView, BuildSavedView } from './integration-views';
 import { INTEGRATION_TARGET, leasedBrowse } from './job';
+import { suggestionFailed } from './repeats';
 import { requestReview } from './reviews';
 import { integrationRevisions, integrations, runs } from './schema';
 import { Shape } from './shape';
@@ -256,8 +257,16 @@ export async function enableDecided(
   );
 }
 
-/** 굳히기 작업이 실패 · 취소로 끝났다: 굳히는 중인 도구를 끈다 (마지막 실패 까닭과 함께) */
-export async function buildSettled(work: Work, spaceId: string, taskId: string): Promise<boolean> {
+/**
+ * 굳히기 작업이 실패 · 취소로 끝났다: 굳히는 중인 도구를 끈다 (마지막 실패 까닭과 함께). 되풀이 제안에서 시작한 도구면
+ * 그 제안을 못 만듦(failed)으로 (C4, 2026-11-28). error: 작업의 실패 글 (취소면 null)
+ */
+export async function buildSettled(
+  work: Work,
+  spaceId: string,
+  taskId: string,
+  error: string | null,
+): Promise<boolean> {
   const row = await work.row(integrations, {
     space_id: spaceId,
     build_task_id: taskId,
@@ -274,5 +283,6 @@ export async function buildSettled(work: Work, spaceId: string, taskId: string):
     },
     { id: row.id, version: row.version },
   );
+  await suggestionFailed(work, spaceId, row.id, error || '굳히기 작업이 멈췄어요');
   return true;
 }

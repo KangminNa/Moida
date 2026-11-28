@@ -3,6 +3,9 @@ import type { IntegrationReviewRow, SuggestionRow } from './tables';
 // MCP 3단계(2026-11-16)가 내보내는 모양: 검토(콘솔 · 검토자 MCP)와 되풀이 제안(콘솔)
 
 /** 되풀이되는 일 제안 목록 (콘솔) */
+/** 못 만든 제안을 다시 굳히기까지 (C4 못 만듦, 2026-11-28, repeats.ts가 함께 쓴다) */
+export const RETRY_DAYS = 30;
+
 export class SuggestionListView {
   constructor(
     private readonly rows: readonly Readonly<SuggestionRow>[],
@@ -18,6 +21,12 @@ export class SuggestionListView {
         count: r.count,
         sample: r.sample,
         note: r.note,
+        /** open · failed (못 만듦: 까닭 failReason, 다시 굳힐 수 있는 때 retryAt) */
+        status: r.status,
+        failReason: r.fail_reason,
+        retryAt: r.failed_at
+          ? new Date(r.failed_at.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString()
+          : null,
         version: r.version,
         lastSeenAt: r.last_seen_at.toISOString(),
       })),

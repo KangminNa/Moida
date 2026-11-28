@@ -229,4 +229,6 @@ export const suggestions = browserTabsSchema.table('suggestions', {
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
   version: integer('version').notNull(),
   note: text('note').notNull(),
+  failed_at: timestamp('failed_at', { withTimezone: true }),
+  fail_reason: text('fail_reason').notNull(),
 });

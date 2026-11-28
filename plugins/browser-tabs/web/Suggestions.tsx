@@ -5,7 +5,8 @@ import type { BuildSeed, Call, Suggestion } from './browser-types';
 // 승인한 누르기 계획으로 누른 일에서 쓰기 API가 기록되면 바로 제안한다 (2026-11-21, note에 까닭. 폼은 쓰기 모드로 연다).
 // "도구로 만들기"는 아래 폼을 사이트 · 힌트(예시 지시)로 채워 연다. "그만 보기"면 다시 내지 않는다.
 // 되풀이 읽기 일은 서버가 묻지 않고 굳힌다 (2026-11-24, 설정 autoRepeatTools): 여기에는 쓰기 제안 · 설정을 끈 때 · 그 사이트가
-// 다른 도구를 굳히는 중이라 기다리는 제안만 남는다
+// 다른 도구를 굳히는 중이라 기다리는 제안만 남는다. 굳히지 못한 제안은 "못 만듦: 까닭"으로 남고 30일 뒤 다시 되풀이되면
+// 서버가 같은 도구를 다시 굳힌다 (C4, 2026-11-28). 그동안 그 일은 브라우저로 한다
 
 export function Suggestions({
   call,
@@ -54,24 +55,34 @@ export function Suggestions({
             </span>
             <span className="text">{s.sample}</span>
             {s.note && <span className="note">{s.note}</span>}
+            {s.status === 'failed' && (
+              <span className="note">
+                못 만듦: {s.failReason || '까닭 없음'}
+                {s.retryAt
+                  ? ` · ${new Date(s.retryAt).toLocaleDateString('ko-KR')}부터 다시 해 봐요`
+                  : ''}
+              </span>
+            )}
             <div className="row">
-              <button
-                type="button"
-                className="ghost small fit"
-                onClick={() =>
-                  onPick({
-                    key: s.id,
-                    siteId: s.siteId,
-                    hint: s.note
-                      ? `${s.note}\n지시 예:\n${s.sample}`
-                      : `되풀이된 지시 예:\n${s.sample}`,
-                    suggestionId: s.id,
-                    mode: s.note ? 'write' : 'read',
-                  })
-                }
-              >
-                도구로 만들기
-              </button>
+              {s.status !== 'failed' && (
+                <button
+                  type="button"
+                  className="ghost small fit"
+                  onClick={() =>
+                    onPick({
+                      key: s.id,
+                      siteId: s.siteId,
+                      hint: s.note
+                        ? `${s.note}\n지시 예:\n${s.sample}`
+                        : `되풀이된 지시 예:\n${s.sample}`,
+                      suggestionId: s.id,
+                      mode: s.note ? 'write' : 'read',
+                    })
+                  }
+                >
+                  도구로 만들기
+                </button>
+              )}
               <button
                 type="button"
                 className="ghost small fit"
