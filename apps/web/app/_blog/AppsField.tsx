@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../_lib/client-api';
 import './apps-field.css';
-import { AppsTiles, type FieldApp } from './AppsTiles';
+import { AppsDeck, type DeckApp, type DeckNews } from './AppsDeck';
 import { FieldParticles, type FieldShape } from './field-particles';
 
 // 공통 앱 도메인의 첫 화면 (C안 "가득 찬 화면", 사용자 시안 2026-11-27): 화면 가득 점 그림 위에 소개 네 단계가 5.2초마다 넘어가고,
-// 아래 가운데의 떠 있는 버튼으로 소개 ↔ 앱을 바꾼다. 앱으로 가면 배경이 밝아지고 점이 화면 가득 흩어진다.
+// 아래 가운데의 떠 있는 버튼으로 소개 ↔ 앱을 바꾼다. 앱으로 가면 같은 어두운 바탕에서 점이 화면 가득 흩어지고
+// 앱 카드를 옆으로 넘겨 본다 (D1, 2026-11-28: AppsDeck). 카드를 넘기면 점이 그쪽으로 한 번 쏠린다.
 // 앱 보기는 주소(?view=apps)에 둔다: 폰의 뒤로 가기가 소개로 돌아오고, 새로 고쳐도 그대로다 (웹 규칙 뒤로 가기)
 
 type View = 'intro' | 'apps';
@@ -50,6 +51,9 @@ export function AppsField({
   name,
   logo,
   apps,
+  news,
+  extra,
+  extraFirst,
   loginHref,
   joinHref,
   signedIn,
@@ -57,7 +61,12 @@ export function AppsField({
 }: {
   name: string;
   logo: string | null;
-  apps: readonly FieldApp[];
+  apps: readonly DeckApp[];
+  news: readonly DeckNews[];
+  /** 앱 보기 카드 아래 (플러그인 자리 store.after) */
+  extra: ReactNode;
+  /** 메일 링크로 왔으면 extra를 앱 보기 맨 위에 */
+  extraFirst: boolean;
   loginHref: string | null;
   joinHref: string | null;
   /** 이 도메인에 로그인한 계정 (앱 없는 로그인 · 어느 앱에서 한 로그인이든): 보일 이름과 로그아웃의 쓰기 확인 값 */
@@ -116,6 +125,9 @@ export function AppsField({
       setView('intro');
     }
   }, []);
+
+  // 다음 카드로 가면 카드가 왼쪽으로 흐르니 점도 왼쪽으로
+  const turned = useCallback((toward: -1 | 1) => field.current?.pulse(0.7, -toward), []);
 
   const now = STAGES[stage] ?? STAGES[0];
   return (
@@ -217,7 +229,9 @@ export function AppsField({
         </>
       )}
 
-      {view === 'apps' && <AppsTiles apps={apps} />}
+      {view === 'apps' && (
+        <AppsDeck apps={apps} news={news} extra={extra} extraFirst={extraFirst} onTurn={turned} />
+      )}
 
       <nav className="fd-pill" aria-label="보기">
         <button

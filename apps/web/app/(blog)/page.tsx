@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { AppsHome } from '../_blog/AppsHome';
+import { appsOrigin } from '../_blog/apps-domain';
 import { SiteFooter } from '../_blog/SiteFooter';
-import { StoreHome } from '../_blog/StoreHome';
 import { siteNow } from '../_blog/site';
 
 // 첫 화면 (스토어 1-4, 시안 6 · 7 · 8번): 관리자가 공개 앱 하나로 고정했으면 그 앱으로(스토어 2단계, 설정 › 사이트 "첫 화면"),
-// 아니면 자동: 공개 앱이 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다), 0개 · 2개 이상이면 스토어 첫 화면
-// (2026-11-26, _blog/StoreHome). 스토어 첫 화면은 고정 · 앱 하나와 상관없이 /store에서도 열린다. 관리자가 열어도 방문자가 보는 그대로다.
+// 아니면 자동: 공개 앱이 1개면 그 앱의 주소로 보내고(스토어 1-6: 앱 화면은 앱 코드가 그린다), 0개 · 2개 이상이면 첫 화면
+// (소개 + 넘겨 보는 앱 카드, _blog/AppsHome, 2026-11-28). 첫 화면은 고정 · 앱 하나와 상관없이 /store에서도 열린다. 관리자가 열어도 방문자가 보는 그대로다.
+// 공통 앱 도메인을 정한 배포에서는 proxy가 이 / 를 그 도메인으로 넘긴다
 export const dynamic = 'force-dynamic';
 
 /** 예전 관리 시트 주소 (?sheet=이름). 이미 저장된 링크가 있어서 콘솔 주소로 넘긴다 */
@@ -19,7 +21,7 @@ const OLD_SHEETS: Record<string, string> = {
   account: '/admin/account',
 };
 
-type Search = { sheet?: string; session?: string; error?: string };
+type Search = { sheet?: string; session?: string; error?: string; view?: string };
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await siteNow();
@@ -54,7 +56,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   if (only && site.apps.length === 1) redirect(only.url);
   return (
     <>
-      <StoreHome site={site} mail={{ mail: null, token: null }} />
+      <AppsHome
+        site={site}
+        appsOrigin={appsOrigin()}
+        view={search.view === 'apps' ? 'apps' : 'intro'}
+      />
       <SiteFooter site={site} />
     </>
   );

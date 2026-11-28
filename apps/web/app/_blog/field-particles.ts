@@ -1,5 +1,5 @@
 // 공통 앱 도메인 첫 화면(C안, 2026-11-27)의 점 그림. 점 수천 개가 모양(일 카드 · 이어진 컴퓨터 · 도는 고리 · 구)으로 모였다가
-// 앱 목록에서는 화면 가득 흩어진다. 마우스가 지나가면 밀려난다. 움직임을 줄이는 설정이면 돌지 않고 바로 자리를 잡는다.
+// 앱 보기에서는 어두운 바탕 그대로 화면 가득 흩어져 옅어진다(2026-11-28 D1). 마우스가 지나가면 밀려난다. 움직임을 줄이는 설정이면 돌지 않고 바로 자리를 잡는다.
 // React와 상관없는 그리기만 (AppsField가 만들고 모양을 바꾸고 멈춘다).
 // 로그인 · 가입 화면(AuthField, 2026-11-28)은 'account' 모양을 왼쪽에 두고, 글자를 칠 때마다 점을 밖으로 한 번 민다(pulse)
 
@@ -81,14 +81,12 @@ export class FieldParticles {
   private readonly dots: Dot[] = [];
   private readonly reduced: boolean;
   private readonly paper: [number, number, number];
-  private readonly ink: [number, number, number];
   private shape: FieldShape = 'dust';
   private mx = -9999;
   private my = -9999;
   private t = 0;
   private rot = 0;
   private tilt = 0;
-  private inked = 0;
   private dim = 1;
   private last = 0;
   private raf = 0;
@@ -112,7 +110,6 @@ export class FieldParticles {
     this.reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const style = getComputedStyle(canvas);
     this.paper = rgbOf(style.getPropertyValue('--field-paper'), [239, 238, 233]);
-    this.ink = rgbOf(style.getPropertyValue('--field-ink'), [21, 21, 24]);
     const count = (canvas.clientWidth || 1440) < 720 ? 1800 : 4200;
     for (let i = 0; i < count; i++)
       this.dots.push({
@@ -148,14 +145,17 @@ export class FieldParticles {
     });
   }
 
-  /** 점을 가운데에서 밖으로 한 번 민다 (s: 세기, 글자를 칠 때 0.35 · 탭을 바꿀 때 0.8). 움직임을 줄이는 설정이면 하지 않는다 */
-  pulse(s: number): void {
+  /**
+   * 점을 한 번 민다 (s: 세기, 글자를 칠 때 0.35 · 탭을 바꿀 때 0.8). toward를 주면 그쪽(-1 왼쪽 · 1 오른쪽)으로 쏠리고
+   * (앱 카드를 넘길 때), 없으면 가운데에서 밖으로. 움직임을 줄이는 설정이면 하지 않는다
+   */
+  pulse(s: number, toward = 0): void {
     if (this.reduced) return;
     for (const p of this.dots) {
       const d = Math.hypot(p.x, p.y) || 1;
       const f = (3 + p.r3 * 8) * s;
-      p.ox += (p.x / d) * f;
-      p.oy += (p.y / d) * f;
+      p.ox += toward === 0 ? (p.x / d) * f : toward * f * (0.6 + p.r2);
+      p.oy += toward === 0 ? (p.y / d) * f : 0;
     }
   }
 
@@ -264,7 +264,6 @@ export class FieldParticles {
     }
     this.tilt += ((spin ? -0.22 : 0) - this.tilt) * Math.min(1, dt * 1.6);
     const apps = shape === 'dust';
-    this.inked += ((apps ? 1 : 0) - this.inked) * Math.min(1, dt * 2.4);
     this.dim += ((apps ? 0.42 : 1) - this.dim) * Math.min(1, dt * 2.4);
     if (shape === 'orbit' || shape === 'nodes' || shape === 'account')
       this.dots.forEach((p, i) => {
@@ -282,11 +281,9 @@ export class FieldParticles {
 
   private draw(step: number): void {
     const { ctx, canvas, R, cx, cy, dpr, mx, my, t } = this;
-    const mix = (i: 0 | 1 | 2) =>
-      Math.round(this.paper[i] + (this.ink[i] - this.paper[i]) * this.inked);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = `rgb(${mix(0)},${mix(1)},${mix(2)})`;
+    ctx.fillStyle = `rgb(${this.paper.join(',')})`;
     const [cosR, sinR, cosT, sinT] = [
       Math.cos(this.rot),
       Math.sin(this.rot),
@@ -294,8 +291,8 @@ export class FieldParticles {
       Math.sin(this.tilt),
     ];
     const F = 3.4;
-    const wob = this.reduced ? 0 : 0.014;
-    const base = (0.9 - 0.25 * this.inked) * this.dim;
+    const wob = this.reduced ? 0 : this.shape === 'dust' ? 0.05 : 0.014; // 앱 보기의 흩어진 점은 크게 떠다닌다
+    const base = 0.9 * this.dim;
     for (const p of this.dots) {
       const kk = this.reduced ? 1 : Math.min(1, p.k * step);
       p.x += (p.tx - p.x) * kk;
