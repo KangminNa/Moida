@@ -29,6 +29,7 @@ import type {
 import type { ChatDetailView, ChatListView } from '../../../server/src/modules/task/chat/chat.view';
 import type { ChatTrashView } from '../../../server/src/modules/task/chat/chat-trash.view';
 import type {
+  ConnectorPresetListView,
   ExternalToolListView,
   OAuthStartView,
 } from '../../../server/src/modules/task/external-tool/external-tool.view';
@@ -108,6 +109,8 @@ export type AgentLead = ReturnType<AgentLeadView['toJSON']>;
 /** 외부 도구 (2차 7단계). 토큰은 실리지 않는다 (hasSecret만) */
 export type ExternalToolList = ReturnType<ExternalToolListView['toJSON']>;
 export type ExternalTool = ExternalToolList['tools'][number];
+/** 추천 커넥터 (C2): 저장소의 공식 원격 MCP 목록과 이미 더했는지 */
+export type ConnectorPresetList = ReturnType<ConnectorPresetListView['toJSON']>;
 /** OAuth 커넥터의 로그인 시작 (C1): 같은 탭으로 열 로그인 서버의 주소 */
 /** API 커넥터 (2026-11-24): 일꾼이 낸 정의서로 붙인 REST API. 키는 넣었는지만 */
 export type ApiConnectorList = ReturnType<ApiConnectorListView['toJSON']>;

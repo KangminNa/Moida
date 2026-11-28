@@ -1,4 +1,5 @@
 import { ApiConnectorPanel } from './ApiConnectorPanel';
+import { ConnectorPresets } from './ConnectorPresets';
 import { ExternalToolPanel } from './ExternalToolPanel';
 import { MadeToolsPanel } from './MadeToolsPanel';
 
@@ -15,6 +16,7 @@ export default async function ExternalToolPage({
   return (
     <section className="console-inner narrow" aria-label="외부 도구">
       <ExternalToolPanel connected={connected ?? null} oauthProblem={problem ?? null} />
+      <ConnectorPresets />
       <ApiConnectorPanel />
       <MadeToolsPanel />
     </section>

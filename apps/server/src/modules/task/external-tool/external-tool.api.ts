@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/com
 import { type Actor, CurrentActor } from '../../platform';
 import type { TaskView } from '../task/task.view';
 import {
+  AddPresetInput,
   ApproveCatalogInput,
   CheckExternalToolInput,
   CreateExternalToolInput,
@@ -11,7 +12,11 @@ import {
 } from './external-tool.input';
 import { ExternalToolQuery } from './external-tool.query';
 import { ExternalToolService } from './external-tool.service';
-import type { ExternalToolListView, ExternalToolView } from './external-tool.view';
+import type {
+  ConnectorPresetListView,
+  ExternalToolListView,
+  ExternalToolView,
+} from './external-tool.view';
 import { ExternalToolCheckService } from './external-tool-check.service';
 
 // 외부 도구 API (2차 7단계, 관리자만). Input 만들기 → Service·Query 메서드 하나 → View. 권한은 Service·Query 첫 줄에서.
@@ -27,6 +32,22 @@ export class ExternalToolController {
   @Get()
   list(@CurrentActor() actor: Actor): Promise<ExternalToolListView> {
     return this.query.list(actor);
+  }
+
+  /** 추천 커넥터 (C2): 저장소의 공식 원격 MCP 목록 */
+  @Get('presets')
+  presets(@CurrentActor() actor: Actor): Promise<ConnectorPresetListView> {
+    return this.query.presets(actor);
+  }
+
+  /** 추천 커넥터 더하기: 만들고 모든 일꾼에게 허락 */
+  @Post('presets/:key')
+  async addPreset(
+    @CurrentActor() actor: Actor,
+    @Param('key') key: string,
+    @Body() body: unknown,
+  ): Promise<ExternalToolView> {
+    return (await this.service.addPreset(actor, AddPresetInput.from(key, body))).view();
   }
 
   @Post()

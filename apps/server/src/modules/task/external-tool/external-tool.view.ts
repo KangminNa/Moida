@@ -147,3 +147,39 @@ export class ConnectorSettingsView {
     return { connectors: this.items.map((i) => i.toJSON()) };
   }
 }
+
+/** 추천 커넥터 하나 (C2): 저장소의 목록 한 줄과 이미 더했는지 (같은 이름 · 같은 주소의 커넥터) */
+export class ConnectorPresetView {
+  constructor(
+    private readonly preset: Readonly<{
+      key: string;
+      title: string;
+      url: string;
+      auth: string;
+      does: string;
+      setup?: string;
+    }>,
+    private readonly added: boolean,
+  ) {}
+
+  toJSON() {
+    const p = this.preset;
+    return {
+      key: p.key,
+      title: p.title,
+      url: p.url,
+      auth: p.auth,
+      does: p.does,
+      setup: p.setup ?? null,
+      added: this.added,
+    };
+  }
+}
+
+export class ConnectorPresetListView {
+  constructor(private readonly presets: readonly ConnectorPresetView[]) {}
+
+  toJSON() {
+    return { presets: this.presets.map((p) => p.toJSON()) };
+  }
+}

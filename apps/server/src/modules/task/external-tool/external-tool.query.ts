@@ -12,8 +12,11 @@ import type { Agent } from '../agent/agent';
 import type { JobToolView } from '../task/job.view';
 import { externalTools } from '../task.schema';
 import type { TaskRow } from '../task.tables';
+import { ConnectorPresets } from './connector-preset.policy';
 import { ExternalTool } from './external-tool';
 import {
+  ConnectorPresetListView,
+  ConnectorPresetView,
   ConnectorSettingsView,
   ConnectorSettingView,
   ExternalToolListView,
@@ -28,6 +31,21 @@ export class ExternalToolQuery extends BaseQuery {
     private readonly box: SecretBox,
   ) {
     super(db);
+  }
+
+  /** 추천 커넥터 (C2, 주인만): 저장소의 목록과 이미 더했는지 (같은 이름이나 같은 주소의 커넥터가 있음) */
+  async presets(actor: Actor): Promise<ConnectorPresetListView> {
+    actor.assertOwner();
+    const rows = await this.rows(externalTools, { space_id: actor.requireSpace() });
+    return new ConnectorPresetListView(
+      ConnectorPresets.ALL.map(
+        (p) =>
+          new ConnectorPresetView(
+            p,
+            rows.some((r) => r.name === p.name || r.url === p.url),
+          ),
+      ),
+    );
   }
 
   /** 콘솔의 외부 도구 메뉴 (주인만). 이름순, 도구마다 허락한 에이전트 */

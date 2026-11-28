@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   Actor,
   AgentActor,
+  Conflict,
   Database,
   EntityService,
   Forbidden,
@@ -16,8 +17,10 @@ import {
 import { AgentRepository } from '../agent/agent.repository';
 import { SettingChanges } from '../setting-change/setting-change.policy';
 import { ConnectorEdit } from './connector-edit';
+import { ConnectorPresets } from './connector-preset.policy';
 import { ExternalTool } from './external-tool';
 import type {
+  AddPresetInput,
   CreateExternalToolInput,
   ExternalToolSecretInput,
   PlugDecisionInput,
@@ -66,6 +69,37 @@ export class ExternalToolService extends EntityService<ExternalTool> {
       const tool = ExternalTool.open(spaceId, req.name, req.fields, now);
       if (secret) tool.setSecret(secret, now);
       await tools.save(tool);
+      await once.remember({ id: tool.id });
+      return tool;
+    });
+  }
+
+  /**
+   * 추천 커넥터 더하기 (C2): 목록의 칸으로 만들고 지우지 않은 모든 에이전트(대표 포함)에게 허락한다 (허락할 자리가 남은
+   * 에이전트만, AgentScopes). 같은 이름이 있으면 409, 같은 requestId는 처음 만든 것. 토큰 · 로그인은 그 뒤 목록에서.
+   * 잠그는 순서는 도구 → 에이전트
+   */
+  async addPreset(actor: Actor, req: AddPresetInput): Promise<ExternalTool> {
+    actor.assertOwner();
+    const spaceId = actor.requireSpace();
+    const preset = ConnectorPresets.find(req.key);
+    return this.transaction(async (tx) => {
+      const tools = this.store(tx);
+      const owner = actor.id ?? spaceId;
+      const once = new Idempotency(tx, owner, req.requestId, ExternalToolService.CREATE);
+      const before = await once.previous();
+      if (before) return tools.load(spaceId, String(before.id));
+      if ((await tools.missing(spaceId, [preset.name])).length === 0)
+        throw new Conflict(`같은 이름의 커넥터가 있어요: ${preset.name}`);
+      const now = new Date();
+      const tool = ExternalTool.open(spaceId, preset.name, ConnectorPresets.fields(preset), now);
+      await tools.save(tool);
+      const agents = new AgentRepository(tx);
+      for (const agent of await agents.lockAll(spaceId)) {
+        if (agent.toolProblem(preset.name) !== null) continue;
+        agent.plugTool(preset.name);
+        await agents.save(agent);
+      }
       await once.remember({ id: tool.id });
       return tool;
     });
