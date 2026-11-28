@@ -48,7 +48,7 @@ describe('서버 브라우저 화면', () => {
 
   test('클릭은 옮기고 · 누르고 · 떼고, 좌표를 그대로 보낸다', async () => {
     cdp.calls.length = 0;
-    await screen.control(D, { type: 'click', x: 10, y: 20 });
+    await screen.control(D, { type: 'click', x: 10, y: 20, count: 1 });
     const mouse = cdp.calls.filter((c) => c.method === 'Input.dispatchMouseEvent');
     assert.deepEqual(
       mouse.map((c) => [c.params.type, c.params.x, c.params.y]),
@@ -63,8 +63,8 @@ describe('서버 브라우저 화면', () => {
 
   test('Enter는 글자(\\r)와 함께 눌러 폼을 보내고, 화살표는 글자 없이', async () => {
     cdp.calls.length = 0;
-    await screen.control(A, { type: 'key', key: 'Enter' });
-    await screen.control(A, { type: 'key', key: 'ArrowDown' });
+    await screen.control(A, { type: 'key', key: 'Enter', mods: 0 });
+    await screen.control(A, { type: 'key', key: 'ArrowDown', mods: 0 });
     const keys = cdp.calls.map((c) => [c.params.type, c.params.key, c.params.text]);
     assert.deepEqual(keys, [
       ['keyDown', 'Enter', '\r'],
@@ -89,6 +89,67 @@ describe('서버 브라우저 화면', () => {
     ]);
     assert.equal(cdp.calls[0]?.params.text, '안녕');
     assert.equal(cdp.calls[3]?.params.entryId, 11, '지금(1)의 앞 항목');
+  });
+
+  test('더블클릭 · 끌기 · 마우스 올리기', async () => {
+    cdp.calls.length = 0;
+    await screen.control(A, { type: 'click', x: 1, y: 2, count: 2 });
+    await screen.control(A, { type: 'press', x: 5, y: 5 });
+    await screen.control(A, { type: 'move', x: 50, y: 5 });
+    await screen.control(A, { type: 'release', x: 50, y: 5 });
+    await screen.control(A, { type: 'hover', x: 9, y: 9 });
+    const mouse = cdp.calls.map((c) => [c.params.type, c.params.clickCount, c.params.buttons]);
+    assert.deepEqual(mouse, [
+      ['mouseMoved', undefined, undefined],
+      ['mousePressed', 1, undefined],
+      ['mouseReleased', 1, undefined],
+      ['mousePressed', 2, undefined],
+      ['mouseReleased', 2, undefined],
+      ['mouseMoved', undefined, undefined],
+      ['mousePressed', 1, 1],
+      ['mouseMoved', undefined, 1],
+      ['mouseReleased', 1, 0],
+      ['mouseMoved', undefined, undefined],
+    ]);
+  });
+
+  test('조합 키: Ctrl+A는 글자 없이 전체 선택, Shift+Tab은 조합만 싣는다', async () => {
+    cdp.calls.length = 0;
+    await screen.control(A, { type: 'key', key: 'a', mods: 2 });
+    await screen.control(A, { type: 'key', key: 'Tab', mods: 8 });
+    const keys = cdp.calls.map((c) => [
+      c.params.type,
+      c.params.key,
+      c.params.modifiers,
+      c.params.commands,
+    ]);
+    assert.deepEqual(keys, [
+      ['rawKeyDown', 'a', 2, ['selectAll']],
+      ['keyUp', 'a', 2, undefined],
+      ['rawKeyDown', 'Tab', 8, undefined],
+      ['keyUp', 'Tab', 8, undefined],
+    ]);
+  });
+
+  test('새 탭은 주소(없으면 빈 탭)를 열고 id를, 마지막 탭을 닫으면 빈 탭을 먼저 연다', async () => {
+    const before = cdp.targets.map((t) => ({ ...t }));
+    try {
+      const cast = new ScreenCastGateway(screen);
+      const id = await cast.control(A, { type: 'newTab', url: 'https://example.net/a?b=1' });
+      assert.ok(id && cdp.targets.some((t) => t.id === id));
+      assert.equal(cdp.opened.at(-1), 'https://example.net/a?b=1');
+      await cast.control(A, { type: 'newTab', url: null });
+      assert.equal(cdp.opened.at(-1), 'about:blank');
+      await cast.control(id ?? '', { type: 'closeTab' });
+      assert.ok(!cdp.targets.some((t) => t.id === id));
+      cdp.targets = cdp.targets.filter((t) => t.id === A);
+      const opened = cdp.opened.length;
+      await cast.control(A, { type: 'closeTab' });
+      assert.equal(cdp.opened.length, opened + 1, '마지막 탭이라 빈 탭을 먼저');
+      await assert.rejects(cast.control(A, { type: 'closeTab' }), /닫힌 탭이에요/);
+    } finally {
+      cdp.targets = before;
+    }
   });
 
   test('앞으로 · 새로고침', async () => {
@@ -124,6 +185,7 @@ describe('화면 동작의 입력', () => {
   test('종류마다 칸을 읽는다', () => {
     assert.deepEqual(control.input({ tab: A, type: 'click', x: 1, y: 2 }).action, {
       type: 'click',
+      count: 1,
       x: 1,
       y: 2,
     });
@@ -134,6 +196,10 @@ describe('화면 동작의 입력', () => {
   test('모르는 종류 · 키, http(s)가 아닌 주소, 이상한 탭 id, 범위 밖 좌표는 400', () => {
     bad({ tab: A, type: 'drag' }, 'type');
     bad({ tab: A, type: 'key', key: 'F12' }, 'key');
+    bad({ tab: A, type: 'key', key: 'a' }, 'key');
+    bad({ tab: A, type: 'key', key: 'Tab', mods: 16 }, 'mods');
+    bad({ tab: A, type: 'click', x: 1, y: 2, count: 3 }, 'count');
+    bad({ tab: A, type: 'newTab', url: 'file:///etc/passwd' }, 'url');
     bad({ tab: A, type: 'navigate', url: 'javascript:alert(1)' }, 'url');
     bad({ tab: '../json', type: 'back' }, 'tab');
     bad({ tab: A, type: 'click', x: -1, y: 0 }, 'x');

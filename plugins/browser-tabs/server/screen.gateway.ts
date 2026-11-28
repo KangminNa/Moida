@@ -1,5 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { BaseGateway } from '../../../apps/server/src/plugin-api';
+import { type ScreenAction, ScreenActions, type Send } from './screen-actions';
 
 // 서버 브라우저의 화면을 콘솔로 중계하는 길 (CDP, 2026-11-14). 영상 없이 HTTPS만으로 보고 누르고, 사이트 세션을 지운다.
 // 브라우저 컨테이너 안의 중계(cdp-relay.py 9223 → Chrome 127.0.0.1:9222)는 서버와 브라우저만 붙는 망(browser)에서만 닿는다
@@ -19,35 +20,7 @@ export type ScreenShot = {
   height: number;
 };
 
-/** 화면에 보내는 동작. 좌표는 그림 위의 CSS 픽셀 */
-export type ScreenAction =
-  | { type: 'click'; x: number; y: number }
-  | { type: 'scroll'; x: number; y: number; dy: number }
-  | { type: 'text'; text: string }
-  | { type: 'key'; key: string }
-  | { type: 'navigate'; url: string }
-  | { type: 'back' }
-  | { type: 'forward' }
-  | { type: 'reload' }
-  | { type: 'activate' };
-
-/** 보낼 수 있는 키 (키 이름 → Windows 키 코드 · 함께 들어가는 글자) */
-const KEYS: Record<string, { code: number; text?: string }> = {
-  Enter: { code: 13, text: '\r' },
-  Tab: { code: 9 },
-  Backspace: { code: 8 },
-  Escape: { code: 27 },
-  ArrowUp: { code: 38 },
-  ArrowDown: { code: 40 },
-  ArrowLeft: { code: 37 },
-  ArrowRight: { code: 39 },
-};
-
-export type Send = (method: string, params?: object) => Promise<Record<string, unknown>>;
-
 export class BrowserScreenGateway extends BaseGateway {
-  /** 보낼 수 있는 키 이름 (입력 검사가 쓴다) */
-  static readonly KEY_NAMES: readonly string[] = Object.keys(KEYS);
   /** 탭 id의 모양 (Chrome은 32자리 16진수). 주소에 넣기 전에 본다 */
   static readonly TAB_ID = /^[A-Za-z0-9]{1,64}$/;
   /** 콘솔에 보여 줄 탭 수 */
@@ -127,7 +100,38 @@ export class BrowserScreenGateway extends BaseGateway {
       const base = await this.base();
       const tabs = await this.tabs(base, signal);
       if (!tabs.some((t) => t.id === tab)) throw new Error('닫힌 탭이에요');
-      await this.session(base, tab, signal, (send) => BrowserScreenGateway.act(send, action));
+      await this.session(base, tab, signal, (send) => ScreenActions.act(send, action));
+    });
+  }
+
+  /**
+   * 새 탭 (2026-11-28 브라우저처럼): 로그인된 프로필(기본 컨텍스트)에 주소 하나를 연다(없으면 빈 탭). 연 탭의 id.
+   * 주소는 http(s)만 들어온다 (ScreenControl). 막은 이름(이 서버 · compose 서비스)은 Chrome의 정책이 다시 막는다
+   */
+  openTab(url: string | null): Promise<string> {
+    return this.call(async (signal) => {
+      const target = encodeURIComponent(url ?? 'about:blank');
+      const res = await fetch(`http://${await this.base()}/json/new?${target}`, {
+        method: 'PUT',
+        signal,
+      });
+      const opened = res.ok ? ((await res.json()) as { id?: unknown }) : {};
+      if (typeof opened.id !== 'string' || !BrowserScreenGateway.TAB_ID.test(opened.id))
+        throw new Error(`새 탭을 열지 못했어요 (${res.status})`);
+      return opened.id;
+    });
+  }
+
+  /** 탭 닫기. 마지막 탭이면 빈 탭을 먼저 열어 둔다 (탭이 하나도 없으면 화면에 그릴 것이 없다) */
+  closeTab(tab: string): Promise<void> {
+    return this.call(async (signal) => {
+      const base = await this.base();
+      const tabs = await this.tabs(base, signal);
+      if (!tabs.some((t) => t.id === tab)) throw new Error('닫힌 탭이에요');
+      if (tabs.length === 1)
+        await fetch(`http://${base}/json/new?about:blank`, { method: 'PUT', signal });
+      const res = await fetch(`http://${base}/json/close/${tab}`, { signal });
+      if (!res.ok) throw new Error(`탭을 닫지 못했어요 (${res.status})`);
     });
   }
 
@@ -175,67 +179,6 @@ export class BrowserScreenGateway extends BaseGateway {
   private static sentTo(domain: string, host: string): boolean {
     const d = domain.replace(/^\./, '').toLowerCase();
     return host === d || host.endsWith(`.${d}`);
-  }
-
-  /** 붙어 있는 탭에 동작 하나를 보낸다 (화면 흘려보내기도 같은 동작을 쓴다) */
-  static async act(send: Send, action: ScreenAction): Promise<void> {
-    switch (action.type) {
-      case 'click': {
-        const at = { x: action.x, y: action.y };
-        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...at });
-        const press = { ...at, button: 'left', clickCount: 1 };
-        await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...press });
-        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...press });
-        return;
-      }
-      case 'scroll':
-        await send('Input.dispatchMouseEvent', {
-          type: 'mouseWheel',
-          x: action.x,
-          y: action.y,
-          deltaX: 0,
-          deltaY: action.dy,
-        });
-        return;
-      case 'text':
-        await send('Input.insertText', { text: action.text });
-        return;
-      case 'key': {
-        const key = KEYS[action.key];
-        if (!key) throw new Error(`보낼 수 없는 키예요: ${action.key}`);
-        const base = {
-          key: action.key,
-          code: action.key,
-          windowsVirtualKeyCode: key.code,
-          nativeVirtualKeyCode: key.code,
-        };
-        await send('Input.dispatchKeyEvent', {
-          type: key.text ? 'keyDown' : 'rawKeyDown',
-          ...base,
-          ...(key.text ? { text: key.text } : {}),
-        });
-        await send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
-        return;
-      }
-      case 'navigate':
-        await send('Page.navigate', { url: action.url });
-        return;
-      case 'back':
-      case 'forward': {
-        const history = await send('Page.getNavigationHistory');
-        const index = Number(history.currentIndex) + (action.type === 'back' ? -1 : 1);
-        const entry = (history.entries as { id: number }[])[index];
-        if (entry) await send('Page.navigateToHistoryEntry', { entryId: entry.id });
-        return;
-      }
-      // 새로고침 (2026-11-28): 캡차 · 만료된 양식처럼 페이지를 다시 받아야 풀리는 것
-      case 'reload':
-        await send('Page.reload', { ignoreCache: false });
-        return;
-      case 'activate':
-        await send('Page.bringToFront');
-        return;
-    }
   }
 
   /** 중계의 주소. Chrome의 Host 검사를 지나려고 이름을 IP로 푼다 */

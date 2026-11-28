@@ -19,6 +19,9 @@ export class FakeCdp {
     { id: 'D'.repeat(32), type: 'page', title: '둘째 탭', url: 'https://example.org/' },
   ];
 
+  /** 새 탭으로 연 주소 (순서대로) */
+  readonly opened: string[] = [];
+
   /** 흘려보내기를 시작하면 그림을 보내는가 (false면 가려진 탭처럼 보내지 않는다) */
   screencast = true;
   private frames = 0;
@@ -41,11 +44,24 @@ export class FakeCdp {
     const server = createServer();
     const fake = new FakeCdp(server);
     server.on('request', (req, res) => {
-      if (req.url !== '/json/list') {
-        res.writeHead(404).end();
-        return;
+      const url = String(req.url);
+      const json = (body: unknown) =>
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+      if (url === '/json/list') return json(fake.targets);
+      // 새 탭 (PUT /json/new?<주소>) · 탭 닫기 (/json/close/<id>): 탭 목록을 바꾸고 무엇을 열었는지 남긴다
+      if (url.startsWith('/json/new') && req.method === 'PUT') {
+        const id = `N${fake.targets.length}`.padEnd(32, 'N');
+        const opened = decodeURIComponent(url.slice('/json/new?'.length));
+        fake.opened.push(opened);
+        fake.targets.unshift({ id, type: 'page', title: '', url: opened });
+        return json({ id });
       }
-      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(fake.targets));
+      if (url.startsWith('/json/close/')) {
+        const id = url.slice('/json/close/'.length);
+        fake.targets = fake.targets.filter((t) => t.id !== id);
+        return res.writeHead(200).end('Target is closing');
+      }
+      res.writeHead(404).end();
     });
     server.on('upgrade', (req, socket) =>
       fake.accept(String(req.url), String(req.headers['sec-websocket-key']), socket),

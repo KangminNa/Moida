@@ -1,5 +1,6 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Call } from './browser-types';
+import { ScreenBar } from './ScreenBar';
 import { ScreenPicture } from './ScreenPicture';
 import { ScreenStatus } from './ScreenStatus';
 
@@ -57,7 +58,6 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
   const [problem, setProblem] = useState<string | null>(null);
   // 이 창이 가려져 있는가 (그동안은 그리지 않는다)
   const [hidden, setHidden] = useState(false);
-  const [url, setUrl] = useState('');
   // 카드: 화면을 가득 채워 보는 중인가, 묶을 탭을 찾지 못했는가
   const [large, setLarge] = useState(false);
   const [lost, setLost] = useState(false);
@@ -146,20 +146,42 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
     [call],
   );
 
-  function go(e: FormEvent) {
-    e.preventDefault();
-    if (!url.trim()) return;
-    send({ type: 'navigate', url: url.trim() });
-  }
-
   function pick(id: string) {
     tab.current = id;
     seen.current = 0;
     send({ type: 'activate' });
   }
 
-  function scrollBy(dy: number) {
+  /** 새 탭을 열고 그 탭으로 옮긴다 (2026-11-28) */
+  const openTab = useCallback(
+    (address: string | null) => {
+      queue.current = queue.current.then(async () => {
+        if (!tab.current) return;
+        const body = { tab: tab.current, type: 'newTab', ...(address ? { url: address } : {}) };
+        const reply = await call('POST', 'screen/control', body);
+        if (!reply.ok) return setProblem(reply.message);
+        const opened = (reply.data as { tab?: string | null }).tab;
+        if (opened) {
+          tab.current = opened;
+          seen.current = 0;
+        }
+      });
+    },
+    [call],
+  );
+
+  /** 지금 탭을 닫는다. 다음 그림부터 서버가 남은 맨 앞 탭을 고른다 */
+  function closeTab() {
+    send({ type: 'closeTab' });
+    queue.current = queue.current.then(() => {
+      tab.current = null;
+      seen.current = 0;
+    });
+  }
+
+  function scroll(way: -1 | 1) {
     if (!shot) return;
+    const dy = way * SCROLL;
     send({ type: 'scroll', x: Math.round(shot.width / 2), y: Math.round(shot.height / 2), dy });
   }
 
@@ -168,25 +190,6 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
     setOpen(!open);
   }
 
-  const moves = (
-    <>
-      <button type="button" className="ghost" onClick={() => send({ type: 'back' })}>
-        뒤로
-      </button>
-      <button type="button" className="ghost" onClick={() => send({ type: 'forward' })}>
-        앞으로
-      </button>
-      <button type="button" className="ghost" onClick={() => send({ type: 'reload' })}>
-        새로고침
-      </button>
-      <button type="button" className="ghost" onClick={() => scrollBy(-SCROLL)}>
-        위로
-      </button>
-      <button type="button" className="ghost" onClick={() => scrollBy(SCROLL)}>
-        아래로
-      </button>
-    </>
-  );
   const status = open && (
     <ScreenStatus problem={problem} hidden={hidden} retry={() => void draw()} />
   );
@@ -195,6 +198,7 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
       {open ? '화면 닫기' : '화면 열기'}
     </button>
   );
+  const current = shot?.tabs.find((t) => t.id === shot.tab)?.url ?? '';
 
   if (pin)
     return (
@@ -203,12 +207,15 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
         {open && lost && <p className="note">열어 둔 탭을 찾지 못해 맨 앞 탭을 보여요</p>}
         {open && shot && (
           <>
-            <div className="row">
-              {moves}
-              <button type="button" className="ghost" onClick={() => setLarge(!large)}>
-                {large ? '작게 보기' : '크게 보기'}
-              </button>
-            </div>
+            <ScreenBar
+              send={send}
+              scroll={scroll}
+              extra={
+                <button type="button" className="ghost" onClick={() => setLarge(!large)}>
+                  {large ? '작게 보기' : '크게 보기'}
+                </button>
+              }
+            />
             <ScreenPicture shot={shot} send={send} />
           </>
         )}
@@ -221,8 +228,9 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
       <b>화면</b>
       <p className="note">
         화면을 누르면 그 자리를 클릭하고 이어서 키보드로 치면 서버 브라우저에 들어가요 (한글 · 붙여
-        넣기 · Enter · Tab 포함). 휠로 스크롤해요. 사이트 로그인과, 승인된 클릭이 바뀌어 누르지 못한
-        것은 여기서 직접 해요
+        넣기 · Enter · Tab · Ctrl+A 포함). 끌어서 밀기 · 고르기, 두 번 눌러 더블클릭, 마우스를 올려
+        메뉴 열기, 휠로 스크롤해요. Alt+← · → 로 뒤로 · 앞으로, Ctrl+R · F5로 새로고침. 사이트
+        로그인과, 승인된 클릭이 바뀌어 누르지 못한 것은 여기서 직접 해요
       </p>
       {status}
       {open && shot && (
@@ -238,24 +246,15 @@ export function Screen({ call, pin }: { call: Call; pin?: { url: string } }) {
                 ))}
               </select>
             </label>
-            {moves}
           </div>
+          <ScreenBar
+            send={send}
+            current={current}
+            scroll={scroll}
+            openTab={openTab}
+            closeTab={closeTab}
+          />
           <ScreenPicture shot={shot} send={send} />
-          <form className="row" onSubmit={go}>
-            <label className="field">
-              <span>주소로 가기</span>
-              <input
-                className="input"
-                type="url"
-                placeholder="https://"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </label>
-            <button type="submit" className="ghost">
-              가기
-            </button>
-          </form>
         </>
       )}
       {toggler}

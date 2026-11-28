@@ -45,7 +45,7 @@ describe('ScreenCastGateway', () => {
   test('클릭은 붙은 연결로 보내고, 바뀐 그림을 기다리던 쪽이 바로 받는다', async () => {
     const waiting = cast.frame(A, 1, 4_000);
     const started = Date.now();
-    await cast.control(A, { type: 'click', x: 10, y: 20 });
+    await cast.control(A, { type: 'click', x: 10, y: 20, count: 1 });
     const frame = await waiting;
     assert.equal(frame?.seq, 2);
     assert.ok(Date.now() - started < 2_000, '기다림이 끝까지 가지 않는다');
@@ -69,7 +69,10 @@ describe('ScreenCastGateway', () => {
   test('붙지 않은 탭의 동작은 한 번 붙어서 보낸다 (예전 길)', async () => {
     const before = cdp.calls.length;
     // 닫힌 탭이면 예전 길이 "닫힌 탭"으로 거절한다
-    await assert.rejects(cast.control('Q'.repeat(32), { type: 'key', key: 'Enter' }), /닫힌 탭/);
+    await assert.rejects(
+      cast.control('Q'.repeat(32), { type: 'key', key: 'Enter', mods: 0 }),
+      /닫힌 탭/,
+    );
     assert.equal(cdp.calls.length, before);
   });
 });
