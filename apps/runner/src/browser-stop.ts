@@ -8,7 +8,7 @@ export class BrowserStopProblem extends Error {}
 
 // AI가 멈춘 자리 (cairn-browse 스킬). AI는 결재를 올리지 않고 작업 폴더에 browser-stop.json을 쓰고 끝낸다:
 //   { "stop": "final_click", "page_url": "...", "button": { "role": "button", "name": "게시", "nth": 0 }, "note": "...",
-//     "check": ["홍길동", "50,000원"] }
+//     "check": ["홍길동", "50,000원"], "human": ["카드 번호", "인증 번호"] }
 //   { "stop": "login", "page_url": "...", "reason": "캡차" }
 //   { "stop": "click_plan", "page_url": "...", "plan": { "summary": "네이버 지도 '대구 여행' 목록에 12곳 저장", "count": 12 } }
 //   { "stop": "login", "page_url": "...", "form": { "fields": [{ "kind": "id", "role": "textbox", "name": "아이디" }, …],
@@ -18,6 +18,8 @@ export class BrowserStopProblem extends Error {}
 // AI 없이 러너가 그 칸에 넣는다 (LoginRunner). 모양이 틀리면 form만 버린다 (화면에서 직접 로그인으로).
 // click_plan은 같은 사이트에서 마지막 버튼을 여러 번 누르는 일의 계획이다 (F2, 2026-11-21): 승인되면 같은 일이 이어서 돌고
 // AI가 버튼마다 browser_press로 요청하면 러너가 누른다 (PressLoop). summary는 무엇을, count는 몇 번 (1~50).
+// human은 사람이 넣을 칸의 이름이다 (final_click만, 개인정보 규칙 ① 2026-11-28): 결제 수단 · 본인 인증 번호 · 주민번호 칸은 AI가
+// 채우지 않고 멈춘다. 관리자가 승인 카드의 화면에서 넣고 승인하면 러너가 누른다 (AI는 그 페이지로 돌아가지 않는다).
 // check는 누르기 전 확인할 화면의 글자다 (final_click만, 2026-11-24, PageChecks): 러너가 붙잡을 때와 누르기 직전에 화면에 있는지 본다.
 // 러너(AI 없음)가 읽어 버튼을 다시 찾아 붙잡거나(결재된 클릭) 로그인 필요 · 계획 결재를 올린다. 믿지 않는 입력이라 모양을 본다.
 export class BrowserStop {
@@ -42,6 +44,8 @@ export class BrowserStop {
     readonly plan: { summary: string; count: number } | null = null,
     /** 누르기 전 확인할 화면의 글자 (final_click만) */
     readonly checks: readonly string[] = [],
+    /** 사람이 넣을 칸의 이름 (final_click만, 개인정보 규칙 ①: 결제 수단 · 본인 인증 번호 · 주민번호) */
+    readonly human: readonly string[] = [],
   ) {}
 
   /** 파일을 읽는다. 없으면 null (AI가 멈추지 않고 끝냈다). 링크 · 큰 파일 · 틀린 모양은 BrowserStopProblem */
@@ -91,7 +95,17 @@ export class BrowserStop {
     const checks = PageChecks.of(r.check);
     if (typeof checks === 'string') throw new BrowserStopProblem(checks);
     const button = new ButtonRef(role, name, nth);
-    return new BrowserStop('final_click', url, button, note, null, null, null, checks);
+    const human = BrowserStop.humanOf(r.human);
+    return new BrowserStop('final_click', url, button, note, null, null, null, checks, human);
+  }
+
+  /** 사람이 넣을 칸: 화면에 보이는 칸 이름 (1~40자, 5개까지). 틀린 모양이면 BrowserStopProblem */
+  private static humanOf(raw: unknown): readonly string[] {
+    if (raw === undefined || raw === null) return [];
+    const names = Array.isArray(raw) ? raw.map((n) => (typeof n === 'string' ? n.trim() : '')) : [];
+    if (!Array.isArray(raw) || names.length > 5 || names.some((n) => !n || n.length > 40))
+      throw new BrowserStopProblem('human은 칸 이름(1~40자) 5개까지의 목록이에요');
+    return [...new Set(names)];
   }
 
   /** 누르기 계획: 한 줄로 다듬은 요약(1~300자)과 횟수(1~50) */

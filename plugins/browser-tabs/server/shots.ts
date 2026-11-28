@@ -15,8 +15,8 @@ import { shots } from './schema';
 import type { ClickRow, ShotKind, ShotMime } from './tables';
 
 // 브라우저 작업의 화면 (단계 캡처, 2026-11-14). 결과물이 아니라 이 패키지에 남는다: 결과를 고르지 않아도 증거가 사라지지 않게.
-//   step: AI가 단계마다 찍은 것을 러너가 일이 끝난 뒤 올린다. 작업마다 30장, 30일이 지나면 새로 저장할 때 지운다
-//   login · before · after · changed: 러너(AI 없음)가 로그인 화면 · 멈춘 화면 · 누른 뒤 · 바뀐 화면을 직접 찍는다. 남긴다
+//   step: AI가 단계마다 찍은 것을 러너가 일이 끝난 뒤 올린다. 작업마다 30장, 30일 (dropOldShots)
+//   login · before · after · changed: 러너(AI 없음)가 로그인 화면 · 멈춘 화면 · 누른 뒤 · 바뀐 화면을 직접 찍는다. 90일 (dropOldShots)
 
 /** 그림 하나의 크기 (DB CHECK와 같다) */
 const IMAGE_MAX = 300 * 1024;
@@ -24,6 +24,8 @@ const IMAGE_MAX = 300 * 1024;
 const IMAGE_TEXT_MAX = Math.ceil(IMAGE_MAX / 3) * 4;
 const STEPS_MAX = 30;
 const STEP_DAYS = 30;
+/** 로그인 · 누르기 전후 화면의 보관 기한 (개인정보 규칙 ④, 2026-11-28): 승인의 근거라 단계 화면보다 길게 */
+const KEPT_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** 받은 그림: 바이트와 형식 */
@@ -103,11 +105,7 @@ export class SaveShot extends Command<StepInput> {
     const steps = await work.rows(shots, { task_id: job.id, kind: 'step' });
     if (steps.length >= STEPS_MAX)
       throw new RuleViolation(`단계 화면은 작업마다 ${STEPS_MAX}장까지예요`);
-    await work.deleteRows(shots, {
-      space_id: space,
-      kind: 'step',
-      created_at: Rule.before(new Date(Date.now() - STEP_DAYS * DAY_MS)),
-    });
+    await dropOldShots(work, space);
     const saved = await addShot(work, space, job.id, 'step', image, input);
     return new ShotSavedView(saved.id, saved.seq);
   }
@@ -173,4 +171,18 @@ export function confirmOf(
     confirm_ref: reference || null,
     confirm_title: c.optionalText('title', 100) || null,
   };
+}
+
+/**
+ * 보관 기한이 지난 화면을 지운다 (개인정보 규칙 ④, 2026-11-17 결정 · 2026-11-28 구현): 단계 화면 30일, 로그인 · 누르기 전후 화면 90일.
+ * 화면 사진은 로그인된 사이트의 화면이라 우리 쪽에 새로 생긴 사본이다. 작업이 끝날 때(TaskSettled)와 단계 화면을 저장할 때 지운다
+ */
+export async function dropOldShots(work: Work, spaceId: string): Promise<void> {
+  const before = (days: number) => Rule.before(new Date(Date.now() - days * DAY_MS));
+  await work.deleteRows(shots, { space_id: spaceId, kind: 'step', created_at: before(STEP_DAYS) });
+  await work.deleteRows(shots, {
+    space_id: spaceId,
+    kind: ['login', 'before', 'after', 'changed'],
+    created_at: before(KEPT_DAYS),
+  });
 }

@@ -65,6 +65,7 @@ export const clicks = browserTabsSchema.table('clicks', {
   confirm_state: text('confirm_state').$type<ClickConfirmState>(),
   confirm_ref: text('confirm_ref'),
   confirm_title: text('confirm_title'),
+  human_fields: text('human_fields').array().notNull(),
 });
 
 /** browser_tabs.endpoints */

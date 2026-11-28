@@ -224,6 +224,8 @@ export class ClickView {
       note: r.note,
       /** 누르기 전 확인한 내용 (화면의 글자. 누르기 직전에 다시 본다) */
       checks: r.checks,
+      /** 사람이 넣을 칸 (개인정보 규칙 ①): 관리자가 승인 카드의 화면에서 직접 넣은 뒤 승인한다. AI는 넣지 않는다 */
+      humanFields: r.human_fields,
       status: r.status,
       reason: r.reason,
       afterUrl: r.after_url,

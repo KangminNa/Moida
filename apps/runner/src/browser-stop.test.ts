@@ -10,6 +10,23 @@ import { BrowserStop, BrowserStopProblem } from './browser-stop';
 // 브라우저 자리(BrowserSlot): 사이트 일과 결재된 클릭이 차례대로 하나씩.
 
 describe('멈춘 자리 (browser-stop.json)', () => {
+  test('사람이 넣을 칸(human, 개인정보 규칙 ①): 칸 이름 5개까지, 틀린 모양은 받지 않는다', () => {
+    const base = {
+      stop: 'final_click',
+      page_url: 'https://shop.example/pay',
+      button: { role: 'button', name: '결제' },
+    };
+    const click = BrowserStop.of({ ...base, human: [' 카드 번호 ', '인증 번호', '카드 번호'] });
+    assert.deepEqual(click.human, ['카드 번호', '인증 번호']);
+    assert.deepEqual(BrowserStop.of(base).human, []);
+    assert.throws(() => BrowserStop.of({ ...base, human: '카드 번호' }), BrowserStopProblem);
+    assert.throws(
+      () => BrowserStop.of({ ...base, human: ['1', '2', '3', '4', '5', '6'] }),
+      BrowserStopProblem,
+    );
+    assert.throws(() => BrowserStop.of({ ...base, human: [''] }), BrowserStopProblem);
+  });
+
   test('final_click은 역할 · 이름 · 순번, login은 주소만', () => {
     const click = BrowserStop.of({
       stop: 'final_click',

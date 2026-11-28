@@ -39,7 +39,7 @@ export class StopHold {
       return { error: `멈춘 버튼을 붙잡지 못했어요: ${(error as Error).message}` };
     }
     try {
-      const click = await this.server.holdClick(this.taskId, held, stop.note);
+      const click = await this.server.holdClick(this.taskId, held, stop);
       const host = URL.canParse(held.pageUrl) ? new URL(held.pageUrl).host : '';
       return {
         approval: {

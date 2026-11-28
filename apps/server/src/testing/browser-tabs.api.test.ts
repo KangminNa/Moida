@@ -438,6 +438,28 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
     );
     const one = ok(await api.get(`${BASE}/shots/${shots[0]?.id}`, owner));
     assert.deepEqual([one.image, one.mime], [JPEG, 'image/jpeg']);
+
+    // 보관 기한 (개인정보 규칙 ④, 2026-11-28): 단계 화면 30일 · 누르기 전후 화면 90일. 다른 작업이 끝날 때 지운다
+    const db = api.service(Database);
+    await db.sql`UPDATE browser_tabs.shots SET created_at = now() - interval '31 days'
+      WHERE task_id = ${taskId} AND kind = 'step'`;
+    await db.sql`UPDATE browser_tabs.shots SET created_at = now() - interval '89 days'
+      WHERE task_id = ${taskId} AND kind = 'before'`;
+    await db.sql`UPDATE browser_tabs.shots SET created_at = now() - interval '91 days'
+      WHERE task_id = ${taskId} AND kind = 'after'`;
+    const later = await siteJob(await newSite());
+    ok(
+      await api.request('POST', `/api/tasks/${later.taskId}/cancel`, owner, {
+        version: (await taskOf(later.taskId)).version,
+      }),
+    );
+    await drain();
+    const left = await db.sql`SELECT kind FROM browser_tabs.shots WHERE task_id = ${taskId}`;
+    assert.deepEqual(
+      left.map((r) => r.kind),
+      ['before'],
+      '30일 지난 단계 · 90일 지난 누른 뒤 화면은 지우고 89일 된 멈춘 화면은 남긴다',
+    );
   });
 
   test('승인 뒤 페이지가 바뀌었으면 누르지 않고(changed) 작업은 실패, 관리자가 직접 한 것을 기록한다', async () => {
@@ -486,10 +508,16 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
     const { taskId, run } = await siteJob(await newSite());
     const tooMany = await hold(taskId, { checks: ['a', 'b', 'c', 'd', 'e', 'f'] });
     assert.equal(tooMany.ok, false);
-    const held = await hold(taskId, { checks: ['홍길동', '50,000원'] });
+    // 사람이 넣을 칸 (개인정보 규칙 ①, 2026-11-28): 결제 수단 · 인증 번호 칸은 AI가 채우지 않고 승인 카드에서 사람이 넣는다
+    const held = await hold(taskId, {
+      checks: ['홍길동', '50,000원'],
+      human_fields: ['카드 번호', '인증 번호'],
+    });
     assert.equal(held.ok, true, JSON.stringify(held.body));
     const clickId = String(held.body.click_id);
-    assert.deepEqual((await clickOf(clickId)).checks, ['홍길동', '50,000원'], '승인 화면에 보인다');
+    const shown = await clickOf(clickId);
+    assert.deepEqual(shown.checks, ['홍길동', '50,000원'], '승인 화면에 보인다');
+    assert.deepEqual(shown.humanFields, ['카드 번호', '인증 번호']);
     const asked = await tool(run, 'request_approval', {
       request_id: `click-${clickId}`,
       action: 'browser.site.publish',

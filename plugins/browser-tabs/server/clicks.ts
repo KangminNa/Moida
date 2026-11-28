@@ -54,6 +54,8 @@ type HoldInput = {
   note: string | null;
   /** 누르기 전 내용 확인: 러너가 화면에 있음을 본 글자 (2026-11-24). 누르기 직전에 다시 본다 */
   checks: readonly string[];
+  /** 사람이 넣을 칸의 이름 (개인정보 규칙 ①: 결제 수단 · 본인 인증 번호 · 주민번호) */
+  humanFields: readonly string[];
   image: string;
 };
 
@@ -89,6 +91,7 @@ export class HoldClick extends Command<HoldInput> {
         fingerprint,
         note: f.optionalText('note', 500),
         checks: f.optionalTextList('checks', CHECKS_MAX, CHECK_LENGTH) ?? [],
+        humanFields: f.optionalTextList('human_fields', CHECKS_MAX, 40) ?? [],
         image: imageOf(f, 'image', true) ?? '',
       };
     });
@@ -118,6 +121,7 @@ export class HoldClick extends Command<HoldInput> {
       fingerprint: input.fingerprint,
       note: input.note,
       checks: [...input.checks],
+      human_fields: [...input.humanFields],
     });
     const held = (await work.row(clicks, { task_id: input.taskId, status: 'held' })) as ClickRow;
     await addShot(

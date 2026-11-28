@@ -302,7 +302,7 @@ export class CairnServer {
   async holdClick(
     taskId: string,
     held: HeldButton,
-    note: string | null,
+    { note, human }: { note: string | null; human: readonly string[] },
   ): Promise<{ clickId: string; version: number }> {
     const body = await this.mcp.call('browser_click_hold', {
       task_id: taskId,
@@ -316,6 +316,7 @@ export class CairnServer {
       fingerprint: held.fingerprint,
       ...(note ? { note } : {}),
       ...(held.checks.length > 0 ? { checks: held.checks } : {}),
+      ...(human.length > 0 ? { human_fields: human } : {}),
       image: held.image,
     });
     return { clickId: body.text('click_id'), version: body.number('version') };

@@ -18,6 +18,7 @@ import {
 } from './job';
 import { planDecided, settlePlans } from './plans';
 import { clicks, sites } from './schema';
+import { dropOldShots } from './shots';
 import { ConfirmedView } from './views';
 import { writeDecided } from './write-runs';
 
@@ -159,6 +160,7 @@ export class TaskSettled extends Command<SettledInput> {
 
   async run(work: Work, _actor: Actor, input: SettledInput): Promise<ConfirmedView> {
     if (!TaskSettled.SETTLED.includes(input.status)) return new ConfirmedView(false);
+    await dropOldShots(work, input.spaceId);
     const planned = await settlePlans(work, input.taskId, true);
     if (!TaskSettled.ENDED.includes(input.status)) return new ConfirmedView(planned);
     const built = await buildSettled(work, input.spaceId, input.taskId);

@@ -69,6 +69,7 @@ export interface ClickRow {
   confirm_state: ClickConfirmState | null;
   confirm_ref: string | null;
   confirm_title: string | null;
+  human_fields: readonly string[];
 }
 export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'page_url' | 'role' | 'name'>;
 
