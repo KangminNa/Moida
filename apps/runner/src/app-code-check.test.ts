@@ -30,13 +30,16 @@ const mapSdkHosts = (): string[] => {
   return Object.values(spec.providers).flatMap((p) => p.sdkHosts);
 };
 
+// 결과 화면 찍기는 result-shots.test에서 본다. 여기서는 꺼서 이 컴퓨터에 Chromium이 있어도 검사 목록이 같게 한다
+process.env.MOIDA_SHOT_CHROMIUM = 'off';
+
 // 앱 코드를 고치는 만들기 일 (스토어 1-6c): 지금 코드 받기(app_code_base) · 지시 단락 · 묶음과 템플릿 검사.
 
 const id = (n: number) => `00000000-0000-7000-8000-${String(n).padStart(12, '0')}`;
 const STARTERS = resolve(__dirname, '../../server/starters');
 const scan = (text: string, partials: readonly string[] = []) =>
   AppCodeCheck.scan(text, (name) => partials.includes(name));
-const codeOf = (files: object[], hosts: string[] = []) =>
+const codeOf = (files: object[], hosts: string[] = [], library: object[] = []) =>
   AppCodeBase.from(
     Json.of({
       app_id: id(1),
@@ -46,6 +49,7 @@ const codeOf = (files: object[], hosts: string[] = []) =>
       seq: 0,
       files,
       hosts,
+      library,
     }),
   ) as AppCodeBase;
 // 디자인 기준 · 디자인 문서 검사는 design-check.test · design-doc-check.test에서 본다: 여기 본보기 코드는 화면 조각이다
@@ -461,6 +465,10 @@ describe('앱 코드 일 (MakeStage)', () => {
         { name: 'photo.jpg', size: 9000, text: null },
       ],
       ['fonts.example.com'],
+      [
+        { plugin: 'map', provides: ['moida.map', '<moida-place-list>'] },
+        { plugin: 'empty', provides: [] },
+      ],
     );
     const config = new RunnerConfig(
       'http://moida',
@@ -507,10 +515,16 @@ describe('앱 코드 일 (MakeStage)', () => {
       );
       assert.match(prompt, /- photo\.jpg \(그대로 남아요/);
       assert.match(prompt, /\(지금: fonts\.example\.com\)/);
+      // 켜진 플러그인의 라이브러리 (2026-11-28): 준 것이 없는 플러그인은 빠진다
+      assert.match(prompt, /references\/library\.md\)/);
+      assert.match(
+        prompt,
+        /켜진 플러그인이 주는 것: moida\.map · <moida-place-list> \(플러그인 map\)\n/,
+      );
       assert.doesNotMatch(prompt, /# 재료/);
 
       await writeFile(join(room.outputsDir, 'list.html'), '{{#posts}}<b>{{title}}</b>');
-      const checks = await stage.check();
+      const checks = await stage.check(new AbortController().signal, () => {});
       assert.deepEqual(short(checks), [
         ['결과물 파일', true, '1개'],
         [AppCodeCheck.BUNDLE, true, '5개 · 9KB'],
@@ -532,7 +546,7 @@ describe('앱 코드 일 (MakeStage)', () => {
         join(room.outputsDir, 'design.md'),
         '## 한 줄\n블로그\n## 참고한 곳\n- https://a.example/\n- https://b.example/\n## 방향\n조용함\n## 토큰\n:root {}',
       );
-      const fixed = await stage.check();
+      const fixed = await stage.check(new AbortController().signal, () => {});
       assert.equal(
         fixed.every((c) => c.ok),
         true,
@@ -553,7 +567,7 @@ describe('앱 코드 일 (MakeStage)', () => {
         'moida.json': '{"moida":1,"render":"static"}',
       });
       await writeFile(join(room.outputsDir, 'app.zip'), zip);
-      const packed = await stage.check();
+      const packed = await stage.check(new AbortController().signal, () => {});
       const bundle = packed.find((c) => c.name === AppCodeCheck.BUNDLE);
       assert.equal(bundle?.ok, true, bundle?.tail);
       // zip 안이 묶음 전체라 디자인 문서도 zip 안에 있어야 한다
@@ -562,7 +576,10 @@ describe('앱 코드 일 (MakeStage)', () => {
         /design\.md가 없어요/,
       );
       await writeFile(join(room.outputsDir, 'app.zip'), 'zip이 아닌 글');
-      assert.match((await stage.check()).at(-1)?.tail ?? '', /app\.zip을 읽지 못했어요/);
+      assert.match(
+        (await stage.check(new AbortController().signal, () => {})).at(-1)?.tail ?? '',
+        /app\.zip을 읽지 못했어요/,
+      );
     } finally {
       await stage.close();
       await rm(work, { recursive: true, force: true });

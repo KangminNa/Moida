@@ -8,6 +8,7 @@
 // 결과: apps/web/app/_plugins/installed/<이름>/…  (복사본, git에 올리지 않음)
 //       apps/web/app/_plugins/slots.generated.ts   (자동 생성, git에 올리지 않음)
 //       apps/web/app/_plugins/packages.generated.ts (기능 패키지의 콘솔 메뉴와 화면, 자동 생성)
+//       apps/web/app/_plugins/clients.generated.ts  (앱 라이브러리에 붙는 브라우저 스크립트, 목록 파일 client.file, 자동 생성)
 // 목록 파일의 자세한 검사는 서버가 시작할 때 한다. 여기서는 웹에 필요한 것만 본다.
 import {
   cpSync,
@@ -39,6 +40,7 @@ const imports = [];
 const slots = new Map();
 const packages = [];
 const pageImports = [];
+const clients = [];
 for (const name of names) {
   const dir = join(pluginsDir, name);
   const manifestFile = manifestOf(dir);
@@ -46,6 +48,11 @@ for (const name of names) {
   const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
   if (manifest.name !== name)
     throw new Error(`폴더 이름(${name})과 플러그인 이름(${manifest.name})이 달라요`);
+  // 앱 라이브러리 (2026-11-28): 켜졌는지는 moida.js를 줄 때 서버에 묻는다. 여기서는 글자만 담는다
+  if (typeof manifest.client?.file === 'string')
+    clients.push(
+      `{ plugin: '${name}', source: ${JSON.stringify(readFileSync(join(dir, manifest.client.file), 'utf8'))} }`,
+    );
   const web = manifest.web ?? {};
   const menu = manifest.menu ?? null;
   if (Object.keys(web).length === 0 && !menu) continue;
@@ -95,6 +102,17 @@ ${pageImports.join('\n')}
 
 export const PACKAGES: readonly PackageEntry[] = [
 ${packages.map((p) => `  ${p},`).join('\n')}
+];
+`,
+);
+writeFileSync(
+  join(target, 'clients.generated.ts'),
+  `// 자동 생성 파일: scripts/sync-plugins.mjs가 만든다. 직접 고치지 않는다.
+// 플러그인이 앱 라이브러리(moida.js)에 붙이는 브라우저 스크립트 (목록 파일 client.file). 켜졌는지는 moida.js를 줄 때 서버에 묻는다
+import type { PluginClientSource } from './client-types';
+
+export const CLIENTS: readonly PluginClientSource[] = [
+${clients.map((c) => `  ${c},`).join('\n')}
 ];
 `,
 );

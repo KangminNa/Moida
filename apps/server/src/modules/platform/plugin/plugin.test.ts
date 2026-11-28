@@ -122,6 +122,43 @@ describe('PluginManifest', () => {
         ].every((w) => e.message.includes(w)),
     );
   });
+
+  test('client: 앱 라이브러리(moida.js)에 붙이는 것. file은 client/ 안의 .js, provides는 moida.<이름> · <moida-이름>', () => {
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
+    const base = { version: '0.1.0', moida: '>=0.1' };
+    const named = PluginManifest.read(
+      makePlugin(root, 'test-client-a', {
+        ...base,
+        name: 'test-client-a',
+        client: { provides: ['moida.thing', '<moida-thing>'] },
+      }),
+    );
+    assert.deepEqual(named.client, { file: null, provides: ['moida.thing', '<moida-thing>'] });
+    const withFile = makePlugin(root, 'test-client-b', {
+      ...base,
+      name: 'test-client-b',
+      client: { file: 'client/thing.js', provides: ['moida.thing'] },
+    });
+    mkdirSync(join(withFile, 'client'));
+    writeFileSync(join(withFile, 'client/thing.js'), 'moida.thing = () => settings;');
+    assert.equal(PluginManifest.read(withFile).client?.file, 'client/thing.js');
+    assert.equal(
+      PluginManifest.read(makePlugin(root, 'test-client-c', { ...base, name: 'test-client-c' }))
+        .client,
+      null,
+    );
+    assert.throws(
+      () =>
+        PluginManifest.read(
+          makePlugin(root, 'test-client-d', {
+            ...base,
+            name: 'test-client-d',
+            client: { file: 'web/thing.js', provides: ['thing'] },
+          }),
+        ),
+      (e: Error) => e.message.includes('client.file') && e.message.includes('client.provides'),
+    );
+  });
 });
 
 describe('SecretBox', () => {
@@ -163,6 +200,27 @@ describe('PluginService (DB)', () => {
 
     await plugins.disable(owner, 'test-giscus');
     assert.equal(registry.state('test-giscus')?.isActiveFor(m), false);
+  });
+
+  test('libraries: 켜져 동작하는 플러그인이 앱 라이브러리에 주는 것만', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'moida-plugins-'));
+    makePlugin(root, 'test-lib', {
+      name: 'test-lib',
+      version: '0.1.0',
+      moida: '>=0.1',
+      client: { provides: ['moida.lib', '<moida-lib>'] },
+    });
+    makePlugin(root, 'test-nolib', { name: 'test-nolib', version: '0.1.0', moida: '>=0.1' });
+    const registry = await PluginRegistry.boot(root, db.sql, archive, box, restore);
+    const plugins = new PluginService(db, registry, box);
+    assert.deepEqual(registry.libraries(), [], '꺼져 있으면 없다');
+    await plugins.enable(owner, 'test-lib');
+    await plugins.enable(owner, 'test-nolib');
+    assert.deepEqual(registry.libraries(), [
+      { plugin: 'test-lib', provides: ['moida.lib', '<moida-lib>'] },
+    ]);
+    await plugins.disable(owner, 'test-lib');
+    assert.deepEqual(registry.libraries(), []);
   });
 
   test('새 버전이 확장 지점을 더 쓰면 다시 켤 때까지 동작하지 않는다', async () => {

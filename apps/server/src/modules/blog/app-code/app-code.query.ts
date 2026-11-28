@@ -8,6 +8,7 @@ import {
   Database,
   Leases,
   NotFound,
+  PluginRegistry,
   RuleViolation,
   SecretBox,
   ZipFile,
@@ -64,6 +65,7 @@ export class AppCodeQuery extends BaseQuery {
     private readonly box: SecretBox,
     private readonly leases: Leases,
     private readonly starters: AppStarterGateway,
+    private readonly plugins: PluginRegistry,
   ) {
     super(db);
   }
@@ -122,9 +124,9 @@ export class AppCodeQuery extends BaseQuery {
     actor.assertCan(Actor.RUN);
     const work = await this.leases.of(actor, req.taskId);
     const appId = AppCodeQuery.appOfWork(work.kind, work.payload);
-    if (appId === null) return new AppCodeBaseView(null, 0, [], []);
+    if (appId === null) return new AppCodeBaseView(null, 0, [], [], []);
     const app = await this.row(apps, { space_id: actor.requireSpace(), id: appId });
-    if (!app) return new AppCodeBaseView(null, 0, [], []);
+    if (!app) return new AppCodeBaseView(null, 0, [], [], []);
     const code = await this.filesOf(actor, app, app.code_versions);
     const given = AppCodeQuery.givenOf(code.files);
     const files: AppCodeBaseFile[] = [];
@@ -132,7 +134,9 @@ export class AppCodeQuery extends BaseQuery {
       const text = given.has(f.name) ? await this.textOf(actor, code, f.name, f.sizeBytes) : null;
       files.push({ name: f.name, size: f.sizeBytes, text });
     }
-    return new AppCodeBaseView(app, code.seq, files, await this.hostsOf(actor, code));
+    // 켜진 플러그인이 moida.js에 더한 것 (목록 파일 client, 2026-11-28): 일꾼이 쓸 수 있는 라이브러리로 지시문에 적힌다
+    const library = this.plugins.libraries();
+    return new AppCodeBaseView(app, code.seq, files, await this.hostsOf(actor, code), library);
   }
 
   /**

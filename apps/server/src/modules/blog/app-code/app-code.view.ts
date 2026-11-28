@@ -145,6 +145,7 @@ export class AppCodeBaseView {
     private readonly seq: number,
     private readonly files: readonly AppCodeBaseFile[],
     private readonly hosts: readonly string[],
+    private readonly library: readonly { plugin: string; provides: readonly string[] }[],
   ) {}
 
   toJSON() {
@@ -158,6 +159,8 @@ export class AppCodeBaseView {
       seq: this.seq,
       files: this.files,
       hosts: [...this.hosts],
+      /** 켜진 플러그인이 앱 라이브러리(moida.js)에 더한 것: 플러그인 이름과 moida.<모듈> · <moida-부품> 목록 */
+      library: this.library.map((l) => ({ plugin: l.plugin, provides: [...l.provides] })),
     };
   }
 }

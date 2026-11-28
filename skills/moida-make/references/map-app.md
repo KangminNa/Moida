@@ -1,9 +1,40 @@
-# 지도 앱 (moida.map 본보기)
+# 지도 앱 (<moida-place-list> · moida.map 본보기)
 
-장소가 중심인 **앱**(맛집 · 코스 · 매장 · 여행 · 동네 안내)은 이 본보기로 시작한다. 페이지(AI가 만든 HTML)의 지도는 [map.md](map.md)다.
+장소가 중심인 **앱**(맛집 · 코스 · 매장 · 여행 · 동네 안내)은 부품 `<moida-place-list>` 한 줄로 시작한다. 페이지(AI가 만든 HTML)의 지도는 [map.md](map.md)다.
+
+## 먼저: 부품 한 줄 (기본)
+
+부품은 아래 "모양"을 모두 갖췄다 (목록 먼저 · 분류 칩 · 거르기 · 목록 ↔ 핀 · 30곳 넘으면 묶기 · 지도를 못 그리면 목록과 지도 링크). 파일은 `moida.json` · `index.html` · `places.json` (+ `design.md`, 꾸밀 `style.css`).
+
+```html
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>성수 나들이</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="_/moida.js" defer></script>
+</head>
+<body>
+  <header class="head"><h1>성수 나들이</h1><p>걸어서 도는 하루 코스</p></header>
+  <main>
+    <moida-place-list src="places.json"></moida-place-list>
+  </main>
+</body>
+</html>
+```
+
+- 앱 데이터 표에 둔 목록이면 `src` 대신 `table="places"`. 지도 높이는 `map-height="50vh"`, 적어도 묶으려면 `cluster`.
+- 꾸밈은 `style.css`의 `:root` 토큰(`--accent` · `--surface` · `--space-*` …)과 `.moida-place` · `.moida-chip` 같은 클래스로 한다 (부품은 그림자 DOM 없이 그린다).
+- 고른 장소로 다른 것을 할 때만 스크립트: `document.querySelector('moida-place-list').addEventListener('moida:select', (e) => …e.detail.place)`.
+- 목록 한 줄에 가격 · 사진 · 시간처럼 부품에 없는 칸이 꼭 필요하면 아래 본보기를 직접 짠다.
+
+## 직접 짤 때 (본보기)
+
 본보기는 실제 브라우저에서 확인한 것이다 (2026-11-28: 데스크톱 · 폰 · 지도를 못 받을 때, 거르기 · 목록 ↔ 핀 고르기). 새로 짓지 말고 파일 다섯을 그대로 낸 뒤 바꾸는 곳만 바꾼다.
 
-## 모양 (정해 둔 것)
+### 모양 (정해 둔 것, 부품도 같다)
 
 - **정적 앱**이다 (`moida.json`의 `"render": "static"`): 파일 `moida.json` · `index.html` · `style.css` · `app.js` · `places.json` (+ 디자인 문서 `design.md`). 폴더가 없으니 결과물 폴더에 그대로 둔다.
 - **목록이 먼저다.** 장소 목록을 그린 뒤 지도를 얹는다. 지도를 못 그려도(지도 회사 · 키 · 네트워크) 목록과 장소마다의 카카오맵 · 네이버 지도 링크로 쓸 수 있어야 한다.
@@ -17,7 +48,7 @@
 | 장소 목록이 | 둘 곳 | 이유 |
 |---|---|---|
 | 관리자가 정하고 가끔 바뀐다 (대부분) | 묶음의 `places.json` | 바꾸면 앱 코드의 새 버전이 되어 승인을 거친다. 따로 넣을 일이 없다 |
-| 회원이 더하거나, 관리자가 자주 더한다 | 앱 데이터 표 `places` (`read: "anyone"`, `write: "admin"` 또는 `"member"`) | `loadPlaces`만 바꾼다 (`app.js`의 주석). 첫 줄은 답에 "넣을 줄"로 적어 승인 뒤 넣는다 ([app-code.md](app-code.md)) |
+| 회원이 더하거나, 관리자가 자주 더한다 | 앱 데이터 표 `places` (`read: "anyone"`, `write: "admin"` 또는 `"member"`) | 부품이면 `table="places"`, 직접 짠 본보기면 `loadPlaces`만 바꾼다 (`app.js`의 주석). 첫 줄은 답에 "넣을 줄"로 적어 승인 뒤 넣는다 ([app-code.md](app-code.md)) |
 
 - 장소 하나: `{ "name", "category", "address", "note", "lat", "lng" }`. `name` · `address`는 꼭 적고 나머지는 있으면.
 - **좌표는 확실할 때만** (`lat` · `lng`). 모르면 빼고 `address`만 둔다: 열 때 서버가 지도 플러그인의 키로 찾아 핀을 찍는다. 처음 찾는 주소는 방문자 한 곳에서 한 번에 30개까지라, 주소만 있는 장소가 30곳을 넘으면 넘는 곳은 목록에만 남는다 (그때는 좌표를 아는 곳의 좌표를 적는다).

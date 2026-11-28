@@ -1,5 +1,9 @@
-import type { MapChoice } from './map-config';
+import { type MapChoice, mapFor } from './map-config';
 import { moidaMapScript } from './moida-map';
+import { pluginClients } from './moida-plugins';
+import { UI_ACCOUNT } from './moida-ui-account';
+import { UI_BASE } from './moida-ui-base';
+import { UI_PLACES } from './moida-ui-places';
 
 // moida.js (앱 플랫폼, docs/스토어.md 12.4): 앱 코드가 Moida의 기능을 부르는 작은 스크립트. 앱은 <script src="_/moida.js">로 싣는다
 // (앱 도메인에서는 /_/moida.js, 기본 도메인 · 미리 보기에서는 /<앱>/_/moida.js: <base> 덕에 같은 상대 주소다).
@@ -15,6 +19,8 @@ import { moidaMapScript } from './moida-map';
 //   moida.data(주소?, 다음 쪽?)          → 그 주소의 데이터 (약속 moida: 1). '' 첫 화면 · 'posts/<글>' · 'm/<메뉴>' · 'm/<메뉴>/<번호>'.
 //                                       다른 공개 앱의 글이면 { redirect }만 온다 (2026-11-25, 스토어 14장 A3: 템플릿 없이 글 · 메뉴 · 호를 그린다)
 //   moida.map.provider · moida.map.create(자리, { places })   지도 (지도 플러그인, 약속은 moida-map.ts)
+//   화면 부품 <moida-place-list> · <moida-map> · <moida-account> · <moida-rows> (moida-ui-*.ts, 2026-11-28)
+//   켜진 플러그인이 붙이는 것 (목록 파일 client.file, moida-plugins.ts). 쓸 수 있는 것의 목록과 타입은 moida-catalog.ts (/_/moida.d.ts)
 // 실패하면 Error를 던진다 (status · code가 붙는다). 쓰기 확인 값(CSRF)은 스크립트가 me에서 읽어 싣는다.
 // 브라우저에서 그대로 도는 글자다: 빌드를 거치지 않는다
 
@@ -141,20 +147,28 @@ const SOURCE = String.raw`(() => {
 
 /**
  * moida.js의 글자. open: 격리를 푼 화면에서 싣는가 (그 앱의 도메인 · 공통 앱 도메인, 미리 보기 아님).
- * app: 공통 앱 도메인이면 이 앱의 주소 (2026-11-27). 뒤에 지도(moida.map, 지도 플러그인)를 붙인다: 격리된 화면이면 키가 필요 없는 OpenStreetMap
+ * app: 공통 앱 도메인이면 이 앱의 주소 (2026-11-27). 뒤에 지도(moida.map, 지도 플러그인: 격리된 화면이면 키가 필요 없는 OpenStreetMap),
+ * 화면 부품, 켜진 플러그인의 조각(clients)을 차례로 붙인다
  */
-function moidaScript(open: boolean, map: MapChoice, app: string | null): string {
+function moidaScript(
+  open: boolean,
+  map: MapChoice,
+  app: string | null,
+  clients: readonly string[],
+): string {
   const source = SOURCE.replace('__OPEN__', open ? 'true' : 'false').replace(
     '__APP__',
     JSON.stringify(app),
   );
+  const ui = `(() => {${UI_BASE}${UI_PLACES}${UI_ACCOUNT}})();`;
   // 옛 이름(2026-11-28 전에 만든 앱 코드의 window.cairn)도 같은 것을 가리킨다
-  return `${source}\n${moidaMapScript(map)}\nwindow.cairn = window.moida;`;
+  return [source, moidaMapScript(map), ui, ...clients, 'window.cairn = window.moida;'].join('\n');
 }
 
 /** moida.js의 응답. 버전마다 바뀔 수 있어 오래 담아 두지 않는다 */
-export function moidaAnswer(open: boolean, map: MapChoice, app: string | null = null): Response {
-  return new Response(moidaScript(open, map, app), {
+export async function moidaAnswer(open: boolean, app: string | null = null): Promise<Response> {
+  const script = moidaScript(open, await mapFor(open), app, await pluginClients());
+  return new Response(script, {
     status: 200,
     headers: {
       'Content-Type': 'text/javascript; charset=utf-8',

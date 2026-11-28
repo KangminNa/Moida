@@ -22,6 +22,7 @@ plugins/<이름>/
   `public: true`인 값만 웹으로 내려간다 (비밀값은 공개할 수 없다)
 - `guide`: 쉬운 말 안내 (2026-11-26). `does`(하는 일) · `setup`(설정 순서), 한 줄 300자 · 12줄까지. 콘솔의 플러그인 카드에 보이고, 켜면 허락하는 기술 목록(`uses`)은 "자세히"로 접힌다. 새 플러그인은 꼭 적는다
 - `web`: 화면 자리 → 파일. 지금 자리는 `post.after`(글 아래), `task.office`(콘솔의 오피스), `store.after`(스토어 화면 아래: 공개 앱의 주소 · 이름, 메일 링크의 `mail` · `token`)
+- `client`: 앱 라이브러리(`moida.js`)에 붙이는 것 (2026-11-28). `provides`는 이 플러그인이 주는 이름(`moida.<이름>` · `<moida-이름>`, 1~20개)이고, `file`(있으면 `client/` 안의 `.js`)은 `function (moida, settings) { … }`의 몸통이다: 켜진 동안 웹이 `moida.js` 뒤에 그 플러그인의 공개 설정과 함께 붙인다(`_blog/moida-plugins.ts`, 생성 파일 `_plugins/clients.generated.ts`). 켜진 플러그인의 `provides`는 앱 코드 일의 지시문에 "쓸 수 있는 라이브러리"로 적힌다. 이름마다 웹 `_blog/moida-catalog.ts`에 설명 한 줄을 적는다 (테스트가 맞춰 본다, 스킬 `library.md`가 거기서 나온다). `map`은 파일 없이 `moida.map` · `<moida-map>` · `<moida-place-list>`를 적었다 (코드는 웹에 있다)
 - `server`, `uses`: 서버 코드와 쓰는 확장 지점 (`event:<무늬>`, `job:<이름>`, `action:<이름>`, `archive:read`, `archive:restore`, `login:<이름>`, `delegate:<대상 종류>`). 객체설계 12장
 
 ## 켜기·설정

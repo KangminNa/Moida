@@ -126,12 +126,13 @@
 ## 회원 · 데이터 · 권한 (moida.js, 그 앱의 도메인에서만)
 
 앱 코드는 서버 코드 · SQL을 갖지 않는다. 표는 `moida.json`에 선언하고, 화면에서는 `moida.js`로 읽고 쓴다.
+쓸 수 있는 것의 목록(부품 · 함수 · 플러그인이 주는 것)은 [library.md](library.md)다. 로그인 줄은 `<moida-account>`, 표의 줄 목록은 `<moida-rows table="…"><template>…</template></moida-rows>`로 먼저 짠다.
 
 ```html
 <script src="_/moida.js"></script>
 ```
 
-- 주소는 상대로 쓴다: 묶음 맨 위의 HTML에서는 `_/moida.js`, `about/index.html`처럼 폴더 안이면 `../_/moida.js`. 템플릿 앱에서는 `{{base}}/_/moida.js`.
+- 주소는 상대로 쓴다: 묶음 맨 위의 HTML에서는 `_/moida.js`, `about/index.html`처럼 폴더 안이면 `../_/moida.js`. 템플릿 앱에서는 `{{base}}/_/moida.js`. 타입은 같은 자리의 `_/moida.d.ts` (내 컴퓨터에서 짤 때 편집기에).
 - `moida.open`: 이 화면에서 회원 · 데이터를 쓸 수 있는가 (그 앱의 도메인으로 연 공개 화면). 거짓이면 아래 호출은 실패한다 (`code: 'closed'`).
 
 | 부르는 것 | 하는 일 |

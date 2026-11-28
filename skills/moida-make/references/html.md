@@ -9,7 +9,7 @@ pptx · xlsx · docx는 지시에 그 형식이 적혀 있을 때만 만든다 (
 - 열린 페이지는 격리된다: 쿠키 · `localStorage` · 서버 API를 쓸 수 없다. 넣을 내용은 만들 때 다 넣는다.
 - 이름은 내용을 알 수 있게 한국어로 짧게, 확장자 `.html` (`2026 계획 발표.html`). 페이지로 내보내는 일(지시의 `# 페이지`)이면 `index.html`.
 - 아래 본보기를 **그대로 복사해 내용만 바꾼다.** 넘기기 · 정렬 · 인쇄 스크립트는 고치지 않는다.
-- 확인: 칸에는 브라우저가 없다. 만든 뒤 파일을 다시 읽어 본다.
+- 확인: 만든 뒤 파일을 다시 읽어 본다 (러너도 화면을 찍는다).
   - 닫히지 않은 태그, 빈 링크, `http`로 시작하는 스크립트 · 스타일 · 글꼴 주소가 없는지
   - 발표: 장마다 글이 5줄 · 120자 안팎인지 (넘치면 장을 나눈다)
   - 표: 데이터가 JSON으로 읽히는지 `python3 -c "import json,re,sys; t=open(sys.argv[1],encoding='utf-8').read(); d=json.loads(re.search(r'id=\"data\" type=\"application/json\">(.*?)</script>', t, re.S).group(1)); print(len(d['rows']), '줄')" 파일.html`
