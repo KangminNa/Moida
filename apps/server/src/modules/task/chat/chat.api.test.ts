@@ -819,6 +819,7 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
         },
       ],
     });
+    await drain(); // 회차가 팀원을 기다리기 시작하면 나눠 맡긴 계획이 판단 소식으로 (D3)
     const sub = (await jobs()).find((j) => j.task.title === '요강 읽기') as Json;
     await tool(sub.run_token, 'post_update', {
       kind: 'assumption',
@@ -859,6 +860,7 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
       news.map((n: Json) => [n.kind, n.agent, n.text]),
       [
         ['decision', boss.name, '본선 규정을 먼저 본다'],
+        ['decision', boss.name, '일 1개를 나눠 맡김'], // 나눠 맡긴 계획 (D3, 회차가 팀원을 기다리기 시작할 때)
         ['assumption', member.name, '본선은 오프라인이라고 가정'],
         ['member_done', member.name, '요강 읽기 — 평가 기준 3가지'],
       ],
@@ -866,7 +868,7 @@ describe('내 컴퓨터의 AI 도구가 서버 팀에 맡기기 (MCP ask_agent �
     const room = await detail(chatId);
     assert.deepEqual([room.state, room.active], ['working', 1], '팀원은 끝났고 회차가 다시 돈다');
     assert.deepEqual(
-      room.news.slice(-3).map((n: Json) => [n.kind, n.agent]),
+      room.news.slice(-news.length).map((n: Json) => [n.kind, n.agent]),
       news.map((n: Json) => [n.kind, n.agent]),
       '상세의 소식은 agent_updates와 같다',
     );

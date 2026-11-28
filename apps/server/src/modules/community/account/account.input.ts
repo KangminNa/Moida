@@ -81,6 +81,9 @@ export class StorePlace extends BaseRequest {
  * 앱을 고르지 않고 로그인한다. 기본 도메인(콘솔과 같은 출처)과 앱마다의 도메인에서는 없는 주소
  */
 export class SharedPlace extends BaseRequest {
+  /** 앱 없음: 요청자도 앱 없는 계정이다 (MemberActor의 appId null). 계정 일은 MemberPlace와 같은 Service가 받는다 */
+  readonly appId = null;
+
   private constructor(
     readonly spaceId: string,
     /** 요청한 곳 (시도 제한의 열쇠, 서버 메모리에서만 쓰고 저장하지 않는다) */

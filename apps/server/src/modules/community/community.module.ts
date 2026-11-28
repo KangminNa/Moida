@@ -5,6 +5,7 @@ import { AccountQuery } from './account/account.query';
 import { AccountService } from './account/account.service';
 import { AccountMailService } from './account/account-mail.service';
 import { NewsUnsubscribedHandler } from './account/news-unsubscribed.handler';
+import { StoreAccountController } from './account/store-account.api';
 import { StoreJoinController } from './account/store-join.api';
 import { StoreJoinService } from './account/store-join.service';
 import { StoreSessionController } from './account/store-session.api';
@@ -91,6 +92,7 @@ import { TopicService } from './topic/topic.service';
     AccountAdminController,
     StoreJoinController,
     StoreSessionController,
+    StoreAccountController,
     TermsAdminController,
   ],
   exports: [CommunityTools],

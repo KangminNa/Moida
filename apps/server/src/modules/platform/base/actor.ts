@@ -334,8 +334,8 @@ export class MemberActor extends Actor {
   readonly kind = 'member';
 
   constructor(
-    /** 이 로그인이 열린 앱 (그 앱 도메인) */
-    readonly appId: string,
+    /** 이 로그인이 열린 앱 (그 앱 도메인). 공통 앱 도메인의 앱 없는 요청(api/store, 2026-11-28)이면 null */
+    readonly appId: string | null,
     /** 이 앱의 회원 (참여 전이면 null) */
     memberId: string | null,
     /** 로그인한 스토어 계정 */
@@ -355,8 +355,8 @@ export class MemberActor extends Actor {
     return me as MemberActor & { readonly id: string };
   }
 
-  /** 이 앱 도메인에 로그인한 계정이면 그 요청자 (앱 참여는 묻지 않는다), 아니면 401 */
-  static requireAccount(actor: Actor, appId: string): MemberActor {
+  /** 이 앱 도메인에 로그인한 계정이면 그 요청자 (앱 참여는 묻지 않는다), 아니면 401. appId null: 공통 앱 도메인의 앱 없는 요청 */
+  static requireAccount(actor: Actor, appId: string | null): MemberActor {
     if (actor instanceof MemberActor && actor.appId === appId) return actor;
     throw new Unauthenticated('로그인이 필요해요');
   }

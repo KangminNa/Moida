@@ -1,20 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { memberApi } from '../../../../_community/member-api';
-import { useAction } from '../../../../_lib/use-action';
+import { useAction } from '../_lib/use-action';
+import { accountApi } from './member-api';
 
 // 비밀번호 다시 정하기: 가입한 메일로 인증코드를 받아 새 비밀번호를 정한다 (2026-11-26).
-// 가입하지 않은 메일이어도 답은 같다 (메일만 오지 않는다). 정하면 모든 기기에서 로그아웃되고 로그인 화면으로
+// 가입하지 않은 메일이어도 답은 같다 (메일만 오지 않는다). 정하면 모든 기기에서 로그아웃되고 로그인 화면으로.
+// 앱의 /_/reset과 공통 앱 도메인의 앱 없는 /_/reset(shared, 2026-11-28)이 함께 쓴다
 export function ResetPanel({
   base,
   csrf,
   returnTo,
+  shared = false,
 }: {
+  /** 앱 화면의 뿌리 (자기 도메인 · 앱 없는 화면 '', 공통 앱 도메인의 앱 /<앱>) */
   base: string;
   csrf: string | null;
   returnTo: string;
+  shared?: boolean;
 }) {
+  const call = accountApi(shared);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +31,7 @@ export function ResetPanel({
 
   async function sendCode() {
     const reply = await sending.run('code', () =>
-      memberApi<null>(csrf, 'POST', 'password/code', { email }),
+      call<null>(csrf, 'POST', 'password/code', { email }),
     );
     if (reply?.ok) setSentTo(email.trim());
   }
@@ -34,7 +39,7 @@ export function ResetPanel({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const reply = await action.run('reset', () =>
-      memberApi<null>(csrf, 'POST', 'password/reset', { email, code, password }),
+      call<null>(csrf, 'POST', 'password/reset', { email, code, password }),
     );
     if (reply?.ok) window.location.replace(login);
   }

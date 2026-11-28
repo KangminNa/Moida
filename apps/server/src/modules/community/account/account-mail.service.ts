@@ -6,6 +6,7 @@ import {
   CodeMail,
   Database,
   EmailAddress,
+  HostGate,
   InvalidRequest,
   Lookups,
   MemberActor,
@@ -20,11 +21,18 @@ import { MemberPassword } from '../member/member-password.policy';
 import { TermsQuery } from '../terms/terms.query';
 import { TermsConsent } from '../terms/terms-consent.policy';
 import { Account } from './account';
-import type { CodeRequestInput, EmailInput, JoinInput, ResetPasswordInput } from './account.input';
+import type {
+  CodeRequestInput,
+  EmailInput,
+  JoinInput,
+  ResetPasswordInput,
+  SharedPlace,
+} from './account.input';
 import { AccountRepository } from './account.repository';
 import { LoginId } from './login-id.policy';
 
 // 메일로 하는 계정 일 (2026-11-26, 스토어 계정): 가입 인증코드 → 가입(계정 + 이 앱 참여), 비밀번호 다시 정하기, 옛 계정의 메일 등록.
+// 비밀번호 다시 정하기는 공통 앱 도메인에서 앱 없이도 (SharedPlace, 2026-11-28: 메일 제목은 사이트 주소).
 // 인증코드는 서버 메모리에만 (VerifyCodes: 6자리, 10분, 5번 틀리면 버림, 60초 뒤 다시 받기), 메일은 메일 플러그인의 길(CodeMail).
 // 가입한 주소인지 드러내지 않는다: 코드를 보내 달라는 요청의 답은 늘 같다 (204). 가입한 주소로 가입 코드를 달라면 코드 대신
 // "이미 가입한 주소" 메일을, 가입하지 않은 주소로 비밀번호 코드를 달라면 아무것도 보내지 않는다. 메일은 기다리지 않고 보낸다 (같은 시간)
@@ -65,6 +73,7 @@ export class AccountMailService extends BaseService {
     private readonly hasher: PasswordHasher,
     private readonly terms: TermsQuery,
     private readonly mail: CodeMail,
+    private readonly gate: HostGate,
   ) {
     super(db);
   }
@@ -145,7 +154,11 @@ export class AccountMailService extends BaseService {
   }
 
   /** 비밀번호 다시 정하기 인증코드 (가입한 주소에만 보낸다). 답은 늘 같다 */
-  async sendResetCode(actor: Actor, place: MemberPlace, req: CodeRequestInput): Promise<void> {
+  async sendResetCode(
+    actor: Actor,
+    place: MemberPlace | SharedPlace,
+    req: CodeRequestInput,
+  ): Promise<void> {
     const app = await this.appName(actor, place);
     const email = AccountMailService.address(req.email);
     this.mail.assertReady();
@@ -165,7 +178,11 @@ export class AccountMailService extends BaseService {
   }
 
   /** 코드로 새 비밀번호를 정한다. 모든 로그인이 끝난다 (다시 로그인) */
-  async resetPassword(actor: Actor, place: MemberPlace, req: ResetPasswordInput): Promise<void> {
+  async resetPassword(
+    actor: Actor,
+    place: MemberPlace | SharedPlace,
+    req: ResetPasswordInput,
+  ): Promise<void> {
     await this.appName(actor, place);
     const email = AccountMailService.address(req.email);
     const key = AccountMailService.key('reset', place, email);
@@ -235,12 +252,12 @@ export class AccountMailService extends BaseService {
   }
 
   /** 그 공간에 이 메일로 가입한 계정 (탈퇴하면 메일을 지워 없다) */
-  private joined(place: MemberPlace, email: string): Promise<Account | null> {
+  private joined(place: MemberPlace | SharedPlace, email: string): Promise<Account | null> {
     return this.transaction((tx) => new AccountRepository(tx).findByEmail(place.spaceId, email));
   }
 
   /** 코드가 맞는가. 틀리면 곳마다 세고 422 (코드는 VerifyCodes가 5번 틀리면 버린다) */
-  private checkCode(place: MemberPlace, key: string, code: string): void {
+  private checkCode(place: MemberPlace | SharedPlace, key: string, code: string): void {
     const at = AccountMailService.placeOf(place);
     this.wrong.check(at);
     if (this.codes.check(key, code)) return;
@@ -248,7 +265,7 @@ export class AccountMailService extends BaseService {
     throw new InvalidRequest(new Map([['code', AccountMailService.WRONG_CODE]]));
   }
 
-  private countSend(place: MemberPlace, email: string): void {
+  private countSend(place: MemberPlace | SharedPlace, email: string): void {
     this.sendsByPlace.hit(AccountMailService.placeOf(place));
     this.sendsByAddress.hit(`${place.spaceId}:${email}`);
   }
@@ -260,17 +277,18 @@ export class AccountMailService extends BaseService {
   }
 
   /** 코드의 열쇠: 쓰임 · 공간 · 메일 (가입한 앱이 달라도 같은 계정의 코드다) */
-  private static key(use: string, place: MemberPlace, email: string): string {
+  private static key(use: string, place: MemberPlace | SharedPlace, email: string): string {
     return `${use}:${place.spaceId}:${email}`;
   }
 
   /** 시도를 세는 곳: 공간(스토어)마다 */
-  private static placeOf(place: MemberPlace): string {
+  private static placeOf(place: MemberPlace | SharedPlace): string {
     return `${place.spaceId}:${AttemptLimiter.place(place.ip)}`;
   }
 
-  /** 회원을 받는 공개 앱인가, 그 이름 (메일 제목). 아니면 404 */
-  private async appName(actor: Actor, place: MemberPlace): Promise<string> {
+  /** 회원을 받는 공개 앱인가, 그 이름 (메일 제목). 아니면 404. 앱 없는 요청(공통 앱 도메인)은 사이트 주소 */
+  private async appName(actor: Actor, place: MemberPlace | SharedPlace): Promise<string> {
+    if (place.appId === null) return (await this.gate.siteHost()) ?? 'Moida';
     const name = (await this.lookups.visible('member-app', actor, [place.appId])).get(place.appId);
     if (name === undefined) throw new NotFound('없는 주소예요');
     return name;

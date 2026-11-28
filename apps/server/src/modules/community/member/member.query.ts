@@ -41,6 +41,20 @@ export class MemberQuery extends BaseQuery {
   }
 
   /**
+   * 공통 앱 도메인의 앱 없는 요청(api/store, 2026-11-28)의 요청자: 그 공간의 끝나지 않은 세션의 계정 (탈퇴 · 정지가 아닌).
+   * 그 도메인의 쿠키는 모든 앱이 함께 써서 어느 앱에서 연 세션이든 받는다. 앱이 없어 회원은 늘 null
+   */
+  async sharedActorFor(token: string, spaceId: string): Promise<MemberActor | null> {
+    const [row] = await this.sql<{ account_id: string }[]>`
+      SELECT a.id AS account_id FROM community.account_sessions s
+      JOIN community.accounts a ON a.id = s.account_id
+      WHERE s.token_hash = ${AccountSession.hash(token)} AND s.ended_at IS NULL
+        AND s.expires_at > now() AND a.space_id = ${spaceId} AND a.left_at IS NULL
+        AND (a.suspended_until IS NULL OR a.suspended_until <= now())`;
+    return row ? new MemberActor(null, null, row.account_id) : null;
+  }
+
+  /**
    * 이 브라우저가 누구인가: 로그인한 계정 · 이 앱의 회원(참여 전이면 null)과 쓰기 요청의 확인 값(회원 쿠키로 만든 MemberCsrf).
    * 쿠키가 없으면 모두 null
    */
@@ -67,19 +81,15 @@ export class MemberQuery extends BaseQuery {
    * 그 도메인의 쿠키는 모든 앱이 함께 써서 어느 앱에서 연 로그인이든, 앱 없이 연 로그인이든 받는다
    */
   async sharedMe(
-    _actor: Actor,
+    actor: Actor,
     place: SharedPlace,
     memberCookie: string | null,
   ): Promise<MemberMeView> {
     if (!memberCookie) return new MemberMeView(null, null, null);
     const csrf = this.csrf.tokenOf(memberCookie);
-    const [row] = await this.sql<{ account_id: string }[]>`
-      SELECT a.id AS account_id FROM community.account_sessions s
-      JOIN community.accounts a ON a.id = s.account_id
-      WHERE s.token_hash = ${AccountSession.hash(memberCookie)} AND s.ended_at IS NULL
-        AND s.expires_at > now() AND a.space_id = ${place.spaceId} AND a.left_at IS NULL
-        AND (a.suspended_until IS NULL OR a.suspended_until <= now())`;
-    const account = row ? await this.row(accounts, { id: row.account_id }) : null;
+    if (!(actor instanceof MemberActor) || actor.appId !== null)
+      return new MemberMeView(null, null, csrf);
+    const account = await this.row(accounts, { id: actor.accountId, space_id: place.spaceId });
     return new MemberMeView(account ? new AccountSelfView(account) : null, null, csrf);
   }
 
