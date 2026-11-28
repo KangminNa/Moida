@@ -4,6 +4,7 @@
 // 로그인 · 가입 화면(AuthField, 2026-11-28)은 'account' 모양을 왼쪽에 두고, 글자를 칠 때마다 점을 밖으로 한 번 민다(pulse)
 
 import { accountMoves, placeAccount } from './field-account';
+import { FieldAir } from './field-air';
 
 export type FieldShape = 'task' | 'nodes' | 'orbit' | 'sphere' | 'dust' | 'account';
 
@@ -87,7 +88,6 @@ export class FieldParticles {
   private t = 0;
   private rot = 0;
   private tilt = 0;
-  private dim = 1;
   private last = 0;
   private raf = 0;
   private w = 1;
@@ -97,6 +97,8 @@ export class FieldParticles {
   private cy = 0;
   private R = 1;
   private readonly resize: ResizeObserver | null;
+  /** 화면 전체를 흐르는 점 (C안) */
+  private readonly air: FieldAir;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -119,6 +121,7 @@ export class FieldParticles {
         a: Math.random() * TAU,
       });
     this.measure();
+    this.air = new FieldAir(this.w, this.h);
     this.setShape('dust');
     for (const p of this.dots) [p.x, p.y, p.z] = [p.tx, p.ty, p.tz];
     this.setShape(shape);
@@ -157,6 +160,7 @@ export class FieldParticles {
       p.ox += toward === 0 ? (p.x / d) * f : toward * f * (0.6 + p.r2);
       p.oy += toward === 0 ? (p.y / d) * f : 0;
     }
+    this.air.kick(s, toward, this.cx, this.cy);
   }
 
   /** 마우스 자리 (캔버스 기준). 밖으로 나가면 null */
@@ -167,6 +171,7 @@ export class FieldParticles {
 
   private remeasure(): void {
     this.measure();
+    this.air.spread(this.w, this.h);
     this.setShape(this.shape);
   }
 
@@ -263,8 +268,6 @@ export class FieldParticles {
       }
     }
     this.tilt += ((spin ? -0.22 : 0) - this.tilt) * Math.min(1, dt * 1.6);
-    const apps = shape === 'dust';
-    this.dim += ((apps ? 0.42 : 1) - this.dim) * Math.min(1, dt * 2.4);
     if (shape === 'orbit' || shape === 'nodes' || shape === 'account')
       this.dots.forEach((p, i) => {
         if (
@@ -276,14 +279,16 @@ export class FieldParticles {
         )
           this.place(p, i, shape);
       });
-    this.draw(step);
+    this.draw(step, dt);
   }
 
-  private draw(step: number): void {
+  private draw(step: number, dt: number): void {
     const { ctx, canvas, R, cx, cy, dpr, mx, my, t } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    FieldAir.wipe(ctx, canvas, step, this.reduced);
     ctx.fillStyle = `rgb(${this.paper.join(',')})`;
+    const at = { w: this.w, h: this.h, cx, cy, R, mx, my, dpr };
+    this.air.step(ctx, { shape: this.shape, t, dt, step, still: this.reduced }, at);
     const [cosR, sinR, cosT, sinT] = [
       Math.cos(this.rot),
       Math.sin(this.rot),
@@ -292,7 +297,7 @@ export class FieldParticles {
     ];
     const F = 3.4;
     const wob = this.reduced ? 0 : this.shape === 'dust' ? 0.05 : 0.014; // 앱 보기의 흩어진 점은 크게 떠다닌다
-    const base = 0.9 * this.dim;
+    const base = 0.82;
     for (const p of this.dots) {
       const kk = this.reduced ? 1 : Math.min(1, p.k * step);
       p.x += (p.tx - p.x) * kk;

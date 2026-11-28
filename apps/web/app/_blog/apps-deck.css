@@ -304,10 +304,13 @@
 .dk-extra:empty {
   display: none;
 }
+/* 구독 칸(blog.css)은 --fg 바탕에 --bg 글자(반전)로 그린다. 앱 보기에서는 카드처럼 종이 바탕 · 먹 글자로:
+   두 토큰을 칸 안에서만 바꿔 설명 · 칩 · 입력 · 동의 글이 함께 따라오게 (2026-11-28, 밝은 바탕에 밝은 글자였던 것) */
 .dk-extra :is(.store-subscribe, .store-mail-link) {
+  --fg: var(--field-paper);
+  --bg: var(--field-ink);
   margin: 0;
-  background: var(--field-paper);
-  color: var(--field-ink);
+  color-scheme: light;
 }
 @keyframes dk-fill {
   from {
