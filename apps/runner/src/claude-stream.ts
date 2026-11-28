@@ -14,6 +14,8 @@ import { RunTranscript } from './run-transcript';
 // 토큰: input + cache_creation + output. cache_read는 값이 매우 싸고 턴마다 다시 세어져 한도에 넣지 않는다.
 // assistant 줄은 내용 블록마다 하나씩 나오고 같은 message.id에 같은 usage를 싣는다. 그래서 id별로 늘어난 만큼만 센다.
 // 하위 에이전트까지 든 정확한 합은 result의 modelUsage에 있어서, 끝에서 모자란 만큼을 더한다.
+// 인수인계 메모 (2026-11-28 고침): 답을 마치려다 Stop 훅에 막혀 메모를 쓰면, 그 뒤의 글("메모를 썼어요")이 마지막 답이 되어
+// 진짜 답을 덮었다. 그래서 메모 쓰기가 마지막 도구면, 메모 전에 도구 없이 끝낸 글(끝내려던 답)이 더 길 때 그것을 답으로 둔다
 export class ClaudeStream implements AiStream {
   /** 늘 허락하는 MCP 서버. 브라우저 작업에서만 playwright를 더한다 (BrowserMcp) */
   static readonly SERVER = 'cairn';
@@ -52,6 +54,13 @@ export class ClaudeStream implements AiStream {
   /** 셸을 열지 않은 일에서 셸을 쓴 명령 (설정이 먹지 않은 것) */
   private shellUsed: string | null = null;
   private planWindows: readonly PlanWindow[] = [];
+  /** 지금 읽는 assistant 메시지 (내용 블록마다 줄이 따로 온다): id · 글 · 도구를 썼는지 */
+  private msg = { id: '', text: '', tools: false };
+  /** 도구 없이 글만 쓰고 끝낸 마지막 메시지의 글 (끝내려던 답) */
+  private lastFinish: string | null = null;
+  /** 메모를 쓰기 직전의 끝내려던 답, 메모 쓰기가 마지막 도구인가 */
+  private memoAnswer: string | null = null;
+  private memoLast = false;
   private session: string | null = null;
   readonly transcript = new RunTranscript();
 
@@ -60,11 +69,29 @@ export class ClaudeStream implements AiStream {
     private readonly servers: readonly string[] = [ClaudeStream.SERVER],
     /** 셸을 연 일인가 (코드 러너 칸의 코드 · 만들기 작업). 아니면 셸이 보일 때 격리가 깨진 것 */
     private readonly shellAllowed = false,
+    /** 인수인계 메모 파일 (메모를 쓰는 일만) */
+    private readonly memoPath: string | null = null,
   ) {}
 
   /** 마지막 답 */
   get finalText(): string {
-    return this.resultText ?? this.lastText;
+    return this.answer(this.resultText ?? this.lastText);
+  }
+
+  /** 메모 쓰기로 끝났으면 메모 전에 끝내려던 답이 더 길 때 그것 (위 설명) */
+  private answer(text: string): string {
+    const before = this.memoLast ? this.memoAnswer : null;
+    return before !== null && before.trim().length > text.trim().length ? before : text;
+  }
+
+  /** 내용 블록 하나를 메시지별로 모은다. 새 메시지가 시작되면 앞 메시지가 글만 썼는지 본다 */
+  private noteBlock(id: string, text: string | null, tool: boolean): void {
+    if (id !== this.msg.id) {
+      if (this.msg.text && !this.msg.tools) this.lastFinish = this.msg.text;
+      this.msg = { id, text: '', tools: false };
+    }
+    if (text) this.msg.text += (this.msg.text ? '\n\n' : '') + text;
+    if (tool) this.msg.tools = true;
   }
 
   /** CLI가 실패로 끝냈다면 그 이유 */
@@ -154,12 +181,19 @@ export class ClaudeStream implements AiStream {
     const message = event.child('message');
     this.count(message);
     const events: RunEvent[] = [];
+    const id = message.text('id');
     for (const block of message.list('content')) {
       if (block.text('type') === 'text') {
+        this.noteBlock(id, block.text('text'), false);
         this.lastText = block.text('text') || this.lastText;
         this.transcript.said(block.text('text'));
       } else if (block.text('type') === 'tool_use') {
         const name = block.text('name');
+        this.noteBlock(id, null, true);
+        const memo =
+          this.memoPath !== null && block.child('input').text('file_path') === this.memoPath;
+        if (memo && !this.memoLast) this.memoAnswer = this.lastFinish;
+        this.memoLast = memo;
         this.calls.called(ConnectorCalls.serverOf(name) ?? '', block.text('id'));
         if (name === ClaudeStream.SHELL && !this.shellAllowed)
           this.shellUsed ??= block.child('input').text('command') || '(명령)';
@@ -193,7 +227,7 @@ export class ClaudeStream implements AiStream {
       this.failureText = text || event.texts('errors').join('\n') || event.text('subtype');
       return [new RunEvent(RunEvent.ERROR, this.failureText, this.takeOwed())];
     }
-    this.resultText = text || this.lastText;
+    this.resultText = this.answer(text || this.lastText);
     return [new RunEvent(RunEvent.RESULT, this.resultText, this.takeOwed())];
   }
 

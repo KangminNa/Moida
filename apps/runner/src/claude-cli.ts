@@ -83,6 +83,8 @@ export class ClaudeCli implements AiTool {
   private resumeFrom: string | null = null;
   /** 인수인계 메모를 쓰게 하는가 (작업 세션에 기록하는 일): Stop 훅을 단다 */
   private memo = false;
+  /** 그 메모 파일 (스트림이 메모 쓰기를 알아본다) */
+  private memoFile: string | null = null;
   /** --effort가 받는 값 (Claude Code 2.1의 도움말). 모르는 값은 넘기지 않고 CLI의 기본으로 */
   static readonly EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -126,6 +128,7 @@ export class ClaudeCli implements AiTool {
       this.memo,
     );
     if (this.memo) await MemoHook.install(workspace.configDir);
+    this.memoFile = this.memo ? workspace.memoPath : null;
     return workspace;
   }
 
@@ -137,6 +140,7 @@ export class ClaudeCli implements AiTool {
         ...this.tools.map((t) => t.server),
       ],
       this.shell,
+      this.memoFile,
     );
   }
 

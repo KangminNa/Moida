@@ -1,0 +1,402 @@
+/* 공통 앱 도메인의 계정 화면 (C안 "로그인 · 가입", AuthField). 색은 globals.css의 --field-* 토큰만 쓴다.
+   어두운 바탕에 밝은 점 · 왼쪽 아래 글 · 오른쪽의 밝은 판. 판 안의 칸(.field · .input · .cta · .ghost · .member-*)은
+   앱 화면과 같은 부품이라 여기서 모양만 시안에 맞춘다 */
+
+.au-root {
+  position: relative;
+  box-sizing: border-box;
+  height: 100dvh;
+  min-height: 640px;
+  overflow: hidden;
+  background: var(--field-night);
+  color: var(--field-paper);
+  font-family: var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+.au-root a {
+  color: inherit;
+}
+.au-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.au-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    60% 56% at 0% 100%,
+    color-mix(in srgb, var(--field-night) 90%, transparent) 0%,
+    color-mix(in srgb, var(--field-night) 50%, transparent) 45%,
+    transparent 100%
+  );
+}
+.au-mono {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.au-muted {
+  color: var(--field-dim);
+}
+.au-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 28px;
+}
+.au-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  text-decoration: none;
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.au-logo img {
+  border-radius: 6px;
+}
+.au-links {
+  display: flex;
+  gap: 2px;
+}
+.au-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+.au-links a:hover {
+  background: color-mix(in srgb, var(--field-paper) 10%, transparent);
+}
+.au-body {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+  padding: 96px 48px 48px 32px;
+}
+.au-copy {
+  align-self: flex-end;
+  width: min(560px, 46%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 16px;
+}
+.au-copy p {
+  margin: 0;
+}
+.au-h1 {
+  margin: 0;
+  font-size: clamp(1.875rem, 3.6vw, 3.375rem);
+  font-weight: 300;
+  line-height: 1.14;
+  letter-spacing: -0.03em;
+}
+.au-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+.au-up {
+  display: block;
+  animation: au-up 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.au-d1 {
+  animation-delay: 0.08s;
+}
+.au-sub {
+  max-width: 440px;
+  font-size: 1rem;
+  line-height: 1.7;
+  animation: au-fade 0.8s ease 0.25s both;
+}
+.au-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  animation: au-fade 0.8s ease 0.35s both;
+}
+.au-notes li {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--field-dim);
+}
+.au-notes .au-mono {
+  flex: none;
+  color: var(--field-paper);
+}
+
+/* 오른쪽의 밝은 판 */
+.au-panel {
+  flex: none;
+  box-sizing: border-box;
+  width: 420px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--field-paper);
+  color: var(--field-ink);
+  box-shadow: 0 24px 80px var(--field-shadow);
+  animation: au-rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s both;
+}
+.au-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.au-tabs {
+  display: flex;
+  align-self: flex-start;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--field-ink) 7%, transparent);
+}
+.au-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--field-dim-day);
+  font: inherit;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition:
+    color 0.3s,
+    background-color 0.3s;
+}
+.au-tab:hover {
+  color: var(--field-ink);
+}
+.au-tab.is-on {
+  background: var(--field-ink);
+  color: var(--field-paper);
+  font-weight: 500;
+}
+.au-panel .member-form {
+  gap: 14px;
+  animation: au-fade 0.4s ease both;
+}
+.au-panel .member-form + .member-form,
+.au-panel .member-form > .member-form + .member-form {
+  border-top-color: color-mix(in srgb, var(--field-ink) 12%, transparent);
+}
+.au-panel .field {
+  gap: 6px;
+  min-width: 0;
+}
+.au-panel .field > span {
+  color: var(--field-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.au-panel .field small,
+.au-panel .member-hint {
+  color: var(--field-dim-day);
+}
+.au-panel .input {
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--field-ink) 7%, transparent);
+  color: var(--field-ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+}
+.au-panel .input:hover {
+  background: color-mix(in srgb, var(--field-ink) 10%, transparent);
+}
+.au-panel .input:focus {
+  outline: 2px solid var(--field-ink);
+  outline-offset: 0;
+  background: var(--field-white);
+  box-shadow: none;
+}
+.au-panel .ghost {
+  flex: none;
+  height: auto;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--field-ink) 12%, transparent);
+  color: var(--field-ink);
+}
+.au-panel .ghost:hover {
+  background: color-mix(in srgb, var(--field-ink) 18%, transparent);
+}
+.au-panel .cta {
+  justify-content: center;
+  height: auto;
+  min-height: 52px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--field-ink);
+  color: var(--field-paper);
+  font-size: 1rem;
+  font-weight: 500;
+}
+.au-panel .cta:hover {
+  background: color-mix(in srgb, var(--field-ink) 88%, var(--field-paper));
+}
+.au-panel .member-check input {
+  accent-color: var(--field-ink);
+}
+.au-panel .member-terms {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--field-ink) 5%, transparent);
+}
+.au-panel a {
+  text-underline-offset: 3px;
+}
+.au-panel .member-facts dt {
+  color: var(--field-dim-day);
+}
+.au-logo:focus-visible,
+.au-links a:focus-visible,
+.au-tab:focus-visible,
+.au-panel a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@keyframes au-up {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes au-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes au-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .au-up,
+  .au-sub,
+  .au-notes,
+  .au-panel,
+  .au-panel .member-form {
+    animation: none;
+  }
+}
+
+/* 폰: 위에 점 그림과 글, 아래에 판 (화면을 내린다) */
+@media (max-width: 720px) {
+  .au-root {
+    overflow-y: auto;
+  }
+  .au-shade {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--field-night) 88%, transparent) 0%,
+      color-mix(in srgb, var(--field-night) 40%, transparent) 24%,
+      transparent 40%
+    );
+  }
+  .au-canvas {
+    position: fixed;
+  }
+  .au-top {
+    padding: 10px 14px;
+  }
+  .au-body {
+    position: relative;
+    inset: auto;
+    min-height: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+    padding: 68px 12px 12px;
+  }
+  .au-copy {
+    align-self: stretch;
+    width: auto;
+    gap: 10px;
+    padding: 0 8px;
+  }
+  .au-h1 {
+    font-size: 1.75rem;
+    line-height: 1.22;
+  }
+  .au-sub {
+    font-size: 0.875rem;
+    line-height: 1.65;
+  }
+  .au-notes {
+    display: none;
+  }
+  .au-panel {
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    margin-top: auto;
+    padding: 20px 16px;
+    border-radius: 22px;
+  }
+  .au-tabs {
+    align-self: stretch;
+  }
+  .au-tab {
+    flex: 1;
+  }
+}

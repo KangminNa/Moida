@@ -326,3 +326,62 @@ describe('셸', () => {
     assert.match(events[0]?.body ?? '', /Bash.*pnpm test/);
   });
 });
+
+describe('인수인계 메모로 끝난 답 (2026-11-28)', () => {
+  const MEMO = '/work/.cairn/memo.md';
+  const usage = { input_tokens: 1, output_tokens: 1 };
+  const answer = '공릉 카페: 1) 카페 A — 조용해요 2) 카페 B — 디저트. 음식점: 1) 식당 C 2) 식당 D';
+  const ack = '인수인계 메모를 .cairn/memo.md에 썼습니다. 추천 내용은 앞의 답 그대로입니다.';
+  const writeMemo = (id: string) =>
+    assistant(id, usage, {
+      type: 'tool_use',
+      id: `t-${id}`,
+      name: 'Write',
+      input: { file_path: MEMO, content: '메모' },
+    });
+  const result = (text: string) => line({ type: 'result', subtype: 'success', result: text });
+
+  test('끝내려다 Stop 훅에 막혀 메모를 쓰면, 그 뒤의 짧은 말이 아니라 끝내려던 답이 남는다', () => {
+    const stream = new ClaudeStream([ClaudeStream.SERVER], false, MEMO);
+    stream.read(assistant('m1', usage, { type: 'text', text: answer }));
+    stream.read(assistant('m2', usage, { type: 'text', text: '메모를 쓸게요' }));
+    stream.read(writeMemo('m2'));
+    stream.read(assistant('m3', usage, { type: 'text', text: ack }));
+    const events = stream.read(result(ack));
+    assert.equal(stream.finalText, answer);
+    assert.equal(events.at(-1)?.body, answer);
+  });
+
+  test('메모 뒤에 답을 다시 길게 적으면 그 답, 메모 뒤에 일을 더 했으면 마지막 답 그대로', () => {
+    const again = new ClaudeStream([ClaudeStream.SERVER], false, MEMO);
+    again.read(assistant('m1', usage, { type: 'text', text: '짧은 답' }));
+    again.read(writeMemo('m2'));
+    again.read(assistant('m3', usage, { type: 'text', text: answer }));
+    again.read(result(answer));
+    assert.equal(again.finalText, answer);
+
+    const early = new ClaudeStream([ClaudeStream.SERVER], false, MEMO);
+    early.read(assistant('m1', usage, { type: 'text', text: answer }));
+    early.read(writeMemo('m2'));
+    early.read(
+      assistant('m3', usage, {
+        type: 'tool_use',
+        id: 't3',
+        name: 'Read',
+        input: { file_path: 'a' },
+      }),
+    );
+    early.read(assistant('m4', usage, { type: 'text', text: '고친 짧은 답' }));
+    early.read(result('고친 짧은 답'));
+    assert.equal(early.finalText, '고친 짧은 답');
+  });
+
+  test('메모를 쓰지 않는 일은 그대로', () => {
+    const stream = new ClaudeStream();
+    stream.read(assistant('m1', usage, { type: 'text', text: answer }));
+    stream.read(writeMemo('m2'));
+    stream.read(assistant('m3', usage, { type: 'text', text: ack }));
+    stream.read(result(ack));
+    assert.equal(stream.finalText, ack);
+  });
+});
