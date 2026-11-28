@@ -1,5 +1,6 @@
-import { BaseRequest, type RequestFields } from '../../platform';
+import { BaseRequest, type RequestFields, ValueList } from '../../platform';
 import { type RefPick, TaskRefs } from '../task/task-refs.policy';
+import { CHAT_STOP_MODE, type ChatStopMode } from '../task.tables';
 import { Chat } from './chat';
 
 // 대화 입력의 모양. 뜻(상대가 대표인지, 덧붙인 말의 한도)은 Chat이 검사한다.
@@ -105,13 +106,17 @@ export class SendChatInput extends BaseRequest {
   }
 }
 
-/** PATCH /api/chats/:id { version, model, effort }: 대화의 모델 · 생각 강도 (2026-11-15 B). 비우면(null · 빈 글) 대표의 설정 */
+/**
+ * PATCH /api/chats/:id { version, model, effort, stop_mode? }: 대화의 모델 · 생각 강도 (2026-11-15 B). 비우면(null · 빈 글)
+ * 대표의 설정. stop_mode는 멈춤 기준 (L3: all · confirm · end). 주지 않으면 그대로
+ */
 export class TuneChatInput extends BaseRequest {
   private constructor(
     readonly id: string,
     readonly version: number,
     readonly model: string | null,
     readonly effort: string | null,
+    readonly stopMode: ChatStopMode | null,
   ) {
     super();
   }
@@ -125,8 +130,16 @@ export class TuneChatInput extends BaseRequest {
           f.version(),
           f.optionalText('model', 80),
           f.optionalText('effort', 20),
+          TuneChatInput.stopOf(f, f.optionalText('stop_mode', 20)),
         ),
     );
+  }
+
+  /** 멈춤 기준은 값 목록 중 하나 (표의 CHECK와 같다) */
+  private static stopOf(f: RequestFields, given: string | null): ChatStopMode | null {
+    if (given === null || ValueList.has(CHAT_STOP_MODE, given)) return given;
+    f.reject('stop_mode', `${CHAT_STOP_MODE.join(' · ')} 중 하나예요`);
+    return null;
   }
 }
 

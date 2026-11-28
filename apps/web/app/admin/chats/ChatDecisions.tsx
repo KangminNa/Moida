@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { when } from '../../_task/labels';
+import { CONFIRM_LABELS, when } from '../../_task/labels';
 import type { ChatNews } from '../../_task/types';
 
 /** 판단의 모양 (서버 소식의 decision, post_update의 decision 그대로) */
@@ -11,11 +11,15 @@ export type Decision = {
   why: string;
   weight: string;
   step: string | null;
+  /** 확인 필요의 까닭 (L3). 알림 판단이면 null */
+  confirm: string | null;
+  /** 멈춤 기준에 걸려 고를 안 승인으로 멈췄는가 (L3) */
+  asked: boolean;
 };
 
 /** 소식의 decision 칸을 읽는다. 모양이 아니면 null (옛 판단 · 다른 종류) */
 export function decisionOf(raw: unknown): Decision | null {
-  const d = raw as Partial<Decision> | null;
+  const d = raw as (Partial<Decision> & { approval_id?: unknown }) | null;
   if (!d || typeof d.chosen !== 'string') return null;
   return {
     chosen: d.chosen,
@@ -23,6 +27,8 @@ export function decisionOf(raw: unknown): Decision | null {
     why: typeof d.why === 'string' ? d.why : '',
     weight: typeof d.weight === 'string' ? d.weight : 'medium',
     step: typeof d.step === 'string' ? d.step : null,
+    confirm: typeof d.confirm === 'string' ? d.confirm : null,
+    asked: typeof d.approval_id === 'string',
   };
 }
 
@@ -64,6 +70,12 @@ export function ChatDecisions({
           <p className="decision-chosen">고른 안: {d.chosen}</p>
           {d.alternatives.length > 0 && <small>다른 안: {d.alternatives.join(' · ')}</small>}
           {d.why && <small>까닭: {d.why}</small>}
+          {d.confirm && (
+            <small>
+              확인 필요 · {CONFIRM_LABELS[d.confirm] ?? d.confirm}
+              {d.asked ? ' · 회차 아래 승인에서 골라요' : ''}
+            </small>
+          )}
           {open === n.n ? (
             <div className="decision-change">
               <textarea

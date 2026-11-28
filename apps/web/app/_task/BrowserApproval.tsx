@@ -7,6 +7,8 @@ import { useAction } from '../_lib/use-action';
 import { useLiveValue } from '../_lib/use-live';
 import { Screen } from '../_plugins/installed/browser-tabs/Screen';
 import { callFor } from '../_plugins/packages';
+import { ClickAfter } from './ClickAfter';
+import { ClickHuman } from './ClickHuman';
 import { LoginFields, useLoginCard } from './LoginFields';
 import { LOGGED_IN_NOTE } from './labels';
 import type { Approval, BrowserClick, BrowserShot, BrowserShots } from './types';
@@ -129,6 +131,8 @@ export function ClickTarget({ approval }: { approval: Approval }) {
           {click.reason ? ` · ${click.reason}` : ''}
         </dd>
       </dl>
+      <ClickHuman click={click} />
+      <ClickAfter click={click} />
       {click.beforeImage && (
         <MarkedShot image={click.beforeImage} box={click.box} label="멈춘 화면" />
       )}

@@ -20,7 +20,7 @@ import {
 } from './click-views';
 import { clickDone, pageUrlOf, siteOfJob } from './job';
 import { clicks, shots, sites } from './schema';
-import { addShot, decodeImage, imageOf, shotsOf } from './shots';
+import { addShot, confirmOf, decodeImage, imageOf, shotsOf } from './shots';
 import { CLICK_STATUS, type ClickRow, type ClickStatus } from './tables';
 
 // 결재된 클릭 (2차 3단계, 2026-11-14). AI는 마지막 버튼(제출 · 결제 · 게시) 앞에서 멈추고, 러너(AI 없음)가
@@ -54,6 +54,8 @@ type HoldInput = {
   note: string | null;
   /** 누르기 전 내용 확인: 러너가 화면에 있음을 본 글자 (2026-11-24). 누르기 직전에 다시 본다 */
   checks: readonly string[];
+  /** 사람이 넣을 칸의 이름 (개인정보 규칙 ①: 결제 수단 · 본인 인증 번호 · 주민번호) */
+  humanFields: readonly string[];
   image: string;
 };
 
@@ -89,6 +91,7 @@ export class HoldClick extends Command<HoldInput> {
         fingerprint,
         note: f.optionalText('note', 500),
         checks: f.optionalTextList('checks', CHECKS_MAX, CHECK_LENGTH) ?? [],
+        humanFields: f.optionalTextList('human_fields', CHECKS_MAX, 40) ?? [],
         image: imageOf(f, 'image', true) ?? '',
       };
     });
@@ -118,6 +121,7 @@ export class HoldClick extends Command<HoldInput> {
       fingerprint: input.fingerprint,
       note: input.note,
       checks: [...input.checks],
+      human_fields: [...input.humanFields],
     });
     const held = (await work.row(clicks, { task_id: input.taskId, status: 'held' })) as ClickRow;
     await addShot(
@@ -142,7 +146,10 @@ async function close(
   row: ClickRow,
   status: ClickStatus,
   reason: string | null,
-  extra: { after_url?: string | null } = {},
+  extra: Pick<
+    Partial<ClickRow>,
+    'after_url' | 'confirm_state' | 'confirm_ref' | 'confirm_title'
+  > = {},
 ): Promise<number> {
   return work.updateRows(
     clicks,
@@ -201,6 +208,8 @@ type SaveInput = {
   reason: string | null;
   afterUrl: string | null;
   image: string | null;
+  /** 누른 뒤 확인 (L3, confirmOf) */
+  confirm: Pick<Partial<ClickRow>, 'confirm_state' | 'confirm_ref' | 'confirm_title'>;
 };
 
 /** MCP browser_click_save: 누른 결과(clicked) 또는 누르지 않은 까닭(changed)과 그때의 화면. 가져간 러너만 */
@@ -222,6 +231,7 @@ export class SaveClick extends Command<SaveInput> {
         reason: f.optionalText('reason', 500),
         afterUrl: after && /^https?:\/\//i.test(after) ? after : null,
         image: imageOf(f, 'image', false),
+        confirm: confirmOf(f, raw),
       };
     });
   }
@@ -238,7 +248,7 @@ export class SaveClick extends Command<SaveInput> {
       throw new Conflict(`누르는 중인 클릭이 아니에요 (${row.status})`);
     const changed = input.outcome === 'changed';
     const reason = input.reason ?? (changed ? '페이지가 바뀌었어요' : null);
-    await close(work, row, input.outcome, reason, { after_url: input.afterUrl });
+    await close(work, row, input.outcome, reason, { after_url: input.afterUrl, ...input.confirm });
     if (input.image)
       await addShot(
         work,

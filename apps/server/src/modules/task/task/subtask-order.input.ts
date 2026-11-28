@@ -35,6 +35,8 @@ export class SubtaskOrder extends BaseRequest {
     readonly after: readonly string[],
     /** 이 일의 방법 (ROUTES). 없으면 순서대로 (공식 MCP → 사이트 도구 → read_url → 브라우저) */
     readonly route: string | null,
+    /** 검증받기 (L2, 2026-11-27): 끝나면 다른 일꾼이 검증하고 고칠 것이 있으면 다시 (SubtaskVerify) */
+    readonly verify: boolean,
     /** 받은 모양 그대로 (after가 있으면 위 작업에 적어 두었다가 그대로 다시 읽는다, SubtaskOrder.saved) */
     readonly raw: Readonly<Record<string, unknown>>,
   ) {
@@ -67,6 +69,7 @@ export class SubtaskOrder extends BaseRequest {
       f.optionalText('model', 20),
       f.optionalTextList('after', SubtaskOrder.AFTER_MAX, 200) ?? [],
       SubtaskOrder.routeOf(f.optionalText('route', 10)),
+      (raw as { verify?: unknown } | null)?.verify === undefined ? false : f.boolean('verify'),
       (raw ?? {}) as Record<string, unknown>,
     );
   }

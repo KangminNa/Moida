@@ -42,6 +42,20 @@ export const RAISE_LIMIT = 'task.agent.raise_limit';
 export const PUBLISH_SITE = 'browser.site.publish';
 /** browser-tabs 패키지의 로그인 필요: 콘솔 화면에서 로그인한 뒤 "로그인했어요"(수정 요청)로 같은 작업을 잇는다 */
 export const LOGIN_SITE = 'browser.site.login';
+/** 확인 필요 판단 (L3): 고를 안이 있는 승인. 고르면 그 안으로 일이 이어진다 */
+export const DECIDE = 'task.decision';
+/** 확인 필요의 까닭 (decision.confirm) */
+export const CONFIRM_LABELS: Record<string, string> = {
+  repeat_limit: '반복 한도',
+  direction: '방향 바꿈',
+  irreversible: '되돌리기 어려움',
+};
+/** 대화의 멈춤 기준 (L3, chats.stop_mode) */
+export const STOP_LABELS: Record<string, string> = {
+  all: '판단마다 멈춤',
+  confirm: '확인 필요만 멈춤',
+  end: '끝에서만 보기',
+};
 /** "로그인했어요"가 보내는 수정 요청의 말 */
 export const LOGGED_IN_NOTE = '로그인했어요';
 /** code-github 패키지의 PR 머지 승인 (주인이 GitHub에서 머지한 뒤 승인) */
@@ -78,6 +92,7 @@ export const ACTION_LABELS: Record<string, string> = {
   [PUBLISH_POST]: '글 공개',
   [PUBLISH_SITE]: '브라우저 버튼 누르기',
   [LOGIN_SITE]: '로그인 필요',
+  [DECIDE]: '확인 필요 판단',
   [MERGE_PULL]: 'PR 머지',
   [PLUG_TOOL]: '커넥터 붙이기',
   [PLUG_API]: 'API 커넥터 붙이기',

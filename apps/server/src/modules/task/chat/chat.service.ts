@@ -151,6 +151,7 @@ export class ChatService extends BaseService {
       chat.assertVersion(req.version);
       const agent = await new AgentRepository(tx).load(spaceId, chat.partnerId);
       chat.tune(req.model, req.effort, agent.tool, new Date());
+      if (req.stopMode !== null) chat.stopAt(req.stopMode);
       await chats.save(chat);
       return chat;
     });

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { pause } from './backoff';
 import { BrowserUnavailable, DevToolsSession } from './browser-tabs';
+import { ClickConfirm } from './click-confirm';
 import { PageChecks } from './page-checks';
 
 /** 서버 브라우저의 탭 하나 (CDP 대상) */
@@ -44,6 +45,8 @@ export class PressResult {
     readonly reason: string | null,
     readonly afterUrl: string | null,
     readonly image: string | null,
+    /** 누른 뒤의 확인 (L3): 인증 화면인지 · 결과의 번호. 누르지 않았거나 읽지 못하면 null */
+    readonly confirm: ClickConfirm | null = null,
   ) {}
 }
 
@@ -225,7 +228,8 @@ export class BrowserPages {
         if (moving) await Promise.race([loaded, pause(BrowserPages.LOAD_MS, signal)]);
         const image = await BrowserPages.capture(s).catch(() => null);
         const after = await BrowserPages.locationOf(s).catch(() => null);
-        return new PressResult('clicked', image ? null : '결과 화면 없음', after, image);
+        const confirm = await ClickConfirm.read(s).catch(() => null);
+        return new PressResult('clicked', image ? null : '결과 화면 없음', after, image, confirm);
       });
     } catch (error) {
       if (error instanceof ButtonProblem) return changed(error.message);

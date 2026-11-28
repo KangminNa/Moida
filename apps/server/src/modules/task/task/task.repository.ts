@@ -3,6 +3,7 @@ import type { Agent } from '../agent/agent';
 import { taskEvents, taskRuns, tasks } from '../task.schema';
 import type { OutputRow, TaskRow, TaskRunNew, TaskRunRow, TaskStatus } from '../task.tables';
 import { type AfterOrderRow, type AfterSiblingRow, SubtaskAfter } from './subtask-after.policy';
+import type { VerifyRow } from './subtask-verify.policy';
 import { Task } from './task';
 import type { ReportProgressInput } from './task.input';
 import type { TaskKind } from './task-kinds';
@@ -186,6 +187,14 @@ export class TaskRepository extends TableRepository<TaskRow, Task> {
     const [row] = await this.sql<Pick<TaskRow, 'payload'>[]>`
       SELECT payload FROM task.tasks WHERE id = ${taskId}`;
     return SubtaskAfter.held(row?.payload);
+  }
+
+  /** 검증 루프(L2)가 읽는 끝난 작업 한 줄 (SubtaskVerify). 없으면 null */
+  async verifyRow(taskId: string): Promise<VerifyRow | null> {
+    const [row] = await this.sql<VerifyRow[]>`
+      SELECT id, agent_id, kind, title, instruction, payload, result, request_id
+      FROM task.tasks WHERE id = ${taskId}`;
+    return row ?? null;
   }
 
   /** 끝나지 않은 하위 작업의 수 */

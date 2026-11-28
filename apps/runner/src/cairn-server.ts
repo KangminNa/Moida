@@ -1,6 +1,6 @@
 import { AppCodeBase } from './app-code-base';
 import { ApprovedClick, BrowseJob } from './browse-job';
-import type { HeldButton } from './browser-page';
+import type { HeldButton, PressResult } from './browser-page';
 import { Job } from './job';
 import { RunMemo } from './job-lineage';
 import type { Json } from './json';
@@ -302,7 +302,7 @@ export class CairnServer {
   async holdClick(
     taskId: string,
     held: HeldButton,
-    note: string | null,
+    { note, human }: { note: string | null; human: readonly string[] },
   ): Promise<{ clickId: string; version: number }> {
     const body = await this.mcp.call('browser_click_hold', {
       task_id: taskId,
@@ -316,6 +316,7 @@ export class CairnServer {
       fingerprint: held.fingerprint,
       ...(note ? { note } : {}),
       ...(held.checks.length > 0 ? { checks: held.checks } : {}),
+      ...(human.length > 0 ? { human_fields: human } : {}),
       image: held.image,
     });
     return { clickId: body.text('click_id'), version: body.number('version') };
@@ -328,15 +329,7 @@ export class CairnServer {
   }
 
   /** browser-tabs: 누른 결과(clicked) 또는 누르지 않은 까닭(changed)과 그때의 화면 */
-  async saveClick(
-    click: ApprovedClick,
-    result: {
-      outcome: string;
-      reason: string | null;
-      afterUrl: string | null;
-      image: string | null;
-    },
-  ): Promise<void> {
+  async saveClick(click: ApprovedClick, result: PressResult): Promise<void> {
     await this.mcp.call('browser_click_save', {
       id: click.id,
       version: click.version,
@@ -346,6 +339,7 @@ export class CairnServer {
         ? { after_url: result.afterUrl.slice(0, 2000) }
         : {}),
       ...(result.image ? { image: result.image } : {}),
+      ...(result.confirm ? { confirm: result.confirm.toJSON() } : {}),
     });
   }
 

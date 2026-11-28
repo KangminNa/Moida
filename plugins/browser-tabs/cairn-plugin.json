@@ -1,6 +1,6 @@
 {
   "name": "browser-tabs",
-  "version": "0.14.0",
+  "version": "0.16.0",
   "cairn": ">=0.9",
   "description": "서버 브라우저로 하는 일: 주소를 탭으로 읽고, 등록한 사이트(로그인된 프로필)나 둘러보기(새 빈 창)에서 AI 에이전트가 일하고, 마지막 버튼은 결재 뒤 러너가 같은 버튼인지 확인하고 누른다. 콘솔에서 화면을 보고 누르고 사이트 세션을 지운다. 되풀이하는 일은 사이트 도구(Playwright 코드)로 굳혀 에이전트가 AI 없이 부른다 (쓰기 도구는 검토자 짝 · 부를 때마다 결재)",
   "guide": {
@@ -539,6 +539,12 @@
             },
             "description": "누르기 전 확인한 화면의 글자 (받는 사람 · 금액 · 제목 같은 것). 러너가 누르기 직전에 다시 본다"
           },
+          "human_fields": {
+            "type": "array",
+            "maxItems": 5,
+            "items": { "type": "string", "maxLength": 40 },
+            "description": "사람이 넣을 칸의 이름 (개인정보 규칙 ①: 결제 수단 · 본인 인증 번호 · 주민번호). 관리자가 승인 카드의 화면에서 넣은 뒤 승인한다"
+          },
           "image": {
             "type": "string",
             "maxLength": 409604,
@@ -598,6 +604,16 @@
             "type": "string",
             "maxLength": 409604,
             "description": "화면 그림 (JPEG · PNG, base64, 300KB까지)"
+          },
+          "confirm": {
+            "type": "object",
+            "description": "누른 뒤 확인 (L3): 누른 화면이 결제 · 본인 인증 화면이면 auth, 결과 화면이면 done과 예약 · 주문 번호(영숫자 · 하이픈 40자) · 페이지 제목(100자). 화면의 글은 보내지 않는다",
+            "properties": {
+              "state": { "type": "string", "enum": ["auth", "done"] },
+              "reference": { "type": "string", "maxLength": 40 },
+              "title": { "type": "string", "maxLength": 100 }
+            },
+            "required": ["state"]
           }
         },
         "required": ["id", "version", "outcome"]
@@ -766,6 +782,16 @@
           "after_image": {
             "type": "string",
             "description": "누른 뒤 · 바뀐 화면 (JPEG · PNG base64, 300KB까지)"
+          },
+          "confirm": {
+            "type": "object",
+            "description": "누른 뒤 확인 (L3): 누른 화면이 결제 · 본인 인증 화면이면 auth, 결과 화면이면 done과 예약 · 주문 번호(영숫자 · 하이픈 40자) · 페이지 제목(100자). 화면의 글은 보내지 않는다",
+            "properties": {
+              "state": { "type": "string", "enum": ["auth", "done"] },
+              "reference": { "type": "string", "maxLength": 40 },
+              "title": { "type": "string", "maxLength": 100 }
+            },
+            "required": ["state"]
           }
         },
         "required": ["task_id", "click_id", "version", "outcome"]

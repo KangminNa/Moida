@@ -71,6 +71,7 @@ export class DelegateTaskTool extends BaseTool {
             app_id: { type: 'string', format: 'uuid' },
             model: { type: 'string', enum: [...ModelTier.CHOICES] },
             route: { type: 'string', enum: [...SubtaskOrder.ROUTES] },
+            verify: { type: 'boolean' },
           },
           required: ['request_id', 'to_agent_id', 'title', 'instruction'],
         },

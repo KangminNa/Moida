@@ -13,7 +13,7 @@ import { leasedBrowse, pageUrlOf } from './job';
 import { NextPressView, PressView } from './plan-views';
 import { approvedPlan, moveClick } from './plans';
 import { clickPlans, clicks, sites } from './schema';
-import { addShot, decodeImage, imageOf } from './shots';
+import { addShot, confirmOf, decodeImage, imageOf } from './shots';
 import type { ClickRow, ClickStatus } from './tables';
 
 // 계획 안의 누르기 (F2, 2026-11-21, plans.ts의 계획이 승인된 뒤). 에이전트가 버튼마다 요청하고(browser_press),
@@ -160,6 +160,8 @@ type SaveInput = {
   held: { tabId: string; box: Record<string, number>; fingerprint: string } | null;
   before: string | null;
   after: string | null;
+  /** 누른 뒤 확인 (L3, confirmOf) */
+  confirm: Pick<Partial<ClickRow>, 'confirm_state' | 'confirm_ref' | 'confirm_title'>;
 };
 
 /**
@@ -203,6 +205,7 @@ export class SavePress extends Command<SaveInput> {
             : null,
         before: imageOf(f, 'before_image', false),
         after: imageOf(f, 'after_image', false),
+        confirm: confirmOf(f, raw),
       };
     });
   }
@@ -224,6 +227,7 @@ export class SavePress extends Command<SaveInput> {
     await moveClick(work, row, input.outcome, {
       reason: input.reason ?? (changed ? '버튼을 다시 찾지 못했어요' : null),
       after_url: input.afterUrl,
+      ...input.confirm,
       ...(input.held
         ? { tab_id: input.held.tabId, box: input.held.box, fingerprint: input.held.fingerprint }
         : {}),

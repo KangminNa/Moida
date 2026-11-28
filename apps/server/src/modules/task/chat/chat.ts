@@ -109,11 +109,6 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     return this.row.agent_id;
   }
 
-  /** 맡기 전에 받은 첫 메시지 (맡으면 첫 회차가 되고 비워진다) */
-  get pending(): string | null {
-    return this.row.pending;
-  }
-
   get turns(): number {
     return this.row.turns;
   }
@@ -122,9 +117,14 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
     return this.row.goal;
   }
 
-  /** 맡기 전 첫 메시지의 참조 (맡으면 첫 회차로 옮긴다) */
-  get pendingRefs(): TaskRefs {
-    return TaskRefs.of({ refs: this.row.pending_refs });
+  /** 멈춤 기준 (L3): all 판단마다 · confirm 확인 필요 판단만(기본) · end 끝에서만 (DecisionNote.stops) */
+  get stopMode(): ChatRow['stop_mode'] {
+    return this.row.stop_mode;
+  }
+
+  /** 멈춤 기준을 바꾼다 (값 목록은 입력이 거른다). 바꾸면 tune과 함께 저장된다 */
+  stopAt(mode: ChatRow['stop_mode']): void {
+    this.put('stop_mode', mode);
   }
 
   /** 받을 것 (비우면 대화 답) */
@@ -317,7 +317,8 @@ export class Chat extends TableEntity<ChatRow, ChatNew> {
   assign(lead: Agent, now: Date, deliver: string | null = null, mail = false): Task {
     const message = this.row.pending;
     if (this.row.agent_id !== null || message === null) throw new Conflict('이미 맡은 대화예요');
-    const refs = this.pendingRefs;
+    // 맡기 전 첫 메시지의 참조는 첫 회차로 옮긴다
+    const refs = TaskRefs.of({ refs: this.row.pending_refs });
     this.put('agent_id', lead.id);
     this.put('pending', null);
     this.put('pending_refs', null);

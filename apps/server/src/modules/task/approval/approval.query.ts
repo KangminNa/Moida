@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { type Actor, BaseQuery, NotFound, Rule, ValueList } from '../../platform';
 import { approvals } from '../task.schema';
-import { APPROVAL_STATUS } from '../task.tables';
+import { APPROVAL_STATUS, type ApprovalRow } from '../task.tables';
+import { Approval } from './approval';
 import type { ApprovalIdInput, ListApprovalsInput } from './approval.input';
 import { ApprovalPageView, ApprovalView } from './approval.view';
 
@@ -32,6 +33,24 @@ export class ApprovalQuery extends BaseQuery {
       items.map((r) => new ApprovalView(r)),
       next,
     );
+  }
+
+  /** 기한이 지난 기다리는 결재 (DecisionLapseJob). 공간 · 결재 id */
+  async expired(actor: Actor, now: Date): Promise<readonly Pick<ApprovalRow, 'space_id' | 'id'>[]> {
+    actor.assertOwnerOrSystem();
+    return this.sql<Pick<ApprovalRow, 'space_id' | 'id'>[]>`
+      SELECT space_id, id FROM task.approvals
+      WHERE expires_at <= ${now} AND status = ${Approval.PENDING} AND expires_at IS NOT NULL
+      ORDER BY expires_at LIMIT 50`;
+  }
+
+  /** 가장 이른 기다리는 결재의 기한. 없으면 null (결재가 생기는 신호로 다시 잰다) */
+  async nextExpiry(actor: Actor): Promise<Date | null> {
+    actor.assertOwnerOrSystem();
+    const [row] = await this.sql<Pick<ApprovalRow, 'expires_at'>[]>`
+      SELECT min(expires_at) AS expires_at FROM task.approvals
+      WHERE status = ${Approval.PENDING} AND expires_at IS NOT NULL`;
+    return row?.expires_at ?? null;
   }
 
   async get(actor: Actor, req: ApprovalIdInput): Promise<ApprovalView> {

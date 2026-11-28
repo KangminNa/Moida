@@ -25,6 +25,21 @@ export class TaskNotices implements OnModuleInit {
   private static readonly BODY_MAX = 300;
   /** 결과 카드의 동작 (Approval.CARD. 알림 등록은 결재 엔티티를 가져오지 않는다) */
   private static readonly CARD = 'task.chat.result';
+  /** 확인 필요 판단 (L3, DecisionAsk.ACTION): 대화의 판단 칸에서 고른다 */
+  private static readonly DECISION = 'task.decision';
+  private static readonly TITLES: Readonly<Record<string, string>> = {
+    [TaskNotices.CARD]: '결과를 골라 주세요',
+    [TaskNotices.DECISION]: '판단을 골라 주세요',
+  };
+
+  /** 알림을 누르면 갈 곳: 결과 카드 · 판단은 그 대화, 나머지는 승인 목록 */
+  private static linkOf(data: Readonly<Record<string, unknown>>): string {
+    if (data.action === TaskNotices.CARD) return `/admin/chats/${data.targetId}`;
+    const chatId = (data.payload as { chatId?: unknown } | null)?.chatId;
+    if (data.action === TaskNotices.DECISION && typeof chatId === 'string')
+      return `/admin/chats/${chatId}`;
+    return '/admin/approvals';
+  }
 
   constructor(private readonly catalog: NoticeCatalog) {}
 
@@ -36,16 +51,12 @@ export class TaskNotices implements OnModuleInit {
           e.data.chatId
             ? null
             : {
-                title:
-                  e.data.action === TaskNotices.CARD ? '결과를 골라 주세요' : '승인을 기다려요',
+                title: TaskNotices.TITLES[String(e.data.action)] ?? '승인을 기다려요',
                 body: [e.data.note, e.data.action]
                   .filter((v) => typeof v === 'string' && v !== '')
                   .join(' · ')
                   .slice(0, TaskNotices.BODY_MAX),
-                link:
-                  e.data.action === TaskNotices.CARD
-                    ? `/admin/chats/${e.data.targetId}`
-                    : '/admin/approvals',
+                link: TaskNotices.linkOf(e.data),
                 group_key: `approval:${e.data.approvalId}`,
                 data: { approvalId: e.data.approvalId, taskId: e.data.taskId },
               },

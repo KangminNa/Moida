@@ -45,7 +45,7 @@ export class AgentUpdatesInput extends BaseRequest {
   }
 }
 
-/** MCP post_update { kind, text, decision? } (작업 토큰). decision은 판단의 모양 (L1, kind decision에만, DecisionNote) */
+/** MCP post_update { kind, text, decision? } (작업 토큰). decision은 판단의 모양 (L1, kind decision에만, DecisionNote. confirm · wait_minutes는 L3) */
 export class PostUpdateInput extends BaseRequest {
   private constructor(
     readonly kind: string,
@@ -73,6 +73,9 @@ export class PostUpdateInput extends BaseRequest {
               why: d.optionalText('why', D.WHY_MAX)?.trim() ?? '',
               weight: d.optionalText('weight', 10) ?? 'medium',
               step: d.optionalText('step', D.STEP_MAX)?.trim() || null,
+              confirm: d.optionalText('confirm', 20) ?? null,
+              wait_minutes:
+                d.optionalInteger('wait_minutes', D.WAIT_MIN, D.WAIT_MAX) ?? D.WAIT_DEFAULT,
             };
       return new PostUpdateInput(
         f.text('kind', 40),

@@ -224,9 +224,18 @@ export class ClickView {
       note: r.note,
       /** 누르기 전 확인한 내용 (화면의 글자. 누르기 직전에 다시 본다) */
       checks: r.checks,
+      /** 사람이 넣을 칸 (개인정보 규칙 ①): 관리자가 승인 카드의 화면에서 직접 넣은 뒤 승인한다. AI는 넣지 않는다 */
+      humanFields: r.human_fields,
       status: r.status,
       reason: r.reason,
       afterUrl: r.after_url,
+      /**
+       * 누른 뒤 확인 (L3): 러너가 누른 화면에서 고른 상태(auth: 결제 · 본인 인증 화면, done: 결과) · 예약 · 주문 번호 · 페이지 제목.
+       * 확인하지 못했거나 누르기 전이면 null
+       */
+      confirm: r.confirm_state
+        ? { state: r.confirm_state, reference: r.confirm_ref, title: r.confirm_title }
+        : null,
       version: r.version,
       createdAt: r.created_at.toISOString(),
       decidedAt: r.decided_at?.toISOString() ?? null,

@@ -6,15 +6,19 @@ import {
   Conflict,
   Forbidden,
   RuleViolation,
+  type Sql,
   SystemActor,
 } from '../../platform';
 import { AgentRepository } from '../agent/agent.repository';
+import { Approval } from '../approval/approval';
+import { ApprovalRepository } from '../approval/approval.repository';
+import { DecisionAsk } from '../approval/decision-ask.policy';
 import { TaskRepository } from '../task/task.repository';
 import { ChatRepository } from './chat.repository';
 import type { AskBriefInput, PostUpdateInput, SetDeliverInput } from './chat-update.input';
 import { ChatUpdates } from './chat-update.policy';
-import { BriefAskedView, DeliverSetView } from './chat-update.view';
-import { DecisionNote } from './decision-note.policy';
+import { BriefAskedView, DeliverSetView, PostedUpdateView } from './chat-update.view';
+import { DecisionNote, type DecisionNoteRow } from './decision-note.policy';
 import { TurnBrief } from './turn-brief.policy';
 import { TurnDeliver } from './turn-deliver.policy';
 
@@ -39,8 +43,11 @@ export class ChatUpdateService extends BaseService {
     });
   }
 
-  /** MCP post_update: 소식 하나를 남기고 그 번호(n)를 돌려준다. 대화에서 맡은 일이 아니면 RuleViolation */
-  async post(actor: Actor, req: PostUpdateInput): Promise<number> {
+  /**
+   * MCP post_update: 소식 하나를 남기고 그 번호(n)를 돌려준다. 대화에서 맡은 일이 아니면 RuleViolation.
+   * 판단이 대화의 멈춤 기준에 걸리면(L3) 승인으로 멈춘다 (stopFor)
+   */
+  async post(actor: Actor, req: PostUpdateInput): Promise<PostedUpdateView> {
     actor.assertCan(Actor.AGENT);
     if (!(actor instanceof AgentActor) || !actor.spaceId || !actor.id)
       throw new Forbidden(Actor.AGENT);
@@ -53,10 +60,40 @@ export class ChatUpdateService extends BaseService {
       const chat = await chats.load(spaceId, place.chat_id);
       const posted = await chats.countUpdates(taskId, ChatUpdates.POSTED);
       const data = DecisionNote.dataFor(req.kind, req.decision);
-      chat.post(req.kind, { text: req.text, data }, taskId, agentId, posted, now);
+      const stop =
+        req.decision && DecisionNote.stops(chat.stopMode, req.decision)
+          ? await this.stopFor(tx, taskId, agentId, req.text, req.decision, chat.id, now)
+          : null;
+      const said = { text: req.text, data: stop ? { ...data, ...stop } : data };
+      chat.post(req.kind, said, taskId, agentId, posted, now);
       await chats.save(chat);
-      return chats.numberOf(chat.addedUpdates[0]?.id ?? '');
+      return new PostedUpdateView(await chats.numberOf(chat.addedUpdates[0]?.id ?? ''), stop);
     });
+  }
+
+  /**
+   * 확인 필요 판단 (L3): 고를 안이 있는 승인을 올리고 일은 기다린다 (러너는 다음 보고에서 멈춘다).
+   * 소식에는 승인 id와 기한을 함께 적어 화면이 판단 칸에서 바로 고르게 한다. 잠그는 순서는 작업 → 결재
+   */
+  private async stopFor(
+    tx: Sql,
+    taskId: string,
+    agentId: string,
+    text: string,
+    note: DecisionNoteRow,
+    chatId: string,
+    now: Date,
+  ): Promise<{ approval_id: string; expires_at: string | null }> {
+    const tasks = new TaskRepository(tx);
+    const task = await tasks.lockById(taskId);
+    if (!task) throw new RuleViolation('대화에서 맡은 일이 아니에요');
+    const agent = await new AgentRepository(tx).load(task.spaceId, agentId);
+    const ask = DecisionAsk.request(task, text, note, chatId, now);
+    const approval = Approval.request(task, agent, ask.fields, now, null, ask.payload);
+    approval.expireAt(ask.expiresAt);
+    await tasks.save(task);
+    await new ApprovalRepository(tx).save(approval);
+    return { approval_id: approval.id, expires_at: ask.expiresAt?.toISOString() ?? null };
   }
 
   /**

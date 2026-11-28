@@ -19,9 +19,11 @@ import {
 } from './ApprovalTargets';
 import { ClickTarget, LoginDecide, LoginTarget, PlanTarget } from './BrowserApproval';
 import { ChatCardApproval } from './ChatCardApproval';
+import { DecisionDecide, DecisionTarget } from './DecisionApproval';
 import {
   APPROVE_LABELS,
   actionLabel,
+  DECIDE,
   GOAL_RUN,
   LOGIN_SITE,
   MERGE_PULL,
@@ -153,6 +155,8 @@ function Loaded({
         <ClickTarget approval={a} />
       ) : a.action === LOGIN_SITE ? (
         <LoginTarget approval={a} reload={reload} />
+      ) : a.action === DECIDE ? (
+        <DecisionTarget approval={a} />
       ) : a.target.kind === GOAL_RUN ? (
         <GoalRunTarget approval={a} />
       ) : a.target.kind === 'chat' ? (
@@ -193,14 +197,20 @@ function Loaded({
       {a.status === 'pending' && a.action === LOGIN_SITE && (
         <LoginDecide approval={a} reload={reload} />
       )}
-      {a.status === 'pending' && a.action !== LOGIN_SITE && a.target.kind !== 'chat' && (
-        <Decide
-          approval={a}
-          canApprove={!isPost || (post.data !== null && post.error === null)}
-          unchanged={unchanged}
-          reload={reload}
-        />
+      {a.status === 'pending' && a.action === DECIDE && (
+        <DecisionDecide approval={a} reload={reload} />
       )}
+      {a.status === 'pending' &&
+        a.action !== LOGIN_SITE &&
+        a.action !== DECIDE &&
+        a.target.kind !== 'chat' && (
+          <Decide
+            approval={a}
+            canApprove={!isPost || (post.data !== null && post.error === null)}
+            unchanged={unchanged}
+            reload={reload}
+          />
+        )}
     </article>
   );
 }

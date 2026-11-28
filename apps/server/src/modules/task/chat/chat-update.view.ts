@@ -81,10 +81,16 @@ export class AskedView {
 
 /** post_update의 답 */
 export class PostedUpdateView {
-  constructor(private readonly n: number) {}
+  constructor(
+    private readonly n: number,
+    /** 판단이 멈춤 기준에 걸려 승인을 올렸으면 (L3) 그 승인과 기한 */
+    private readonly stop: { approval_id: string; expires_at: string | null } | null = null,
+  ) {}
 
   toJSON() {
-    return { n: this.n };
+    if (!this.stop) return { n: this.n };
+    // 일은 승인을 기다린다: 여기서 실행을 끝내면 고른 안을 받아 다시 시작한다 (지시문의 decided)
+    return { n: this.n, waiting: 'approval', ...this.stop };
   }
 }
 

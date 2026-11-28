@@ -171,12 +171,12 @@ export function ChatThreadPanel({
       reload: detail.reload,
     });
 
-  const tune = (body: { model: string | null; effort: string | null }) =>
+  const tune = (body: { model: string | null; effort: string | null; stop_mode?: string }) =>
     tuning.run(
       'tune',
       () => api('PATCH', `/api/chats/${id}`, { version: d.chat.version, ...body }),
       {
-        done: '이 대화의 모델을 바꿨어요',
+        done: body.stop_mode ? '멈춤 기준을 바꿨어요' : '이 대화의 모델을 바꿨어요',
         reload: detail.reload,
         conflict: '그사이 바뀐 대화예요. 최신 내용을 다시 읽었어요',
       },
@@ -251,8 +251,7 @@ export function ChatThreadPanel({
             <ChatRuntimeForm
               key={d.chat.version}
               tool={tool}
-              model={d.chat.model}
-              effort={d.chat.effort}
+              chat={d.chat}
               busy={tuning.busy !== null}
               onSubmit={tune}
             />

@@ -161,6 +161,7 @@ export interface ApprovalRow {
   payload: unknown | null;
   inspected_at: Date | null;
   agent_decided: boolean;
+  expires_at: Date | null;
 }
 export type ApprovalNew = Partial<ApprovalRow> & Pick<ApprovalRow, 'id' | 'space_id' | 'action' | 'target_kind' | 'target_id' | 'target_version'>;
 
@@ -190,6 +191,9 @@ export type ChatDeliver = (typeof CHAT_DELIVER)[number];
 /** task.chats.effort (값 목록 CHECK) */
 export const CHAT_EFFORT = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ChatEffort = (typeof CHAT_EFFORT)[number];
+/** task.chats.stop_mode (값 목록 CHECK) */
+export const CHAT_STOP_MODE = ['all', 'confirm', 'end'] as const;
+export type ChatStopMode = (typeof CHAT_STOP_MODE)[number];
 /** task.chats */
 export interface ChatRow {
   id: string;
@@ -211,6 +215,7 @@ export interface ChatRow {
   pending_refs: unknown | null;
   app_id: string | null;
   deleted_at: Date | null;
+  stop_mode: ChatStopMode;
 }
 export type ChatNew = Partial<ChatRow> & Pick<ChatRow, 'id' | 'space_id' | 'title' | 'request_id'>;
 
