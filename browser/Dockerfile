@@ -29,3 +29,7 @@ RUN files="$(grep -rl '^\[program:neko\]' /etc/neko)" && test -n "$files" \
 # 화면 크기: neko 서버가 정하던 1280×720을 Chromium 창으로 정한다 (--window-size, chromium.conf).
 # X 화면은 1920×1080이라 openbox가 창을 최대화하지 않게 한다 (없는 판이면 그대로 두고 최대화된 채로 돈다)
 RUN sed -i 's#<maximized>true</maximized>#<maximized>false</maximized>#' /etc/neko/openbox.xml
+# 상태 검사 (2026-11-28): 기본 이미지의 검사는 끈 neko 서버(8080)를 물어 늘 unhealthy였다. 서버가 실제로 쓰는 길
+# (조종 중계 9223 → Chrome 9222)로 Chrome의 버전 정보를 받아 본다. 중계나 Chrome이 죽으면 unhealthy
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9223/json/version', timeout=4)"

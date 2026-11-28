@@ -1,5 +1,6 @@
 import { Operation, Read, type RequestFields } from '../../../apps/server/src/plugin-api';
-import { BrowserScreenGateway, type ScreenAction } from './screen.gateway';
+import { BrowserScreenGateway } from './screen.gateway';
+import { type ScreenAction, ScreenActions } from './screen-actions';
 import { ScreenCastGateway } from './screen-cast.gateway';
 import { ControlledView, ScreenView } from './views';
 
@@ -49,7 +50,10 @@ export class ScreenRead extends Read<{ tab: string | null; after: number }> {
 
 type ControlInput = { tab: string; action: ScreenAction };
 
-/** POST /api/p/browser-tabs/screen/control: 탭 하나에 클릭 · 스크롤 · 글자 · 키 · 이동 · 뒤로 · 앞으로 가져오기 (관리자) */
+/**
+ * POST /api/p/browser-tabs/screen/control: 탭 하나에 클릭(더블클릭) · 끌기 · 마우스 올리기 · 스크롤 · 글자 · 키(조합) · 이동 ·
+ * 뒤로 · 앞으로 · 새로고침 · 앞으로 가져오기 · 새 탭 · 탭 닫기 (관리자). 새 탭이면 그 탭의 id를 돌려준다
+ */
 export class ScreenControl extends Read<ControlInput> {
   readonly name = 'screenControl';
   readonly allow = Operation.OWNER;
@@ -71,8 +75,7 @@ export class ScreenControl extends Read<ControlInput> {
   }
 
   async run(_work: unknown, _actor: unknown, input: ControlInput): Promise<ControlledView> {
-    await this.cast.control(input.tab, input.action);
-    return new ControlledView();
+    return new ControlledView(await this.cast.control(input.tab, input.action));
   }
 
   /** 동작의 종류에 따라 칸을 읽는다. 모르는 종류 · 키 · http(s)가 아닌 주소는 그 칸의 오류로 */
@@ -82,6 +85,11 @@ export class ScreenControl extends Read<ControlInput> {
     const at = () => ({ x: f.integer('x', 0, span), y: f.integer('y', 0, span) });
     switch (type) {
       case 'click':
+        return { type, ...at(), count: f.optionalInteger('count', 1, 2) ?? 1 };
+      case 'press':
+      case 'move':
+      case 'release':
+      case 'hover':
         return { type, ...at() };
       case 'scroll':
         return { type, ...at(), dy: f.integer('dy', -span, span) };
@@ -89,22 +97,34 @@ export class ScreenControl extends Read<ControlInput> {
         return { type, text: f.text('text', ScreenControl.TEXT_MAX) };
       case 'key': {
         const key = f.text('key', 20);
-        if (key && !BrowserScreenGateway.KEY_NAMES.includes(key))
-          f.reject('key', `보낼 수 있는 키는 ${BrowserScreenGateway.KEY_NAMES.join(' · ')}예요`);
-        return { type, key };
+        const mods = f.optionalInteger('mods', 0, 15) ?? 0;
+        if (key && !ScreenActions.KEY_NAMES.includes(key))
+          f.reject('key', `보낼 수 있는 키는 ${ScreenActions.KEY_NAMES.join(' · ')}예요`);
+        else if (ScreenActions.bareLetter(key, mods))
+          f.reject('key', '글자 키는 Ctrl · Cmd와 함께만 보내요 (그냥 글자는 text로)');
+        return { type, key, mods };
       }
+      case 'newTab': {
+        const url = f.optionalText('url', ScreenControl.URL_MAX);
+        if (url && !/^https?:\/\//i.test(url)) f.reject('url', 'http · https 주소만 열 수 있어요');
+        return { type, url: url || null };
+      }
+      case 'closeTab':
+        return { type };
       case 'navigate': {
         const url = f.text('url', ScreenControl.URL_MAX);
         if (url && !/^https?:\/\//i.test(url)) f.reject('url', 'http · https 주소만 열 수 있어요');
         return { type, url };
       }
       case 'back':
+      case 'forward':
+      case 'reload':
       case 'activate':
         return { type };
       default:
         f.reject(
           'type',
-          '동작은 click · scroll · text · key · navigate · back · activate 중 하나예요',
+          '동작은 click · press · move · release · hover · scroll · text · key · navigate · back · forward · reload · activate · newTab · closeTab 중 하나예요',
         );
         return { type: 'activate' };
     }

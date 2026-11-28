@@ -1,5 +1,6 @@
 import { BaseGateway } from '../../../apps/server/src/plugin-api';
-import { BrowserScreenGateway, type ScreenAction, type Send } from './screen.gateway';
+import type { BrowserScreenGateway } from './screen.gateway';
+import { type ScreenAction, ScreenActions, type Send } from './screen-actions';
 
 // 서버 브라우저 화면 흘려보내기 (2026-11-26 "브라우저가 끊기듯이 동작"): 1초마다 그림을 새로 찍던 것을
 // 탭에 오래 붙어(웹소켓 하나) Chrome이 화면이 바뀔 때마다 보내는 그림(Page.startScreencast)을 받아 두는 것으로 바꿨다.
@@ -182,13 +183,24 @@ export class ScreenCastGateway extends BaseGateway {
     return frame && frame.seq > after ? frame : null;
   }
 
-  /** 동작을 보낸다: 그 탭에 붙어 있으면 같은 연결로(빠르다), 아니면 한 번 붙어서 */
-  async control(tab: string, action: ScreenAction): Promise<void> {
+  /**
+   * 동작을 보낸다: 그 탭에 붙어 있으면 같은 연결로(빠르다), 아니면 한 번 붙어서.
+   * 탭 열고 닫기는 탭 밖의 일이라 BrowserScreenGateway로 (새 탭이면 그 id를 돌려준다, 콘솔이 그 탭으로 옮긴다)
+   */
+  async control(tab: string, action: ScreenAction): Promise<string | null> {
+    if (action.type === 'newTab') return this.screen.openTab(action.url);
+    if (action.type === 'closeTab') {
+      await this.screen.closeTab(tab);
+      return null;
+    }
     const live = this.casts.get(tab);
     const cast = live ? await live.catch(() => null) : null;
-    if (!cast || cast.closed) return this.screen.control(tab, action);
-    cast.usedAt = Date.now();
-    await this.call(() => BrowserScreenGateway.act(cast.send, action));
+    if (!cast || cast.closed) await this.screen.control(tab, action);
+    else {
+      cast.usedAt = Date.now();
+      await this.call(() => ScreenActions.act(cast.send, action));
+    }
+    return null;
   }
 
   /** 그 탭에 붙은 연결. 없거나 끊겼으면 새로 붙는다 (같은 탭을 함께 물으면 하나만 붙는다) */

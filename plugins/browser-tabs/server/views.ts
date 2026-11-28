@@ -182,8 +182,10 @@ export class ScreenView {
 
 /** 화면에 동작을 보냈다 */
 export class ControlledView {
+  /** newTab: 연 탭의 id (콘솔이 그 탭으로 옮긴다). 그 밖은 null */
+  constructor(private readonly tab: string | null = null) {}
   toJSON() {
-    return { ok: true };
+    return { ok: true, tab: this.tab };
   }
 }
 
