@@ -42,6 +42,10 @@ export class PressView {
       status: r.status,
       reason: r.reason,
       after_url: r.after_url,
+      /** 누른 뒤 확인 (L3): auth면 결제 · 본인 인증 화면이라 사람이 마친다 (더 누르지 않고 결과에 적는다), done이면 번호 */
+      confirm: r.confirm_state
+        ? { state: r.confirm_state, reference: r.confirm_ref, title: r.confirm_title }
+        : null,
       left: plan ? Math.max(0, plan.max_clicks - plan.used) : 0,
     };
   }

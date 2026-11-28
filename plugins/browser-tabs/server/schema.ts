@@ -4,7 +4,7 @@
 import { TableColumns } from '../../../apps/server/src/plugin-api';
 
 const { boolean, customType, integer, jsonb, pgSchema, text, timestamp, uuid } = TableColumns;
-import type { ClickPlanStatus, ClickStatus, IntegrationMode, IntegrationReviewVerdict, IntegrationStatus, ReadStatus, RunErrorKind, RunStatus, ShotKind, ShotMime, SuggestionStatus } from './tables';
+import type { ClickConfirmState, ClickPlanStatus, ClickStatus, IntegrationMode, IntegrationReviewVerdict, IntegrationStatus, ReadStatus, RunErrorKind, RunStatus, ShotKind, ShotMime, SuggestionStatus } from './tables';
 
 const byteaColumn = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const browserTabsSchema = pgSchema('browser_tabs');
@@ -62,6 +62,9 @@ export const clicks = browserTabsSchema.table('clicks', {
   version: integer('version').notNull(),
   plan_id: uuid('plan_id'),
   checks: text('checks').array().notNull(),
+  confirm_state: text('confirm_state').$type<ClickConfirmState>(),
+  confirm_ref: text('confirm_ref'),
+  confirm_title: text('confirm_title'),
 });
 
 /** browser_tabs.endpoints */

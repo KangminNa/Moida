@@ -407,6 +407,8 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
       outcome: 'clicked',
       after_url: 'https://blog.example/posts/1',
       image: JPEG,
+      // 누른 뒤 확인 (L3): 러너가 결과 화면에서 고른 번호 · 제목만 (화면의 글은 오지 않는다)
+      confirm: { state: 'done', reference: 'RS-1234', title: '게시 완료' },
     });
     assert.deepEqual(saved.body, { id: clickId, status: 'clicked' });
     const again = await tool(runner, 'browser_click_save', {
@@ -422,6 +424,7 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
       [done.status, done.afterUrl, done.afterImage, done.afterKind],
       ['clicked', 'https://blog.example/posts/1', JPEG, 'after'],
     );
+    assert.deepEqual(done.confirm, { state: 'done', reference: 'RS-1234', title: '게시 완료' });
     const { shots } = ok(await api.get(`${BASE}/shots?taskId=${taskId}`, owner)) as {
       shots: Json[];
     };
@@ -442,6 +445,13 @@ describe('브라우저 에이전트: 결재된 클릭', () => {
     const { clickId, approval } = await heldClick(taskId, run);
     await decide(approval, 'approve');
     const next = (await tool(runner, 'browser_click_next')).body.click as Json;
+    const bad = await tool(runner, 'browser_click_save', {
+      id: clickId,
+      version: next.version,
+      outcome: 'clicked',
+      confirm: { state: 'paid' },
+    });
+    assert.equal(bad.ok, false, '확인 상태는 auth · done만');
     await tool(runner, 'browser_click_save', {
       id: clickId,
       version: next.version,

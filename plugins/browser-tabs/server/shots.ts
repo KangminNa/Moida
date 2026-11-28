@@ -12,7 +12,7 @@ import {
 import { ShotImageView, ShotListView, type ShotMeta, ShotSavedView } from './click-views';
 import { leasedBrowse } from './job';
 import { shots } from './schema';
-import type { ShotKind, ShotMime } from './tables';
+import type { ClickRow, ShotKind, ShotMime } from './tables';
 
 // 브라우저 작업의 화면 (단계 캡처, 2026-11-14). 결과물이 아니라 이 패키지에 남는다: 결과를 고르지 않아도 증거가 사라지지 않게.
 //   step: AI가 단계마다 찍은 것을 러너가 일이 끝난 뒤 올린다. 작업마다 30장, 30일이 지나면 새로 저장할 때 지운다
@@ -148,4 +148,29 @@ export class ShotDetail extends Read<{ id: string }> {
     if (!row) throw new NotFound('없는 화면이에요');
     return new ShotImageView(row);
   }
+}
+
+/**
+ * 누른 뒤 확인 (L3, browser_click_save · browser_press_save의 confirm { state, reference?, title? }): 러너가 누른 뒤
+ * 그 화면에서 고른 상태(auth: 결제 · 본인 인증 화면, done: 결과)와 예약 · 주문 번호 · 페이지 제목. 없으면 빈 칸들
+ */
+export function confirmOf(
+  f: RequestFields,
+  raw: unknown,
+): Pick<Partial<ClickRow>, 'confirm_state' | 'confirm_ref' | 'confirm_title'> {
+  if ((raw as { confirm?: unknown } | null)?.confirm == null) return {};
+  const c = f.nested('confirm');
+  const state = c.text('state', 10);
+  if (state !== 'auth' && state !== 'done') {
+    c.reject('state', 'auth · done 중 하나예요');
+    return {};
+  }
+  const reference = c.optionalText('reference', 40);
+  if (reference && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(reference))
+    c.reject('reference', '영문 · 숫자 · 하이픈만이에요');
+  return {
+    confirm_state: state,
+    confirm_ref: reference || null,
+    confirm_title: c.optionalText('title', 100) || null,
+  };
 }

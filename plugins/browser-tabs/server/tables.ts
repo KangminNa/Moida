@@ -37,6 +37,9 @@ export type ClickPlanNew = Partial<ClickPlanRow> & Pick<ClickPlanRow, 'id' | 'sp
 /** browser_tabs.clicks.status (값 목록 CHECK) */
 export const CLICK_STATUS = ['requested', 'held', 'approved', 'clicking', 'clicked', 'changed', 'unknown', 'dropped', 'manual'] as const;
 export type ClickStatus = (typeof CLICK_STATUS)[number];
+/** browser_tabs.clicks.confirm_state (값 목록 CHECK) */
+export const CLICK_CONFIRM_STATE = ['auth', 'done'] as const;
+export type ClickConfirmState = (typeof CLICK_CONFIRM_STATE)[number];
 /** browser_tabs.clicks */
 export interface ClickRow {
   id: string;
@@ -63,6 +66,9 @@ export interface ClickRow {
   version: number;
   plan_id: string | null;
   checks: readonly string[];
+  confirm_state: ClickConfirmState | null;
+  confirm_ref: string | null;
+  confirm_title: string | null;
 }
 export type ClickNew = Partial<ClickRow> & Pick<ClickRow, 'id' | 'space_id' | 'task_id' | 'site_id' | 'page_url' | 'role' | 'name'>;
 

@@ -1,7 +1,6 @@
 import { AppCodeBase } from './app-code-base';
 import { ApprovedClick, BrowseJob } from './browse-job';
-import type { HeldButton } from './browser-page';
-import type { ClickConfirm } from './click-confirm';
+import type { HeldButton, PressResult } from './browser-page';
 import { Job } from './job';
 import { RunMemo } from './job-lineage';
 import type { Json } from './json';
@@ -329,16 +328,7 @@ export class CairnServer {
   }
 
   /** browser-tabs: 누른 결과(clicked) 또는 누르지 않은 까닭(changed)과 그때의 화면 */
-  async saveClick(
-    click: ApprovedClick,
-    result: {
-      outcome: string;
-      reason: string | null;
-      afterUrl: string | null;
-      image: string | null;
-      confirm: ClickConfirm | null;
-    },
-  ): Promise<void> {
+  async saveClick(click: ApprovedClick, result: PressResult): Promise<void> {
     await this.mcp.call('browser_click_save', {
       id: click.id,
       version: click.version,
